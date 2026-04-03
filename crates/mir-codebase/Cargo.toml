@@ -1,0 +1,16 @@
+[package]
+name    = "mir-codebase"
+description = "Codebase storage and resolution for the mir PHP static analyzer"
+version.workspace = true
+edition.workspace = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+homepage.workspace   = true
+
+[dependencies]
+mir-types = { workspace = true }
+indexmap  = { workspace = true }
+dashmap   = { workspace = true }
+serde     = { workspace = true }
+thiserror = { workspace = true }
