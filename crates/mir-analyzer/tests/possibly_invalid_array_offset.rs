@@ -18,7 +18,7 @@ fn does_not_report_destructure_of_plain_array() {
 }
 
 #[test]
-fn reports_destructure_of_only_false() {
+fn does_not_report_destructure_of_only_false() {
     // false alone: has_non_array=true, has_array=false → rule does NOT fire
     // (no array type in union → PossiblyInvalidArrayOffset does NOT fire)
     let src = "<?php\nfunction test(): void {\n    $v = false;\n    [$a] = $v;\n}\n";
@@ -45,7 +45,7 @@ fn does_not_report_after_false_check() {
 
 #[test]
 #[ignore = "known gap: unpack() stub missing — returns mixed instead of array|false, so PossiblyInvalidArrayOffset does not fire"]
-fn does_not_report_unpack_result_when_stub_present() {
+fn reports_unpack_result_when_stub_present() {
     // unpack() returns array|false; once stub is present this should fire PossiblyInvalidArrayOffset
     let src = "<?php\nfunction test(): void {\n    [$a] = unpack('N', pack('N', 1));\n}\n";
     let issues = check(src);
