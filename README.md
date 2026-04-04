@@ -1,5 +1,7 @@
 # mir
 
+[![Docs](https://img.shields.io/badge/docs-jorgsowa.github.io%2Fmir-blue)](https://jorgsowa.github.io/mir/)
+
 A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](https://psalm.dev).
 
 ## Features
