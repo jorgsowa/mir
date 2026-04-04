@@ -2128,4 +2128,44 @@ mod tests {
         assert!(!is_builtin_function(""),                   "empty string should not be a builtin");
         assert!(!is_builtin_function("ast\\parse_file"),    "extension function should not be a builtin");
     }
+
+    fn analyze_for_unused_vars_named(src: &str, name: &str) -> Vec<String> {
+        use crate::project::ProjectAnalyzer;
+        use mir_issues::IssueKind;
+        let tmp = std::env::temp_dir().join(name);
+        std::fs::write(&tmp, src).unwrap();
+        let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+        std::fs::remove_file(tmp).ok();
+        result.issues.iter()
+            .filter_map(|i| if let IssueKind::UnusedVariable { name } = &i.kind { Some(name.clone()) } else { None })
+            .collect()
+    }
+
+    #[test]
+    fn unused_variable_is_reported() {
+        let src = "<?php\nfunction foo(): int {\n    $unused = 1;\n    return 42;\n}\n";
+        let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_reported.php");
+        assert!(names.contains(&"unused".to_string()), "expected UnusedVariable for $unused; got: {names:?}");
+    }
+
+    #[test]
+    fn used_variable_not_reported() {
+        let src = "<?php\nfunction foo(): int {\n    $x = 1;\n    return $x;\n}\n";
+        let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_used.php");
+        assert!(names.is_empty(), "expected no UnusedVariable; got: {names:?}");
+    }
+
+    #[test]
+    fn underscore_variable_not_reported() {
+        let src = "<?php\nfunction foo(): int {\n    $_ignored = 1;\n    return 42;\n}\n";
+        let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_underscore.php");
+        assert!(names.is_empty(), "expected no UnusedVariable for $_ignored; got: {names:?}");
+    }
+
+    #[test]
+    fn parameter_not_reported_as_unused_variable() {
+        let src = "<?php\nfunction foo(int $param): int {\n    return 42;\n}\n";
+        let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_param.php");
+        assert!(names.is_empty(), "parameters must not be reported as UnusedVariable; got: {names:?}");
+    }
 }

@@ -153,8 +153,13 @@ pub fn narrow_from_condition<'arena, 'src>(
         // is_string($x), is_int($x), is_null($x), is_array($x), etc.
         // Also handles assert($x instanceof Y) — narrows like a bare condition.
         ExprKind::FunctionCall(call) => {
-            if let ExprKind::Identifier(fn_name) | ExprKind::Variable(fn_name) = &call.name.kind {
-                if fn_name.as_ref().eq_ignore_ascii_case("assert") {
+            let fn_name_opt: Option<&str> = match &call.name.kind {
+                ExprKind::Identifier(name) => Some(name),
+                ExprKind::Variable(name) => Some(name.as_ref()),
+                _ => None,
+            };
+            if let Some(fn_name) = fn_name_opt {
+                if fn_name.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {
                         narrow_from_condition(&arg_expr.value, ctx, is_true, codebase, file);

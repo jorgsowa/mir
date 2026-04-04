@@ -33,7 +33,7 @@ impl CallAnalyzer {
     ) -> Union {
         // Resolve function name first (needed for sink check before arg eval)
         let fn_name = match &call.name.kind {
-            ExprKind::Identifier(name) => name.as_ref().to_string(),
+            ExprKind::Identifier(name) => (*name).to_string(),
             ExprKind::Variable(_) => {
                 // dynamic call — evaluate args anyway
                 for arg in call.args.iter() { ea.analyze(&arg.value, ctx); }
@@ -63,7 +63,7 @@ impl CallAnalyzer {
         // Resolve the function name: try namespace-qualified first, then global fallback.
         // PHP resolves `foo()` as `\App\Ns\foo` first, then `\foo` if not found.
         // A leading `\` means explicit global namespace (e.g. `\assert` = global `assert`).
-        let fn_name = fn_name.strip_prefix('\\').map(|s| s.to_string()).unwrap_or(fn_name);
+        let fn_name = fn_name.strip_prefix('\\').map(|s: &str| s.to_string()).unwrap_or(fn_name);
         let resolved_fn_name: String = {
             let qualified = ea.codebase.resolve_class_name(&ea.file, &fn_name);
             if ea.codebase.functions.contains_key(qualified.as_str()) {
@@ -197,7 +197,8 @@ impl CallAnalyzer {
         let obj_ty = ea.analyze(call.object, ctx);
 
         let method_name = match &call.method.kind {
-            ExprKind::Identifier(name) | ExprKind::Variable(name) => name.as_ref().to_string(),
+            ExprKind::Identifier(name) => (*name).to_string(),
+            ExprKind::Variable(name) => name.as_ref().to_string(),
             _ => return Union::mixed(),
         };
 
