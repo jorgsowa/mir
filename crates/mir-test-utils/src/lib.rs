@@ -10,9 +10,10 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 /// Creates a unique temp file, analyzes it, deletes it, and returns all
 /// unsuppressed issues.
 pub fn check(src: &str) -> Vec<Issue> {
-    let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp: PathBuf = std::env::temp_dir().join(format!("mir_test_{}.php", id));
-    std::fs::write(&tmp, src).expect("write temp PHP file");
+    std::fs::write(&tmp, src)
+        .unwrap_or_else(|e| panic!("failed to write temp PHP file {}: {}", tmp.display(), e));
     let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
     std::fs::remove_file(&tmp).ok();
     result.issues.into_iter().filter(|i| !i.suppressed).collect()
