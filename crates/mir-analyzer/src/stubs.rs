@@ -7,7 +7,8 @@
 /// Class/interface stubs cover the exception hierarchy, core interfaces
 /// (`Throwable`, `Iterator`, `Countable`, `ArrayAccess`, `Stringable`,
 /// `Traversable`, `IteratorAggregate`), and `stdClass` / `Closure`.
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, LazyLock};
 
 use mir_codebase::storage::{
     ClassStorage, FnParam, FunctionStorage, InterfaceStorage, MethodStorage, Visibility,
@@ -23,6 +24,32 @@ pub fn load_stubs(codebase: &Codebase) {
     load_functions(codebase);
     load_classes(codebase);
     load_interfaces(codebase);
+}
+
+// ---------------------------------------------------------------------------
+// Builtin-function query
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if `name` is a known PHP built-in function defined in the
+/// stubs registry.  The set is computed once and cached for the lifetime of
+/// the process.
+///
+/// # Example
+/// ```
+/// assert!(mir_analyzer::stubs::is_builtin_function("strlen"));
+/// assert!(!mir_analyzer::stubs::is_builtin_function("my_custom_function"));
+/// ```
+pub fn is_builtin_function(name: &str) -> bool {
+    static BUILTIN_FUNCTIONS: LazyLock<HashSet<Box<str>>> = LazyLock::new(|| {
+        let codebase = Codebase::new();
+        load_functions(&codebase);
+        codebase
+            .functions
+            .iter()
+            .map(|entry| Box::from(entry.key().as_ref()))
+            .collect()
+    });
+    BUILTIN_FUNCTIONS.contains(name)
 }
 
 // ---------------------------------------------------------------------------
@@ -2085,5 +2112,20 @@ mod tests {
         let cb = stubs_codebase();
         assert_fn(&cb, "cli_set_process_title");
         assert_fn(&cb, "cli_get_process_title");
+    }
+
+    #[test]
+    fn is_builtin_function_returns_true_for_known_builtins() {
+        assert!(is_builtin_function("strlen"),   "strlen should be a builtin");
+        assert!(is_builtin_function("array_map"),"array_map should be a builtin");
+        assert!(is_builtin_function("json_encode"), "json_encode should be a builtin");
+        assert!(is_builtin_function("preg_match"),  "preg_match should be a builtin");
+    }
+
+    #[test]
+    fn is_builtin_function_returns_false_for_unknown_names() {
+        assert!(!is_builtin_function("my_custom_function"), "my_custom_function should not be a builtin");
+        assert!(!is_builtin_function(""),                   "empty string should not be a builtin");
+        assert!(!is_builtin_function("ast\\parse_file"),    "extension function should not be a builtin");
     }
 }
