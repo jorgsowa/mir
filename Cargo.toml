@@ -6,6 +6,7 @@ members = [
     "crates/mir-codebase",
     "crates/mir-analyzer",
     "crates/mir-cli",
+    "crates/mir-test-utils",
 ]
 
 [workspace.package]
@@ -18,10 +19,11 @@ homepage = "https://github.com/jorgsowa/mir"
 
 [workspace.dependencies]
 # Internal crates
-mir-types    = { path = "crates/mir-types",    version = "0.1.0" }
-mir-issues   = { path = "crates/mir-issues",   version = "0.1.0" }
-mir-codebase = { path = "crates/mir-codebase", version = "0.1.0" }
-mir-analyzer = { path = "crates/mir-analyzer", version = "0.1.0" }
+mir-types      = { path = "crates/mir-types",      version = "0.1.0" }
+mir-issues     = { path = "crates/mir-issues",     version = "0.1.0" }
+mir-codebase   = { path = "crates/mir-codebase",   version = "0.1.0" }
+mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.1.0" }
+mir-test-utils = { path = "crates/mir-test-utils", version = "0.1.0" }
 
 # PHP parsing
 php-rs-parser = "0.3.2"
