@@ -1,0 +1,12 @@
+[book]
+title = "mir"
+description = "A fast, incremental PHP static analyzer written in Rust"
+authors = []
+language = "en"
+src = "docs"
+
+[output.html]
+site-url = "/mir/"
+git-repository-url = "https://github.com/jorgsowa/mir"
+edit-url-template = "https://github.com/jorgsowa/mir/edit/main/docs/{path}"
+no-section-label = true
