@@ -15,19 +15,19 @@ fn reports_unknown_function() {
 
 #[test]
 fn does_not_report_strlen() {
-    let issues = check("<?php\nstrlen('hello');\n");
+    let issues = check("<?php\nfunction test(): void {\n    strlen('hello');\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
 #[test]
 fn does_not_report_array_map() {
-    let issues = check("<?php\narray_map(fn($x) => $x, [1, 2, 3]);\n");
+    let issues = check("<?php\nfunction test(): void {\n    array_map(fn($x) => $x, [1, 2, 3]);\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
 #[test]
 fn does_not_report_user_defined_function() {
-    let issues = check("<?php\nfunction myFn(): void {}\nmyFn();\n");
+    let issues = check("<?php\nfunction myFn(): void {}\nfunction test(): void {\n    myFn();\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
@@ -47,13 +47,13 @@ fn reports_global_namespace_unknown_function() {
 fn does_not_report_unpack() {
     // unpack() is a PHP builtin — must be in stubs
     // NOTE: this test currently FAILS if unpack() stub is missing (see CLAUDE.md gap analysis)
-    let issues = check("<?php\n$r = unpack('N*', pack('N*', 1));\n");
+    let issues = check("<?php\nfunction test(): void {\n    $r = unpack('N*', pack('N*', 1));\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
 #[test]
 fn does_not_report_suppressed_call() {
-    let src = "<?php\n/** @psalm-suppress UndefinedFunction */\nnoSuchFunction();\n";
+    let src = "<?php\nfunction test(): void {\n    /**\n     * @psalm-suppress UndefinedFunction\n     */\n    noSuchFunction();\n}\n";
     let issues = check(src);
     assert_no_issue(&issues, "UndefinedFunction");
 }
