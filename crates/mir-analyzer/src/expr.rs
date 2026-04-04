@@ -48,7 +48,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     (bits & 0xFFFF_FFFF) as i64,
                 ))
             }
-            ExprKind::String(s) => Union::single(Atomic::TLiteralString(s.as_ref().into())),
+            ExprKind::String(s) => Union::single(Atomic::TLiteralString((*s).into())),
             ExprKind::Bool(b) => {
                 if *b { Union::single(Atomic::TTrue) } else { Union::single(Atomic::TFalse) }
             }
@@ -1233,7 +1233,7 @@ fn extract_string_from_expr<'arena, 'src>(
 ) -> Option<String> {
     match &expr.kind {
         ExprKind::Identifier(s) => {
-            Some(s.as_ref().trim_start_matches('$').to_string())
+            Some(s.trim_start_matches('$').to_string())
         }
         // Variable in property position means dynamic access ($obj->$prop) — not a literal name.
         ExprKind::Variable(_) => None,

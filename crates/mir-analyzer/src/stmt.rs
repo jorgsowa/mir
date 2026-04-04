@@ -102,7 +102,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // For standalone assert($condition) calls, narrow from the condition.
                 if let php_ast::ast::ExprKind::FunctionCall(call) = &expr.kind {
                     if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
-                        if fn_name.as_ref().eq_ignore_ascii_case("assert") {
+                        if fn_name.eq_ignore_ascii_case("assert") {
                             if let Some(arg) = call.args.first() {
                                 narrow_from_condition(&arg.value, ctx, true, self.codebase, &self.file);
                             }

@@ -52,6 +52,10 @@ pub struct Context {
     /// Used by UnusedParam detection (M18).
     pub read_vars: HashSet<String>,
 
+    /// Names of function/method parameters in this scope (stripped of `$`).
+    /// Used to exclude parameters from UnusedVariable detection.
+    pub param_names: HashSet<String>,
+
     /// Whether every execution path through this context has diverged
     /// (returned, thrown, or exited). Used to detect "all catch branches
     /// return" so that variables assigned only in the try body are
@@ -75,6 +79,7 @@ impl Context {
             strict_types: false,
             tainted_vars: HashSet::new(),
             read_vars: HashSet::new(),
+            param_names: HashSet::new(),
             diverges: false,
         };
         // PHP superglobals — always in scope in any context
@@ -135,7 +140,8 @@ impl Context {
             };
             let name = p.name.as_ref().trim_start_matches('$').to_string();
             ctx.vars.insert(name.clone(), ty);
-            ctx.assigned_vars.insert(name);
+            ctx.assigned_vars.insert(name.clone());
+            ctx.param_names.insert(name);
         }
         ctx
     }

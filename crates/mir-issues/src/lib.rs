@@ -176,7 +176,8 @@ impl IssueKind {
             | IssueKind::UndefinedProperty { .. }
             | IssueKind::InvalidOperand { .. }
             | IssueKind::OverriddenMethodAccess { .. }
-            | IssueKind::MissingThrowsDocblock { .. } => Severity::Warning,
+            | IssueKind::MissingThrowsDocblock { .. }
+            | IssueKind::UnusedVariable { .. } => Severity::Warning,
 
             // Possibly-null / possibly-undefined (only shown in strict mode, level ≥ 7)
             IssueKind::PossiblyUndefinedVariable { .. }
@@ -190,7 +191,6 @@ impl IssueKind {
             | IssueKind::RedundantCast { .. }
             | IssueKind::UnnecessaryVarAnnotation { .. }
             | IssueKind::TypeDoesNotContainType { .. }
-            | IssueKind::UnusedVariable { .. }
             | IssueKind::UnusedParam { .. }
             | IssueKind::UnreachableCode
             | IssueKind::UnusedMethod { .. }

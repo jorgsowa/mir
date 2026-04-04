@@ -288,6 +288,7 @@ impl ProjectAnalyzer {
         drop(sa);
 
         emit_unused_params(&params, &ctx, false, file, all_issues);
+        emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
         if let Some(fqn) = fqn {
@@ -355,6 +356,7 @@ impl ProjectAnalyzer {
             drop(sa);
 
             emit_unused_params(&params, &ctx, is_ctor, file, all_issues);
+            emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
@@ -503,6 +505,34 @@ fn emit_unused_params(
         if !ctx.read_vars.contains(name) {
             issues.push(mir_issues::Issue::new(
                 mir_issues::IssueKind::UnusedParam { name: name.to_string() },
+                mir_issues::Location { file: file.clone(), line: 1, col_start: 0, col_end: 0 },
+            ));
+        }
+    }
+}
+
+fn emit_unused_variables(
+    ctx: &crate::context::Context,
+    file: &Arc<str>,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    // Superglobals are always "used" — skip them
+    const SUPERGLOBALS: &[&str] = &[
+        "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV", "GLOBALS",
+    ];
+    for name in &ctx.assigned_vars {
+        if ctx.param_names.contains(name) {
+            continue;
+        }
+        if SUPERGLOBALS.contains(&name.as_str()) {
+            continue;
+        }
+        if name.starts_with('_') {
+            continue;
+        }
+        if !ctx.read_vars.contains(name) {
+            issues.push(mir_issues::Issue::new(
+                mir_issues::IssueKind::UnusedVariable { name: name.clone() },
                 mir_issues::Location { file: file.clone(), line: 1, col_start: 0, col_end: 0 },
             ));
         }
