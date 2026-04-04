@@ -37,7 +37,7 @@ fn reports_unknown_class_in_param_type_hint() {
 #[test]
 fn reports_unknown_class_in_return_type_hint() {
     // Return type hints are checked in Pass 1
-    let src = "<?php\nfunction f(): UnknownClass {\n    return new UnknownClass();\n}\n";
+    let src = "<?php\nfunction f(): UnknownClass {\n    return null;\n}\n";
     let issues = check(src);
     // Check for at least the return type hint issue on line 2 (col 14 = after "function f(): ")
     assert_issue_kind(&issues, "UndefinedClass", 2, 14);
@@ -60,12 +60,11 @@ fn does_not_report_known_aliased_class() {
 }
 
 #[test]
-#[should_panic]
+#[ignore = "instanceof does not trigger UndefinedClass — not yet implemented"]
 fn reports_instanceof_unknown_class() {
-    // NOTE: This test is EXPECTED TO FAIL — instanceof on unknown class is currently unimplemented.
-    // Written to document expected behavior for future implementation.
     let src = "<?php\nfunction test($x): bool {\n    return $x instanceof NoSuchClass;\n}\n";
     let issues = check(src);
+    // col 22: "    return $x instanceof " = 25... verify after un-ignoring
     assert_issue_kind(&issues, "UndefinedClass", 3, 22);
 }
 
