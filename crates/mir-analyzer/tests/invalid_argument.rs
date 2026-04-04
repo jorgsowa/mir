@@ -5,7 +5,7 @@ use mir_test_utils::{assert_issue_kind, assert_no_issue, check};
 fn reports_string_passed_as_int() {
     // f(int $x) called with 'hello' inside a function body
     // line 3: "function test(): void { f('hello'); }"
-    // "function test(): void { f(" = 25 chars (0-indexed), col_start = 26 (1-indexed)
+    // "function test(): void { f(" = 26 bytes → col_start = 26 (0-based byte offset)
     let src = "<?php\nfunction f(int $x): void {}\nfunction test(): void { f('hello'); }\n";
     let issues = check(src);
     assert_issue_kind(&issues, "InvalidArgument", 3, 26);
@@ -23,17 +23,27 @@ fn reports_object_passed_as_int() {
     // f(int $x) called with an object — clearly incompatible
     let src = "<?php\nclass Foo {}\nfunction f(int $x): void {}\nfunction test(): void { f(new Foo()); }\n";
     let issues = check(src);
-    // line 4: "function test(): void { f(" = 25 chars → col 26
+    // line 4: "function test(): void { f(" = 26 bytes → col_start = 26 (0-based byte offset)
     assert_issue_kind(&issues, "InvalidArgument", 4, 26);
 }
 
 #[test]
-#[ignore = "known issue: int|string passed to int is skipped because param atomic (int) is subtype of arg — analyzer does not fire"]
-fn reports_incompatible_union_arg() {
-    // f(int $x) called with int|string value — should fire but doesn't
-    let src = "<?php\nfunction f(int $x): void {}\nfunction test(int|string $v): void { f($v); }\n";
+#[ignore = "null→string fires PossiblyNullArgument, not InvalidArgument — documenting expected ideal behavior"]
+fn reports_null_passed_as_string() {
+    let src = "<?php\nfunction f(string $x): void {}\nfunction test(): void { f(null); }\n";
     let issues = check(src);
-    assert_issue_kind(&issues, "InvalidArgument", 3, 40);
+    // 'null' value starts at col 26 (after "function test(): void { f(")
+    assert_issue_kind(&issues, "InvalidArgument", 3, 26);
+}
+
+#[test]
+#[ignore = "known issue: @var int|string passed to int is skipped because param atomic (int) is subtype of arg — analyzer does not fire"]
+fn reports_incompatible_union_arg() {
+    // Use @var docblock so the analyzer understands the union type
+    let src = "<?php\nfunction f(int $x): void {}\nfunction test(): void {\n    /** @var int|string $v */\n    $v = 1;\n    f($v);\n}\n";
+    let issues = check(src);
+    // f($v) on line 6, col 4 (inside function body)
+    assert_issue_kind(&issues, "InvalidArgument", 6, 4);
 }
 
 #[test]
@@ -65,7 +75,7 @@ fn does_not_report_mixed_arg() {
 fn reports_variadic_wrong_type() {
     // variadic int, pass 'a' string
     // line 3: "function test(): void { f('a'); }"
-    // "function test(): void { f(" = 25 chars → col 26
+    // "function test(): void { f(" = 26 bytes → col_start = 26 (0-based byte offset)
     let src = "<?php\nfunction f(int ...$xs): void {}\nfunction test(): void { f('a'); }\n";
     let issues = check(src);
     assert_issue_kind(&issues, "InvalidArgument", 3, 26);
