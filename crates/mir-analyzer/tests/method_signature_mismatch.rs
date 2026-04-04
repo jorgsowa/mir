@@ -2,7 +2,7 @@
 use mir_test_utils::{assert_issue_kind, assert_no_issue, check};
 
 #[test]
-#[ignore = "known issue: MethodSignatureMismatch not emitted for param type narrowing — analyzer only emits UnusedParam"]
+#[ignore = "known issue: param type mismatch check not implemented for overrides — MethodSignatureMismatch not emitted"]
 fn reports_override_narrowing_param_type() {
     // Parent accepts string; Child accepts only int — narrowing is not allowed
     let src = "<?php\nclass Base {\n    public function f(string $x): void {}\n}\nclass Child extends Base {\n    public function f(int $x): void {}\n}\n";
@@ -50,7 +50,7 @@ fn reports_override_removes_default() {
 }
 
 #[test]
-#[ignore = "known issue: MethodSignatureMismatch not emitted for interface implementation with wrong param type — analyzer only emits UnusedParam"]
+#[ignore = "known issue: param type mismatch check not implemented for interface implementations — MethodSignatureMismatch not emitted"]
 fn reports_interface_implementation_wrong_signature() {
     let src = "<?php\ninterface I {\n    public function f(string $x): void;\n}\nclass C implements I {\n    public function f(int $x): void {}\n}\n";
     let issues = check(src);
