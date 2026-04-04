@@ -71,6 +71,18 @@ struct Cli {
     /// Override global error level (1 = errors only, 2 = +warnings, 3+ = +info)
     #[arg(long, value_name = "1-8")]
     error_level: Option<u8>,
+
+    /// Save all current issues to a baseline file and exit (default: psalm-baseline.xml)
+    #[arg(long, value_name = "FILE", num_args = 0..=1, default_missing_value = "psalm-baseline.xml")]
+    set_baseline: Option<PathBuf>,
+
+    /// Update the baseline by removing issues that are no longer present
+    #[arg(long)]
+    update_baseline: bool,
+
+    /// Ignore the baseline and report all issues
+    #[arg(long)]
+    ignore_baseline: bool,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -251,12 +263,17 @@ fn main() {
     }
 }
 
-/// Load baseline from `--baseline` flag or config (auto-discover `baseline.xml` / `psalm-baseline.xml`).
-fn load_baseline(cli: &Cli, _config: &Config) -> Option<Baseline> {
+/// Load baseline from `--baseline` flag or config (auto-discover `psalm-baseline.xml`).
+/// Returns `None` when `--ignore-baseline` or `--set-baseline` is active (both bypass the baseline).
+/// Otherwise returns `Some((path, baseline))`.
+fn load_baseline(cli: &Cli, _config: &Config) -> Option<(PathBuf, Baseline)> {
+    if cli.ignore_baseline || cli.set_baseline.is_some() {
+        return None;
+    }
+
     let path = if let Some(p) = &cli.baseline {
         p.clone()
     } else {
-        // Auto-discover baseline file in the current directory
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let candidate = cwd.join("psalm-baseline.xml");
         if candidate.exists() {
@@ -271,7 +288,7 @@ fn load_baseline(cli: &Cli, _config: &Config) -> Option<Baseline> {
             if !cli.quiet {
                 eprintln!("mir: using baseline {}", path.display());
             }
-            Some(b)
+            Some((path, b))
         }
         Err(e) => {
             eprintln!("mir: baseline error in {}: {}", path.display(), e);
@@ -285,27 +302,72 @@ fn run_output(
     config: &Config,
     files: &[PathBuf],
     result: mir_analyzer::project::AnalysisResult,
-    mut baseline: Option<Baseline>,
+    baseline: Option<(PathBuf, Baseline)>,
     elapsed: std::time::Duration,
 ) {
+    // --set-baseline: write every issue to the baseline file and exit 0.
+    if let Some(path) = &cli.set_baseline {
+        let bl = baseline_from_issues(&result.issues);
+        match bl.write(path) {
+            Ok(()) => {
+                if !cli.quiet {
+                    eprintln!("mir: baseline written to {}", path.display());
+                }
+            }
+            Err(e) => eprintln!("mir: failed to write baseline: {}", e),
+        }
+        return;
+    }
+
+    let (baseline_path, mut baseline_data) = match baseline {
+        Some((p, b)) => (Some(p), Some(b)),
+        None => (None, None),
+    };
+
     // Suppress issues matched by the baseline.
-    // Matching is (file, issue_kind, snippet); falls back to (file, issue_kind) when
-    // no snippet is stored.
-    let suppressed_by_baseline: std::collections::HashSet<usize> = if let Some(bl) = &mut baseline {
+    // For --update-baseline, also accumulate the consumed entries into a new baseline.
+    let mut new_baseline = Baseline::default();
+    let suppressed_by_baseline: std::collections::HashSet<usize> = if let Some(bl) = &mut baseline_data {
         result.issues.iter().enumerate().filter_map(|(idx, issue)| {
             let file = issue.location.file.as_ref();
             let kind = issue.kind.name();
-            let matched = if let Some(snippet) = &issue.snippet {
-                bl.consume(file, kind, snippet)
+            let snippet = issue.snippet.as_deref().unwrap_or("");
+            let matched = bl.consume(file, kind, snippet);
+            if matched {
+                if cli.update_baseline {
+                    new_baseline.entries
+                        .entry(file.to_string())
+                        .or_default()
+                        .entry(kind.to_string())
+                        .or_default()
+                        .push(snippet.to_string());
+                }
+                Some(idx)
             } else {
-                // No snippet — check counts: consume if kind present in file
-                bl.consume(file, kind, "")
-            };
-            if matched { Some(idx) } else { None }
+                None
+            }
         }).collect()
     } else {
         std::collections::HashSet::new()
     };
+
+    // --update-baseline: write back only the issues still present in the baseline.
+    if cli.update_baseline {
+        let path = baseline_path
+            .as_deref()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("psalm-baseline.xml"));
+        match new_baseline.write(&path) {
+            Ok(()) => {
+                if !cli.quiet {
+                    eprintln!("mir: baseline updated at {}", path.display());
+                }
+            }
+            Err(e) => eprintln!("mir: failed to update baseline: {}", e),
+        }
+    }
 
     // Apply per-issue-kind overrides from config, then filter by effective severity.
     let effective_severity = |issue: &Issue| -> Option<Severity> {
@@ -433,6 +495,20 @@ fn run_output(
     if has_errors {
         process::exit(1);
     }
+}
+
+/// Build a Baseline from a slice of issues (used by --set-baseline).
+fn baseline_from_issues(issues: &[Issue]) -> Baseline {
+    let mut bl = Baseline::default();
+    for issue in issues {
+        bl.entries
+            .entry(issue.location.file.to_string())
+            .or_default()
+            .entry(issue.kind.name().to_string())
+            .or_default()
+            .push(issue.snippet.clone().unwrap_or_default());
+    }
+    bl
 }
 
 // ---------------------------------------------------------------------------
