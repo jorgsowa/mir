@@ -4,6 +4,13 @@
 
 ---
 
+# Guides
+
+- [Getting Started](getting-started.md)
+- [Configuration](configuration.md)
+
+---
+
 # Reference
 
 - [CLI](cli.md)
