@@ -898,10 +898,49 @@ fn load_functions(codebase: &Codebase) {
     reg(codebase, "escapeshellarg",         vec![req("arg")], t_str());
     reg(codebase, "escapeshellcmd",         vec![req("command")], t_str());
 
+    // ---- Streams (additional) --------------------------------------------------
+    reg(codebase, "stream_isatty",        vec![req("stream")], t_bool());
+    reg(codebase, "stream_select",        vec![byref("read"), byref("write"), byref("except"), req("seconds"), opt("microseconds")], t_int_or_false());
+    reg(codebase, "stream_get_meta_data", vec![req("stream")], t_array());
+    reg(codebase, "stream_set_blocking",  vec![req("stream"), req("enable")], t_bool());
+    reg(codebase, "stream_copy_to_stream",vec![req("from"), req("to"), opt("length"), opt("offset")], t_int_or_false());
+
+    // ---- PCRE (additional) -----------------------------------------------------
+    reg(codebase, "preg_grep",      vec![req("pattern"), req("array"), opt("flags")], t_array_or_false());
+
+    // ---- Standard (additional) -------------------------------------------------
+    reg(codebase, "get_resource_type",       vec![req("resource")], t_str());
+    reg(codebase, "ftruncate",               vec![req("stream"), req("size")], t_bool());
+    reg(codebase, "umask",                   vec![opt("mask")], t_int());
+    reg(codebase, "date_default_timezone_set", vec![req("timezoneId")], t_bool());
+    reg(codebase, "date_default_timezone_get", vec![], t_str());
+
+    // ---- Multibyte string (additional) -----------------------------------------
+    reg(codebase, "mb_strwidth",         vec![req("string"), opt("encoding")], t_int());
+    reg(codebase, "mb_convert_variables",vec![req("to_encoding"), req("from_encoding"), byref("var"), vari("vars")], t_str_or_false());
+
+    // ---- Windows SAPI ----------------------------------------------------------
+    reg(codebase, "sapi_windows_vt100_support", vec![req("stream"), opt("enable")], t_bool());
+    reg(codebase, "sapi_windows_cp_set",        vec![req("codepage")], t_bool());
+    reg(codebase, "sapi_windows_cp_get",        vec![opt("kind")], t_int());
+    reg(codebase, "sapi_windows_cp_conv",       vec![req("in_codepage"), req("out_codepage"), req("subject")], t_str_or_false());
+
+    // ---- CLI / process title ---------------------------------------------------
+    reg(codebase, "cli_set_process_title", vec![req("title")], t_bool());
+    reg(codebase, "cli_get_process_title", vec![], t_str_or_false());
+
     // ---- PCNTL (process control) -----------------------------------------------
     reg(codebase, "pcntl_fork",     vec![], t_int());
     reg(codebase, "pcntl_waitpid",  vec![req("process_id"), byref("status"), opt("flags"), opt("resource_usage")], t_int());
     reg(codebase, "pcntl_wexitstatus", vec![req("status")], t_int());
+    reg(codebase, "pcntl_signal",              vec![req("signal"), req("handler"), opt("restart_syscalls")], t_bool());
+    reg(codebase, "pcntl_async_signals",       vec![opt("enable")], t_bool());
+    reg(codebase, "pcntl_signal_get_handler",  vec![req("signal")], Union::mixed());
+    reg(codebase, "pcntl_alarm",               vec![req("seconds")], t_int());
+
+    // ---- POSIX -----------------------------------------------------------------
+    reg(codebase, "posix_kill",   vec![req("process_id"), req("signal")], t_bool());
+    reg(codebase, "posix_getpid", vec![], t_int());
 
     // ---- MySQLi procedural (additional) ----------------------------------------
     reg(codebase, "mysqli_connect_error", vec![], Union::mixed());
@@ -1919,4 +1958,92 @@ fn load_interfaces(codebase: &Codebase) {
     // Psr\Log\LoggerInterface (commonly used)
     let psr_logger = empty_interface("Psr\\Log\\LoggerInterface", vec![]);
     codebase.interfaces.insert(Arc::from("Psr\\Log\\LoggerInterface"), psr_logger);
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mir_codebase::Codebase;
+
+    fn stubs_codebase() -> Codebase {
+        let cb = Codebase::new();
+        load_stubs(&cb);
+        cb
+    }
+
+    fn assert_fn(cb: &Codebase, name: &str) {
+        assert!(
+            cb.functions.contains_key(name),
+            "expected stub for `{name}` to be registered"
+        );
+    }
+
+    #[test]
+    fn stream_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "stream_isatty");
+        assert_fn(&cb, "stream_select");
+        assert_fn(&cb, "stream_get_meta_data");
+        assert_fn(&cb, "stream_set_blocking");
+        assert_fn(&cb, "stream_copy_to_stream");
+    }
+
+    #[test]
+    fn preg_grep_is_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "preg_grep");
+    }
+
+    #[test]
+    fn standard_missing_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "get_resource_type");
+        assert_fn(&cb, "ftruncate");
+        assert_fn(&cb, "umask");
+        assert_fn(&cb, "date_default_timezone_set");
+        assert_fn(&cb, "date_default_timezone_get");
+    }
+
+    #[test]
+    fn mb_missing_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "mb_strwidth");
+        assert_fn(&cb, "mb_convert_variables");
+    }
+
+    #[test]
+    fn pcntl_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "pcntl_signal");
+        assert_fn(&cb, "pcntl_async_signals");
+        assert_fn(&cb, "pcntl_signal_get_handler");
+        assert_fn(&cb, "pcntl_alarm");
+    }
+
+    #[test]
+    fn posix_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "posix_kill");
+        assert_fn(&cb, "posix_getpid");
+    }
+
+    #[test]
+    fn sapi_windows_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "sapi_windows_vt100_support");
+        assert_fn(&cb, "sapi_windows_cp_set");
+        assert_fn(&cb, "sapi_windows_cp_get");
+        assert_fn(&cb, "sapi_windows_cp_conv");
+    }
+
+    #[test]
+    fn cli_functions_are_defined() {
+        let cb = stubs_codebase();
+        assert_fn(&cb, "cli_set_process_title");
+        assert_fn(&cb, "cli_get_process_title");
+    }
 }
