@@ -286,6 +286,45 @@ impl Baseline {
             .map(|v| !v.is_empty())
             .unwrap_or(false)
     }
+
+    /// Serialize this baseline to a Psalm-compatible XML file.
+    pub fn write(&self, path: &std::path::Path) -> Result<(), ConfigError> {
+        let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<files>\n");
+
+        let mut files: Vec<&String> = self.entries.keys().collect();
+        files.sort_unstable();
+
+        for file in files {
+            let by_kind = &self.entries[file];
+            let mut kinds: Vec<&String> = by_kind.keys().collect();
+            kinds.sort_unstable();
+
+            out.push_str(&format!("  <file src=\"{}\">\n", xml_escape_attr(file)));
+            for kind in kinds {
+                let snippets = &by_kind[kind];
+                out.push_str(&format!("    <{}>\n", kind));
+                for snippet in snippets {
+                    out.push_str(&format!(
+                        "      <code><![CDATA[{}]]></code>\n",
+                        snippet
+                    ));
+                }
+                out.push_str(&format!("    </{}>\n", kind));
+            }
+            out.push_str("  </file>\n");
+        }
+
+        out.push_str("</files>\n");
+
+        std::fs::write(path, out).map_err(|e| ConfigError::Io(e.to_string()))
+    }
+}
+
+fn xml_escape_attr(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
