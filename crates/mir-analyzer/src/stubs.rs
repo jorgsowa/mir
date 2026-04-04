@@ -66,6 +66,18 @@ fn vari(name: &'static str) -> FnParam {
 }
 
 #[inline]
+fn byref_vari(name: &'static str) -> FnParam {
+    FnParam {
+        name: Arc::from(name),
+        ty: None,
+        default: None,
+        is_variadic: true,
+        is_byref: true,
+        is_optional: true,
+    }
+}
+
+#[inline]
 fn byref(name: &'static str) -> FnParam {
     FnParam {
         name: Arc::from(name),
@@ -284,7 +296,7 @@ fn load_functions(codebase: &Codebase) {
     reg(codebase, "vsprintf", vec![req("format"), req("values")],   t_str());
     reg(codebase, "printf",   vec![req("format"), vari("values")],  t_int());
     reg(codebase, "vprintf",  vec![req("format"), req("values")],   t_int());
-    reg(codebase, "sscanf",   vec![req("string"), req("format"), vari("vars")], Union::mixed());
+    reg(codebase, "sscanf",   vec![req("string"), req("format"), byref_vari("vars")], Union::mixed());
     reg(codebase, "fprintf",  vec![req("handle"), req("format"), vari("values")], t_int());
     reg(codebase, "explode",  vec![req("separator"), req("string"), opt("limit")], t_array());
     reg(codebase, "implode",  vec![req("separator"), opt("array")], t_str());
@@ -1982,6 +1994,32 @@ mod tests {
             cb.functions.contains_key(name),
             "expected stub for `{name}` to be registered"
         );
+    }
+
+    #[test]
+    fn sscanf_vars_param_is_byref_and_variadic() {
+        let cb = stubs_codebase();
+        let func = cb.functions.get("sscanf").expect("sscanf must be defined");
+        let vars = func.params.get(2).expect("sscanf must have a 3rd param");
+        assert!(vars.is_byref, "sscanf vars param must be by-ref");
+        assert!(vars.is_variadic, "sscanf vars param must be variadic");
+    }
+
+    #[test]
+    fn sscanf_output_vars_not_undefined() {
+        use std::path::PathBuf;
+        use crate::project::ProjectAnalyzer;
+        use mir_issues::IssueKind;
+
+        let src = "<?php\nfunction test($str) {\n    sscanf($str, \"%d %d\", $row, $col);\n    return $row + $col;\n}\n";
+        let tmp = std::env::temp_dir().join("mir_test_sscanf_undefined.php");
+        std::fs::write(&tmp, src).unwrap();
+        let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+        std::fs::remove_file(tmp).ok();
+        let undef: Vec<_> = result.issues.iter()
+            .filter(|i| matches!(&i.kind, IssueKind::UndefinedVariable { name } if name == "row" || name == "col"))
+            .collect();
+        assert!(undef.is_empty(), "sscanf output vars must not be reported as UndefinedVariable; got: {undef:?}");
     }
 
     #[test]

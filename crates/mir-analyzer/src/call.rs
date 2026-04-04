@@ -82,7 +82,17 @@ impl CallAnalyzer {
         if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
             for (i, param) in func.params.iter().enumerate() {
                 if param.is_byref {
-                    if let Some(arg) = call.args.get(i) {
+                    if param.is_variadic {
+                        // Variadic by-ref: mark every remaining argument (e.g. sscanf output vars).
+                        for arg in call.args.iter().skip(i) {
+                            if let ExprKind::Variable(name) = &arg.value.kind {
+                                let var_name = name.as_ref().trim_start_matches('$');
+                                if !ctx.var_is_defined(var_name) {
+                                    ctx.set_var(var_name, Union::mixed());
+                                }
+                            }
+                        }
+                    } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
                             if !ctx.var_is_defined(var_name) {
@@ -125,7 +135,14 @@ impl CallAnalyzer {
             // Also ensure by-ref vars are defined after the call (for post-call usage)
             for (i, param) in params.iter().enumerate() {
                 if param.is_byref {
-                    if let Some(arg) = call.args.get(i) {
+                    if param.is_variadic {
+                        for arg in call.args.iter().skip(i) {
+                            if let ExprKind::Variable(name) = &arg.value.kind {
+                                let var_name = name.as_ref().trim_start_matches('$');
+                                ctx.set_var(var_name, Union::mixed());
+                            }
+                        }
+                    } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
                             ctx.set_var(var_name, Union::mixed());
