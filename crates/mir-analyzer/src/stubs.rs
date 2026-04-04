@@ -900,7 +900,8 @@ fn load_functions(codebase: &Codebase) {
 
     // ---- Streams (additional) --------------------------------------------------
     reg(codebase, "stream_isatty",        vec![req("stream")], t_bool());
-    reg(codebase, "stream_select",        vec![byref("read"), byref("write"), byref("except"), req("seconds"), opt("microseconds")], t_int_or_false());
+    // `$except` is by-ref but callers routinely pass null literals, so byref_opt
+    reg(codebase, "stream_select",        vec![byref("read"), byref("write"), byref_opt("except"), req("seconds"), opt("microseconds")], t_int_or_false());
     reg(codebase, "stream_get_meta_data", vec![req("stream")], t_array());
     reg(codebase, "stream_set_blocking",  vec![req("stream"), req("enable")], t_bool());
     reg(codebase, "stream_copy_to_stream",vec![req("from"), req("to"), opt("length"), opt("offset")], t_int_or_false());
@@ -935,6 +936,7 @@ fn load_functions(codebase: &Codebase) {
     reg(codebase, "pcntl_wexitstatus", vec![req("status")], t_int());
     reg(codebase, "pcntl_signal",              vec![req("signal"), req("handler"), opt("restart_syscalls")], t_bool());
     reg(codebase, "pcntl_async_signals",       vec![opt("enable")], t_bool());
+    // Returns callable|int (SIG_DFL=0 / SIG_IGN=1); mixed used as mir has no callable atomic yet
     reg(codebase, "pcntl_signal_get_handler",  vec![req("signal")], Union::mixed());
     reg(codebase, "pcntl_alarm",               vec![req("seconds")], t_int());
 
