@@ -299,7 +299,8 @@ impl CallAnalyzer {
                         // Interface types: method may exist on the concrete implementation — suppress
                         // (UndefinedInterfaceMethod is not emitted at default error level).
                         let is_interface = ea.codebase.interfaces.contains_key(fqcn.as_ref());
-                        if is_interface || ea.codebase.get_method(fqcn, "__call").is_some() {
+                        let is_abstract = ea.codebase.is_abstract_class(fqcn.as_ref());
+                        if is_interface || is_abstract || ea.codebase.get_method(fqcn, "__call").is_some() {
                             result = Union::merge(&result, &Union::mixed());
                         } else {
                             ea.emit(
@@ -374,7 +375,8 @@ impl CallAnalyzer {
             // Classes with __call handle any method dynamically — suppress.
             // Interface: concrete impl may have the method — suppress at default error level.
             let is_interface = ea.codebase.interfaces.contains_key(fqcn.as_str());
-            if is_interface || ea.codebase.get_method(&fqcn, "__call").is_some() {
+            let is_abstract = ea.codebase.is_abstract_class(&fqcn);
+            if is_interface || is_abstract || ea.codebase.get_method(&fqcn, "__call").is_some() {
                 Union::mixed()
             } else {
                 ea.emit(

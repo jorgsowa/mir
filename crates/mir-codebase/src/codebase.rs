@@ -204,6 +204,13 @@ impl Codebase {
         self.functions.contains_key(fqn)
     }
 
+    /// Returns true if the class is declared abstract.
+    /// Used to suppress `UndefinedMethod` on abstract class receivers: the concrete
+    /// subclass is expected to implement the method, matching Psalm errorLevel=3 behaviour.
+    pub fn is_abstract_class(&self, fqcn: &str) -> bool {
+        self.classes.get(fqcn).map_or(false, |c| c.is_abstract)
+    }
+
     /// Returns true if the class (or any ancestor/trait) defines a `__get` magic method.
     /// Such classes allow arbitrary property access, suppressing UndefinedProperty.
     pub fn has_magic_get(&self, fqcn: &str) -> bool {
