@@ -4,7 +4,7 @@ use mir_test_utils::{assert_issue_kind, assert_no_issue, check};
 #[test]
 fn reports_missing_instance_method() {
     // Call a method that does not exist on the class
-    // line 4: "    $f->missing();" — col 4 ($f starts at col 4)
+    // line 5: "    $f->missing();" — col 4 ($f starts at col 4)
     let src = "<?php\nclass Foo {}\nfunction test(): void {\n    $f = new Foo();\n    $f->missing();\n}\n";
     let issues = check(src);
     assert_issue_kind(&issues, "UndefinedMethod", 5, 4);
