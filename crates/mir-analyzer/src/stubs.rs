@@ -2168,4 +2168,49 @@ mod tests {
         let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_param.php");
         assert!(names.is_empty(), "parameters must not be reported as UnusedVariable; got: {names:?}");
     }
+
+    fn analyze_issues(src: &str, filename: &str) -> Vec<mir_issues::IssueKind> {
+        use crate::project::ProjectAnalyzer;
+        let tmp = std::env::temp_dir().join(filename);
+        std::fs::write(&tmp, src).unwrap();
+        let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+        std::fs::remove_file(tmp).ok();
+        result.issues.into_iter().map(|i| i.kind).collect()
+    }
+
+    #[test]
+    fn possibly_undefined_variable_if_only() {
+        use mir_issues::IssueKind;
+        let src = "<?php\nfunction foo(bool $c): string {\n    if ($c) { $r = 'hello'; }\n    return $r;\n}\n";
+        let kinds = analyze_issues(src, "mir_test_possibly_undef_if.php");
+        let has = kinds.iter().any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
+        assert!(has, "expected PossiblyUndefinedVariable for $r; got: {kinds:?}");
+    }
+
+    #[test]
+    fn possibly_undefined_variable_both_branches_no_error() {
+        use mir_issues::IssueKind;
+        let src = "<?php\nfunction foo(bool $c): string {\n    if ($c) { $r = 'a'; } else { $r = 'b'; }\n    return $r;\n}\n";
+        let kinds = analyze_issues(src, "mir_test_possibly_undef_both.php");
+        let has = kinds.iter().any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
+        assert!(!has, "expected no PossiblyUndefinedVariable for $r; got: {kinds:?}");
+    }
+
+    #[test]
+    fn possibly_undefined_variable_defined_before_if_no_error() {
+        use mir_issues::IssueKind;
+        let src = "<?php\nfunction foo(bool $c): string {\n    $r = 'default';\n    if ($c) { $r = 'hello'; }\n    return $r;\n}\n";
+        let kinds = analyze_issues(src, "mir_test_possibly_undef_before.php");
+        let has = kinds.iter().any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
+        assert!(!has, "expected no PossiblyUndefinedVariable for pre-defined $r; got: {kinds:?}");
+    }
+
+    #[test]
+    fn undefined_method_suppressed_on_abstract_class() {
+        use mir_issues::IssueKind;
+        let src = "<?php\nabstract class Base {\n    abstract public function run(): void;\n}\nfunction call_run(Base $b): void {\n    $b->nonExistentMethod();\n}\n";
+        let kinds = analyze_issues(src, "mir_test_abstract_undef_method.php");
+        let has = kinds.iter().any(|k| matches!(k, IssueKind::UndefinedMethod { .. }));
+        assert!(!has, "UndefinedMethod must be suppressed on abstract class receivers; got: {kinds:?}");
+    }
 }
