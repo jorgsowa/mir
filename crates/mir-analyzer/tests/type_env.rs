@@ -67,3 +67,10 @@ fn var_names_lists_all_variables_in_scope() {
     assert!(names.contains(&"a"), "Expected 'a' in var_names");
     assert!(names.contains(&"b"), "Expected 'b' in var_names");
 }
+
+#[test]
+fn issue_kind_accessible_via_mir_analyzer() {
+    // Verify IssueKind can be used directly from mir_analyzer without importing mir_issues
+    let _kind = mir_analyzer::IssueKind::UndefinedVariable { name: "foo".into() };
+    let _sev  = mir_analyzer::Severity::Error;
+}
