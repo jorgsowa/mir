@@ -11,6 +11,7 @@ pub enum ScopeId {
 }
 
 /// Variable type environment for one scope — the stable public view of Context.vars.
+#[derive(Debug)]
 pub struct TypeEnv {
     vars: IndexMap<String, Union>,
 }
