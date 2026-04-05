@@ -1,5 +1,5 @@
 // crates/mir-analyzer/tests/type_env.rs
-use mir_analyzer::ScopeId;
+use mir_analyzer::{ProjectAnalyzer, ScopeId};
 use std::sync::Arc;
 
 #[test]
@@ -14,8 +14,6 @@ fn scope_id_function_equality() {
     };
     assert_eq!(a, b);
 }
-
-use mir_analyzer::ProjectAnalyzer;
 
 #[test]
 fn analyze_result_has_type_envs_field() {
