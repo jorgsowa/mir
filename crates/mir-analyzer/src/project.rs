@@ -166,7 +166,24 @@ impl ProjectAnalyzer {
         let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&self.codebase).analyze();
         all_issues.extend(dead_code_issues);
 
-        AnalysisResult { issues: all_issues }
+        AnalysisResult { issues: all_issues, type_envs: std::collections::HashMap::new() }
+    }
+
+    /// Analyze a PHP source string without a real file path.
+    /// Useful for tests and LSP single-file mode.
+    pub fn analyze_source(source: &str) -> AnalysisResult {
+        use crate::collector::DefinitionCollector;
+        let analyzer = ProjectAnalyzer::new();
+        analyzer.load_stubs();
+        let file: Arc<str> = Arc::from("<source>");
+        let arena = bumpalo::Bump::new();
+        let result = php_rs_parser::parse(&arena, source);
+        let mut all_issues = Vec::new();
+        let collector = DefinitionCollector::new(&analyzer.codebase, file.clone(), source);
+        all_issues.extend(collector.collect(&result.program));
+        analyzer.codebase.finalize();
+        all_issues.extend(analyzer.analyze_bodies(&result.program, file.clone(), source));
+        AnalysisResult { issues: all_issues, type_envs: std::collections::HashMap::new() }
     }
 
     /// Pass 2: walk all function/method bodies in one file, return issues, and
@@ -575,6 +592,7 @@ fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
+    pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
 }
 
 impl AnalysisResult {
