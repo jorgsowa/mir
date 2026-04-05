@@ -50,7 +50,11 @@ fn returns_type_env_for_method_scope() {
 fn get_var_returns_none_for_unknown_variable() {
     let src = "<?php\nfunction f(): void {\n    $x = 1;\n}\n";
     let result = ProjectAnalyzer::analyze_source(src);
-    let env = result.type_envs.values().next().unwrap();
+    let scope = result.type_envs.iter().find(|(k, _)| {
+        matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "f")
+    });
+    assert!(scope.is_some(), "Expected a TypeEnv for function f");
+    let env = scope.unwrap().1;
     assert!(env.get_var("nonexistent").is_none());
 }
 
