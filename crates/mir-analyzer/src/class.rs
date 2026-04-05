@@ -297,8 +297,58 @@ impl<'a> ClassAnalyzer<'a> {
                             child_required, parent_required
                         ),
                     },
-                    loc,
+                    loc.clone(),
                 ));
+            }
+
+            // ---- e. Param types must not be narrowed (contravariance) --------
+            // For each positional param present in both parent and child:
+            //   parent_param_type must be a subtype of child_param_type.
+            //   (Child may widen; it must not narrow.)
+            // Skip when:
+            //   - Either side has no type hint
+            //   - Either type is mixed
+            //   - Either type contains a named object (needs codebase for inheritance check)
+            //   - Either type contains TSelf/TStaticObject
+            //   - Either type contains a template param
+            let shared_len = parent.params.len().min(own_method.params.len());
+            for i in 0..shared_len {
+                let parent_param = &parent.params[i];
+                let child_param = &own_method.params[i];
+
+                let (parent_ty, child_ty) = match (&parent_param.ty, &child_param.ty) {
+                    (Some(p), Some(c)) => (p, c),
+                    _ => continue,
+                };
+
+                if parent_ty.is_mixed()
+                    || child_ty.is_mixed()
+                    || self.type_has_named_objects(parent_ty)
+                    || self.type_has_named_objects(child_ty)
+                    || self.type_has_self_or_static(parent_ty)
+                    || self.type_has_self_or_static(child_ty)
+                    || self.return_type_has_template(parent_ty)
+                    || self.return_type_has_template(child_ty)
+                {
+                    continue;
+                }
+
+                // Contravariance: parent_ty must be subtype of child_ty.
+                // If not, child has narrowed the param type.
+                if !parent_ty.is_subtype_of_simple(child_ty) {
+                    issues.push(Issue::new(
+                        IssueKind::MethodSignatureMismatch {
+                            class: fqcn.to_string(),
+                            method: method_name.to_string(),
+                            detail: format!(
+                                "parameter ${} type '{}' is narrower than parent type '{}'",
+                                child_param.name, child_ty, parent_ty
+                            ),
+                        },
+                        loc.clone(),
+                    ));
+                    break; // one issue per method is enough
+                }
             }
         }
     }
