@@ -18,7 +18,6 @@ fn does_not_report_correct_return_type() {
 }
 
 #[test]
-#[ignore = "known issue: null returned from non-nullable is not flagged as InvalidReturnType — skipped by remove_null compatibility check"]
 fn reports_null_returned_from_non_nullable() {
     // return null from function declared as string (non-nullable) — should fire but doesn't
     let src = "<?php\nfunction f(): string {\n    return null;\n}\n";
@@ -27,7 +26,6 @@ fn reports_null_returned_from_non_nullable() {
 }
 
 #[test]
-#[ignore = "known issue: bare `return;` from non-void function is not flagged as InvalidReturnType — not implemented"]
 fn reports_bare_return_from_non_void() {
     // bare `return;` from int function — returns void but declared int
     let src = "<?php\nfunction f(): int {\n    return;\n}\n";
@@ -52,7 +50,6 @@ fn does_not_report_mixed_return() {
 }
 
 #[test]
-#[ignore = "known issue: `return null;` from void function is not flagged as InvalidReturnType — not implemented"]
 fn reports_return_null_from_void() {
     // `return null;` from void function should fire
     let src = "<?php\nfunction f(): void {\n    return null;\n}\n";

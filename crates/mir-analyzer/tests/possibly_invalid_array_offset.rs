@@ -44,7 +44,6 @@ fn does_not_report_after_false_check() {
 }
 
 #[test]
-#[ignore = "known gap: unpack() stub missing — returns mixed instead of array|false, so PossiblyInvalidArrayOffset does not fire"]
 fn reports_unpack_result_when_stub_present() {
     // unpack() returns array|false; once stub is present this should fire PossiblyInvalidArrayOffset
     let src = "<?php\nfunction test(): void {\n    [$a] = unpack('N', pack('N', 1));\n}\n";

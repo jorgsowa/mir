@@ -60,12 +60,11 @@ fn does_not_report_known_aliased_class() {
 }
 
 #[test]
-#[ignore = "instanceof does not trigger UndefinedClass — not yet implemented"]
 fn reports_instanceof_unknown_class() {
     let src = "<?php\nfunction test($x): bool {\n    return $x instanceof NoSuchClass;\n}\n";
     let issues = check(src);
-    // col 22: "    return $x instanceof " = 25... verify after un-ignoring
-    assert_issue_kind(&issues, "UndefinedClass", 3, 22);
+    // "    return $x instanceof " = 25 chars → NoSuchClass starts at col 25
+    assert_issue_kind(&issues, "UndefinedClass", 3, 25);
 }
 
 #[test]
