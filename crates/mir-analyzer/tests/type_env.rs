@@ -1,5 +1,5 @@
 // crates/mir-analyzer/tests/type_env.rs
-use mir_analyzer::{ScopeId, TypeEnv};
+use mir_analyzer::ScopeId;
 use std::sync::Arc;
 
 #[test]
