@@ -148,20 +148,43 @@ impl<'a> StatementsAnalyzer<'a> {
 
                     // Check against declared return type
                     if let Some(declared) = &ctx.fn_return_type.clone() {
-                        if !check_ty.is_subtype_of_simple(declared)
+                        // Special case: `void` functions must not return any value.
+                        // The heuristic checks below can suppress this incorrectly (e.g.
+                        // named_object_return_compatible considers TVoid compatible with TNull),
+                        // so we emit the error here before those checks run.
+                        if declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed() {
+                            let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                            self.issues.add(mir_issues::Issue::new(
+                                IssueKind::InvalidReturnType {
+                                    expected: format!("{}", declared),
+                                    actual: format!("{}", ret_ty),
+                                },
+                                mir_issues::Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    col_start: col,
+                                    col_end: col,
+                                },
+                            ));
+                        } else if !check_ty.is_subtype_of_simple(declared)
                             && !declared.is_mixed()
                             && !check_ty.is_mixed()
                             && !named_object_return_compatible(&check_ty, declared, self.codebase, &self.file)
-                            // Also check without null (handles `null|T` where T implements declared)
-                            && !named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, &self.file)
+                            // Also check without null (handles `null|T` where T implements declared).
+                            // Guard: if check_ty is purely null, remove_null() is empty and would
+                            // vacuously return true, incorrectly suppressing the error.
+                            && !(!check_ty.remove_null().is_empty() && named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, &self.file))
                             && !declared_return_has_template(declared, self.codebase)
                             && !declared_return_has_template(&check_ty, self.codebase)
                             && !return_arrays_compatible(&check_ty, declared, self.codebase, &self.file)
                             // Skip coercions: declared is more specific than actual
                             && !declared.is_subtype_of_simple(&check_ty)
                             && !declared.remove_null().is_subtype_of_simple(&check_ty)
-                            // Skip when actual is compatible after removing null/false
-                            && !check_ty.remove_null().is_subtype_of_simple(declared)
+                            // Skip when actual is compatible after removing null/false.
+                            // Guard against empty union (e.g. pure-null type): removing null
+                            // from `null` alone gives an empty union which vacuously passes
+                            // is_subtype_of_simple — that would incorrectly suppress the error.
+                            && !(!check_ty.remove_null().is_empty() && check_ty.remove_null().is_subtype_of_simple(declared))
                             && !check_ty.remove_false().is_subtype_of_simple(declared)
                             // Suppress LessSpecificReturnStatement (level 4): actual is a
                             // supertype of declared (not flagged at default error level).
@@ -186,6 +209,24 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.return_types.push(ret_ty);
                 } else {
                     self.return_types.push(Union::single(Atomic::TVoid));
+                    // Bare `return;` from a non-void declared function is an error.
+                    if let Some(declared) = &ctx.fn_return_type.clone() {
+                        if !declared.is_void() && !declared.is_mixed() {
+                            let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                            self.issues.add(mir_issues::Issue::new(
+                                IssueKind::InvalidReturnType {
+                                    expected: format!("{}", declared),
+                                    actual: "void".to_string(),
+                                },
+                                mir_issues::Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    col_start: col,
+                                    col_end: col,
+                                },
+                            ));
+                        }
+                    }
                 }
                 ctx.diverges = true;
             }

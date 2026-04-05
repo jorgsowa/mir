@@ -811,8 +811,25 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::Less
             | BinaryOp::Greater
             | BinaryOp::LessOrEqual
-            | BinaryOp::GreaterOrEqual
-            | BinaryOp::Instanceof => Union::single(Atomic::TBool),
+            | BinaryOp::GreaterOrEqual => Union::single(Atomic::TBool),
+
+            BinaryOp::Instanceof => {
+                // Check that the class on the right side of `instanceof` exists.
+                if let ExprKind::Identifier(name) = &b.right.kind {
+                    let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
+                    let fqcn: std::sync::Arc<str> = std::sync::Arc::from(resolved.as_str());
+                    if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                        && !self.codebase.type_exists(&fqcn)
+                    {
+                        self.emit(
+                            IssueKind::UndefinedClass { name: resolved },
+                            Severity::Error,
+                            b.right.span,
+                        );
+                    }
+                }
+                Union::single(Atomic::TBool)
+            }
 
             // Spaceship returns -1|0|1
             BinaryOp::Spaceship => Union::single(Atomic::TIntRange {
