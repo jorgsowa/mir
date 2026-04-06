@@ -374,6 +374,12 @@ impl CallAnalyzer {
                 Atomic::TObject => {
                     result = Union::merge(&result, &Union::mixed());
                 }
+                // Template type parameters (e.g. `T` in `@template T`) are unbound at
+                // analysis time — we cannot know which methods the concrete type will have,
+                // so we must not emit UndefinedMethod here. Treat as mixed and move on.
+                Atomic::TTemplateParam { .. } => {
+                    result = Union::merge(&result, &Union::mixed());
+                }
                 _ => {
                     result = Union::merge(&result, &Union::mixed());
                 }
