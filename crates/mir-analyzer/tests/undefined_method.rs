@@ -64,10 +64,52 @@ fn does_not_report_parent_method_that_exists() {
 }
 
 #[test]
-#[ignore = "known issue: UndefinedMethod fires on generic template type — not yet suppressed"]
 fn does_not_report_call_on_generic_type_param() {
-    // @template T — method calls on generic type params should not be flagged
+    // @template T on a function — method calls on the template param should not be flagged
     let src = "<?php\n/**\n * @template T\n * @param T $obj\n */\nfunction f($obj): void {\n    $obj->method();\n}\n";
+    let issues = check(src);
+    assert_no_issue(&issues, "UndefinedMethod");
+}
+
+#[test]
+fn does_not_report_call_on_class_level_generic_return() {
+    // @template T on a class — calling a method on the value returned by a generic getter
+    // must not produce UndefinedMethod even when T is not concretely bound at call-site.
+    let src = r#"<?php
+/**
+ * @template T
+ */
+class Box {
+    /** @var T */
+    private mixed $value;
+
+    /** @param T $value */
+    public function __construct(mixed $value) {
+        $this->value = $value;
+    }
+
+    /** @return T */
+    public function get(): mixed {
+        return $this->value;
+    }
+}
+
+class User {
+    public function getName(): string { return 'Alice'; }
+}
+
+$box = new Box(new User());
+$user = $box->get();
+$user->getName();
+"#;
+    let issues = check(src);
+    assert_no_issue(&issues, "UndefinedMethod");
+}
+
+#[test]
+fn does_not_report_call_on_template_param_with_bound() {
+    // @template T of object — bounded template param; method calls should still be allowed
+    let src = "<?php\n/**\n * @template T of object\n * @param T $obj\n */\nfunction g($obj): void {\n    $obj->doSomething();\n}\n";
     let issues = check(src);
     assert_no_issue(&issues, "UndefinedMethod");
 }
