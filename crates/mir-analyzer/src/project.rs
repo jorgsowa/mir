@@ -166,7 +166,25 @@ impl ProjectAnalyzer {
         let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&self.codebase).analyze();
         all_issues.extend(dead_code_issues);
 
-        AnalysisResult { issues: all_issues }
+        AnalysisResult { issues: all_issues, type_envs: std::collections::HashMap::new() }
+    }
+
+    /// Analyze a PHP source string without a real file path.
+    /// Useful for tests and LSP single-file mode.
+    pub fn analyze_source(source: &str) -> AnalysisResult {
+        use crate::collector::DefinitionCollector;
+        let analyzer = ProjectAnalyzer::new();
+        analyzer.load_stubs();
+        let file: Arc<str> = Arc::from("<source>");
+        let arena = bumpalo::Bump::new();
+        let result = php_rs_parser::parse(&arena, source);
+        let mut all_issues = Vec::new();
+        let collector = DefinitionCollector::new(&analyzer.codebase, file.clone(), source);
+        all_issues.extend(collector.collect(&result.program));
+        analyzer.codebase.finalize();
+        let mut type_envs = std::collections::HashMap::new();
+        all_issues.extend(analyzer.analyze_bodies_typed(&result.program, file.clone(), source, &mut type_envs));
+        AnalysisResult { issues: all_issues, type_envs }
     }
 
     /// Pass 2: walk all function/method bodies in one file, return issues, and
@@ -354,6 +372,208 @@ impl ProjectAnalyzer {
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
+
+            emit_unused_params(&params, &ctx, is_ctor, file, all_issues);
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_issues());
+
+            if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
+                if let Some(m) = cls.own_methods.get_mut(method.name) {
+                    m.inferred_return_type = Some(inferred);
+                }
+            }
+        }
+    }
+
+    /// Like `analyze_bodies` but also populates `type_envs` with per-scope type environments.
+    fn analyze_bodies_typed<'arena, 'src>(
+        &self,
+        program: &php_ast::ast::Program<'arena, 'src>,
+        file: Arc<str>,
+        source: &str,
+        type_envs: &mut std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+    ) -> Vec<mir_issues::Issue> {
+        use php_ast::ast::StmtKind;
+        let mut all_issues = Vec::new();
+        for stmt in program.stmts.iter() {
+            match &stmt.kind {
+                StmtKind::Function(decl) => {
+                    self.analyze_fn_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                }
+                StmtKind::Class(decl) => {
+                    self.analyze_class_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                }
+                StmtKind::Enum(decl) => {
+                    self.analyze_enum_decl(decl, &file, source, &mut all_issues);
+                }
+                StmtKind::Namespace(ns) => {
+                    if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
+                        for inner in stmts.iter() {
+                            match &inner.kind {
+                                StmtKind::Function(decl) => {
+                                    self.analyze_fn_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                                }
+                                StmtKind::Class(decl) => {
+                                    self.analyze_class_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                                }
+                                StmtKind::Enum(decl) => {
+                                    self.analyze_enum_decl(decl, &file, source, &mut all_issues);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        all_issues
+    }
+
+    /// Like `analyze_fn_decl` but also captures a `TypeEnv` for the function scope.
+    fn analyze_fn_decl_typed<'arena, 'src>(
+        &self,
+        decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
+        file: &Arc<str>,
+        source: &str,
+        all_issues: &mut Vec<mir_issues::Issue>,
+        type_envs: &mut std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+    ) {
+        use crate::context::Context;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        let fn_name = decl.name;
+        let body = &decl.body;
+
+        for param in decl.params.iter() {
+            if let Some(hint) = &param.type_hint {
+                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+            }
+        }
+        if let Some(hint) = &decl.return_type {
+            check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+        }
+
+        let resolved_fn = self.codebase.resolve_class_name(file.as_ref(), fn_name);
+        let func_opt: Option<mir_codebase::storage::FunctionStorage> =
+            self.codebase.functions.get(resolved_fn.as_str())
+                .map(|r| r.clone())
+                .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
+                .or_else(|| {
+                    self.codebase.functions.iter()
+                        .find(|e| e.short_name.as_ref() == fn_name)
+                        .map(|e| e.value().clone())
+                });
+
+        let fqn = func_opt.as_ref().map(|f| f.fqn.clone());
+        let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match &func_opt {
+            Some(f) if f.params.len() == decl.params.len()
+                && f.params.iter().zip(decl.params.iter()).all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
+            {
+                (f.params.clone(), f.return_type.clone())
+            }
+            _ => {
+                let ast_params = decl.params.iter().map(|p| mir_codebase::FnParam {
+                    name: Arc::from(p.name),
+                    ty: None,
+                    default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
+                    is_variadic: p.variadic,
+                    is_byref: p.by_ref,
+                    is_optional: p.default.is_some() || p.variadic,
+                }).collect();
+                (ast_params, None)
+            }
+        };
+
+        let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
+        let mut buf = IssueBuffer::new();
+        let mut sa = StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf);
+        sa.analyze_stmts(body, &mut ctx);
+        let inferred = merge_return_types(&sa.return_types);
+        drop(sa);
+
+        // Capture TypeEnv for this scope
+        let scope_name = fqn.clone().unwrap_or_else(|| Arc::from(fn_name));
+        type_envs.insert(
+            crate::type_env::ScopeId::Function { file: file.clone(), name: scope_name },
+            crate::type_env::TypeEnv::new(ctx.vars.clone()),
+        );
+
+        emit_unused_params(&params, &ctx, false, file, all_issues);
+        emit_unused_variables(&ctx, file, all_issues);
+        all_issues.extend(buf.into_issues());
+
+        if let Some(fqn) = fqn {
+            if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
+                func.inferred_return_type = Some(inferred);
+            }
+        }
+    }
+
+    /// Like `analyze_class_decl` but also captures a `TypeEnv` per method scope.
+    fn analyze_class_decl_typed<'arena, 'src>(
+        &self,
+        decl: &php_ast::ast::ClassDecl<'arena, 'src>,
+        file: &Arc<str>,
+        source: &str,
+        all_issues: &mut Vec<mir_issues::Issue>,
+        type_envs: &mut std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+    ) {
+        use crate::context::Context;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        let class_name = decl.name.unwrap_or("<anonymous>");
+        let resolved = self.codebase.resolve_class_name(file.as_ref(), class_name);
+        let fqcn: &str = &resolved;
+        let parent_fqcn = self.codebase.classes.get(fqcn).and_then(|c| c.parent.clone());
+
+        for member in decl.members.iter() {
+            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else { continue };
+
+            for param in method.params.iter() {
+                if let Some(hint) = &param.type_hint {
+                    check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                }
+            }
+            if let Some(hint) = &method.return_type {
+                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+            }
+
+            let Some(body) = &method.body else { continue };
+
+            let method_storage = self.codebase.get_method(fqcn, method.name);
+            let (params, return_ty) = method_storage
+                .as_ref()
+                .map(|m| (m.params.clone(), m.return_type.clone()))
+                .unwrap_or_default();
+
+            let is_ctor = method.name == "__construct";
+            let mut ctx = Context::for_method(
+                &params,
+                return_ty,
+                Some(Arc::from(fqcn)),
+                parent_fqcn.clone(),
+                Some(Arc::from(fqcn)),
+                false,
+                is_ctor,
+            );
+
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf);
+            sa.analyze_stmts(body, &mut ctx);
+            let inferred = merge_return_types(&sa.return_types);
+            drop(sa);
+
+            // Capture TypeEnv for this method scope
+            type_envs.insert(
+                crate::type_env::ScopeId::Method {
+                    class: Arc::from(fqcn),
+                    method: Arc::from(method.name),
+                },
+                crate::type_env::TypeEnv::new(ctx.vars.clone()),
+            );
 
             emit_unused_params(&params, &ctx, is_ctor, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
@@ -575,6 +795,7 @@ fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
+    pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
 }
 
 impl AnalysisResult {
