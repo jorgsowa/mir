@@ -167,8 +167,44 @@ fn main() {
             }
         };
 
+        // Apply --cache-dir if specified
+        if let Some(cache_dir) = &cli.cache_dir {
+            analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
+        }
+
         let vendor_files = map.vendor_files();
-        let files = map.project_files();
+
+        // Resolve ignore dirs to absolute paths (relative to config file location)
+        let ignore_dirs: Vec<PathBuf> = config
+            .ignore_dirs
+            .iter()
+            .map(|d| {
+                let p = PathBuf::from(d);
+                if p.is_absolute() {
+                    p
+                } else {
+                    config_base.join(d)
+                }
+            })
+            .collect();
+
+        // Filter out ignored directories from project files
+        let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let files: Vec<PathBuf> = map
+            .project_files()
+            .into_iter()
+            .filter(|p| {
+                if ignore_dirs.is_empty() {
+                    return true;
+                }
+                let abs = if p.is_absolute() {
+                    p.clone()
+                } else {
+                    cwd_abs.join(p)
+                };
+                !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
+            })
+            .collect();
 
         if files.is_empty() {
             if !cli.quiet {

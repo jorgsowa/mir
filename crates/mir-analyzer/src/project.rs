@@ -56,7 +56,7 @@ impl ProjectAnalyzer {
         root: &Path,
     ) -> Result<(Self, crate::composer::Psr4Map), crate::composer::ComposerError> {
         let map = crate::composer::Psr4Map::from_composer(root)?;
-        let psr4 = Arc::new(crate::composer::Psr4Map::from_composer(root)?);
+        let psr4 = Arc::new(map.clone());
         let analyzer = Self {
             codebase: Arc::new(Codebase::new()),
             cache: None,
