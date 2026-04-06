@@ -135,8 +135,17 @@ impl Psr4Map {
 
     /// Resolve a fully-qualified class name to a file path using longest-prefix-first matching.
     /// Returns `None` if no prefix matches or the mapped file does not exist on disk.
-    pub fn resolve(&self, _fqcn: &str) -> Option<PathBuf> {
-        todo!()
+    pub fn resolve(&self, fqcn: &str) -> Option<PathBuf> {
+        for (prefix, dir) in self.project_entries.iter().chain(self.vendor_entries.iter()) {
+            if fqcn.starts_with(prefix.as_str()) {
+                let relative = &fqcn[prefix.len()..];
+                let file_path = dir.join(relative.replace('\\', "/")).with_extension("php");
+                if file_path.exists() {
+                    return Some(file_path);
+                }
+            }
+        }
+        None
     }
 }
 
@@ -280,5 +289,54 @@ mod tests {
         let files = map.project_files();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("Foo.php"));
+    }
+
+    #[test]
+    fn resolve_existing_file() {
+        let root = make_temp_project("resolve_existing");
+        let models = root.join("src/models");
+        fs::create_dir_all(&models).unwrap();
+        fs::write(models.join("User.php"), "<?php class User {}").unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\Models\\":"src/models/","App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let result = map.resolve("App\\Models\\User");
+        assert!(result.is_some(), "expected a resolved path");
+        assert!(result.unwrap().ends_with("User.php"));
+    }
+
+    #[test]
+    fn resolve_missing_file() {
+        let root = make_temp_project("resolve_missing");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let result = map.resolve("App\\Models\\User");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn boundary_check() {
+        let root = make_temp_project("boundary_check");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        // "App\" must NOT match "Application\Foo"
+        let result = map.resolve("Application\\Foo");
+        assert!(result.is_none(), "App\\ prefix must not match Application\\Foo");
     }
 }
