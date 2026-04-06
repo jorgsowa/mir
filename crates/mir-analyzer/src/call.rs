@@ -128,12 +128,24 @@ impl CallAnalyzer {
         // Look up user-defined function in codebase
         if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
             ea.codebase.mark_function_referenced(&func.fqn.clone());
+            let is_deprecated = func.is_deprecated;
             let params = func.params.clone();
             let template_params = func.template_params.clone();
             let return_ty_raw = func
                 .effective_return_type()
                 .cloned()
                 .unwrap_or_else(Union::mixed);
+
+            // Emit DeprecatedCall if the function is marked @deprecated
+            if is_deprecated {
+                ea.emit(
+                    IssueKind::DeprecatedCall {
+                        name: resolved_fn_name.clone(),
+                    },
+                    Severity::Info,
+                    span,
+                );
+            }
 
             check_args(
                 ea,
@@ -288,6 +300,17 @@ impl CallAnalyzer {
                     if let Some(method) = ea.codebase.get_method(fqcn, &method_name) {
                         // Record reference for dead-code detection (M18)
                         ea.codebase.mark_method_referenced(fqcn, &method_name);
+                        // Emit DeprecatedMethodCall if the method is marked @deprecated
+                        if method.is_deprecated {
+                            ea.emit(
+                                IssueKind::DeprecatedMethodCall {
+                                    class: fqcn.to_string(),
+                                    method: method_name.clone(),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
                         // Visibility check (simplified — only checks private from outside)
                         check_method_visibility(ea, &method, ctx, span);
 
@@ -432,6 +455,17 @@ impl CallAnalyzer {
 
         if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
             ea.codebase.mark_method_referenced(&fqcn, method_name);
+            // Emit DeprecatedMethodCall if the method is marked @deprecated
+            if method.is_deprecated {
+                ea.emit(
+                    IssueKind::DeprecatedMethodCall {
+                        class: fqcn.clone(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Info,
+                    span,
+                );
+            }
             let arg_names: Vec<Option<String>> = call
                 .args
                 .iter()
