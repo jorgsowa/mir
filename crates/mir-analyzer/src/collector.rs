@@ -365,6 +365,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 };
 
+                self.codebase
+                    .symbol_to_file
+                    .insert(Arc::from(fqn.as_str()), self.file.clone());
                 self.codebase.functions.insert(fqn.into(), storage);
             }
 
@@ -489,6 +492,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 };
 
+                self.codebase
+                    .symbol_to_file
+                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
                 self.codebase.classes.insert(fqcn.into(), storage);
             }
 
@@ -528,6 +534,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
+                self.codebase
+                    .symbol_to_file
+                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
                 self.codebase.interfaces.insert(
                     fqcn.clone().into(),
                     InterfaceStorage {
@@ -616,6 +625,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
+                self.codebase
+                    .symbol_to_file
+                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
                 self.codebase.traits.insert(
                     fqcn.clone().into(),
                     TraitStorage {
@@ -680,6 +692,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
+                self.codebase
+                    .symbol_to_file
+                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
                 self.codebase.enums.insert(
                     fqcn.clone().into(),
                     mir_codebase::EnumStorage {

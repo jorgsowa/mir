@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use rayon::prelude::*;
 
+use std::collections::{HashMap, HashSet};
+
 use crate::cache::{hash_content, AnalysisCache};
 use mir_codebase::Codebase;
 use mir_issues::Issue;
@@ -90,6 +92,27 @@ impl ProjectAnalyzer {
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
         self.load_stubs();
 
+        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
+        // Uses the reverse dep graph persisted from the previous run.
+        if let Some(cache) = &self.cache {
+            let changed: Vec<String> = paths
+                .iter()
+                .filter_map(|p| {
+                    let path_str = p.to_string_lossy().into_owned();
+                    let content = std::fs::read_to_string(p).ok()?;
+                    let h = hash_content(&content);
+                    if cache.get(&path_str, &h).is_none() {
+                        Some(path_str)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if !changed.is_empty() {
+                cache.evict_with_dependents(&changed);
+            }
+        }
+
         // ---- Pass 1: read files in parallel ----------------------------------
         let file_data: Vec<(Arc<str>, String)> = paths
             .par_iter()
@@ -130,6 +153,12 @@ impl ProjectAnalyzer {
 
         // ---- Finalize codebase (resolve inheritance, build dispatch tables) --
         self.codebase.finalize();
+
+        // ---- Build reverse dep graph and persist it for the next run ---------
+        if let Some(cache) = &self.cache {
+            let rev = build_reverse_deps(&self.codebase);
+            cache.set_reverse_deps(rev);
+        }
 
         // ---- Class-level checks (M11) ----------------------------------------
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
@@ -908,6 +937,69 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 // ---------------------------------------------------------------------------
 // AnalysisResult
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// build_reverse_deps
+// ---------------------------------------------------------------------------
+
+/// Build a reverse dependency graph from the codebase after Pass 1.
+///
+/// Returns a map: `defining_file → {files that depend on it}`.
+///
+/// Dependency edges captured (all derivable from Pass 1 data):
+/// - `use` imports  (`file_imports`)
+/// - `extends` / `implements` / trait `use` from `ClassStorage`
+fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
+    let mut reverse: HashMap<String, HashSet<String>> = HashMap::new();
+
+    // Helper: record edge "defining_file → dependent_file"
+    let mut add_edge = |symbol: &str, dependent_file: &str| {
+        if let Some(defining_file) = codebase.symbol_to_file.get(symbol) {
+            let def = defining_file.as_ref().to_string();
+            if def != dependent_file {
+                reverse
+                    .entry(def)
+                    .or_default()
+                    .insert(dependent_file.to_string());
+            }
+        }
+    };
+
+    // use-import edges
+    for entry in codebase.file_imports.iter() {
+        let file = entry.key().as_ref().to_string();
+        for fqcn in entry.value().values() {
+            add_edge(fqcn, &file);
+        }
+    }
+
+    // extends / implements / trait edges from ClassStorage
+    for entry in codebase.classes.iter() {
+        let defining = {
+            let fqcn = entry.key().as_ref();
+            codebase
+                .symbol_to_file
+                .get(fqcn)
+                .map(|f| f.as_ref().to_string())
+        };
+        let Some(file) = defining else { continue };
+
+        let cls = entry.value();
+        if let Some(ref parent) = cls.parent {
+            add_edge(parent.as_ref(), &file);
+        }
+        for iface in &cls.interfaces {
+            add_edge(iface.as_ref(), &file);
+        }
+        for tr in &cls.traits {
+            add_edge(tr.as_ref(), &file);
+        }
+    }
+
+    reverse
+}
+
 // ---------------------------------------------------------------------------
 
 pub struct AnalysisResult {

@@ -226,12 +226,16 @@ fn main() {
 
         if !vendor_files.is_empty() {
             if !cli.quiet {
-                eprintln!("mir: scanning {} vendor files for types...", vendor_files.len());
+                eprintln!(
+                    "mir: scanning {} vendor files for types...",
+                    vendor_files.len()
+                );
             }
             analyzer.collect_types_only(&vendor_files);
         }
 
-        let show_progress = !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
+        let show_progress =
+            !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
         let start = std::time::Instant::now();
         if show_progress {
             let pb = Arc::new(
