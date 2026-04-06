@@ -83,6 +83,14 @@ struct Cli {
     /// Ignore the baseline and report all issues
     #[arg(long)]
     ignore_baseline: bool,
+
+    /// Skip reading from and writing to the cache for this run
+    #[arg(long)]
+    no_cache: bool,
+
+    /// Delete all cached results and exit
+    #[arg(long)]
+    clear_cache: bool,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -100,6 +108,23 @@ enum OutputFormat {
 
 fn main() {
     let cli = Cli::parse();
+
+    // --clear-cache: delete the cache file and exit before doing anything else
+    if cli.clear_cache {
+        if let Some(cache_dir) = &cli.cache_dir {
+            let cache_file = cache_dir.join("cache.json");
+            if cache_file.exists() {
+                std::fs::remove_file(&cache_file).expect("Failed to remove cache file");
+            }
+            if !cli.quiet {
+                eprintln!("mir: cache cleared ({})", cache_dir.display());
+            }
+        } else {
+            eprintln!("mir: --clear-cache requires --cache-dir");
+            std::process::exit(2);
+        }
+        std::process::exit(0);
+    }
 
     // Load configuration (explicit --config, or auto-discover mir.xml / psalm.xml as fallback)
     let mut config_base: PathBuf = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -167,9 +192,11 @@ fn main() {
             }
         };
 
-        // Apply --cache-dir if specified
+        // Apply --cache-dir if specified (skip when --no-cache is set)
         if let Some(cache_dir) = &cli.cache_dir {
-            analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
+            if !cli.no_cache {
+                analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
+            }
         }
 
         let vendor_files = map.vendor_files();
@@ -343,9 +370,13 @@ fn main() {
         );
     }
 
-    // Build analyzer
+    // Build analyzer (skip cache when --no-cache is set)
     let mut analyzer = if let Some(cache_dir) = &cli.cache_dir {
-        ProjectAnalyzer::with_cache(cache_dir)
+        if !cli.no_cache {
+            ProjectAnalyzer::with_cache(cache_dir)
+        } else {
+            ProjectAnalyzer::new()
+        }
     } else {
         ProjectAnalyzer::new()
     };
