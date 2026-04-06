@@ -91,8 +91,7 @@ impl Psr4Map {
         let content = std::fs::read_to_string(&composer_path)?;
         let value: serde_json::Value = serde_json::from_str(&content)?;
 
-        let has_autoload = value.get("autoload").is_some()
-            || value.get("autoload-dev").is_some();
+        let has_autoload = value.get("autoload").is_some() || value.get("autoload-dev").is_some();
         if !has_autoload {
             return Err(ComposerError::MissingAutoload);
         }
@@ -112,7 +111,10 @@ impl Psr4Map {
                 }
             }
         }
-        if let Some(map) = value.pointer("/autoload-dev/psr-4").and_then(|v| v.as_object()) {
+        if let Some(map) = value
+            .pointer("/autoload-dev/psr-4")
+            .and_then(|v| v.as_object())
+        {
             for (prefix, dir) in map {
                 if let Some(d) = dir.as_str() {
                     project_entries.push((ensure_trailing_backslash(prefix), root.join(d)));
@@ -156,7 +158,11 @@ impl Psr4Map {
     /// Resolve a fully-qualified class name to a file path using longest-prefix-first matching.
     /// Returns `None` if no prefix matches or the mapped file does not exist on disk.
     pub fn resolve(&self, fqcn: &str) -> Option<PathBuf> {
-        for (prefix, dir) in self.project_entries.iter().chain(self.vendor_entries.iter()) {
+        for (prefix, dir) in self
+            .project_entries
+            .iter()
+            .chain(self.vendor_entries.iter())
+        {
             if fqcn.starts_with(prefix.as_str()) {
                 let relative = &fqcn[prefix.len()..];
                 let file_path = dir.join(relative.replace('\\', "/")).with_extension("php");
@@ -198,7 +204,11 @@ mod tests {
 
         let map = Psr4Map::from_composer(&root).unwrap();
 
-        let prefixes: Vec<&str> = map.project_entries.iter().map(|(p, _)| p.as_str()).collect();
+        let prefixes: Vec<&str> = map
+            .project_entries
+            .iter()
+            .map(|(p, _)| p.as_str())
+            .collect();
         assert!(prefixes.contains(&"App\\Models\\"), "missing App\\Models\\");
         assert!(prefixes.contains(&"App\\"), "missing App\\");
         assert!(prefixes.contains(&"Tests\\"), "missing Tests\\");
@@ -237,7 +247,11 @@ mod tests {
     #[test]
     fn composer_v2_installed() {
         let root = make_temp_project("composer_v2");
-        fs::write(root.join("composer.json"), r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
 
         let vendor_dir = root.join("vendor/composer");
         fs::create_dir_all(&vendor_dir).unwrap();
@@ -263,7 +277,11 @@ mod tests {
     #[test]
     fn composer_v1_installed() {
         let root = make_temp_project("composer_v1");
-        fs::write(root.join("composer.json"), r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
 
         let vendor_dir = root.join("vendor/composer");
         fs::create_dir_all(&vendor_dir).unwrap();
@@ -287,7 +305,11 @@ mod tests {
     #[test]
     fn missing_installed_json() {
         let root = make_temp_project("missing_installed");
-        fs::write(root.join("composer.json"), r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
         let map = Psr4Map::from_composer(&root).unwrap();
         assert!(map.vendor_entries.is_empty());
     }
@@ -357,7 +379,10 @@ mod tests {
         let map = Psr4Map::from_composer(&root).unwrap();
         // "App\" must NOT match "Application\Foo"
         let result = map.resolve("Application\\Foo");
-        assert!(result.is_none(), "App\\ prefix must not match Application\\Foo");
+        assert!(
+            result.is_none(),
+            "App\\ prefix must not match Application\\Foo"
+        );
     }
 
     #[test]
@@ -377,7 +402,11 @@ mod tests {
 
         let map = Psr4Map::from_composer(&root).unwrap();
         // Both dirs should be in project_entries
-        assert_eq!(map.project_entries.len(), 2, "expected 2 entries for array-valued dir");
+        assert_eq!(
+            map.project_entries.len(),
+            2,
+            "expected 2 entries for array-valued dir"
+        );
         let files = map.project_files();
         assert_eq!(files.len(), 2, "expected Foo.php and Bar.php");
     }
