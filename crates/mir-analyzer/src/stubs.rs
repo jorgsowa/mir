@@ -167,13 +167,34 @@ fn reg(codebase: &Codebase, name: &'static str, params: Vec<FnParam>, ret: Union
 // Return-type shorthands
 // ---------------------------------------------------------------------------
 
-#[inline] fn t_str()  -> Union { Union::single(Atomic::TString) }
-#[inline] fn t_int()  -> Union { Union::single(Atomic::TInt) }
-#[inline] fn t_float()-> Union { Union::single(Atomic::TFloat) }
-#[inline] fn t_bool() -> Union { Union::single(Atomic::TBool) }
-#[inline] fn t_void() -> Union { Union::single(Atomic::TVoid) }
-#[inline] fn t_never()-> Union { Union::single(Atomic::TNever) }
-#[inline] fn t_ni()   -> Union { Union::single(Atomic::TNonNegativeInt) }
+#[inline]
+fn t_str() -> Union {
+    Union::single(Atomic::TString)
+}
+#[inline]
+fn t_int() -> Union {
+    Union::single(Atomic::TInt)
+}
+#[inline]
+fn t_float() -> Union {
+    Union::single(Atomic::TFloat)
+}
+#[inline]
+fn t_bool() -> Union {
+    Union::single(Atomic::TBool)
+}
+#[inline]
+fn t_void() -> Union {
+    Union::single(Atomic::TVoid)
+}
+#[inline]
+fn t_never() -> Union {
+    Union::single(Atomic::TNever)
+}
+#[inline]
+fn t_ni() -> Union {
+    Union::single(Atomic::TNonNegativeInt)
+}
 
 /// string|false
 #[inline]
@@ -286,737 +307,2894 @@ fn t_obj_or_false(fqcn: &'static str) -> Union {
 fn load_functions(codebase: &Codebase) {
     // ---- String ----------------------------------------------------------------
 
-    reg(codebase, "strlen",     vec![req("str")],                              t_ni());
-    reg(codebase, "mb_strlen",  vec![req("str"), opt("encoding")],             t_ni());
-    reg(codebase, "substr",     vec![req("str"), req("offset"), opt("length")], t_str());
-    reg(codebase, "mb_substr",  vec![req("str"), req("start"), opt("length"), opt("encoding")], t_str());
-    reg(codebase, "str_replace",  vec![req("search"), req("replace"), req("subject"), opt("count")], t_str_or_array());
-    reg(codebase, "str_ireplace", vec![req("search"), req("replace"), req("subject"), opt("count")], t_str_or_array());
-    reg(codebase, "substr_replace", vec![req("string"), req("replace"), req("offset"), opt("length")], t_str_or_array());
-    reg(codebase, "str_contains",   vec![req("haystack"), req("needle")], t_bool());
-    reg(codebase, "str_starts_with",vec![req("haystack"), req("needle")], t_bool());
-    reg(codebase, "str_ends_with",  vec![req("haystack"), req("needle")], t_bool());
-    reg(codebase, "strpos",   vec![req("haystack"), req("needle"), opt("offset")], t_int_or_false());
-    reg(codebase, "strrpos",  vec![req("haystack"), req("needle"), opt("offset")], t_int_or_false());
-    reg(codebase, "stripos",  vec![req("haystack"), req("needle"), opt("offset")], t_int_or_false());
-    reg(codebase, "strripos", vec![req("haystack"), req("needle"), opt("offset")], t_int_or_false());
-    reg(codebase, "mb_strpos",  vec![req("haystack"), req("needle"), opt("offset"), opt("encoding")], t_int_or_false());
-    reg(codebase, "mb_strrpos", vec![req("haystack"), req("needle"), opt("offset"), opt("encoding")], t_int_or_false());
-    reg(codebase, "strstr",   vec![req("haystack"), req("needle"), opt("before_needle")], t_str_or_false());
-    reg(codebase, "stristr",  vec![req("haystack"), req("needle"), opt("before_needle")], t_str_or_false());
-    reg(codebase, "strrchr",  vec![req("haystack"), req("needle")], t_str_or_false());
-    reg(codebase, "trim",    vec![req("string"), opt("characters")], t_str());
-    reg(codebase, "ltrim",   vec![req("string"), opt("characters")], t_str());
-    reg(codebase, "rtrim",   vec![req("string"), opt("characters")], t_str());
+    reg(codebase, "strlen", vec![req("str")], t_ni());
+    reg(
+        codebase,
+        "mb_strlen",
+        vec![req("str"), opt("encoding")],
+        t_ni(),
+    );
+    reg(
+        codebase,
+        "substr",
+        vec![req("str"), req("offset"), opt("length")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_substr",
+        vec![req("str"), req("start"), opt("length"), opt("encoding")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "str_replace",
+        vec![req("search"), req("replace"), req("subject"), opt("count")],
+        t_str_or_array(),
+    );
+    reg(
+        codebase,
+        "str_ireplace",
+        vec![req("search"), req("replace"), req("subject"), opt("count")],
+        t_str_or_array(),
+    );
+    reg(
+        codebase,
+        "substr_replace",
+        vec![req("string"), req("replace"), req("offset"), opt("length")],
+        t_str_or_array(),
+    );
+    reg(
+        codebase,
+        "str_contains",
+        vec![req("haystack"), req("needle")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "str_starts_with",
+        vec![req("haystack"), req("needle")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "str_ends_with",
+        vec![req("haystack"), req("needle")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "strpos",
+        vec![req("haystack"), req("needle"), opt("offset")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "strrpos",
+        vec![req("haystack"), req("needle"), opt("offset")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "stripos",
+        vec![req("haystack"), req("needle"), opt("offset")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "strripos",
+        vec![req("haystack"), req("needle"), opt("offset")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "mb_strpos",
+        vec![
+            req("haystack"),
+            req("needle"),
+            opt("offset"),
+            opt("encoding"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "mb_strrpos",
+        vec![
+            req("haystack"),
+            req("needle"),
+            opt("offset"),
+            opt("encoding"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "strstr",
+        vec![req("haystack"), req("needle"), opt("before_needle")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "stristr",
+        vec![req("haystack"), req("needle"), opt("before_needle")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "strrchr",
+        vec![req("haystack"), req("needle")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "trim",
+        vec![req("string"), opt("characters")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "ltrim",
+        vec![req("string"), opt("characters")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "rtrim",
+        vec![req("string"), opt("characters")],
+        t_str(),
+    );
     reg(codebase, "strtolower", vec![req("string")], t_str());
     reg(codebase, "strtoupper", vec![req("string")], t_str());
-    reg(codebase, "ucfirst",   vec![req("string")], t_str());
-    reg(codebase, "lcfirst",   vec![req("string")], t_str());
-    reg(codebase, "ucwords",   vec![req("string"), opt("separators")], t_str());
-    reg(codebase, "mb_strtolower", vec![req("string"), opt("encoding")], t_str());
-    reg(codebase, "mb_strtoupper", vec![req("string"), opt("encoding")], t_str());
-    reg(codebase, "mb_convert_encoding", vec![req("string"), req("to_encoding"), opt("from_encoding")], t_str());
-    reg(codebase, "mb_detect_encoding", vec![req("string"), opt("encodings"), opt("strict")], t_str_or_false());
-    reg(codebase, "mb_internal_encoding", vec![opt("encoding")], t_str_or_bool());
-    reg(codebase, "mb_str_split", vec![req("string"), opt("length"), opt("encoding")], t_array());
-    reg(codebase, "sprintf",  vec![req("format"), vari("values")],  t_str());
-    reg(codebase, "vsprintf", vec![req("format"), req("values")],   t_str());
-    reg(codebase, "printf",   vec![req("format"), vari("values")],  t_int());
-    reg(codebase, "vprintf",  vec![req("format"), req("values")],   t_int());
-    reg(codebase, "sscanf",   vec![req("string"), req("format"), byref_vari("vars")], Union::mixed());
-    reg(codebase, "fprintf",  vec![req("handle"), req("format"), vari("values")], t_int());
-    reg(codebase, "explode",  vec![req("separator"), req("string"), opt("limit")], t_array());
-    reg(codebase, "implode",  vec![req("separator"), opt("array")], t_str());
-    reg(codebase, "join",     vec![req("separator"), opt("array")], t_str());
-    reg(codebase, "str_split",     vec![req("string"), opt("length")], t_array());
-    reg(codebase, "str_word_count",vec![req("string"), opt("format"), opt("characters")], Union::mixed());
-    reg(codebase, "str_getcsv",    vec![req("string"), opt("separator"), opt("enclosure"), opt("escape")], t_array());
-    reg(codebase, "str_pad",  vec![req("string"), req("length"), opt("pad_string"), opt("pad_type")], t_str());
-    reg(codebase, "str_repeat",    vec![req("string"), req("times")], t_str());
-    reg(codebase, "wordwrap",      vec![req("string"), opt("width"), opt("break"), opt("cut_long_words")], t_str());
-    reg(codebase, "chunk_split",   vec![req("string"), opt("length"), opt("separator")], t_str());
-    reg(codebase, "nl2br",         vec![req("string"), opt("use_xhtml")], t_str());
-    reg(codebase, "number_format", vec![req("num"), opt("decimals"), opt("decimal_separator"), opt("thousands_separator")], t_str());
-    reg(codebase, "htmlspecialchars",       vec![req("string"), opt("flags"), opt("encoding"), opt("double_encode")], t_str());
-    reg(codebase, "htmlspecialchars_decode",vec![req("string"), opt("flags")], t_str());
-    reg(codebase, "htmlentities",           vec![req("string"), opt("flags"), opt("encoding"), opt("double_encode")], t_str());
-    reg(codebase, "html_entity_decode",     vec![req("string"), opt("flags"), opt("encoding")], t_str());
-    reg(codebase, "strip_tags",    vec![req("string"), opt("allowed_tags")], t_str());
-    reg(codebase, "addslashes",    vec![req("string")], t_str());
-    reg(codebase, "stripslashes",  vec![req("string")], t_str());
-    reg(codebase, "addcslashes",   vec![req("string"), req("characters")], t_str());
+    reg(codebase, "ucfirst", vec![req("string")], t_str());
+    reg(codebase, "lcfirst", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "ucwords",
+        vec![req("string"), opt("separators")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_strtolower",
+        vec![req("string"), opt("encoding")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_strtoupper",
+        vec![req("string"), opt("encoding")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_convert_encoding",
+        vec![req("string"), req("to_encoding"), opt("from_encoding")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_detect_encoding",
+        vec![req("string"), opt("encodings"), opt("strict")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "mb_internal_encoding",
+        vec![opt("encoding")],
+        t_str_or_bool(),
+    );
+    reg(
+        codebase,
+        "mb_str_split",
+        vec![req("string"), opt("length"), opt("encoding")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "sprintf",
+        vec![req("format"), vari("values")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "vsprintf",
+        vec![req("format"), req("values")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "printf",
+        vec![req("format"), vari("values")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "vprintf",
+        vec![req("format"), req("values")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "sscanf",
+        vec![req("string"), req("format"), byref_vari("vars")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "fprintf",
+        vec![req("handle"), req("format"), vari("values")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "explode",
+        vec![req("separator"), req("string"), opt("limit")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "implode",
+        vec![req("separator"), opt("array")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "join",
+        vec![req("separator"), opt("array")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "str_split",
+        vec![req("string"), opt("length")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "str_word_count",
+        vec![req("string"), opt("format"), opt("characters")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "str_getcsv",
+        vec![
+            req("string"),
+            opt("separator"),
+            opt("enclosure"),
+            opt("escape"),
+        ],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "str_pad",
+        vec![
+            req("string"),
+            req("length"),
+            opt("pad_string"),
+            opt("pad_type"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "str_repeat",
+        vec![req("string"), req("times")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "wordwrap",
+        vec![
+            req("string"),
+            opt("width"),
+            opt("break"),
+            opt("cut_long_words"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "chunk_split",
+        vec![req("string"), opt("length"), opt("separator")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "nl2br",
+        vec![req("string"), opt("use_xhtml")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "number_format",
+        vec![
+            req("num"),
+            opt("decimals"),
+            opt("decimal_separator"),
+            opt("thousands_separator"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "htmlspecialchars",
+        vec![
+            req("string"),
+            opt("flags"),
+            opt("encoding"),
+            opt("double_encode"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "htmlspecialchars_decode",
+        vec![req("string"), opt("flags")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "htmlentities",
+        vec![
+            req("string"),
+            opt("flags"),
+            opt("encoding"),
+            opt("double_encode"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "html_entity_decode",
+        vec![req("string"), opt("flags"), opt("encoding")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "strip_tags",
+        vec![req("string"), opt("allowed_tags")],
+        t_str(),
+    );
+    reg(codebase, "addslashes", vec![req("string")], t_str());
+    reg(codebase, "stripslashes", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "addcslashes",
+        vec![req("string"), req("characters")],
+        t_str(),
+    );
     reg(codebase, "stripcslashes", vec![req("string")], t_str());
-    reg(codebase, "md5",         vec![req("string"), opt("binary")], t_str());
-    reg(codebase, "sha1",        vec![req("string"), opt("binary")], t_str());
-    reg(codebase, "base64_encode",vec![req("string")], t_str());
-    reg(codebase, "base64_decode",vec![req("string"), opt("strict")], t_str_or_false());
-    reg(codebase, "urlencode",   vec![req("string")], t_str());
-    reg(codebase, "urldecode",   vec![req("string")], t_str());
-    reg(codebase, "rawurlencode",vec![req("string")], t_str());
-    reg(codebase, "rawurldecode",vec![req("string")], t_str());
-    reg(codebase, "http_build_query", vec![req("data"), opt("numeric_prefix"), opt("arg_separator"), opt("encoding_type")], t_str());
-    reg(codebase, "parse_url",   vec![req("url"), opt("component")], Union::mixed());
-    reg(codebase, "quoted_printable_encode", vec![req("string")], t_str());
-    reg(codebase, "quoted_printable_decode", vec![req("string")], t_str());
-    reg(codebase, "hex2bin",     vec![req("string")], t_str_or_false());
-    reg(codebase, "bin2hex",     vec![req("string")], t_str());
-    reg(codebase, "crc32",       vec![req("string")], t_int());
-    reg(codebase, "crypt",       vec![req("string"), opt("salt")], t_str());
-    reg(codebase, "password_hash",   vec![req("password"), req("algo"), opt("options")], t_str());
-    reg(codebase, "password_verify", vec![req("password"), req("hash")], t_bool());
-    reg(codebase, "hash",        vec![req("algo"), req("data"), opt("binary")], t_str());
-    reg(codebase, "hash_hmac",   vec![req("algo"), req("data"), req("key"), opt("binary")], t_str());
-    reg(codebase, "hash_equals", vec![req("known_string"), req("user_string")], t_bool());
-    reg(codebase, "preg_match",        vec![req("pattern"), req("subject"), byref_opt("matches"), opt("flags"), opt("offset")], t_int_or_false());
-    reg(codebase, "preg_match_all",    vec![req("pattern"), req("subject"), byref_opt("matches"), opt("flags"), opt("offset")], t_int_or_false());
-    reg(codebase, "preg_replace",      vec![req("pattern"), req("replacement"), req("subject"), opt("limit"), opt("count")], t_str_or_array_or_null());
-    reg(codebase, "preg_replace_callback",       vec![req("pattern"), req("callback"), req("subject"), opt("limit"), opt("count")], t_str_or_array_or_null());
-    reg(codebase, "preg_replace_callback_array", vec![req("pattern"), req("subject"), opt("limit"), opt("count")], t_str_or_array_or_null());
-    reg(codebase, "preg_split",  vec![req("pattern"), req("subject"), opt("limit"), opt("flags")], t_array_or_false());
-    reg(codebase, "preg_quote",  vec![req("string"), opt("delimiter")], t_str());
-    reg(codebase, "substr_count",vec![req("haystack"), req("needle"), opt("offset"), opt("length")], t_int());
-    reg(codebase, "strcmp",      vec![req("string1"), req("string2")], t_int());
-    reg(codebase, "strcasecmp",  vec![req("string1"), req("string2")], t_int());
-    reg(codebase, "strncmp",     vec![req("string1"), req("string2"), req("length")], t_int());
-    reg(codebase, "strncasecmp", vec![req("string1"), req("string2"), req("length")], t_int());
-    reg(codebase, "strnatcmp",      vec![req("string1"), req("string2")], t_int());
-    reg(codebase, "strnatcasecmp",  vec![req("string1"), req("string2")], t_int());
-    reg(codebase, "version_compare", vec![req("version1"), req("version2"), opt("operator")], t_str_or_int_or_bool());
-    reg(codebase, "similar_text", vec![req("string1"), req("string2"), opt("percent")], t_int());
-    reg(codebase, "soundex",     vec![req("string")], t_str());
-    reg(codebase, "metaphone",   vec![req("string"), opt("max_phonemes")], t_str());
-    reg(codebase, "levenshtein", vec![req("string1"), req("string2")], t_int());
-    reg(codebase, "ord",  vec![req("character")], t_int());
-    reg(codebase, "chr",  vec![req("codepoint")],  t_str());
-    reg(codebase, "ctype_alpha",  vec![req("string")], t_bool());
-    reg(codebase, "ctype_digit",  vec![req("string")], t_bool());
-    reg(codebase, "ctype_alnum",  vec![req("string")], t_bool());
-    reg(codebase, "ctype_space",  vec![req("string")], t_bool());
-    reg(codebase, "serialize",   vec![req("value")], t_str());
-    reg(codebase, "unserialize", vec![req("data"), opt("options")], Union::mixed());
-    reg(codebase, "dirname",     vec![req("path"), opt("levels")], t_str());
-    reg(codebase, "basename",    vec![req("path"), opt("suffix")], t_str());
-    reg(codebase, "pathinfo",    vec![req("path"), opt("option")], Union::mixed());
-    reg(codebase, "realpath",    vec![req("path")], t_str_or_false());
-    reg(codebase, "getcwd",      vec![], t_str_or_false());
-    reg(codebase, "tempnam",     vec![req("directory"), req("prefix")], t_str_or_false());
+    reg(codebase, "md5", vec![req("string"), opt("binary")], t_str());
+    reg(
+        codebase,
+        "sha1",
+        vec![req("string"), opt("binary")],
+        t_str(),
+    );
+    reg(codebase, "base64_encode", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "base64_decode",
+        vec![req("string"), opt("strict")],
+        t_str_or_false(),
+    );
+    reg(codebase, "urlencode", vec![req("string")], t_str());
+    reg(codebase, "urldecode", vec![req("string")], t_str());
+    reg(codebase, "rawurlencode", vec![req("string")], t_str());
+    reg(codebase, "rawurldecode", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "http_build_query",
+        vec![
+            req("data"),
+            opt("numeric_prefix"),
+            opt("arg_separator"),
+            opt("encoding_type"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "parse_url",
+        vec![req("url"), opt("component")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "quoted_printable_encode",
+        vec![req("string")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "quoted_printable_decode",
+        vec![req("string")],
+        t_str(),
+    );
+    reg(codebase, "hex2bin", vec![req("string")], t_str_or_false());
+    reg(codebase, "bin2hex", vec![req("string")], t_str());
+    reg(codebase, "crc32", vec![req("string")], t_int());
+    reg(codebase, "crypt", vec![req("string"), opt("salt")], t_str());
+    reg(
+        codebase,
+        "password_hash",
+        vec![req("password"), req("algo"), opt("options")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "password_verify",
+        vec![req("password"), req("hash")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "hash",
+        vec![req("algo"), req("data"), opt("binary")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "hash_hmac",
+        vec![req("algo"), req("data"), req("key"), opt("binary")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "hash_equals",
+        vec![req("known_string"), req("user_string")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "preg_match",
+        vec![
+            req("pattern"),
+            req("subject"),
+            byref_opt("matches"),
+            opt("flags"),
+            opt("offset"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "preg_match_all",
+        vec![
+            req("pattern"),
+            req("subject"),
+            byref_opt("matches"),
+            opt("flags"),
+            opt("offset"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "preg_replace",
+        vec![
+            req("pattern"),
+            req("replacement"),
+            req("subject"),
+            opt("limit"),
+            opt("count"),
+        ],
+        t_str_or_array_or_null(),
+    );
+    reg(
+        codebase,
+        "preg_replace_callback",
+        vec![
+            req("pattern"),
+            req("callback"),
+            req("subject"),
+            opt("limit"),
+            opt("count"),
+        ],
+        t_str_or_array_or_null(),
+    );
+    reg(
+        codebase,
+        "preg_replace_callback_array",
+        vec![req("pattern"), req("subject"), opt("limit"), opt("count")],
+        t_str_or_array_or_null(),
+    );
+    reg(
+        codebase,
+        "preg_split",
+        vec![req("pattern"), req("subject"), opt("limit"), opt("flags")],
+        t_array_or_false(),
+    );
+    reg(
+        codebase,
+        "preg_quote",
+        vec![req("string"), opt("delimiter")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "substr_count",
+        vec![req("haystack"), req("needle"), opt("offset"), opt("length")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "strcmp",
+        vec![req("string1"), req("string2")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "strcasecmp",
+        vec![req("string1"), req("string2")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "strncmp",
+        vec![req("string1"), req("string2"), req("length")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "strncasecmp",
+        vec![req("string1"), req("string2"), req("length")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "strnatcmp",
+        vec![req("string1"), req("string2")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "strnatcasecmp",
+        vec![req("string1"), req("string2")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "version_compare",
+        vec![req("version1"), req("version2"), opt("operator")],
+        t_str_or_int_or_bool(),
+    );
+    reg(
+        codebase,
+        "similar_text",
+        vec![req("string1"), req("string2"), opt("percent")],
+        t_int(),
+    );
+    reg(codebase, "soundex", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "metaphone",
+        vec![req("string"), opt("max_phonemes")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "levenshtein",
+        vec![req("string1"), req("string2")],
+        t_int(),
+    );
+    reg(codebase, "ord", vec![req("character")], t_int());
+    reg(codebase, "chr", vec![req("codepoint")], t_str());
+    reg(codebase, "ctype_alpha", vec![req("string")], t_bool());
+    reg(codebase, "ctype_digit", vec![req("string")], t_bool());
+    reg(codebase, "ctype_alnum", vec![req("string")], t_bool());
+    reg(codebase, "ctype_space", vec![req("string")], t_bool());
+    reg(codebase, "serialize", vec![req("value")], t_str());
+    reg(
+        codebase,
+        "unserialize",
+        vec![req("data"), opt("options")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "dirname",
+        vec![req("path"), opt("levels")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "basename",
+        vec![req("path"), opt("suffix")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "pathinfo",
+        vec![req("path"), opt("option")],
+        Union::mixed(),
+    );
+    reg(codebase, "realpath", vec![req("path")], t_str_or_false());
+    reg(codebase, "getcwd", vec![], t_str_or_false());
+    reg(
+        codebase,
+        "tempnam",
+        vec![req("directory"), req("prefix")],
+        t_str_or_false(),
+    );
     reg(codebase, "sys_get_temp_dir", vec![], t_str());
-    reg(codebase, "inet_ntop",   vec![req("ip")], t_str_or_false());
-    reg(codebase, "inet_pton",   vec![req("ip")], t_str_or_false());
-    reg(codebase, "ip2long",     vec![req("ip")], t_int_or_false());
-    reg(codebase, "long2ip",     vec![req("ip")], t_str());
-    reg(codebase, "money_format",  vec![req("format"), req("num")], t_str());
-    reg(codebase, "base_convert",  vec![req("num"), req("from_base"), req("to_base")], t_str());
-    reg(codebase, "bindec",   vec![req("binary_string")], t_float());
-    reg(codebase, "octdec",   vec![req("octal_string")],  t_float());
-    reg(codebase, "hexdec",   vec![req("hex_string")],    t_float());
-    reg(codebase, "decoct",   vec![req("num")], t_str());
-    reg(codebase, "dechex",   vec![req("num")], t_str());
-    reg(codebase, "decbin",   vec![req("num")], t_str());
+    reg(codebase, "inet_ntop", vec![req("ip")], t_str_or_false());
+    reg(codebase, "inet_pton", vec![req("ip")], t_str_or_false());
+    reg(codebase, "ip2long", vec![req("ip")], t_int_or_false());
+    reg(codebase, "long2ip", vec![req("ip")], t_str());
+    reg(
+        codebase,
+        "money_format",
+        vec![req("format"), req("num")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "base_convert",
+        vec![req("num"), req("from_base"), req("to_base")],
+        t_str(),
+    );
+    reg(codebase, "bindec", vec![req("binary_string")], t_float());
+    reg(codebase, "octdec", vec![req("octal_string")], t_float());
+    reg(codebase, "hexdec", vec![req("hex_string")], t_float());
+    reg(codebase, "decoct", vec![req("num")], t_str());
+    reg(codebase, "dechex", vec![req("num")], t_str());
+    reg(codebase, "decbin", vec![req("num")], t_str());
 
-    reg(codebase, "pack",   vec![req("format"), vari("values")], t_str_or_false());
-    reg(codebase, "unpack", vec![req("format"), req("string"), opt("offset")], t_array_or_false());
+    reg(
+        codebase,
+        "pack",
+        vec![req("format"), vari("values")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "unpack",
+        vec![req("format"), req("string"), opt("offset")],
+        t_array_or_false(),
+    );
 
     // ---- Array -----------------------------------------------------------------
 
-    reg(codebase, "count",    vec![req("array"), opt("mode")],  t_ni());
-    reg(codebase, "sizeof",   vec![req("array"), opt("mode")],  t_ni());
-    reg(codebase, "array_keys",    vec![req("array"), opt("filter_value"), opt("strict")], t_array());
-    reg(codebase, "array_values",  vec![req("array")], t_array());
-    reg(codebase, "array_reverse", vec![req("array"), opt("preserve_keys")], t_array());
-    reg(codebase, "array_unique",  vec![req("array"), opt("flags")], t_array());
-    reg(codebase, "array_flip",    vec![req("array")], t_array());
-    reg(codebase, "array_merge",   vec![vari("arrays")], t_array());
-    reg(codebase, "array_slice",   vec![req("array"), req("offset"), opt("length"), opt("preserve_keys")], t_array());
-    reg(codebase, "array_map",     vec![req("callback"), req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_filter",  vec![req("array"), opt("callback"), opt("mode")], t_array());
-    reg(codebase, "array_pop",     vec![byref("array")], Union::mixed());
-    reg(codebase, "array_shift",   vec![byref("array")], Union::mixed());
-    reg(codebase, "array_push",    vec![byref("array"), vari("values")], t_int());
-    reg(codebase, "array_unshift", vec![byref("array"), vari("values")], t_int());
-    reg(codebase, "in_array",          vec![req("needle"), req("haystack"), opt("strict")], t_bool());
-    reg(codebase, "array_key_exists",  vec![req("key"), req("array")], t_bool());
-    reg(codebase, "array_search",      vec![req("needle"), req("haystack"), opt("strict")], Union::mixed());
-    reg(codebase, "array_combine",     vec![req("keys"), req("values")], Union::mixed());
-    reg(codebase, "array_diff",        vec![req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_diff_key",    vec![req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_diff_assoc",  vec![req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_intersect",        vec![req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_intersect_key",    vec![req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_intersect_assoc",  vec![req("array"), vari("arrays")], t_array());
-    reg(codebase, "array_fill",      vec![req("start_index"), req("count"), req("value")], t_array());
-    reg(codebase, "array_fill_keys", vec![req("keys"), req("value")], t_array());
-    reg(codebase, "array_pad",       vec![req("array"), req("length"), req("value")], t_array());
-    reg(codebase, "array_chunk",     vec![req("array"), req("length"), opt("preserve_keys")], t_array());
-    reg(codebase, "array_column",    vec![req("array"), req("column_key"), opt("index_key")], t_array());
-    reg(codebase, "array_count_values",   vec![req("array")], t_array());
-    reg(codebase, "array_walk",           vec![byref("array"), req("callback"), opt("arg")], t_bool());
-    reg(codebase, "array_walk_recursive", vec![byref("array"), req("callback"), opt("arg")], t_bool());
-    reg(codebase, "array_splice",  vec![byref("array"), req("offset"), opt("length"), opt("replacement")], t_array());
-    reg(codebase, "range",         vec![req("start"), req("end"), opt("step")], t_array());
-    reg(codebase, "array_reduce",  vec![req("array"), req("callback"), opt("initial")], Union::mixed());
-    reg(codebase, "sort",    vec![byref("array"), opt("flags")], t_bool());
-    reg(codebase, "rsort",   vec![byref("array"), opt("flags")], t_bool());
-    reg(codebase, "asort",   vec![byref("array"), opt("flags")], t_bool());
-    reg(codebase, "arsort",  vec![byref("array"), opt("flags")], t_bool());
-    reg(codebase, "ksort",   vec![byref("array"), opt("flags")], t_bool());
-    reg(codebase, "krsort",  vec![byref("array"), opt("flags")], t_bool());
-    reg(codebase, "usort",   vec![byref("array"), req("callback")], t_bool());
-    reg(codebase, "uasort",  vec![byref("array"), req("callback")], t_bool());
-    reg(codebase, "uksort",  vec![byref("array"), req("callback")], t_bool());
+    reg(codebase, "count", vec![req("array"), opt("mode")], t_ni());
+    reg(codebase, "sizeof", vec![req("array"), opt("mode")], t_ni());
+    reg(
+        codebase,
+        "array_keys",
+        vec![req("array"), opt("filter_value"), opt("strict")],
+        t_array(),
+    );
+    reg(codebase, "array_values", vec![req("array")], t_array());
+    reg(
+        codebase,
+        "array_reverse",
+        vec![req("array"), opt("preserve_keys")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_unique",
+        vec![req("array"), opt("flags")],
+        t_array(),
+    );
+    reg(codebase, "array_flip", vec![req("array")], t_array());
+    reg(codebase, "array_merge", vec![vari("arrays")], t_array());
+    reg(
+        codebase,
+        "array_slice",
+        vec![
+            req("array"),
+            req("offset"),
+            opt("length"),
+            opt("preserve_keys"),
+        ],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_map",
+        vec![req("callback"), req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_filter",
+        vec![req("array"), opt("callback"), opt("mode")],
+        t_array(),
+    );
+    reg(codebase, "array_pop", vec![byref("array")], Union::mixed());
+    reg(
+        codebase,
+        "array_shift",
+        vec![byref("array")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "array_push",
+        vec![byref("array"), vari("values")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "array_unshift",
+        vec![byref("array"), vari("values")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "in_array",
+        vec![req("needle"), req("haystack"), opt("strict")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "array_key_exists",
+        vec![req("key"), req("array")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "array_search",
+        vec![req("needle"), req("haystack"), opt("strict")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "array_combine",
+        vec![req("keys"), req("values")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "array_diff",
+        vec![req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_diff_key",
+        vec![req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_diff_assoc",
+        vec![req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_intersect",
+        vec![req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_intersect_key",
+        vec![req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_intersect_assoc",
+        vec![req("array"), vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_fill",
+        vec![req("start_index"), req("count"), req("value")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_fill_keys",
+        vec![req("keys"), req("value")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_pad",
+        vec![req("array"), req("length"), req("value")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_chunk",
+        vec![req("array"), req("length"), opt("preserve_keys")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_column",
+        vec![req("array"), req("column_key"), opt("index_key")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_count_values",
+        vec![req("array")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_walk",
+        vec![byref("array"), req("callback"), opt("arg")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "array_walk_recursive",
+        vec![byref("array"), req("callback"), opt("arg")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "array_splice",
+        vec![
+            byref("array"),
+            req("offset"),
+            opt("length"),
+            opt("replacement"),
+        ],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "range",
+        vec![req("start"), req("end"), opt("step")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_reduce",
+        vec![req("array"), req("callback"), opt("initial")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "sort",
+        vec![byref("array"), opt("flags")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "rsort",
+        vec![byref("array"), opt("flags")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "asort",
+        vec![byref("array"), opt("flags")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "arsort",
+        vec![byref("array"), opt("flags")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "ksort",
+        vec![byref("array"), opt("flags")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "krsort",
+        vec![byref("array"), opt("flags")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "usort",
+        vec![byref("array"), req("callback")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "uasort",
+        vec![byref("array"), req("callback")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "uksort",
+        vec![byref("array"), req("callback")],
+        t_bool(),
+    );
     reg(codebase, "shuffle", vec![byref("array")], t_bool());
     reg(codebase, "natcasesort", vec![byref("array")], t_bool());
-    reg(codebase, "natsort",     vec![byref("array")], t_bool());
-    reg(codebase, "array_key_first", vec![req("array")], t_int_str_null());
-    reg(codebase, "array_key_last",  vec![req("array")], t_int_str_null());
-    reg(codebase, "compact",  vec![vari("var_names")], t_array());
-    reg(codebase, "extract",  vec![byref("array"), opt("flags"), opt("prefix")], t_int());
-    reg(codebase, "list",     vec![vari("vars")], Union::mixed());
+    reg(codebase, "natsort", vec![byref("array")], t_bool());
+    reg(
+        codebase,
+        "array_key_first",
+        vec![req("array")],
+        t_int_str_null(),
+    );
+    reg(
+        codebase,
+        "array_key_last",
+        vec![req("array")],
+        t_int_str_null(),
+    );
+    reg(codebase, "compact", vec![vari("var_names")], t_array());
+    reg(
+        codebase,
+        "extract",
+        vec![byref("array"), opt("flags"), opt("prefix")],
+        t_int(),
+    );
+    reg(codebase, "list", vec![vari("vars")], Union::mixed());
 
     // ---- Math ------------------------------------------------------------------
 
-    reg(codebase, "abs",   vec![req("num")], Union::mixed());
-    reg(codebase, "ceil",  vec![req("num")], t_float());
+    reg(codebase, "abs", vec![req("num")], Union::mixed());
+    reg(codebase, "ceil", vec![req("num")], t_float());
     reg(codebase, "floor", vec![req("num")], t_float());
-    reg(codebase, "round", vec![req("num"), opt("precision"), opt("mode")], t_float());
-    reg(codebase, "fmod",  vec![req("num1"), req("num2")], t_float());
-    reg(codebase, "fdiv",  vec![req("num1"), req("num2")], t_float());
-    reg(codebase, "pow",   vec![req("base"), req("exp")], Union::mixed());
-    reg(codebase, "sqrt",  vec![req("num")], t_float());
-    reg(codebase, "log",   vec![req("num"), opt("base")], t_float());
+    reg(
+        codebase,
+        "round",
+        vec![req("num"), opt("precision"), opt("mode")],
+        t_float(),
+    );
+    reg(codebase, "fmod", vec![req("num1"), req("num2")], t_float());
+    reg(codebase, "fdiv", vec![req("num1"), req("num2")], t_float());
+    reg(
+        codebase,
+        "pow",
+        vec![req("base"), req("exp")],
+        Union::mixed(),
+    );
+    reg(codebase, "sqrt", vec![req("num")], t_float());
+    reg(codebase, "log", vec![req("num"), opt("base")], t_float());
     reg(codebase, "log10", vec![req("num")], t_float());
-    reg(codebase, "log2",  vec![req("num")], t_float());
-    reg(codebase, "exp",   vec![req("num")], t_float());
-    reg(codebase, "sin",   vec![req("num")], t_float());
-    reg(codebase, "cos",   vec![req("num")], t_float());
-    reg(codebase, "tan",   vec![req("num")], t_float());
-    reg(codebase, "asin",  vec![req("num")], t_float());
-    reg(codebase, "acos",  vec![req("num")], t_float());
-    reg(codebase, "atan",  vec![req("num")], t_float());
+    reg(codebase, "log2", vec![req("num")], t_float());
+    reg(codebase, "exp", vec![req("num")], t_float());
+    reg(codebase, "sin", vec![req("num")], t_float());
+    reg(codebase, "cos", vec![req("num")], t_float());
+    reg(codebase, "tan", vec![req("num")], t_float());
+    reg(codebase, "asin", vec![req("num")], t_float());
+    reg(codebase, "acos", vec![req("num")], t_float());
+    reg(codebase, "atan", vec![req("num")], t_float());
     reg(codebase, "atan2", vec![req("y"), req("x")], t_float());
-    reg(codebase, "sinh",  vec![req("num")], t_float());
-    reg(codebase, "cosh",  vec![req("num")], t_float());
-    reg(codebase, "tanh",  vec![req("num")], t_float());
+    reg(codebase, "sinh", vec![req("num")], t_float());
+    reg(codebase, "cosh", vec![req("num")], t_float());
+    reg(codebase, "tanh", vec![req("num")], t_float());
     reg(codebase, "deg2rad", vec![req("num")], t_float());
     reg(codebase, "rad2deg", vec![req("num")], t_float());
-    reg(codebase, "pi",      vec![], t_float());
-    reg(codebase, "hypot",   vec![req("x"), req("y")], t_float());
-    reg(codebase, "fabs",    vec![req("num")], t_float());
-    reg(codebase, "intdiv",  vec![req("num"), req("divisor")], t_int());
-    reg(codebase, "rand",       vec![opt("min"), opt("max")], t_int());
-    reg(codebase, "mt_rand",    vec![opt("min"), opt("max")], t_int());
-    reg(codebase, "random_int", vec![req("min"), req("max")], t_int());
-    reg(codebase, "array_sum",     vec![req("array")], t_int_or_float());
-    reg(codebase, "array_product", vec![req("array")], t_int_or_float());
-    reg(codebase, "max",  vec![req("value"), vari("values")], Union::mixed());
-    reg(codebase, "min",  vec![req("value"), vari("values")], Union::mixed());
+    reg(codebase, "pi", vec![], t_float());
+    reg(codebase, "hypot", vec![req("x"), req("y")], t_float());
+    reg(codebase, "fabs", vec![req("num")], t_float());
+    reg(
+        codebase,
+        "intdiv",
+        vec![req("num"), req("divisor")],
+        t_int(),
+    );
+    reg(codebase, "rand", vec![opt("min"), opt("max")], t_int());
+    reg(codebase, "mt_rand", vec![opt("min"), opt("max")], t_int());
+    reg(
+        codebase,
+        "random_int",
+        vec![req("min"), req("max")],
+        t_int(),
+    );
+    reg(codebase, "array_sum", vec![req("array")], t_int_or_float());
+    reg(
+        codebase,
+        "array_product",
+        vec![req("array")],
+        t_int_or_float(),
+    );
+    reg(
+        codebase,
+        "max",
+        vec![req("value"), vari("values")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "min",
+        vec![req("value"), vari("values")],
+        Union::mixed(),
+    );
 
     // ---- Type coercion / checking ----------------------------------------------
 
-    reg(codebase, "intval",    vec![req("value"), opt("base")], t_int());
-    reg(codebase, "floatval",  vec![req("value")], t_float());
+    reg(codebase, "intval", vec![req("value"), opt("base")], t_int());
+    reg(codebase, "floatval", vec![req("value")], t_float());
     reg(codebase, "doubleval", vec![req("value")], t_float());
-    reg(codebase, "strval",    vec![req("value")], t_str());
-    reg(codebase, "boolval",   vec![req("value")], t_bool());
-    reg(codebase, "settype",   vec![byref("var"), req("type")], t_bool());
-    reg(codebase, "is_string",   vec![req("value")], t_bool());
-    reg(codebase, "is_int",      vec![req("value")], t_bool());
-    reg(codebase, "is_integer",  vec![req("value")], t_bool());
-    reg(codebase, "is_long",     vec![req("value")], t_bool());
-    reg(codebase, "is_float",    vec![req("value")], t_bool());
-    reg(codebase, "is_double",   vec![req("value")], t_bool());
-    reg(codebase, "is_real",     vec![req("value")], t_bool());
-    reg(codebase, "is_bool",     vec![req("value")], t_bool());
-    reg(codebase, "is_null",     vec![req("value")], t_bool());
-    reg(codebase, "is_array",    vec![req("value")], t_bool());
-    reg(codebase, "is_object",   vec![req("value")], t_bool());
-    reg(codebase, "is_callable", vec![req("value"), opt("syntax_only"), opt("callable_name")], t_bool());
-    reg(codebase, "is_numeric",  vec![req("value")], t_bool());
+    reg(codebase, "strval", vec![req("value")], t_str());
+    reg(codebase, "boolval", vec![req("value")], t_bool());
+    reg(
+        codebase,
+        "settype",
+        vec![byref("var"), req("type")],
+        t_bool(),
+    );
+    reg(codebase, "is_string", vec![req("value")], t_bool());
+    reg(codebase, "is_int", vec![req("value")], t_bool());
+    reg(codebase, "is_integer", vec![req("value")], t_bool());
+    reg(codebase, "is_long", vec![req("value")], t_bool());
+    reg(codebase, "is_float", vec![req("value")], t_bool());
+    reg(codebase, "is_double", vec![req("value")], t_bool());
+    reg(codebase, "is_real", vec![req("value")], t_bool());
+    reg(codebase, "is_bool", vec![req("value")], t_bool());
+    reg(codebase, "is_null", vec![req("value")], t_bool());
+    reg(codebase, "is_array", vec![req("value")], t_bool());
+    reg(codebase, "is_object", vec![req("value")], t_bool());
+    reg(
+        codebase,
+        "is_callable",
+        vec![req("value"), opt("syntax_only"), opt("callable_name")],
+        t_bool(),
+    );
+    reg(codebase, "is_numeric", vec![req("value")], t_bool());
     reg(codebase, "is_resource", vec![req("value")], t_bool());
-    reg(codebase, "is_finite",   vec![req("value")], t_bool());
+    reg(codebase, "is_finite", vec![req("value")], t_bool());
     reg(codebase, "is_infinite", vec![req("value")], t_bool());
-    reg(codebase, "is_nan",      vec![req("value")], t_bool());
-    reg(codebase, "is_a",          vec![req("object"), req("class"), opt("allow_string")], t_bool());
-    reg(codebase, "is_subclass_of",vec![req("object"), req("class"), opt("allow_string")], t_bool());
-    reg(codebase, "gettype",        vec![req("value")], t_str());
+    reg(codebase, "is_nan", vec![req("value")], t_bool());
+    reg(
+        codebase,
+        "is_a",
+        vec![req("object"), req("class"), opt("allow_string")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "is_subclass_of",
+        vec![req("object"), req("class"), opt("allow_string")],
+        t_bool(),
+    );
+    reg(codebase, "gettype", vec![req("value")], t_str());
     reg(codebase, "get_debug_type", vec![req("value")], t_str());
-    reg(codebase, "get_class",        vec![opt("object")], t_str_or_false());
-    reg(codebase, "get_parent_class", vec![opt("object")], t_str_or_false());
+    reg(codebase, "get_class", vec![opt("object")], t_str_or_false());
+    reg(
+        codebase,
+        "get_parent_class",
+        vec![opt("object")],
+        t_str_or_false(),
+    );
     reg(codebase, "get_called_class", vec![], t_str());
-    reg(codebase, "class_exists",     vec![req("class"), opt("autoload")], t_bool());
-    reg(codebase, "interface_exists", vec![req("class"), opt("autoload")], t_bool());
-    reg(codebase, "trait_exists",     vec![req("class"), opt("autoload")], t_bool());
-    reg(codebase, "function_exists",  vec![req("function")], t_bool());
-    reg(codebase, "method_exists",    vec![req("object"), req("method")], t_bool());
-    reg(codebase, "property_exists",  vec![req("object"), req("property")], t_bool());
-    reg(codebase, "defined",          vec![req("constant")], t_bool());
-    reg(codebase, "extension_loaded", vec![req("extension")], t_bool());
+    reg(
+        codebase,
+        "class_exists",
+        vec![req("class"), opt("autoload")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "interface_exists",
+        vec![req("class"), opt("autoload")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "trait_exists",
+        vec![req("class"), opt("autoload")],
+        t_bool(),
+    );
+    reg(codebase, "function_exists", vec![req("function")], t_bool());
+    reg(
+        codebase,
+        "method_exists",
+        vec![req("object"), req("method")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "property_exists",
+        vec![req("object"), req("property")],
+        t_bool(),
+    );
+    reg(codebase, "defined", vec![req("constant")], t_bool());
+    reg(
+        codebase,
+        "extension_loaded",
+        vec![req("extension")],
+        t_bool(),
+    );
 
     // ---- JSON ------------------------------------------------------------------
 
-    reg(codebase, "json_encode", vec![req("value"), opt("flags"), opt("depth")], t_str_or_false());
-    reg(codebase, "json_decode", vec![req("json"), opt("associative"), opt("depth"), opt("flags")], Union::mixed());
+    reg(
+        codebase,
+        "json_encode",
+        vec![req("value"), opt("flags"), opt("depth")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "json_decode",
+        vec![req("json"), opt("associative"), opt("depth"), opt("flags")],
+        Union::mixed(),
+    );
 
     // ---- File I/O --------------------------------------------------------------
 
-    reg(codebase, "file_get_contents", vec![req("filename"), opt("use_include_path"), opt("context"), opt("offset"), opt("length")], t_str_or_false());
-    reg(codebase, "file_put_contents", vec![req("filename"), req("data"), opt("flags"), opt("context")], t_int_or_false());
-    reg(codebase, "fopen",  vec![req("filename"), req("mode"), opt("use_include_path"), opt("context")], t_obj_or_false("resource"));
-    reg(codebase, "fread",  vec![req("handle"), req("length")], t_str_or_false());
-    reg(codebase, "fwrite", vec![req("handle"), req("string"), opt("length")], t_int_or_false());
-    reg(codebase, "fgets",  vec![req("handle"), opt("length")], t_str_or_false());
-    reg(codebase, "fgetc",  vec![req("handle")], t_str_or_false());
-    reg(codebase, "fgetss", vec![req("handle"), opt("length"), opt("allowable_tags")], t_str_or_false());
+    reg(
+        codebase,
+        "file_get_contents",
+        vec![
+            req("filename"),
+            opt("use_include_path"),
+            opt("context"),
+            opt("offset"),
+            opt("length"),
+        ],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "file_put_contents",
+        vec![req("filename"), req("data"), opt("flags"), opt("context")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "fopen",
+        vec![
+            req("filename"),
+            req("mode"),
+            opt("use_include_path"),
+            opt("context"),
+        ],
+        t_obj_or_false("resource"),
+    );
+    reg(
+        codebase,
+        "fread",
+        vec![req("handle"), req("length")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "fwrite",
+        vec![req("handle"), req("string"), opt("length")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "fgets",
+        vec![req("handle"), opt("length")],
+        t_str_or_false(),
+    );
+    reg(codebase, "fgetc", vec![req("handle")], t_str_or_false());
+    reg(
+        codebase,
+        "fgetss",
+        vec![req("handle"), opt("length"), opt("allowable_tags")],
+        t_str_or_false(),
+    );
     reg(codebase, "fclose", vec![req("handle")], t_bool());
-    reg(codebase, "feof",   vec![req("handle")], t_bool());
-    reg(codebase, "fseek",  vec![req("handle"), req("offset"), opt("whence")], t_int());
-    reg(codebase, "ftell",  vec![req("handle")], t_int_or_false());
+    reg(codebase, "feof", vec![req("handle")], t_bool());
+    reg(
+        codebase,
+        "fseek",
+        vec![req("handle"), req("offset"), opt("whence")],
+        t_int(),
+    );
+    reg(codebase, "ftell", vec![req("handle")], t_int_or_false());
     reg(codebase, "rewind", vec![req("handle")], t_bool());
     reg(codebase, "fflush", vec![req("handle")], t_bool());
-    reg(codebase, "file",   vec![req("filename"), opt("flags"), opt("context")], t_array_or_false());
-    reg(codebase, "glob",   vec![req("pattern"), opt("flags")], t_array_or_false());
-    reg(codebase, "scandir",vec![req("directory"), opt("sorting_order"), opt("context")], t_array_or_false());
-    reg(codebase, "readdir",vec![opt("dir_handle")], t_str_or_false());
-    reg(codebase, "opendir",vec![req("directory"), opt("context")], Union::mixed());
-    reg(codebase, "closedir",vec![opt("dir_handle")], t_void());
-    reg(codebase, "file_exists",   vec![req("filename")], t_bool());
-    reg(codebase, "is_file",       vec![req("filename")], t_bool());
-    reg(codebase, "is_dir",        vec![req("filename")], t_bool());
-    reg(codebase, "is_readable",   vec![req("filename")], t_bool());
-    reg(codebase, "is_writable",   vec![req("filename")], t_bool());
+    reg(
+        codebase,
+        "file",
+        vec![req("filename"), opt("flags"), opt("context")],
+        t_array_or_false(),
+    );
+    reg(
+        codebase,
+        "glob",
+        vec![req("pattern"), opt("flags")],
+        t_array_or_false(),
+    );
+    reg(
+        codebase,
+        "scandir",
+        vec![req("directory"), opt("sorting_order"), opt("context")],
+        t_array_or_false(),
+    );
+    reg(
+        codebase,
+        "readdir",
+        vec![opt("dir_handle")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "opendir",
+        vec![req("directory"), opt("context")],
+        Union::mixed(),
+    );
+    reg(codebase, "closedir", vec![opt("dir_handle")], t_void());
+    reg(codebase, "file_exists", vec![req("filename")], t_bool());
+    reg(codebase, "is_file", vec![req("filename")], t_bool());
+    reg(codebase, "is_dir", vec![req("filename")], t_bool());
+    reg(codebase, "is_readable", vec![req("filename")], t_bool());
+    reg(codebase, "is_writable", vec![req("filename")], t_bool());
     reg(codebase, "is_executable", vec![req("filename")], t_bool());
-    reg(codebase, "is_link",       vec![req("filename")], t_bool());
-    reg(codebase, "mkdir",  vec![req("directory"), opt("permissions"), opt("recursive"), opt("context")], t_bool());
-    reg(codebase, "rmdir",  vec![req("directory"), opt("context")], t_bool());
-    reg(codebase, "unlink", vec![req("filename"), opt("context")], t_bool());
-    reg(codebase, "rename", vec![req("from"), req("to"), opt("context")], t_bool());
-    reg(codebase, "copy",   vec![req("from"), req("to"), opt("context")], t_bool());
-    reg(codebase, "symlink",vec![req("target"), req("link")], t_bool());
-    reg(codebase, "link",   vec![req("target"), req("link")], t_bool());
-    reg(codebase, "chdir",  vec![req("directory")], t_bool());
-    reg(codebase, "chown",  vec![req("filename"), req("user")], t_bool());
-    reg(codebase, "chmod",  vec![req("filename"), req("permissions")], t_bool());
-    reg(codebase, "filemtime",  vec![req("filename")], t_int_or_false());
-    reg(codebase, "fileatime", vec![req("filename")], t_int_or_false());
-    reg(codebase, "filectime", vec![req("filename")], t_int_or_false());
-    reg(codebase, "filesize",  vec![req("filename")], t_int_or_false());
-    reg(codebase, "fileperms", vec![req("filename")], t_int_or_false());
-    reg(codebase, "fileinode", vec![req("filename")], t_int_or_false());
-    reg(codebase, "stream_get_contents",  vec![req("stream"), opt("length"), opt("offset")], t_str_or_false());
-    reg(codebase, "stream_socket_client",vec![req("address"), opt("error_code"), opt("error_message"), opt("timeout"), opt("flags"), opt("context")], t_obj_or_false("resource"));
-    reg(codebase, "popen",  vec![req("command"), req("mode")], t_obj_or_false("resource"));
+    reg(codebase, "is_link", vec![req("filename")], t_bool());
+    reg(
+        codebase,
+        "mkdir",
+        vec![
+            req("directory"),
+            opt("permissions"),
+            opt("recursive"),
+            opt("context"),
+        ],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "rmdir",
+        vec![req("directory"), opt("context")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "unlink",
+        vec![req("filename"), opt("context")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "rename",
+        vec![req("from"), req("to"), opt("context")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "copy",
+        vec![req("from"), req("to"), opt("context")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "symlink",
+        vec![req("target"), req("link")],
+        t_bool(),
+    );
+    reg(codebase, "link", vec![req("target"), req("link")], t_bool());
+    reg(codebase, "chdir", vec![req("directory")], t_bool());
+    reg(
+        codebase,
+        "chown",
+        vec![req("filename"), req("user")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "chmod",
+        vec![req("filename"), req("permissions")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "filemtime",
+        vec![req("filename")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "fileatime",
+        vec![req("filename")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "filectime",
+        vec![req("filename")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "filesize",
+        vec![req("filename")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "fileperms",
+        vec![req("filename")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "fileinode",
+        vec![req("filename")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "stream_get_contents",
+        vec![req("stream"), opt("length"), opt("offset")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "stream_socket_client",
+        vec![
+            req("address"),
+            opt("error_code"),
+            opt("error_message"),
+            opt("timeout"),
+            opt("flags"),
+            opt("context"),
+        ],
+        t_obj_or_false("resource"),
+    );
+    reg(
+        codebase,
+        "popen",
+        vec![req("command"), req("mode")],
+        t_obj_or_false("resource"),
+    );
 
     // ---- Date / time -----------------------------------------------------------
 
-    reg(codebase, "time",        vec![], t_int());
-    reg(codebase, "mktime",      vec![opt("hour"), opt("minute"), opt("second"), opt("month"), opt("day"), opt("year")], t_int_or_false());
-    reg(codebase, "gmmktime",    vec![opt("hour"), opt("minute"), opt("second"), opt("month"), opt("day"), opt("year")], t_int_or_false());
-    reg(codebase, "strtotime",   vec![req("datetime"), opt("baseTimestamp")], t_int_or_false());
-    reg(codebase, "date",        vec![req("format"), opt("timestamp")], t_str());
-    reg(codebase, "gmdate",      vec![req("format"), opt("timestamp")], t_str());
-    reg(codebase, "strftime",    vec![req("format"), opt("timestamp")], t_str_or_false());
-    reg(codebase, "gmstrftime",  vec![req("format"), opt("timestamp")], t_str_or_false());
-    reg(codebase, "microtime",   vec![opt("as_float")], Union::mixed());
-    reg(codebase, "checkdate",   vec![req("month"), req("day"), req("year")], t_bool());
-    reg(codebase, "date_create", vec![opt("datetime"), opt("timezone")], t_obj_or_false("DateTime"));
-    reg(codebase, "date_format", vec![req("datetime"), req("format")], t_str_or_false());
-    reg(codebase, "date_modify", vec![req("object"), req("modifier")], t_obj_or_false("DateTime"));
+    reg(codebase, "time", vec![], t_int());
+    reg(
+        codebase,
+        "mktime",
+        vec![
+            opt("hour"),
+            opt("minute"),
+            opt("second"),
+            opt("month"),
+            opt("day"),
+            opt("year"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "gmmktime",
+        vec![
+            opt("hour"),
+            opt("minute"),
+            opt("second"),
+            opt("month"),
+            opt("day"),
+            opt("year"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "strtotime",
+        vec![req("datetime"), opt("baseTimestamp")],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "date",
+        vec![req("format"), opt("timestamp")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "gmdate",
+        vec![req("format"), opt("timestamp")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "strftime",
+        vec![req("format"), opt("timestamp")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "gmstrftime",
+        vec![req("format"), opt("timestamp")],
+        t_str_or_false(),
+    );
+    reg(codebase, "microtime", vec![opt("as_float")], Union::mixed());
+    reg(
+        codebase,
+        "checkdate",
+        vec![req("month"), req("day"), req("year")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "date_create",
+        vec![opt("datetime"), opt("timezone")],
+        t_obj_or_false("DateTime"),
+    );
+    reg(
+        codebase,
+        "date_format",
+        vec![req("datetime"), req("format")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "date_modify",
+        vec![req("object"), req("modifier")],
+        t_obj_or_false("DateTime"),
+    );
 
     // ---- Output control --------------------------------------------------------
 
-    reg(codebase, "ob_start",       vec![opt("callback"), opt("chunk_size"), opt("flags")], t_bool());
-    reg(codebase, "ob_end_clean",   vec![], t_bool());
-    reg(codebase, "ob_end_flush",   vec![], t_bool());
-    reg(codebase, "ob_flush",       vec![], t_bool());
-    reg(codebase, "ob_get_clean",   vec![], t_str_or_false());
-    reg(codebase, "ob_get_contents",vec![], t_str_or_false());
-    reg(codebase, "ob_get_level",   vec![], t_int());
-    reg(codebase, "ob_get_length",  vec![], t_int_or_false());
-    reg(codebase, "ob_get_status",  vec![opt("full_status")], t_array());
-    reg(codebase, "flush",          vec![], t_void());
+    reg(
+        codebase,
+        "ob_start",
+        vec![opt("callback"), opt("chunk_size"), opt("flags")],
+        t_bool(),
+    );
+    reg(codebase, "ob_end_clean", vec![], t_bool());
+    reg(codebase, "ob_end_flush", vec![], t_bool());
+    reg(codebase, "ob_flush", vec![], t_bool());
+    reg(codebase, "ob_get_clean", vec![], t_str_or_false());
+    reg(codebase, "ob_get_contents", vec![], t_str_or_false());
+    reg(codebase, "ob_get_level", vec![], t_int());
+    reg(codebase, "ob_get_length", vec![], t_int_or_false());
+    reg(
+        codebase,
+        "ob_get_status",
+        vec![opt("full_status")],
+        t_array(),
+    );
+    reg(codebase, "flush", vec![], t_void());
 
     // ---- Session ---------------------------------------------------------------
 
-    reg(codebase, "session_start",           vec![opt("options")], t_bool());
-    reg(codebase, "session_destroy",         vec![], t_bool());
-    reg(codebase, "session_regenerate_id",   vec![opt("delete_old_session")], t_bool());
-    reg(codebase, "session_id",              vec![opt("id")], t_str_or_false());
-    reg(codebase, "session_name",            vec![opt("name")], t_str_or_false());
+    reg(codebase, "session_start", vec![opt("options")], t_bool());
+    reg(codebase, "session_destroy", vec![], t_bool());
+    reg(
+        codebase,
+        "session_regenerate_id",
+        vec![opt("delete_old_session")],
+        t_bool(),
+    );
+    reg(codebase, "session_id", vec![opt("id")], t_str_or_false());
+    reg(
+        codebase,
+        "session_name",
+        vec![opt("name")],
+        t_str_or_false(),
+    );
 
     // ---- Headers / cookies -----------------------------------------------------
 
-    reg(codebase, "header",        vec![req("header"), opt("replace"), opt("response_code")], t_void());
-    reg(codebase, "headers_sent",  vec![opt("filename"), opt("line")], t_bool());
-    reg(codebase, "headers_list",  vec![], t_array());
+    reg(
+        codebase,
+        "header",
+        vec![req("header"), opt("replace"), opt("response_code")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "headers_sent",
+        vec![opt("filename"), opt("line")],
+        t_bool(),
+    );
+    reg(codebase, "headers_list", vec![], t_array());
     reg(codebase, "header_remove", vec![opt("name")], t_void());
-    reg(codebase, "setcookie",    vec![req("name"), opt("value"), opt("expires_or_options"), opt("path"), opt("domain"), opt("secure"), opt("httponly")], t_bool());
+    reg(
+        codebase,
+        "setcookie",
+        vec![
+            req("name"),
+            opt("value"),
+            opt("expires_or_options"),
+            opt("path"),
+            opt("domain"),
+            opt("secure"),
+            opt("httponly"),
+        ],
+        t_bool(),
+    );
 
     // ---- Misc / control-flow ---------------------------------------------------
 
-    reg(codebase, "var_dump",    vec![req("value"), vari("values")], t_void());
-    reg(codebase, "print_r",     vec![req("value"), opt("return")], Union::mixed());
-    reg(codebase, "var_export",  vec![req("value"), opt("return")], Union::mixed());
-    reg(codebase, "die",         vec![opt("status")], t_never());
-    reg(codebase, "exit",        vec![opt("status")], t_never());
-    reg(codebase, "assert",      vec![req("assertion"), opt("description")], t_bool());
-    reg(codebase, "sleep",       vec![req("seconds")], t_int_or_false());
-    reg(codebase, "usleep",      vec![req("microseconds")], t_void());
+    reg(
+        codebase,
+        "var_dump",
+        vec![req("value"), vari("values")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "print_r",
+        vec![req("value"), opt("return")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "var_export",
+        vec![req("value"), opt("return")],
+        Union::mixed(),
+    );
+    reg(codebase, "die", vec![opt("status")], t_never());
+    reg(codebase, "exit", vec![opt("status")], t_never());
+    reg(
+        codebase,
+        "assert",
+        vec![req("assertion"), opt("description")],
+        t_bool(),
+    );
+    reg(codebase, "sleep", vec![req("seconds")], t_int_or_false());
+    reg(codebase, "usleep", vec![req("microseconds")], t_void());
     reg(codebase, "gc_collect_cycles", vec![], t_int());
-    reg(codebase, "call_user_func",        vec![req("callback"), vari("args")], Union::mixed());
-    reg(codebase, "call_user_func_array",  vec![req("callback"), req("args")],  Union::mixed());
-    reg(codebase, "forward_static_call",       vec![req("callback"), vari("args")], Union::mixed());
-    reg(codebase, "forward_static_call_array", vec![req("callback"), req("args")], Union::mixed());
-    reg(codebase, "func_get_args",  vec![], t_array());
-    reg(codebase, "func_get_arg",   vec![req("position")], Union::mixed());
-    reg(codebase, "func_num_args",  vec![], t_int());
-    reg(codebase, "clone",          vec![req("object")], Union::mixed());
-    reg(codebase, "isset",          vec![vari("vars")], t_bool());
-    reg(codebase, "empty",          vec![req("var")], t_bool());
+    reg(
+        codebase,
+        "call_user_func",
+        vec![req("callback"), vari("args")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "call_user_func_array",
+        vec![req("callback"), req("args")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "forward_static_call",
+        vec![req("callback"), vari("args")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "forward_static_call_array",
+        vec![req("callback"), req("args")],
+        Union::mixed(),
+    );
+    reg(codebase, "func_get_args", vec![], t_array());
+    reg(
+        codebase,
+        "func_get_arg",
+        vec![req("position")],
+        Union::mixed(),
+    );
+    reg(codebase, "func_num_args", vec![], t_int());
+    reg(codebase, "clone", vec![req("object")], Union::mixed());
+    reg(codebase, "isset", vec![vari("vars")], t_bool());
+    reg(codebase, "empty", vec![req("var")], t_bool());
 
     // ---- Error / runtime -------------------------------------------------------
 
-    reg(codebase, "error_log",              vec![req("message"), opt("message_type"), opt("destination"), opt("additional_headers")], t_bool());
-    reg(codebase, "trigger_error",          vec![req("message"), opt("error_level")], t_bool());
-    reg(codebase, "user_error",             vec![req("message"), opt("error_level")], t_bool());
-    reg(codebase, "set_error_handler",      vec![req("callback"), opt("error_levels")], Union::mixed());
-    reg(codebase, "set_exception_handler",  vec![req("callback")], Union::mixed());
-    reg(codebase, "error_reporting",        vec![opt("error_level")], t_int());
-    reg(codebase, "restore_error_handler",  vec![], t_bool());
+    reg(
+        codebase,
+        "error_log",
+        vec![
+            req("message"),
+            opt("message_type"),
+            opt("destination"),
+            opt("additional_headers"),
+        ],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "trigger_error",
+        vec![req("message"), opt("error_level")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "user_error",
+        vec![req("message"), opt("error_level")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "set_error_handler",
+        vec![req("callback"), opt("error_levels")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "set_exception_handler",
+        vec![req("callback")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "error_reporting",
+        vec![opt("error_level")],
+        t_int(),
+    );
+    reg(codebase, "restore_error_handler", vec![], t_bool());
     reg(codebase, "restore_exception_handler", vec![], t_bool());
-    reg(codebase, "ignore_user_abort",      vec![opt("value")], t_int());
-    reg(codebase, "register_shutdown_function", vec![req("callback"), vari("args")], t_void());
+    reg(codebase, "ignore_user_abort", vec![opt("value")], t_int());
+    reg(
+        codebase,
+        "register_shutdown_function",
+        vec![req("callback"), vari("args")],
+        t_void(),
+    );
 
     // ---- System info -----------------------------------------------------------
 
-    reg(codebase, "ini_set",          vec![req("option"), req("value")], t_str_or_false());
-    reg(codebase, "ini_get",          vec![req("option")], t_str_or_false());
-    reg(codebase, "php_uname",        vec![opt("mode")], t_str());
-    reg(codebase, "phpversion",       vec![opt("extension")], t_str_or_false());
-    reg(codebase, "php_sapi_name",    vec![], t_str_or_false());
-    reg(codebase, "zend_version",     vec![], t_str());
-    reg(codebase, "memory_get_usage", vec![opt("real_usage")], t_int());
-    reg(codebase, "memory_get_peak_usage", vec![opt("real_usage")], t_int());
-    reg(codebase, "getmypid",         vec![], t_int_or_false());
-    reg(codebase, "getmyuid",         vec![], t_int_or_false());
-    reg(codebase, "getenv",           vec![opt("varname"), opt("local_only")], Union::mixed());
-    reg(codebase, "putenv",           vec![req("assignment")], t_bool());
+    reg(
+        codebase,
+        "ini_set",
+        vec![req("option"), req("value")],
+        t_str_or_false(),
+    );
+    reg(codebase, "ini_get", vec![req("option")], t_str_or_false());
+    reg(codebase, "php_uname", vec![opt("mode")], t_str());
+    reg(
+        codebase,
+        "phpversion",
+        vec![opt("extension")],
+        t_str_or_false(),
+    );
+    reg(codebase, "php_sapi_name", vec![], t_str_or_false());
+    reg(codebase, "zend_version", vec![], t_str());
+    reg(
+        codebase,
+        "memory_get_usage",
+        vec![opt("real_usage")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "memory_get_peak_usage",
+        vec![opt("real_usage")],
+        t_int(),
+    );
+    reg(codebase, "getmypid", vec![], t_int_or_false());
+    reg(codebase, "getmyuid", vec![], t_int_or_false());
+    reg(
+        codebase,
+        "getenv",
+        vec![opt("varname"), opt("local_only")],
+        Union::mixed(),
+    );
+    reg(codebase, "putenv", vec![req("assignment")], t_bool());
 
     // ---- Misc ------------------------------------------------------------------
 
-    reg(codebase, "parse_str",       vec![req("string"), byref("result")], t_void());
-    reg(codebase, "parse_ini_file",  vec![req("filename"), opt("process_sections"), opt("scanner_mode")], t_array_or_false());
-    reg(codebase, "parse_ini_string",vec![req("ini_string"), opt("process_sections"), opt("scanner_mode")], t_array_or_false());
-    reg(codebase, "openssl_encrypt", vec![req("data"), req("cipher_algo"), req("passphrase"), opt("options"), opt("iv"), opt("tag"), opt("aad"), opt("tag_length")], t_str_or_false());
-    reg(codebase, "openssl_decrypt", vec![req("data"), req("cipher_algo"), req("passphrase"), opt("options"), opt("iv"), opt("tag"), opt("aad")], t_str_or_false());
-    reg(codebase, "curl_init",       vec![opt("url")], t_obj_or_false("CurlHandle"));
-    reg(codebase, "curl_setopt",     vec![req("handle"), req("option"), req("value")], t_bool());
-    reg(codebase, "curl_exec",       vec![req("handle")], Union::mixed());
-    reg(codebase, "curl_close",      vec![req("handle")], t_void());
-    reg(codebase, "curl_error",      vec![req("handle")], t_str());
-    reg(codebase, "curl_errno",      vec![req("handle")], t_int());
-    reg(codebase, "mysqli_connect",  vec![opt("host"), opt("user"), opt("passwd"), opt("db"), opt("port"), opt("socket")], Union::mixed());
-    reg(codebase, "mysqli_query",    vec![req("mysql"), req("query"), opt("result_mode")], Union::mixed());
-    reg(codebase, "mysqli_fetch_assoc", vec![req("result")], Union::mixed());
-    reg(codebase, "mysqli_fetch_row",   vec![req("result")], Union::mixed());
-    reg(codebase, "mysqli_fetch_array", vec![req("result"), opt("mode")], Union::mixed());
-    reg(codebase, "mysqli_close",    vec![req("mysql")], t_void());
-    reg(codebase, "mysqli_real_escape_string", vec![req("mysql"), req("string")], t_str());
-    reg(codebase, "pg_connect",      vec![req("connection_string")], Union::mixed());
-    reg(codebase, "pg_query",        vec![req("connection_or_query"), opt("query")], Union::mixed());
-    reg(codebase, "pg_exec",         vec![req("connection_or_query"), opt("query")], Union::mixed());
-    reg(codebase, "pg_fetch_assoc",  vec![req("result"), opt("row")], Union::mixed());
-    reg(codebase, "pg_fetch_row",    vec![req("result"), opt("row"), opt("mode")], Union::mixed());
-    reg(codebase, "pg_close",        vec![opt("connection")], t_bool());
-    reg(codebase, "socket_create",   vec![req("domain"), req("type"), req("protocol")], Union::mixed());
+    reg(
+        codebase,
+        "parse_str",
+        vec![req("string"), byref("result")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "parse_ini_file",
+        vec![
+            req("filename"),
+            opt("process_sections"),
+            opt("scanner_mode"),
+        ],
+        t_array_or_false(),
+    );
+    reg(
+        codebase,
+        "parse_ini_string",
+        vec![
+            req("ini_string"),
+            opt("process_sections"),
+            opt("scanner_mode"),
+        ],
+        t_array_or_false(),
+    );
+    reg(
+        codebase,
+        "openssl_encrypt",
+        vec![
+            req("data"),
+            req("cipher_algo"),
+            req("passphrase"),
+            opt("options"),
+            opt("iv"),
+            opt("tag"),
+            opt("aad"),
+            opt("tag_length"),
+        ],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "openssl_decrypt",
+        vec![
+            req("data"),
+            req("cipher_algo"),
+            req("passphrase"),
+            opt("options"),
+            opt("iv"),
+            opt("tag"),
+            opt("aad"),
+        ],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "curl_init",
+        vec![opt("url")],
+        t_obj_or_false("CurlHandle"),
+    );
+    reg(
+        codebase,
+        "curl_setopt",
+        vec![req("handle"), req("option"), req("value")],
+        t_bool(),
+    );
+    reg(codebase, "curl_exec", vec![req("handle")], Union::mixed());
+    reg(codebase, "curl_close", vec![req("handle")], t_void());
+    reg(codebase, "curl_error", vec![req("handle")], t_str());
+    reg(codebase, "curl_errno", vec![req("handle")], t_int());
+    reg(
+        codebase,
+        "mysqli_connect",
+        vec![
+            opt("host"),
+            opt("user"),
+            opt("passwd"),
+            opt("db"),
+            opt("port"),
+            opt("socket"),
+        ],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "mysqli_query",
+        vec![req("mysql"), req("query"), opt("result_mode")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "mysqli_fetch_assoc",
+        vec![req("result")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "mysqli_fetch_row",
+        vec![req("result")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "mysqli_fetch_array",
+        vec![req("result"), opt("mode")],
+        Union::mixed(),
+    );
+    reg(codebase, "mysqli_close", vec![req("mysql")], t_void());
+    reg(
+        codebase,
+        "mysqli_real_escape_string",
+        vec![req("mysql"), req("string")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "pg_connect",
+        vec![req("connection_string")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "pg_query",
+        vec![req("connection_or_query"), opt("query")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "pg_exec",
+        vec![req("connection_or_query"), opt("query")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "pg_fetch_assoc",
+        vec![req("result"), opt("row")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "pg_fetch_row",
+        vec![req("result"), opt("row"), opt("mode")],
+        Union::mixed(),
+    );
+    reg(codebase, "pg_close", vec![opt("connection")], t_bool());
+    reg(
+        codebase,
+        "socket_create",
+        vec![req("domain"), req("type"), req("protocol")],
+        Union::mixed(),
+    );
 
     // ---- Missing array functions -----------------------------------------------
-    reg(codebase, "array_replace",         vec![req("array"), vari("replacements")], t_array());
-    reg(codebase, "array_replace_recursive",vec![req("array"), vari("replacements")], t_array());
-    reg(codebase, "array_find",            vec![req("array"), req("callback")], Union::mixed());
-    reg(codebase, "array_find_key",        vec![req("array"), req("callback")], Union::mixed());
-    reg(codebase, "array_any",             vec![req("array"), req("callback")], t_bool());
-    reg(codebase, "array_all",             vec![req("array"), req("callback")], t_bool());
-    reg(codebase, "array_is_list",         vec![req("array")], t_bool());
-    reg(codebase, "current",               vec![req("array")], Union::mixed());
-    reg(codebase, "next",                  vec![byref("array")], Union::mixed());
-    reg(codebase, "prev",                  vec![byref("array")], Union::mixed());
-    reg(codebase, "reset",                 vec![byref("array")], Union::mixed());
-    reg(codebase, "end",                   vec![byref("array")], Union::mixed());
-    reg(codebase, "key",                   vec![req("array")], Union::mixed());
-    reg(codebase, "each",                  vec![byref("array")], Union::mixed());
-    reg(codebase, "list",                  vec![vari("vars")], Union::mixed());
+    reg(
+        codebase,
+        "array_replace",
+        vec![req("array"), vari("replacements")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_replace_recursive",
+        vec![req("array"), vari("replacements")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_find",
+        vec![req("array"), req("callback")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "array_find_key",
+        vec![req("array"), req("callback")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "array_any",
+        vec![req("array"), req("callback")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "array_all",
+        vec![req("array"), req("callback")],
+        t_bool(),
+    );
+    reg(codebase, "array_is_list", vec![req("array")], t_bool());
+    reg(codebase, "current", vec![req("array")], Union::mixed());
+    reg(codebase, "next", vec![byref("array")], Union::mixed());
+    reg(codebase, "prev", vec![byref("array")], Union::mixed());
+    reg(codebase, "reset", vec![byref("array")], Union::mixed());
+    reg(codebase, "end", vec![byref("array")], Union::mixed());
+    reg(codebase, "key", vec![req("array")], Union::mixed());
+    reg(codebase, "each", vec![byref("array")], Union::mixed());
+    reg(codebase, "list", vec![vari("vars")], Union::mixed());
 
     // ---- Session ---------------------------------------------------------------
-    reg(codebase, "session_status",        vec![], t_int());
-    reg(codebase, "session_write_close",   vec![], t_bool());
-    reg(codebase, "session_set_cookie_params", vec![req("lifetime_or_options"), opt("path"), opt("domain"), opt("secure"), opt("httponly")], t_bool());
+    reg(codebase, "session_status", vec![], t_int());
+    reg(codebase, "session_write_close", vec![], t_bool());
+    reg(
+        codebase,
+        "session_set_cookie_params",
+        vec![
+            req("lifetime_or_options"),
+            opt("path"),
+            opt("domain"),
+            opt("secure"),
+            opt("httponly"),
+        ],
+        t_bool(),
+    );
     reg(codebase, "session_get_cookie_params", vec![], t_array());
-    reg(codebase, "session_unset",         vec![], t_bool());
-    reg(codebase, "session_save_path",     vec![opt("path")], t_str_or_false());
+    reg(codebase, "session_unset", vec![], t_bool());
+    reg(
+        codebase,
+        "session_save_path",
+        vec![opt("path")],
+        t_str_or_false(),
+    );
 
     // ---- Filter ----------------------------------------------------------------
-    reg(codebase, "filter_var",        vec![req("value"), opt("filter"), opt("options")], Union::mixed());
-    reg(codebase, "filter_input",      vec![req("type"), req("var_name"), opt("filter"), opt("options")], Union::mixed());
-    reg(codebase, "filter_has_var",    vec![req("input_type"), req("var_name")], t_bool());
-    reg(codebase, "filter_var_array",  vec![req("array"), opt("options"), opt("add_empty")], Union::mixed());
-    reg(codebase, "filter_input_array",vec![req("type"), opt("options"), opt("add_empty")], Union::mixed());
+    reg(
+        codebase,
+        "filter_var",
+        vec![req("value"), opt("filter"), opt("options")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "filter_input",
+        vec![req("type"), req("var_name"), opt("filter"), opt("options")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "filter_has_var",
+        vec![req("input_type"), req("var_name")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "filter_var_array",
+        vec![req("array"), opt("options"), opt("add_empty")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "filter_input_array",
+        vec![req("type"), opt("options"), opt("add_empty")],
+        Union::mixed(),
+    );
 
     // ---- Iterator / SPL --------------------------------------------------------
-    reg(codebase, "iterator_to_array", vec![req("iterator"), opt("preserve_keys")], t_array());
-    reg(codebase, "iterator_count",    vec![req("iterator")], t_int());
-    reg(codebase, "iterator_apply",    vec![req("iterator"), req("callback"), opt("args")], t_int());
+    reg(
+        codebase,
+        "iterator_to_array",
+        vec![req("iterator"), opt("preserve_keys")],
+        t_array(),
+    );
+    reg(codebase, "iterator_count", vec![req("iterator")], t_int());
+    reg(
+        codebase,
+        "iterator_apply",
+        vec![req("iterator"), req("callback"), opt("args")],
+        t_int(),
+    );
 
     // ---- String (additional) ---------------------------------------------------
-    reg(codebase, "strrev",            vec![req("string")], t_str());
-    reg(codebase, "str_word_count",    vec![req("string"), opt("format"), opt("characters")], Union::mixed());
-    reg(codebase, "wordwrap",          vec![req("string"), opt("width"), opt("break"), opt("cut_long_words")], t_str());
-    reg(codebase, "number_format",     vec![req("num"), opt("decimals"), opt("decimal_separator"), opt("thousands_separator")], t_str());
-    reg(codebase, "money_format",      vec![req("format"), req("num")], t_str());
-    reg(codebase, "nl2br",             vec![req("string"), opt("use_xhtml")], t_str());
-    reg(codebase, "htmlentities",      vec![req("string"), opt("flags"), opt("encoding"), opt("double_encode")], t_str());
-    reg(codebase, "quoted_printable_encode", vec![req("string")], t_str());
-    reg(codebase, "quoted_printable_decode", vec![req("string")], t_str());
-    reg(codebase, "chunk_split",       vec![req("string"), opt("length"), opt("separator")], t_str());
-    reg(codebase, "str_contains",      vec![req("haystack"), req("needle")], t_bool());
-    reg(codebase, "str_starts_with",   vec![req("haystack"), req("needle")], t_bool());
-    reg(codebase, "str_ends_with",     vec![req("haystack"), req("needle")], t_bool());
-    reg(codebase, "str_split",         vec![req("string"), opt("length")], t_array());
-    reg(codebase, "grapheme_strlen",   vec![req("string")], Union::mixed());
-    reg(codebase, "grapheme_substr",   vec![req("string"), req("offset"), opt("length")], Union::mixed());
+    reg(codebase, "strrev", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "str_word_count",
+        vec![req("string"), opt("format"), opt("characters")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "wordwrap",
+        vec![
+            req("string"),
+            opt("width"),
+            opt("break"),
+            opt("cut_long_words"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "number_format",
+        vec![
+            req("num"),
+            opt("decimals"),
+            opt("decimal_separator"),
+            opt("thousands_separator"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "money_format",
+        vec![req("format"), req("num")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "nl2br",
+        vec![req("string"), opt("use_xhtml")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "htmlentities",
+        vec![
+            req("string"),
+            opt("flags"),
+            opt("encoding"),
+            opt("double_encode"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "quoted_printable_encode",
+        vec![req("string")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "quoted_printable_decode",
+        vec![req("string")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "chunk_split",
+        vec![req("string"), opt("length"), opt("separator")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "str_contains",
+        vec![req("haystack"), req("needle")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "str_starts_with",
+        vec![req("haystack"), req("needle")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "str_ends_with",
+        vec![req("haystack"), req("needle")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "str_split",
+        vec![req("string"), opt("length")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "grapheme_strlen",
+        vec![req("string")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "grapheme_substr",
+        vec![req("string"), req("offset"), opt("length")],
+        Union::mixed(),
+    );
 
     // ---- Math (additional) -----------------------------------------------------
-    reg(codebase, "number_format",     vec![req("num"), opt("decimals"), opt("decimal_separator"), opt("thousands_separator")], t_str());
-    reg(codebase, "random_bytes",      vec![req("length")], t_str());
-    reg(codebase, "intdiv",            vec![req("num"), req("divisor")], t_int());
+    reg(
+        codebase,
+        "number_format",
+        vec![
+            req("num"),
+            opt("decimals"),
+            opt("decimal_separator"),
+            opt("thousands_separator"),
+        ],
+        t_str(),
+    );
+    reg(codebase, "random_bytes", vec![req("length")], t_str());
+    reg(
+        codebase,
+        "intdiv",
+        vec![req("num"), req("divisor")],
+        t_int(),
+    );
 
     // ---- Exec / process --------------------------------------------------------
-    reg(codebase, "exec",         vec![req("command"), byref_opt("output"), byref_opt("result_code")], t_str_or_false());
-    reg(codebase, "system",       vec![req("command"), byref_opt("result_code")], t_str_or_false());
-    reg(codebase, "passthru",     vec![req("command"), byref_opt("result_code")], t_void());
-    reg(codebase, "shell_exec",   vec![req("command")], Union::mixed());
-    reg(codebase, "proc_open",    vec![req("command"), req("descriptor_spec"), byref("pipes"), opt("cwd"), opt("env_vars"), opt("options")], Union::mixed());
-    reg(codebase, "proc_close",   vec![req("process")], t_int());
+    reg(
+        codebase,
+        "exec",
+        vec![
+            req("command"),
+            byref_opt("output"),
+            byref_opt("result_code"),
+        ],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "system",
+        vec![req("command"), byref_opt("result_code")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "passthru",
+        vec![req("command"), byref_opt("result_code")],
+        t_void(),
+    );
+    reg(codebase, "shell_exec", vec![req("command")], Union::mixed());
+    reg(
+        codebase,
+        "proc_open",
+        vec![
+            req("command"),
+            req("descriptor_spec"),
+            byref("pipes"),
+            opt("cwd"),
+            opt("env_vars"),
+            opt("options"),
+        ],
+        Union::mixed(),
+    );
+    reg(codebase, "proc_close", vec![req("process")], t_int());
     reg(codebase, "proc_get_status", vec![req("process")], t_array());
-    reg(codebase, "pclose",       vec![req("handle")], t_int());
+    reg(codebase, "pclose", vec![req("handle")], t_int());
 
     // ---- File (additional) -----------------------------------------------------
-    reg(codebase, "touch",         vec![req("filename"), opt("mtime"), opt("atime")], t_bool());
-    reg(codebase, "fputcsv",       vec![req("stream"), req("fields"), opt("separator"), opt("enclosure"), opt("escape"), opt("eol")], t_int_or_false());
-    reg(codebase, "fgetcsv",       vec![req("stream"), opt("length"), opt("separator"), opt("enclosure"), opt("escape")], Union::mixed());
-    reg(codebase, "tmpfile",       vec![], Union::mixed());
-    reg(codebase, "tempnam",       vec![req("directory"), req("prefix")], t_str_or_false());
-    reg(codebase, "realpath",      vec![req("path")], t_str_or_false());
-    reg(codebase, "pathinfo",      vec![req("path"), opt("options")], Union::mixed());
-    reg(codebase, "basename",      vec![req("path"), opt("suffix")], t_str());
-    reg(codebase, "dirname",       vec![req("path"), opt("levels")], t_str());
-    reg(codebase, "stat",          vec![req("filename")], Union::mixed());
-    reg(codebase, "lstat",         vec![req("filename")], Union::mixed());
-    reg(codebase, "clearstatcache",vec![opt("clear_realpath_cache"), opt("filename")], t_void());
+    reg(
+        codebase,
+        "touch",
+        vec![req("filename"), opt("mtime"), opt("atime")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "fputcsv",
+        vec![
+            req("stream"),
+            req("fields"),
+            opt("separator"),
+            opt("enclosure"),
+            opt("escape"),
+            opt("eol"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "fgetcsv",
+        vec![
+            req("stream"),
+            opt("length"),
+            opt("separator"),
+            opt("enclosure"),
+            opt("escape"),
+        ],
+        Union::mixed(),
+    );
+    reg(codebase, "tmpfile", vec![], Union::mixed());
+    reg(
+        codebase,
+        "tempnam",
+        vec![req("directory"), req("prefix")],
+        t_str_or_false(),
+    );
+    reg(codebase, "realpath", vec![req("path")], t_str_or_false());
+    reg(
+        codebase,
+        "pathinfo",
+        vec![req("path"), opt("options")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "basename",
+        vec![req("path"), opt("suffix")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "dirname",
+        vec![req("path"), opt("levels")],
+        t_str(),
+    );
+    reg(codebase, "stat", vec![req("filename")], Union::mixed());
+    reg(codebase, "lstat", vec![req("filename")], Union::mixed());
+    reg(
+        codebase,
+        "clearstatcache",
+        vec![opt("clear_realpath_cache"), opt("filename")],
+        t_void(),
+    );
 
     // ---- Misc (additional) -----------------------------------------------------
-    reg(codebase, "is_scalar",     vec![req("value")], t_bool());
-    reg(codebase, "is_iterable",   vec![req("value")], t_bool());
-    reg(codebase, "is_countable",  vec![req("value")], t_bool());
-    reg(codebase, "unserialize",   vec![req("data"), opt("options")], Union::mixed());
-    reg(codebase, "serialize",     vec![req("value")], t_str());
+    reg(codebase, "is_scalar", vec![req("value")], t_bool());
+    reg(codebase, "is_iterable", vec![req("value")], t_bool());
+    reg(codebase, "is_countable", vec![req("value")], t_bool());
+    reg(
+        codebase,
+        "unserialize",
+        vec![req("data"), opt("options")],
+        Union::mixed(),
+    );
+    reg(codebase, "serialize", vec![req("value")], t_str());
     reg(codebase, "base64_encode", vec![req("string")], t_str());
-    reg(codebase, "base64_decode", vec![req("string"), opt("strict")], t_str_or_false());
-    reg(codebase, "http_build_query",vec![req("data"), opt("numeric_prefix"), opt("arg_separator"), opt("encoding_type")], t_str());
-    reg(codebase, "parse_url",     vec![req("url"), opt("component")], Union::mixed());
-    reg(codebase, "urlencode",     vec![req("string")], t_str());
-    reg(codebase, "urldecode",     vec![req("string")], t_str());
-    reg(codebase, "rawurlencode",  vec![req("string")], t_str());
-    reg(codebase, "rawurldecode",  vec![req("string")], t_str());
-    reg(codebase, "gzencode",      vec![req("data"), opt("level"), opt("encoding")], t_str_or_false());
-    reg(codebase, "gzdecode",      vec![req("data"), opt("max_length")], t_str_or_false());
-    reg(codebase, "gzcompress",    vec![req("data"), opt("level"), opt("encoding")], t_str_or_false());
-    reg(codebase, "gzuncompress",  vec![req("data"), opt("max_length")], t_str_or_false());
-    reg(codebase, "gzinflate",     vec![req("data"), opt("max_length")], t_str_or_false());
-    reg(codebase, "gzdeflate",     vec![req("data"), opt("level"), opt("encoding")], t_str_or_false());
-    reg(codebase, "crc32",         vec![req("string")], t_int());
-    reg(codebase, "md5",           vec![req("string"), opt("binary")], t_str());
-    reg(codebase, "sha1",          vec![req("string"), opt("binary")], t_str());
-    reg(codebase, "ctype_alpha",   vec![req("text")], t_bool());
-    reg(codebase, "ctype_digit",   vec![req("text")], t_bool());
-    reg(codebase, "ctype_alnum",   vec![req("text")], t_bool());
-    reg(codebase, "ctype_space",   vec![req("text")], t_bool());
-    reg(codebase, "ctype_upper",   vec![req("text")], t_bool());
-    reg(codebase, "ctype_lower",   vec![req("text")], t_bool());
-    reg(codebase, "class_implements", vec![req("object"), opt("autoload")], Union::mixed());
-    reg(codebase, "class_parents",    vec![req("object"), opt("autoload")], Union::mixed());
-    reg(codebase, "class_uses",       vec![req("object"), opt("autoload")], Union::mixed());
-    reg(codebase, "get_object_vars",  vec![req("object")], t_array());
-    reg(codebase, "get_class_methods",vec![req("object")], Union::mixed());
-    reg(codebase, "spl_autoload_register", vec![opt("callback"), opt("throw"), opt("prepend")], t_void());
+    reg(
+        codebase,
+        "base64_decode",
+        vec![req("string"), opt("strict")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "http_build_query",
+        vec![
+            req("data"),
+            opt("numeric_prefix"),
+            opt("arg_separator"),
+            opt("encoding_type"),
+        ],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "parse_url",
+        vec![req("url"), opt("component")],
+        Union::mixed(),
+    );
+    reg(codebase, "urlencode", vec![req("string")], t_str());
+    reg(codebase, "urldecode", vec![req("string")], t_str());
+    reg(codebase, "rawurlencode", vec![req("string")], t_str());
+    reg(codebase, "rawurldecode", vec![req("string")], t_str());
+    reg(
+        codebase,
+        "gzencode",
+        vec![req("data"), opt("level"), opt("encoding")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "gzdecode",
+        vec![req("data"), opt("max_length")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "gzcompress",
+        vec![req("data"), opt("level"), opt("encoding")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "gzuncompress",
+        vec![req("data"), opt("max_length")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "gzinflate",
+        vec![req("data"), opt("max_length")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "gzdeflate",
+        vec![req("data"), opt("level"), opt("encoding")],
+        t_str_or_false(),
+    );
+    reg(codebase, "crc32", vec![req("string")], t_int());
+    reg(codebase, "md5", vec![req("string"), opt("binary")], t_str());
+    reg(
+        codebase,
+        "sha1",
+        vec![req("string"), opt("binary")],
+        t_str(),
+    );
+    reg(codebase, "ctype_alpha", vec![req("text")], t_bool());
+    reg(codebase, "ctype_digit", vec![req("text")], t_bool());
+    reg(codebase, "ctype_alnum", vec![req("text")], t_bool());
+    reg(codebase, "ctype_space", vec![req("text")], t_bool());
+    reg(codebase, "ctype_upper", vec![req("text")], t_bool());
+    reg(codebase, "ctype_lower", vec![req("text")], t_bool());
+    reg(
+        codebase,
+        "class_implements",
+        vec![req("object"), opt("autoload")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "class_parents",
+        vec![req("object"), opt("autoload")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "class_uses",
+        vec![req("object"), opt("autoload")],
+        Union::mixed(),
+    );
+    reg(codebase, "get_object_vars", vec![req("object")], t_array());
+    reg(
+        codebase,
+        "get_class_methods",
+        vec![req("object")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "spl_autoload_register",
+        vec![opt("callback"), opt("throw"), opt("prepend")],
+        t_void(),
+    );
     reg(codebase, "spl_object_hash", vec![req("object")], t_str());
-    reg(codebase, "spl_object_id",   vec![req("object")], t_int());
-    reg(codebase, "intl_error_name", vec![req("error_code")], t_str());
+    reg(codebase, "spl_object_id", vec![req("object")], t_int());
+    reg(
+        codebase,
+        "intl_error_name",
+        vec![req("error_code")],
+        t_str(),
+    );
 
     // ---- PHPUnit-style assertions (often used in test helpers) -----------------
-    reg(codebase, "assertEquals",        vec![req("expected"), req("actual"), opt("message")], t_void());
-    reg(codebase, "assertSame",          vec![req("expected"), req("actual"), opt("message")], t_void());
-    reg(codebase, "assertTrue",          vec![req("condition"), opt("message")], t_void());
-    reg(codebase, "assertFalse",         vec![req("condition"), opt("message")], t_void());
-    reg(codebase, "assertNull",          vec![req("actual"), opt("message")], t_void());
-    reg(codebase, "assertNotNull",       vec![req("actual"), opt("message")], t_void());
-    reg(codebase, "assertCount",         vec![req("expected_count"), req("haystack"), opt("message")], t_void());
-    reg(codebase, "assertContains",      vec![req("needle"), req("haystack"), opt("message")], t_void());
-    reg(codebase, "assertInstanceOf",    vec![req("expected"), req("actual"), opt("message")], t_void());
-    reg(codebase, "assertArrayHasKey",   vec![req("key"), req("array"), opt("message")], t_void());
-    reg(codebase, "assertStringContainsString", vec![req("needle"), req("haystack"), opt("message")], t_void());
+    reg(
+        codebase,
+        "assertEquals",
+        vec![req("expected"), req("actual"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertSame",
+        vec![req("expected"), req("actual"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertTrue",
+        vec![req("condition"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertFalse",
+        vec![req("condition"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertNull",
+        vec![req("actual"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertNotNull",
+        vec![req("actual"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertCount",
+        vec![req("expected_count"), req("haystack"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertContains",
+        vec![req("needle"), req("haystack"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertInstanceOf",
+        vec![req("expected"), req("actual"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertArrayHasKey",
+        vec![req("key"), req("array"), opt("message")],
+        t_void(),
+    );
+    reg(
+        codebase,
+        "assertStringContainsString",
+        vec![req("needle"), req("haystack"), opt("message")],
+        t_void(),
+    );
 
     // ---- Timing / execution control -------------------------------------------
-    reg(codebase, "hrtime",            vec![opt("as_number")], Union::mixed());
-    reg(codebase, "set_time_limit",    vec![req("seconds")], t_bool());
+    reg(codebase, "hrtime", vec![opt("as_number")], Union::mixed());
+    reg(codebase, "set_time_limit", vec![req("seconds")], t_bool());
     reg(codebase, "connection_status", vec![], t_int());
-    reg(codebase, "connection_aborted",vec![], t_int());
+    reg(codebase, "connection_aborted", vec![], t_int());
 
     // ---- String (more) ---------------------------------------------------------
-    reg(codebase, "strtr",             vec![req("string"), req("from_or_pairs"), opt("to")], t_str());
-    reg(codebase, "strpbrk",           vec![req("string"), req("characters")], t_str_or_false());
-    reg(codebase, "strtok",            vec![req("string_or_token"), opt("token")], t_str_or_false());
-    reg(codebase, "iconv",             vec![req("from_encoding"), req("to_encoding"), req("string")], t_str_or_false());
-    reg(codebase, "idn_to_ascii",      vec![req("domain"), opt("flags"), opt("variant"), byref_opt("idna_info")], t_str_or_false());
-    reg(codebase, "getallheaders",     vec![], t_array_or_false());
-    reg(codebase, "get_headers",       vec![req("url"), opt("associative"), opt("context")], Union::mixed());
-    reg(codebase, "http_response_code",vec![opt("response_code")], Union::mixed());
-    reg(codebase, "http_get_last_response_headers", vec![], Union::mixed());
+    reg(
+        codebase,
+        "strtr",
+        vec![req("string"), req("from_or_pairs"), opt("to")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "strpbrk",
+        vec![req("string"), req("characters")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "strtok",
+        vec![req("string_or_token"), opt("token")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "iconv",
+        vec![req("from_encoding"), req("to_encoding"), req("string")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "idn_to_ascii",
+        vec![
+            req("domain"),
+            opt("flags"),
+            opt("variant"),
+            byref_opt("idna_info"),
+        ],
+        t_str_or_false(),
+    );
+    reg(codebase, "getallheaders", vec![], t_array_or_false());
+    reg(
+        codebase,
+        "get_headers",
+        vec![req("url"), opt("associative"), opt("context")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "http_response_code",
+        vec![opt("response_code")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "http_get_last_response_headers",
+        vec![],
+        Union::mixed(),
+    );
 
     // ---- Multibyte string (mb_) ------------------------------------------------
-    reg(codebase, "mb_trim",               vec![req("string"), opt("characters")], t_str());
-    reg(codebase, "mb_check_encoding",     vec![opt("value"), opt("encoding")], t_bool());
-    reg(codebase, "mb_substitute_character",vec![opt("substitute_character")], Union::mixed());
-    reg(codebase, "mb_chr",                vec![req("codepoint"), opt("encoding")], t_str_or_false());
-    reg(codebase, "mb_list_encodings",     vec![], t_array());
-    reg(codebase, "mb_strcut",             vec![req("string"), req("start"), opt("length"), opt("encoding")], t_str());
-    reg(codebase, "mb_ucfirst",            vec![req("string"), opt("encoding")], t_str());
+    reg(
+        codebase,
+        "mb_trim",
+        vec![req("string"), opt("characters")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_check_encoding",
+        vec![opt("value"), opt("encoding")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "mb_substitute_character",
+        vec![opt("substitute_character")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "mb_chr",
+        vec![req("codepoint"), opt("encoding")],
+        t_str_or_false(),
+    );
+    reg(codebase, "mb_list_encodings", vec![], t_array());
+    reg(
+        codebase,
+        "mb_strcut",
+        vec![req("string"), req("start"), opt("length"), opt("encoding")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "mb_ucfirst",
+        vec![req("string"), opt("encoding")],
+        t_str(),
+    );
 
     // ---- Array (more) ----------------------------------------------------------
-    reg(codebase, "array_multisort",       vec![byref("array"), vari("rest")], t_bool());
-    reg(codebase, "array_udiff",           vec![req("array"), req("arrays"), req("value_compare_func")], t_array());
-    reg(codebase, "array_uintersect",      vec![req("array"), req("arrays"), req("value_compare_func")], t_array());
-    reg(codebase, "array_change_key_case", vec![req("array"), opt("case")], t_array());
-    reg(codebase, "array_merge_recursive", vec![vari("arrays")], t_array());
-    reg(codebase, "array_rand",            vec![req("array"), opt("num")], Union::mixed());
+    reg(
+        codebase,
+        "array_multisort",
+        vec![byref("array"), vari("rest")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "array_udiff",
+        vec![req("array"), req("arrays"), req("value_compare_func")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_uintersect",
+        vec![req("array"), req("arrays"), req("value_compare_func")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_change_key_case",
+        vec![req("array"), opt("case")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_merge_recursive",
+        vec![vari("arrays")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "array_rand",
+        vec![req("array"), opt("num")],
+        Union::mixed(),
+    );
 
     // ---- File info (finfo) -----------------------------------------------------
-    reg(codebase, "finfo_open",   vec![opt("flags"), opt("magic_database")], t_obj_or_false("finfo"));
-    reg(codebase, "finfo_file",   vec![req("finfo"), req("filename"), opt("flags"), opt("context")], t_str_or_false());
-    reg(codebase, "finfo_buffer", vec![req("finfo"), req("string"), opt("flags"), opt("context")], t_str_or_false());
-    reg(codebase, "finfo_close",  vec![req("finfo")], t_bool());
-    reg(codebase, "fstat",        vec![req("stream")], Union::mixed());
-    reg(codebase, "readfile",     vec![req("filename"), opt("use_include_path"), opt("context")], t_int_or_false());
+    reg(
+        codebase,
+        "finfo_open",
+        vec![opt("flags"), opt("magic_database")],
+        t_obj_or_false("finfo"),
+    );
+    reg(
+        codebase,
+        "finfo_file",
+        vec![req("finfo"), req("filename"), opt("flags"), opt("context")],
+        t_str_or_false(),
+    );
+    reg(
+        codebase,
+        "finfo_buffer",
+        vec![req("finfo"), req("string"), opt("flags"), opt("context")],
+        t_str_or_false(),
+    );
+    reg(codebase, "finfo_close", vec![req("finfo")], t_bool());
+    reg(codebase, "fstat", vec![req("stream")], Union::mixed());
+    reg(
+        codebase,
+        "readfile",
+        vec![req("filename"), opt("use_include_path"), opt("context")],
+        t_int_or_false(),
+    );
 
     // ---- SimpleXML -------------------------------------------------------------
-    reg(codebase, "simplexml_load_string", vec![req("data"), opt("class_name"), opt("options"), opt("namespace_or_prefix"), opt("is_prefix")], Union::mixed());
-    reg(codebase, "simplexml_load_file",   vec![req("filename"), opt("class_name"), opt("options"), opt("namespace_or_prefix"), opt("is_prefix")], Union::mixed());
-    reg(codebase, "simplexml_import_dom",  vec![req("node"), opt("class_name")], Union::mixed());
+    reg(
+        codebase,
+        "simplexml_load_string",
+        vec![
+            req("data"),
+            opt("class_name"),
+            opt("options"),
+            opt("namespace_or_prefix"),
+            opt("is_prefix"),
+        ],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "simplexml_load_file",
+        vec![
+            req("filename"),
+            opt("class_name"),
+            opt("options"),
+            opt("namespace_or_prefix"),
+            opt("is_prefix"),
+        ],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "simplexml_import_dom",
+        vec![req("node"), opt("class_name")],
+        Union::mixed(),
+    );
 
     // ---- LibXML ----------------------------------------------------------------
-    reg(codebase, "libxml_use_internal_errors",  vec![opt("use_errors")], t_bool());
-    reg(codebase, "libxml_get_errors",           vec![], t_array());
-    reg(codebase, "libxml_clear_errors",         vec![], t_void());
+    reg(
+        codebase,
+        "libxml_use_internal_errors",
+        vec![opt("use_errors")],
+        t_bool(),
+    );
+    reg(codebase, "libxml_get_errors", vec![], t_array());
+    reg(codebase, "libxml_clear_errors", vec![], t_void());
 
     // ---- Syslog ----------------------------------------------------------------
-    reg(codebase, "openlog",  vec![req("prefix"), req("flags"), req("facility")], t_bool());
+    reg(
+        codebase,
+        "openlog",
+        vec![req("prefix"), req("flags"), req("facility")],
+        t_bool(),
+    );
     reg(codebase, "closelog", vec![], t_bool());
-    reg(codebase, "syslog",   vec![req("priority"), req("message")], t_bool());
+    reg(
+        codebase,
+        "syslog",
+        vec![req("priority"), req("message")],
+        t_bool(),
+    );
 
     // ---- Misc (more) -----------------------------------------------------------
-    reg(codebase, "uniqid",                 vec![opt("prefix"), opt("more_entropy")], t_str());
-    reg(codebase, "timezone_open",          vec![req("timezone_id")], t_obj_or_false("DateTimeZone"));
-    reg(codebase, "date_timezone_set",      vec![req("object"), req("timezone")], t_obj_or_false("DateTime"));
-    reg(codebase, "define",                 vec![req("constant_name"), req("value"), opt("case_insensitive")], t_bool());
-    reg(codebase, "debug_backtrace",        vec![opt("options"), opt("limit")], t_array());
-    reg(codebase, "error_get_last",         vec![], Union::mixed());
-    reg(codebase, "password_get_info",      vec![req("hash")], t_array());
-    reg(codebase, "getopt",                 vec![req("short_options"), opt("long_options"), byref_opt("rest_index")], Union::mixed());
-    reg(codebase, "preg_last_error_msg",    vec![], t_str());
-    reg(codebase, "stream_context_create",  vec![opt("options"), opt("params")], t_obj_or_false("resource"));
-    reg(codebase, "mt_getrandmax",          vec![], t_int());
-    reg(codebase, "escapeshellarg",         vec![req("arg")], t_str());
-    reg(codebase, "escapeshellcmd",         vec![req("command")], t_str());
+    reg(
+        codebase,
+        "uniqid",
+        vec![opt("prefix"), opt("more_entropy")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "timezone_open",
+        vec![req("timezone_id")],
+        t_obj_or_false("DateTimeZone"),
+    );
+    reg(
+        codebase,
+        "date_timezone_set",
+        vec![req("object"), req("timezone")],
+        t_obj_or_false("DateTime"),
+    );
+    reg(
+        codebase,
+        "define",
+        vec![req("constant_name"), req("value"), opt("case_insensitive")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "debug_backtrace",
+        vec![opt("options"), opt("limit")],
+        t_array(),
+    );
+    reg(codebase, "error_get_last", vec![], Union::mixed());
+    reg(codebase, "password_get_info", vec![req("hash")], t_array());
+    reg(
+        codebase,
+        "getopt",
+        vec![
+            req("short_options"),
+            opt("long_options"),
+            byref_opt("rest_index"),
+        ],
+        Union::mixed(),
+    );
+    reg(codebase, "preg_last_error_msg", vec![], t_str());
+    reg(
+        codebase,
+        "stream_context_create",
+        vec![opt("options"), opt("params")],
+        t_obj_or_false("resource"),
+    );
+    reg(codebase, "mt_getrandmax", vec![], t_int());
+    reg(codebase, "escapeshellarg", vec![req("arg")], t_str());
+    reg(codebase, "escapeshellcmd", vec![req("command")], t_str());
 
     // ---- Streams (additional) --------------------------------------------------
-    reg(codebase, "stream_isatty",        vec![req("stream")], t_bool());
+    reg(codebase, "stream_isatty", vec![req("stream")], t_bool());
     // `$except` is by-ref but callers routinely pass null literals, so byref_opt
-    reg(codebase, "stream_select",        vec![byref("read"), byref("write"), byref_opt("except"), req("seconds"), opt("microseconds")], t_int_or_false());
-    reg(codebase, "stream_get_meta_data", vec![req("stream")], t_array());
-    reg(codebase, "stream_set_blocking",  vec![req("stream"), req("enable")], t_bool());
-    reg(codebase, "stream_copy_to_stream",vec![req("from"), req("to"), opt("length"), opt("offset")], t_int_or_false());
+    reg(
+        codebase,
+        "stream_select",
+        vec![
+            byref("read"),
+            byref("write"),
+            byref_opt("except"),
+            req("seconds"),
+            opt("microseconds"),
+        ],
+        t_int_or_false(),
+    );
+    reg(
+        codebase,
+        "stream_get_meta_data",
+        vec![req("stream")],
+        t_array(),
+    );
+    reg(
+        codebase,
+        "stream_set_blocking",
+        vec![req("stream"), req("enable")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "stream_copy_to_stream",
+        vec![req("from"), req("to"), opt("length"), opt("offset")],
+        t_int_or_false(),
+    );
 
     // ---- PCRE (additional) -----------------------------------------------------
-    reg(codebase, "preg_grep",      vec![req("pattern"), req("array"), opt("flags")], t_array_or_false());
+    reg(
+        codebase,
+        "preg_grep",
+        vec![req("pattern"), req("array"), opt("flags")],
+        t_array_or_false(),
+    );
 
     // ---- Standard (additional) -------------------------------------------------
-    reg(codebase, "get_resource_type",       vec![req("resource")], t_str());
-    reg(codebase, "ftruncate",               vec![req("stream"), req("size")], t_bool());
-    reg(codebase, "umask",                   vec![opt("mask")], t_int());
-    reg(codebase, "date_default_timezone_set", vec![req("timezoneId")], t_bool());
+    reg(
+        codebase,
+        "get_resource_type",
+        vec![req("resource")],
+        t_str(),
+    );
+    reg(
+        codebase,
+        "ftruncate",
+        vec![req("stream"), req("size")],
+        t_bool(),
+    );
+    reg(codebase, "umask", vec![opt("mask")], t_int());
+    reg(
+        codebase,
+        "date_default_timezone_set",
+        vec![req("timezoneId")],
+        t_bool(),
+    );
     reg(codebase, "date_default_timezone_get", vec![], t_str());
 
     // ---- Multibyte string (additional) -----------------------------------------
-    reg(codebase, "mb_strwidth",         vec![req("string"), opt("encoding")], t_int());
-    reg(codebase, "mb_convert_variables",vec![req("to_encoding"), req("from_encoding"), byref("var"), vari("vars")], t_str_or_false());
+    reg(
+        codebase,
+        "mb_strwidth",
+        vec![req("string"), opt("encoding")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "mb_convert_variables",
+        vec![
+            req("to_encoding"),
+            req("from_encoding"),
+            byref("var"),
+            vari("vars"),
+        ],
+        t_str_or_false(),
+    );
 
     // ---- Windows SAPI ----------------------------------------------------------
-    reg(codebase, "sapi_windows_vt100_support", vec![req("stream"), opt("enable")], t_bool());
-    reg(codebase, "sapi_windows_cp_set",        vec![req("codepage")], t_bool());
-    reg(codebase, "sapi_windows_cp_get",        vec![opt("kind")], t_int());
-    reg(codebase, "sapi_windows_cp_conv",       vec![req("in_codepage"), req("out_codepage"), req("subject")], t_str_or_false());
+    reg(
+        codebase,
+        "sapi_windows_vt100_support",
+        vec![req("stream"), opt("enable")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "sapi_windows_cp_set",
+        vec![req("codepage")],
+        t_bool(),
+    );
+    reg(codebase, "sapi_windows_cp_get", vec![opt("kind")], t_int());
+    reg(
+        codebase,
+        "sapi_windows_cp_conv",
+        vec![req("in_codepage"), req("out_codepage"), req("subject")],
+        t_str_or_false(),
+    );
 
     // ---- CLI / process title ---------------------------------------------------
-    reg(codebase, "cli_set_process_title", vec![req("title")], t_bool());
+    reg(
+        codebase,
+        "cli_set_process_title",
+        vec![req("title")],
+        t_bool(),
+    );
     reg(codebase, "cli_get_process_title", vec![], t_str_or_false());
 
     // ---- PCNTL (process control) -----------------------------------------------
-    reg(codebase, "pcntl_fork",     vec![], t_int());
-    reg(codebase, "pcntl_waitpid",  vec![req("process_id"), byref("status"), opt("flags"), opt("resource_usage")], t_int());
+    reg(codebase, "pcntl_fork", vec![], t_int());
+    reg(
+        codebase,
+        "pcntl_waitpid",
+        vec![
+            req("process_id"),
+            byref("status"),
+            opt("flags"),
+            opt("resource_usage"),
+        ],
+        t_int(),
+    );
     reg(codebase, "pcntl_wexitstatus", vec![req("status")], t_int());
-    reg(codebase, "pcntl_signal",              vec![req("signal"), req("handler"), opt("restart_syscalls")], t_bool());
-    reg(codebase, "pcntl_async_signals",       vec![opt("enable")], t_bool());
+    reg(
+        codebase,
+        "pcntl_signal",
+        vec![req("signal"), req("handler"), opt("restart_syscalls")],
+        t_bool(),
+    );
+    reg(
+        codebase,
+        "pcntl_async_signals",
+        vec![opt("enable")],
+        t_bool(),
+    );
     // Returns callable|int (SIG_DFL=0 / SIG_IGN=1); mixed used as mir has no callable atomic yet
-    reg(codebase, "pcntl_signal_get_handler",  vec![req("signal")], Union::mixed());
-    reg(codebase, "pcntl_alarm",               vec![req("seconds")], t_int());
+    reg(
+        codebase,
+        "pcntl_signal_get_handler",
+        vec![req("signal")],
+        Union::mixed(),
+    );
+    reg(codebase, "pcntl_alarm", vec![req("seconds")], t_int());
 
     // ---- POSIX -----------------------------------------------------------------
-    reg(codebase, "posix_kill",   vec![req("process_id"), req("signal")], t_bool());
+    reg(
+        codebase,
+        "posix_kill",
+        vec![req("process_id"), req("signal")],
+        t_bool(),
+    );
     reg(codebase, "posix_getpid", vec![], t_int());
 
     // ---- MySQLi procedural (additional) ----------------------------------------
     reg(codebase, "mysqli_connect_error", vec![], Union::mixed());
     reg(codebase, "mysqli_connect_errno", vec![], t_int());
-    reg(codebase, "mysqli_init",          vec![], Union::mixed());
+    reg(codebase, "mysqli_init", vec![], Union::mixed());
 
     // ---- OpenSSL (additional) --------------------------------------------------
-    reg(codebase, "openssl_cipher_iv_length", vec![req("cipher_algo")], t_int_or_false());
-    reg(codebase, "openssl_error_string",     vec![], t_str_or_false());
+    reg(
+        codebase,
+        "openssl_cipher_iv_length",
+        vec![req("cipher_algo")],
+        t_int_or_false(),
+    );
+    reg(codebase, "openssl_error_string", vec![], t_str_or_false());
 
     // ---- bzip2 -----------------------------------------------------------------
-    reg(codebase, "bzcompress",   vec![req("data"), opt("block_size"), opt("work_factor")], Union::mixed());
-    reg(codebase, "bzdecompress", vec![req("data"), opt("use_less_memory")], Union::mixed());
+    reg(
+        codebase,
+        "bzcompress",
+        vec![req("data"), opt("block_size"), opt("work_factor")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "bzdecompress",
+        vec![req("data"), opt("use_less_memory")],
+        Union::mixed(),
+    );
 
     // ---- Grapheme (intl) -------------------------------------------------------
-    reg(codebase, "grapheme_strpos",  vec![req("haystack"), req("needle"), opt("offset")], Union::mixed());
-    reg(codebase, "grapheme_strrpos", vec![req("haystack"), req("needle"), opt("offset")], Union::mixed());
+    reg(
+        codebase,
+        "grapheme_strpos",
+        vec![req("haystack"), req("needle"), opt("offset")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "grapheme_strrpos",
+        vec![req("haystack"), req("needle"), opt("offset")],
+        Union::mixed(),
+    );
 
     // ---- curl (additional) -----------------------------------------------------
-    reg(codebase, "curl_getinfo",     vec![req("handle"), opt("option")], Union::mixed());
-    reg(codebase, "curl_setopt_array",vec![req("handle"), req("options")], t_bool());
-    reg(codebase, "curl_multi_init",  vec![], Union::mixed());
-    reg(codebase, "curl_multi_add_handle", vec![req("multi_handle"), req("handle")], t_int());
-    reg(codebase, "curl_multi_exec",  vec![req("multi_handle"), byref("still_running")], t_int());
-    reg(codebase, "curl_multi_getcontent", vec![req("handle")], Union::mixed());
-    reg(codebase, "curl_multi_remove_handle", vec![req("multi_handle"), req("handle")], t_int());
-    reg(codebase, "curl_multi_close", vec![req("multi_handle")], t_void());
-    reg(codebase, "curl_reset",       vec![req("handle")], t_void());
+    reg(
+        codebase,
+        "curl_getinfo",
+        vec![req("handle"), opt("option")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "curl_setopt_array",
+        vec![req("handle"), req("options")],
+        t_bool(),
+    );
+    reg(codebase, "curl_multi_init", vec![], Union::mixed());
+    reg(
+        codebase,
+        "curl_multi_add_handle",
+        vec![req("multi_handle"), req("handle")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "curl_multi_exec",
+        vec![req("multi_handle"), byref("still_running")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "curl_multi_getcontent",
+        vec![req("handle")],
+        Union::mixed(),
+    );
+    reg(
+        codebase,
+        "curl_multi_remove_handle",
+        vec![req("multi_handle"), req("handle")],
+        t_int(),
+    );
+    reg(
+        codebase,
+        "curl_multi_close",
+        vec![req("multi_handle")],
+        t_void(),
+    );
+    reg(codebase, "curl_reset", vec![req("handle")], t_void());
 }
 
 // ---------------------------------------------------------------------------
 // Class stubs
 // ---------------------------------------------------------------------------
 
-fn empty_class(fqcn: &'static str, parent: Option<&'static str>, interfaces: Vec<&'static str>) -> ClassStorage {
+fn empty_class(
+    fqcn: &'static str,
+    parent: Option<&'static str>,
+    interfaces: Vec<&'static str>,
+) -> ClassStorage {
     ClassStorage {
         fqcn: Arc::from(fqcn),
         short_name: Arc::from(fqcn),
@@ -1089,45 +3267,104 @@ fn load_classes(codebase: &Codebase) {
 
     // ---- stdClass ---- (has __get/__set for dynamic property access)
     let mut std_class = empty_class("stdClass", None, vec![]);
-    std_class.own_methods.insert(Arc::from("__get"),
-        stub_method("stdClass", "__get", vec![req("name")], Union::mixed(), Visibility::Public).1);
-    std_class.own_methods.insert(Arc::from("__set"),
-        stub_method("stdClass", "__set", vec![req("name"), req("value")], t_void(), Visibility::Public).1);
-    std_class.own_methods.insert(Arc::from("__isset"),
-        stub_method("stdClass", "__isset", vec![req("name")], t_bool(), Visibility::Public).1);
+    std_class.own_methods.insert(
+        Arc::from("__get"),
+        stub_method(
+            "stdClass",
+            "__get",
+            vec![req("name")],
+            Union::mixed(),
+            Visibility::Public,
+        )
+        .1,
+    );
+    std_class.own_methods.insert(
+        Arc::from("__set"),
+        stub_method(
+            "stdClass",
+            "__set",
+            vec![req("name"), req("value")],
+            t_void(),
+            Visibility::Public,
+        )
+        .1,
+    );
+    std_class.own_methods.insert(
+        Arc::from("__isset"),
+        stub_method(
+            "stdClass",
+            "__isset",
+            vec![req("name")],
+            t_bool(),
+            Visibility::Public,
+        )
+        .1,
+    );
     codebase.classes.insert(Arc::from("stdClass"), std_class);
 
     // ---- Closure ----
     let mut closure = empty_class("Closure", None, vec![]);
     closure.own_methods.insert(
         Arc::from("__invoke"),
-        stub_method("Closure", "__invoke", vec![vari("args")], Union::mixed(), Public).1,
+        stub_method(
+            "Closure",
+            "__invoke",
+            vec![vari("args")],
+            Union::mixed(),
+            Public,
+        )
+        .1,
     );
     closure.own_methods.insert(
         Arc::from("bind"),
-        stub_method("Closure", "bind", vec![req("closure"), req("newThis"), opt("newScope")], t_obj_or_false("Closure"), Public).1,
+        stub_method(
+            "Closure",
+            "bind",
+            vec![req("closure"), req("newThis"), opt("newScope")],
+            t_obj_or_false("Closure"),
+            Public,
+        )
+        .1,
     );
     closure.own_methods.insert(
         Arc::from("bindTo"),
-        stub_method("Closure", "bindTo", vec![req("newThis"), opt("newScope")], t_obj_or_false("Closure"), Public).1,
+        stub_method(
+            "Closure",
+            "bindTo",
+            vec![req("newThis"), opt("newScope")],
+            t_obj_or_false("Closure"),
+            Public,
+        )
+        .1,
     );
     closure.own_methods.insert(
         Arc::from("call"),
-        stub_method("Closure", "call", vec![req("newThis"), vari("args")], Union::mixed(), Public).1,
+        stub_method(
+            "Closure",
+            "call",
+            vec![req("newThis"), vari("args")],
+            Union::mixed(),
+            Public,
+        )
+        .1,
     );
     codebase.classes.insert(Arc::from("Closure"), closure);
 
     // ---- Exception hierarchy ----
     let exc_methods: &[(&'static str, Vec<FnParam>, Union)] = &[
-        ("__construct",     vec![opt("message"), opt("code"), opt("previous")], t_void()),
-        ("getMessage",      vec![], t_str()),
-        ("getCode",         vec![], Union::mixed()),
-        ("getFile",         vec![], t_str()),
-        ("getLine",         vec![], t_int()),
-        ("getTrace",        vec![], t_array()),
-        ("getTraceAsString",vec![], t_str()),
-        ("getPrevious",     vec![], Union::mixed()),
-        ("__toString",      vec![], t_str()),
+        (
+            "__construct",
+            vec![opt("message"), opt("code"), opt("previous")],
+            t_void(),
+        ),
+        ("getMessage", vec![], t_str()),
+        ("getCode", vec![], Union::mixed()),
+        ("getFile", vec![], t_str()),
+        ("getLine", vec![], t_int()),
+        ("getTrace", vec![], t_array()),
+        ("getTraceAsString", vec![], t_str()),
+        ("getPrevious", vec![], Union::mixed()),
+        ("__toString", vec![], t_str()),
     ];
 
     for class_name in &[
@@ -1161,11 +3398,18 @@ fn load_classes(codebase: &Codebase) {
             "RuntimeException" | "LogicException" => Some("Exception"),
             "TypeError" | "ValueError" | "ArithmeticError" | "ParseError" => Some("Error"),
             "DivisionByZeroError" => Some("ArithmeticError"),
-            "InvalidArgumentException" | "OutOfRangeException" | "LengthException"
-            | "DomainException" | "BadFunctionCallException" => Some("LogicException"),
+            "InvalidArgumentException"
+            | "OutOfRangeException"
+            | "LengthException"
+            | "DomainException"
+            | "BadFunctionCallException" => Some("LogicException"),
             "BadMethodCallException" => Some("BadFunctionCallException"),
-            "OverflowException" | "UnderflowException" | "OutOfBoundsException"
-            | "UnexpectedValueException" | "JsonException" | "PDOException"
+            "OverflowException"
+            | "UnderflowException"
+            | "OutOfBoundsException"
+            | "UnexpectedValueException"
+            | "JsonException"
+            | "PDOException"
             | "mysqli_sql_exception" => Some("RuntimeException"),
             _ => Some("Exception"),
         };
@@ -1182,14 +3426,14 @@ fn load_classes(codebase: &Codebase) {
     // ---- Generator ----
     let mut gen = empty_class("Generator", None, vec!["Iterator"]);
     for (name, params, ret) in &[
-        ("current",  vec![], Union::mixed()),
-        ("key",      vec![], Union::mixed()),
-        ("next",     vec![], t_void()),
-        ("rewind",   vec![], t_void()),
-        ("valid",    vec![], t_bool()),
-        ("send",     vec![req("value")], Union::mixed()),
-        ("throw",    vec![req("exception")], Union::mixed()),
-        ("getReturn",vec![], Union::mixed()),
+        ("current", vec![], Union::mixed()),
+        ("key", vec![], Union::mixed()),
+        ("next", vec![], t_void()),
+        ("rewind", vec![], t_void()),
+        ("valid", vec![], t_bool()),
+        ("send", vec![req("value")], Union::mixed()),
+        ("throw", vec![req("exception")], Union::mixed()),
+        ("getReturn", vec![], Union::mixed()),
     ] {
         gen.own_methods.insert(
             Arc::from(*name),
@@ -1202,21 +3446,46 @@ fn load_classes(codebase: &Codebase) {
     for class_name in &["DateTime", "DateTimeImmutable"] {
         let mut dt = empty_class(class_name, None, vec!["DateTimeInterface"]);
         for (name, params, ret) in &[
-            ("__construct",  vec![opt("datetime"), opt("timezone")], t_void()),
-            ("format",       vec![req("format")], t_str()),
+            (
+                "__construct",
+                vec![opt("datetime"), opt("timezone")],
+                t_void(),
+            ),
+            ("format", vec![req("format")], t_str()),
             ("getTimestamp", vec![], t_int()),
-            ("modify",       vec![req("modifier")], Union::mixed()),
-            ("setDate",      vec![req("year"), req("month"), req("day")], Union::mixed()),
-            ("setTime",      vec![req("hour"), req("minute"), opt("second"), opt("microsecond")], Union::mixed()),
-            ("diff",         vec![req("targetObject"), opt("absolute")], t_obj("DateInterval")),
-            ("add",                vec![req("interval")], Union::mixed()),
-            ("sub",                vec![req("interval")], Union::mixed()),
-            ("createFromFormat",   vec![req("format"), req("datetime"), opt("timezone")], Union::mixed()),
-            ("createFromMutable",  vec![req("object")], Union::mixed()),
-            ("createFromImmutable",vec![req("object")], Union::mixed()),
-            ("setTimezone",        vec![req("timezone")], Union::mixed()),
-            ("setTimestamp",       vec![req("timestamp")], Union::mixed()),
-            ("getTimezone",        vec![], Union::mixed()),
+            ("modify", vec![req("modifier")], Union::mixed()),
+            (
+                "setDate",
+                vec![req("year"), req("month"), req("day")],
+                Union::mixed(),
+            ),
+            (
+                "setTime",
+                vec![
+                    req("hour"),
+                    req("minute"),
+                    opt("second"),
+                    opt("microsecond"),
+                ],
+                Union::mixed(),
+            ),
+            (
+                "diff",
+                vec![req("targetObject"), opt("absolute")],
+                t_obj("DateInterval"),
+            ),
+            ("add", vec![req("interval")], Union::mixed()),
+            ("sub", vec![req("interval")], Union::mixed()),
+            (
+                "createFromFormat",
+                vec![req("format"), req("datetime"), opt("timezone")],
+                Union::mixed(),
+            ),
+            ("createFromMutable", vec![req("object")], Union::mixed()),
+            ("createFromImmutable", vec![req("object")], Union::mixed()),
+            ("setTimezone", vec![req("timezone")], Union::mixed()),
+            ("setTimestamp", vec![req("timestamp")], Union::mixed()),
+            ("getTimezone", vec![], Union::mixed()),
         ] {
             let is_ctor = *name == "__construct";
             let mut m = stub_method(class_name, name, params.clone(), ret.clone(), Public).1;
@@ -1229,38 +3498,55 @@ fn load_classes(codebase: &Codebase) {
     // ---- SplDoublyLinkedList / SplStack / SplQueue ----
     {
         use Visibility::Public;
-        let mut dll = empty_class("SplDoublyLinkedList", None, vec!["Iterator", "Countable", "ArrayAccess"]);
+        let mut dll = empty_class(
+            "SplDoublyLinkedList",
+            None,
+            vec!["Iterator", "Countable", "ArrayAccess"],
+        );
         for (name, params, ret) in &[
-            ("push",     vec![req("value")], t_void()),
-            ("pop",      vec![], Union::mixed()),
-            ("shift",    vec![], Union::mixed()),
-            ("unshift",  vec![req("value")], t_void()),
-            ("top",      vec![], Union::mixed()),
-            ("bottom",   vec![], Union::mixed()),
-            ("isEmpty",  vec![], t_bool()),
-            ("count",    vec![], t_int()),
-            ("valid",    vec![], t_bool()),
-            ("current",  vec![], Union::mixed()),
-            ("next",     vec![], t_void()),
-            ("prev",     vec![], t_void()),
-            ("rewind",   vec![], t_void()),
-            ("key",      vec![], Union::mixed()),
+            ("push", vec![req("value")], t_void()),
+            ("pop", vec![], Union::mixed()),
+            ("shift", vec![], Union::mixed()),
+            ("unshift", vec![req("value")], t_void()),
+            ("top", vec![], Union::mixed()),
+            ("bottom", vec![], Union::mixed()),
+            ("isEmpty", vec![], t_bool()),
+            ("count", vec![], t_int()),
+            ("valid", vec![], t_bool()),
+            ("current", vec![], Union::mixed()),
+            ("next", vec![], t_void()),
+            ("prev", vec![], t_void()),
+            ("rewind", vec![], t_void()),
+            ("key", vec![], Union::mixed()),
         ] {
-            dll.own_methods.insert(Arc::from(*name),
-                stub_method("SplDoublyLinkedList", name, params.clone(), ret.clone(), Public).1);
+            dll.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "SplDoublyLinkedList",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
-        codebase.classes.insert(Arc::from("SplDoublyLinkedList"), dll);
+        codebase
+            .classes
+            .insert(Arc::from("SplDoublyLinkedList"), dll);
 
         let mut stack = empty_class("SplStack", Some("SplDoublyLinkedList"), vec![]);
         for (name, params, ret) in &[
-            ("push",    vec![req("value")], t_void()),
-            ("pop",     vec![], Union::mixed()),
-            ("top",     vec![], Union::mixed()),
+            ("push", vec![req("value")], t_void()),
+            ("pop", vec![], Union::mixed()),
+            ("top", vec![], Union::mixed()),
             ("isEmpty", vec![], t_bool()),
-            ("count",   vec![], t_int()),
+            ("count", vec![], t_int()),
         ] {
-            stack.own_methods.insert(Arc::from(*name),
-                stub_method("SplStack", name, params.clone(), ret.clone(), Public).1);
+            stack.own_methods.insert(
+                Arc::from(*name),
+                stub_method("SplStack", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("SplStack"), stack);
 
@@ -1269,41 +3555,64 @@ fn load_classes(codebase: &Codebase) {
             ("enqueue", vec![req("value")], t_void()),
             ("dequeue", vec![], Union::mixed()),
             ("isEmpty", vec![], t_bool()),
-            ("count",   vec![], t_int()),
+            ("count", vec![], t_int()),
         ] {
-            queue.own_methods.insert(Arc::from(*name),
-                stub_method("SplQueue", name, params.clone(), ret.clone(), Public).1);
+            queue.own_methods.insert(
+                Arc::from(*name),
+                stub_method("SplQueue", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("SplQueue"), queue);
     }
-
 
     // ---- ZipArchive ----
     {
         use Visibility::Public;
         let mut zip = empty_class("ZipArchive", None, vec![]);
         for (name, params, ret) in &[
-            ("open",        vec![req("filename"), opt("flags")], Union::mixed()),
-            ("close",       vec![], t_bool()),
-            ("addFile",     vec![req("filename"), opt("localname")], t_bool()),
-            ("addFromString",vec![req("localname"), req("contents")], t_bool()),
+            ("open", vec![req("filename"), opt("flags")], Union::mixed()),
+            ("close", vec![], t_bool()),
+            ("addFile", vec![req("filename"), opt("localname")], t_bool()),
+            (
+                "addFromString",
+                vec![req("localname"), req("contents")],
+                t_bool(),
+            ),
             ("addEmptyDir", vec![req("dirname")], t_bool()),
-            ("extractTo",   vec![req("destination"), opt("files")], t_bool()),
-            ("getNameIndex",vec![req("index")], Union::mixed()),
-            ("getStream",   vec![req("name")], Union::mixed()),
-            ("statIndex",   vec![req("index"), opt("flags")], Union::mixed()),
-            ("locateName",  vec![req("name"), opt("flags")], Union::mixed()),
-            ("renameName",  vec![req("from"), req("to")], t_bool()),
-            ("deleteName",  vec![req("name")], t_bool()),
-            ("count",       vec![], t_int()),
+            (
+                "extractTo",
+                vec![req("destination"), opt("files")],
+                t_bool(),
+            ),
+            ("getNameIndex", vec![req("index")], Union::mixed()),
+            ("getStream", vec![req("name")], Union::mixed()),
+            (
+                "statIndex",
+                vec![req("index"), opt("flags")],
+                Union::mixed(),
+            ),
+            (
+                "locateName",
+                vec![req("name"), opt("flags")],
+                Union::mixed(),
+            ),
+            ("renameName", vec![req("from"), req("to")], t_bool()),
+            ("deleteName", vec![req("name")], t_bool()),
+            ("count", vec![], t_int()),
         ] {
-            zip.own_methods.insert(Arc::from(*name),
-                stub_method("ZipArchive", name, params.clone(), ret.clone(), Public).1);
+            zip.own_methods.insert(
+                Arc::from(*name),
+                stub_method("ZipArchive", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         for (name, ty) in &[
-            ("numFiles", t_int()), ("filename", t_str()), ("comment", t_str()), ("status", t_int()),
+            ("numFiles", t_int()),
+            ("filename", t_str()),
+            ("comment", t_str()),
+            ("status", t_int()),
         ] {
-            zip.own_properties.insert(Arc::from(*name), stub_prop(name, ty.clone()));
+            zip.own_properties
+                .insert(Arc::from(*name), stub_prop(name, ty.clone()));
         }
         codebase.classes.insert(Arc::from("ZipArchive"), zip);
     }
@@ -1313,187 +3622,318 @@ fn load_classes(codebase: &Codebase) {
         use Visibility::Public;
         let mut rc = empty_class("ReflectionClass", None, vec![]);
         for (name, params, ret) in &[
-            ("__construct",        vec![req("argument")], t_void()),
-            ("getName",            vec![], t_str()),
-            ("getMethod",          vec![req("name")], t_obj("ReflectionMethod")),
-            ("getMethods",         vec![opt("filter")], t_array()),
-            ("getProperties",      vec![opt("filter")], t_array()),
-            ("getProperty",        vec![req("name")], t_obj("ReflectionProperty")),
-            ("hasMethod",          vec![req("name")], t_bool()),
-            ("hasProperty",        vec![req("name")], t_bool()),
-            ("newInstanceArgs",    vec![opt("args")], t_obj("object")),
+            ("__construct", vec![req("argument")], t_void()),
+            ("getName", vec![], t_str()),
+            ("getMethod", vec![req("name")], t_obj("ReflectionMethod")),
+            ("getMethods", vec![opt("filter")], t_array()),
+            ("getProperties", vec![opt("filter")], t_array()),
+            (
+                "getProperty",
+                vec![req("name")],
+                t_obj("ReflectionProperty"),
+            ),
+            ("hasMethod", vec![req("name")], t_bool()),
+            ("hasProperty", vec![req("name")], t_bool()),
+            ("newInstanceArgs", vec![opt("args")], t_obj("object")),
             ("newInstanceWithoutConstructor", vec![], t_obj("object")),
-            ("isAbstract",         vec![], t_bool()),
-            ("isFinal",            vec![], t_bool()),
-            ("isInterface",        vec![], t_bool()),
-            ("isInstantiable",     vec![], t_bool()),
-            ("implementsInterface",vec![req("interface")], t_bool()),
-            ("isSubclassOf",       vec![req("class")], t_bool()),
-            ("getInterfaces",      vec![], t_array()),
-            ("getParentClass",     vec![], Union::mixed()),
-            ("getAttributes",      vec![opt("name"), opt("flags")], t_array()),
-            ("getConstants",       vec![], t_array()),
-            ("getConstant",        vec![req("name")], Union::mixed()),
-            ("getConstructor",     vec![], Union::mixed()),
-            ("getFileName",        vec![], Union::mixed()),
-            ("isAnonymous",        vec![], t_bool()),
-            ("isReadOnly",         vec![], t_bool()),
-            ("isEnum",             vec![], t_bool()),
+            ("isAbstract", vec![], t_bool()),
+            ("isFinal", vec![], t_bool()),
+            ("isInterface", vec![], t_bool()),
+            ("isInstantiable", vec![], t_bool()),
+            ("implementsInterface", vec![req("interface")], t_bool()),
+            ("isSubclassOf", vec![req("class")], t_bool()),
+            ("getInterfaces", vec![], t_array()),
+            ("getParentClass", vec![], Union::mixed()),
+            ("getAttributes", vec![opt("name"), opt("flags")], t_array()),
+            ("getConstants", vec![], t_array()),
+            ("getConstant", vec![req("name")], Union::mixed()),
+            ("getConstructor", vec![], Union::mixed()),
+            ("getFileName", vec![], Union::mixed()),
+            ("isAnonymous", vec![], t_bool()),
+            ("isReadOnly", vec![], t_bool()),
+            ("isEnum", vec![], t_bool()),
         ] {
-            rc.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionClass", name, params.clone(), ret.clone(), Public).1);
+            rc.own_methods.insert(
+                Arc::from(*name),
+                stub_method("ReflectionClass", name, params.clone(), ret.clone(), Public).1,
+            );
         }
-        rc.own_properties.insert(Arc::from("name"), stub_prop("name", t_str()));
+        rc.own_properties
+            .insert(Arc::from("name"), stub_prop("name", t_str()));
         codebase.classes.insert(Arc::from("ReflectionClass"), rc);
         let mut rm = empty_class("ReflectionMethod", None, vec![]);
         for (name, params, ret) in &[
-            ("getName",            vec![], t_str()),
-            ("getParameters",      vec![], t_array()),
-            ("getReturnType",      vec![], Union::mixed()),
-            ("getDeclaringClass",  vec![], t_obj("ReflectionClass")),
-            ("invoke",             vec![req("object")], Union::mixed()),
-            ("isPublic",           vec![], t_bool()),
-            ("isProtected",        vec![], t_bool()),
-            ("isPrivate",          vec![], t_bool()),
-            ("isStatic",           vec![], t_bool()),
-            ("isAbstract",         vec![], t_bool()),
-            ("isFinal",            vec![], t_bool()),
-            ("isConstructor",      vec![], t_bool()),
-            ("getAttributes",      vec![opt("name"), opt("flags")], t_array()),
-            ("setAccessible",      vec![req("accessible")], t_void()),
+            ("getName", vec![], t_str()),
+            ("getParameters", vec![], t_array()),
+            ("getReturnType", vec![], Union::mixed()),
+            ("getDeclaringClass", vec![], t_obj("ReflectionClass")),
+            ("invoke", vec![req("object")], Union::mixed()),
+            ("isPublic", vec![], t_bool()),
+            ("isProtected", vec![], t_bool()),
+            ("isPrivate", vec![], t_bool()),
+            ("isStatic", vec![], t_bool()),
+            ("isAbstract", vec![], t_bool()),
+            ("isFinal", vec![], t_bool()),
+            ("isConstructor", vec![], t_bool()),
+            ("getAttributes", vec![opt("name"), opt("flags")], t_array()),
+            ("setAccessible", vec![req("accessible")], t_void()),
         ] {
-            rm.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionMethod", name, params.clone(), ret.clone(), Public).1);
+            rm.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "ReflectionMethod",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
         codebase.classes.insert(Arc::from("ReflectionMethod"), rm);
         let mut rp = empty_class("ReflectionProperty", None, vec![]);
         for (name, params, ret) in &[
-            ("getValue",       vec![opt("object")], Union::mixed()),
-            ("setValue",       vec![req("objectOrValue"), opt("value")], t_void()),
-            ("getType",        vec![], Union::mixed()),
-            ("getReturnType",  vec![], Union::mixed()),
+            ("getValue", vec![opt("object")], Union::mixed()),
+            (
+                "setValue",
+                vec![req("objectOrValue"), opt("value")],
+                t_void(),
+            ),
+            ("getType", vec![], Union::mixed()),
+            ("getReturnType", vec![], Union::mixed()),
             ("getDeclaringClass", vec![], t_obj("ReflectionClass")),
-            ("setAccessible",  vec![req("accessible")], t_void()),
-            ("getName",        vec![], t_str()),
-            ("isPublic",       vec![], t_bool()),
-            ("isStatic",       vec![], t_bool()),
+            ("setAccessible", vec![req("accessible")], t_void()),
+            ("getName", vec![], t_str()),
+            ("isPublic", vec![], t_bool()),
+            ("isStatic", vec![], t_bool()),
         ] {
-            rp.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionProperty", name, params.clone(), ret.clone(), Public).1);
+            rp.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "ReflectionProperty",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
         codebase.classes.insert(Arc::from("ReflectionProperty"), rp);
         let re = empty_class("ReflectionEnum", None, vec![]);
         codebase.classes.insert(Arc::from("ReflectionEnum"), re);
         let mut rf = empty_class("ReflectionFunction", None, vec![]);
         for (name, params, ret) in &[
-            ("__construct",   vec![req("function")], t_void()),
-            ("getName",       vec![], t_str()),
+            ("__construct", vec![req("function")], t_void()),
+            ("getName", vec![], t_str()),
             ("getParameters", vec![], t_array()),
             ("getReturnType", vec![], Union::mixed()),
-            ("getFileName",   vec![], Union::mixed()),
-            ("invoke",        vec![opt("args")], Union::mixed()),
+            ("getFileName", vec![], Union::mixed()),
+            ("invoke", vec![opt("args")], Union::mixed()),
         ] {
-            rf.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionFunction", name, params.clone(), ret.clone(), Public).1);
+            rf.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "ReflectionFunction",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
         codebase.classes.insert(Arc::from("ReflectionFunction"), rf);
         let mut rp2 = empty_class("ReflectionParameter", None, vec![]);
         for (name, params, ret) in &[
-            ("getName",               vec![], t_str()),
-            ("getType",               vec![], Union::mixed()),
-            ("getDefaultValue",       vec![], Union::mixed()),
+            ("getName", vec![], t_str()),
+            ("getType", vec![], Union::mixed()),
+            ("getDefaultValue", vec![], Union::mixed()),
             ("isDefaultValueAvailable", vec![], t_bool()),
-            ("isOptional",            vec![], t_bool()),
-            ("isVariadic",            vec![], t_bool()),
-            ("hasDefaultValue",       vec![], t_bool()),
-            ("getAttributes",         vec![opt("name"), opt("flags")], t_array()),
-            ("getPosition",           vec![], t_int()),
+            ("isOptional", vec![], t_bool()),
+            ("isVariadic", vec![], t_bool()),
+            ("hasDefaultValue", vec![], t_bool()),
+            ("getAttributes", vec![opt("name"), opt("flags")], t_array()),
+            ("getPosition", vec![], t_int()),
         ] {
-            rp2.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionParameter", name, params.clone(), ret.clone(), Public).1);
+            rp2.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "ReflectionParameter",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
-        codebase.classes.insert(Arc::from("ReflectionParameter"), rp2);
+        codebase
+            .classes
+            .insert(Arc::from("ReflectionParameter"), rp2);
         let mut rnt = empty_class("ReflectionNamedType", None, vec![]);
         for (name, params, ret) in &[
-            ("getName",       vec![], t_str()),
-            ("allowsNull",    vec![], t_bool()),
-            ("isBuiltin",     vec![], t_bool()),
-            ("__toString",    vec![], t_str()),
+            ("getName", vec![], t_str()),
+            ("allowsNull", vec![], t_bool()),
+            ("isBuiltin", vec![], t_bool()),
+            ("__toString", vec![], t_str()),
         ] {
-            rnt.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionNamedType", name, params.clone(), ret.clone(), Public).1);
+            rnt.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "ReflectionNamedType",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
-        codebase.classes.insert(Arc::from("ReflectionNamedType"), rnt);
+        codebase
+            .classes
+            .insert(Arc::from("ReflectionNamedType"), rnt);
         let mut rut = empty_class("ReflectionUnionType", None, vec![]);
         for (name, params, ret) in &[
-            ("getTypes",      vec![], t_array()),
-            ("allowsNull",    vec![], t_bool()),
+            ("getTypes", vec![], t_array()),
+            ("allowsNull", vec![], t_bool()),
         ] {
-            rut.own_methods.insert(Arc::from(*name),
-                stub_method("ReflectionUnionType", name, params.clone(), ret.clone(), Public).1);
+            rut.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "ReflectionUnionType",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
-        codebase.classes.insert(Arc::from("ReflectionUnionType"), rut);
+        codebase
+            .classes
+            .insert(Arc::from("ReflectionUnionType"), rut);
     }
 
     // ---- DOM extension ----
     {
         // (class_name, parent) — PHP DOM inheritance hierarchy
         for (class_name, dom_parent) in &[
-            ("DOMNode",                None),
-            ("DOMDocument",            Some("DOMNode")),
-            ("DOMElement",             Some("DOMNode")),
-            ("DOMAttr",                Some("DOMNode")),
-            ("DOMCharacterData",       Some("DOMNode")),
-            ("DOMText",                Some("DOMCharacterData")),
-            ("DOMComment",             Some("DOMCharacterData")),
-            ("DOMCdataSection",        Some("DOMText")),
-            ("DOMDocumentFragment",    Some("DOMNode")),
-            ("DOMDocumentType",        Some("DOMNode")),
+            ("DOMNode", None),
+            ("DOMDocument", Some("DOMNode")),
+            ("DOMElement", Some("DOMNode")),
+            ("DOMAttr", Some("DOMNode")),
+            ("DOMCharacterData", Some("DOMNode")),
+            ("DOMText", Some("DOMCharacterData")),
+            ("DOMComment", Some("DOMCharacterData")),
+            ("DOMCdataSection", Some("DOMText")),
+            ("DOMDocumentFragment", Some("DOMNode")),
+            ("DOMDocumentType", Some("DOMNode")),
             ("DOMProcessingInstruction", Some("DOMNode")),
-            ("DOMEntityReference",     Some("DOMNode")),
-            ("DOMEntity",              Some("DOMNode")),
-            ("DOMNotation",            Some("DOMNode")),
-            ("DOMNodeList",            None),
-            ("DOMNamedNodeMap",        None),
-            ("DOMXPath",               None),
-            ("DOMImplementation",      None),
+            ("DOMEntityReference", Some("DOMNode")),
+            ("DOMEntity", Some("DOMNode")),
+            ("DOMNotation", Some("DOMNode")),
+            ("DOMNodeList", None),
+            ("DOMNamedNodeMap", None),
+            ("DOMXPath", None),
+            ("DOMImplementation", None),
         ] {
-            let class_name: &str = *class_name;
+            let class_name: &str = class_name;
             let mut cls = empty_class(class_name, *dom_parent, vec![]);
             // Common DOMNode methods
             for (name, params, ret) in &[
-                ("appendChild",     vec![req("node")], t_obj("DOMNode")),
-                ("cloneNode",       vec![opt("deep")], t_obj("DOMNode")),
-                ("getAttribute",    vec![req("qualifiedName")], t_str()),
-                ("setAttribute",    vec![req("qualifiedName"), req("value")], Union::mixed()),
-                ("hasAttribute",    vec![req("qualifiedName")], t_bool()),
-                ("hasAttributes",   vec![], t_bool()),
-                ("hasChildNodes",   vec![], t_bool()),
-                ("getNodePath",     vec![], Union::mixed()),
+                ("appendChild", vec![req("node")], t_obj("DOMNode")),
+                ("cloneNode", vec![opt("deep")], t_obj("DOMNode")),
+                ("getAttribute", vec![req("qualifiedName")], t_str()),
+                (
+                    "setAttribute",
+                    vec![req("qualifiedName"), req("value")],
+                    Union::mixed(),
+                ),
+                ("hasAttribute", vec![req("qualifiedName")], t_bool()),
+                ("hasAttributes", vec![], t_bool()),
+                ("hasChildNodes", vec![], t_bool()),
+                ("getNodePath", vec![], Union::mixed()),
                 ("removeAttribute", vec![req("qualifiedName")], t_bool()),
-                ("removeChild",     vec![req("child")], t_obj("DOMNode")),
-                ("getElementsByTagName", vec![req("qualifiedName")], t_obj("DOMNodeList")),
-                ("createElement",   vec![req("localName"), opt("value")], t_obj("DOMElement")),
-                ("createTextNode",  vec![req("data")], t_obj("DOMText")),
-                ("getElementById",  vec![req("elementId")], Union::mixed()),
-                ("loadXML",         vec![req("source"), opt("options")], Union::mixed()),
-                ("loadHTML",        vec![req("source"), opt("options")], Union::mixed()),
-                ("saveHTML",        vec![opt("node")], t_str_or_false()),
-                ("saveXML",         vec![opt("node"), opt("options")], t_str_or_false()),
-                ("item",            vec![req("index")], Union::mixed()),
-                ("getNamedItem",    vec![req("qualifiedName")], Union::mixed()),
-                ("evaluate",        vec![req("expression"), opt("contextNode"), opt("registerNodeNS")], Union::mixed()),
-                ("query",           vec![req("expression"), opt("contextNode"), opt("registerNodeNS")], Union::mixed()),
-                ("registerNamespace", vec![req("prefix"), req("namespaceURI")], t_bool()),
-                ("load",            vec![req("filename"), opt("options")], Union::mixed()),
-                ("save",            vec![req("filename"), opt("options")], Union::mixed()),
-                ("importNode",      vec![req("node"), opt("deep")], t_obj("DOMNode")),
-                ("createFragment",  vec![], t_obj("DOMDocumentFragment")),
-                ("createComment",   vec![req("data")], t_obj("DOMComment")),
-                ("createElementNS", vec![req("namespace"), req("qualifiedName"), opt("value")], t_obj("DOMElement")),
-                ("normalize",       vec![], t_void()),
-                ("replaceChild",    vec![req("node"), req("child")], t_obj("DOMNode")),
-                ("insertBefore",    vec![req("node"), opt("child")], t_obj("DOMNode")),
+                ("removeChild", vec![req("child")], t_obj("DOMNode")),
+                (
+                    "getElementsByTagName",
+                    vec![req("qualifiedName")],
+                    t_obj("DOMNodeList"),
+                ),
+                (
+                    "createElement",
+                    vec![req("localName"), opt("value")],
+                    t_obj("DOMElement"),
+                ),
+                ("createTextNode", vec![req("data")], t_obj("DOMText")),
+                ("getElementById", vec![req("elementId")], Union::mixed()),
+                (
+                    "loadXML",
+                    vec![req("source"), opt("options")],
+                    Union::mixed(),
+                ),
+                (
+                    "loadHTML",
+                    vec![req("source"), opt("options")],
+                    Union::mixed(),
+                ),
+                ("saveHTML", vec![opt("node")], t_str_or_false()),
+                (
+                    "saveXML",
+                    vec![opt("node"), opt("options")],
+                    t_str_or_false(),
+                ),
+                ("item", vec![req("index")], Union::mixed()),
+                ("getNamedItem", vec![req("qualifiedName")], Union::mixed()),
+                (
+                    "evaluate",
+                    vec![req("expression"), opt("contextNode"), opt("registerNodeNS")],
+                    Union::mixed(),
+                ),
+                (
+                    "query",
+                    vec![req("expression"), opt("contextNode"), opt("registerNodeNS")],
+                    Union::mixed(),
+                ),
+                (
+                    "registerNamespace",
+                    vec![req("prefix"), req("namespaceURI")],
+                    t_bool(),
+                ),
+                (
+                    "load",
+                    vec![req("filename"), opt("options")],
+                    Union::mixed(),
+                ),
+                (
+                    "save",
+                    vec![req("filename"), opt("options")],
+                    Union::mixed(),
+                ),
+                (
+                    "importNode",
+                    vec![req("node"), opt("deep")],
+                    t_obj("DOMNode"),
+                ),
+                ("createFragment", vec![], t_obj("DOMDocumentFragment")),
+                ("createComment", vec![req("data")], t_obj("DOMComment")),
+                (
+                    "createElementNS",
+                    vec![req("namespace"), req("qualifiedName"), opt("value")],
+                    t_obj("DOMElement"),
+                ),
+                ("normalize", vec![], t_void()),
+                (
+                    "replaceChild",
+                    vec![req("node"), req("child")],
+                    t_obj("DOMNode"),
+                ),
+                (
+                    "insertBefore",
+                    vec![req("node"), opt("child")],
+                    t_obj("DOMNode"),
+                ),
             ] {
                 cls.own_methods.insert(
                     Arc::from(*name),
@@ -1501,31 +3941,78 @@ fn load_classes(codebase: &Codebase) {
                 );
             }
             // Common properties
-            cls.own_properties.insert(Arc::from("nodeValue"), stub_prop("nodeValue", Union::mixed()));
-            cls.own_properties.insert(Arc::from("nodeType"), stub_prop("nodeType", t_int()));
-            cls.own_properties.insert(Arc::from("nodeName"), stub_prop("nodeName", t_str()));
-            cls.own_properties.insert(Arc::from("childNodes"), stub_prop("childNodes", t_obj("DOMNodeList")));
-            cls.own_properties.insert(Arc::from("parentNode"), stub_prop("parentNode", Union::mixed()));
-            cls.own_properties.insert(Arc::from("firstChild"), stub_prop("firstChild", Union::mixed()));
-            cls.own_properties.insert(Arc::from("lastChild"), stub_prop("lastChild", Union::mixed()));
-            cls.own_properties.insert(Arc::from("nextSibling"), stub_prop("nextSibling", Union::mixed()));
-            cls.own_properties.insert(Arc::from("previousSibling"), stub_prop("previousSibling", Union::mixed()));
-            cls.own_properties.insert(Arc::from("ownerDocument"), stub_prop("ownerDocument", Union::mixed()));
-            cls.own_properties.insert(Arc::from("tagName"), stub_prop("tagName", t_str()));
-            cls.own_properties.insert(Arc::from("localName"), stub_prop("localName", t_str()));
-            cls.own_properties.insert(Arc::from("namespaceURI"), stub_prop("namespaceURI", Union::mixed()));
-            cls.own_properties.insert(Arc::from("prefix"), stub_prop("prefix", Union::mixed()));
-            cls.own_properties.insert(Arc::from("data"), stub_prop("data", t_str()));
-            cls.own_properties.insert(Arc::from("value"), stub_prop("value", t_str()));
-            cls.own_properties.insert(Arc::from("textContent"), stub_prop("textContent", t_str()));
-            cls.own_properties.insert(Arc::from("length"), stub_prop("length", t_int()));
-            cls.own_properties.insert(Arc::from("attributes"), stub_prop("attributes", t_obj("DOMNamedNodeMap")));
-            cls.own_properties.insert(Arc::from("documentElement"), stub_prop("documentElement", Union::mixed()));
+            cls.own_properties.insert(
+                Arc::from("nodeValue"),
+                stub_prop("nodeValue", Union::mixed()),
+            );
+            cls.own_properties
+                .insert(Arc::from("nodeType"), stub_prop("nodeType", t_int()));
+            cls.own_properties
+                .insert(Arc::from("nodeName"), stub_prop("nodeName", t_str()));
+            cls.own_properties.insert(
+                Arc::from("childNodes"),
+                stub_prop("childNodes", t_obj("DOMNodeList")),
+            );
+            cls.own_properties.insert(
+                Arc::from("parentNode"),
+                stub_prop("parentNode", Union::mixed()),
+            );
+            cls.own_properties.insert(
+                Arc::from("firstChild"),
+                stub_prop("firstChild", Union::mixed()),
+            );
+            cls.own_properties.insert(
+                Arc::from("lastChild"),
+                stub_prop("lastChild", Union::mixed()),
+            );
+            cls.own_properties.insert(
+                Arc::from("nextSibling"),
+                stub_prop("nextSibling", Union::mixed()),
+            );
+            cls.own_properties.insert(
+                Arc::from("previousSibling"),
+                stub_prop("previousSibling", Union::mixed()),
+            );
+            cls.own_properties.insert(
+                Arc::from("ownerDocument"),
+                stub_prop("ownerDocument", Union::mixed()),
+            );
+            cls.own_properties
+                .insert(Arc::from("tagName"), stub_prop("tagName", t_str()));
+            cls.own_properties
+                .insert(Arc::from("localName"), stub_prop("localName", t_str()));
+            cls.own_properties.insert(
+                Arc::from("namespaceURI"),
+                stub_prop("namespaceURI", Union::mixed()),
+            );
+            cls.own_properties
+                .insert(Arc::from("prefix"), stub_prop("prefix", Union::mixed()));
+            cls.own_properties
+                .insert(Arc::from("data"), stub_prop("data", t_str()));
+            cls.own_properties
+                .insert(Arc::from("value"), stub_prop("value", t_str()));
+            cls.own_properties
+                .insert(Arc::from("textContent"), stub_prop("textContent", t_str()));
+            cls.own_properties
+                .insert(Arc::from("length"), stub_prop("length", t_int()));
+            cls.own_properties.insert(
+                Arc::from("attributes"),
+                stub_prop("attributes", t_obj("DOMNamedNodeMap")),
+            );
+            cls.own_properties.insert(
+                Arc::from("documentElement"),
+                stub_prop("documentElement", Union::mixed()),
+            );
             // Add $name property specifically for DOMAttr (attribute name)
             if class_name == "DOMAttr" {
-                cls.own_properties.insert(Arc::from("name"), stub_prop("name", t_str()));
-                cls.own_properties.insert(Arc::from("specified"), stub_prop("specified", t_bool()));
-                cls.own_properties.insert(Arc::from("ownerElement"), stub_prop("ownerElement", Union::mixed()));
+                cls.own_properties
+                    .insert(Arc::from("name"), stub_prop("name", t_str()));
+                cls.own_properties
+                    .insert(Arc::from("specified"), stub_prop("specified", t_bool()));
+                cls.own_properties.insert(
+                    Arc::from("ownerElement"),
+                    stub_prop("ownerElement", Union::mixed()),
+                );
             }
             codebase.classes.insert(Arc::from(class_name), cls);
         }
@@ -1535,52 +4022,94 @@ fn load_classes(codebase: &Codebase) {
     {
         let mut sxe = empty_class("SimpleXMLElement", None, vec![]);
         for (name, params, ret) in &[
-            ("attributes",  vec![opt("namespace"), opt("is_prefix")], Union::mixed()),
-            ("children",    vec![opt("namespace"), opt("is_prefix")], Union::mixed()),
-            ("xpath",       vec![req("expression")], Union::mixed()),
-            ("getName",     vec![], t_str()),
-            ("addChild",    vec![req("qualifiedName"), opt("value"), opt("namespace")], Union::mixed()),
-            ("addAttribute",vec![req("qualifiedName"), req("value"), opt("namespace")], t_void()),
-            ("count",       vec![], t_int()),
-            ("asXML",       vec![opt("filename")], Union::mixed()),
+            (
+                "attributes",
+                vec![opt("namespace"), opt("is_prefix")],
+                Union::mixed(),
+            ),
+            (
+                "children",
+                vec![opt("namespace"), opt("is_prefix")],
+                Union::mixed(),
+            ),
+            ("xpath", vec![req("expression")], Union::mixed()),
+            ("getName", vec![], t_str()),
+            (
+                "addChild",
+                vec![req("qualifiedName"), opt("value"), opt("namespace")],
+                Union::mixed(),
+            ),
+            (
+                "addAttribute",
+                vec![req("qualifiedName"), req("value"), opt("namespace")],
+                t_void(),
+            ),
+            ("count", vec![], t_int()),
+            ("asXML", vec![opt("filename")], Union::mixed()),
         ] {
-            sxe.own_methods.insert(Arc::from(*name),
-                stub_method("SimpleXMLElement", name, params.clone(), ret.clone(), Public).1);
+            sxe.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "SimpleXMLElement",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
         codebase.classes.insert(Arc::from("SimpleXMLElement"), sxe);
         let sxe_it = empty_class("SimpleXMLIterator", Some("SimpleXMLElement"), vec![]);
-        codebase.classes.insert(Arc::from("SimpleXMLIterator"), sxe_it);
+        codebase
+            .classes
+            .insert(Arc::from("SimpleXMLIterator"), sxe_it);
     }
 
     // ---- Fiber (PHP 8.1) ----
     {
         let mut fiber = empty_class("Fiber", None, vec![]);
         for (name, params, ret) in &[
-            ("start",    vec![vari("args")], Union::mixed()),
-            ("resume",   vec![opt("value")], Union::mixed()),
-            ("getReturn",vec![], Union::mixed()),
-            ("isStarted",vec![], t_bool()),
-            ("isSuspended",vec![], t_bool()),
-            ("isRunning",vec![], t_bool()),
-            ("isTerminated",vec![], t_bool()),
-            ("getCurrent",vec![], Union::mixed()),
-            ("suspend",  vec![opt("value")], Union::mixed()),
+            ("start", vec![vari("args")], Union::mixed()),
+            ("resume", vec![opt("value")], Union::mixed()),
+            ("getReturn", vec![], Union::mixed()),
+            ("isStarted", vec![], t_bool()),
+            ("isSuspended", vec![], t_bool()),
+            ("isRunning", vec![], t_bool()),
+            ("isTerminated", vec![], t_bool()),
+            ("getCurrent", vec![], Union::mixed()),
+            ("suspend", vec![opt("value")], Union::mixed()),
         ] {
-            fiber.own_methods.insert(Arc::from(*name),
-                stub_method("Fiber", name, params.clone(), ret.clone(), Public).1);
+            fiber.own_methods.insert(
+                Arc::from(*name),
+                stub_method("Fiber", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("Fiber"), fiber);
         let fiber_error = empty_class("FiberError", Some("Error"), vec![]);
-        codebase.classes.insert(Arc::from("FiberError"), fiber_error);
+        codebase
+            .classes
+            .insert(Arc::from("FiberError"), fiber_error);
     }
 
     // ---- WeakReference / WeakMap ----
     {
         let mut wr = empty_class("WeakReference", None, vec![]);
-        wr.own_methods.insert(Arc::from("get"),
-            stub_method("WeakReference", "get", vec![], Union::mixed(), Public).1);
-        wr.own_methods.insert(Arc::from("create"),
-            stub_method("WeakReference", "create", vec![req("object")], t_obj("WeakReference"), Public).1);
+        wr.own_methods.insert(
+            Arc::from("get"),
+            stub_method("WeakReference", "get", vec![], Union::mixed(), Public).1,
+        );
+        wr.own_methods.insert(
+            Arc::from("create"),
+            stub_method(
+                "WeakReference",
+                "create",
+                vec![req("object")],
+                t_obj("WeakReference"),
+                Public,
+            )
+            .1,
+        );
         codebase.classes.insert(Arc::from("WeakReference"), wr);
         let wm = empty_class("WeakMap", None, vec![]);
         codebase.classes.insert(Arc::from("WeakMap"), wm);
@@ -1592,62 +4121,89 @@ fn load_classes(codebase: &Codebase) {
         // SplFileInfo
         let mut sfi = empty_class("SplFileInfo", None, vec![]);
         for (name, params, ret) in &[
-            ("getFilename",    vec![], t_str()),
-            ("getBasename",    vec![opt("suffix")], t_str()),
-            ("getPathname",    vec![], t_str()),
-            ("getRealPath",    vec![], Union::mixed()),
-            ("getExtension",   vec![], t_str()),
-            ("getPath",        vec![], t_str()),
-            ("isDir",          vec![], t_bool()),
-            ("isFile",         vec![], t_bool()),
-            ("isLink",         vec![], t_bool()),
-            ("isReadable",     vec![], t_bool()),
-            ("isWritable",     vec![], t_bool()),
-            ("getSize",        vec![], t_int()),
-            ("getMTime",       vec![], t_int()),
-            ("openFile",       vec![opt("mode"), opt("useIncludePath"), opt("context")], t_obj("SplFileObject")),
-            ("getType",        vec![], t_str()),
-            ("getOwner",       vec![], t_int()),
-            ("getGroup",       vec![], t_int()),
-            ("getPerms",       vec![], t_int()),
-            ("getInode",       vec![], t_int()),
+            ("getFilename", vec![], t_str()),
+            ("getBasename", vec![opt("suffix")], t_str()),
+            ("getPathname", vec![], t_str()),
+            ("getRealPath", vec![], Union::mixed()),
+            ("getExtension", vec![], t_str()),
+            ("getPath", vec![], t_str()),
+            ("isDir", vec![], t_bool()),
+            ("isFile", vec![], t_bool()),
+            ("isLink", vec![], t_bool()),
+            ("isReadable", vec![], t_bool()),
+            ("isWritable", vec![], t_bool()),
+            ("getSize", vec![], t_int()),
+            ("getMTime", vec![], t_int()),
+            (
+                "openFile",
+                vec![opt("mode"), opt("useIncludePath"), opt("context")],
+                t_obj("SplFileObject"),
+            ),
+            ("getType", vec![], t_str()),
+            ("getOwner", vec![], t_int()),
+            ("getGroup", vec![], t_int()),
+            ("getPerms", vec![], t_int()),
+            ("getInode", vec![], t_int()),
         ] {
-            sfi.own_methods.insert(Arc::from(*name),
-                stub_method("SplFileInfo", name, params.clone(), ret.clone(), Public).1);
+            sfi.own_methods.insert(
+                Arc::from(*name),
+                stub_method("SplFileInfo", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("SplFileInfo"), sfi);
         let sfo = empty_class("SplFileObject", Some("SplFileInfo"), vec![]);
         codebase.classes.insert(Arc::from("SplFileObject"), sfo);
 
         // ArrayObject
-        let ao = empty_class("ArrayObject", None, vec!["IteratorAggregate", "ArrayAccess", "Countable", "Serializable"]);
+        let ao = empty_class(
+            "ArrayObject",
+            None,
+            vec![
+                "IteratorAggregate",
+                "ArrayAccess",
+                "Countable",
+                "Serializable",
+            ],
+        );
         codebase.classes.insert(Arc::from("ArrayObject"), ao);
 
         // ArrayIterator
-        let mut ai = empty_class("ArrayIterator", None, vec!["Iterator", "ArrayAccess", "Countable", "Serializable"]);
+        let mut ai = empty_class(
+            "ArrayIterator",
+            None,
+            vec!["Iterator", "ArrayAccess", "Countable", "Serializable"],
+        );
         for (name, params, ret) in &[
-            ("__construct",  vec![opt("array"), opt("flags")], t_void()),
-            ("current",      vec![], Union::mixed()),
-            ("key",          vec![], Union::mixed()),
-            ("next",         vec![], t_void()),
-            ("rewind",       vec![], t_void()),
-            ("valid",        vec![], t_bool()),
-            ("count",        vec![], t_int()),
-            ("append",       vec![req("value")], t_void()),
-            ("offsetGet",    vec![req("key")], Union::mixed()),
+            ("__construct", vec![opt("array"), opt("flags")], t_void()),
+            ("current", vec![], Union::mixed()),
+            ("key", vec![], Union::mixed()),
+            ("next", vec![], t_void()),
+            ("rewind", vec![], t_void()),
+            ("valid", vec![], t_bool()),
+            ("count", vec![], t_int()),
+            ("append", vec![req("value")], t_void()),
+            ("offsetGet", vec![req("key")], Union::mixed()),
             ("offsetExists", vec![req("key")], t_bool()),
-            ("offsetSet",    vec![req("key"), req("value")], t_void()),
-            ("offsetUnset",  vec![req("key")], t_void()),
+            ("offsetSet", vec![req("key"), req("value")], t_void()),
+            ("offsetUnset", vec![req("key")], t_void()),
             ("getArrayCopy", vec![], t_array()),
         ] {
-            ai.own_methods.insert(Arc::from(*name),
-                stub_method("ArrayIterator", name, params.clone(), ret.clone(), Public).1);
+            ai.own_methods.insert(
+                Arc::from(*name),
+                stub_method("ArrayIterator", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("ArrayIterator"), ai);
 
         // RecursiveArrayIterator
-        let rai = empty_class("RecursiveArrayIterator", Some("ArrayIterator"), vec!["RecursiveIterator"]);
-        codebase.classes.insert(Arc::from("RecursiveArrayIterator"), rai);
+        let rai = empty_class(
+            "RecursiveArrayIterator",
+            Some("ArrayIterator"),
+            vec!["RecursiveIterator"],
+        );
+        codebase
+            .classes
+            .insert(Arc::from("RecursiveArrayIterator"), rai);
 
         // DirectoryIterator
         let di = empty_class("DirectoryIterator", Some("SplFileInfo"), vec!["Iterator"]);
@@ -1655,35 +4211,58 @@ fn load_classes(codebase: &Codebase) {
 
         // FilesystemIterator
         let fsi = empty_class("FilesystemIterator", Some("DirectoryIterator"), vec![]);
-        codebase.classes.insert(Arc::from("FilesystemIterator"), fsi);
+        codebase
+            .classes
+            .insert(Arc::from("FilesystemIterator"), fsi);
 
         // RecursiveDirectoryIterator
-        let rdi = empty_class("RecursiveDirectoryIterator", Some("FilesystemIterator"), vec!["RecursiveIterator"]);
-        codebase.classes.insert(Arc::from("RecursiveDirectoryIterator"), rdi);
+        let rdi = empty_class(
+            "RecursiveDirectoryIterator",
+            Some("FilesystemIterator"),
+            vec!["RecursiveIterator"],
+        );
+        codebase
+            .classes
+            .insert(Arc::from("RecursiveDirectoryIterator"), rdi);
 
         // RecursiveIteratorIterator
         let mut rii = empty_class("RecursiveIteratorIterator", None, vec!["OuterIterator"]);
         for (name, params, ret) in &[
-            ("__construct",      vec![req("iterator"), opt("mode"), opt("flags")], t_void()),
-            ("current",          vec![], Union::mixed()),
-            ("key",              vec![], Union::mixed()),
-            ("next",             vec![], t_void()),
-            ("rewind",           vec![], t_void()),
-            ("valid",            vec![], t_bool()),
-            ("getDepth",         vec![], t_int()),
-            ("getSubIterator",   vec![opt("level")], Union::mixed()),
+            (
+                "__construct",
+                vec![req("iterator"), opt("mode"), opt("flags")],
+                t_void(),
+            ),
+            ("current", vec![], Union::mixed()),
+            ("key", vec![], Union::mixed()),
+            ("next", vec![], t_void()),
+            ("rewind", vec![], t_void()),
+            ("valid", vec![], t_bool()),
+            ("getDepth", vec![], t_int()),
+            ("getSubIterator", vec![opt("level")], Union::mixed()),
             ("getInnerIterator", vec![], Union::mixed()),
-            ("beginIteration",   vec![], t_void()),
-            ("endIteration",     vec![], t_void()),
-            ("callHasChildren",  vec![], t_bool()),
-            ("callGetChildren",  vec![], Union::mixed()),
-            ("getMaxDepth",      vec![], Union::mixed()),
-            ("setMaxDepth",      vec![opt("maxDepth")], t_void()),
+            ("beginIteration", vec![], t_void()),
+            ("endIteration", vec![], t_void()),
+            ("callHasChildren", vec![], t_bool()),
+            ("callGetChildren", vec![], Union::mixed()),
+            ("getMaxDepth", vec![], Union::mixed()),
+            ("setMaxDepth", vec![opt("maxDepth")], t_void()),
         ] {
-            rii.own_methods.insert(Arc::from(*name),
-                stub_method("RecursiveIteratorIterator", name, params.clone(), ret.clone(), Public).1);
+            rii.own_methods.insert(
+                Arc::from(*name),
+                stub_method(
+                    "RecursiveIteratorIterator",
+                    name,
+                    params.clone(),
+                    ret.clone(),
+                    Public,
+                )
+                .1,
+            );
         }
-        codebase.classes.insert(Arc::from("RecursiveIteratorIterator"), rii);
+        codebase
+            .classes
+            .insert(Arc::from("RecursiveIteratorIterator"), rii);
 
         // SplMinHeap / SplMaxHeap / SplPriorityQueue (SplDoublyLinkedList/SplStack/SplQueue defined above)
         for cls in &["SplMinHeap", "SplMaxHeap"] {
@@ -1692,7 +4271,11 @@ fn load_classes(codebase: &Codebase) {
         }
         let spq = empty_class("SplPriorityQueue", None, vec!["Iterator", "Countable"]);
         codebase.classes.insert(Arc::from("SplPriorityQueue"), spq);
-        let sfs = empty_class("SplFixedArray", None, vec!["Iterator", "ArrayAccess", "Countable"]);
+        let sfs = empty_class(
+            "SplFixedArray",
+            None,
+            vec!["Iterator", "ArrayAccess", "Countable"],
+        );
         codebase.classes.insert(Arc::from("SplFixedArray"), sfs);
     }
 
@@ -1702,27 +4285,45 @@ fn load_classes(codebase: &Codebase) {
         let mut dtz = empty_class("DateTimeZone", None, vec![]);
         for (name, params, ret) in &[
             ("__construct", vec![req("timezone")], t_void()),
-            ("getName",     vec![], t_str()),
-            ("getOffset",   vec![req("datetime")], t_int()),
-            ("getTransitions", vec![opt("timestampBegin"), opt("timestampEnd")], Union::mixed()),
+            ("getName", vec![], t_str()),
+            ("getOffset", vec![req("datetime")], t_int()),
+            (
+                "getTransitions",
+                vec![opt("timestampBegin"), opt("timestampEnd")],
+                Union::mixed(),
+            ),
             ("listAbbreviations", vec![], t_array()),
-            ("listIdentifiers",   vec![opt("timezoneGroup"), opt("countryCode")], t_array()),
+            (
+                "listIdentifiers",
+                vec![opt("timezoneGroup"), opt("countryCode")],
+                t_array(),
+            ),
         ] {
-            dtz.own_methods.insert(Arc::from(*name),
-                stub_method("DateTimeZone", name, params.clone(), ret.clone(), Public).1);
+            dtz.own_methods.insert(
+                Arc::from(*name),
+                stub_method("DateTimeZone", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("DateTimeZone"), dtz);
         let mut di_cls = empty_class("DateInterval", None, vec![]);
         for (name, params, ret) in &[
-            ("__construct",    vec![req("duration")], t_void()),
-            ("createFromDateString", vec![req("datetime")], Union::mixed()),
-            ("format",         vec![req("format")], t_str()),
+            ("__construct", vec![req("duration")], t_void()),
+            (
+                "createFromDateString",
+                vec![req("datetime")],
+                Union::mixed(),
+            ),
+            ("format", vec![req("format")], t_str()),
         ] {
-            di_cls.own_methods.insert(Arc::from(*name),
-                stub_method("DateInterval", name, params.clone(), ret.clone(), Public).1);
+            di_cls.own_methods.insert(
+                Arc::from(*name),
+                stub_method("DateInterval", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         for prop in &["y", "m", "d", "h", "i", "s", "invert", "days"] {
-            di_cls.own_properties.insert(Arc::from(*prop), stub_prop(prop, t_int()));
+            di_cls
+                .own_properties
+                .insert(Arc::from(*prop), stub_prop(prop, t_int()));
         }
         codebase.classes.insert(Arc::from("DateInterval"), di_cls);
         let dp = empty_class("DatePeriod", None, vec!["IteratorAggregate"]);
@@ -1734,44 +4335,69 @@ fn load_classes(codebase: &Codebase) {
         use Visibility::Public;
         let mut my = empty_class("mysqli", None, vec![]);
         for (name, params, ret) in &[
-            ("__construct",   vec![opt("host"), opt("user"), opt("password"), opt("database"), opt("port"), opt("socket")], t_void()),
-            ("connect",       vec![opt("host"), opt("user"), opt("password"), opt("database")], t_bool()),
-            ("query",         vec![req("query"), opt("result_mode")], Union::mixed()),
-            ("prepare",       vec![req("query")], Union::mixed()),
-            ("multi_query",   vec![req("query")], t_bool()),
-            ("close",         vec![], t_bool()),
+            (
+                "__construct",
+                vec![
+                    opt("host"),
+                    opt("user"),
+                    opt("password"),
+                    opt("database"),
+                    opt("port"),
+                    opt("socket"),
+                ],
+                t_void(),
+            ),
+            (
+                "connect",
+                vec![opt("host"), opt("user"), opt("password"), opt("database")],
+                t_bool(),
+            ),
+            (
+                "query",
+                vec![req("query"), opt("result_mode")],
+                Union::mixed(),
+            ),
+            ("prepare", vec![req("query")], Union::mixed()),
+            ("multi_query", vec![req("query")], t_bool()),
+            ("close", vec![], t_bool()),
             ("real_escape_string", vec![req("string")], t_str()),
-            ("error",         vec![], t_str()),
-            ("errno",         vec![], t_int()),
-            ("select_db",     vec![req("database")], t_bool()),
+            ("error", vec![], t_str()),
+            ("errno", vec![], t_int()),
+            ("select_db", vec![req("database")], t_bool()),
             ("begin_transaction", vec![], t_bool()),
-            ("commit",        vec![], t_bool()),
-            ("rollback",      vec![], t_bool()),
-            ("set_charset",   vec![req("charset")], t_bool()),
-            ("next_result",   vec![], t_bool()),
+            ("commit", vec![], t_bool()),
+            ("rollback", vec![], t_bool()),
+            ("set_charset", vec![req("charset")], t_bool()),
+            ("next_result", vec![], t_bool()),
         ] {
-            my.own_methods.insert(Arc::from(*name),
-                stub_method("mysqli", name, params.clone(), ret.clone(), Public).1);
+            my.own_methods.insert(
+                Arc::from(*name),
+                stub_method("mysqli", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         for prop in &["error", "errno", "insert_id", "affected_rows", "num_rows"] {
-            my.own_properties.insert(Arc::from(*prop), stub_prop(prop, Union::mixed()));
+            my.own_properties
+                .insert(Arc::from(*prop), stub_prop(prop, Union::mixed()));
         }
         codebase.classes.insert(Arc::from("mysqli"), my);
         let mut mys = empty_class("mysqli_stmt", None, vec![]);
         for (name, params, ret) in &[
-            ("bind_param",    vec![req("types"), vari("vars")], t_bool()),
-            ("bind_result",   vec![vari("vars")], t_bool()),
-            ("execute",       vec![opt("params")], t_bool()),
-            ("fetch",         vec![], Union::mixed()),
-            ("close",         vec![], t_bool()),
-            ("get_result",    vec![], Union::mixed()),
-            ("error",         vec![], t_str()),
+            ("bind_param", vec![req("types"), vari("vars")], t_bool()),
+            ("bind_result", vec![vari("vars")], t_bool()),
+            ("execute", vec![opt("params")], t_bool()),
+            ("fetch", vec![], Union::mixed()),
+            ("close", vec![], t_bool()),
+            ("get_result", vec![], Union::mixed()),
+            ("error", vec![], t_str()),
         ] {
-            mys.own_methods.insert(Arc::from(*name),
-                stub_method("mysqli_stmt", name, params.clone(), ret.clone(), Public).1);
+            mys.own_methods.insert(
+                Arc::from(*name),
+                stub_method("mysqli_stmt", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         for prop in &["errno", "error", "insert_id", "affected_rows", "num_rows"] {
-            mys.own_properties.insert(Arc::from(*prop), stub_prop(prop, Union::mixed()));
+            mys.own_properties
+                .insert(Arc::from(*prop), stub_prop(prop, Union::mixed()));
         }
         codebase.classes.insert(Arc::from("mysqli_stmt"), mys);
         let myr = empty_class("mysqli_result", None, vec![]);
@@ -1782,47 +4408,103 @@ fn load_classes(codebase: &Codebase) {
     {
         let mut pdo = empty_class("PDO", None, vec![]);
         for (name, params, ret) in &[
-            ("__construct",    vec![req("dsn"), opt("username"), opt("password"), opt("options")], t_void()),
-            ("prepare",        vec![req("query"), opt("options")], Union::mixed()),
-            ("query",          vec![req("query"), opt("fetchMode")], Union::mixed()),
-            ("exec",           vec![req("statement")], Union::mixed()),
-            ("quote",          vec![req("string"), opt("type")], Union::mixed()),
-            ("lastInsertId",   vec![opt("name")], Union::mixed()),
+            (
+                "__construct",
+                vec![req("dsn"), opt("username"), opt("password"), opt("options")],
+                t_void(),
+            ),
+            (
+                "prepare",
+                vec![req("query"), opt("options")],
+                Union::mixed(),
+            ),
+            (
+                "query",
+                vec![req("query"), opt("fetchMode")],
+                Union::mixed(),
+            ),
+            ("exec", vec![req("statement")], Union::mixed()),
+            ("quote", vec![req("string"), opt("type")], Union::mixed()),
+            ("lastInsertId", vec![opt("name")], Union::mixed()),
             ("beginTransaction", vec![], t_bool()),
-            ("commit",         vec![], t_bool()),
-            ("rollBack",       vec![], t_bool()),
-            ("inTransaction",  vec![], t_bool()),
-            ("setAttribute",   vec![req("attribute"), req("value")], t_bool()),
-            ("getAttribute",   vec![req("attribute")], Union::mixed()),
-            ("errorCode",      vec![], Union::mixed()),
-            ("errorInfo",      vec![], t_array()),
+            ("commit", vec![], t_bool()),
+            ("rollBack", vec![], t_bool()),
+            ("inTransaction", vec![], t_bool()),
+            (
+                "setAttribute",
+                vec![req("attribute"), req("value")],
+                t_bool(),
+            ),
+            ("getAttribute", vec![req("attribute")], Union::mixed()),
+            ("errorCode", vec![], Union::mixed()),
+            ("errorInfo", vec![], t_array()),
         ] {
-            pdo.own_methods.insert(Arc::from(*name),
-                stub_method("PDO", name, params.clone(), ret.clone(), Public).1);
+            pdo.own_methods.insert(
+                Arc::from(*name),
+                stub_method("PDO", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("PDO"), pdo);
 
         let mut pdo_stmt = empty_class("PDOStatement", None, vec!["Traversable"]);
         for (name, params, ret) in &[
-            ("execute",        vec![opt("params")], Union::mixed()),
-            ("fetch",          vec![opt("mode"), opt("cursorOrientation"), opt("cursorOffset")], Union::mixed()),
-            ("fetchAll",       vec![opt("mode"), opt("fetchArgument"), opt("constructorArgs")], t_array()),
-            ("fetchColumn",    vec![opt("column")], Union::mixed()),
-            ("fetchObject",    vec![opt("class"), opt("constructorArgs")], Union::mixed()),
-            ("rowCount",       vec![], t_int()),
-            ("columnCount",    vec![], t_int()),
-            ("bindParam",      vec![req("param"), req("var"), opt("type"), opt("maxLength"), opt("driverOptions")], t_bool()),
-            ("bindValue",      vec![req("param"), req("value"), opt("type")], t_bool()),
-            ("bindColumn",     vec![req("column"), req("var"), opt("type"), opt("maxLength"), opt("driverOptions")], t_bool()),
-            ("closeCursor",    vec![], t_bool()),
-            ("errorCode",      vec![], Union::mixed()),
-            ("errorInfo",      vec![], t_array()),
-            ("getColumnMeta",  vec![req("column")], Union::mixed()),
-            ("setFetchMode",   vec![req("mode")], t_bool()),
-            ("nextRowset",     vec![], t_bool()),
+            ("execute", vec![opt("params")], Union::mixed()),
+            (
+                "fetch",
+                vec![opt("mode"), opt("cursorOrientation"), opt("cursorOffset")],
+                Union::mixed(),
+            ),
+            (
+                "fetchAll",
+                vec![opt("mode"), opt("fetchArgument"), opt("constructorArgs")],
+                t_array(),
+            ),
+            ("fetchColumn", vec![opt("column")], Union::mixed()),
+            (
+                "fetchObject",
+                vec![opt("class"), opt("constructorArgs")],
+                Union::mixed(),
+            ),
+            ("rowCount", vec![], t_int()),
+            ("columnCount", vec![], t_int()),
+            (
+                "bindParam",
+                vec![
+                    req("param"),
+                    req("var"),
+                    opt("type"),
+                    opt("maxLength"),
+                    opt("driverOptions"),
+                ],
+                t_bool(),
+            ),
+            (
+                "bindValue",
+                vec![req("param"), req("value"), opt("type")],
+                t_bool(),
+            ),
+            (
+                "bindColumn",
+                vec![
+                    req("column"),
+                    req("var"),
+                    opt("type"),
+                    opt("maxLength"),
+                    opt("driverOptions"),
+                ],
+                t_bool(),
+            ),
+            ("closeCursor", vec![], t_bool()),
+            ("errorCode", vec![], Union::mixed()),
+            ("errorInfo", vec![], t_array()),
+            ("getColumnMeta", vec![req("column")], Union::mixed()),
+            ("setFetchMode", vec![req("mode")], t_bool()),
+            ("nextRowset", vec![], t_bool()),
         ] {
-            pdo_stmt.own_methods.insert(Arc::from(*name),
-                stub_method("PDOStatement", name, params.clone(), ret.clone(), Public).1);
+            pdo_stmt.own_methods.insert(
+                Arc::from(*name),
+                stub_method("PDOStatement", name, params.clone(), ret.clone(), Public).1,
+            );
         }
         codebase.classes.insert(Arc::from("PDOStatement"), pdo_stmt);
     }
@@ -1830,17 +4512,27 @@ fn load_classes(codebase: &Codebase) {
     // ---- Misc PHP built-ins ----
     {
         let value_error = empty_class("ValueError", Some("Error"), vec![]);
-        codebase.classes.insert(Arc::from("ValueError"), value_error);
+        codebase
+            .classes
+            .insert(Arc::from("ValueError"), value_error);
         let type_error = empty_class("TypeError", Some("Error"), vec![]);
         codebase.classes.insert(Arc::from("TypeError"), type_error);
         let parse_error = empty_class("ParseError", Some("Error"), vec![]);
-        codebase.classes.insert(Arc::from("ParseError"), parse_error);
+        codebase
+            .classes
+            .insert(Arc::from("ParseError"), parse_error);
         let arithmetic_error = empty_class("ArithmeticError", Some("Error"), vec![]);
-        codebase.classes.insert(Arc::from("ArithmeticError"), arithmetic_error);
+        codebase
+            .classes
+            .insert(Arc::from("ArithmeticError"), arithmetic_error);
         let division_by_zero = empty_class("DivisionByZeroError", Some("ArithmeticError"), vec![]);
-        codebase.classes.insert(Arc::from("DivisionByZeroError"), division_by_zero);
+        codebase
+            .classes
+            .insert(Arc::from("DivisionByZeroError"), division_by_zero);
         let unhandled_match = empty_class("UnhandledMatchError", Some("Error"), vec![]);
-        codebase.classes.insert(Arc::from("UnhandledMatchError"), unhandled_match);
+        codebase
+            .classes
+            .insert(Arc::from("UnhandledMatchError"), unhandled_match);
     }
 }
 
@@ -1854,21 +4546,23 @@ fn load_interfaces(codebase: &Codebase) {
     // Throwable
     let mut throwable = empty_interface("Throwable", vec![]);
     for (name, params, ret) in &[
-        ("getMessage",       vec![], t_str()),
-        ("getCode",          vec![], Union::mixed()),
-        ("getFile",          vec![], t_str()),
-        ("getLine",          vec![], t_int()),
-        ("getTrace",         vec![], t_array()),
+        ("getMessage", vec![], t_str()),
+        ("getCode", vec![], Union::mixed()),
+        ("getFile", vec![], t_str()),
+        ("getLine", vec![], t_int()),
+        ("getTrace", vec![], t_array()),
         ("getTraceAsString", vec![], t_str()),
-        ("getPrevious",      vec![], Union::mixed()),
-        ("__toString",       vec![], t_str()),
+        ("getPrevious", vec![], Union::mixed()),
+        ("__toString", vec![], t_str()),
     ] {
         throwable.own_methods.insert(
             Arc::from(*name),
             stub_method("Throwable", name, params.clone(), ret.clone(), Public).1,
         );
     }
-    codebase.interfaces.insert(Arc::from("Throwable"), throwable);
+    codebase
+        .interfaces
+        .insert(Arc::from("Throwable"), throwable);
 
     // Stringable
     let mut stringable = empty_interface("Stringable", vec![]);
@@ -1876,7 +4570,9 @@ fn load_interfaces(codebase: &Codebase) {
         Arc::from("__toString"),
         stub_method("Stringable", "__toString", vec![], t_str(), Public).1,
     );
-    codebase.interfaces.insert(Arc::from("Stringable"), stringable);
+    codebase
+        .interfaces
+        .insert(Arc::from("Stringable"), stringable);
 
     // Countable
     let mut countable = empty_interface("Countable", vec![]);
@@ -1884,20 +4580,24 @@ fn load_interfaces(codebase: &Codebase) {
         Arc::from("count"),
         stub_method("Countable", "count", vec![], t_int(), Public).1,
     );
-    codebase.interfaces.insert(Arc::from("Countable"), countable);
+    codebase
+        .interfaces
+        .insert(Arc::from("Countable"), countable);
 
     // Traversable (marker, no methods)
     let traversable = empty_interface("Traversable", vec![]);
-    codebase.interfaces.insert(Arc::from("Traversable"), traversable);
+    codebase
+        .interfaces
+        .insert(Arc::from("Traversable"), traversable);
 
     // Iterator
     let mut iterator = empty_interface("Iterator", vec!["Traversable"]);
     for (name, params, ret) in &[
         ("current", vec![], Union::mixed()),
-        ("key",     vec![], Union::mixed()),
-        ("next",    vec![], t_void()),
-        ("rewind",  vec![], t_void()),
-        ("valid",   vec![], t_bool()),
+        ("key", vec![], Union::mixed()),
+        ("next", vec![], t_void()),
+        ("rewind", vec![], t_void()),
+        ("valid", vec![], t_bool()),
     ] {
         iterator.own_methods.insert(
             Arc::from(*name),
@@ -1910,17 +4610,26 @@ fn load_interfaces(codebase: &Codebase) {
     let mut iter_agg = empty_interface("IteratorAggregate", vec!["Traversable"]);
     iter_agg.own_methods.insert(
         Arc::from("getIterator"),
-        stub_method("IteratorAggregate", "getIterator", vec![], t_obj("Traversable"), Public).1,
+        stub_method(
+            "IteratorAggregate",
+            "getIterator",
+            vec![],
+            t_obj("Traversable"),
+            Public,
+        )
+        .1,
     );
-    codebase.interfaces.insert(Arc::from("IteratorAggregate"), iter_agg);
+    codebase
+        .interfaces
+        .insert(Arc::from("IteratorAggregate"), iter_agg);
 
     // ArrayAccess
     let mut aa = empty_interface("ArrayAccess", vec![]);
     for (name, params, ret) in &[
         ("offsetExists", vec![req("offset")], t_bool()),
-        ("offsetGet",    vec![req("offset")], Union::mixed()),
-        ("offsetSet",    vec![req("offset"), req("value")], t_void()),
-        ("offsetUnset",  vec![req("offset")], t_void()),
+        ("offsetGet", vec![req("offset")], Union::mixed()),
+        ("offsetSet", vec![req("offset"), req("value")], t_void()),
+        ("offsetUnset", vec![req("offset")], t_void()),
     ] {
         aa.own_methods.insert(
             Arc::from(*name),
@@ -1932,24 +4641,46 @@ fn load_interfaces(codebase: &Codebase) {
     // DateTimeInterface
     let mut dti = empty_interface("DateTimeInterface", vec![]);
     for (name, params, ret) in &[
-        ("format",       vec![req("format")], t_str()),
+        ("format", vec![req("format")], t_str()),
         ("getTimestamp", vec![], t_int()),
-        ("diff",         vec![req("targetObject"), opt("absolute")], t_obj("DateInterval")),
+        (
+            "diff",
+            vec![req("targetObject"), opt("absolute")],
+            t_obj("DateInterval"),
+        ),
     ] {
         dti.own_methods.insert(
             Arc::from(*name),
-            stub_method("DateTimeInterface", name, params.clone(), ret.clone(), Public).1,
+            stub_method(
+                "DateTimeInterface",
+                name,
+                params.clone(),
+                ret.clone(),
+                Public,
+            )
+            .1,
         );
     }
-    codebase.interfaces.insert(Arc::from("DateTimeInterface"), dti);
+    codebase
+        .interfaces
+        .insert(Arc::from("DateTimeInterface"), dti);
 
     // JsonSerializable
     let mut json_ser = empty_interface("JsonSerializable", vec![]);
     json_ser.own_methods.insert(
         Arc::from("jsonSerialize"),
-        stub_method("JsonSerializable", "jsonSerialize", vec![], Union::mixed(), Public).1,
+        stub_method(
+            "JsonSerializable",
+            "jsonSerialize",
+            vec![],
+            Union::mixed(),
+            Public,
+        )
+        .1,
     );
-    codebase.interfaces.insert(Arc::from("JsonSerializable"), json_ser);
+    codebase
+        .interfaces
+        .insert(Arc::from("JsonSerializable"), json_ser);
 
     // UnitEnum (PHP 8.1 — base for all enums)
     let unit_enum = empty_interface("UnitEnum", vec![]);
@@ -1957,7 +4688,9 @@ fn load_interfaces(codebase: &Codebase) {
 
     // BackedEnum (PHP 8.1 — base for string/int-backed enums)
     let backed_enum = empty_interface("BackedEnum", vec!["UnitEnum"]);
-    codebase.interfaces.insert(Arc::from("BackedEnum"), backed_enum);
+    codebase
+        .interfaces
+        .insert(Arc::from("BackedEnum"), backed_enum);
 
     // Countable
     let mut countable = empty_interface("Countable", vec![]);
@@ -1965,19 +4698,32 @@ fn load_interfaces(codebase: &Codebase) {
         Arc::from("count"),
         stub_method("Countable", "count", vec![], t_int(), Public).1,
     );
-    codebase.interfaces.insert(Arc::from("Countable"), countable);
+    codebase
+        .interfaces
+        .insert(Arc::from("Countable"), countable);
 
     // IteratorAggregate
     let mut iter_agg = empty_interface("IteratorAggregate", vec!["Traversable"]);
     iter_agg.own_methods.insert(
         Arc::from("getIterator"),
-        stub_method("IteratorAggregate", "getIterator", vec![], t_obj("Traversable"), Public).1,
+        stub_method(
+            "IteratorAggregate",
+            "getIterator",
+            vec![],
+            t_obj("Traversable"),
+            Public,
+        )
+        .1,
     );
-    codebase.interfaces.insert(Arc::from("IteratorAggregate"), iter_agg);
+    codebase
+        .interfaces
+        .insert(Arc::from("IteratorAggregate"), iter_agg);
 
     // Serializable
     let serializable = empty_interface("Serializable", vec![]);
-    codebase.interfaces.insert(Arc::from("Serializable"), serializable);
+    codebase
+        .interfaces
+        .insert(Arc::from("Serializable"), serializable);
 
     // RecursiveIterator
     let mut recursive_iterator = empty_interface("RecursiveIterator", vec!["Iterator"]);
@@ -1987,18 +4733,31 @@ fn load_interfaces(codebase: &Codebase) {
     ] {
         recursive_iterator.own_methods.insert(
             Arc::from(*name),
-            stub_method("RecursiveIterator", name, params.clone(), ret.clone(), Public).1,
+            stub_method(
+                "RecursiveIterator",
+                name,
+                params.clone(),
+                ret.clone(),
+                Public,
+            )
+            .1,
         );
     }
-    codebase.interfaces.insert(Arc::from("RecursiveIterator"), recursive_iterator);
+    codebase
+        .interfaces
+        .insert(Arc::from("RecursiveIterator"), recursive_iterator);
 
     // OuterIterator
     let outer_iterator = empty_interface("OuterIterator", vec!["Iterator"]);
-    codebase.interfaces.insert(Arc::from("OuterIterator"), outer_iterator);
+    codebase
+        .interfaces
+        .insert(Arc::from("OuterIterator"), outer_iterator);
 
     // Psr\Log\LoggerInterface (commonly used)
     let psr_logger = empty_interface("Psr\\Log\\LoggerInterface", vec![]);
-    codebase.interfaces.insert(Arc::from("Psr\\Log\\LoggerInterface"), psr_logger);
+    codebase
+        .interfaces
+        .insert(Arc::from("Psr\\Log\\LoggerInterface"), psr_logger);
 }
 
 // ---------------------------------------------------------------------------
@@ -2034,19 +4793,21 @@ mod tests {
 
     #[test]
     fn sscanf_output_vars_not_undefined() {
-        use std::path::PathBuf;
         use crate::project::ProjectAnalyzer;
         use mir_issues::IssueKind;
 
         let src = "<?php\nfunction test($str) {\n    sscanf($str, \"%d %d\", $row, $col);\n    return $row + $col;\n}\n";
         let tmp = std::env::temp_dir().join("mir_test_sscanf_undefined.php");
         std::fs::write(&tmp, src).unwrap();
-        let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+        let result = ProjectAnalyzer::new().analyze(std::slice::from_ref(&tmp));
         std::fs::remove_file(tmp).ok();
         let undef: Vec<_> = result.issues.iter()
             .filter(|i| matches!(&i.kind, IssueKind::UndefinedVariable { name } if name == "row" || name == "col"))
             .collect();
-        assert!(undef.is_empty(), "sscanf output vars must not be reported as UndefinedVariable; got: {undef:?}");
+        assert!(
+            undef.is_empty(),
+            "sscanf output vars must not be reported as UndefinedVariable; got: {undef:?}"
+        );
     }
 
     #[test]
@@ -2116,17 +4877,35 @@ mod tests {
 
     #[test]
     fn is_builtin_function_returns_true_for_known_builtins() {
-        assert!(is_builtin_function("strlen"),   "strlen should be a builtin");
-        assert!(is_builtin_function("array_map"),"array_map should be a builtin");
-        assert!(is_builtin_function("json_encode"), "json_encode should be a builtin");
-        assert!(is_builtin_function("preg_match"),  "preg_match should be a builtin");
+        assert!(is_builtin_function("strlen"), "strlen should be a builtin");
+        assert!(
+            is_builtin_function("array_map"),
+            "array_map should be a builtin"
+        );
+        assert!(
+            is_builtin_function("json_encode"),
+            "json_encode should be a builtin"
+        );
+        assert!(
+            is_builtin_function("preg_match"),
+            "preg_match should be a builtin"
+        );
     }
 
     #[test]
     fn is_builtin_function_returns_false_for_unknown_names() {
-        assert!(!is_builtin_function("my_custom_function"), "my_custom_function should not be a builtin");
-        assert!(!is_builtin_function(""),                   "empty string should not be a builtin");
-        assert!(!is_builtin_function("ast\\parse_file"),    "extension function should not be a builtin");
+        assert!(
+            !is_builtin_function("my_custom_function"),
+            "my_custom_function should not be a builtin"
+        );
+        assert!(
+            !is_builtin_function(""),
+            "empty string should not be a builtin"
+        );
+        assert!(
+            !is_builtin_function("ast\\parse_file"),
+            "extension function should not be a builtin"
+        );
     }
 
     fn analyze_for_unused_vars_named(src: &str, name: &str) -> Vec<String> {
@@ -2134,10 +4913,18 @@ mod tests {
         use mir_issues::IssueKind;
         let tmp = std::env::temp_dir().join(name);
         std::fs::write(&tmp, src).unwrap();
-        let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+        let result = ProjectAnalyzer::new().analyze(std::slice::from_ref(&tmp));
         std::fs::remove_file(tmp).ok();
-        result.issues.iter()
-            .filter_map(|i| if let IssueKind::UnusedVariable { name } = &i.kind { Some(name.clone()) } else { None })
+        result
+            .issues
+            .iter()
+            .filter_map(|i| {
+                if let IssueKind::UnusedVariable { name } = &i.kind {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
@@ -2145,35 +4932,47 @@ mod tests {
     fn unused_variable_is_reported() {
         let src = "<?php\nfunction foo(): int {\n    $unused = 1;\n    return 42;\n}\n";
         let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_reported.php");
-        assert!(names.contains(&"unused".to_string()), "expected UnusedVariable for $unused; got: {names:?}");
+        assert!(
+            names.contains(&"unused".to_string()),
+            "expected UnusedVariable for $unused; got: {names:?}"
+        );
     }
 
     #[test]
     fn used_variable_not_reported() {
         let src = "<?php\nfunction foo(): int {\n    $x = 1;\n    return $x;\n}\n";
         let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_used.php");
-        assert!(names.is_empty(), "expected no UnusedVariable; got: {names:?}");
+        assert!(
+            names.is_empty(),
+            "expected no UnusedVariable; got: {names:?}"
+        );
     }
 
     #[test]
     fn underscore_variable_not_reported() {
         let src = "<?php\nfunction foo(): int {\n    $_ignored = 1;\n    return 42;\n}\n";
         let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_underscore.php");
-        assert!(names.is_empty(), "expected no UnusedVariable for $_ignored; got: {names:?}");
+        assert!(
+            names.is_empty(),
+            "expected no UnusedVariable for $_ignored; got: {names:?}"
+        );
     }
 
     #[test]
     fn parameter_not_reported_as_unused_variable() {
         let src = "<?php\nfunction foo(int $param): int {\n    return 42;\n}\n";
         let names = analyze_for_unused_vars_named(src, "mir_test_unused_var_param.php");
-        assert!(names.is_empty(), "parameters must not be reported as UnusedVariable; got: {names:?}");
+        assert!(
+            names.is_empty(),
+            "parameters must not be reported as UnusedVariable; got: {names:?}"
+        );
     }
 
     fn analyze_issues(src: &str, filename: &str) -> Vec<mir_issues::IssueKind> {
         use crate::project::ProjectAnalyzer;
         let tmp = std::env::temp_dir().join(filename);
         std::fs::write(&tmp, src).unwrap();
-        let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+        let result = ProjectAnalyzer::new().analyze(std::slice::from_ref(&tmp));
         std::fs::remove_file(tmp).ok();
         result.issues.into_iter().map(|i| i.kind).collect()
     }
@@ -2183,8 +4982,13 @@ mod tests {
         use mir_issues::IssueKind;
         let src = "<?php\nfunction foo(bool $c): string {\n    if ($c) { $r = 'hello'; }\n    return $r;\n}\n";
         let kinds = analyze_issues(src, "mir_test_possibly_undef_if.php");
-        let has = kinds.iter().any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
-        assert!(has, "expected PossiblyUndefinedVariable for $r; got: {kinds:?}");
+        let has = kinds
+            .iter()
+            .any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
+        assert!(
+            has,
+            "expected PossiblyUndefinedVariable for $r; got: {kinds:?}"
+        );
     }
 
     #[test]
@@ -2192,8 +4996,13 @@ mod tests {
         use mir_issues::IssueKind;
         let src = "<?php\nfunction foo(bool $c): string {\n    if ($c) { $r = 'a'; } else { $r = 'b'; }\n    return $r;\n}\n";
         let kinds = analyze_issues(src, "mir_test_possibly_undef_both.php");
-        let has = kinds.iter().any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
-        assert!(!has, "expected no PossiblyUndefinedVariable for $r; got: {kinds:?}");
+        let has = kinds
+            .iter()
+            .any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
+        assert!(
+            !has,
+            "expected no PossiblyUndefinedVariable for $r; got: {kinds:?}"
+        );
     }
 
     #[test]
@@ -2201,8 +5010,13 @@ mod tests {
         use mir_issues::IssueKind;
         let src = "<?php\nfunction foo(bool $c): string {\n    $r = 'default';\n    if ($c) { $r = 'hello'; }\n    return $r;\n}\n";
         let kinds = analyze_issues(src, "mir_test_possibly_undef_before.php");
-        let has = kinds.iter().any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
-        assert!(!has, "expected no PossiblyUndefinedVariable for pre-defined $r; got: {kinds:?}");
+        let has = kinds
+            .iter()
+            .any(|k| matches!(k, IssueKind::PossiblyUndefinedVariable { name } if name == "r"));
+        assert!(
+            !has,
+            "expected no PossiblyUndefinedVariable for pre-defined $r; got: {kinds:?}"
+        );
     }
 
     #[test]
@@ -2210,7 +5024,12 @@ mod tests {
         use mir_issues::IssueKind;
         let src = "<?php\nabstract class Base {\n    abstract public function run(): void;\n}\nfunction call_run(Base $b): void {\n    $b->nonExistentMethod();\n}\n";
         let kinds = analyze_issues(src, "mir_test_abstract_undef_method.php");
-        let has = kinds.iter().any(|k| matches!(k, IssueKind::UndefinedMethod { .. }));
-        assert!(!has, "UndefinedMethod must be suppressed on abstract class receivers; got: {kinds:?}");
+        let has = kinds
+            .iter()
+            .any(|k| matches!(k, IssueKind::UndefinedMethod { .. }));
+        assert!(
+            !has,
+            "UndefinedMethod must be suppressed on abstract class receivers; got: {kinds:?}"
+        );
     }
 }

@@ -37,16 +37,18 @@ pub enum SinkKind {
 pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     match fn_name.to_lowercase().as_str() {
         // HTML output
-        "echo" | "print" | "printf" | "vprintf" | "fprintf"
-        | "header" | "setcookie" => Some(SinkKind::Html),
+        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "header" | "setcookie" => {
+            Some(SinkKind::Html)
+        }
 
         // SQL
-        "mysql_query" | "mysqli_query" | "pg_query" | "pg_exec"
-        | "sqlite_query" | "mssql_query" => Some(SinkKind::Sql),
+        "mysql_query" | "mysqli_query" | "pg_query" | "pg_exec" | "sqlite_query"
+        | "mssql_query" => Some(SinkKind::Sql),
 
         // Shell
-        "system" | "exec" | "shell_exec" | "passthru" | "popen"
-        | "proc_open" | "pcntl_exec" => Some(SinkKind::Shell),
+        "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "pcntl_exec" => {
+            Some(SinkKind::Shell)
+        }
 
         _ => None,
     }
@@ -78,9 +80,7 @@ pub fn is_expr_tainted<'arena, 'src>(expr: &Expr<'arena, 'src>, ctx: &Context) -
 
         ExprKind::Assign(a) => is_expr_tainted(a.value, ctx),
 
-        ExprKind::Binary(op) => {
-            is_expr_tainted(op.left, ctx) || is_expr_tainted(op.right, ctx)
-        }
+        ExprKind::Binary(op) => is_expr_tainted(op.left, ctx) || is_expr_tainted(op.right, ctx),
 
         ExprKind::UnaryPrefix(u) => is_expr_tainted(u.operand, ctx),
 

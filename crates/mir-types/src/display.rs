@@ -26,8 +26,12 @@ impl fmt::Display for Atomic {
             Atomic::TInt => write!(f, "int"),
             Atomic::TLiteralInt(n) => write!(f, "{}", n),
             Atomic::TIntRange { min, max } => {
-                let lo = min.map(|n| n.to_string()).unwrap_or_else(|| "min".to_string());
-                let hi = max.map(|n| n.to_string()).unwrap_or_else(|| "max".to_string());
+                let lo = min
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| "min".to_string());
+                let hi = max
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| "max".to_string());
                 write!(f, "int<{}, {}>", lo, hi)
             }
             Atomic::TPositiveInt => write!(f, "positive-int"),
@@ -53,7 +57,8 @@ impl fmt::Display for Atomic {
                 if type_params.is_empty() {
                     write!(f, "{}", fqcn)
                 } else {
-                    let params: Vec<String> = type_params.iter().map(|p| format!("{}", p)).collect();
+                    let params: Vec<String> =
+                        type_params.iter().map(|p| format!("{}", p)).collect();
                     write!(f, "{}<{}>", fqcn, params.join(", "))
                 }
             }
@@ -61,31 +66,51 @@ impl fmt::Display for Atomic {
             Atomic::TSelf { fqcn } => write!(f, "self({})", fqcn),
             Atomic::TParent { fqcn } => write!(f, "parent({})", fqcn),
 
-            Atomic::TCallable { params: None, return_type: None } => write!(f, "callable"),
-            Atomic::TCallable { params: Some(params), return_type } => {
-                let ps: Vec<String> = params.iter().map(|p| {
-                    if let Some(ty) = &p.ty {
-                        format!("{}", ty)
-                    } else {
-                        "mixed".to_string()
-                    }
-                }).collect();
-                let ret = return_type.as_ref()
+            Atomic::TCallable {
+                params: None,
+                return_type: None,
+            } => write!(f, "callable"),
+            Atomic::TCallable {
+                params: Some(params),
+                return_type,
+            } => {
+                let ps: Vec<String> = params
+                    .iter()
+                    .map(|p| {
+                        if let Some(ty) = &p.ty {
+                            format!("{}", ty)
+                        } else {
+                            "mixed".to_string()
+                        }
+                    })
+                    .collect();
+                let ret = return_type
+                    .as_ref()
                     .map(|r| format!("{}", r))
                     .unwrap_or_else(|| "mixed".to_string());
                 write!(f, "callable({}): {}", ps.join(", "), ret)
             }
-            Atomic::TCallable { params: None, return_type: Some(ret) } => {
+            Atomic::TCallable {
+                params: None,
+                return_type: Some(ret),
+            } => {
                 write!(f, "callable(): {}", ret)
             }
-            Atomic::TClosure { params, return_type, .. } => {
-                let ps: Vec<String> = params.iter().map(|p| {
-                    if let Some(ty) = &p.ty {
-                        format!("{}", ty)
-                    } else {
-                        "mixed".to_string()
-                    }
-                }).collect();
+            Atomic::TClosure {
+                params,
+                return_type,
+                ..
+            } => {
+                let ps: Vec<String> = params
+                    .iter()
+                    .map(|p| {
+                        if let Some(ty) = &p.ty {
+                            format!("{}", ty)
+                        } else {
+                            "mixed".to_string()
+                        }
+                    })
+                    .collect();
                 write!(f, "Closure({}): {}", ps.join(", "), return_type)
             }
 
@@ -98,19 +123,26 @@ impl fmt::Display for Atomic {
             }
             Atomic::TNonEmptyList { value } => write!(f, "non-empty-list<{}>", value),
             Atomic::TKeyedArray { properties, .. } => {
-                let entries: Vec<String> = properties.iter().map(|(k, v)| {
-                    let key_str = match k {
-                        crate::atomic::ArrayKey::String(s) => format!("'{}'", s),
-                        crate::atomic::ArrayKey::Int(n) => n.to_string(),
-                    };
-                    let opt = if v.optional { "?" } else { "" };
-                    format!("{}{}: {}", key_str, opt, v.ty)
-                }).collect();
+                let entries: Vec<String> = properties
+                    .iter()
+                    .map(|(k, v)| {
+                        let key_str = match k {
+                            crate::atomic::ArrayKey::String(s) => format!("'{}'", s),
+                            crate::atomic::ArrayKey::Int(n) => n.to_string(),
+                        };
+                        let opt = if v.optional { "?" } else { "" };
+                        format!("{}{}: {}", key_str, opt, v.ty)
+                    })
+                    .collect();
                 write!(f, "array{{{}}}", entries.join(", "))
             }
 
             Atomic::TTemplateParam { name, .. } => write!(f, "{}", name),
-            Atomic::TConditional { subject, if_true, if_false } => {
+            Atomic::TConditional {
+                subject,
+                if_true,
+                if_false,
+            } => {
                 write!(f, "({} is ? {} : {})", subject, if_true, if_false)
             }
 

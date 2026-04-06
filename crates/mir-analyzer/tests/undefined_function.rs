@@ -21,13 +21,15 @@ fn does_not_report_strlen() {
 
 #[test]
 fn does_not_report_array_map() {
-    let issues = check("<?php\nfunction test(): void {\n    array_map(fn($x) => $x, [1, 2, 3]);\n}\n");
+    let issues =
+        check("<?php\nfunction test(): void {\n    array_map(fn($x) => $x, [1, 2, 3]);\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
 #[test]
 fn does_not_report_user_defined_function() {
-    let issues = check("<?php\nfunction myFn(): void {}\nfunction test(): void {\n    myFn();\n}\n");
+    let issues =
+        check("<?php\nfunction myFn(): void {}\nfunction test(): void {\n    myFn();\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
@@ -37,7 +39,9 @@ fn reports_global_namespace_unknown_function() {
     let issues = check("<?php\nfunction test(): void {\n    \\nonExistent();\n}\n");
     assert_issue(
         &issues,
-        IssueKind::UndefinedFunction { name: "nonExistent".into() },
+        IssueKind::UndefinedFunction {
+            name: "nonExistent".into(),
+        },
         3,
         4,
     );
@@ -47,7 +51,8 @@ fn reports_global_namespace_unknown_function() {
 fn does_not_report_unpack() {
     // unpack() is a PHP builtin — must be in stubs
     // NOTE: this test currently FAILS if unpack() stub is missing (see CLAUDE.md gap analysis)
-    let issues = check("<?php\nfunction test(): void {\n    $r = unpack('N*', pack('N*', 1));\n}\n");
+    let issues =
+        check("<?php\nfunction test(): void {\n    $r = unpack('N*', pack('N*', 1));\n}\n");
     assert_no_issue(&issues, "UndefinedFunction");
 }
 
@@ -64,7 +69,9 @@ fn reports_inside_method_body() {
     let issues = check(src);
     assert_issue(
         &issues,
-        IssueKind::UndefinedFunction { name: "missing".into() },
+        IssueKind::UndefinedFunction {
+            name: "missing".into(),
+        },
         4,
         8,
     );

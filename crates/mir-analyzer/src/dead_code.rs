@@ -66,7 +66,12 @@ impl<'a> DeadCodeAnalyzer<'a> {
                             class: fqcn.to_string(),
                             method: name.to_string(),
                         },
-                        Location { file, line, col_start: 0, col_end: 0 },
+                        Location {
+                            file,
+                            line,
+                            col_start: 0,
+                            col_end: 0,
+                        },
                     ));
                 }
             }
@@ -83,7 +88,12 @@ impl<'a> DeadCodeAnalyzer<'a> {
                             class: fqcn.to_string(),
                             property: name.to_string(),
                         },
-                        Location { file, line, col_start: 0, col_end: 0 },
+                        Location {
+                            file,
+                            line,
+                            col_start: 0,
+                            col_end: 0,
+                        },
                     ));
                 }
             }

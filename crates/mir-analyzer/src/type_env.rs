@@ -1,13 +1,13 @@
 // crates/mir-analyzer/src/type_env.rs
-use std::sync::Arc;
 use indexmap::IndexMap;
 use mir_types::Union;
+use std::sync::Arc;
 
 /// Identifies a single analysis scope within a project.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ScopeId {
     Function { file: Arc<str>, name: Arc<str> },
-    Method   { class: Arc<str>, method: Arc<str> },
+    Method { class: Arc<str>, method: Arc<str> },
 }
 
 /// Variable type environment for one scope — the stable public view of Context.vars.
