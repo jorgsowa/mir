@@ -21,6 +21,8 @@ pub struct ProjectAnalyzer {
     pub cache: Option<AnalysisCache>,
     /// Called once after each file completes Pass 2 (used for progress reporting).
     pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
+    /// PSR-4 autoloader mapping from composer.json, if available.
+    pub psr4: Option<Arc<crate::composer::Psr4Map>>,
     /// Whether stubs have already been loaded (to avoid double-loading).
     stubs_loaded: std::sync::atomic::AtomicBool,
 }
@@ -31,6 +33,7 @@ impl ProjectAnalyzer {
             codebase: Arc::new(Codebase::new()),
             cache: None,
             on_file_done: None,
+            psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -41,8 +44,27 @@ impl ProjectAnalyzer {
             codebase: Arc::new(Codebase::new()),
             cache: Some(AnalysisCache::open(cache_dir)),
             on_file_done: None,
+            psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// Create a `ProjectAnalyzer` from a project root containing `composer.json`.
+    /// Returns the analyzer (with `psr4` set) and the `Psr4Map` so callers can
+    /// call `map.project_files()` / `map.vendor_files()`.
+    pub fn from_composer(
+        root: &Path,
+    ) -> Result<(Self, crate::composer::Psr4Map), crate::composer::ComposerError> {
+        let map = crate::composer::Psr4Map::from_composer(root)?;
+        let psr4 = Arc::new(crate::composer::Psr4Map::from_composer(root)?);
+        let analyzer = Self {
+            codebase: Arc::new(Codebase::new()),
+            cache: None,
+            on_file_done: None,
+            psr4: Some(psr4),
+            stubs_loaded: std::sync::atomic::AtomicBool::new(false),
+        };
+        Ok((analyzer, map))
     }
 
     /// Expose codebase for external use (e.g., pre-loading stubs from CLI).
