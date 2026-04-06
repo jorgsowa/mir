@@ -241,6 +241,13 @@ pub enum IssueKind {
     },
 
     // --- Other --------------------------------------------------------------
+    DeprecatedCall {
+        name: String,
+    },
+    DeprecatedMethodCall {
+        class: String,
+        method: String,
+    },
     DeprecatedMethod {
         class: String,
         method: String,
@@ -345,6 +352,8 @@ impl IssueKind {
             | IssueKind::UnusedMethod { .. }
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
+            | IssueKind::DeprecatedCall { .. }
+            | IssueKind::DeprecatedMethodCall { .. }
             | IssueKind::DeprecatedMethod { .. }
             | IssueKind::DeprecatedClass { .. }
             | IssueKind::InternalMethod { .. }
@@ -412,6 +421,8 @@ impl IssueKind {
             IssueKind::TaintedHtml => "TaintedHtml",
             IssueKind::TaintedSql => "TaintedSql",
             IssueKind::TaintedShell => "TaintedShell",
+            IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
+            IssueKind::DeprecatedMethodCall { .. } => "DeprecatedMethodCall",
             IssueKind::DeprecatedMethod { .. } => "DeprecatedMethod",
             IssueKind::DeprecatedClass { .. } => "DeprecatedClass",
             IssueKind::InternalMethod { .. } => "InternalMethod",
@@ -638,6 +649,12 @@ impl IssueKind {
                 "Tainted shell command — possible command injection".to_string()
             }
 
+            IssueKind::DeprecatedCall { name } => {
+                format!("Call to deprecated function {}", name)
+            }
+            IssueKind::DeprecatedMethodCall { class, method } => {
+                format!("Call to deprecated method {}::{}", class, method)
+            }
             IssueKind::DeprecatedMethod { class, method } => {
                 format!("Method {}::{}() is deprecated", class, method)
             }
