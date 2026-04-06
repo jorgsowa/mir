@@ -3,7 +3,7 @@
 /// Cache key: file path.  Cache validity: SHA-256 hash of file content.
 /// If the content hash matches what was stored, the cached issues are returned
 /// and Pass 2 analysis is skipped for that file.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -37,10 +37,23 @@ struct CacheEntry {
 // AnalysisCache
 // ---------------------------------------------------------------------------
 
+/// Serialized form of the full cache file.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct CacheFile {
+    #[serde(default)]
+    entries: HashMap<String, CacheEntry>,
+    /// Reverse dependency graph: defining_file → [files that depend on it].
+    /// Persisted so that the next run can invalidate dependents before Pass 1.
+    #[serde(default)]
+    reverse_deps: HashMap<String, HashSet<String>>,
+}
+
 /// Thread-safe, disk-backed cache for per-file analysis results.
 pub struct AnalysisCache {
     cache_dir: PathBuf,
     entries: Mutex<HashMap<String, CacheEntry>>,
+    /// Reverse dependency graph loaded from disk (from the previous run).
+    reverse_deps: Mutex<HashMap<String, HashSet<String>>>,
     dirty: Mutex<bool>,
 }
 
@@ -50,10 +63,11 @@ impl AnalysisCache {
     /// the first `flush()` call.
     pub fn open(cache_dir: &Path) -> Self {
         std::fs::create_dir_all(cache_dir).ok();
-        let entries = Self::load(cache_dir);
+        let file = Self::load(cache_dir);
         Self {
             cache_dir: cache_dir.to_path_buf(),
-            entries: Mutex::new(entries),
+            entries: Mutex::new(file.entries),
+            reverse_deps: Mutex::new(file.reverse_deps),
             dirty: Mutex::new(false),
         }
     }
@@ -101,20 +115,177 @@ impl AnalysisCache {
         if !dirty {
             return;
         }
-        let entries = self.entries.lock().unwrap();
         let cache_file = self.cache_dir.join("cache.json");
-        if let Ok(json) = serde_json::to_string(&*entries) {
+        let file = CacheFile {
+            entries: self.entries.lock().unwrap().clone(),
+            reverse_deps: self.reverse_deps.lock().unwrap().clone(),
+        };
+        if let Ok(json) = serde_json::to_string(&file) {
             std::fs::write(cache_file, json).ok();
         }
     }
 
+    /// Replace the reverse dependency graph (called after each Pass 1).
+    pub fn set_reverse_deps(&self, deps: HashMap<String, HashSet<String>>) {
+        *self.reverse_deps.lock().unwrap() = deps;
+        *self.dirty.lock().unwrap() = true;
+    }
+
+    /// BFS from each changed file through the reverse dep graph.
+    /// Evicts every reachable dependent's cache entry.
+    /// Returns the number of entries evicted.
+    pub fn evict_with_dependents(&self, changed_files: &[String]) -> usize {
+        // Phase 1: collect all dependents to evict via BFS (lock held only here).
+        let to_evict: Vec<String> = {
+            let deps = self.reverse_deps.lock().unwrap();
+            let mut visited: HashSet<String> = changed_files.iter().cloned().collect();
+            let mut queue: std::collections::VecDeque<String> =
+                changed_files.iter().cloned().collect();
+            let mut result = Vec::new();
+
+            while let Some(file) = queue.pop_front() {
+                if let Some(dependents) = deps.get(&file) {
+                    for dep in dependents {
+                        if visited.insert(dep.clone()) {
+                            queue.push_back(dep.clone());
+                            result.push(dep.clone());
+                        }
+                    }
+                }
+            }
+            result
+        };
+
+        // Phase 2: evict (reverse_deps lock released above, entries lock taken per file).
+        let count = to_evict.len();
+        for file in &to_evict {
+            self.evict(file);
+        }
+        count
+    }
+
+    /// Remove a single file's cache entry.
+    pub fn evict(&self, file_path: &str) {
+        let mut entries = self.entries.lock().unwrap();
+        entries.remove(file_path);
+        *self.dirty.lock().unwrap() = true;
+    }
+
     // -----------------------------------------------------------------------
 
-    fn load(cache_dir: &Path) -> HashMap<String, CacheEntry> {
+    fn load(cache_dir: &Path) -> CacheFile {
         let cache_file = cache_dir.join("cache.json");
         let Ok(bytes) = std::fs::read(&cache_file) else {
-            return HashMap::new();
+            return CacheFile::default();
         };
         serde_json::from_slice(&bytes).unwrap_or_default()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn make_cache(dir: &TempDir) -> AnalysisCache {
+        AnalysisCache::open(dir.path())
+    }
+
+    fn seed(cache: &AnalysisCache, file: &str) {
+        cache.put(file, "hash".to_string(), vec![]);
+    }
+
+    #[test]
+    fn evict_with_dependents_linear_chain() {
+        // reverse_deps: A → [B], B → [C]
+        // Changing A must evict B and C.
+        let dir = TempDir::new().unwrap();
+        let cache = make_cache(&dir);
+        seed(&cache, "A");
+        seed(&cache, "B");
+        seed(&cache, "C");
+
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        deps.entry("A".into()).or_default().insert("B".into());
+        deps.entry("B".into()).or_default().insert("C".into());
+        cache.set_reverse_deps(deps);
+
+        let evicted = cache.evict_with_dependents(&["A".to_string()]);
+
+        assert_eq!(evicted, 2, "B and C should be evicted");
+        assert!(cache.get("A", "hash").is_some(), "A itself is not evicted");
+        assert!(cache.get("B", "hash").is_none(), "B should be evicted");
+        assert!(cache.get("C", "hash").is_none(), "C should be evicted");
+    }
+
+    #[test]
+    fn evict_with_dependents_diamond() {
+        // reverse_deps: A → [B, C], B → [D], C → [D]
+        // D should be evicted exactly once (visited set prevents double-eviction).
+        let dir = TempDir::new().unwrap();
+        let cache = make_cache(&dir);
+        seed(&cache, "A");
+        seed(&cache, "B");
+        seed(&cache, "C");
+        seed(&cache, "D");
+
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        deps.entry("A".into()).or_default().insert("B".into());
+        deps.entry("A".into()).or_default().insert("C".into());
+        deps.entry("B".into()).or_default().insert("D".into());
+        deps.entry("C".into()).or_default().insert("D".into());
+        cache.set_reverse_deps(deps);
+
+        let evicted = cache.evict_with_dependents(&["A".to_string()]);
+
+        assert_eq!(evicted, 3, "B, C, D each evicted once");
+        assert!(cache.get("D", "hash").is_none());
+    }
+
+    #[test]
+    fn evict_with_dependents_cycle_safety() {
+        // reverse_deps: A → [B], B → [A]  (circular)
+        // Must not loop forever; B should be evicted.
+        let dir = TempDir::new().unwrap();
+        let cache = make_cache(&dir);
+        seed(&cache, "A");
+        seed(&cache, "B");
+
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        deps.entry("A".into()).or_default().insert("B".into());
+        deps.entry("B".into()).or_default().insert("A".into());
+        cache.set_reverse_deps(deps);
+
+        let evicted = cache.evict_with_dependents(&["A".to_string()]);
+
+        // B is a dependent of A; A is the seed (not counted as "evicted dependent")
+        assert_eq!(evicted, 1);
+        assert!(cache.get("B", "hash").is_none());
+    }
+
+    #[test]
+    fn evict_with_dependents_unrelated_file_untouched() {
+        // Changing C should not evict B (which depends on A, not C).
+        let dir = TempDir::new().unwrap();
+        let cache = make_cache(&dir);
+        seed(&cache, "A");
+        seed(&cache, "B");
+        seed(&cache, "C");
+
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        deps.entry("A".into()).or_default().insert("B".into());
+        cache.set_reverse_deps(deps);
+
+        let evicted = cache.evict_with_dependents(&["C".to_string()]);
+
+        assert_eq!(evicted, 0);
+        assert!(
+            cache.get("B", "hash").is_some(),
+            "B unrelated, should survive"
+        );
     }
 }

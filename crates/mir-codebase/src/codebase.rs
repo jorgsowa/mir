@@ -28,6 +28,10 @@ pub struct Codebase {
     /// Free functions referenced during Pass 2 — key: fully-qualified name.
     pub referenced_functions: DashSet<Arc<str>>,
 
+    /// Maps every FQCN (class, interface, trait, enum, function) to the absolute
+    /// path of the file that defines it. Populated during Pass 1.
+    pub symbol_to_file: DashMap<Arc<str>, Arc<str>>,
+
     /// Per-file `use` alias maps: alias → FQCN.  Populated during Pass 1.
     ///
     /// Key: absolute file path (as `Arc<str>`).
