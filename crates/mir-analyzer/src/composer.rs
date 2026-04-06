@@ -1,36 +1,18 @@
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 // ---------------------------------------------------------------------------
 // Error
 // ---------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ComposerError {
-    Io(std::io::Error),
-    Json(serde_json::Error),
+    #[error("composer I/O error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("composer JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("composer.json has no autoload section")]
     MissingAutoload,
-}
-
-impl std::fmt::Display for ComposerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ComposerError::Io(e) => write!(f, "composer I/O error: {}", e),
-            ComposerError::Json(e) => write!(f, "composer JSON error: {}", e),
-            ComposerError::MissingAutoload => write!(f, "composer.json has no autoload section"),
-        }
-    }
-}
-
-impl From<std::io::Error> for ComposerError {
-    fn from(e: std::io::Error) -> Self {
-        ComposerError::Io(e)
-    }
-}
-
-impl From<serde_json::Error> for ComposerError {
-    fn from(e: serde_json::Error) -> Self {
-        ComposerError::Json(e)
-    }
 }
 
 // ---------------------------------------------------------------------------
