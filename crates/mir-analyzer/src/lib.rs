@@ -19,3 +19,6 @@ pub use stubs::is_builtin_function;
 pub mod type_env;
 pub use mir_issues::{Issue, IssueKind, Location, Severity};
 pub use type_env::{ScopeId, TypeEnv};
+
+pub mod composer;
+pub use composer::Psr4Map;

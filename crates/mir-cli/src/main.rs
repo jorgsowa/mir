@@ -155,6 +155,113 @@ fn main() {
             .ok();
     }
 
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    // --- Composer auto-detection -------------------------------------------
+    if cli.paths.is_empty() && cwd.join("composer.json").exists() {
+        let (mut analyzer, map) = match ProjectAnalyzer::from_composer(&cwd) {
+            Ok(pair) => pair,
+            Err(e) => {
+                eprintln!("mir: composer error: {}", e);
+                std::process::exit(2);
+            }
+        };
+
+        // Apply --cache-dir if specified
+        if let Some(cache_dir) = &cli.cache_dir {
+            analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
+        }
+
+        let vendor_files = map.vendor_files();
+
+        // Resolve ignore dirs to absolute paths (relative to config file location)
+        let ignore_dirs: Vec<PathBuf> = config
+            .ignore_dirs
+            .iter()
+            .map(|d| {
+                let p = PathBuf::from(d);
+                if p.is_absolute() {
+                    p
+                } else {
+                    config_base.join(d)
+                }
+            })
+            .collect();
+
+        // Filter out ignored directories from project files
+        let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let files: Vec<PathBuf> = map
+            .project_files()
+            .into_iter()
+            .filter(|p| {
+                if ignore_dirs.is_empty() {
+                    return true;
+                }
+                let abs = if p.is_absolute() {
+                    p.clone()
+                } else {
+                    cwd_abs.join(p)
+                };
+                !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
+            })
+            .collect();
+
+        if files.is_empty() {
+            if !cli.quiet {
+                eprintln!("No PHP files found via composer.json.");
+            }
+            process::exit(0);
+        }
+
+        if !cli.quiet {
+            eprintln!(
+                "{} Analyzing {} file{} (from composer.json)...",
+                "mir".bold().green(),
+                files.len(),
+                if files.len() == 1 { "" } else { "s" },
+            );
+        }
+
+        analyzer.load_stubs();
+
+        if !vendor_files.is_empty() {
+            if !cli.quiet {
+                eprintln!("mir: scanning {} vendor files for types...", vendor_files.len());
+            }
+            analyzer.collect_types_only(&vendor_files);
+        }
+
+        let show_progress = !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
+        let start = std::time::Instant::now();
+        if show_progress {
+            let pb = Arc::new(
+                ProgressBar::new(files.len() as u64).with_style(
+                    ProgressStyle::with_template(
+                        "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} files {elapsed_precise}",
+                    )
+                    .unwrap_or_else(|_| ProgressStyle::default_bar())
+                    .progress_chars("=> "),
+                ),
+            );
+            let pb2 = pb.clone();
+            analyzer.on_file_done = Some(Arc::new(move || {
+                pb2.inc(1);
+            }));
+            let result = analyzer.analyze(&files);
+            let elapsed = start.elapsed();
+            pb.finish_and_clear();
+            let baseline = load_baseline(&cli, &config);
+            run_output(&cli, &config, &files, result, baseline, elapsed);
+        } else {
+            let result = analyzer.analyze(&files);
+            let elapsed = start.elapsed();
+            let baseline = load_baseline(&cli, &config);
+            run_output(&cli, &config, &files, result, baseline, elapsed);
+        }
+        return;
+    }
+    // --- End composer auto-detection ----------------------------------------
+
     // Resolve paths
     let paths: Vec<PathBuf> = if cli.paths.is_empty() {
         vec![std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))]
