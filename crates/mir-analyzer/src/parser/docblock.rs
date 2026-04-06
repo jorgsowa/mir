@@ -12,6 +12,23 @@ pub struct DocblockParser;
 impl DocblockParser {
     pub fn parse(text: &str) -> ParsedDocblock {
         let mut result = ParsedDocblock::default();
+
+        // --- Description pre-pass: collect text before the first `@` tag ---
+        {
+            let raw_lines = extract_lines(text);
+            let mut desc_lines: Vec<String> = Vec::new();
+            for l in &raw_lines {
+                let l = l.trim();
+                if l.starts_with('@') {
+                    break;
+                }
+                if !l.is_empty() {
+                    desc_lines.push(l.to_string());
+                }
+            }
+            result.description = desc_lines.join(" ");
+        }
+
         let lines = extract_lines(text);
 
         for line in lines {
@@ -120,8 +137,54 @@ impl DocblockParser {
                 if !suppressed.is_empty() {
                     result.suppressed_issues.push(suppressed);
                 }
-            } else if line.starts_with("@deprecated") {
+            } else if let Some(rest) = line.strip_prefix("@deprecated") {
                 result.is_deprecated = true;
+                let msg = rest.trim().to_string();
+                result.deprecated = Some(msg);
+            } else if line.starts_with("@see") || line.starts_with("@link") {
+                let rest = if let Some(r) = line.strip_prefix("@see") {
+                    r
+                } else {
+                    line.strip_prefix("@link").unwrap_or("")
+                };
+                let s = rest.trim().to_string();
+                if !s.is_empty() {
+                    result.see.push(s);
+                }
+            } else if let Some(rest) = line.strip_prefix("@mixin") {
+                let cls = rest.trim().to_string();
+                if !cls.is_empty() {
+                    result.mixins.push(cls);
+                }
+            } else if line.starts_with("@property-read") {
+                if let Some(rest) = line.strip_prefix("@property-read") {
+                    if let Some(prop) = parse_property_line(rest.trim(), true, false) {
+                        result.properties.push(prop);
+                    }
+                }
+            } else if line.starts_with("@property-write") {
+                if let Some(rest) = line.strip_prefix("@property-write") {
+                    if let Some(prop) = parse_property_line(rest.trim(), false, true) {
+                        result.properties.push(prop);
+                    }
+                }
+            } else if line.starts_with("@property") {
+                if let Some(rest) = line.strip_prefix("@property") {
+                    if let Some(prop) = parse_property_line(rest.trim(), false, false) {
+                        result.properties.push(prop);
+                    }
+                }
+            } else if let Some(rest) = line.strip_prefix("@method") {
+                if let Some(m) = parse_method_line(rest.trim()) {
+                    result.methods.push(m);
+                }
+            } else if let Some(rest) = line
+                .strip_prefix("@psalm-type")
+                .or_else(|| line.strip_prefix("@phpstan-type"))
+            {
+                if let Some(alias) = parse_type_alias_line(rest.trim()) {
+                    result.type_aliases.push(alias);
+                }
             } else if line.starts_with("@internal") {
                 result.is_internal = true;
             } else if line.starts_with("@psalm-pure") || line.starts_with("@pure") {
@@ -137,6 +200,31 @@ impl DocblockParser {
 
         result
     }
+}
+
+// ---------------------------------------------------------------------------
+// ParsedDocblock support types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default, Clone)]
+pub struct DocProperty {
+    pub type_hint: String,
+    pub name: String,     // without leading $
+    pub read_only: bool,  // true for @property-read
+    pub write_only: bool, // true for @property-write
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct DocMethod {
+    pub return_type: String,
+    pub name: String,
+    pub is_static: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct DocTypeAlias {
+    pub name: String,
+    pub type_expr: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +263,20 @@ pub struct ParsedDocblock {
     pub is_immutable: bool,
     pub is_readonly: bool,
     pub is_api: bool,
+    /// Free text before first `@` tag — used for hover display
+    pub description: String,
+    /// `@deprecated message` — Some(message) or Some("") if no message
+    pub deprecated: Option<String>,
+    /// `@see ClassName` / `@link URL`
+    pub see: Vec<String>,
+    /// `@mixin ClassName`
+    pub mixins: Vec<String>,
+    /// `@property`, `@property-read`, `@property-write`
+    pub properties: Vec<DocProperty>,
+    /// `@method [static] ReturnType name([params])`
+    pub methods: Vec<DocMethod>,
+    /// `@psalm-type Alias = TypeExpr` / `@phpstan-type Alias = TypeExpr`
+    pub type_aliases: Vec<DocTypeAlias>,
 }
 
 impl ParsedDocblock {
@@ -555,6 +657,108 @@ fn normalize_fqcn(s: &str) -> String {
     s.trim_start_matches('\\').to_string()
 }
 
+/// Parse `[Type] $name [description]` for @property tags.
+fn parse_property_line(s: &str, read_only: bool, write_only: bool) -> Option<DocProperty> {
+    // s has already had the tag prefix stripped and trimmed
+    // Formats: `$name`, `Type $name`, `Type $name description`
+    let mut words = s.splitn(3, char::is_whitespace);
+    let first = words.next()?.trim();
+    if first.is_empty() {
+        return None;
+    }
+    if first.starts_with('$') {
+        // No type hint given
+        Some(DocProperty {
+            type_hint: String::new(),
+            name: first.trim_start_matches('$').to_string(),
+            read_only,
+            write_only,
+        })
+    } else {
+        // first word is the type hint
+        let type_hint = first.to_string();
+        let name_word = words.next()?.trim();
+        if name_word.is_empty() {
+            return None;
+        }
+        Some(DocProperty {
+            type_hint,
+            name: name_word.trim_start_matches('$').to_string(),
+            read_only,
+            write_only,
+        })
+    }
+}
+
+/// Parse `[static] [ReturnType] name(...)` for @method tags.
+fn parse_method_line(s: &str) -> Option<DocMethod> {
+    let mut words = s.splitn(4, char::is_whitespace);
+    let first = words.next()?.trim();
+    if first.is_empty() {
+        return None;
+    }
+    let is_static = first.eq_ignore_ascii_case("static");
+    let (return_type, name_part) = if is_static {
+        let ret = words.next()?.trim().to_string();
+        let nm = words.next()?.trim().to_string();
+        (ret, nm)
+    } else {
+        // Check if next token looks like a method name (contains '(')
+        let second = words
+            .next()
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        if second.is_empty() {
+            // Only one word — treat as name with no return type
+            let name = first.split('(').next().unwrap_or(first).to_string();
+            return Some(DocMethod {
+                return_type: String::new(),
+                name,
+                is_static: false,
+            });
+        }
+        if first.contains('(') {
+            // first word is `name(...)`, no return type
+            let name = first.split('(').next().unwrap_or(first).to_string();
+            return Some(DocMethod {
+                return_type: String::new(),
+                name,
+                is_static: false,
+            });
+        }
+        (first.to_string(), second)
+    };
+    let name = name_part
+        .split('(')
+        .next()
+        .unwrap_or(&name_part)
+        .to_string();
+    Some(DocMethod {
+        return_type,
+        name,
+        is_static,
+    })
+}
+
+/// Parse `Alias = TypeExpr` for @psalm-type / @phpstan-type tags.
+fn parse_type_alias_line(s: &str) -> Option<DocTypeAlias> {
+    let (name_part, type_part) = if let Some(eq_pos) = s.find('=') {
+        (&s[..eq_pos], &s[eq_pos + 1..])
+    } else {
+        // No `=` — just a name, no type expression
+        return Some(DocTypeAlias {
+            name: s.trim().to_string(),
+            type_expr: String::new(),
+        });
+    };
+    let name = name_part.trim().to_string();
+    let type_expr = type_part.trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
+    Some(DocTypeAlias { name, type_expr })
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -634,5 +838,84 @@ mod tests {
         let doc = "/** @deprecated use newMethod() instead */";
         let parsed = DocblockParser::parse(doc);
         assert!(parsed.is_deprecated);
+        assert_eq!(
+            parsed.deprecated.as_deref(),
+            Some("use newMethod() instead")
+        );
+    }
+
+    #[test]
+    fn parse_description() {
+        let doc = r#"/**
+         * This is a description.
+         * Spans two lines.
+         * @param string $x
+         */"#;
+        let parsed = DocblockParser::parse(doc);
+        assert!(parsed.description.contains("This is a description"));
+        assert!(parsed.description.contains("Spans two lines"));
+    }
+
+    #[test]
+    fn parse_see_and_link() {
+        let doc = "/** @see SomeClass\n * @link https://example.com */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.see.len(), 2);
+        assert!(parsed.see.contains(&"SomeClass".to_string()));
+        assert!(parsed.see.contains(&"https://example.com".to_string()));
+    }
+
+    #[test]
+    fn parse_mixin() {
+        let doc = "/** @mixin SomeTrait */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.mixins, vec!["SomeTrait".to_string()]);
+    }
+
+    #[test]
+    fn parse_property_tags() {
+        let doc = r#"/**
+         * @property string $name
+         * @property-read int $id
+         * @property-write bool $active
+         */"#;
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.properties.len(), 3);
+        let name_prop = parsed.properties.iter().find(|p| p.name == "name").unwrap();
+        assert_eq!(name_prop.type_hint, "string");
+        assert!(!name_prop.read_only);
+        assert!(!name_prop.write_only);
+        let id_prop = parsed.properties.iter().find(|p| p.name == "id").unwrap();
+        assert!(id_prop.read_only);
+        let active_prop = parsed
+            .properties
+            .iter()
+            .find(|p| p.name == "active")
+            .unwrap();
+        assert!(active_prop.write_only);
+    }
+
+    #[test]
+    fn parse_method_tag() {
+        let doc = r#"/**
+         * @method string getName()
+         * @method static int create()
+         */"#;
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.methods.len(), 2);
+        let get_name = parsed.methods.iter().find(|m| m.name == "getName").unwrap();
+        assert_eq!(get_name.return_type, "string");
+        assert!(!get_name.is_static);
+        let create = parsed.methods.iter().find(|m| m.name == "create").unwrap();
+        assert!(create.is_static);
+    }
+
+    #[test]
+    fn parse_type_alias_tag() {
+        let doc = "/** @psalm-type MyAlias = string|int */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.type_aliases.len(), 1);
+        assert_eq!(parsed.type_aliases[0].name, "MyAlias");
+        assert_eq!(parsed.type_aliases[0].type_expr, "string|int");
     }
 }
