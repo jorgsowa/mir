@@ -2,7 +2,6 @@
 use mir_test_utils::{assert_issue_kind, assert_no_issue, check};
 
 #[test]
-#[ignore = "known gap: RedundantCondition rule not yet implemented"]
 fn reports_null_check_on_non_nullable() {
     // $x is string — checking === null is always false
     let src = "<?php\nfunction f(string $x): void {\n    if ($x === null) {}\n}\n";
@@ -12,7 +11,6 @@ fn reports_null_check_on_non_nullable() {
 }
 
 #[test]
-#[ignore = "known gap: RedundantCondition rule not yet implemented"]
 fn reports_not_null_check_on_non_nullable() {
     let src = "<?php\nfunction f(string $x): void {\n    if ($x !== null) {}\n}\n";
     let issues = check(src);
@@ -27,7 +25,6 @@ fn does_not_report_null_check_on_nullable() {
 }
 
 #[test]
-#[ignore = "known gap: RedundantCondition rule not yet implemented"]
 fn reports_is_string_on_string_type() {
     let src = "<?php\nfunction f(string $x): void {\n    if (is_string($x)) {}\n}\n";
     let issues = check(src);
@@ -43,7 +40,6 @@ fn does_not_report_is_string_on_union() {
 }
 
 #[test]
-#[ignore = "known gap: RedundantCondition rule not yet implemented"]
 fn reports_redundant_check_after_narrowing() {
     // After $x is narrowed to string in first branch, second check is redundant
     let src = "<?php\nfunction f(string|int $x): void {\n    if (is_string($x)) {\n        if (is_string($x)) {}\n    }\n}\n";

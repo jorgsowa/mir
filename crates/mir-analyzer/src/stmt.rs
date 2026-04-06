@@ -321,7 +321,8 @@ impl<'a> StatementsAnalyzer<'a> {
                 let pre_ctx = ctx.clone();
 
                 // Analyse condition expression
-                self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
+                let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
+                let pre_diverges = ctx.diverges;
 
                 // True branch
                 let mut then_ctx = ctx.fork();
@@ -351,6 +352,20 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let Some(else_branch) = &if_stmt.else_branch {
                         self.analyze_stmt(else_branch, &mut else_ctx);
                     }
+                }
+
+                // Emit RedundantCondition if narrowing proves one branch is statically unreachable.
+                if !pre_diverges && (then_ctx.diverges || else_ctx.diverges) {
+                    let (line, col) = crate::parser::span_to_line_col(self.source, if_stmt.condition.span);
+                    self.issues.add(mir_issues::Issue::new(
+                        IssueKind::RedundantCondition { ty: format!("{}", cond_type) },
+                        mir_issues::Location {
+                            file: self.file.clone(),
+                            line,
+                            col_start: col,
+                            col_end: col,
+                        },
+                    ));
                 }
 
                 // Merge all branches
