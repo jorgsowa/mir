@@ -9,8 +9,8 @@ use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location, Severity};
 use mir_types::{Atomic, Union};
 
-use crate::context::Context;
 use crate::call::CallAnalyzer;
+use crate::context::Context;
 
 // ---------------------------------------------------------------------------
 // ExpressionAnalyzer
@@ -30,7 +30,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         source: &'a str,
         issues: &'a mut IssueBuffer,
     ) -> Self {
-        Self { codebase, file, source, issues }
+        Self {
+            codebase,
+            file,
+            source,
+            issues,
+        }
     }
 
     pub fn analyze<'arena, 'src>(
@@ -50,14 +55,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             ExprKind::String(s) => Union::single(Atomic::TLiteralString((*s).into())),
             ExprKind::Bool(b) => {
-                if *b { Union::single(Atomic::TTrue) } else { Union::single(Atomic::TFalse) }
+                if *b {
+                    Union::single(Atomic::TTrue)
+                } else {
+                    Union::single(Atomic::TFalse)
+                }
             }
             ExprKind::Null => Union::single(Atomic::TNull),
 
             // Interpolated strings always produce TString
-            ExprKind::InterpolatedString(_) | ExprKind::Heredoc { .. } | ExprKind::Nowdoc { .. } => {
-                Union::single(Atomic::TString)
-            }
+            ExprKind::InterpolatedString(_)
+            | ExprKind::Heredoc { .. }
+            | ExprKind::Nowdoc { .. } => Union::single(Atomic::TString),
             ExprKind::ShellExec(_) => Union::single(Atomic::TString),
 
             // --- Variables --------------------------------------------------
@@ -66,13 +75,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if !ctx.var_is_defined(name_str) {
                     if ctx.var_possibly_defined(name_str) {
                         self.emit(
-                            IssueKind::PossiblyUndefinedVariable { name: name_str.to_string() },
+                            IssueKind::PossiblyUndefinedVariable {
+                                name: name_str.to_string(),
+                            },
                             Severity::Info,
                             expr.span,
                         );
                     } else if name_str != "this" {
                         self.emit(
-                            IssueKind::UndefinedVariable { name: name_str.to_string() },
+                            IssueKind::UndefinedVariable {
+                                name: name_str.to_string(),
+                            },
                             Severity::Error,
                             expr.span,
                         );
@@ -111,7 +124,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                         Union::single(Atomic::TString)
                     }
-                    AssignOp::Plus | AssignOp::Minus | AssignOp::Mul | AssignOp::Div | AssignOp::Mod | AssignOp::Pow => {
+                    AssignOp::Plus
+                    | AssignOp::Minus
+                    | AssignOp::Mul
+                    | AssignOp::Div
+                    | AssignOp::Mod
+                    | AssignOp::Pow => {
                         let lhs_ty = self.analyze(a.target, ctx);
                         let result_ty = infer_arithmetic(&lhs_ty, &rhs_ty);
                         if let Some(var_name) = extract_simple_var(a.target) {
@@ -158,7 +176,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // ++$x / --$x: increment and return new value
                         if let Some(var_name) = extract_simple_var(u.operand) {
                             let ty = ctx.get_var(&var_name);
-                            let new_ty = if ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+                            let new_ty = if ty.contains(|t| {
+                                matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))
+                            }) {
                                 Union::single(Atomic::TFloat)
                             } else {
                                 Union::single(Atomic::TInt)
@@ -178,7 +198,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match u.op {
                     UnaryPostfixOp::PostIncrement | UnaryPostfixOp::PostDecrement => {
                         if let Some(var_name) = extract_simple_var(u.operand) {
-                            let new_ty = if operand_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+                            let new_ty = if operand_ty.contains(|t| {
+                                matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))
+                            }) {
                                 Union::single(Atomic::TFloat)
                             } else {
                                 Union::single(Atomic::TInt)
@@ -196,12 +218,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match &t.then_expr {
                     Some(then_expr) => {
                         let mut then_ctx = ctx.fork();
-                        crate::narrowing::narrow_from_condition(t.condition, &mut then_ctx, true, self.codebase, &self.file);
-                        let then_ty = self.with_ctx(&mut then_ctx, |ea, c| ea.analyze(then_expr, c));
+                        crate::narrowing::narrow_from_condition(
+                            t.condition,
+                            &mut then_ctx,
+                            true,
+                            self.codebase,
+                            &self.file,
+                        );
+                        let then_ty =
+                            self.with_ctx(&mut then_ctx, |ea, c| ea.analyze(then_expr, c));
 
                         let mut else_ctx = ctx.fork();
-                        crate::narrowing::narrow_from_condition(t.condition, &mut else_ctx, false, self.codebase, &self.file);
-                        let else_ty = self.with_ctx(&mut else_ctx, |ea, c| ea.analyze(t.else_expr, c));
+                        crate::narrowing::narrow_from_condition(
+                            t.condition,
+                            &mut else_ctx,
+                            false,
+                            self.codebase,
+                            &self.file,
+                        );
+                        let else_ty =
+                            self.with_ctx(&mut else_ctx, |ea, c| ea.analyze(t.else_expr, c));
 
                         Union::merge(&then_ty, &else_ty)
                     }
@@ -267,7 +303,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 // Try to build a TKeyedArray when all keys are literal strings/ints
                 // (or no keys — pure list). Fall back to TArray on spread or dynamic keys.
-                let mut keyed_props: indexmap::IndexMap<ArrayKey, KeyedProperty> = indexmap::IndexMap::new();
+                let mut keyed_props: indexmap::IndexMap<ArrayKey, KeyedProperty> =
+                    indexmap::IndexMap::new();
                 let mut is_list = true;
                 let mut can_be_keyed = true;
                 let mut next_int_key: i64 = 0;
@@ -284,15 +321,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // Only build keyed array if key is a string or int literal
                         match key_ty.types.as_slice() {
                             [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
-                            [Atomic::TLiteralInt(i)] => { next_int_key = *i + 1; ArrayKey::Int(*i) }
-                            _ => { can_be_keyed = false; break; }
+                            [Atomic::TLiteralInt(i)] => {
+                                next_int_key = *i + 1;
+                                ArrayKey::Int(*i)
+                            }
+                            _ => {
+                                can_be_keyed = false;
+                                break;
+                            }
                         }
                     } else {
                         let k = ArrayKey::Int(next_int_key);
                         next_int_key += 1;
                         k
                     };
-                    keyed_props.insert(array_key, KeyedProperty { ty: value_ty, optional: false });
+                    keyed_props.insert(
+                        array_key,
+                        KeyedProperty {
+                            ty: value_ty,
+                            optional: false,
+                        },
+                    );
                 }
 
                 if can_be_keyed {
@@ -322,7 +371,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         key_union.add_type(Atomic::TInt);
                     }
                 }
-                if key_union.is_empty() { key_union.add_type(Atomic::TInt); }
+                if key_union.is_empty() {
+                    key_union.add_type(Atomic::TInt);
+                }
                 Union::single(Atomic::TArray {
                     key: Box::new(key_union),
                     value: Box::new(all_value_types),
@@ -331,7 +382,6 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Array access -----------------------------------------------
             ExprKind::ArrayAccess(aa) => {
-
                 let arr_ty = self.analyze(aa.array, ctx);
 
                 // Check for null access
@@ -340,17 +390,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Union::mixed();
                 }
                 if arr_ty.is_nullable() {
-                    self.emit(IssueKind::PossiblyNullArrayAccess, Severity::Info, expr.span);
+                    self.emit(
+                        IssueKind::PossiblyNullArrayAccess,
+                        Severity::Info,
+                        expr.span,
+                    );
                 }
 
                 // Determine the key being accessed (if it's a literal)
-                let literal_key: Option<mir_types::atomic::ArrayKey> = aa.index.as_ref().and_then(|idx| {
-                    match &idx.kind {
-                        ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(Arc::from(s.as_ref()))),
+                let literal_key: Option<mir_types::atomic::ArrayKey> =
+                    aa.index.as_ref().and_then(|idx| match &idx.kind {
+                        ExprKind::String(s) => {
+                            Some(mir_types::atomic::ArrayKey::String(Arc::from(&**s)))
+                        }
                         ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
                         _ => None,
-                    }
-                });
+                    });
 
                 // Infer element type
                 for atomic in &arr_ty.types {
@@ -367,7 +422,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             for prop in properties.values() {
                                 result = Union::merge(&result, &prop.ty);
                             }
-                            return if result.types.is_empty() { Union::mixed() } else { result };
+                            return if result.types.is_empty() {
+                                Union::mixed()
+                            } else {
+                                result
+                            };
                         }
                         Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. } => {
                             return *value.clone();
@@ -401,14 +460,22 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- new ClassName(...) ----------------------------------------
             ExprKind::New(n) => {
                 // Evaluate args first (needed for taint / type check)
-                let arg_types: Vec<Union> = n.args.iter()
+                let arg_types: Vec<Union> = n
+                    .args
+                    .iter()
                     .map(|a| {
                         let ty = self.analyze(&a.value, ctx);
-                        if a.unpack { crate::call::spread_element_type(&ty) } else { ty }
+                        if a.unpack {
+                            crate::call::spread_element_type(&ty)
+                        } else {
+                            ty
+                        }
                     })
                     .collect();
                 let arg_spans: Vec<php_ast::Span> = n.args.iter().map(|a| a.span).collect();
-                let arg_names: Vec<Option<String>> = n.args.iter()
+                let arg_names: Vec<Option<String>> = n
+                    .args
+                    .iter()
                     .map(|a| a.name.as_ref().map(|nm| nm.to_string()))
                     .collect();
 
@@ -417,10 +484,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
                         // `self`, `static`, `parent` resolve to the current class — use ctx
                         let fqcn: Arc<str> = match resolved.as_str() {
-                            "self" | "static" => ctx.self_fqcn.clone()
+                            "self" | "static" => ctx
+                                .self_fqcn
+                                .clone()
                                 .or_else(|| ctx.static_fqcn.clone())
                                 .unwrap_or_else(|| Arc::from(resolved.as_str())),
-                            "parent" => ctx.parent_fqcn.clone()
+                            "parent" => ctx
+                                .parent_fqcn
+                                .clone()
                                 .unwrap_or_else(|| Arc::from(resolved.as_str())),
                             _ => Arc::from(resolved.as_str()),
                         };
@@ -428,7 +499,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             && !self.codebase.type_exists(&fqcn)
                         {
                             self.emit(
-                                IssueKind::UndefinedClass { name: resolved.clone() },
+                                IssueKind::UndefinedClass {
+                                    name: resolved.clone(),
+                                },
                                 Severity::Error,
                                 n.class.span,
                             );
@@ -438,16 +511,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 crate::call::check_constructor_args(
                                     self,
                                     &fqcn,
-                                    &ctor.params,
-                                    &arg_types,
-                                    &arg_spans,
-                                    &arg_names,
-                                    expr.span,
-                                    n.args.iter().any(|a| a.unpack),
+                                    crate::call::CheckArgsParams {
+                                        fn_name: "__construct",
+                                        params: &ctor.params,
+                                        arg_types: &arg_types,
+                                        arg_spans: &arg_spans,
+                                        arg_names: &arg_names,
+                                        call_span: expr.span,
+                                        has_spread: n.args.iter().any(|a| a.unpack),
+                                    },
                                 );
                             }
                         }
-                        Union::single(Atomic::TNamedObject { fqcn, type_params: vec![] })
+                        Union::single(Atomic::TNamedObject {
+                            fqcn,
+                            type_params: vec![],
+                        })
                     }
                     ExprKind::Variable(_) => Union::single(Atomic::TObject),
                     _ => Union::single(Atomic::TObject),
@@ -465,7 +544,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 if obj_ty.contains(|t| matches!(t, Atomic::TNull)) && obj_ty.is_single() {
                     self.emit(
-                        IssueKind::NullPropertyFetch { property: prop_name.clone() },
+                        IssueKind::NullPropertyFetch {
+                            property: prop_name.clone(),
+                        },
                         Severity::Error,
                         expr.span,
                     );
@@ -473,7 +554,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 if obj_ty.is_nullable() {
                     self.emit(
-                        IssueKind::PossiblyNullPropertyFetch { property: prop_name.clone() },
+                        IssueKind::PossiblyNullPropertyFetch {
+                            property: prop_name.clone(),
+                        },
                         Severity::Info,
                         expr.span,
                     );
@@ -543,8 +626,15 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Closures / arrow functions --------------------------------
             ExprKind::Closure(c) => {
-                let params = ast_params_to_fn_params_resolved(&c.params, ctx.self_fqcn.as_deref(), self.codebase, &self.file);
-                let return_ty_hint = c.return_type.as_ref()
+                let params = ast_params_to_fn_params_resolved(
+                    &c.params,
+                    ctx.self_fqcn.as_deref(),
+                    self.codebase,
+                    &self.file,
+                );
+                let return_ty_hint = c
+                    .return_type
+                    .as_ref()
                     .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
                     .map(|u| resolve_named_objects_in_union(u, self.codebase, &self.file));
 
@@ -562,13 +652,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                 for use_var in c.use_vars.iter() {
                     let name = use_var.name.trim_start_matches('$');
                     closure_ctx.set_var(name, ctx.get_var(name));
-                    if ctx.is_tainted(name) { closure_ctx.taint_var(name); }
+                    if ctx.is_tainted(name) {
+                        closure_ctx.taint_var(name);
+                    }
                 }
 
                 // Analyze closure body, collecting issues into the same buffer
                 let inferred_return = {
                     let mut sa = crate::stmt::StatementsAnalyzer::new(
-                        self.codebase, self.file.clone(), self.source, self.issues,
+                        self.codebase,
+                        self.file.clone(),
+                        self.source,
+                        self.issues,
                     );
                     sa.analyze_stmts(&c.body, &mut closure_ctx);
                     let ret = crate::project::merge_return_types(&sa.return_types);
@@ -577,7 +672,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
 
                 let return_ty = return_ty_hint.unwrap_or(inferred_return);
-                let closure_params: Vec<mir_types::atomic::FnParam> = params.iter()
+                let closure_params: Vec<mir_types::atomic::FnParam> = params
+                    .iter()
                     .map(|p| mir_types::atomic::FnParam {
                         name: p.name.clone(),
                         ty: p.ty.clone(),
@@ -592,14 +688,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                     params: closure_params,
                     return_type: Box::new(return_ty),
                     this_type: ctx.self_fqcn.clone().map(|f| {
-                        Box::new(Union::single(Atomic::TNamedObject { fqcn: f, type_params: vec![] }))
+                        Box::new(Union::single(Atomic::TNamedObject {
+                            fqcn: f,
+                            type_params: vec![],
+                        }))
                     }),
                 })
             }
 
             ExprKind::ArrowFunction(af) => {
-                let params = ast_params_to_fn_params_resolved(&af.params, ctx.self_fqcn.as_deref(), self.codebase, &self.file);
-                let return_ty_hint = af.return_type.as_ref()
+                let params = ast_params_to_fn_params_resolved(
+                    &af.params,
+                    ctx.self_fqcn.as_deref(),
+                    self.codebase,
+                    &self.file,
+                );
+                let return_ty_hint = af
+                    .return_type
+                    .as_ref()
                     .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
                     .map(|u| resolve_named_objects_in_union(u, self.codebase, &self.file));
 
@@ -624,7 +730,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Analyze single-expression body
                 let inferred_return = self.analyze(af.body, &mut arrow_ctx);
                 let return_ty = return_ty_hint.unwrap_or(inferred_return);
-                let closure_params: Vec<mir_types::atomic::FnParam> = params.iter()
+                let closure_params: Vec<mir_types::atomic::FnParam> = params
+                    .iter()
                     .map(|p| mir_types::atomic::FnParam {
                         name: p.name.clone(),
                         ty: p.ty.clone(),
@@ -638,9 +745,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Union::single(Atomic::TClosure {
                     params: closure_params,
                     return_type: Box::new(return_ty),
-                    this_type: if af.is_static { None } else {
+                    this_type: if af.is_static {
+                        None
+                    } else {
                         ctx.self_fqcn.clone().map(|f| {
-                            Box::new(Union::single(Atomic::TNamedObject { fqcn: f, type_params: vec![] }))
+                            Box::new(Union::single(Atomic::TNamedObject {
+                                fqcn: f,
+                                type_params: vec![],
+                            }))
                         })
                     },
                 })
@@ -690,7 +802,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if let Some(conditions) = &arm.conditions {
                         for cond in conditions.iter() {
                             crate::narrowing::narrow_from_condition(
-                                cond, &mut arm_ctx, true, self.codebase, &self.file,
+                                cond,
+                                &mut arm_ctx,
+                                true,
+                                self.codebase,
+                                &self.file,
                             );
                         }
                     }
@@ -698,7 +814,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let arm_body_ty = self.analyze(&arm.body, &mut arm_ctx);
                     result = Union::merge(&result, &arm_body_ty);
                 }
-                if result.is_empty() { Union::mixed() } else { result }
+                if result.is_empty() {
+                    Union::mixed()
+                } else {
+                    result
+                }
             }
 
             // --- Throw as expression (PHP 8) --------------------------------
@@ -737,7 +857,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Exit -------------------------------------------------------
             ExprKind::Exit(opt) => {
-                if let Some(e) = opt { self.analyze(e, ctx); }
+                if let Some(e) = opt {
+                    self.analyze(e, ctx);
+                }
                 Union::single(Atomic::TNever)
             }
 
@@ -765,11 +887,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         // (e.g. `instanceof`) applies to method/property calls on the right side
         // without permanently mutating the caller's context.
         use php_ast::ast::BinaryOp as B;
-        if matches!(b.op, B::BooleanAnd | B::LogicalAnd | B::BooleanOr | B::LogicalOr) {
+        if matches!(
+            b.op,
+            B::BooleanAnd | B::LogicalAnd | B::BooleanOr | B::LogicalOr
+        ) {
             let _left_ty = self.analyze(b.left, ctx);
             let mut right_ctx = ctx.fork();
             let is_and = matches!(b.op, B::BooleanAnd | B::LogicalAnd);
-            crate::narrowing::narrow_from_condition(b.left, &mut right_ctx, is_and, self.codebase, &self.file);
+            crate::narrowing::narrow_from_condition(
+                b.left,
+                &mut right_ctx,
+                is_and,
+                self.codebase,
+                &self.file,
+            );
             // If narrowing made the right side statically unreachable, skip it
             // (e.g. `$x === null || $x->method()` — right is dead when $x is only null).
             if !right_ctx.diverges {
@@ -796,9 +927,12 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         match b.op {
             // Arithmetic
-            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                infer_arithmetic(&left_ty, &right_ty)
-            }
+            BinaryOp::Add
+            | BinaryOp::Sub
+            | BinaryOp::Mul
+            | BinaryOp::Div
+            | BinaryOp::Mod
+            | BinaryOp::Pow => infer_arithmetic(&left_ty, &right_ty),
 
             // String concatenation
             BinaryOp::Concat => Union::single(Atomic::TString),
@@ -845,8 +979,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::LogicalXor => Union::single(Atomic::TBool),
 
             // Bitwise
-            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor
-            | BinaryOp::ShiftLeft | BinaryOp::ShiftRight => Union::single(Atomic::TInt),
+            BinaryOp::BitwiseAnd
+            | BinaryOp::BitwiseOr
+            | BinaryOp::BitwiseXor
+            | BinaryOp::ShiftLeft
+            | BinaryOp::ShiftRight => Union::single(Atomic::TInt),
 
             // Pipe (FirstClassCallable-style) — rare
             BinaryOp::Pipe => right_ty,
@@ -940,13 +1077,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
 
                 // Extract the element value type from the RHS array type (if known).
-                let value_ty: Union = ty.types.iter().find_map(|a| match a {
-                    Atomic::TArray { value, .. }
-                    | Atomic::TList { value }
-                    | Atomic::TNonEmptyArray { value, .. }
-                    | Atomic::TNonEmptyList { value } => Some(*value.clone()),
-                    _ => None,
-                }).unwrap_or_else(Union::mixed);
+                let value_ty: Union = ty
+                    .types
+                    .iter()
+                    .find_map(|a| match a {
+                        Atomic::TArray { value, .. }
+                        | Atomic::TList { value }
+                        | Atomic::TNonEmptyArray { value, .. }
+                        | Atomic::TNonEmptyList { value } => Some(*value.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(Union::mixed);
 
                 for elem in elements.iter() {
                     self.assign_to_target(&elem.value, value_ty.clone(), ctx, span);
@@ -1092,7 +1233,9 @@ fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
             }
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
                 let merged = Union::merge(value, new_value);
-                result.add_type(Atomic::TList { value: Box::new(merged) });
+                result.add_type(Atomic::TList {
+                    value: Box::new(merged),
+                });
                 found_array = true;
             }
             Atomic::TMixed => {
@@ -1118,25 +1261,42 @@ pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
     }
 
     // PHP array union: array + array → array (union of keys)
-    let left_is_array = left.contains(|t| matches!(t,
-        Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. }
-        | Atomic::TList { .. } | Atomic::TNonEmptyList { .. }
-        | Atomic::TKeyedArray { .. }));
-    let right_is_array = right.contains(|t| matches!(t,
-        Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. }
-        | Atomic::TList { .. } | Atomic::TNonEmptyList { .. }
-        | Atomic::TKeyedArray { .. }));
+    let left_is_array = left.contains(|t| {
+        matches!(
+            t,
+            Atomic::TArray { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }
+        )
+    });
+    let right_is_array = right.contains(|t| {
+        matches!(
+            t,
+            Atomic::TArray { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }
+        )
+    });
     if left_is_array || right_is_array {
         // Merge the two array types (simplified: return mixed array)
-        let merged_left = if left_is_array { left.clone() } else { Union::single(Atomic::TArray {
-            key: Box::new(Union::single(Atomic::TMixed)),
-            value: Box::new(Union::mixed()),
-        }) };
+        let merged_left = if left_is_array {
+            left.clone()
+        } else {
+            Union::single(Atomic::TArray {
+                key: Box::new(Union::single(Atomic::TMixed)),
+                value: Box::new(Union::mixed()),
+            })
+        };
         return merged_left;
     }
 
     let left_is_float = left.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
-    let right_is_float = right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
+    let right_is_float =
+        right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
     if left_is_float || right_is_float {
         Union::single(Atomic::TFloat)
     } else if left.contains(|t| t.is_int()) && right.contains(|t| t.is_int()) {
@@ -1150,9 +1310,7 @@ pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
     }
 }
 
-pub fn extract_simple_var<'arena, 'src>(
-    expr: &php_ast::ast::Expr<'arena, 'src>,
-) -> Option<String> {
+pub fn extract_simple_var<'arena, 'src>(expr: &php_ast::ast::Expr<'arena, 'src>) -> Option<String> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.as_ref().trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_simple_var(inner),
@@ -1186,24 +1344,6 @@ pub fn extract_destructure_vars<'arena, 'src>(
     }
 }
 
-/// Convert AST `Param` list to `FnParam` list for context initialization.
-fn ast_params_to_fn_params<'arena, 'src>(
-    params: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Param<'arena, 'src>>,
-    self_fqcn: Option<&str>,
-) -> Vec<mir_codebase::FnParam> {
-    params.iter().map(|p| {
-        let ty = p.type_hint.as_ref()
-            .map(|h| crate::parser::type_from_hint(h, self_fqcn));
-        mir_codebase::FnParam {
-            name: p.name.trim_start_matches('$').into(),
-            ty,
-            default: p.default.as_ref().map(|_| Union::mixed()),
-            is_variadic: p.variadic,
-            is_byref: p.by_ref,
-            is_optional: p.default.is_some() || p.variadic,
-        }
-    }).collect()
-}
 
 /// Like `ast_params_to_fn_params` but resolves type names through the file's import table.
 fn ast_params_to_fn_params_resolved<'arena, 'src>(
@@ -1212,33 +1352,49 @@ fn ast_params_to_fn_params_resolved<'arena, 'src>(
     codebase: &mir_codebase::Codebase,
     file: &str,
 ) -> Vec<mir_codebase::FnParam> {
-    params.iter().map(|p| {
-        let ty = p.type_hint.as_ref()
-            .map(|h| crate::parser::type_from_hint(h, self_fqcn))
-            .map(|u| resolve_named_objects_in_union(u, codebase, file));
-        mir_codebase::FnParam {
-            name: p.name.trim_start_matches('$').into(),
-            ty,
-            default: p.default.as_ref().map(|_| Union::mixed()),
-            is_variadic: p.variadic,
-            is_byref: p.by_ref,
-            is_optional: p.default.is_some() || p.variadic,
-        }
-    }).collect()
+    params
+        .iter()
+        .map(|p| {
+            let ty = p
+                .type_hint
+                .as_ref()
+                .map(|h| crate::parser::type_from_hint(h, self_fqcn))
+                .map(|u| resolve_named_objects_in_union(u, codebase, file));
+            mir_codebase::FnParam {
+                name: p.name.trim_start_matches('$').into(),
+                ty,
+                default: p.default.as_ref().map(|_| Union::mixed()),
+                is_variadic: p.variadic,
+                is_byref: p.by_ref,
+                is_optional: p.default.is_some() || p.variadic,
+            }
+        })
+        .collect()
 }
 
 /// Resolve TNamedObject fqcns in a union through the file's import table.
-fn resolve_named_objects_in_union(union: Union, codebase: &mir_codebase::Codebase, file: &str) -> Union {
+fn resolve_named_objects_in_union(
+    union: Union,
+    codebase: &mir_codebase::Codebase,
+    file: &str,
+) -> Union {
     use mir_types::Atomic;
     let from_docblock = union.from_docblock;
     let possibly_undefined = union.possibly_undefined;
-    let types: Vec<Atomic> = union.types.into_iter().map(|a| match a {
-        Atomic::TNamedObject { fqcn, type_params } => {
-            let resolved = codebase.resolve_class_name(file, fqcn.as_ref());
-            Atomic::TNamedObject { fqcn: resolved.into(), type_params }
-        }
-        other => other,
-    }).collect();
+    let types: Vec<Atomic> = union
+        .types
+        .into_iter()
+        .map(|a| match a {
+            Atomic::TNamedObject { fqcn, type_params } => {
+                let resolved = codebase.resolve_class_name(file, fqcn.as_ref());
+                Atomic::TNamedObject {
+                    fqcn: resolved.into(),
+                    type_params,
+                }
+            }
+            other => other,
+        })
+        .collect();
     let mut result = Union::from_vec(types);
     result.from_docblock = from_docblock;
     result.possibly_undefined = possibly_undefined;
@@ -1249,9 +1405,7 @@ fn extract_string_from_expr<'arena, 'src>(
     expr: &php_ast::ast::Expr<'arena, 'src>,
 ) -> Option<String> {
     match &expr.kind {
-        ExprKind::Identifier(s) => {
-            Some(s.trim_start_matches('$').to_string())
-        }
+        ExprKind::Identifier(s) => Some(s.trim_start_matches('$').to_string()),
         // Variable in property position means dynamic access ($obj->$prop) — not a literal name.
         ExprKind::Variable(_) => None,
         ExprKind::String(s) => Some(s.to_string()),

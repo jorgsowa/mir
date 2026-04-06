@@ -54,87 +54,236 @@ impl fmt::Display for Location {
 #[non_exhaustive]
 pub enum IssueKind {
     // --- Undefined ----------------------------------------------------------
-    UndefinedVariable { name: String },
-    UndefinedFunction { name: String },
-    UndefinedMethod { class: String, method: String },
-    UndefinedClass { name: String },
-    UndefinedProperty { class: String, property: String },
-    UndefinedConstant { name: String },
-    PossiblyUndefinedVariable { name: String },
+    UndefinedVariable {
+        name: String,
+    },
+    UndefinedFunction {
+        name: String,
+    },
+    UndefinedMethod {
+        class: String,
+        method: String,
+    },
+    UndefinedClass {
+        name: String,
+    },
+    UndefinedProperty {
+        class: String,
+        property: String,
+    },
+    UndefinedConstant {
+        name: String,
+    },
+    PossiblyUndefinedVariable {
+        name: String,
+    },
 
     // --- Nullability --------------------------------------------------------
-    NullArgument { param: String, fn_name: String },
-    NullPropertyFetch { property: String },
-    NullMethodCall { method: String },
+    NullArgument {
+        param: String,
+        fn_name: String,
+    },
+    NullPropertyFetch {
+        property: String,
+    },
+    NullMethodCall {
+        method: String,
+    },
     NullArrayAccess,
-    PossiblyNullArgument { param: String, fn_name: String },
-    PossiblyNullPropertyFetch { property: String },
-    PossiblyNullMethodCall { method: String },
+    PossiblyNullArgument {
+        param: String,
+        fn_name: String,
+    },
+    PossiblyNullPropertyFetch {
+        property: String,
+    },
+    PossiblyNullMethodCall {
+        method: String,
+    },
     PossiblyNullArrayAccess,
-    NullableReturnStatement { expected: String, actual: String },
+    NullableReturnStatement {
+        expected: String,
+        actual: String,
+    },
 
     // --- Type mismatches ----------------------------------------------------
-    InvalidReturnType { expected: String, actual: String },
-    InvalidArgument { param: String, fn_name: String, expected: String, actual: String },
-    InvalidPropertyAssignment { property: String, expected: String, actual: String },
-    InvalidCast { from: String, to: String },
-    InvalidOperand { op: String, left: String, right: String },
-    MismatchingDocblockReturnType { declared: String, inferred: String },
-    MismatchingDocblockParamType { param: String, declared: String, inferred: String },
+    InvalidReturnType {
+        expected: String,
+        actual: String,
+    },
+    InvalidArgument {
+        param: String,
+        fn_name: String,
+        expected: String,
+        actual: String,
+    },
+    InvalidPropertyAssignment {
+        property: String,
+        expected: String,
+        actual: String,
+    },
+    InvalidCast {
+        from: String,
+        to: String,
+    },
+    InvalidOperand {
+        op: String,
+        left: String,
+        right: String,
+    },
+    MismatchingDocblockReturnType {
+        declared: String,
+        inferred: String,
+    },
+    MismatchingDocblockParamType {
+        param: String,
+        declared: String,
+        inferred: String,
+    },
 
     // --- Array issues -------------------------------------------------------
-    InvalidArrayOffset { expected: String, actual: String },
-    NonExistentArrayOffset { key: String },
-    PossiblyInvalidArrayOffset { expected: String, actual: String },
+    InvalidArrayOffset {
+        expected: String,
+        actual: String,
+    },
+    NonExistentArrayOffset {
+        key: String,
+    },
+    PossiblyInvalidArrayOffset {
+        expected: String,
+        actual: String,
+    },
 
     // --- Redundancy ---------------------------------------------------------
-    RedundantCondition { ty: String },
-    RedundantCast { from: String, to: String },
-    UnnecessaryVarAnnotation { var: String },
-    TypeDoesNotContainType { left: String, right: String },
+    RedundantCondition {
+        ty: String,
+    },
+    RedundantCast {
+        from: String,
+        to: String,
+    },
+    UnnecessaryVarAnnotation {
+        var: String,
+    },
+    TypeDoesNotContainType {
+        left: String,
+        right: String,
+    },
 
     // --- Dead code ----------------------------------------------------------
-    UnusedVariable { name: String },
-    UnusedParam { name: String },
+    UnusedVariable {
+        name: String,
+    },
+    UnusedParam {
+        name: String,
+    },
     UnreachableCode,
-    UnusedMethod { class: String, method: String },
-    UnusedProperty { class: String, property: String },
-    UnusedFunction { name: String },
+    UnusedMethod {
+        class: String,
+        method: String,
+    },
+    UnusedProperty {
+        class: String,
+        property: String,
+    },
+    UnusedFunction {
+        name: String,
+    },
 
     // --- Readonly -----------------------------------------------------------
-    ReadonlyPropertyAssignment { class: String, property: String },
+    ReadonlyPropertyAssignment {
+        class: String,
+        property: String,
+    },
 
     // --- Inheritance --------------------------------------------------------
-    UnimplementedAbstractMethod { class: String, method: String },
-    UnimplementedInterfaceMethod { class: String, interface: String, method: String },
-    MethodSignatureMismatch { class: String, method: String, detail: String },
-    OverriddenMethodAccess { class: String, method: String },
-    FinalClassExtended { parent: String, child: String },
-    FinalMethodOverridden { class: String, method: String, parent: String },
+    UnimplementedAbstractMethod {
+        class: String,
+        method: String,
+    },
+    UnimplementedInterfaceMethod {
+        class: String,
+        interface: String,
+        method: String,
+    },
+    MethodSignatureMismatch {
+        class: String,
+        method: String,
+        detail: String,
+    },
+    OverriddenMethodAccess {
+        class: String,
+        method: String,
+    },
+    FinalClassExtended {
+        parent: String,
+        child: String,
+    },
+    FinalMethodOverridden {
+        class: String,
+        method: String,
+        parent: String,
+    },
 
     // --- Security (taint) ---------------------------------------------------
-    TaintedInput { sink: String },
+    TaintedInput {
+        sink: String,
+    },
     TaintedHtml,
     TaintedSql,
     TaintedShell,
 
     // --- Generics -----------------------------------------------------------
-    InvalidTemplateParam { name: String, expected_bound: String, actual: String },
+    InvalidTemplateParam {
+        name: String,
+        expected_bound: String,
+        actual: String,
+    },
 
     // --- Other --------------------------------------------------------------
-    DeprecatedMethod { class: String, method: String },
-    DeprecatedClass { name: String },
-    InternalMethod { class: String, method: String },
-    MissingReturnType { fn_name: String },
-    MissingParamType { fn_name: String, param: String },
-    InvalidThrow { ty: String },
-    MissingThrowsDocblock { class: String },
-    ParseError { message: String },
-    InvalidDocblock { message: String },
-    MixedArgument { param: String, fn_name: String },
-    MixedAssignment { var: String },
-    MixedMethodCall { method: String },
-    MixedPropertyFetch { property: String },
+    DeprecatedMethod {
+        class: String,
+        method: String,
+    },
+    DeprecatedClass {
+        name: String,
+    },
+    InternalMethod {
+        class: String,
+        method: String,
+    },
+    MissingReturnType {
+        fn_name: String,
+    },
+    MissingParamType {
+        fn_name: String,
+        param: String,
+    },
+    InvalidThrow {
+        ty: String,
+    },
+    MissingThrowsDocblock {
+        class: String,
+    },
+    ParseError {
+        message: String,
+    },
+    InvalidDocblock {
+        message: String,
+    },
+    MixedArgument {
+        param: String,
+        fn_name: String,
+    },
+    MixedAssignment {
+        var: String,
+    },
+    MixedMethodCall {
+        method: String,
+    },
+    MixedPropertyFetch {
+        property: String,
+    },
 }
 
 impl IssueKind {
@@ -310,7 +459,10 @@ impl IssueKind {
                 format!("Argument ${} of {}() might be null", param, fn_name)
             }
             IssueKind::PossiblyNullPropertyFetch { property } => {
-                format!("Cannot access property ${} on possibly null value", property)
+                format!(
+                    "Cannot access property ${} on possibly null value",
+                    property
+                )
             }
             IssueKind::PossiblyNullMethodCall { method } => {
                 format!("Cannot call method {}() on possibly null value", method)
@@ -319,19 +471,34 @@ impl IssueKind {
                 "Cannot access array on possibly null value".to_string()
             }
             IssueKind::NullableReturnStatement { expected, actual } => {
-                format!("Return type '{}' is not compatible with declared '{}'", actual, expected)
+                format!(
+                    "Return type '{}' is not compatible with declared '{}'",
+                    actual, expected
+                )
             }
 
             IssueKind::InvalidReturnType { expected, actual } => {
-                format!("Return type '{}' is not compatible with declared '{}'", actual, expected)
+                format!(
+                    "Return type '{}' is not compatible with declared '{}'",
+                    actual, expected
+                )
             }
-            IssueKind::InvalidArgument { param, fn_name, expected, actual } => {
+            IssueKind::InvalidArgument {
+                param,
+                fn_name,
+                expected,
+                actual,
+            } => {
                 format!(
                     "Argument ${} of {}() expects '{}', got '{}'",
                     param, fn_name, expected, actual
                 )
             }
-            IssueKind::InvalidPropertyAssignment { property, expected, actual } => {
+            IssueKind::InvalidPropertyAssignment {
+                property,
+                expected,
+                actual,
+            } => {
                 format!(
                     "Property ${} expects '{}', cannot assign '{}'",
                     property, expected, actual
@@ -341,12 +508,22 @@ impl IssueKind {
                 format!("Cannot cast '{}' to '{}'", from, to)
             }
             IssueKind::InvalidOperand { op, left, right } => {
-                format!("Operator '{}' not supported between '{}' and '{}'", op, left, right)
+                format!(
+                    "Operator '{}' not supported between '{}' and '{}'",
+                    op, left, right
+                )
             }
             IssueKind::MismatchingDocblockReturnType { declared, inferred } => {
-                format!("Docblock return type '{}' does not match inferred '{}'", declared, inferred)
+                format!(
+                    "Docblock return type '{}' does not match inferred '{}'",
+                    declared, inferred
+                )
             }
-            IssueKind::MismatchingDocblockParamType { param, declared, inferred } => {
+            IssueKind::MismatchingDocblockParamType {
+                param,
+                declared,
+                inferred,
+            } => {
                 format!(
                     "Docblock type '{}' for ${} does not match inferred '{}'",
                     declared, param, inferred
@@ -360,7 +537,10 @@ impl IssueKind {
                 format!("Array offset '{}' does not exist", key)
             }
             IssueKind::PossiblyInvalidArrayOffset { expected, actual } => {
-                format!("Array offset might be invalid: expects '{}', got '{}'", expected, actual)
+                format!(
+                    "Array offset might be invalid: expects '{}', got '{}'",
+                    expected, actual
+                )
             }
 
             IssueKind::RedundantCondition { ty } => {
@@ -390,16 +570,30 @@ impl IssueKind {
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
-                format!("Class {} must implement abstract method {}()", class, method)
+                format!(
+                    "Class {} must implement abstract method {}()",
+                    class, method
+                )
             }
-            IssueKind::UnimplementedInterfaceMethod { class, interface, method } => {
+            IssueKind::UnimplementedInterfaceMethod {
+                class,
+                interface,
+                method,
+            } => {
                 format!(
                     "Class {} must implement {}::{}() from interface",
                     class, interface, method
                 )
             }
-            IssueKind::MethodSignatureMismatch { class, method, detail } => {
-                format!("Method {}::{}() signature mismatch: {}", class, method, detail)
+            IssueKind::MethodSignatureMismatch {
+                class,
+                method,
+                detail,
+            } => {
+                format!(
+                    "Method {}::{}() signature mismatch: {}",
+                    class, method, detail
+                )
             }
             IssueKind::OverriddenMethodAccess { class, method } => {
                 format!(
@@ -408,18 +602,29 @@ impl IssueKind {
                 )
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
-                format!("Cannot assign to readonly property {}::${} outside of constructor", class, property)
+                format!(
+                    "Cannot assign to readonly property {}::${} outside of constructor",
+                    class, property
+                )
             }
             IssueKind::FinalClassExtended { parent, child } => {
                 format!("Class {} cannot extend final class {}", child, parent)
             }
-            IssueKind::InvalidTemplateParam { name, expected_bound, actual } => {
+            IssueKind::InvalidTemplateParam {
+                name,
+                expected_bound,
+                actual,
+            } => {
                 format!(
                     "Template type '{}' inferred as '{}' does not satisfy bound '{}'",
                     name, actual, expected_bound
                 )
             }
-            IssueKind::FinalMethodOverridden { class, method, parent } => {
+            IssueKind::FinalMethodOverridden {
+                class,
+                method,
+                parent,
+            } => {
                 format!(
                     "Method {}::{}() cannot override final method from {}",
                     class, method, parent
@@ -444,7 +649,10 @@ impl IssueKind {
                 format!("Function {}() has no return type annotation", fn_name)
             }
             IssueKind::MissingParamType { fn_name, param } => {
-                format!("Parameter ${} of {}() has no type annotation", param, fn_name)
+                format!(
+                    "Parameter ${} of {}() has no type annotation",
+                    param, fn_name
+                )
             }
             IssueKind::InvalidThrow { ty } => {
                 format!("Thrown type '{}' does not extend Throwable", ty)

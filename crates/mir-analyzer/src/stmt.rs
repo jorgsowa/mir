@@ -104,7 +104,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
                         if fn_name.eq_ignore_ascii_case("assert") {
                             if let Some(arg) = call.args.first() {
-                                narrow_from_condition(&arg.value, ctx, true, self.codebase, &self.file);
+                                narrow_from_condition(
+                                    &arg.value,
+                                    ctx,
+                                    true,
+                                    self.codebase,
+                                    &self.file,
+                                );
                             }
                         }
                     }
@@ -140,58 +146,46 @@ impl<'a> StatementsAnalyzer<'a> {
                     // use the annotated type for the return-type compatibility check.
                     // `@var Type $name` with a variable name narrows the variable (handled in
                     // analyze_stmts loop), not the return type.
-                    let check_ty = if let Some((None, var_ty)) = self.extract_var_annotation(stmt.span) {
-                        var_ty
-                    } else {
-                        ret_ty.clone()
-                    };
+                    let check_ty =
+                        if let Some((None, var_ty)) = self.extract_var_annotation(stmt.span) {
+                            var_ty
+                        } else {
+                            ret_ty.clone()
+                        };
 
                     // Check against declared return type
                     if let Some(declared) = &ctx.fn_return_type.clone() {
-                        // Special case: `void` functions must not return any value.
-                        // The heuristic checks below can suppress this incorrectly (e.g.
-                        // named_object_return_compatible considers TVoid compatible with TNull),
-                        // so we emit the error here before those checks run.
-                        if declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed() {
-                            let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
-                            self.issues.add(mir_issues::Issue::new(
-                                IssueKind::InvalidReturnType {
-                                    expected: format!("{}", declared),
-                                    actual: format!("{}", ret_ty),
-                                },
-                                mir_issues::Location {
-                                    file: self.file.clone(),
-                                    line,
-                                    col_start: col,
-                                    col_end: col,
-                                },
-                            ));
-                        } else if !check_ty.is_subtype_of_simple(declared)
-                            && !declared.is_mixed()
-                            && !check_ty.is_mixed()
-                            && !named_object_return_compatible(&check_ty, declared, self.codebase, &self.file)
-                            // Also check without null (handles `null|T` where T implements declared).
-                            // Guard: if check_ty is purely null, remove_null() is empty and would
-                            // vacuously return true, incorrectly suppressing the error.
-                            && !(!check_ty.remove_null().is_empty() && named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, &self.file))
-                            && !declared_return_has_template(declared, self.codebase)
-                            && !declared_return_has_template(&check_ty, self.codebase)
-                            && !return_arrays_compatible(&check_ty, declared, self.codebase, &self.file)
-                            // Skip coercions: declared is more specific than actual
-                            && !declared.is_subtype_of_simple(&check_ty)
-                            && !declared.remove_null().is_subtype_of_simple(&check_ty)
-                            // Skip when actual is compatible after removing null/false.
-                            // Guard against empty union (e.g. pure-null type): removing null
-                            // from `null` alone gives an empty union which vacuously passes
-                            // is_subtype_of_simple — that would incorrectly suppress the error.
-                            && !(!check_ty.remove_null().is_empty() && check_ty.remove_null().is_subtype_of_simple(declared))
-                            && !check_ty.remove_false().is_subtype_of_simple(declared)
-                            // Suppress LessSpecificReturnStatement (level 4): actual is a
-                            // supertype of declared (not flagged at default error level).
-                            && !named_object_return_compatible(declared, &check_ty, self.codebase, &self.file)
-                            && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file)
+                        // Check return type compatibility. Special case: `void` functions must not
+                        // return any value (named_object_return_compatible considers TVoid compatible
+                        // with TNull, so handle void separately to avoid false suppression).
+                        if (declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
+                            || (!check_ty.is_subtype_of_simple(declared)
+                                && !declared.is_mixed()
+                                && !check_ty.is_mixed()
+                                && !named_object_return_compatible(&check_ty, declared, self.codebase, &self.file)
+                                // Also check without null (handles `null|T` where T implements declared).
+                                // Guard: if check_ty is purely null, remove_null() is empty and would
+                                // vacuously return true, incorrectly suppressing the error.
+                                && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, &self.file))
+                                && !declared_return_has_template(declared, self.codebase)
+                                && !declared_return_has_template(&check_ty, self.codebase)
+                                && !return_arrays_compatible(&check_ty, declared, self.codebase, &self.file)
+                                // Skip coercions: declared is more specific than actual
+                                && !declared.is_subtype_of_simple(&check_ty)
+                                && !declared.remove_null().is_subtype_of_simple(&check_ty)
+                                // Skip when actual is compatible after removing null/false.
+                                // Guard against empty union (e.g. pure-null type): removing null
+                                // from `null` alone gives an empty union which vacuously passes
+                                // is_subtype_of_simple — that would incorrectly suppress the error.
+                                && (check_ty.remove_null().is_empty() || !check_ty.remove_null().is_subtype_of_simple(declared))
+                                && !check_ty.remove_false().is_subtype_of_simple(declared)
+                                // Suppress LessSpecificReturnStatement (level 4): actual is a
+                                // supertype of declared (not flagged at default error level).
+                                && !named_object_return_compatible(declared, &check_ty, self.codebase, &self.file)
+                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file))
                         {
-                            let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                            let (line, col) =
+                                crate::parser::span_to_line_col(self.source, stmt.span);
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::InvalidReturnType {
                                     expected: format!("{}", declared),
@@ -212,7 +206,8 @@ impl<'a> StatementsAnalyzer<'a> {
                     // Bare `return;` from a non-void declared function is an error.
                     if let Some(declared) = &ctx.fn_return_type.clone() {
                         if !declared.is_void() && !declared.is_mixed() {
-                            let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                            let (line, col) =
+                                crate::parser::span_to_line_col(self.source, stmt.span);
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::InvalidReturnType {
                                     expected: format!("{}", declared),
@@ -257,9 +252,12 @@ impl<'a> StatementsAnalyzer<'a> {
                                 // Suppress if class is not in codebase at all (could be extension class)
                                 || (!self.codebase.type_exists(&resolved) && !self.codebase.type_exists(fqcn));
                             if !is_throwable {
-                                let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                                let (line, col) =
+                                    crate::parser::span_to_line_col(self.source, stmt.span);
                                 self.issues.add(mir_issues::Issue::new(
-                                    IssueKind::InvalidThrow { ty: fqcn.to_string() },
+                                    IssueKind::InvalidThrow {
+                                        ty: fqcn.to_string(),
+                                    },
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
@@ -286,9 +284,12 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || self.codebase.has_unknown_ancestor(&resolved)
                                 || self.codebase.has_unknown_ancestor(fqcn);
                             if !is_throwable {
-                                let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                                let (line, col) =
+                                    crate::parser::span_to_line_col(self.source, stmt.span);
                                 self.issues.add(mir_issues::Issue::new(
-                                    IssueKind::InvalidThrow { ty: fqcn.to_string() },
+                                    IssueKind::InvalidThrow {
+                                        ty: fqcn.to_string(),
+                                    },
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
@@ -300,9 +301,12 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                         mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
                         _ => {
-                            let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                            let (line, col) =
+                                crate::parser::span_to_line_col(self.source, stmt.span);
                             self.issues.add(mir_issues::Issue::new(
-                                IssueKind::InvalidThrow { ty: format!("{}", thrown_ty) },
+                                IssueKind::InvalidThrow {
+                                    ty: format!("{}", thrown_ty),
+                                },
                                 mir_issues::Location {
                                     file: self.file.clone(),
                                     line,
@@ -326,7 +330,13 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // True branch
                 let mut then_ctx = ctx.fork();
-                narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.codebase, &self.file);
+                narrow_from_condition(
+                    &if_stmt.condition,
+                    &mut then_ctx,
+                    true,
+                    self.codebase,
+                    &self.file,
+                );
                 // Skip analyzing a statically-unreachable branch (prevents false
                 // positives in dead branches caused by overly conservative types).
                 if !then_ctx.diverges {
@@ -337,8 +347,15 @@ impl<'a> StatementsAnalyzer<'a> {
                 let mut elseif_ctxs: Vec<Context> = vec![];
                 for elseif in if_stmt.elseif_branches.iter() {
                     let mut branch_ctx = ctx.fork();
-                    narrow_from_condition(&elseif.condition, &mut branch_ctx, true, self.codebase, &self.file);
-                    self.expr_analyzer(&branch_ctx).analyze(&elseif.condition, &mut branch_ctx);
+                    narrow_from_condition(
+                        &elseif.condition,
+                        &mut branch_ctx,
+                        true,
+                        self.codebase,
+                        &self.file,
+                    );
+                    self.expr_analyzer(&branch_ctx)
+                        .analyze(&elseif.condition, &mut branch_ctx);
                     if !branch_ctx.diverges {
                         self.analyze_stmt(&elseif.body, &mut branch_ctx);
                     }
@@ -347,7 +364,13 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // Else branch
                 let mut else_ctx = ctx.fork();
-                narrow_from_condition(&if_stmt.condition, &mut else_ctx, false, self.codebase, &self.file);
+                narrow_from_condition(
+                    &if_stmt.condition,
+                    &mut else_ctx,
+                    false,
+                    self.codebase,
+                    &self.file,
+                );
                 if !else_ctx.diverges {
                     if let Some(else_branch) = &if_stmt.else_branch {
                         self.analyze_stmt(else_branch, &mut else_ctx);
@@ -356,9 +379,12 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // Emit RedundantCondition if narrowing proves one branch is statically unreachable.
                 if !pre_diverges && (then_ctx.diverges || else_ctx.diverges) {
-                    let (line, col) = crate::parser::span_to_line_col(self.source, if_stmt.condition.span);
+                    let (line, col) =
+                        crate::parser::span_to_line_col(self.source, if_stmt.condition.span);
                     self.issues.add(mir_issues::Issue::new(
-                        IssueKind::RedundantCondition { ty: format!("{}", cond_type) },
+                        IssueKind::RedundantCondition {
+                            ty: format!("{}", cond_type),
+                        },
                         mir_issues::Location {
                             file: self.file.clone(),
                             line,
@@ -507,22 +533,28 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let Some(val) = &case.value {
                         if switch_on_true {
                             // `switch(true) { case $x instanceof Y: }` — narrow from condition
-                            narrow_from_condition(val, &mut case_ctx, true, self.codebase, &self.file);
+                            narrow_from_condition(
+                                val,
+                                &mut case_ctx,
+                                true,
+                                self.codebase,
+                                &self.file,
+                            );
                         } else if let Some(ref var_name) = subject_var {
                             // Narrow subject var to the literal type of the case value
                             let narrow_ty = match &val.kind {
                                 php_ast::ast::ExprKind::Int(n) => {
                                     Some(Union::single(Atomic::TLiteralInt(*n)))
                                 }
-                                php_ast::ast::ExprKind::String(s) => {
-                                    Some(Union::single(Atomic::TLiteralString(Arc::from(s.as_ref()))))
-                                }
-                                php_ast::ast::ExprKind::Bool(b) => {
-                                    Some(Union::single(if *b { Atomic::TTrue } else { Atomic::TFalse }))
-                                }
-                                php_ast::ast::ExprKind::Null => {
-                                    Some(Union::single(Atomic::TNull))
-                                }
+                                php_ast::ast::ExprKind::String(s) => Some(Union::single(
+                                    Atomic::TLiteralString(Arc::from(&**s)),
+                                )),
+                                php_ast::ast::ExprKind::Bool(b) => Some(Union::single(if *b {
+                                    Atomic::TTrue
+                                } else {
+                                    Atomic::TFalse
+                                })),
+                                php_ast::ast::ExprKind::Null => Some(Union::single(Atomic::TNull)),
                                 _ => None,
                             };
                             if let Some(narrowed) = narrow_ty {
@@ -609,7 +641,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // If ALL catch branches diverge (return/throw/continue/break),
                 // code after the try/catch is only reachable from the try body.
                 // Use try_ctx directly so variables assigned in try are definitely set.
-                let mut result = if non_diverging_catches.is_empty() {
+                let result = if non_diverging_catches.is_empty() {
                     let mut r = try_ctx;
                     r.diverges = false; // the try body itself may not have diverged
                     r
@@ -710,8 +742,11 @@ impl<'a> StatementsAnalyzer<'a> {
             StmtKind::Namespace(_) | StmtKind::Use(_) | StmtKind::Const(_) => {}
 
             // ---- Inert --------------------------------------------------------
-            StmtKind::InlineHtml(_) | StmtKind::Nop | StmtKind::Goto(_)
-            | StmtKind::Label(_) | StmtKind::HaltCompiler(_) => {}
+            StmtKind::InlineHtml(_)
+            | StmtKind::Nop
+            | StmtKind::Goto(_)
+            | StmtKind::Label(_)
+            | StmtKind::HaltCompiler(_) => {}
 
             StmtKind::Error => {}
         }
@@ -725,12 +760,7 @@ impl<'a> StatementsAnalyzer<'a> {
     where
         'a: 'b,
     {
-        ExpressionAnalyzer::new(
-            self.codebase,
-            self.file.clone(),
-            self.source,
-            self.issues,
-        )
+        ExpressionAnalyzer::new(self.codebase, self.file.clone(), self.source, self.issues)
     }
 
     // -----------------------------------------------------------------------
@@ -763,7 +793,10 @@ impl<'a> StatementsAnalyzer<'a> {
     /// Extract `@var Type [$varname]` from the docblock immediately preceding `span`.
     /// Returns `(optional_var_name, resolved_type)` if an annotation exists.
     /// The type is resolved through the codebase's file-level imports/namespace.
-    fn extract_var_annotation(&self, span: php_ast::Span) -> Option<(Option<String>, mir_types::Union)> {
+    fn extract_var_annotation(
+        &self,
+        span: php_ast::Span,
+    ) -> Option<(Option<String>, mir_types::Union)> {
         let doc = crate::parser::find_preceding_docblock(self.source, span.start)?;
         let parsed = crate::parser::DocblockParser::parse(&doc);
         let ty = parsed.var_type?;
@@ -838,7 +871,8 @@ fn vars_stabilized(
     if prev.len() != next.len() {
         return false;
     }
-    prev.iter().all(|(k, v)| next.get(k).map(|u| u == v).unwrap_or(false))
+    prev.iter()
+        .all(|(k, v)| next.get(k).map(|u| u == v).unwrap_or(false))
 }
 
 /// For any variable whose type changed relative to `pre_vars`, widen to
@@ -877,7 +911,11 @@ fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
                 }
                 // Empty keyed array (e.g. `$arr = []` before push) — treat value as mixed
                 // to avoid propagating Union::empty() as a variable type.
-                let values = if values.is_empty() { Union::mixed() } else { values };
+                let values = if values.is_empty() {
+                    Union::mixed()
+                } else {
+                    values
+                };
                 return (Union::single(Atomic::TMixed), values);
             }
             Atomic::TString => {
@@ -895,7 +933,12 @@ fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
 
 /// Returns true if `actual` is compatible with `declared` considering class
 /// hierarchy, self/static resolution, and short-name vs FQCN mismatches.
-fn named_object_return_compatible(actual: &Union, declared: &Union, codebase: &Codebase, file: &str) -> bool {
+fn named_object_return_compatible(
+    actual: &Union,
+    declared: &Union,
+    codebase: &Codebase,
+    file: &str,
+) -> bool {
     actual.types.iter().all(|actual_atom| {
         // Extract the actual FQCN — handles TNamedObject, TSelf, TStaticObject, TParent
         let actual_fqcn: &Arc<str> = match actual_atom {
@@ -906,7 +949,12 @@ fn named_object_return_compatible(actual: &Union, declared: &Union, codebase: &C
             // TNull: compatible if declared also includes null
             Atomic::TNull => return declared.types.iter().any(|d| matches!(d, Atomic::TNull)),
             // TVoid: compatible with void declared
-            Atomic::TVoid => return declared.types.iter().any(|d| matches!(d, Atomic::TVoid | Atomic::TNull)),
+            Atomic::TVoid => {
+                return declared
+                    .types
+                    .iter()
+                    .any(|d| matches!(d, Atomic::TVoid | Atomic::TNull))
+            }
             // TNever is the bottom type — compatible with anything
             Atomic::TNever => return true,
             // class-string<X> is compatible with class-string<Y> if X extends/implements Y
@@ -915,14 +963,18 @@ fn named_object_return_compatible(actual: &Union, declared: &Union, codebase: &C
                     Atomic::TClassString(None) => true,
                     Atomic::TClassString(Some(declared_cls)) => {
                         actual_cls == declared_cls
-                            || codebase.extends_or_implements(actual_cls.as_ref(), declared_cls.as_ref())
+                            || codebase
+                                .extends_or_implements(actual_cls.as_ref(), declared_cls.as_ref())
                     }
                     Atomic::TString => true,
                     _ => false,
                 });
             }
             Atomic::TClassString(None) => {
-                return declared.types.iter().any(|d| matches!(d, Atomic::TClassString(_) | Atomic::TString));
+                return declared
+                    .types
+                    .iter()
+                    .any(|d| matches!(d, Atomic::TClassString(_) | Atomic::TString));
             }
             // Non-object types: not handled here (fall through to simple subtype check)
             _ => return false,
@@ -942,8 +994,10 @@ fn named_object_return_compatible(actual: &Union, declared: &Union, codebase: &C
             let resolved_actual = codebase.resolve_class_name(file, actual_fqcn.as_ref());
 
             // Self/static always compatible with the class itself
-            if matches!(actual_atom, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }) {
-                if resolved_actual == resolved_declared
+            if matches!(
+                actual_atom,
+                Atomic::TSelf { .. } | Atomic::TStaticObject { .. }
+            ) && (resolved_actual == resolved_declared
                     || actual_fqcn.as_ref() == declared_fqcn.as_ref()
                     || actual_fqcn.as_ref() == resolved_declared.as_str()
                     || resolved_actual.as_str() == declared_fqcn.as_ref()
@@ -955,10 +1009,9 @@ fn named_object_return_compatible(actual: &Union, declared: &Union, codebase: &C
                     // (because when called on Y, static = Y which satisfies declared Y)
                     || codebase.extends_or_implements(&resolved_declared, actual_fqcn.as_ref())
                     || codebase.extends_or_implements(&resolved_declared, &resolved_actual)
-                    || codebase.extends_or_implements(declared_fqcn.as_ref(), actual_fqcn.as_ref())
-                {
-                    return true;
-                }
+                    || codebase.extends_or_implements(declared_fqcn.as_ref(), actual_fqcn.as_ref()))
+            {
+                return true;
             }
 
             // Same after resolution
@@ -992,16 +1045,16 @@ fn declared_return_has_template(declared: &Union, codebase: &Codebase) -> bool {
                 || !codebase.type_exists(fqcn.as_ref())
                 || codebase.interfaces.contains_key(fqcn.as_ref())
         }
-        Atomic::TArray { value, .. } | Atomic::TList { value }
-        | Atomic::TNonEmptyArray { value, .. } | Atomic::TNonEmptyList { value } => {
-            value.types.iter().any(|v| match v {
-                Atomic::TTemplateParam { .. } => true,
-                Atomic::TNamedObject { fqcn, .. } => {
-                    !fqcn.contains('\\') && !codebase.type_exists(fqcn.as_ref())
-                }
-                _ => false,
-            })
-        }
+        Atomic::TArray { value, .. }
+        | Atomic::TList { value }
+        | Atomic::TNonEmptyArray { value, .. }
+        | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
+            Atomic::TTemplateParam { .. } => true,
+            Atomic::TNamedObject { fqcn, .. } => {
+                !fqcn.contains('\\') && !codebase.type_exists(fqcn.as_ref())
+            }
+            _ => false,
+        }),
         _ => false,
     })
 }
@@ -1032,7 +1085,10 @@ fn resolve_atomic_for_file(atomic: Atomic, codebase: &Codebase, file: &str) -> A
                 return Atomic::TNamedObject { fqcn, type_params };
             }
             let resolved = codebase.resolve_class_name(file, fqcn.as_ref());
-            Atomic::TNamedObject { fqcn: resolved.into(), type_params }
+            Atomic::TNamedObject {
+                fqcn: resolved.into(),
+                type_params,
+            }
         }
         Atomic::TClassString(Some(cls)) => {
             let resolved = codebase.resolve_class_name(file, cls.as_ref());
@@ -1058,19 +1114,28 @@ fn resolve_atomic_for_file(atomic: Atomic, codebase: &Codebase, file: &str) -> A
 
 /// Returns true if both actual and declared are array/list types whose value types are
 /// compatible with FQCN resolution (to avoid short-name vs FQCN mismatches in return types).
-fn return_arrays_compatible(actual: &Union, declared: &Union, codebase: &Codebase, file: &str) -> bool {
+fn return_arrays_compatible(
+    actual: &Union,
+    declared: &Union,
+    codebase: &Codebase,
+    file: &str,
+) -> bool {
     actual.types.iter().all(|a_atomic| {
         let act_val: &Union = match a_atomic {
-            Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. }
-            | Atomic::TList { value } | Atomic::TNonEmptyList { value } => value,
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => value,
             Atomic::TKeyedArray { .. } => return true,
             _ => return false,
         };
 
         declared.types.iter().any(|d_atomic| {
             let dec_val: &Union = match d_atomic {
-                Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. }
-                | Atomic::TList { value } | Atomic::TNonEmptyList { value } => value,
+                Atomic::TArray { value, .. }
+                | Atomic::TNonEmptyArray { value, .. }
+                | Atomic::TList { value }
+                | Atomic::TNonEmptyList { value } => value,
                 _ => return false,
             };
 
@@ -1082,7 +1147,8 @@ fn return_arrays_compatible(actual: &Union, declared: &Union, codebase: &Codebas
                             Atomic::TClassString(None) | Atomic::TString => true,
                             Atomic::TClassString(Some(dv_cls)) => {
                                 av_cls == dv_cls
-                                    || codebase.extends_or_implements(av_cls.as_ref(), dv_cls.as_ref())
+                                    || codebase
+                                        .extends_or_implements(av_cls.as_ref(), dv_cls.as_ref())
                             }
                             _ => false,
                         });
@@ -1114,4 +1180,3 @@ fn return_arrays_compatible(actual: &Union, declared: &Union, codebase: &Codebas
         })
     })
 }
-

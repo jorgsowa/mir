@@ -10,8 +10,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use mir_codebase::Codebase;
 use mir_codebase::storage::{MethodStorage, Visibility};
+use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
 
 // ---------------------------------------------------------------------------
@@ -26,11 +26,17 @@ pub struct ClassAnalyzer<'a> {
 
 impl<'a> ClassAnalyzer<'a> {
     pub fn new(codebase: &'a Codebase) -> Self {
-        Self { codebase, analyzed_files: HashSet::new() }
+        Self {
+            codebase,
+            analyzed_files: HashSet::new(),
+        }
     }
 
     pub fn with_files(codebase: &'a Codebase, files: HashSet<Arc<str>>) -> Self {
-        Self { codebase, analyzed_files: files }
+        Self {
+            codebase,
+            analyzed_files: files,
+        }
     }
 
     /// Run all class-level checks and return every discovered issue.
@@ -52,7 +58,9 @@ impl<'a> ClassAnalyzer<'a> {
 
             // Skip classes from vendor / stub files — only check user-analyzed files
             if !self.analyzed_files.is_empty() {
-                let in_analyzed = cls.location.as_ref()
+                let in_analyzed = cls
+                    .location
+                    .as_ref()
                     .map(|loc| self.analyzed_files.contains(&loc.file))
                     .unwrap_or(false);
                 if !in_analyzed {
@@ -121,7 +129,11 @@ impl<'a> ClassAnalyzer<'a> {
                 }
 
                 // Check if the concrete class (or any closer ancestor) provides it
-                if cls.get_method(method_name.as_ref()).map(|m| !m.is_abstract).unwrap_or(false) {
+                if cls
+                    .get_method(method_name.as_ref())
+                    .map(|m| !m.is_abstract)
+                    .unwrap_or(false)
+                {
                     continue; // implemented
                 }
 
@@ -186,11 +198,7 @@ impl<'a> ClassAnalyzer<'a> {
     // Check: override compatibility
     // -----------------------------------------------------------------------
 
-    fn check_overrides(
-        &self,
-        cls: &mir_codebase::storage::ClassStorage,
-        issues: &mut Vec<Issue>,
-    ) {
+    fn check_overrides(&self, cls: &mir_codebase::storage::ClassStorage, issues: &mut Vec<Issue>) {
         let fqcn = &cls.fqcn;
         // Use the actual source file if available, otherwise fall back to fqcn.
         let class_file: Arc<str> = cls
@@ -213,7 +221,12 @@ impl<'a> ClassAnalyzer<'a> {
                 None => continue, // not an override
             };
 
-            let loc = Location { file: class_file.clone(), line: 1, col_start: 0, col_end: 0 };
+            let loc = Location {
+                file: class_file.clone(),
+                line: 1,
+                col_start: 0,
+                col_end: 0,
+            };
 
             // ---- a. Cannot override a final method -------------------------
             if parent.is_final {
@@ -364,9 +377,7 @@ impl<'a> ClassAnalyzer<'a> {
         use mir_types::Atomic;
         ty.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
-            Atomic::TClassString(Some(inner)) => {
-                !self.codebase.type_exists(inner.as_ref())
-            }
+            Atomic::TClassString(Some(inner)) => !self.codebase.type_exists(inner.as_ref()),
             Atomic::TNamedObject { fqcn, type_params } => {
                 // Bare name with no namespace separator is likely a template param
                 (!fqcn.contains('\\') && !self.codebase.type_exists(fqcn.as_ref()))
@@ -405,7 +416,9 @@ impl<'a> ClassAnalyzer<'a> {
     /// These are always considered compatible with their bound class type.
     fn type_has_self_or_static(&self, ty: &mir_types::Union) -> bool {
         use mir_types::Atomic;
-        ty.types.iter().any(|a| matches!(a, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }))
+        ty.types
+            .iter()
+            .any(|a| matches!(a, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }))
     }
 
     /// Find a method with the given name in the closest ancestor (not the class itself).
@@ -441,8 +454,8 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
     matches!(
         (parent_vis, child_vis),
         (Visibility::Public, Visibility::Protected)
-        | (Visibility::Public, Visibility::Private)
-        | (Visibility::Protected, Visibility::Private)
+            | (Visibility::Public, Visibility::Private)
+            | (Visibility::Protected, Visibility::Private)
     )
 }
 
