@@ -58,6 +58,16 @@ impl Codebase {
         Self::default()
     }
 
+    /// Reset the finalization flag so that `finalize()` will run again.
+    ///
+    /// Use this when new class definitions have been added after an initial
+    /// `finalize()` call (e.g., lazily loaded via PSR-4) and the inheritance
+    /// graph needs to be rebuilt.
+    pub fn invalidate_finalization(&self) {
+        self.finalized
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
     // -----------------------------------------------------------------------
     // Lookups
     // -----------------------------------------------------------------------

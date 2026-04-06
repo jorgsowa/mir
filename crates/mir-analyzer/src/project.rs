@@ -154,6 +154,11 @@ impl ProjectAnalyzer {
         // ---- Finalize codebase (resolve inheritance, build dispatch tables) --
         self.codebase.finalize();
 
+        // ---- Lazy-load unknown classes via PSR-4 (issue #50) ----------------
+        if let Some(psr4) = &self.psr4 {
+            self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);
+        }
+
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let rev = build_reverse_deps(&self.codebase);
@@ -217,6 +222,80 @@ impl ProjectAnalyzer {
         AnalysisResult {
             issues: all_issues,
             type_envs: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Lazily load class definitions for referenced-but-unknown FQCNs via PSR-4.
+    ///
+    /// After Pass 1 and `codebase.finalize()`, some classes referenced as parents
+    /// or interfaces may not be in the codebase (they weren't in the initial file
+    /// list). This method iterates up to `max_depth` times, each time resolving
+    /// unknown parent/interface FQCNs via the PSR-4 map, running Pass 1 on those
+    /// files, and re-finalizing the codebase. The loop stops when no new files
+    /// are discovered.
+    fn lazy_load_missing_classes(
+        &self,
+        psr4: Arc<crate::composer::Psr4Map>,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        use std::collections::HashSet;
+
+        let max_depth = 10; // prevent infinite chains
+        let mut loaded: HashSet<String> = HashSet::new();
+
+        for _ in 0..max_depth {
+            // Collect all referenced FQCNs that aren't in the codebase
+            let mut to_load: Vec<(String, PathBuf)> = Vec::new();
+
+            for entry in self.codebase.classes.iter() {
+                let cls = entry.value();
+
+                // Check parent class
+                if let Some(parent) = &cls.parent {
+                    let fqcn = parent.as_ref();
+                    if !self.codebase.classes.contains_key(fqcn) && !loaded.contains(fqcn) {
+                        if let Some(path) = psr4.resolve(fqcn) {
+                            to_load.push((fqcn.to_string(), path));
+                        }
+                    }
+                }
+
+                // Check interfaces
+                for iface in &cls.interfaces {
+                    let fqcn = iface.as_ref();
+                    if !self.codebase.classes.contains_key(fqcn)
+                        && !self.codebase.interfaces.contains_key(fqcn)
+                        && !loaded.contains(fqcn)
+                    {
+                        if let Some(path) = psr4.resolve(fqcn) {
+                            to_load.push((fqcn.to_string(), path));
+                        }
+                    }
+                }
+            }
+
+            if to_load.is_empty() {
+                break;
+            }
+
+            // Load each discovered file (Pass 1 only)
+            for (fqcn, path) in to_load {
+                loaded.insert(fqcn);
+                if let Ok(src) = std::fs::read_to_string(&path) {
+                    let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+                    let arena = bumpalo::Bump::new();
+                    let result = php_rs_parser::parse(&arena, &src);
+                    let collector =
+                        crate::collector::DefinitionCollector::new(&self.codebase, file, &src);
+                    let issues = collector.collect(&result.program);
+                    all_issues.extend(issues);
+                }
+            }
+
+            // Re-finalize to include newly loaded classes in the inheritance graph.
+            // Must reset the flag first so finalize() isn't a no-op.
+            self.codebase.invalidate_finalization();
+            self.codebase.finalize();
         }
     }
 
