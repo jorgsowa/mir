@@ -25,9 +25,11 @@ pub enum ComposerError {
 /// `vendor_entries`  covers `vendor/composer/installed.json` packages.
 ///
 /// Both lists are sorted longest-prefix-first for correct prefix matching.
+#[derive(Clone)]
 pub struct Psr4Map {
     project_entries: Vec<(String, PathBuf)>,
     vendor_entries: Vec<(String, PathBuf)>,
+    #[allow(dead_code)] // used by issue #50 (lazy FQCN resolution)
     root: PathBuf,
 }
 
@@ -68,6 +70,12 @@ fn parse_vendor_entries(root: &Path) -> Vec<(String, PathBuf)> {
             for (prefix, dir) in map {
                 if let Some(d) = dir.as_str() {
                     entries.push((ensure_trailing_backslash(prefix), pkg_dir.join(d)));
+                } else if let Some(arr) = dir.as_array() {
+                    for item in arr {
+                        if let Some(d) = item.as_str() {
+                            entries.push((ensure_trailing_backslash(prefix), pkg_dir.join(d)));
+                        }
+                    }
                 }
             }
         }
@@ -95,6 +103,12 @@ impl Psr4Map {
             for (prefix, dir) in map {
                 if let Some(d) = dir.as_str() {
                     project_entries.push((ensure_trailing_backslash(prefix), root.join(d)));
+                } else if let Some(arr) = dir.as_array() {
+                    for item in arr {
+                        if let Some(d) = item.as_str() {
+                            project_entries.push((ensure_trailing_backslash(prefix), root.join(d)));
+                        }
+                    }
                 }
             }
         }
@@ -102,6 +116,12 @@ impl Psr4Map {
             for (prefix, dir) in map {
                 if let Some(d) = dir.as_str() {
                     project_entries.push((ensure_trailing_backslash(prefix), root.join(d)));
+                } else if let Some(arr) = dir.as_array() {
+                    for item in arr {
+                        if let Some(d) = item.as_str() {
+                            project_entries.push((ensure_trailing_backslash(prefix), root.join(d)));
+                        }
+                    }
                 }
             }
         }
@@ -338,5 +358,27 @@ mod tests {
         // "App\" must NOT match "Application\Foo"
         let result = map.resolve("Application\\Foo");
         assert!(result.is_none(), "App\\ prefix must not match Application\\Foo");
+    }
+
+    #[test]
+    fn array_valued_psr4_dirs() {
+        let root = make_temp_project("array_dirs");
+        let src = root.join("src");
+        let lib = root.join("lib");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&lib).unwrap();
+        fs::write(src.join("Foo.php"), "<?php class Foo {}").unwrap();
+        fs::write(lib.join("Bar.php"), "<?php class Bar {}").unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":["src/","lib/"]}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        // Both dirs should be in project_entries
+        assert_eq!(map.project_entries.len(), 2, "expected 2 entries for array-valued dir");
+        let files = map.project_files();
+        assert_eq!(files.len(), 2, "expected Foo.php and Bar.php");
     }
 }
