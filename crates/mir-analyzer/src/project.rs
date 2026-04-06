@@ -27,6 +27,8 @@ pub struct ProjectAnalyzer {
     pub psr4: Option<Arc<crate::composer::Psr4Map>>,
     /// Whether stubs have already been loaded (to avoid double-loading).
     stubs_loaded: std::sync::atomic::AtomicBool,
+    /// When true, run dead code detection at the end of analysis.
+    pub find_dead_code: bool,
 }
 
 impl ProjectAnalyzer {
@@ -37,6 +39,7 @@ impl ProjectAnalyzer {
             on_file_done: None,
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
+            find_dead_code: false,
         }
     }
 
@@ -48,6 +51,7 @@ impl ProjectAnalyzer {
             on_file_done: None,
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
+            find_dead_code: false,
         }
     }
 
@@ -65,6 +69,7 @@ impl ProjectAnalyzer {
             on_file_done: None,
             psr4: Some(psr4),
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
+            find_dead_code: false,
         };
         Ok((analyzer, map))
     }
@@ -216,8 +221,11 @@ impl ProjectAnalyzer {
         }
 
         // ---- Dead-code detection (M18) --------------------------------------
-        let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&self.codebase).analyze();
-        all_issues.extend(dead_code_issues);
+        if self.find_dead_code {
+            let dead_code_issues =
+                crate::dead_code::DeadCodeAnalyzer::new(&self.codebase).analyze();
+            all_issues.extend(dead_code_issues);
+        }
 
         AnalysisResult {
             issues: all_issues,

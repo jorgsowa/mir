@@ -91,6 +91,10 @@ struct Cli {
     /// Delete all cached results and exit
     #[arg(long)]
     clear_cache: bool,
+
+    /// Run dead code detection (UnusedMethod, UnusedProperty, UnusedFunction)
+    #[arg(long)]
+    find_dead_code: bool,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -198,6 +202,8 @@ fn main() {
                 analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
             }
         }
+
+        analyzer.find_dead_code = cli.find_dead_code;
 
         let vendor_files = map.vendor_files();
 
@@ -380,6 +386,8 @@ fn main() {
     } else {
         ProjectAnalyzer::new()
     };
+
+    analyzer.find_dead_code = cli.find_dead_code;
 
     // Load type stubs first (needed before collect_types_only)
     analyzer.load_stubs();
