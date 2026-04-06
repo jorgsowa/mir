@@ -860,7 +860,7 @@ pub fn merge_return_types(return_types: &[Union]) -> Union {
         .fold(Union::empty(), |acc, t| Union::merge(&acc, t))
 }
 
-fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
+pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             // Skip symlinks — they can form cycles (e.g. .pnpm-store)
