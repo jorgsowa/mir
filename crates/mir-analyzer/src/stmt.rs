@@ -546,9 +546,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                 php_ast::ast::ExprKind::Int(n) => {
                                     Some(Union::single(Atomic::TLiteralInt(*n)))
                                 }
-                                php_ast::ast::ExprKind::String(s) => Some(Union::single(
-                                    Atomic::TLiteralString(Arc::from(&**s)),
-                                )),
+                                php_ast::ast::ExprKind::String(s) => {
+                                    Some(Union::single(Atomic::TLiteralString(Arc::from(&**s))))
+                                }
                                 php_ast::ast::ExprKind::Bool(b) => Some(Union::single(if *b {
                                     Atomic::TTrue
                                 } else {

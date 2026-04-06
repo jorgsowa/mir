@@ -1344,7 +1344,6 @@ pub fn extract_destructure_vars<'arena, 'src>(
     }
 }
 
-
 /// Like `ast_params_to_fn_params` but resolves type names through the file's import table.
 fn ast_params_to_fn_params_resolved<'arena, 'src>(
     params: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Param<'arena, 'src>>,
