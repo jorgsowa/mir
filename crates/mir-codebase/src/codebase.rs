@@ -29,8 +29,20 @@ pub struct Codebase {
     pub referenced_functions: DashSet<Arc<str>>,
 
     /// Per-file `use` alias maps: alias → FQCN.  Populated during Pass 1.
+    ///
+    /// Key: absolute file path (as `Arc<str>`).
+    /// Value: map of `alias → fully-qualified class name`.
+    ///
+    /// Exposed as `pub` so that external consumers (e.g. `php-lsp`) can read
+    /// import data that mir already collects, instead of reimplementing it.
     pub file_imports: DashMap<Arc<str>, std::collections::HashMap<String, String>>,
     /// Per-file current namespace (if any).  Populated during Pass 1.
+    ///
+    /// Key: absolute file path (as `Arc<str>`).
+    /// Value: the declared namespace string (e.g. `"App\\Controller"`).
+    ///
+    /// Exposed as `pub` so that external consumers (e.g. `php-lsp`) can read
+    /// namespace data that mir already collects, instead of reimplementing it.
     pub file_namespaces: DashMap<Arc<str>, String>,
 
     /// Whether finalize() has been called.
