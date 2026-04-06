@@ -196,4 +196,62 @@ mod tests {
             "expected MissingAutoload error"
         );
     }
+
+    #[test]
+    fn composer_v2_installed() {
+        let root = make_temp_project("composer_v2");
+        fs::write(root.join("composer.json"), r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#).unwrap();
+
+        let vendor_dir = root.join("vendor/composer");
+        fs::create_dir_all(&vendor_dir).unwrap();
+        fs::write(
+            vendor_dir.join("installed.json"),
+            r#"{
+                "packages": [
+                    {
+                        "name": "vendor/pkg",
+                        "autoload": { "psr-4": { "Vendor\\Pkg\\": "src/" } }
+                    }
+                ]
+            }"#,
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("vendor/vendor/pkg/src")).unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let prefixes: Vec<&str> = map.vendor_entries.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(prefixes.contains(&"Vendor\\Pkg\\"), "missing Vendor\\Pkg\\");
+    }
+
+    #[test]
+    fn composer_v1_installed() {
+        let root = make_temp_project("composer_v1");
+        fs::write(root.join("composer.json"), r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#).unwrap();
+
+        let vendor_dir = root.join("vendor/composer");
+        fs::create_dir_all(&vendor_dir).unwrap();
+        fs::write(
+            vendor_dir.join("installed.json"),
+            r#"[
+                {
+                    "name": "vendor/pkg",
+                    "autoload": { "psr-4": { "Vendor\\Pkg\\": "src/" } }
+                }
+            ]"#,
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("vendor/vendor/pkg/src")).unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let prefixes: Vec<&str> = map.vendor_entries.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(prefixes.contains(&"Vendor\\Pkg\\"), "missing Vendor\\Pkg\\");
+    }
+
+    #[test]
+    fn missing_installed_json() {
+        let root = make_temp_project("missing_installed");
+        fs::write(root.join("composer.json"), r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#).unwrap();
+        let map = Psr4Map::from_composer(&root).unwrap();
+        assert!(map.vendor_entries.is_empty());
+    }
 }
