@@ -359,6 +359,9 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
     };
     if !narrowed.is_empty() {
         ctx.set_var(var_name, narrowed);
+    } else if !current.is_empty() && !current.is_mixed() {
+        // The type cannot satisfy this type-function constraint → dead branch.
+        ctx.diverges = true;
     }
 }
 
