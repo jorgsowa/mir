@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use mir_analyzer::project::ProjectAnalyzer;
 use mir_issues::{Issue, IssueKind};
@@ -14,17 +14,21 @@ pub fn check(src: &str) -> Vec<Issue> {
     let tmp: PathBuf = std::env::temp_dir().join(format!("mir_test_{}.php", id));
     std::fs::write(&tmp, src)
         .unwrap_or_else(|e| panic!("failed to write temp PHP file {}: {}", tmp.display(), e));
-    let result = ProjectAnalyzer::new().analyze(&[tmp.clone()]);
+    let result = ProjectAnalyzer::new().analyze(std::slice::from_ref(&tmp));
     std::fs::remove_file(&tmp).ok();
-    result.issues.into_iter().filter(|i| !i.suppressed).collect()
+    result
+        .issues
+        .into_iter()
+        .filter(|i| !i.suppressed)
+        .collect()
 }
 
 /// Assert that `issues` contains at least one issue with the exact `IssueKind`
 /// at `line` and `col_start`. Panics with the full issue list on failure.
 pub fn assert_issue(issues: &[Issue], kind: IssueKind, line: u32, col_start: u16) {
-    let found = issues.iter().any(|i| {
-        i.kind == kind && i.location.line == line && i.location.col_start == col_start
-    });
+    let found = issues
+        .iter()
+        .any(|i| i.kind == kind && i.location.line == line && i.location.col_start == col_start);
     if !found {
         panic!(
             "Expected issue {:?} at line {}, col {}.\nActual issues:\n{}",
@@ -41,9 +45,7 @@ pub fn assert_issue(issues: &[Issue], kind: IssueKind, line: u32, col_start: u16
 /// field values are complex (e.g. type-format strings in InvalidArgument).
 pub fn assert_issue_kind(issues: &[Issue], kind_name: &str, line: u32, col_start: u16) {
     let found = issues.iter().any(|i| {
-        i.kind.name() == kind_name
-            && i.location.line == line
-            && i.location.col_start == col_start
+        i.kind.name() == kind_name && i.location.line == line && i.location.col_start == col_start
     });
     if !found {
         panic!(

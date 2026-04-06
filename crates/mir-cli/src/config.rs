@@ -95,8 +95,7 @@ impl Config {
 
     /// Load and parse `mir.xml` at the given path.
     pub fn from_file(path: &Path) -> Result<Self, ConfigError> {
-        let xml = std::fs::read_to_string(path)
-            .map_err(|e| ConfigError::Io(e.to_string()))?;
+        let xml = std::fs::read_to_string(path).map_err(|e| ConfigError::Io(e.to_string()))?;
         Self::parse(&xml)
     }
 
@@ -129,10 +128,15 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 let name = bytes_to_string(e.name().as_ref());
 
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
-                if path.last().map(|s: &String| s == "issueHandlers").unwrap_or(false) {
+                if path
+                    .last()
+                    .map(|s: &String| s == "issueHandlers")
+                    .unwrap_or(false)
+                {
                     for attr in e.attributes().flatten() {
                         if bytes_to_string(attr.key.as_ref()) == "errorLevel" {
-                            if let Some(level) = ErrorLevel::from_str(&bytes_to_string(&attr.value)) {
+                            if let Some(level) = ErrorLevel::from_str(&bytes_to_string(&attr.value))
+                            {
                                 config.issue_handlers.insert(name.clone(), level);
                             }
                         }
@@ -152,10 +156,15 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             Ok(Event::Empty(e)) => {
                 let name = bytes_to_string(e.name().as_ref());
 
-                if path.last().map(|s: &String| s == "issueHandlers").unwrap_or(false) {
+                if path
+                    .last()
+                    .map(|s: &String| s == "issueHandlers")
+                    .unwrap_or(false)
+                {
                     for attr in e.attributes().flatten() {
                         if bytes_to_string(attr.key.as_ref()) == "errorLevel" {
-                            if let Some(level) = ErrorLevel::from_str(&bytes_to_string(&attr.value)) {
+                            if let Some(level) = ErrorLevel::from_str(&bytes_to_string(&attr.value))
+                            {
                                 config.issue_handlers.insert(name.clone(), level);
                             }
                         }
@@ -168,7 +177,8 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             }
 
             Ok(Event::Text(t)) => {
-                text_buf = t.unescape()
+                text_buf = t
+                    .unescape()
                     .map_err(|e| ConfigError::Parse(e.to_string()))?
                     .to_string();
             }
@@ -252,8 +262,7 @@ pub struct Baseline {
 impl Baseline {
     /// Load a baseline from a file path.
     pub fn from_file(path: &std::path::Path) -> Result<Self, ConfigError> {
-        let xml = std::fs::read_to_string(path)
-            .map_err(|e| ConfigError::Io(e.to_string()))?;
+        let xml = std::fs::read_to_string(path).map_err(|e| ConfigError::Io(e.to_string()))?;
         Self::parse(&xml)
     }
 
@@ -279,6 +288,7 @@ impl Baseline {
 
     /// Return true if the (file, issue_kind) pair exists in the baseline
     /// regardless of snippet.  Used as a fallback when no snippet is available.
+    #[allow(dead_code)]
     pub fn contains_kind(&self, file: &str, issue_kind: &str) -> bool {
         self.entries
             .get(file)
@@ -304,10 +314,7 @@ impl Baseline {
                 let snippets = &by_kind[kind];
                 out.push_str(&format!("    <{}>\n", kind));
                 for snippet in snippets {
-                    out.push_str(&format!(
-                        "      <code><![CDATA[{}]]></code>\n",
-                        snippet
-                    ));
+                    out.push_str(&format!("      <code><![CDATA[{}]]></code>\n", snippet));
                 }
                 out.push_str(&format!("    </{}>\n", kind));
             }
@@ -379,7 +386,9 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
                 text_buf = String::from_utf8_lossy(cd.as_ref()).trim().to_string();
             }
             Ok(Event::Text(t)) => {
-                let s = t.unescape().map_err(|e| ConfigError::Parse(e.to_string()))?;
+                let s = t
+                    .unescape()
+                    .map_err(|e| ConfigError::Parse(e.to_string()))?;
                 let trimmed = s.trim().to_string();
                 if !trimmed.is_empty() {
                     text_buf = trimmed;

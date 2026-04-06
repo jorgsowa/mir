@@ -47,7 +47,11 @@ impl Codebase {
     // -----------------------------------------------------------------------
 
     /// Resolve a property, walking up the inheritance chain (parent classes and traits).
-    pub fn get_property(&self, fqcn: &str, prop_name: &str) -> Option<crate::storage::PropertyStorage> {
+    pub fn get_property(
+        &self,
+        fqcn: &str,
+        prop_name: &str,
+    ) -> Option<crate::storage::PropertyStorage> {
         // Check direct class own_properties
         if let Some(cls) = self.classes.get(fqcn) {
             if let Some(p) = cls.own_properties.get(prop_name) {
@@ -104,18 +108,26 @@ impl Codebase {
         }
         // Check interface methods (including parent interfaces via all_parents)
         if let Some(iface) = self.interfaces.get(fqcn) {
-            if let Some(m) = iface.own_methods.get(method_name)
-                .or_else(|| iface.own_methods.iter().find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name)).map(|(_, v)| v))
-            {
+            if let Some(m) = iface.own_methods.get(method_name).or_else(|| {
+                iface
+                    .own_methods
+                    .iter()
+                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
+                    .map(|(_, v)| v)
+            }) {
                 return Some(m.clone());
             }
             // Traverse parent interfaces
             let parents = iface.all_parents.clone();
             for parent_fqcn in &parents {
                 if let Some(parent_iface) = self.interfaces.get(parent_fqcn.as_ref()) {
-                    if let Some(m) = parent_iface.own_methods.get(method_name)
-                        .or_else(|| parent_iface.own_methods.iter().find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name)).map(|(_, v)| v))
-                    {
+                    if let Some(m) = parent_iface.own_methods.get(method_name).or_else(|| {
+                        parent_iface
+                            .own_methods
+                            .iter()
+                            .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
+                            .map(|(_, v)| v)
+                    }) {
                         return Some(m.clone());
                     }
                 }
@@ -123,17 +135,23 @@ impl Codebase {
         }
         // Check trait methods (when a variable is annotated with a trait type)
         if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(m) = tr.own_methods.get(method_name)
-                .or_else(|| tr.own_methods.iter().find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name)).map(|(_, v)| v))
-            {
+            if let Some(m) = tr.own_methods.get(method_name).or_else(|| {
+                tr.own_methods
+                    .iter()
+                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
+                    .map(|(_, v)| v)
+            }) {
                 return Some(m.clone());
             }
         }
         // Check enum methods
         if let Some(e) = self.enums.get(fqcn) {
-            if let Some(m) = e.own_methods.get(method_name)
-                .or_else(|| e.own_methods.iter().find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name)).map(|(_, v)| v))
-            {
+            if let Some(m) = e.own_methods.get(method_name).or_else(|| {
+                e.own_methods
+                    .iter()
+                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
+                    .map(|(_, v)| v)
+            }) {
                 return Some(m.clone());
             }
             // PHP 8.1 built-in enum methods: cases(), from(), tryFrom()
@@ -185,7 +203,8 @@ impl Codebase {
                 return true;
             }
             // Backed enums implement BackedEnum
-            if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && en.scalar_type.is_some() {
+            if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && en.scalar_type.is_some()
+            {
                 return true;
             }
         }
@@ -208,7 +227,7 @@ impl Codebase {
     /// Used to suppress `UndefinedMethod` on abstract class receivers: the concrete
     /// subclass is expected to implement the method, matching Psalm errorLevel=3 behaviour.
     pub fn is_abstract_class(&self, fqcn: &str) -> bool {
-        self.classes.get(fqcn).map_or(false, |c| c.is_abstract)
+        self.classes.get(fqcn).is_some_and(|c| c.is_abstract)
     }
 
     /// Returns true if the class (or any ancestor/trait) defines a `__get` magic method.
@@ -230,7 +249,11 @@ impl Codebase {
             }
             // Check ancestors
             let all_parents = {
-                if let Some(c) = self.classes.get(fqcn) { c.all_parents.clone() } else { vec![] }
+                if let Some(c) = self.classes.get(fqcn) {
+                    c.all_parents.clone()
+                } else {
+                    vec![]
+                }
             };
             for ancestor in &all_parents {
                 if let Some(anc) = self.classes.get(ancestor.as_ref()) {
@@ -265,7 +288,9 @@ impl Codebase {
 
         // Clone the data we need so the DashMap ref is dropped before any further lookups.
         let (parent, interfaces, traits, all_parents) = {
-            let Some(cls) = self.classes.get(fqcn) else { return false };
+            let Some(cls) = self.classes.get(fqcn) else {
+                return false;
+            };
             (
                 cls.parent.clone(),
                 cls.interfaces.clone(),
@@ -446,7 +471,8 @@ impl Codebase {
             }
         }
 
-        self.finalized.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.finalized
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     // -----------------------------------------------------------------------

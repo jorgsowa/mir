@@ -8,8 +8,8 @@ use owo_colors::OwoColorize;
 
 mod config;
 
-use mir_analyzer::ProjectAnalyzer;
 use config::{Baseline, Config, ErrorLevel};
+use mir_analyzer::ProjectAnalyzer;
 use mir_issues::{Issue, Severity};
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,10 @@ fn main() {
     // Load configuration (explicit --config, or auto-discover mir.xml / psalm.xml as fallback)
     let mut config_base: PathBuf = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut config = if let Some(path) = &cli.config {
-        config_base = path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| config_base.clone());
+        config_base = path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| config_base.clone());
         match Config::from_file(path) {
             Ok(c) => c,
             Err(e) => {
@@ -115,7 +118,10 @@ fn main() {
     } else {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         if let Some(found) = Config::find(&cwd) {
-            config_base = found.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| cwd.clone());
+            config_base = found
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| cwd.clone());
             match Config::from_file(&found) {
                 Ok(c) => {
                     if !cli.quiet {
@@ -157,17 +163,33 @@ fn main() {
     };
 
     // Resolve ignore dirs to absolute paths (relative to config file location)
-    let ignore_dirs: Vec<PathBuf> = config.ignore_dirs.iter().map(|d| {
-        let p = PathBuf::from(d);
-        if p.is_absolute() { p } else { config_base.join(d) }
-    }).collect();
+    let ignore_dirs: Vec<PathBuf> = config
+        .ignore_dirs
+        .iter()
+        .map(|d| {
+            let p = PathBuf::from(d);
+            if p.is_absolute() {
+                p
+            } else {
+                config_base.join(d)
+            }
+        })
+        .collect();
 
     // Discover files — when config specifies project dirs, use those; otherwise use CLI paths
     let scan_roots: Vec<PathBuf> = if !config.project_dirs.is_empty() && cli.paths.is_empty() {
-        config.project_dirs.iter().map(|d| {
-            let p = PathBuf::from(d);
-            if p.is_absolute() { p } else { config_base.join(d) }
-        }).collect()
+        config
+            .project_dirs
+            .iter()
+            .map(|d| {
+                let p = PathBuf::from(d);
+                if p.is_absolute() {
+                    p
+                } else {
+                    config_base.join(d)
+                }
+            })
+            .collect()
     } else {
         paths.clone()
     };
@@ -181,7 +203,11 @@ fn main() {
             if ignore_dirs.is_empty() {
                 return true;
             }
-            let abs = if p.is_absolute() { p.clone() } else { cwd_abs.join(p) };
+            let abs = if p.is_absolute() {
+                p.clone()
+            } else {
+                cwd_abs.join(p)
+            };
             !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
         })
         .collect();
@@ -224,7 +250,10 @@ fn main() {
             .collect();
         if !vendor_files.is_empty() {
             if !cli.quiet {
-                eprintln!("mir: scanning {} vendor files for types...", vendor_files.len());
+                eprintln!(
+                    "mir: scanning {} vendor files for types...",
+                    vendor_files.len()
+                );
             }
             analyzer.collect_types_only(&vendor_files);
         }
@@ -327,38 +356,47 @@ fn run_output(
     // Suppress issues matched by the baseline.
     // For --update-baseline, also accumulate the consumed entries into a new baseline.
     let mut new_baseline = Baseline::default();
-    let suppressed_by_baseline: std::collections::HashSet<usize> = if let Some(bl) = &mut baseline_data {
-        result.issues.iter().enumerate().filter_map(|(idx, issue)| {
-            let file = issue.location.file.as_ref();
-            let kind = issue.kind.name();
-            let snippet = issue.snippet.as_deref().unwrap_or("");
-            let matched = bl.consume(file, kind, snippet);
-            if matched {
-                if cli.update_baseline {
-                    new_baseline.entries
-                        .entry(file.to_string())
-                        .or_default()
-                        .entry(kind.to_string())
-                        .or_default()
-                        .push(snippet.to_string());
-                }
-                Some(idx)
-            } else {
-                None
-            }
-        }).collect()
-    } else {
-        std::collections::HashSet::new()
-    };
+    let suppressed_by_baseline: std::collections::HashSet<usize> =
+        if let Some(bl) = &mut baseline_data {
+            result
+                .issues
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, issue)| {
+                    let file = issue.location.file.as_ref();
+                    let kind = issue.kind.name();
+                    let snippet = issue.snippet.as_deref().unwrap_or("");
+                    let matched = bl.consume(file, kind, snippet);
+                    if matched {
+                        if cli.update_baseline {
+                            new_baseline
+                                .entries
+                                .entry(file.to_string())
+                                .or_default()
+                                .entry(kind.to_string())
+                                .or_default()
+                                .push(snippet.to_string());
+                        }
+                        Some(idx)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            std::collections::HashSet::new()
+        };
 
     // --update-baseline: write back only the issues still present in the baseline.
     if cli.update_baseline {
         let path = baseline_path
             .as_deref()
             .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .join("psalm-baseline.xml"));
+            .unwrap_or_else(|| {
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .join("psalm-baseline.xml")
+            });
         match new_baseline.write(&path) {
             Ok(()) => {
                 if !cli.quiet {
@@ -406,7 +444,11 @@ fn run_output(
             match sev {
                 Severity::Error | Severity::Warning => Some((i, sev)),
                 Severity::Info => {
-                    if show_info { Some((i, sev)) } else { None }
+                    if show_info {
+                        Some((i, sev))
+                    } else {
+                        None
+                    }
                 }
             }
         })
@@ -425,12 +467,10 @@ fn run_output(
             }
         }
 
-        OutputFormat::Json => {
-            match serde_json::to_string_pretty(&display_issues) {
-                Ok(json) => println!("{}", json),
-                Err(e) => eprintln!("JSON serialization error: {}", e),
-            }
-        }
+        OutputFormat::Json => match serde_json::to_string_pretty(&display_issues) {
+            Ok(json) => println!("{}", json),
+            Err(e) => eprintln!("JSON serialization error: {}", e),
+        },
 
         OutputFormat::GithubActions => {
             for issue in &display_issues {
@@ -461,8 +501,7 @@ fn run_output(
 
     // Verbose: per-file issue counts
     if cli.verbose && !cli.quiet && matches!(cli.format, OutputFormat::Text) {
-        let mut counts: std::collections::HashMap<&str, usize> =
-            std::collections::HashMap::new();
+        let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
         for issue in &display_issues {
             *counts.entry(issue.location.file.as_ref()).or_default() += 1;
         }
@@ -470,14 +509,25 @@ fn run_output(
         entries.sort_by_key(|(f, _)| *f);
         eprintln!();
         for (file, count) in entries {
-            eprintln!("  {} — {} issue{}", file, count, if *count == 1 { "" } else { "s" });
+            eprintln!(
+                "  {} — {} issue{}",
+                file,
+                count,
+                if *count == 1 { "" } else { "s" }
+            );
         }
     }
 
     // Stats
     if cli.stats && !cli.quiet {
-        let errors = display_issues.iter().filter(|i| i.severity == Severity::Error).count();
-        let warnings = display_issues.iter().filter(|i| i.severity == Severity::Warning).count();
+        let errors = display_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Error)
+            .count();
+        let warnings = display_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Warning)
+            .count();
         eprintln!(
             "\n{} Analyzed {} files in {:.2}s  |  {} {}  {} {}",
             "mir".bold().green(),
@@ -521,11 +571,17 @@ fn format_junit(issues: &[&Issue]) -> String {
     // Group by file
     let mut by_file: HashMap<&str, Vec<&Issue>> = HashMap::new();
     for issue in issues {
-        by_file.entry(issue.location.file.as_ref()).or_default().push(issue);
+        by_file
+            .entry(issue.location.file.as_ref())
+            .or_default()
+            .push(issue);
     }
 
     let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    let total_failures: usize = issues.iter().filter(|i| i.severity == Severity::Error).count();
+    let total_failures: usize = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Error)
+        .count();
     out.push_str(&format!(
         "<testsuites name=\"mir\" tests=\"{}\" failures=\"{}\">\n",
         issues.len(),
@@ -537,7 +593,10 @@ fn format_junit(issues: &[&Issue]) -> String {
 
     for file in files {
         let file_issues = &by_file[file];
-        let failures = file_issues.iter().filter(|i| i.severity == Severity::Error).count();
+        let failures = file_issues
+            .iter()
+            .filter(|i| i.severity == Severity::Error)
+            .count();
         out.push_str(&format!(
             "  <testsuite name=\"{}\" tests=\"{}\" failures=\"{}\">\n",
             xml_escape(file),
@@ -564,8 +623,7 @@ fn format_junit(issues: &[&Issue]) -> String {
                 xml_escape(name),
                 xml_escape(&format!(
                     "{}:{}:{} {} {}: {}",
-                    file, issue.location.line, issue.location.col_start,
-                    issue.severity, name, msg
+                    file, issue.location.line, issue.location.col_start, issue.severity, name, msg
                 )),
                 severity,
             ));

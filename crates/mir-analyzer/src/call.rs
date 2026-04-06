@@ -2,7 +2,7 @@
 /// the inferred return type.
 use std::sync::Arc;
 
-use php_ast::ast::{ExprKind, MethodCallExpr, FunctionCallExpr, StaticMethodCallExpr};
+use php_ast::ast::{ExprKind, FunctionCallExpr, MethodCallExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, MethodStorage, Visibility};
@@ -36,11 +36,15 @@ impl CallAnalyzer {
             ExprKind::Identifier(name) => (*name).to_string(),
             ExprKind::Variable(_) => {
                 // dynamic call — evaluate args anyway
-                for arg in call.args.iter() { ea.analyze(&arg.value, ctx); }
+                for arg in call.args.iter() {
+                    ea.analyze(&arg.value, ctx);
+                }
                 return Union::mixed();
             }
             _ => {
-                for arg in call.args.iter() { ea.analyze(&arg.value, ctx); }
+                for arg in call.args.iter() {
+                    ea.analyze(&arg.value, ctx);
+                }
                 return Union::mixed();
             }
         };
@@ -50,8 +54,8 @@ impl CallAnalyzer {
             for arg in call.args.iter() {
                 if is_expr_tainted(&arg.value, ctx) {
                     let issue_kind = match sink_kind {
-                        SinkKind::Html  => IssueKind::TaintedHtml,
-                        SinkKind::Sql   => IssueKind::TaintedSql,
+                        SinkKind::Html => IssueKind::TaintedHtml,
+                        SinkKind::Sql => IssueKind::TaintedSql,
                         SinkKind::Shell => IssueKind::TaintedShell,
                     };
                     ea.emit(issue_kind, Severity::Error, span);
@@ -63,7 +67,10 @@ impl CallAnalyzer {
         // Resolve the function name: try namespace-qualified first, then global fallback.
         // PHP resolves `foo()` as `\App\Ns\foo` first, then `\foo` if not found.
         // A leading `\` means explicit global namespace (e.g. `\assert` = global `assert`).
-        let fn_name = fn_name.strip_prefix('\\').map(|s: &str| s.to_string()).unwrap_or(fn_name);
+        let fn_name = fn_name
+            .strip_prefix('\\')
+            .map(|s: &str| s.to_string())
+            .unwrap_or(fn_name);
         let resolved_fn_name: String = {
             let qualified = ea.codebase.resolve_class_name(&ea.file, &fn_name);
             if ea.codebase.functions.contains_key(qualified.as_str()) {
@@ -110,7 +117,11 @@ impl CallAnalyzer {
             .iter()
             .map(|arg| {
                 let ty = ea.analyze(&arg.value, ctx);
-                if arg.unpack { spread_element_type(&ty) } else { ty }
+                if arg.unpack {
+                    spread_element_type(&ty)
+                } else {
+                    ty
+                }
             })
             .collect();
 
@@ -119,17 +130,26 @@ impl CallAnalyzer {
             ea.codebase.mark_function_referenced(&func.fqn.clone());
             let params = func.params.clone();
             let template_params = func.template_params.clone();
-            let return_ty_raw = func.effective_return_type().cloned().unwrap_or_else(Union::mixed);
+            let return_ty_raw = func
+                .effective_return_type()
+                .cloned()
+                .unwrap_or_else(Union::mixed);
 
             check_args(
                 ea,
-                &fn_name,
-                &params,
-                &arg_types,
-                &call.args.iter().map(|a| a.span).collect::<Vec<_>>(),
-                &call.args.iter().map(|a| a.name.as_ref().map(|n| n.to_string())).collect::<Vec<_>>(),
-                span,
-                call.args.iter().any(|a| a.unpack),
+                CheckArgsParams {
+                    fn_name: &fn_name,
+                    params: &params,
+                    arg_types: &arg_types,
+                    arg_spans: &call.args.iter().map(|a| a.span).collect::<Vec<_>>(),
+                    arg_names: &call
+                        .args
+                        .iter()
+                        .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                        .collect::<Vec<_>>(),
+                    call_span: span,
+                    has_spread: call.args.iter().any(|a| a.unpack),
+                },
             );
 
             // Also ensure by-ref vars are defined after the call (for post-call usage)
@@ -208,14 +228,18 @@ impl CallAnalyzer {
                 // ?-> is fine, just returns null on null receiver
             } else if obj_ty.is_single() {
                 ea.emit(
-                    IssueKind::NullMethodCall { method: method_name.clone() },
+                    IssueKind::NullMethodCall {
+                        method: method_name.clone(),
+                    },
                     Severity::Error,
                     span,
                 );
                 return Union::mixed();
             } else {
                 ea.emit(
-                    IssueKind::PossiblyNullMethodCall { method: method_name.clone() },
+                    IssueKind::PossiblyNullMethodCall {
+                        method: method_name.clone(),
+                    },
                     Severity::Info,
                     span,
                 );
@@ -225,7 +249,9 @@ impl CallAnalyzer {
         // Mixed receiver
         if obj_ty.is_mixed() {
             ea.emit(
-                IssueKind::MixedMethodCall { method: method_name.clone() },
+                IssueKind::MixedMethodCall {
+                    method: method_name.clone(),
+                },
                 Severity::Info,
                 span,
             );
@@ -237,7 +263,11 @@ impl CallAnalyzer {
             .iter()
             .map(|arg| {
                 let ty = ea.analyze(&arg.value, ctx);
-                if arg.unpack { spread_element_type(&ty) } else { ty }
+                if arg.unpack {
+                    spread_element_type(&ty)
+                } else {
+                    ty
+                }
             })
             .collect();
 
@@ -262,16 +292,35 @@ impl CallAnalyzer {
                         check_method_visibility(ea, &method, ctx, span);
 
                         // Arg type check
-                        let arg_names: Vec<Option<String>> = call.args.iter()
-                            .map(|a| a.name.as_ref().map(|n| n.to_string())).collect();
-                        check_args(ea, &method_name, &method.params, &arg_types, &arg_spans, &arg_names, span, call.args.iter().any(|a| a.unpack));
+                        let arg_names: Vec<Option<String>> = call
+                            .args
+                            .iter()
+                            .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                            .collect();
+                        check_args(
+                            ea,
+                            CheckArgsParams {
+                                fn_name: &method_name,
+                                params: &method.params,
+                                arg_types: &arg_types,
+                                arg_spans: &arg_spans,
+                                arg_names: &arg_names,
+                                call_span: span,
+                                has_spread: call.args.iter().any(|a| a.unpack),
+                            },
+                        );
 
-                        let ret_raw = method.effective_return_type().cloned().unwrap_or_else(Union::mixed);
+                        let ret_raw = method
+                            .effective_return_type()
+                            .cloned()
+                            .unwrap_or_else(Union::mixed);
                         // Bind `static` return type to the actual receiver class (LSB).
                         let ret_raw = substitute_static_in_return(ret_raw, fqcn);
                         let ret = if !method.template_params.is_empty() {
                             let bindings = infer_template_bindings(
-                                &method.template_params, &method.params, &arg_types,
+                                &method.template_params,
+                                &method.params,
+                                &arg_types,
                             );
                             for (name, inferred, bound) in
                                 check_template_bounds(&bindings, &method.template_params)
@@ -291,7 +340,9 @@ impl CallAnalyzer {
                             ret_raw
                         };
                         result = Union::merge(&result, &ret);
-                    } else if ea.codebase.type_exists(fqcn) && !ea.codebase.has_unknown_ancestor(fqcn) {
+                    } else if ea.codebase.type_exists(fqcn)
+                        && !ea.codebase.has_unknown_ancestor(fqcn)
+                    {
                         // Class is known AND has no unscanned ancestors → genuine UndefinedMethod.
                         // If the class has an external/unscanned parent (e.g. a PHPUnit TestCase),
                         // the method might be inherited from that parent; skip to avoid false positives.
@@ -300,7 +351,10 @@ impl CallAnalyzer {
                         // (UndefinedInterfaceMethod is not emitted at default error level).
                         let is_interface = ea.codebase.interfaces.contains_key(fqcn.as_ref());
                         let is_abstract = ea.codebase.is_abstract_class(fqcn.as_ref());
-                        if is_interface || is_abstract || ea.codebase.get_method(fqcn, "__call").is_some() {
+                        if is_interface
+                            || is_abstract
+                            || ea.codebase.get_method(fqcn, "__call").is_some()
+                        {
                             result = Union::merge(&result, &Union::mixed());
                         } else {
                             ea.emit(
@@ -330,7 +384,11 @@ impl CallAnalyzer {
             result.add_type(Atomic::TNull);
         }
 
-        if result.is_empty() { Union::mixed() } else { result }
+        if result.is_empty() {
+            Union::mixed()
+        } else {
+            result
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -357,17 +415,38 @@ impl CallAnalyzer {
             .iter()
             .map(|arg| {
                 let ty = ea.analyze(&arg.value, ctx);
-                if arg.unpack { spread_element_type(&ty) } else { ty }
+                if arg.unpack {
+                    spread_element_type(&ty)
+                } else {
+                    ty
+                }
             })
             .collect();
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
             ea.codebase.mark_method_referenced(&fqcn, method_name);
-            let arg_names: Vec<Option<String>> = call.args.iter()
-                .map(|a| a.name.as_ref().map(|n| n.to_string())).collect();
-            check_args(ea, method_name, &method.params, &arg_types, &arg_spans, &arg_names, span, call.args.iter().any(|a| a.unpack));
-            let ret_raw = method.effective_return_type().cloned().unwrap_or_else(Union::mixed);
+            let arg_names: Vec<Option<String>> = call
+                .args
+                .iter()
+                .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                .collect();
+            check_args(
+                ea,
+                CheckArgsParams {
+                    fn_name: method_name,
+                    params: &method.params,
+                    arg_types: &arg_types,
+                    arg_spans: &arg_spans,
+                    arg_names: &arg_names,
+                    call_span: span,
+                    has_spread: call.args.iter().any(|a| a.unpack),
+                },
+            );
+            let ret_raw = method
+                .effective_return_type()
+                .cloned()
+                .unwrap_or_else(Union::mixed);
             let fqcn_arc: std::sync::Arc<str> = Arc::from(fqcn.as_str());
             substitute_static_in_return(ret_raw, &fqcn_arc)
         } else if ea.codebase.type_exists(&fqcn) && !ea.codebase.has_unknown_ancestor(&fqcn) {
@@ -400,33 +479,45 @@ impl CallAnalyzer {
 // Public helper for constructor argument checking (used by expr.rs)
 // ---------------------------------------------------------------------------
 
+pub struct CheckArgsParams<'a> {
+    pub fn_name: &'a str,
+    pub params: &'a [FnParam],
+    pub arg_types: &'a [Union],
+    pub arg_spans: &'a [Span],
+    pub arg_names: &'a [Option<String>],
+    pub call_span: Span,
+    pub has_spread: bool,
+}
+
 pub fn check_constructor_args(
     ea: &mut ExpressionAnalyzer<'_>,
     class_name: &str,
-    params: &[FnParam],
-    arg_types: &[Union],
-    arg_spans: &[Span],
-    arg_names: &[Option<String>],
-    call_span: Span,
-    has_spread: bool,
+    p: CheckArgsParams<'_>,
 ) {
-    check_args(ea, &format!("{}::__construct", class_name), params, arg_types, arg_spans, arg_names, call_span, has_spread);
+    let ctor_name = format!("{}::__construct", class_name);
+    check_args(
+        ea,
+        CheckArgsParams {
+            fn_name: &ctor_name,
+            ..p
+        },
+    );
 }
 
 // ---------------------------------------------------------------------------
 // Argument type checking
 // ---------------------------------------------------------------------------
 
-fn check_args(
-    ea: &mut ExpressionAnalyzer<'_>,
-    fn_name: &str,
-    params: &[FnParam],
-    arg_types: &[Union],
-    arg_spans: &[Span],
-    arg_names: &[Option<String>],
-    call_span: Span,
-    has_spread: bool,
-) {
+fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>) {
+    let CheckArgsParams {
+        fn_name,
+        params,
+        arg_types,
+        arg_spans,
+        arg_names,
+        call_span,
+        has_spread,
+    } = p;
     // Build a remapped (param_index → (arg_type, arg_span)) map that handles
     // named arguments (PHP 8.0+).
     let has_named = arg_names.iter().any(|n| n.is_some());
@@ -462,7 +553,10 @@ fn check_args(
         }
     }
 
-    let required_count = params.iter().filter(|p| !p.is_optional && !p.is_variadic).count();
+    let required_count = params
+        .iter()
+        .filter(|p| !p.is_optional && !p.is_variadic)
+        .count();
     let provided_count = if params.iter().any(|p| p.is_variadic) {
         arg_types.len()
     } else {
@@ -496,7 +590,9 @@ fn check_args(
             let param_ty_owned;
             let param_ty: &Union = if param.is_variadic {
                 if let Some(elem_ty) = raw_param_ty.types.iter().find_map(|a| match a {
-                    Atomic::TList { value } | Atomic::TNonEmptyList { value } => Some(*value.clone()),
+                    Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+                        Some(*value.clone())
+                    }
                     _ => None,
                 }) {
                     param_ty_owned = elem_ty;
@@ -614,7 +710,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     Atomic::TClassString(None) | Atomic::TString => true,
                     Atomic::TClassString(Some(param_cls)) => {
                         arg_cls == param_cls
-                            || ea.codebase.extends_or_implements(arg_cls.as_ref(), param_cls.as_ref())
+                            || ea
+                                .codebase
+                                .extends_or_implements(arg_cls.as_ref(), param_cls.as_ref())
                     }
                     _ => false,
                 });
@@ -625,16 +723,26 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             }
             // False satisfies param if param contains false or bool
             Atomic::TFalse => {
-                return param.types.iter().any(|p| matches!(p, Atomic::TFalse | Atomic::TBool));
+                return param
+                    .types
+                    .iter()
+                    .any(|p| matches!(p, Atomic::TFalse | Atomic::TBool));
             }
             _ => return false, // non-named-object: not handled here
         };
 
         // An object with __invoke satisfies callable|null
-        if param.types.iter().any(|p| matches!(p, Atomic::TCallable { .. })) {
+        if param
+            .types
+            .iter()
+            .any(|p| matches!(p, Atomic::TCallable { .. }))
+        {
             let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
             if ea.codebase.get_method(&resolved_arg, "__invoke").is_some()
-                || ea.codebase.get_method(arg_fqcn.as_ref(), "__invoke").is_some()
+                || ea
+                    .codebase
+                    .get_method(arg_fqcn.as_ref(), "__invoke")
+                    .is_some()
             {
                 return true;
             }
@@ -649,7 +757,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 _ => return false,
             };
             // Resolve param_fqcn in case it's a short name stored from a type hint
-            let resolved_param = ea.codebase.resolve_class_name(&ea.file, param_fqcn.as_ref());
+            let resolved_param = ea
+                .codebase
+                .resolve_class_name(&ea.file, param_fqcn.as_ref());
             let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
 
             if resolved_param == resolved_arg
@@ -675,8 +785,12 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 for entry in ea.codebase.classes.iter() {
                     if entry.value().short_name.as_ref() == arg_fqcn.as_ref() {
                         let actual_fqcn = entry.key().clone();
-                        if ea.codebase.extends_or_implements(actual_fqcn.as_ref(), &resolved_param)
-                            || ea.codebase.extends_or_implements(actual_fqcn.as_ref(), param_fqcn.as_ref())
+                        if ea
+                            .codebase
+                            .extends_or_implements(actual_fqcn.as_ref(), &resolved_param)
+                            || ea
+                                .codebase
+                                .extends_or_implements(actual_fqcn.as_ref(), param_fqcn.as_ref())
                         {
                             return true;
                         }
@@ -698,8 +812,12 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 let compatible = ea.codebase.classes.iter().any(|entry| {
                     let cls = entry.value();
                     cls.all_parents.iter().any(|p| p.as_ref() == iface_fqcn)
-                        && (ea.codebase.extends_or_implements(entry.key().as_ref(), param_fqcn.as_ref())
-                            || ea.codebase.extends_or_implements(entry.key().as_ref(), &resolved_param))
+                        && (ea
+                            .codebase
+                            .extends_or_implements(entry.key().as_ref(), param_fqcn.as_ref())
+                            || ea
+                                .codebase
+                                .extends_or_implements(entry.key().as_ref(), &resolved_param))
                 });
                 if compatible {
                     return true;
@@ -708,13 +826,19 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
 
             // If arg is a fully-qualified vendor class not in our codebase, we can't verify
             // the hierarchy — suppress to avoid false positives on external libraries.
-            if arg_fqcn.contains('\\') && !ea.codebase.type_exists(arg_fqcn.as_ref()) && !ea.codebase.type_exists(&resolved_arg) {
+            if arg_fqcn.contains('\\')
+                && !ea.codebase.type_exists(arg_fqcn.as_ref())
+                && !ea.codebase.type_exists(&resolved_arg)
+            {
                 return true;
             }
 
             // If param is a fully-qualified vendor class not in our codebase, we can't verify
             // the required type — suppress to avoid false positives on external library params.
-            if param_fqcn.contains('\\') && !ea.codebase.type_exists(param_fqcn.as_ref()) && !ea.codebase.type_exists(&resolved_param) {
+            if param_fqcn.contains('\\')
+                && !ea.codebase.type_exists(param_fqcn.as_ref())
+                && !ea.codebase.type_exists(&resolved_param)
+            {
                 return true;
             }
 
@@ -736,16 +860,16 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
         Atomic::TClassString(Some(inner)) => {
             !inner.contains('\\') && !ea.codebase.type_exists(inner.as_ref())
         }
-        Atomic::TArray { key: _, value } | Atomic::TList { value }
-        | Atomic::TNonEmptyArray { key: _, value } | Atomic::TNonEmptyList { value } => {
-            value.types.iter().any(|v| match v {
-                Atomic::TTemplateParam { .. } => true,
-                Atomic::TNamedObject { fqcn, .. } => {
-                    !fqcn.contains('\\') && !ea.codebase.type_exists(fqcn.as_ref())
-                }
-                _ => false,
-            })
-        }
+        Atomic::TArray { key: _, value }
+        | Atomic::TList { value }
+        | Atomic::TNonEmptyArray { key: _, value }
+        | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
+            Atomic::TTemplateParam { .. } => true,
+            Atomic::TNamedObject { fqcn, .. } => {
+                !fqcn.contains('\\') && !ea.codebase.type_exists(fqcn.as_ref())
+            }
+            _ => false,
+        }),
         _ => false,
     })
 }
@@ -755,15 +879,17 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
 fn substitute_static_in_return(ret: Union, receiver_fqcn: &Arc<str>) -> Union {
     use mir_types::Atomic;
     let from_docblock = ret.from_docblock;
-    let types: Vec<Atomic> = ret.types.into_iter().map(|a| {
-        match a {
+    let types: Vec<Atomic> = ret
+        .types
+        .into_iter()
+        .map(|a| match a {
             Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
                 fqcn: receiver_fqcn.clone(),
                 type_params: vec![],
             },
             other => other,
-        }
-    }).collect();
+        })
+        .collect();
     let mut result = Union::from_vec(types);
     result.from_docblock = from_docblock;
     result
@@ -796,7 +922,11 @@ pub fn spread_element_type(arr_ty: &Union) -> Union {
             _ => return Union::mixed(),
         }
     }
-    if result.types.is_empty() { Union::mixed() } else { result }
+    if result.types.is_empty() {
+        Union::mixed()
+    } else {
+        result
+    }
 }
 
 /// Returns true if both arg and param are array/list types whose value types are compatible
@@ -809,14 +939,20 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
         // Named object: use FQCN resolution
         let av_fqcn: &Arc<str> = match av {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
-            Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => fqcn,
+            Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => {
+                fqcn
+            }
             // Nested list/array: recurse
-            Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. }
-            | Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => {
                 return param_ty.types.iter().any(|pv| {
                     let pv_val: &Union = match pv {
-                        Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. }
-                        | Atomic::TList { value } | Atomic::TNonEmptyList { value } => value,
+                        Atomic::TArray { value, .. }
+                        | Atomic::TNonEmptyArray { value, .. }
+                        | Atomic::TList { value }
+                        | Atomic::TNonEmptyList { value } => value,
                         _ => return false,
                     };
                     union_compatible(value, pv_val, ea)
@@ -829,7 +965,9 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
         param_ty.types.iter().any(|pv| {
             let pv_fqcn: &Arc<str> = match pv {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
-                Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => fqcn,
+                Atomic::TSelf { fqcn }
+                | Atomic::TStaticObject { fqcn }
+                | Atomic::TParent { fqcn } => fqcn,
                 _ => return false,
             };
             // Template param wildcard
@@ -839,10 +977,18 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
             let resolved_param = ea.codebase.resolve_class_name(&ea.file, pv_fqcn.as_ref());
             let resolved_arg = ea.codebase.resolve_class_name(&ea.file, av_fqcn.as_ref());
             resolved_param == resolved_arg
-                || ea.codebase.extends_or_implements(av_fqcn.as_ref(), &resolved_param)
-                || ea.codebase.extends_or_implements(&resolved_arg, &resolved_param)
-                || ea.codebase.extends_or_implements(pv_fqcn.as_ref(), &resolved_arg)
-                || ea.codebase.extends_or_implements(&resolved_param, &resolved_arg)
+                || ea
+                    .codebase
+                    .extends_or_implements(av_fqcn.as_ref(), &resolved_param)
+                || ea
+                    .codebase
+                    .extends_or_implements(&resolved_arg, &resolved_param)
+                || ea
+                    .codebase
+                    .extends_or_implements(pv_fqcn.as_ref(), &resolved_arg)
+                || ea
+                    .codebase
+                    .extends_or_implements(&resolved_param, &resolved_arg)
         })
     })
 }
@@ -850,16 +996,20 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
 fn array_list_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|a_atomic| {
         let arg_value: &Union = match a_atomic {
-            Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. }
-            | Atomic::TList { value } | Atomic::TNonEmptyList { value } => value,
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => value,
             Atomic::TKeyedArray { .. } => return true, // keyed arrays are compatible with any list/array
             _ => return false,
         };
 
         param_ty.types.iter().any(|p_atomic| {
             let param_value: &Union = match p_atomic {
-                Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. }
-                | Atomic::TList { value } | Atomic::TNonEmptyList { value } => value,
+                Atomic::TArray { value, .. }
+                | Atomic::TNonEmptyArray { value, .. }
+                | Atomic::TList { value }
+                | Atomic::TNonEmptyList { value } => value,
                 _ => return false,
             };
 
@@ -905,7 +1055,9 @@ fn check_method_visibility(
             } else {
                 // Caller must be the method's class or a subclass of it
                 let allowed = caller_fqcn == method.fqcn.as_ref()
-                    || ea.codebase.extends_or_implements(caller_fqcn, method.fqcn.as_ref());
+                    || ea
+                        .codebase
+                        .extends_or_implements(caller_fqcn, method.fqcn.as_ref());
                 if !allowed {
                     ea.emit(
                         IssueKind::UndefinedMethod {
@@ -926,7 +1078,11 @@ fn resolve_static_class(name: &str, ctx: &Context) -> String {
     match name.to_lowercase().as_str() {
         "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
         "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
-        "static" => ctx.static_fqcn.as_deref().unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static")).to_string(),
+        "static" => ctx
+            .static_fqcn
+            .as_deref()
+            .unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static"))
+            .to_string(),
         _ => name.to_string(),
     }
 }

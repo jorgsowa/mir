@@ -114,7 +114,9 @@ pub struct MethodStorage {
 
 impl MethodStorage {
     pub fn effective_return_type(&self) -> Option<&Union> {
-        self.return_type.as_ref().or(self.inferred_return_type.as_ref())
+        self.return_type
+            .as_ref()
+            .or(self.inferred_return_type.as_ref())
     }
 }
 
@@ -177,16 +179,24 @@ impl ClassStorage {
     pub fn get_method(&self, name: &str) -> Option<&MethodStorage> {
         // PHP method names are case-insensitive; caller should pass lowercase name.
         // Fast path: exact match (works when keys are stored lowercase).
-        if let Some(m) = self.all_methods.get(name).or_else(|| self.own_methods.get(name)) {
+        if let Some(m) = self
+            .all_methods
+            .get(name)
+            .or_else(|| self.own_methods.get(name))
+        {
             return Some(m);
         }
         // Fallback: case-insensitive scan (handles stubs stored with original case).
-        self.all_methods.iter()
+        self.all_methods
+            .iter()
             .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
             .map(|(_, v)| v)
-            .or_else(|| self.own_methods.iter()
-                .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
-                .map(|(_, v)| v))
+            .or_else(|| {
+                self.own_methods
+                    .iter()
+                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
+                    .map(|(_, v)| v)
+            })
     }
 
     pub fn get_property(&self, name: &str) -> Option<&PropertyStorage> {
@@ -273,6 +283,8 @@ pub struct FunctionStorage {
 
 impl FunctionStorage {
     pub fn effective_return_type(&self) -> Option<&Union> {
-        self.return_type.as_ref().or(self.inferred_return_type.as_ref())
+        self.return_type
+            .as_ref()
+            .or(self.inferred_return_type.as_ref())
     }
 }

@@ -83,7 +83,10 @@ impl Context {
             diverges: false,
         };
         // PHP superglobals — always in scope in any context
-        for sg in &["_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV", "GLOBALS"] {
+        for sg in &[
+            "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
+            "GLOBALS",
+        ] {
             ctx.vars.insert(sg.to_string(), mir_types::Union::mixed());
             ctx.assigned_vars.insert(sg.to_string());
         }
@@ -99,7 +102,15 @@ impl Context {
         static_fqcn: Option<Arc<str>>,
         strict_types: bool,
     ) -> Self {
-        Self::for_method(params, return_type, self_fqcn, parent_fqcn, static_fqcn, strict_types, false)
+        Self::for_method(
+            params,
+            return_type,
+            self_fqcn,
+            parent_fqcn,
+            static_fqcn,
+            strict_types,
+            false,
+        )
     }
 
     /// Like `for_function` but also sets `inside_constructor`.
@@ -125,9 +136,15 @@ impl Context {
             // Variadic params like `Type ...$name` are accessed as `list<Type>` in the body.
             // If the docblock already provides a list/array collection type, don't double-wrap.
             let ty = if p.is_variadic {
-                let already_collection = elem_ty.types.iter().any(|a| matches!(a,
-                    mir_types::Atomic::TList { .. } | mir_types::Atomic::TNonEmptyList { .. }
-                    | mir_types::Atomic::TArray { .. } | mir_types::Atomic::TNonEmptyArray { .. }));
+                let already_collection = elem_ty.types.iter().any(|a| {
+                    matches!(
+                        a,
+                        mir_types::Atomic::TList { .. }
+                            | mir_types::Atomic::TNonEmptyList { .. }
+                            | mir_types::Atomic::TArray { .. }
+                            | mir_types::Atomic::TNonEmptyArray { .. }
+                    )
+                });
                 if already_collection {
                     elem_ty
                 } else {
@@ -202,11 +219,7 @@ impl Context {
     /// - vars present in both: merged union of types
     /// - vars present in only one branch: marked `possibly_undefined`
     /// - pre-existing vars from before the branch: preserved
-    pub fn merge_branches(
-        pre: &Context,
-        if_ctx: Context,
-        else_ctx: Option<Context>,
-    ) -> Context {
+    pub fn merge_branches(pre: &Context, if_ctx: Context, else_ctx: Option<Context>) -> Context {
         let else_ctx = else_ctx.unwrap_or_else(|| pre.clone());
 
         // If the then-branch always diverges, the code after the if runs only
@@ -233,8 +246,7 @@ impl Context {
         let mut result = pre.clone();
 
         // Collect all variable names from both branch contexts
-        let all_names: HashSet<&String> =
-            if_ctx.vars.keys().chain(else_ctx.vars.keys()).collect();
+        let all_names: HashSet<&String> = if_ctx.vars.keys().chain(else_ctx.vars.keys()).collect();
 
         for name in all_names {
             let in_if = if_ctx.assigned_vars.contains(name);
@@ -285,7 +297,11 @@ impl Context {
         }
 
         // Taint: conservative union — if either branch taints a var, it stays tainted
-        for name in if_ctx.tainted_vars.iter().chain(else_ctx.tainted_vars.iter()) {
+        for name in if_ctx
+            .tainted_vars
+            .iter()
+            .chain(else_ctx.tainted_vars.iter())
+        {
             result.tainted_vars.insert(name.clone());
         }
 

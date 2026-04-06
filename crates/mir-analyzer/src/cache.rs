@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use mir_issues::Issue;
 
@@ -81,7 +81,10 @@ impl AnalysisCache {
         let mut entries = self.entries.lock().unwrap();
         entries.insert(
             file_path.to_string(),
-            CacheEntry { content_hash, issues },
+            CacheEntry {
+                content_hash,
+                issues,
+            },
         );
         *self.dirty.lock().unwrap() = true;
     }

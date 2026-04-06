@@ -1,15 +1,12 @@
+use mir_types::{Atomic, Union};
 /// Convert an AST `TypeHint` node into a `mir_types::Union`.
 use php_ast::ast::{BuiltinType, TypeHint, TypeHintKind};
-use mir_types::{Atomic, Union};
 
 use super::name_to_string;
 
 /// Convert a PHP AST type hint to a mir Union type.
 /// `context_fqcn` is the class where this type hint appears (used for `self`/`parent`).
-pub fn type_from_hint(
-    hint: &TypeHint<'_, '_>,
-    context_fqcn: Option<&str>,
-) -> Union {
+pub fn type_from_hint(hint: &TypeHint<'_, '_>, context_fqcn: Option<&str>) -> Union {
     match &hint.kind {
         TypeHintKind::Nullable(inner) => {
             let mut u = type_from_hint(inner, context_fqcn);

@@ -31,7 +31,10 @@ fn returns_type_env_for_function_scope() {
     });
     assert!(scope.is_some(), "Expected a TypeEnv for function myFn");
     let env = scope.unwrap().1;
-    assert!(env.get_var("greeting").is_some(), "Expected $greeting in TypeEnv");
+    assert!(
+        env.get_var("greeting").is_some(),
+        "Expected $greeting in TypeEnv"
+    );
 }
 
 #[test]
@@ -43,16 +46,19 @@ fn returns_type_env_for_method_scope() {
     });
     assert!(scope.is_some(), "Expected a TypeEnv for method handle");
     let env = scope.unwrap().1;
-    assert!(env.get_var("result").is_some(), "Expected $result in TypeEnv");
+    assert!(
+        env.get_var("result").is_some(),
+        "Expected $result in TypeEnv"
+    );
 }
 
 #[test]
 fn get_var_returns_none_for_unknown_variable() {
     let src = "<?php\nfunction f(): void {\n    $x = 1;\n}\n";
     let result = ProjectAnalyzer::analyze_source(src);
-    let scope = result.type_envs.iter().find(|(k, _)| {
-        matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "f")
-    });
+    let scope = result.type_envs.iter().find(
+        |(k, _)| matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "f"),
+    );
     assert!(scope.is_some(), "Expected a TypeEnv for function f");
     let env = scope.unwrap().1;
     assert!(env.get_var("nonexistent").is_none());
@@ -72,5 +78,5 @@ fn var_names_lists_all_variables_in_scope() {
 fn issue_kind_accessible_via_mir_analyzer() {
     // Verify IssueKind can be used directly from mir_analyzer without importing mir_issues
     let _kind = mir_analyzer::IssueKind::UndefinedVariable { name: "foo".into() };
-    let _sev  = mir_analyzer::Severity::Error;
+    let _sev = mir_analyzer::Severity::Error;
 }

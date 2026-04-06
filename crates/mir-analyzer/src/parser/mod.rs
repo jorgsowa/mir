@@ -94,7 +94,10 @@ pub fn span_to_line_col(src: &str, span: Span) -> (u32, u16) {
 pub fn span_snippet(src: &str, span: Span) -> String {
     let offset = span.start as usize;
     let line_start = src[..offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
-    let line_end = src[offset..].find('\n').map(|p| offset + p).unwrap_or(src.len());
+    let line_end = src[offset..]
+        .find('\n')
+        .map(|p| offset + p)
+        .unwrap_or(src.len());
     src[line_start..line_end].to_string()
 }
 

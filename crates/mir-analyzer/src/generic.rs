@@ -31,9 +31,9 @@ pub fn infer_template_bindings(
     // For any template not bound through arguments, fall back to its bound
     // (or mixed if no bound is declared).
     for tp in template_params {
-        bindings.entry(tp.name.clone()).or_insert_with(|| {
-            tp.bound.clone().unwrap_or_else(Union::mixed)
-        });
+        bindings
+            .entry(tp.name.clone())
+            .or_insert_with(|| tp.bound.clone().unwrap_or_else(Union::mixed));
     }
 
     bindings
@@ -104,9 +104,16 @@ fn infer_from_pair(param_ty: &Union, arg_ty: &Union, bindings: &mut HashMap<Arc<
             }
 
             // ClassName<T> matched against ClassName<t_ty>
-            Atomic::TNamedObject { fqcn: pfqcn, type_params: pp } => {
+            Atomic::TNamedObject {
+                fqcn: pfqcn,
+                type_params: pp,
+            } => {
                 for a_atomic in &arg_ty.types {
-                    if let Atomic::TNamedObject { fqcn: afqcn, type_params: ap } = a_atomic {
+                    if let Atomic::TNamedObject {
+                        fqcn: afqcn,
+                        type_params: ap,
+                    } = a_atomic
+                    {
                         if pfqcn == afqcn {
                             for (p_param, a_param) in pp.iter().zip(ap.iter()) {
                                 infer_from_pair(p_param, a_param, bindings);

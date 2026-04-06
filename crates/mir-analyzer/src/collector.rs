@@ -10,15 +10,14 @@ use php_ast::ast::{
 };
 use php_ast::visitor::Visitor;
 
+use crate::parser::{find_preceding_docblock, name_to_string, span_to_line_col, type_from_hint};
 use mir_codebase::storage::{
-    ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage,
-    InterfaceStorage, Location, MethodStorage, PropertyStorage,
-    TemplateParam, TraitStorage, Visibility,
+    ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage, InterfaceStorage, Location,
+    MethodStorage, PropertyStorage, TemplateParam, TraitStorage, Visibility,
 };
 use mir_codebase::{ClassStorage, Codebase};
 use mir_issues::{Issue, IssueBuffer, Location as IssueLocation};
 use mir_types::Union;
-use crate::parser::{find_preceding_docblock, name_to_string, span_to_line_col, type_from_hint};
 
 // ---------------------------------------------------------------------------
 // DefinitionCollector
@@ -47,17 +46,18 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    pub fn collect<'arena, 'src>(
-        mut self,
-        program: &Program<'arena, 'src>,
-    ) -> Vec<Issue> {
+    pub fn collect<'arena, 'src>(mut self, program: &Program<'arena, 'src>) -> Vec<Issue> {
         self.visit_program(program);
         // For files using simple (non-braced) namespaces or no namespace at all,
         // the import table has not been stored yet — do it now.
         if !self.codebase.file_imports.contains_key(self.file.as_ref()) {
-            self.codebase.file_imports.insert(self.file.clone(), self.use_aliases.clone());
+            self.codebase
+                .file_imports
+                .insert(self.file.clone(), self.use_aliases.clone());
             if let Some(ns) = &self.namespace {
-                self.codebase.file_namespaces.insert(self.file.clone(), ns.clone());
+                self.codebase
+                    .file_namespaces
+                    .insert(self.file.clone(), ns.clone());
             }
         }
         self.issues.into_issues()
@@ -134,7 +134,9 @@ impl<'a> DefinitionCollector<'a> {
     fn resolve_union_inner(&self, union: Union, full_qualify: bool) -> Union {
         use mir_types::Atomic;
         let from_docblock = union.from_docblock;
-        let types: Vec<Atomic> = union.types.into_iter()
+        let types: Vec<Atomic> = union
+            .types
+            .into_iter()
             .map(|a| self.resolve_atomic_inner(a, full_qualify))
             .collect();
         let mut result = mir_types::Union::from_vec(types);
@@ -142,12 +144,19 @@ impl<'a> DefinitionCollector<'a> {
         result
     }
 
-    fn resolve_atomic_inner(&self, atomic: mir_types::Atomic, full_qualify: bool) -> mir_types::Atomic {
+    fn resolve_atomic_inner(
+        &self,
+        atomic: mir_types::Atomic,
+        full_qualify: bool,
+    ) -> mir_types::Atomic {
         use mir_types::Atomic;
         match atomic {
             Atomic::TNamedObject { fqcn, type_params } => {
                 let resolved = self.resolve_type_name(&fqcn, full_qualify);
-                Atomic::TNamedObject { fqcn: resolved, type_params }
+                Atomic::TNamedObject {
+                    fqcn: resolved,
+                    type_params,
+                }
             }
             Atomic::TClassString(Some(cls)) => {
                 let resolved = self.resolve_type_name(&cls, full_qualify);
@@ -180,12 +189,15 @@ impl<'a> DefinitionCollector<'a> {
         result.from_docblock = union.from_docblock;
         for a in union.types {
             let filled = match a {
-                Atomic::TSelf { ref fqcn } if fqcn.is_empty() =>
-                    Atomic::TSelf { fqcn: class_fqcn.into() },
-                Atomic::TStaticObject { ref fqcn } if fqcn.is_empty() =>
-                    Atomic::TStaticObject { fqcn: class_fqcn.into() },
-                Atomic::TParent { ref fqcn } if fqcn.is_empty() =>
-                    Atomic::TParent { fqcn: class_fqcn.into() },
+                Atomic::TSelf { ref fqcn } if fqcn.is_empty() => Atomic::TSelf {
+                    fqcn: class_fqcn.into(),
+                },
+                Atomic::TStaticObject { ref fqcn } if fqcn.is_empty() => Atomic::TStaticObject {
+                    fqcn: class_fqcn.into(),
+                },
+                Atomic::TParent { ref fqcn } if fqcn.is_empty() => Atomic::TParent {
+                    fqcn: class_fqcn.into(),
+                },
                 other => other,
             };
             result.types.push(filled);
@@ -208,14 +220,9 @@ impl<'a> DefinitionCollector<'a> {
         opt.map(|u| self.resolve_union(u))
     }
 
-    fn resolve_union_doc_opt(&self, opt: Option<Union>) -> Option<Union> {
-        opt.map(|u| self.resolve_union_doc(u))
-    }
-
     fn location(&self, start: u32, end: u32) -> Location {
         Location::new(self.file.clone(), start, end)
     }
-
 
     #[allow(dead_code)]
     fn issue_location(&self, start: u32) -> IssueLocation {
@@ -266,15 +273,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         self.use_aliases.clear();
                         self.process_stmts(stmts);
                         // Store the import table for this file so Pass 2 can use it
-                        self.codebase.file_imports.insert(
-                            self.file.clone(),
-                            self.use_aliases.clone(),
-                        );
+                        self.codebase
+                            .file_imports
+                            .insert(self.file.clone(), self.use_aliases.clone());
                         if let Some(ns_name) = &self.namespace {
-                            self.codebase.file_namespaces.insert(
-                                self.file.clone(),
-                                ns_name.clone(),
-                            );
+                            self.codebase
+                                .file_namespaces
+                                .insert(self.file.clone(), ns_name.clone());
                         }
                         self.use_aliases = saved_aliases;
                     }
@@ -287,9 +292,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             StmtKind::Use(use_decl) => {
                 for item in use_decl.uses.iter() {
                     let full_name = name_to_string(&item.name);
-                    let alias = item.alias.unwrap_or_else(|| {
-                        full_name.rsplit('\\').next().unwrap_or(&full_name)
-                    });
+                    let alias = item
+                        .alias
+                        .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
                     self.use_aliases.insert(alias.to_string(), full_name);
                 }
             }
@@ -308,10 +313,15 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
                 let mut params = Vec::new();
                 for p in decl.params.iter() {
-                    let ty = doc.get_param_type(p.name)
+                    let ty = doc
+                        .get_param_type(p.name)
                         .cloned()
                         .map(|u| self.resolve_union_doc(u))
-                        .or_else(|| self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None))));
+                        .or_else(|| {
+                            self.resolve_union_opt(
+                                p.type_hint.as_ref().map(|h| type_from_hint(h, None)),
+                            )
+                        });
                     params.push(FnParam {
                         name: p.name.into(),
                         ty,
@@ -323,18 +333,23 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 }
 
                 let return_type = match (doc.return_type.clone(), decl.return_type.as_ref()) {
-                    (Some(mut ty), _) => { ty.from_docblock = true; Some(self.resolve_union_doc(ty)) }
+                    (Some(mut ty), _) => {
+                        ty.from_docblock = true;
+                        Some(self.resolve_union_doc(ty))
+                    }
                     (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, None))),
                     (None, None) => None,
                 };
 
-                let template_params = doc.templates.iter().map(|(name, bound)| {
-                    TemplateParam {
+                let template_params = doc
+                    .templates
+                    .iter()
+                    .map(|(name, bound)| TemplateParam {
                         name: name.as_str().into(),
                         bound: bound.clone(),
                         defining_entity: fqn.as_str().into(),
-                    }
-                }).collect();
+                    })
+                    .collect();
 
                 let storage = FunctionStorage {
                     fqn: fqn.clone().into(),
@@ -361,9 +376,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 let fqcn = self.resolve_name(&name);
                 let short_name = name;
 
-                let parent = decl.extends.as_ref().map(|n| {
-                    self.resolve_name(&name_to_string(n)).into()
-                });
+                let parent = decl
+                    .extends
+                    .as_ref()
+                    .map(|n| self.resolve_name(&name_to_string(n)).into());
                 let interfaces: Vec<Arc<str>> = decl
                     .implements
                     .iter()
@@ -382,8 +398,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             if m.name == "__construct" {
                                 for p in m.params.iter() {
                                     if p.visibility.is_some() {
-                                        let ty = self.resolve_union_opt(p.type_hint.as_ref()
-                                            .map(|h| type_from_hint(h, Some(&fqcn))));
+                                        let ty = self.resolve_union_opt(
+                                            p.type_hint
+                                                .as_ref()
+                                                .map(|h| type_from_hint(h, Some(&fqcn))),
+                                        );
                                         let prop = PropertyStorage {
                                             name: p.name.into(),
                                             ty,
@@ -392,19 +411,24 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                             is_static: false,
                                             is_readonly: decl.modifiers.is_readonly,
                                             default: p.default.as_ref().map(|_| Union::mixed()),
-                                            location: Some(self.location(member.span.start, member.span.end)),
+                                            location: Some(
+                                                self.location(member.span.start, member.span.end),
+                                            ),
                                         };
                                         own_properties.insert(p.name.into(), prop);
                                     }
                                 }
                             }
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods.insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods
+                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
                         }
                         ClassMemberKind::Property(p) => {
                             let prop = PropertyStorage {
                                 name: p.name.into(),
-                                ty: self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn)))),
+                                ty: self.resolve_union_opt(
+                                    p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
+                                ),
                                 inferred_ty: None,
                                 visibility: Self::convert_visibility(p.visibility),
                                 is_static: p.is_static,
@@ -435,13 +459,15 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     .map(|d| crate::parser::DocblockParser::parse(&d))
                     .unwrap_or_default();
 
-                let template_params: Vec<TemplateParam> = class_doc.templates.iter().map(|(name, bound)| {
-                    TemplateParam {
+                let template_params: Vec<TemplateParam> = class_doc
+                    .templates
+                    .iter()
+                    .map(|(name, bound)| TemplateParam {
                         name: name.as_str().into(),
                         bound: bound.clone(),
                         defining_entity: fqcn.as_str().into(),
-                    }
-                }).collect();
+                    })
+                    .collect();
 
                 let storage = ClassStorage {
                     fqcn: fqcn.clone().into(),
@@ -482,7 +508,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     match &member.kind {
                         ClassMemberKind::Method(m) => {
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods.insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods
+                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
                         }
                         ClassMemberKind::ClassConst(c) => {
                             own_constants.insert(
@@ -490,7 +517,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 ConstantStorage {
                                     name: c.name.into(),
                                     ty: Union::mixed(),
-                                    visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
+                                    visibility: c
+                                        .visibility
+                                        .map(|v| Self::convert_visibility(Some(v))),
                                     location: None,
                                 },
                             );
@@ -528,8 +557,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             if m.name == "__construct" {
                                 for p in m.params.iter() {
                                     if p.visibility.is_some() {
-                                        let ty = self.resolve_union_opt(p.type_hint.as_ref()
-                                            .map(|h| type_from_hint(h, Some(&fqcn))));
+                                        let ty = self.resolve_union_opt(
+                                            p.type_hint
+                                                .as_ref()
+                                                .map(|h| type_from_hint(h, Some(&fqcn))),
+                                        );
                                         let prop = PropertyStorage {
                                             name: p.name.into(),
                                             ty,
@@ -538,21 +570,28 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                             is_static: false,
                                             is_readonly: p.is_readonly,
                                             default: p.default.as_ref().map(|_| Union::mixed()),
-                                            location: Some(self.location(member.span.start, member.span.end)),
+                                            location: Some(
+                                                self.location(member.span.start, member.span.end),
+                                            ),
                                         };
                                         own_properties.insert(p.name.into(), prop);
                                     }
                                 }
                             }
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods.insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods
+                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
                         }
                         ClassMemberKind::Property(p) => {
                             own_properties.insert(
                                 Arc::from(p.name),
                                 PropertyStorage {
                                     name: p.name.into(),
-                                    ty: self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn)))),
+                                    ty: self.resolve_union_opt(
+                                        p.type_hint
+                                            .as_ref()
+                                            .map(|h| type_from_hint(h, Some(&fqcn))),
+                                    ),
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: p.is_static,
@@ -623,7 +662,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         }
                         EnumMemberKind::Method(m) => {
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods.insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods
+                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
                         }
                         EnumMemberKind::ClassConst(c) => {
                             own_constants.insert(
@@ -691,10 +731,17 @@ impl<'a> DefinitionCollector<'a> {
 
         let mut params = Vec::new();
         for p in m.params.iter() {
-            let ty = doc.get_param_type(p.name)
+            let ty = doc
+                .get_param_type(p.name)
                 .cloned()
                 .map(|u| self.resolve_union_doc(u))
-                .or_else(|| self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, Some(class_fqcn)))));
+                .or_else(|| {
+                    self.resolve_union_opt(
+                        p.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint(h, Some(class_fqcn))),
+                    )
+                });
             params.push(FnParam {
                 name: p.name.into(),
                 ty,
@@ -715,13 +762,15 @@ impl<'a> DefinitionCollector<'a> {
             (None, None) => None,
         };
 
-        let template_params: Vec<TemplateParam> = doc.templates.iter().map(|(name, bound)| {
-            TemplateParam {
+        let template_params: Vec<TemplateParam> = doc
+            .templates
+            .iter()
+            .map(|(name, bound)| TemplateParam {
                 name: name.as_str().into(),
                 bound: bound.clone(),
                 defining_entity: class_fqcn.into(),
-            }
-        }).collect();
+            })
+            .collect();
 
         MethodStorage {
             name: m.name.into(),

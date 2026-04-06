@@ -52,9 +52,7 @@ pub fn narrow_from_condition<'arena, 'src>(
         }
 
         // $x === null / $x !== null
-        ExprKind::Binary(b)
-            if b.op == BinaryOp::Identical || b.op == BinaryOp::NotIdentical =>
-        {
+        ExprKind::Binary(b) if b.op == BinaryOp::Identical || b.op == BinaryOp::NotIdentical => {
             let is_identical = b.op == BinaryOp::Identical;
             let effective_true = if is_identical { is_true } else { !is_true };
 
@@ -81,11 +79,11 @@ pub fn narrow_from_condition<'arena, 'src>(
             // `$x === 'literal'`
             else if let ExprKind::String(s) = &b.right.kind {
                 if let Some(name) = extract_var_name(b.left) {
-                    narrow_var_literal_string(ctx, &name, s.as_ref(), effective_true);
+                    narrow_var_literal_string(ctx, &name, s, effective_true);
                 }
             } else if let ExprKind::String(s) = &b.left.kind {
                 if let Some(name) = extract_var_name(b.right) {
-                    narrow_var_literal_string(ctx, &name, s.as_ref(), effective_true);
+                    narrow_var_literal_string(ctx, &name, s, effective_true);
                 }
             }
             // `$x === 42`
@@ -122,16 +120,14 @@ pub fn narrow_from_condition<'arena, 'src>(
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
             // Unwrap `(!$x)` on the left side — treat as negated instanceof
             let (lhs, extra_negation) = match &b.left.kind {
-                ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
-                    (u.operand, true)
-                }
+                ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => (u.operand, true),
                 ExprKind::Parenthesized(inner) => match &inner.kind {
                     ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
                         (u.operand, true)
                     }
-                    _ => (&*b.left, false),
+                    _ => (b.left, false),
                 },
-                _ => (&*b.left, false),
+                _ => (b.left, false),
             };
             let effective_is_true = if extra_negation { !is_true } else { is_true };
             if let Some(var_name) = extract_var_name(lhs) {
@@ -233,11 +229,20 @@ fn narrow_or_instanceof_true<'arena, 'src>(
     ) -> bool {
         match &expr.kind {
             ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-                if let (Some(vn), Some(cn)) = (extract_var_name(b.left), extract_class_name(b.right)) {
+                if let (Some(vn), Some(cn)) =
+                    (extract_var_name(b.left), extract_class_name(b.right))
+                {
                     let resolved = codebase.resolve_class_name(file, &cn);
                     match var_name {
-                        None => { *var_name = Some(vn); class_names.push(resolved); true }
-                        Some(existing) if existing == &vn => { class_names.push(resolved); true }
+                        None => {
+                            *var_name = Some(vn);
+                            class_names.push(resolved);
+                            true
+                        }
+                        Some(existing) if existing == &vn => {
+                            class_names.push(resolved);
+                            true
+                        }
                         _ => false, // different variable — bail out
                     }
                 } else {
@@ -270,7 +275,11 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                     narrowed = Union::merge(&narrowed, &n);
                 }
                 // Fall back to current if narrowed is empty (e.g. mixed)
-                let result = if narrowed.is_empty() { current.clone() } else { narrowed };
+                let result = if narrowed.is_empty() {
+                    current.clone()
+                } else {
+                    narrowed
+                };
                 if !result.is_empty() {
                     ctx.set_var(&vn, result);
                 }
@@ -316,34 +325,85 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
     let current = ctx.get_var(var_name);
     let narrowed = match fn_name.to_lowercase().as_str() {
         "is_string" => {
-            if is_true { current.narrow_to_string() } else { current.filter(|t| !t.is_string()) }
+            if is_true {
+                current.narrow_to_string()
+            } else {
+                current.filter(|t| !t.is_string())
+            }
         }
         "is_int" | "is_integer" | "is_long" => {
-            if is_true { current.narrow_to_int() } else { current.filter(|t| !t.is_int()) }
+            if is_true {
+                current.narrow_to_int()
+            } else {
+                current.filter(|t| !t.is_int())
+            }
         }
         "is_float" | "is_double" | "is_real" => {
-            if is_true { current.narrow_to_float() } else { current.filter(|t| !matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) }
+            if is_true {
+                current.narrow_to_float()
+            } else {
+                current.filter(|t| !matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+            }
         }
         "is_bool" => {
-            if is_true { current.narrow_to_bool() } else { current.filter(|t| !matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse)) }
+            if is_true {
+                current.narrow_to_bool()
+            } else {
+                current.filter(|t| !matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse))
+            }
         }
         "is_null" => {
-            if is_true { current.narrow_to_null() } else { current.remove_null() }
+            if is_true {
+                current.narrow_to_null()
+            } else {
+                current.remove_null()
+            }
         }
         "is_array" => {
-            if is_true { current.narrow_to_array() } else { current.filter(|t| !t.is_array()) }
+            if is_true {
+                current.narrow_to_array()
+            } else {
+                current.filter(|t| !t.is_array())
+            }
         }
         "is_object" => {
-            if is_true { current.narrow_to_object() } else { current.filter(|t| !t.is_object()) }
+            if is_true {
+                current.narrow_to_object()
+            } else {
+                current.filter(|t| !t.is_object())
+            }
         }
         "is_callable" => {
-            if is_true { current.narrow_to_callable() } else { current.filter(|t| !t.is_callable()) }
+            if is_true {
+                current.narrow_to_callable()
+            } else {
+                current.filter(|t| !t.is_callable())
+            }
         }
         "is_numeric" => {
             if is_true {
-                current.filter(|t| matches!(t, Atomic::TInt | Atomic::TFloat | Atomic::TNumeric | Atomic::TNumericString | Atomic::TLiteralInt(_) | Atomic::TMixed))
+                current.filter(|t| {
+                    matches!(
+                        t,
+                        Atomic::TInt
+                            | Atomic::TFloat
+                            | Atomic::TNumeric
+                            | Atomic::TNumericString
+                            | Atomic::TLiteralInt(_)
+                            | Atomic::TMixed
+                    )
+                })
             } else {
-                current.filter(|t| !matches!(t, Atomic::TInt | Atomic::TFloat | Atomic::TNumeric | Atomic::TNumericString | Atomic::TLiteralInt(_)))
+                current.filter(|t| {
+                    !matches!(
+                        t,
+                        Atomic::TInt
+                            | Atomic::TFloat
+                            | Atomic::TNumeric
+                            | Atomic::TNumericString
+                            | Atomic::TLiteralInt(_)
+                    )
+                })
             }
         }
         // method_exists($obj, 'method') — if true, narrow to TObject (suppresses
@@ -409,9 +469,7 @@ fn extract_var_name<'a, 'arena, 'src>(
     }
 }
 
-fn extract_class_name<'arena, 'src>(
-    expr: &php_ast::ast::Expr<'arena, 'src>,
-) -> Option<String> {
+fn extract_class_name<'arena, 'src>(expr: &php_ast::ast::Expr<'arena, 'src>) -> Option<String> {
     match &expr.kind {
         ExprKind::Identifier(name) => Some(name.to_string()),
         ExprKind::Variable(_name) => None, // dynamic class — can't narrow

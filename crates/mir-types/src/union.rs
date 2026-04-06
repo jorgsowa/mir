@@ -176,20 +176,23 @@ impl Union {
         }
         // TTrue / TFalse are subsumed by TBool.
         if matches!(atomic, Atomic::TTrue | Atomic::TFalse)
-            && self.types.iter().any(|t| matches!(t, Atomic::TBool)) {
-                return;
-            }
+            && self.types.iter().any(|t| matches!(t, Atomic::TBool))
+        {
+            return;
+        }
         // Adding TInt widens away all TLiteralInt variants.
         if matches!(atomic, Atomic::TInt) {
             self.types.retain(|t| !matches!(t, Atomic::TLiteralInt(_)));
         }
         // Adding TString widens away all TLiteralString variants.
         if matches!(atomic, Atomic::TString) {
-            self.types.retain(|t| !matches!(t, Atomic::TLiteralString(_)));
+            self.types
+                .retain(|t| !matches!(t, Atomic::TLiteralString(_)));
         }
         // Adding TBool widens away TTrue/TFalse.
         if matches!(atomic, Atomic::TBool) {
-            self.types.retain(|t| !matches!(t, Atomic::TTrue | Atomic::TFalse));
+            self.types
+                .retain(|t| !matches!(t, Atomic::TTrue | Atomic::TFalse));
         }
 
         self.types.push(atomic);
@@ -246,13 +249,12 @@ impl Union {
             type_params: vec![],
         };
         // If any constituent is an object-like type, the result is the specific class.
-        let has_object = self.types.iter().any(|t| matches!(
-            t,
-            Atomic::TObject
-                | Atomic::TNamedObject { .. }
-                | Atomic::TMixed
-                | Atomic::TNull // null fails instanceof, but mixed/object may include null
-        ));
+        let has_object = self.types.iter().any(|t| {
+            matches!(
+                t,
+                Atomic::TObject | Atomic::TNamedObject { .. } | Atomic::TMixed | Atomic::TNull // null fails instanceof, but mixed/object may include null
+            )
+        });
         if has_object || self.is_empty() {
             Union::single(narrowed_ty)
         } else {
@@ -269,17 +271,33 @@ impl Union {
 
     /// Narrow as if `is_int($x)` is true.
     pub fn narrow_to_int(&self) -> Union {
-        self.filter(|t| t.is_int() || matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric))
+        self.filter(|t| {
+            t.is_int() || matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric)
+        })
     }
 
     /// Narrow as if `is_float($x)` is true.
     pub fn narrow_to_float(&self) -> Union {
-        self.filter(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..) | Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric))
+        self.filter(|t| {
+            matches!(
+                t,
+                Atomic::TFloat
+                    | Atomic::TLiteralFloat(..)
+                    | Atomic::TMixed
+                    | Atomic::TScalar
+                    | Atomic::TNumeric
+            )
+        })
     }
 
     /// Narrow as if `is_bool($x)` is true.
     pub fn narrow_to_bool(&self) -> Union {
-        self.filter(|t| matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TMixed | Atomic::TScalar))
+        self.filter(|t| {
+            matches!(
+                t,
+                Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TMixed | Atomic::TScalar
+            )
+        })
     }
 
     /// Narrow as if `is_null($x)` is true.
@@ -336,7 +354,11 @@ impl Union {
             }
         }
         // If nothing matched, fall back to other (conservative)
-        if result.is_empty() { other.clone() } else { result }
+        if result.is_empty() {
+            other.clone()
+        } else {
+            result
+        }
     }
 
     // --- Template substitution ----------------------------------------------
@@ -404,7 +426,9 @@ impl Union {
         if self.is_never() {
             return true; // never <: everything
         }
-        self.types.iter().all(|a| other.types.iter().any(|b| atomic_subtype(a, b)))
+        self.types
+            .iter()
+            .all(|a| other.types.iter().any(|b| atomic_subtype(a, b)))
     }
 
     // --- Utilities ----------------------------------------------------------
@@ -466,7 +490,10 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TLiteralFloat(..), Atomic::TNumeric) => true,
         (Atomic::TLiteralFloat(..), Atomic::TScalar) => true,
 
-        (Atomic::TLiteralString(s), Atomic::TString) => { let _ = s; true },
+        (Atomic::TLiteralString(s), Atomic::TString) => {
+            let _ = s;
+            true
+        }
         (Atomic::TLiteralString(s), Atomic::TNonEmptyString) => !s.is_empty(),
         (Atomic::TLiteralString(_), Atomic::TScalar) => true,
         (Atomic::TNonEmptyString, Atomic::TString) => true,
@@ -558,9 +585,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 && av.is_subtype_of_simple(lv)
         }
         // TList <: TList value covariance
-        (Atomic::TList { value: v1 }, Atomic::TList { value: v2 }) => {
-            v1.is_subtype_of_simple(v2)
-        }
+        (Atomic::TList { value: v1 }, Atomic::TList { value: v2 }) => v1.is_subtype_of_simple(v2),
         (Atomic::TNonEmptyArray { key: k1, value: v1 }, Atomic::TArray { key: k2, value: v2 }) => {
             k1.is_subtype_of_simple(k2) && v1.is_subtype_of_simple(v2)
         }
@@ -574,11 +599,25 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TKeyedArray { .. }, Atomic::TArray { .. }) => true,
 
         // A list-shaped keyed array (is_list=true, all int keys) is a subtype of list<X>.
-        (Atomic::TKeyedArray { properties, is_list, .. }, Atomic::TList { value: lv }) => {
-            *is_list && properties.values().all(|p| p.ty.is_subtype_of_simple(lv))
-        }
-        (Atomic::TKeyedArray { properties, is_list, .. }, Atomic::TNonEmptyList { value: lv }) => {
-            *is_list && !properties.is_empty() && properties.values().all(|p| p.ty.is_subtype_of_simple(lv))
+        (
+            Atomic::TKeyedArray {
+                properties,
+                is_list,
+                ..
+            },
+            Atomic::TList { value: lv },
+        ) => *is_list && properties.values().all(|p| p.ty.is_subtype_of_simple(lv)),
+        (
+            Atomic::TKeyedArray {
+                properties,
+                is_list,
+                ..
+            },
+            Atomic::TNonEmptyList { value: lv },
+        ) => {
+            *is_list
+                && !properties.is_empty()
+                && properties.values().all(|p| p.ty.is_subtype_of_simple(lv))
         }
 
         // A template parameter T acts as a wildcard — any type satisfies it.

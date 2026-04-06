@@ -52,7 +52,6 @@ pub struct KeyedProperty {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Atomic {
     // --- Scalars ---
-
     /// `string`
     TString,
     /// `"hello"` — a specific string literal
@@ -82,7 +81,6 @@ pub enum Atomic {
     /// `3.14` — a specific float literal
     TLiteralFloat(i64, i64), // stored as (int_bits, frac_bits) to be PartialEq+Hash-friendly
     // We use ordered_float or just store as ordered pair for equality purposes.
-
     /// `bool`
     TBool,
     /// `true`
@@ -94,7 +92,6 @@ pub enum Atomic {
     TNull,
 
     // --- Bottom / top ---
-
     /// `void` — return-only; can't be used as a value
     TVoid,
     /// `never` — function that never returns (throws or infinite loop)
@@ -107,7 +104,6 @@ pub enum Atomic {
     TNumeric,
 
     // --- Objects ---
-
     /// `object` — any object
     TObject,
     /// `ClassName` / `ClassName<T1, T2>` — specific named class/interface
@@ -124,7 +120,6 @@ pub enum Atomic {
     TParent { fqcn: Arc<str> },
 
     // --- Callables ---
-
     /// `callable` or `callable(T): R`
     TCallable {
         params: Option<Vec<FnParam>>,
@@ -138,19 +133,12 @@ pub enum Atomic {
     },
 
     // --- Arrays ---
-
     /// `array` or `array<K, V>`
-    TArray {
-        key: Box<Union>,
-        value: Box<Union>,
-    },
+    TArray { key: Box<Union>, value: Box<Union> },
     /// `list<T>` — integer-keyed sequential array (keys 0, 1, 2, …)
     TList { value: Box<Union> },
     /// `non-empty-array<K, V>`
-    TNonEmptyArray {
-        key: Box<Union>,
-        value: Box<Union>,
-    },
+    TNonEmptyArray { key: Box<Union>, value: Box<Union> },
     /// `non-empty-list<T>`
     TNonEmptyList { value: Box<Union> },
     /// `array{key: T, ...}` — shape / keyed array
@@ -163,7 +151,6 @@ pub enum Atomic {
     },
 
     // --- Generics / meta-types ---
-
     /// `T` — a template type parameter
     TTemplateParam {
         name: Arc<str>,
@@ -179,7 +166,6 @@ pub enum Atomic {
     },
 
     // --- Special object strings ---
-
     /// `interface-string`
     TInterfaceString,
     /// `enum-string`
@@ -318,7 +304,10 @@ impl Atomic {
     /// A human-readable name for this type (used in error messages).
     pub fn type_name(&self) -> &'static str {
         match self {
-            Atomic::TString | Atomic::TLiteralString(_) | Atomic::TNonEmptyString | Atomic::TNumericString => "string",
+            Atomic::TString
+            | Atomic::TLiteralString(_)
+            | Atomic::TNonEmptyString
+            | Atomic::TNumericString => "string",
             Atomic::TClassString(_) => "class-string",
             Atomic::TInt | Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => "int",
             Atomic::TPositiveInt => "positive-int",

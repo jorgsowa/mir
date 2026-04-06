@@ -1,7 +1,7 @@
+use mir_types::{Atomic, Union};
 /// Docblock parser — extracts `@param`, `@return`, `@var`, `@template`,
 /// `@extends`, `@implements`, `@throws`, `@psalm-*`, and other annotations.
 use std::sync::Arc;
-use mir_types::{Atomic, Union};
 
 // ---------------------------------------------------------------------------
 // DocblockParser
@@ -28,7 +28,8 @@ impl DocblockParser {
             } else if let Some(rest) = strip_tag(line, "@return") {
                 let ty = parse_type_string(extract_type_token(rest.trim()));
                 result.return_type = Some(ty);
-            } else if let Some(rest) = line.strip_prefix("@var")
+            } else if let Some(rest) = line
+                .strip_prefix("@var")
                 .or_else(|| line.strip_prefix("@psalm-var"))
                 .or_else(|| line.strip_prefix("@phpstan-var"))
             {
@@ -39,10 +40,17 @@ impl DocblockParser {
                 // Extract optional variable name: `@var Type $name`
                 let after_type = rest[type_str.len()..].trim();
                 if after_type.starts_with('$') {
-                    result.var_name = Some(after_type.trim_start_matches('$').split_whitespace().next().unwrap_or("").to_string());
+                    result.var_name = Some(
+                        after_type
+                            .trim_start_matches('$')
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("")
+                            .to_string(),
+                    );
                 }
-            } else if let Some(rest) = strip_tag(line, "@psalm-return")
-                .or_else(|| strip_tag(line, "@phpstan-return"))
+            } else if let Some(rest) =
+                strip_tag(line, "@psalm-return").or_else(|| strip_tag(line, "@phpstan-return"))
             {
                 let ty = parse_type_string(extract_type_token(rest.trim()));
                 result.return_type = Some(ty); // @psalm-return / @phpstan-return overrides @return
@@ -107,14 +115,8 @@ impl DocblockParser {
                 if let Some((ty_str, name)) = parse_param_line(rest) {
                     result.assertions.push((name, parse_type_string(&ty_str)));
                 }
-            } else if line.contains("@psalm-suppress")
-                || line.contains("@phpstan-ignore")
-            {
-                let suppressed = line
-                    .split_whitespace()
-                    .nth(1)
-                    .unwrap_or("")
-                    .to_string();
+            } else if line.contains("@psalm-suppress") || line.contains("@phpstan-ignore") {
+                let suppressed = line.split_whitespace().nth(1).unwrap_or("").to_string();
                 if !suppressed.is_empty() {
                     result.suppressed_issues.push(suppressed);
                 }
@@ -280,12 +282,23 @@ pub fn parse_type_string(s: &str) -> Union {
         "numeric" => Union::single(Atomic::TNumeric),
         "resource" => Union::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
-        "static" => Union::single(Atomic::TStaticObject { fqcn: Arc::from("") }),
-        "self" | "$this" => Union::single(Atomic::TSelf { fqcn: Arc::from("") }),
-        "parent" => Union::single(Atomic::TParent { fqcn: Arc::from("") }),
+        "static" => Union::single(Atomic::TStaticObject {
+            fqcn: Arc::from(""),
+        }),
+        "self" | "$this" => Union::single(Atomic::TSelf {
+            fqcn: Arc::from(""),
+        }),
+        "parent" => Union::single(Atomic::TParent {
+            fqcn: Arc::from(""),
+        }),
 
         // Named class
-        _ if !s.is_empty() && s.chars().next().map(|c| c.is_alphanumeric() || c == '\\' || c == '_').unwrap_or(false) => {
+        _ if !s.is_empty()
+            && s.chars()
+                .next()
+                .map(|c| c.is_alphanumeric() || c == '\\' || c == '_')
+                .unwrap_or(false) =>
+        {
             Union::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(s).into(),
                 type_params: vec![],
@@ -301,9 +314,15 @@ fn parse_generic(name: &str, inner: &str) -> Union {
         "array" => {
             let params = split_generics(inner);
             let (key, value) = if params.len() >= 2 {
-                (parse_type_string(params[0].trim()), parse_type_string(params[1].trim()))
+                (
+                    parse_type_string(params[0].trim()),
+                    parse_type_string(params[1].trim()),
+                )
             } else {
-                (Union::single(Atomic::TInt), parse_type_string(params[0].trim()))
+                (
+                    Union::single(Atomic::TInt),
+                    parse_type_string(params[0].trim()),
+                )
             };
             Union::single(Atomic::TArray {
                 key: Box::new(key),
@@ -325,9 +344,15 @@ fn parse_generic(name: &str, inner: &str) -> Union {
         "non-empty-array" => {
             let params = split_generics(inner);
             let (key, value) = if params.len() >= 2 {
-                (parse_type_string(params[0].trim()), parse_type_string(params[1].trim()))
+                (
+                    parse_type_string(params[0].trim()),
+                    parse_type_string(params[1].trim()),
+                )
             } else {
-                (Union::single(Atomic::TInt), parse_type_string(params[0].trim()))
+                (
+                    Union::single(Atomic::TInt),
+                    parse_type_string(params[0].trim()),
+                )
             };
             Union::single(Atomic::TNonEmptyArray {
                 key: Box::new(key),
@@ -346,9 +371,9 @@ fn parse_generic(name: &str, inner: &str) -> Union {
                 value: Box::new(value),
             })
         }
-        "class-string" => {
-            Union::single(Atomic::TClassString(Some(normalize_fqcn(inner.trim()).into())))
-        }
+        "class-string" => Union::single(Atomic::TClassString(Some(
+            normalize_fqcn(inner.trim()).into(),
+        ))),
         "int" => {
             // int<min, max>
             Union::single(Atomic::TIntRange {
@@ -383,8 +408,7 @@ fn strip_tag<'a>(line: &'a str, tag: &str) -> Option<&'a str> {
             return Some(rest);
         }
         // Allow plural form: "@return" matches "@returns "
-        if rest.starts_with('s') {
-            let after_s = &rest[1..];
+        if let Some(after_s) = rest.strip_prefix('s') {
             if after_s.is_empty() || after_s.starts_with(' ') || after_s.starts_with('\t') {
                 return Some(after_s);
             }
@@ -426,7 +450,11 @@ fn extract_lines(text: &str) -> Vec<String> {
             // Strip trailing `*/` (handles single-line `/** @return int */`)
             let l = l.trim_end_matches("*/").trim();
             let l = l.trim_start_matches("*/").trim();
-            let l = if let Some(stripped) = l.strip_prefix("* ") { stripped } else { l.trim_start_matches('*') };
+            let l = if let Some(stripped) = l.strip_prefix("* ") {
+                stripped
+            } else {
+                l.trim_start_matches('*')
+            };
             l.trim().to_string()
         })
         .collect()
@@ -462,8 +490,14 @@ fn split_union(s: &str) -> Vec<String> {
     let mut current = String::new();
     for ch in s.chars() {
         match ch {
-            '<' | '(' | '{' => { depth += 1; current.push(ch); }
-            '>' | ')' | '}' => { depth -= 1; current.push(ch); }
+            '<' | '(' | '{' => {
+                depth += 1;
+                current.push(ch);
+            }
+            '>' | ')' | '}' => {
+                depth -= 1;
+                current.push(ch);
+            }
             '|' if depth == 0 => {
                 parts.push(current.trim().to_string());
                 current = String::new();
@@ -483,8 +517,14 @@ fn split_generics(s: &str) -> Vec<String> {
     let mut current = String::new();
     for ch in s.chars() {
         match ch {
-            '<' | '(' | '{' => { depth += 1; current.push(ch); }
-            '>' | ')' | '}' => { depth -= 1; current.push(ch); }
+            '<' | '(' | '{' => {
+                depth += 1;
+                current.push(ch);
+            }
+            '>' | ')' | '}' => {
+                depth -= 1;
+                current.push(ch);
+            }
             ',' if depth == 0 => {
                 parts.push(current.trim().to_string());
                 current = String::new();
@@ -561,7 +601,9 @@ mod tests {
     #[test]
     fn parse_named_class() {
         let u = parse_type_string("Foo\\Bar");
-        assert!(u.contains(|t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Foo\\Bar")));
+        assert!(u.contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Foo\\Bar")
+        ));
     }
 
     #[test]

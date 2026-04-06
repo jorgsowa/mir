@@ -4,15 +4,12 @@ use std::sync::Arc;
 
 use rayon::prelude::*;
 
-use crate::cache::{AnalysisCache, hash_content};
+use crate::cache::{hash_content, AnalysisCache};
 use mir_codebase::Codebase;
 use mir_issues::Issue;
 use mir_types::Union;
 
 use crate::collector::DefinitionCollector;
-
-// bring name_to_string and span_to_line_col into scope for the type-hint checker
-use crate::parser::{name_to_string, span_to_line_col};
 
 // ---------------------------------------------------------------------------
 // ProjectAnalyzer
@@ -55,7 +52,10 @@ impl ProjectAnalyzer {
 
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
     pub fn load_stubs(&self) {
-        if !self.stubs_loaded.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        if !self
+            .stubs_loaded
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
             crate::stubs::load_stubs(&self.codebase);
         }
     }
@@ -71,16 +71,11 @@ impl ProjectAnalyzer {
         // ---- Pass 1: read files in parallel ----------------------------------
         let file_data: Vec<(Arc<str>, String)> = paths
             .par_iter()
-            .filter_map(|path| {
-                match std::fs::read_to_string(path) {
-                    Ok(src) => Some((
-                        Arc::from(path.to_string_lossy().as_ref()),
-                        src,
-                    )),
-                    Err(e) => {
-                        eprintln!("Cannot read {}: {}", path.display(), e);
-                        None
-                    }
+            .filter_map(|path| match std::fs::read_to_string(path) {
+                Ok(src) => Some((Arc::from(path.to_string_lossy().as_ref()), src)),
+                Err(e) => {
+                    eprintln!("Cannot read {}: {}", path.display(), e);
+                    None
                 }
             })
             .collect();
@@ -117,7 +112,9 @@ impl ProjectAnalyzer {
         // ---- Class-level checks (M11) ----------------------------------------
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
-        let class_issues = crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set).analyze_all();
+        let class_issues =
+            crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set)
+                .analyze_all();
         all_issues.extend(class_issues);
 
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
@@ -166,7 +163,10 @@ impl ProjectAnalyzer {
         let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&self.codebase).analyze();
         all_issues.extend(dead_code_issues);
 
-        AnalysisResult { issues: all_issues, type_envs: std::collections::HashMap::new() }
+        AnalysisResult {
+            issues: all_issues,
+            type_envs: std::collections::HashMap::new(),
+        }
     }
 
     /// Analyze a PHP source string without a real file path.
@@ -183,8 +183,16 @@ impl ProjectAnalyzer {
         all_issues.extend(collector.collect(&result.program));
         analyzer.codebase.finalize();
         let mut type_envs = std::collections::HashMap::new();
-        all_issues.extend(analyzer.analyze_bodies_typed(&result.program, file.clone(), source, &mut type_envs));
-        AnalysisResult { issues: all_issues, type_envs }
+        all_issues.extend(analyzer.analyze_bodies_typed(
+            &result.program,
+            file.clone(),
+            source,
+            &mut type_envs,
+        ));
+        AnalysisResult {
+            issues: all_issues,
+            type_envs,
+        }
     }
 
     /// Pass 2: walk all function/method bodies in one file, return issues, and
@@ -260,18 +268,19 @@ impl ProjectAnalyzer {
 
         // Resolve function name using the file's namespace (handles namespaced functions)
         let resolved_fn = self.codebase.resolve_class_name(file.as_ref(), fn_name);
-        let func_opt: Option<mir_codebase::storage::FunctionStorage> =
-            self.codebase.functions.get(resolved_fn.as_str())
-                .map(|r| r.clone())
-                .or_else(|| {
-                    self.codebase.functions.get(fn_name)
-                        .map(|r| r.clone())
-                })
-                .or_else(|| {
-                    self.codebase.functions.iter()
-                        .find(|e| e.short_name.as_ref() == fn_name)
-                        .map(|e| e.value().clone())
-                });
+        let func_opt: Option<mir_codebase::storage::FunctionStorage> = self
+            .codebase
+            .functions
+            .get(resolved_fn.as_str())
+            .map(|r| r.clone())
+            .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
+            .or_else(|| {
+                self.codebase
+                    .functions
+                    .iter()
+                    .find(|e| e.short_name.as_ref() == fn_name)
+                    .map(|e| e.value().clone())
+            });
 
         let fqn = func_opt.as_ref().map(|f| f.fqn.clone());
         // Always use the codebase entry when its params match the AST (same count + names).
@@ -279,21 +288,28 @@ impl ProjectAnalyzer {
         // When names differ (two files define the same unnamespaced function), fall back to
         // the AST params so param variables are always in scope for this file's body.
         let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match &func_opt {
-            Some(f) if f.params.len() == decl.params.len()
-                && f.params.iter().zip(decl.params.iter())
-                    .all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
+            Some(f)
+                if f.params.len() == decl.params.len()
+                    && f.params
+                        .iter()
+                        .zip(decl.params.iter())
+                        .all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
             {
                 (f.params.clone(), f.return_type.clone())
             }
             _ => {
-                let ast_params = decl.params.iter().map(|p| mir_codebase::FnParam {
-                    name: Arc::from(p.name),
-                    ty: None,
-                    default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
-                    is_variadic: p.variadic,
-                    is_byref: p.by_ref,
-                    is_optional: p.default.is_some() || p.variadic,
-                }).collect();
+                let ast_params = decl
+                    .params
+                    .iter()
+                    .map(|p| mir_codebase::FnParam {
+                        name: Arc::from(p.name),
+                        ty: None,
+                        default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
+                        is_variadic: p.variadic,
+                        is_byref: p.by_ref,
+                        is_optional: p.default.is_some() || p.variadic,
+                    })
+                    .collect();
                 (ast_params, None)
             }
         };
@@ -333,10 +349,16 @@ impl ProjectAnalyzer {
         // when multiple classes share the same short name across namespaces.
         let resolved = self.codebase.resolve_class_name(file.as_ref(), class_name);
         let fqcn: &str = &resolved;
-        let parent_fqcn = self.codebase.classes.get(fqcn).and_then(|c| c.parent.clone());
+        let parent_fqcn = self
+            .codebase
+            .classes
+            .get(fqcn)
+            .and_then(|c| c.parent.clone());
 
         for member in decl.members.iter() {
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else { continue };
+            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
 
             // Check parameter and return type hints for undefined classes (even abstract methods).
             for param in method.params.iter() {
@@ -391,7 +413,10 @@ impl ProjectAnalyzer {
         program: &php_ast::ast::Program<'arena, 'src>,
         file: Arc<str>,
         source: &str,
-        type_envs: &mut std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        type_envs: &mut std::collections::HashMap<
+            crate::type_env::ScopeId,
+            crate::type_env::TypeEnv,
+        >,
     ) -> Vec<mir_issues::Issue> {
         use php_ast::ast::StmtKind;
         let mut all_issues = Vec::new();
@@ -411,10 +436,22 @@ impl ProjectAnalyzer {
                         for inner in stmts.iter() {
                             match &inner.kind {
                                 StmtKind::Function(decl) => {
-                                    self.analyze_fn_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                                    self.analyze_fn_decl_typed(
+                                        decl,
+                                        &file,
+                                        source,
+                                        &mut all_issues,
+                                        type_envs,
+                                    );
                                 }
                                 StmtKind::Class(decl) => {
-                                    self.analyze_class_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                                    self.analyze_class_decl_typed(
+                                        decl,
+                                        &file,
+                                        source,
+                                        &mut all_issues,
+                                        type_envs,
+                                    );
                                 }
                                 StmtKind::Enum(decl) => {
                                     self.analyze_enum_decl(decl, &file, source, &mut all_issues);
@@ -437,7 +474,10 @@ impl ProjectAnalyzer {
         file: &Arc<str>,
         source: &str,
         all_issues: &mut Vec<mir_issues::Issue>,
-        type_envs: &mut std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        type_envs: &mut std::collections::HashMap<
+            crate::type_env::ScopeId,
+            crate::type_env::TypeEnv,
+        >,
     ) {
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -456,32 +496,44 @@ impl ProjectAnalyzer {
         }
 
         let resolved_fn = self.codebase.resolve_class_name(file.as_ref(), fn_name);
-        let func_opt: Option<mir_codebase::storage::FunctionStorage> =
-            self.codebase.functions.get(resolved_fn.as_str())
-                .map(|r| r.clone())
-                .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
-                .or_else(|| {
-                    self.codebase.functions.iter()
-                        .find(|e| e.short_name.as_ref() == fn_name)
-                        .map(|e| e.value().clone())
-                });
+        let func_opt: Option<mir_codebase::storage::FunctionStorage> = self
+            .codebase
+            .functions
+            .get(resolved_fn.as_str())
+            .map(|r| r.clone())
+            .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
+            .or_else(|| {
+                self.codebase
+                    .functions
+                    .iter()
+                    .find(|e| e.short_name.as_ref() == fn_name)
+                    .map(|e| e.value().clone())
+            });
 
         let fqn = func_opt.as_ref().map(|f| f.fqn.clone());
         let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match &func_opt {
-            Some(f) if f.params.len() == decl.params.len()
-                && f.params.iter().zip(decl.params.iter()).all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
+            Some(f)
+                if f.params.len() == decl.params.len()
+                    && f.params
+                        .iter()
+                        .zip(decl.params.iter())
+                        .all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
             {
                 (f.params.clone(), f.return_type.clone())
             }
             _ => {
-                let ast_params = decl.params.iter().map(|p| mir_codebase::FnParam {
-                    name: Arc::from(p.name),
-                    ty: None,
-                    default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
-                    is_variadic: p.variadic,
-                    is_byref: p.by_ref,
-                    is_optional: p.default.is_some() || p.variadic,
-                }).collect();
+                let ast_params = decl
+                    .params
+                    .iter()
+                    .map(|p| mir_codebase::FnParam {
+                        name: Arc::from(p.name),
+                        ty: None,
+                        default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
+                        is_variadic: p.variadic,
+                        is_byref: p.by_ref,
+                        is_optional: p.default.is_some() || p.variadic,
+                    })
+                    .collect();
                 (ast_params, None)
             }
         };
@@ -496,7 +548,10 @@ impl ProjectAnalyzer {
         // Capture TypeEnv for this scope
         let scope_name = fqn.clone().unwrap_or_else(|| Arc::from(fn_name));
         type_envs.insert(
-            crate::type_env::ScopeId::Function { file: file.clone(), name: scope_name },
+            crate::type_env::ScopeId::Function {
+                file: file.clone(),
+                name: scope_name,
+            },
             crate::type_env::TypeEnv::new(ctx.vars.clone()),
         );
 
@@ -518,7 +573,10 @@ impl ProjectAnalyzer {
         file: &Arc<str>,
         source: &str,
         all_issues: &mut Vec<mir_issues::Issue>,
-        type_envs: &mut std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        type_envs: &mut std::collections::HashMap<
+            crate::type_env::ScopeId,
+            crate::type_env::TypeEnv,
+        >,
     ) {
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -527,10 +585,16 @@ impl ProjectAnalyzer {
         let class_name = decl.name.unwrap_or("<anonymous>");
         let resolved = self.codebase.resolve_class_name(file.as_ref(), class_name);
         let fqcn: &str = &resolved;
-        let parent_fqcn = self.codebase.classes.get(fqcn).and_then(|c| c.parent.clone());
+        let parent_fqcn = self
+            .codebase
+            .classes
+            .get(fqcn)
+            .and_then(|c| c.parent.clone());
 
         for member in decl.members.iter() {
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else { continue };
+            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
@@ -628,7 +692,9 @@ impl ProjectAnalyzer {
     ) {
         use php_ast::ast::EnumMemberKind;
         for member in decl.members.iter() {
-            let EnumMemberKind::Method(method) = &member.kind else { continue };
+            let EnumMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
                     check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
@@ -642,7 +708,9 @@ impl ProjectAnalyzer {
 }
 
 impl Default for ProjectAnalyzer {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -697,8 +765,18 @@ fn check_type_hint_classes<'arena, 'src>(
 fn is_pseudo_type(name: &str) -> bool {
     matches!(
         name.to_lowercase().as_str(),
-        "self" | "static" | "parent" | "null" | "true" | "false" | "never"
-            | "void" | "mixed" | "object" | "callable" | "iterable"
+        "self"
+            | "static"
+            | "parent"
+            | "null"
+            | "true"
+            | "false"
+            | "never"
+            | "void"
+            | "mixed"
+            | "object"
+            | "callable"
+            | "iterable"
     )
 }
 
@@ -724,8 +802,15 @@ fn emit_unused_params(
         }
         if !ctx.read_vars.contains(name) {
             issues.push(mir_issues::Issue::new(
-                mir_issues::IssueKind::UnusedParam { name: name.to_string() },
-                mir_issues::Location { file: file.clone(), line: 1, col_start: 0, col_end: 0 },
+                mir_issues::IssueKind::UnusedParam {
+                    name: name.to_string(),
+                },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line: 1,
+                    col_start: 0,
+                    col_end: 0,
+                },
             ));
         }
     }
@@ -753,7 +838,12 @@ fn emit_unused_variables(
         if !ctx.read_vars.contains(name) {
             issues.push(mir_issues::Issue::new(
                 mir_issues::IssueKind::UnusedVariable { name: name.clone() },
-                mir_issues::Location { file: file.clone(), line: 1, col_start: 0, col_end: 0 },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line: 1,
+                    col_start: 0,
+                    col_end: 0,
+                },
             ));
         }
     }
@@ -765,7 +855,9 @@ pub fn merge_return_types(return_types: &[Union]) -> Union {
     if return_types.is_empty() {
         return Union::single(mir_types::Atomic::TVoid);
     }
-    return_types.iter().fold(Union::empty(), |acc, t| Union::merge(&acc, t))
+    return_types
+        .iter()
+        .fold(Union::empty(), |acc, t| Union::merge(&acc, t))
 }
 
 fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -778,7 +870,10 @@ fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
             let path = entry.path();
             if path.is_dir() {
                 let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if matches!(name, "vendor" | ".git" | "node_modules" | ".cache" | ".pnpm-store") {
+                if matches!(
+                    name,
+                    "vendor" | ".git" | "node_modules" | ".cache" | ".pnpm-store"
+                ) {
                     continue;
                 }
                 collect_php_files(&path, out);
