@@ -4,4 +4,4 @@ function f(string $x): void {
     if (is_string($x)) {}
 }
 ===expect===
-RedundantCondition at 3:8
+RedundantCondition: is_string($x)

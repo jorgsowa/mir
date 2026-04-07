@@ -186,18 +186,24 @@ impl<'a> StatementsAnalyzer<'a> {
                         {
                             let (line, col) =
                                 crate::parser::span_to_line_col(self.source, stmt.span);
-                            self.issues.add(mir_issues::Issue::new(
-                                IssueKind::InvalidReturnType {
-                                    expected: format!("{}", declared),
-                                    actual: format!("{}", ret_ty),
-                                },
-                                mir_issues::Location {
-                                    file: self.file.clone(),
-                                    line,
-                                    col_start: col,
-                                    col_end: col,
-                                },
-                            ));
+                            self.issues.add(
+                                mir_issues::Issue::new(
+                                    IssueKind::InvalidReturnType {
+                                        expected: format!("{}", declared),
+                                        actual: format!("{}", ret_ty),
+                                    },
+                                    mir_issues::Location {
+                                        file: self.file.clone(),
+                                        line,
+                                        col_start: col,
+                                        col_end: col,
+                                    },
+                                )
+                                .with_snippet(
+                                    crate::parser::span_text(self.source, stmt.span)
+                                        .unwrap_or_default(),
+                                ),
+                            );
                         }
                     }
                     self.return_types.push(ret_ty);
@@ -208,18 +214,24 @@ impl<'a> StatementsAnalyzer<'a> {
                         if !declared.is_void() && !declared.is_mixed() {
                             let (line, col) =
                                 crate::parser::span_to_line_col(self.source, stmt.span);
-                            self.issues.add(mir_issues::Issue::new(
-                                IssueKind::InvalidReturnType {
-                                    expected: format!("{}", declared),
-                                    actual: "void".to_string(),
-                                },
-                                mir_issues::Location {
-                                    file: self.file.clone(),
-                                    line,
-                                    col_start: col,
-                                    col_end: col,
-                                },
-                            ));
+                            self.issues.add(
+                                mir_issues::Issue::new(
+                                    IssueKind::InvalidReturnType {
+                                        expected: format!("{}", declared),
+                                        actual: "void".to_string(),
+                                    },
+                                    mir_issues::Location {
+                                        file: self.file.clone(),
+                                        line,
+                                        col_start: col,
+                                        col_end: col,
+                                    },
+                                )
+                                .with_snippet(
+                                    crate::parser::span_text(self.source, stmt.span)
+                                        .unwrap_or_default(),
+                                ),
+                            );
                         }
                     }
                 }
@@ -381,17 +393,23 @@ impl<'a> StatementsAnalyzer<'a> {
                 if !pre_diverges && (then_ctx.diverges || else_ctx.diverges) {
                     let (line, col) =
                         crate::parser::span_to_line_col(self.source, if_stmt.condition.span);
-                    self.issues.add(mir_issues::Issue::new(
-                        IssueKind::RedundantCondition {
-                            ty: format!("{}", cond_type),
-                        },
-                        mir_issues::Location {
-                            file: self.file.clone(),
-                            line,
-                            col_start: col,
-                            col_end: col,
-                        },
-                    ));
+                    self.issues.add(
+                        mir_issues::Issue::new(
+                            IssueKind::RedundantCondition {
+                                ty: format!("{}", cond_type),
+                            },
+                            mir_issues::Location {
+                                file: self.file.clone(),
+                                line,
+                                col_start: col,
+                                col_end: col,
+                            },
+                        )
+                        .with_snippet(
+                            crate::parser::span_text(self.source, if_stmt.condition.span)
+                                .unwrap_or_default(),
+                        ),
+                    );
                 }
 
                 // Merge all branches

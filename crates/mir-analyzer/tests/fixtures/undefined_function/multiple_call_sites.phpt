@@ -5,5 +5,5 @@ function test(): void {
     foo();
 }
 ===expect===
-UndefinedFunction at 3:4
-UndefinedFunction at 4:4
+UndefinedFunction: foo()
+UndefinedFunction: foo()

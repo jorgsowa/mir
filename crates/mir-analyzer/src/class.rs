@@ -274,17 +274,20 @@ impl<'a> ClassAnalyzer<'a> {
                     && !child_ret.is_mixed()
                     && !self.return_type_has_template(parent_ret)
                 {
-                    issues.push(Issue::new(
-                        IssueKind::MethodSignatureMismatch {
-                            class: fqcn.to_string(),
-                            method: method_name.to_string(),
-                            detail: format!(
-                                "return type '{}' is not a subtype of parent '{}'",
-                                child_ret, parent_ret
-                            ),
-                        },
-                        loc.clone(),
-                    ));
+                    issues.push(
+                        Issue::new(
+                            IssueKind::MethodSignatureMismatch {
+                                class: fqcn.to_string(),
+                                method: method_name.to_string(),
+                                detail: format!(
+                                    "return type '{}' is not a subtype of parent '{}'",
+                                    child_ret, parent_ret
+                                ),
+                            },
+                            loc.clone(),
+                        )
+                        .with_snippet(method_name.to_string()),
+                    );
                 }
             }
 
@@ -301,17 +304,20 @@ impl<'a> ClassAnalyzer<'a> {
                 .count();
 
             if child_required > parent_required {
-                issues.push(Issue::new(
-                    IssueKind::MethodSignatureMismatch {
-                        class: fqcn.to_string(),
-                        method: method_name.to_string(),
-                        detail: format!(
-                            "overriding method requires {} argument(s) but parent requires {}",
-                            child_required, parent_required
-                        ),
-                    },
-                    loc.clone(),
-                ));
+                issues.push(
+                    Issue::new(
+                        IssueKind::MethodSignatureMismatch {
+                            class: fqcn.to_string(),
+                            method: method_name.to_string(),
+                            detail: format!(
+                                "overriding method requires {} argument(s) but parent requires {}",
+                                child_required, parent_required
+                            ),
+                        },
+                        loc.clone(),
+                    )
+                    .with_snippet(method_name.to_string()),
+                );
             }
 
             // ---- e. Param types must not be narrowed (contravariance) --------
@@ -349,17 +355,20 @@ impl<'a> ClassAnalyzer<'a> {
                 // Contravariance: parent_ty must be subtype of child_ty.
                 // If not, child has narrowed the param type.
                 if !parent_ty.is_subtype_of_simple(child_ty) {
-                    issues.push(Issue::new(
-                        IssueKind::MethodSignatureMismatch {
-                            class: fqcn.to_string(),
-                            method: method_name.to_string(),
-                            detail: format!(
-                                "parameter ${} type '{}' is narrower than parent type '{}'",
-                                child_param.name, child_ty, parent_ty
-                            ),
-                        },
-                        loc.clone(),
-                    ));
+                    issues.push(
+                        Issue::new(
+                            IssueKind::MethodSignatureMismatch {
+                                class: fqcn.to_string(),
+                                method: method_name.to_string(),
+                                detail: format!(
+                                    "parameter ${} type '{}' is narrower than parent type '{}'",
+                                    child_param.name, child_ty, parent_ty
+                                ),
+                            },
+                            loc.clone(),
+                        )
+                        .with_snippet(method_name.to_string()),
+                    );
                     break; // one issue per method is enough
                 }
             }

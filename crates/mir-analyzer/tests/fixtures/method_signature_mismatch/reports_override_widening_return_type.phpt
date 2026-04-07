@@ -7,4 +7,4 @@ class Child extends Base {
     public function f(): int|string { return 1; }
 }
 ===expect===
-MethodSignatureMismatch at 1:0
+MethodSignatureMismatch: f

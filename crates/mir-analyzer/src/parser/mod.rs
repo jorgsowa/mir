@@ -90,6 +90,18 @@ pub fn span_to_line_col(src: &str, span: Span) -> (u32, u16) {
     (line, col)
 }
 
+/// Extract the exact source text covered by a span.
+pub fn span_text(src: &str, span: Span) -> Option<String> {
+    if span.start >= span.end {
+        return None;
+    }
+    let s = span.start as usize;
+    let e = (span.end as usize).min(src.len());
+    src.get(s..e)
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+}
+
 /// Extract the source line containing a span.
 pub fn span_snippet(src: &str, span: Span) -> String {
     let offset = span.start as usize;
