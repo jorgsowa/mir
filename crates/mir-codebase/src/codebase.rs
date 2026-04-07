@@ -69,6 +69,42 @@ impl Codebase {
     }
 
     // -----------------------------------------------------------------------
+    // Incremental: remove all definitions from a single file
+    // -----------------------------------------------------------------------
+
+    /// Remove all definitions that were defined in the given file.
+    /// This clears classes, interfaces, traits, enums, functions, and constants
+    /// whose defining file matches `file_path`, as well as the file's import
+    /// and namespace entries. After calling this, `invalidate_finalization()`
+    /// is called so the next `finalize()` rebuilds inheritance.
+    pub fn remove_file_definitions(&self, file_path: &str) {
+        // Collect all symbols defined in this file
+        let symbols: Vec<Arc<str>> = self
+            .symbol_to_file
+            .iter()
+            .filter(|entry| entry.value().as_ref() == file_path)
+            .map(|entry| entry.key().clone())
+            .collect();
+
+        // Remove each symbol from its respective map and from symbol_to_file
+        for sym in &symbols {
+            self.classes.remove(sym.as_ref());
+            self.interfaces.remove(sym.as_ref());
+            self.traits.remove(sym.as_ref());
+            self.enums.remove(sym.as_ref());
+            self.functions.remove(sym.as_ref());
+            self.constants.remove(sym.as_ref());
+            self.symbol_to_file.remove(sym.as_ref());
+        }
+
+        // Remove file-level metadata
+        self.file_imports.remove(file_path);
+        self.file_namespaces.remove(file_path);
+
+        self.invalidate_finalization();
+    }
+
+    // -----------------------------------------------------------------------
     // Lookups
     // -----------------------------------------------------------------------
 
