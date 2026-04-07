@@ -526,7 +526,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     visibility: c
                                         .visibility
                                         .map(|v| Self::convert_visibility(Some(v))),
-                                    location: None,
+                                    location: Some(
+                                        self.location(member.span.start, member.span.end),
+                                    ),
                                 },
                             );
                         }
@@ -606,7 +608,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     is_static: p.is_static,
                                     is_readonly: p.is_readonly,
                                     default: None,
-                                    location: None,
+                                    location: Some(
+                                        self.location(member.span.start, member.span.end),
+                                    ),
                                 },
                             );
                         }
@@ -617,7 +621,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     name: c.name.into(),
                                     ty: Union::mixed(),
                                     visibility: None,
-                                    location: None,
+                                    location: Some(
+                                        self.location(member.span.start, member.span.end),
+                                    ),
                                 },
                             );
                         }
@@ -668,7 +674,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 EnumCaseStorage {
                                     name: c.name.into(),
                                     value: c.value.as_ref().map(|_| Union::mixed()),
-                                    location: None,
+                                    location: Some(
+                                        self.location(member.span.start, member.span.end),
+                                    ),
                                 },
                             );
                         }
@@ -684,7 +692,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     name: c.name.into(),
                                     ty: Union::mixed(),
                                     visibility: None,
-                                    location: None,
+                                    location: Some(
+                                        self.location(member.span.start, member.span.end),
+                                    ),
                                 },
                             );
                         }
