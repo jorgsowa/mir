@@ -256,6 +256,21 @@ impl Codebase {
         self.classes.get(fqcn).is_some_and(|c| c.is_abstract)
     }
 
+    /// Return the declared template params for `fqcn` (class or interface), or
+    /// an empty vec if the type is not found or has no templates.
+    pub fn get_class_template_params(&self, fqcn: &str) -> Vec<crate::storage::TemplateParam> {
+        if let Some(cls) = self.classes.get(fqcn) {
+            return cls.template_params.clone();
+        }
+        if let Some(iface) = self.interfaces.get(fqcn) {
+            return iface.template_params.clone();
+        }
+        if let Some(tr) = self.traits.get(fqcn) {
+            return tr.template_params.clone();
+        }
+        vec![]
+    }
+
     /// Returns true if the class (or any ancestor/trait) defines a `__get` magic method.
     /// Such classes allow arbitrary property access, suppressing UndefinedProperty.
     pub fn has_magic_get(&self, fqcn: &str) -> bool {

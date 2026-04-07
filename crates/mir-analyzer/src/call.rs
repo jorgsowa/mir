@@ -11,7 +11,7 @@ use mir_types::{Atomic, Union};
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
-use crate::generic::{check_template_bounds, infer_template_bindings};
+use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
 use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 
 // ---------------------------------------------------------------------------
@@ -290,10 +290,10 @@ impl CallAnalyzer {
 
         for atomic in &receiver.types {
             match atomic {
-                Atomic::TNamedObject { fqcn, .. }
-                | Atomic::TSelf { fqcn }
-                | Atomic::TStaticObject { fqcn }
-                | Atomic::TParent { fqcn } => {
+                Atomic::TNamedObject {
+                    fqcn,
+                    type_params: receiver_type_params,
+                } => {
                     // Resolve short names to FQCN — docblock types may not be fully qualified.
                     let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
@@ -339,12 +339,30 @@ impl CallAnalyzer {
                             .unwrap_or_else(Union::mixed);
                         // Bind `static` return type to the actual receiver class (LSB).
                         let ret_raw = substitute_static_in_return(ret_raw, fqcn);
-                        let ret = if !method.template_params.is_empty() {
-                            let bindings = infer_template_bindings(
+
+                        // Build class-level bindings from receiver's concrete type params (e.g. Collection<User> → T=User)
+                        let class_tps = ea.codebase.get_class_template_params(fqcn);
+                        let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
+
+                        // Extend with method-level bindings; warn on name collision (method shadows class template)
+                        if !method.template_params.is_empty() {
+                            let method_bindings = infer_template_bindings(
                                 &method.template_params,
                                 &method.params,
                                 &arg_types,
                             );
+                            for key in method_bindings.keys() {
+                                if bindings.contains_key(key) {
+                                    ea.emit(
+                                        IssueKind::ShadowedTemplateParam {
+                                            name: key.to_string(),
+                                        },
+                                        Severity::Info,
+                                        span,
+                                    );
+                                }
+                            }
+                            bindings.extend(method_bindings);
                             for (name, inferred, bound) in
                                 check_template_bounds(&bindings, &method.template_params)
                             {
@@ -358,6 +376,134 @@ impl CallAnalyzer {
                                     span,
                                 );
                             }
+                        }
+
+                        let ret = if !bindings.is_empty() {
+                            ret_raw.substitute_templates(&bindings)
+                        } else {
+                            ret_raw
+                        };
+                        result = Union::merge(&result, &ret);
+                    } else if ea.codebase.type_exists(fqcn)
+                        && !ea.codebase.has_unknown_ancestor(fqcn)
+                    {
+                        // Class is known AND has no unscanned ancestors → genuine UndefinedMethod.
+                        // If the class has an external/unscanned parent (e.g. a PHPUnit TestCase),
+                        // the method might be inherited from that parent; skip to avoid false positives.
+                        // Classes with __call handle any method dynamically — suppress.
+                        // Interface types: method may exist on the concrete implementation — suppress
+                        // (UndefinedInterfaceMethod is not emitted at default error level).
+                        let is_interface = ea.codebase.interfaces.contains_key(fqcn.as_ref());
+                        let is_abstract = ea.codebase.is_abstract_class(fqcn.as_ref());
+                        if is_interface
+                            || is_abstract
+                            || ea.codebase.get_method(fqcn, "__call").is_some()
+                        {
+                            result = Union::merge(&result, &Union::mixed());
+                        } else {
+                            ea.emit(
+                                IssueKind::UndefinedMethod {
+                                    class: fqcn.to_string(),
+                                    method: method_name.clone(),
+                                },
+                                Severity::Error,
+                                span,
+                            );
+                            result = Union::merge(&result, &Union::mixed());
+                        }
+                    } else {
+                        result = Union::merge(&result, &Union::mixed());
+                    }
+                }
+                Atomic::TSelf { fqcn }
+                | Atomic::TStaticObject { fqcn }
+                | Atomic::TParent { fqcn } => {
+                    let receiver_type_params: &[mir_types::Union] = &[];
+                    // Resolve short names to FQCN — docblock types may not be fully qualified.
+                    let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
+                    let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
+                    if let Some(method) = ea.codebase.get_method(fqcn, &method_name) {
+                        // Record reference for dead-code detection (M18)
+                        ea.codebase.mark_method_referenced(fqcn, &method_name);
+                        // Emit DeprecatedMethodCall if the method is marked @deprecated
+                        if method.is_deprecated {
+                            ea.emit(
+                                IssueKind::DeprecatedMethodCall {
+                                    class: fqcn.to_string(),
+                                    method: method_name.clone(),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
+                        // Visibility check (simplified — only checks private from outside)
+                        check_method_visibility(ea, &method, ctx, span);
+
+                        // Arg type check
+                        let arg_names: Vec<Option<String>> = call
+                            .args
+                            .iter()
+                            .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                            .collect();
+                        check_args(
+                            ea,
+                            CheckArgsParams {
+                                fn_name: &method_name,
+                                params: &method.params,
+                                arg_types: &arg_types,
+                                arg_spans: &arg_spans,
+                                arg_names: &arg_names,
+                                call_span: span,
+                                has_spread: call.args.iter().any(|a| a.unpack),
+                            },
+                        );
+
+                        let ret_raw = method
+                            .effective_return_type()
+                            .cloned()
+                            .unwrap_or_else(Union::mixed);
+                        // Bind `static` return type to the actual receiver class (LSB).
+                        let ret_raw = substitute_static_in_return(ret_raw, fqcn);
+
+                        // Build class-level bindings from receiver's concrete type params (e.g. Collection<User> → T=User)
+                        let class_tps = ea.codebase.get_class_template_params(fqcn);
+                        let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
+
+                        // Extend with method-level bindings; warn on name collision (method shadows class template)
+                        if !method.template_params.is_empty() {
+                            let method_bindings = infer_template_bindings(
+                                &method.template_params,
+                                &method.params,
+                                &arg_types,
+                            );
+                            for key in method_bindings.keys() {
+                                if bindings.contains_key(key) {
+                                    ea.emit(
+                                        IssueKind::ShadowedTemplateParam {
+                                            name: key.to_string(),
+                                        },
+                                        Severity::Info,
+                                        span,
+                                    );
+                                }
+                            }
+                            bindings.extend(method_bindings);
+                            for (name, inferred, bound) in
+                                check_template_bounds(&bindings, &method.template_params)
+                            {
+                                ea.emit(
+                                    IssueKind::InvalidTemplateParam {
+                                        name: name.to_string(),
+                                        expected_bound: format!("{}", bound),
+                                        actual: format!("{}", inferred),
+                                    },
+                                    Severity::Error,
+                                    span,
+                                );
+                            }
+                        }
+
+                        let ret = if !bindings.is_empty() {
                             ret_raw.substitute_templates(&bindings)
                         } else {
                             ret_raw
