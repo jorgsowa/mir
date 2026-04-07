@@ -12,6 +12,7 @@ use mir_types::{Atomic, Union};
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
 use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
+use crate::symbol::SymbolKind;
 use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 
 // ---------------------------------------------------------------------------
@@ -203,6 +204,11 @@ impl CallAnalyzer {
                 return_ty_raw
             };
 
+            ea.record_symbol(
+                span,
+                SymbolKind::FunctionCall(func.fqn.clone()),
+                return_ty.clone(),
+            );
             return return_ty;
         }
 
@@ -559,11 +565,26 @@ impl CallAnalyzer {
             result.add_type(Atomic::TNull);
         }
 
-        if result.is_empty() {
+        let final_ty = if result.is_empty() {
             Union::mixed()
         } else {
             result
+        };
+        // Record method call symbol using the first named object in the receiver
+        for atomic in &obj_ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                ea.record_symbol(
+                    span,
+                    SymbolKind::MethodCall {
+                        class: fqcn.clone(),
+                        method: Arc::from(method_name.as_str()),
+                    },
+                    final_ty.clone(),
+                );
+                break;
+            }
         }
+        final_ty
     }
 
     // -----------------------------------------------------------------------
@@ -634,7 +655,16 @@ impl CallAnalyzer {
                 .cloned()
                 .unwrap_or_else(Union::mixed);
             let fqcn_arc: std::sync::Arc<str> = Arc::from(fqcn.as_str());
-            substitute_static_in_return(ret_raw, &fqcn_arc)
+            let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
+            ea.record_symbol(
+                span,
+                SymbolKind::StaticCall {
+                    class: fqcn_arc,
+                    method: Arc::from(method_name),
+                },
+                ret.clone(),
+            );
+            ret
         } else if ea.codebase.type_exists(&fqcn) && !ea.codebase.has_unknown_ancestor(&fqcn) {
             // Class is known AND has no unscanned ancestors → genuine UndefinedMethod.
             // Classes with __call handle any method dynamically — suppress.
