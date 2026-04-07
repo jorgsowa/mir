@@ -18,8 +18,10 @@ pub use parser::{DocblockParser, ParsedDocblock};
 pub use project::{AnalysisResult, ProjectAnalyzer};
 pub use stubs::is_builtin_function;
 
+pub mod symbol;
 pub mod type_env;
 pub use mir_issues::{Issue, IssueKind, Location, Severity};
+pub use symbol::{ResolvedSymbol, SymbolKind};
 pub use type_env::{ScopeId, TypeEnv};
 
 pub mod composer;

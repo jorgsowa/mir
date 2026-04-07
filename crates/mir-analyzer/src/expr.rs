@@ -11,6 +11,7 @@ use mir_types::{Atomic, Union};
 
 use crate::call::CallAnalyzer;
 use crate::context::Context;
+use crate::symbol::{ResolvedSymbol, SymbolKind};
 
 // ---------------------------------------------------------------------------
 // ExpressionAnalyzer
@@ -21,6 +22,7 @@ pub struct ExpressionAnalyzer<'a> {
     pub file: Arc<str>,
     pub source: &'a str,
     pub issues: &'a mut IssueBuffer,
+    pub symbols: &'a mut Vec<ResolvedSymbol>,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -29,13 +31,24 @@ impl<'a> ExpressionAnalyzer<'a> {
         file: Arc<str>,
         source: &'a str,
         issues: &'a mut IssueBuffer,
+        symbols: &'a mut Vec<ResolvedSymbol>,
     ) -> Self {
         Self {
             codebase,
             file,
             source,
             issues,
+            symbols,
         }
+    }
+
+    /// Record a resolved symbol.
+    pub fn record_symbol(&mut self, span: php_ast::Span, kind: SymbolKind, resolved_type: Union) {
+        self.symbols.push(ResolvedSymbol {
+            span,
+            kind,
+            resolved_type,
+        });
     }
 
     pub fn analyze<'arena, 'src>(
@@ -92,7 +105,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 ctx.read_vars.insert(name_str.to_string());
-                ctx.get_var(name_str)
+                let ty = ctx.get_var(name_str);
+                self.record_symbol(
+                    expr.span,
+                    SymbolKind::Variable(name_str.to_string()),
+                    ty.clone(),
+                );
+                ty
             }
 
             ExprKind::VariableVariable(_) => Union::mixed(), // $$x — unknowable
@@ -523,10 +542,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             }
                         }
-                        Union::single(Atomic::TNamedObject {
-                            fqcn,
+                        let ty = Union::single(Atomic::TNamedObject {
+                            fqcn: fqcn.clone(),
                             type_params: vec![],
-                        })
+                        });
+                        self.record_symbol(
+                            n.class.span,
+                            SymbolKind::ClassReference(fqcn),
+                            ty.clone(),
+                        );
+                        ty
                     }
                     ExprKind::Variable(_) => Union::single(Atomic::TObject),
                     _ => Union::single(Atomic::TObject),
@@ -566,7 +591,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if prop_name == "<dynamic>" {
                     return Union::mixed();
                 }
-                self.resolve_property_type(&obj_ty, &prop_name, expr.span)
+                let resolved = self.resolve_property_type(&obj_ty, &prop_name, expr.span);
+                // Record property access symbol for each named object in the receiver type
+                for atomic in &obj_ty.types {
+                    if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                        self.record_symbol(
+                            expr.span,
+                            SymbolKind::PropertyAccess {
+                                class: fqcn.clone(),
+                                property: Arc::from(prop_name.as_str()),
+                            },
+                            resolved.clone(),
+                        );
+                        break;
+                    }
+                }
+                resolved
             }
 
             ExprKind::NullsafePropertyAccess(pa) => {
@@ -664,6 +704,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.file.clone(),
                         self.source,
                         self.issues,
+                        self.symbols,
                     );
                     sa.analyze_stmts(&c.body, &mut closure_ctx);
                     let ret = crate::project::merge_return_types(&sa.return_types);

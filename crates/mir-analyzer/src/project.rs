@@ -183,36 +183,39 @@ impl ProjectAnalyzer {
         // rayon closure so there is no cross-thread borrow.
         // When a cache is present, files whose content hash matches a stored
         // entry skip re-analysis entirely (M17).
-        let pass2_results: Vec<Vec<Issue>> = file_data
+        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
             .par_iter()
             .map(|(file, src)| {
                 // Cache lookup
-                let issues = if let Some(cache) = &self.cache {
+                let result = if let Some(cache) = &self.cache {
                     let h = hash_content(src);
                     if let Some(cached) = cache.get(file, &h) {
-                        cached
+                        (cached, Vec::new())
                     } else {
                         // Miss — analyze and store
                         let arena = bumpalo::Bump::new();
-                        let result = php_rs_parser::parse(&arena, src);
-                        let issues = self.analyze_bodies(&result.program, file.clone(), src);
+                        let parsed = php_rs_parser::parse(&arena, src);
+                        let (issues, symbols) =
+                            self.analyze_bodies(&parsed.program, file.clone(), src);
                         cache.put(file, h, issues.clone());
-                        issues
+                        (issues, symbols)
                     }
                 } else {
                     let arena = bumpalo::Bump::new();
-                    let result = php_rs_parser::parse(&arena, src);
-                    self.analyze_bodies(&result.program, file.clone(), src)
+                    let parsed = php_rs_parser::parse(&arena, src);
+                    self.analyze_bodies(&parsed.program, file.clone(), src)
                 };
                 if let Some(cb) = &self.on_file_done {
                     cb();
                 }
-                issues
+                result
             })
             .collect();
 
-        for issues in pass2_results {
+        let mut all_symbols = Vec::new();
+        for (issues, symbols) in pass2_results {
             all_issues.extend(issues);
+            all_symbols.extend(symbols);
         }
 
         // Persist cache hits/misses to disk
@@ -230,6 +233,7 @@ impl ProjectAnalyzer {
         AnalysisResult {
             issues: all_issues,
             type_envs: std::collections::HashMap::new(),
+            symbols: all_symbols,
         }
     }
 
@@ -321,15 +325,18 @@ impl ProjectAnalyzer {
         all_issues.extend(collector.collect(&result.program));
         analyzer.codebase.finalize();
         let mut type_envs = std::collections::HashMap::new();
+        let mut all_symbols = Vec::new();
         all_issues.extend(analyzer.analyze_bodies_typed(
             &result.program,
             file.clone(),
             source,
             &mut type_envs,
+            &mut all_symbols,
         ));
         AnalysisResult {
             issues: all_issues,
             type_envs,
+            symbols: all_symbols,
         }
     }
 
@@ -340,18 +347,19 @@ impl ProjectAnalyzer {
         program: &php_ast::ast::Program<'arena, 'src>,
         file: Arc<str>,
         source: &str,
-    ) -> Vec<mir_issues::Issue> {
+    ) -> (Vec<mir_issues::Issue>, Vec<crate::symbol::ResolvedSymbol>) {
         use php_ast::ast::StmtKind;
 
         let mut all_issues = Vec::new();
+        let mut all_symbols = Vec::new();
 
         for stmt in program.stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(decl) => {
-                    self.analyze_fn_decl(decl, &file, source, &mut all_issues);
+                    self.analyze_fn_decl(decl, &file, source, &mut all_issues, &mut all_symbols);
                 }
                 StmtKind::Class(decl) => {
-                    self.analyze_class_decl(decl, &file, source, &mut all_issues);
+                    self.analyze_class_decl(decl, &file, source, &mut all_issues, &mut all_symbols);
                 }
                 StmtKind::Enum(decl) => {
                     self.analyze_enum_decl(decl, &file, source, &mut all_issues);
@@ -361,10 +369,22 @@ impl ProjectAnalyzer {
                         for inner in stmts.iter() {
                             match &inner.kind {
                                 StmtKind::Function(decl) => {
-                                    self.analyze_fn_decl(decl, &file, source, &mut all_issues);
+                                    self.analyze_fn_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        &mut all_issues,
+                                        &mut all_symbols,
+                                    );
                                 }
                                 StmtKind::Class(decl) => {
-                                    self.analyze_class_decl(decl, &file, source, &mut all_issues);
+                                    self.analyze_class_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        &mut all_issues,
+                                        &mut all_symbols,
+                                    );
                                 }
                                 StmtKind::Enum(decl) => {
                                     self.analyze_enum_decl(decl, &file, source, &mut all_issues);
@@ -378,7 +398,7 @@ impl ProjectAnalyzer {
             }
         }
 
-        all_issues
+        (all_issues, all_symbols)
     }
 
     /// Analyze a single function declaration body and collect issues + inferred return type.
@@ -388,6 +408,7 @@ impl ProjectAnalyzer {
         file: &Arc<str>,
         source: &str,
         all_issues: &mut Vec<mir_issues::Issue>,
+        all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
         let fn_name = decl.name;
         let body = &decl.body;
@@ -454,7 +475,8 @@ impl ProjectAnalyzer {
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
         let mut buf = IssueBuffer::new();
-        let mut sa = StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf);
+        let mut sa =
+            StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf, all_symbols);
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
@@ -477,6 +499,7 @@ impl ProjectAnalyzer {
         file: &Arc<str>,
         source: &str,
         all_issues: &mut Vec<mir_issues::Issue>,
+        all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -528,7 +551,13 @@ impl ProjectAnalyzer {
             );
 
             let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf);
+            let mut sa = StatementsAnalyzer::new(
+                &self.codebase,
+                file.clone(),
+                source,
+                &mut buf,
+                all_symbols,
+            );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
@@ -555,16 +584,31 @@ impl ProjectAnalyzer {
             crate::type_env::ScopeId,
             crate::type_env::TypeEnv,
         >,
+        all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) -> Vec<mir_issues::Issue> {
         use php_ast::ast::StmtKind;
         let mut all_issues = Vec::new();
         for stmt in program.stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(decl) => {
-                    self.analyze_fn_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                    self.analyze_fn_decl_typed(
+                        decl,
+                        &file,
+                        source,
+                        &mut all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
                 }
                 StmtKind::Class(decl) => {
-                    self.analyze_class_decl_typed(decl, &file, source, &mut all_issues, type_envs);
+                    self.analyze_class_decl_typed(
+                        decl,
+                        &file,
+                        source,
+                        &mut all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
                 }
                 StmtKind::Enum(decl) => {
                     self.analyze_enum_decl(decl, &file, source, &mut all_issues);
@@ -580,6 +624,7 @@ impl ProjectAnalyzer {
                                         source,
                                         &mut all_issues,
                                         type_envs,
+                                        all_symbols,
                                     );
                                 }
                                 StmtKind::Class(decl) => {
@@ -589,6 +634,7 @@ impl ProjectAnalyzer {
                                         source,
                                         &mut all_issues,
                                         type_envs,
+                                        all_symbols,
                                     );
                                 }
                                 StmtKind::Enum(decl) => {
@@ -616,6 +662,7 @@ impl ProjectAnalyzer {
             crate::type_env::ScopeId,
             crate::type_env::TypeEnv,
         >,
+        all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -678,7 +725,8 @@ impl ProjectAnalyzer {
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
         let mut buf = IssueBuffer::new();
-        let mut sa = StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf);
+        let mut sa =
+            StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf, all_symbols);
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
@@ -715,6 +763,7 @@ impl ProjectAnalyzer {
             crate::type_env::ScopeId,
             crate::type_env::TypeEnv,
         >,
+        all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -763,7 +812,13 @@ impl ProjectAnalyzer {
             );
 
             let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf);
+            let mut sa = StatementsAnalyzer::new(
+                &self.codebase,
+                file.clone(),
+                source,
+                &mut buf,
+                all_symbols,
+            );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
@@ -1098,6 +1153,8 @@ fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
     pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+    /// Per-expression resolved symbols from Pass 2.
+    pub symbols: Vec<crate::symbol::ResolvedSymbol>,
 }
 
 impl AnalysisResult {

@@ -11,6 +11,7 @@ use mir_types::{Atomic, Union};
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
 use crate::narrowing::narrow_from_condition;
+use crate::symbol::ResolvedSymbol;
 
 // ---------------------------------------------------------------------------
 // StatementsAnalyzer
@@ -21,6 +22,7 @@ pub struct StatementsAnalyzer<'a> {
     pub file: Arc<str>,
     pub source: &'a str,
     pub issues: &'a mut IssueBuffer,
+    pub symbols: &'a mut Vec<ResolvedSymbol>,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Union>,
     /// Break-context stack: one entry per active loop nesting level.
@@ -34,12 +36,14 @@ impl<'a> StatementsAnalyzer<'a> {
         file: Arc<str>,
         source: &'a str,
         issues: &'a mut IssueBuffer,
+        symbols: &'a mut Vec<ResolvedSymbol>,
     ) -> Self {
         Self {
             codebase,
             file,
             source,
             issues,
+            symbols,
             return_types: Vec::new(),
             break_ctx_stack: Vec::new(),
         }
@@ -778,7 +782,13 @@ impl<'a> StatementsAnalyzer<'a> {
     where
         'a: 'b,
     {
-        ExpressionAnalyzer::new(self.codebase, self.file.clone(), self.source, self.issues)
+        ExpressionAnalyzer::new(
+            self.codebase,
+            self.file.clone(),
+            self.source,
+            self.issues,
+            self.symbols,
+        )
     }
 
     // -----------------------------------------------------------------------
