@@ -15,4 +15,4 @@ function test(): void {
     $first->nonExistentMethod();
 }
 ===expect===
-UndefinedMethod at 14:4
+UndefinedMethod: $first->nonExistentMethod()

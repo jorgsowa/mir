@@ -5,4 +5,4 @@ function test(): void {
     var_dump($a);
 }
 ===expect===
-PossiblyInvalidArrayOffset at 3:4
+PossiblyInvalidArrayOffset: [$a] = unpack('N', pack('N', 1))

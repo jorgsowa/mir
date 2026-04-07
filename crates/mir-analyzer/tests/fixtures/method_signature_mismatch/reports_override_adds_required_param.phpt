@@ -7,4 +7,4 @@ class Child extends Base {
     public function f(string $x): void { var_dump($x); }
 }
 ===expect===
-MethodSignatureMismatch at 1:0
+MethodSignatureMismatch: f

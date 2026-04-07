@@ -7,4 +7,4 @@ function test(): void {
     var_dump($a, $b);
 }
 ===expect===
-PossiblyInvalidArrayOffset at 5:4
+PossiblyInvalidArrayOffset: [$a, $b] = get()
