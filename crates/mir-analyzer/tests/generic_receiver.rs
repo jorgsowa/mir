@@ -22,7 +22,7 @@ function test(): void {
 }
 "#;
     let issues = check(src);
-    assert_issue_kind(&issues, "UndefinedMethod", 16, 4);
+    assert_issue_kind(&issues, "UndefinedMethod", 14, 4);
 }
 
 #[test]
