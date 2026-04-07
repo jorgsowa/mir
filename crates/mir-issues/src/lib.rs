@@ -239,6 +239,9 @@ pub enum IssueKind {
         expected_bound: String,
         actual: String,
     },
+    ShadowedTemplateParam {
+        name: String,
+    },
 
     // --- Other --------------------------------------------------------------
     DeprecatedCall {
@@ -366,7 +369,8 @@ impl IssueKind {
             | IssueKind::MixedArgument { .. }
             | IssueKind::MixedAssignment { .. }
             | IssueKind::MixedMethodCall { .. }
-            | IssueKind::MixedPropertyFetch { .. } => Severity::Info,
+            | IssueKind::MixedPropertyFetch { .. }
+            | IssueKind::ShadowedTemplateParam { .. } => Severity::Info,
         }
     }
 
@@ -417,6 +421,7 @@ impl IssueKind {
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
             IssueKind::InvalidTemplateParam { .. } => "InvalidTemplateParam",
+            IssueKind::ShadowedTemplateParam { .. } => "ShadowedTemplateParam",
             IssueKind::TaintedInput { .. } => "TaintedInput",
             IssueKind::TaintedHtml => "TaintedHtml",
             IssueKind::TaintedSql => "TaintedSql",
@@ -629,6 +634,12 @@ impl IssueKind {
                 format!(
                     "Template type '{}' inferred as '{}' does not satisfy bound '{}'",
                     name, actual, expected_bound
+                )
+            }
+            IssueKind::ShadowedTemplateParam { name } => {
+                format!(
+                    "Method template parameter '{}' shadows class-level template parameter with the same name",
+                    name
                 )
             }
             IssueKind::FinalMethodOverridden {
