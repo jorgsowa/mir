@@ -6,4 +6,4 @@ class A {
     }
 }
 ===expect===
-UndefinedFunction at 4:8
+UndefinedFunction: missing()

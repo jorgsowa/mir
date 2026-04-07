@@ -5,4 +5,4 @@ function test(): void {
     $x->foo();
 }
 ===expect===
-NullMethodCall at 4:4
+NullMethodCall: $x->foo()

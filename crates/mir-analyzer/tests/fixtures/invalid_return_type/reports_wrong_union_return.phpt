@@ -5,4 +5,4 @@ function f(): int {
     return $x;
 }
 ===expect===
-InvalidReturnType at 4:4
+InvalidReturnType: return $x;

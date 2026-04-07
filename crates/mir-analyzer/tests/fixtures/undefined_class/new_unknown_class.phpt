@@ -4,4 +4,4 @@ function test(): void {
     new UnknownClass();
 }
 ===expect===
-UndefinedClass at 3:8
+UndefinedClass: UnknownClass
