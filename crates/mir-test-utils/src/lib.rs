@@ -29,11 +29,10 @@ pub fn check(src: &str) -> Vec<Issue> {
 
 /// One expected issue from a `.phpt` fixture's `===expect===` section.
 ///
-/// Format: `KindName at LINE:COL`
+/// Format: `KindName: snippet`
 pub struct ExpectedIssue {
     pub kind_name: String,
-    pub line: u32,
-    pub col: u16,
+    pub snippet: String,
 }
 
 /// Parse a `.phpt` fixture file into `(php_source, expected_issues)`.
@@ -44,8 +43,8 @@ pub struct ExpectedIssue {
 /// <?php
 /// ...
 /// ===expect===
-/// UndefinedClass at 3:8
-/// UndefinedFunction at 5:4
+/// UndefinedClass: UnknownClass
+/// UndefinedFunction: foo()
 /// ```
 /// An empty `===expect===` section means no issues are expected.
 pub fn parse_phpt(content: &str, path: &str) -> (String, Vec<ExpectedIssue>) {
@@ -80,46 +79,58 @@ pub fn parse_phpt(content: &str, path: &str) -> (String, Vec<ExpectedIssue>) {
     (source, expected)
 }
 
+/// Extract only the source section from a fixture file (used in UPDATE_FIXTURES mode
+/// to avoid parsing potentially stale/old-format expect sections).
+fn parse_phpt_source_only(content: &str, path: &str) -> String {
+    let source_marker = "===source===";
+    let expect_marker = "===expect===";
+
+    let source_pos = content
+        .find(source_marker)
+        .unwrap_or_else(|| panic!("fixture {} missing ===source=== section", path));
+    let expect_pos = content
+        .find(expect_marker)
+        .unwrap_or_else(|| panic!("fixture {} missing ===expect=== section", path));
+
+    content[source_pos + source_marker.len()..expect_pos]
+        .trim()
+        .to_string()
+}
+
 fn parse_expected_line(line: &str, fixture_path: &str) -> ExpectedIssue {
-    // Format: "KindName at LINE:COL"
-    let parts: Vec<&str> = line.splitn(2, " at ").collect();
+    // Format: "KindName: snippet"
+    let parts: Vec<&str> = line.splitn(2, ": ").collect();
     assert_eq!(
         parts.len(),
         2,
-        "fixture {}: invalid expect line {:?} — expected \"KindName at LINE:COL\"",
+        "fixture {}: invalid expect line {:?} — expected \"KindName: snippet\"",
         fixture_path,
         line
     );
-    let kind_name = parts[0].trim().to_string();
-    let loc: Vec<&str> = parts[1].trim().splitn(2, ':').collect();
-    assert_eq!(
-        loc.len(),
-        2,
-        "fixture {}: invalid location {:?} — expected \"LINE:COL\"",
-        fixture_path,
-        parts[1]
-    );
-    let line_num = loc[0]
-        .parse::<u32>()
-        .unwrap_or_else(|_| panic!("fixture {}: invalid line number {:?}", fixture_path, loc[0]));
-    let col = loc[1]
-        .parse::<u16>()
-        .unwrap_or_else(|_| panic!("fixture {}: invalid col {:?}", fixture_path, loc[1]));
-
     ExpectedIssue {
-        kind_name,
-        line: line_num,
-        col,
+        kind_name: parts[0].trim().to_string(),
+        snippet: parts[1].trim().to_string(),
     }
 }
 
 /// Run a `.phpt` fixture file: parse, analyze, and assert the issues match
 /// the `===expect===` section exactly (no missing, no unexpected).
 ///
-/// Called by the [`fixture_test!`] macro.
+/// If the environment variable `UPDATE_FIXTURES` is set to `1`, the fixture
+/// file is rewritten with the actual issues instead of asserting.
+///
+/// Called by the auto-generated test functions in `build.rs`.
 pub fn run_fixture(path: &str) {
     let content = std::fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("failed to read fixture {}: {}", path, e));
+
+    if std::env::var("UPDATE_FIXTURES").as_deref() == Ok("1") {
+        let source = parse_phpt_source_only(&content, path);
+        let actual = check(&source);
+        rewrite_fixture(path, &content, &actual);
+        return;
+    }
+
     let (source, expected) = parse_phpt(&content, path);
     let actual = check(&source);
 
@@ -127,30 +138,23 @@ pub fn run_fixture(path: &str) {
 
     for exp in &expected {
         let found = actual.iter().any(|a| {
-            a.kind.name() == exp.kind_name
-                && a.location.line == exp.line
-                && a.location.col_start == exp.col
+            a.kind.name() == exp.kind_name && a.snippet.as_deref() == Some(exp.snippet.as_str())
         });
         if !found {
-            failures.push(format!(
-                "  MISSING  {} at {}:{}",
-                exp.kind_name, exp.line, exp.col
-            ));
+            failures.push(format!("  MISSING  {}: {}", exp.kind_name, exp.snippet));
         }
     }
 
     for act in &actual {
         let expected_it = expected.iter().any(|e| {
-            e.kind_name == act.kind.name()
-                && e.line == act.location.line
-                && e.col == act.location.col_start
+            e.kind_name == act.kind.name() && Some(e.snippet.as_str()) == act.snippet.as_deref()
         });
         if !expected_it {
+            let snippet = act.snippet.as_deref().unwrap_or("<no snippet>");
             failures.push(format!(
-                "  UNEXPECTED {} at {}:{}  — {}",
+                "  UNEXPECTED {}: {}  — {}",
                 act.kind.name(),
-                act.location.line,
-                act.location.col_start,
+                snippet,
                 act.kind.message(),
             ));
         }
@@ -164,6 +168,35 @@ pub fn run_fixture(path: &str) {
             fmt_issues(&actual)
         );
     }
+}
+
+/// Rewrite the fixture file's `===expect===` section with the actual issues.
+/// Preserves the `===source===` section unchanged.
+fn rewrite_fixture(path: &str, content: &str, actual: &[Issue]) {
+    let source_marker = "===source===";
+    let expect_marker = "===expect===";
+
+    let source_pos = content.find(source_marker).expect("missing ===source===");
+    let expect_pos = content.find(expect_marker).expect("missing ===expect===");
+
+    let source_section = &content[source_pos..expect_pos];
+
+    let mut new_content = String::new();
+    new_content.push_str(source_section);
+    new_content.push_str(expect_marker);
+    new_content.push('\n');
+
+    // Sort issues by (line, col, kind) for deterministic output.
+    let mut sorted: Vec<&Issue> = actual.iter().collect();
+    sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
+
+    for issue in sorted {
+        let snippet = issue.snippet.as_deref().unwrap_or("<no snippet>");
+        new_content.push_str(&format!("{}: {}\n", issue.kind.name(), snippet));
+    }
+
+    std::fs::write(path, &new_content)
+        .unwrap_or_else(|e| panic!("failed to write fixture {}: {}", path, e));
 }
 
 /// Generate a `#[test]` function that runs a `.phpt` fixture file.
@@ -250,13 +283,8 @@ fn fmt_issues(issues: &[Issue]) -> String {
     issues
         .iter()
         .map(|i| {
-            format!(
-                "  {} @ line {}, col {} — {}",
-                i.kind.name(),
-                i.location.line,
-                i.location.col_start,
-                i.kind.message(),
-            )
+            let snippet = i.snippet.as_deref().unwrap_or("<no snippet>");
+            format!("  {}: {}  — {}", i.kind.name(), snippet, i.kind.message(),)
         })
         .collect::<Vec<_>>()
         .join("\n")

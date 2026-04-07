@@ -6,4 +6,4 @@ function test(): void {
     $x->anything();
 }
 ===expect===
-MixedMethodCall at 5:4
+MixedMethodCall: $x->anything()

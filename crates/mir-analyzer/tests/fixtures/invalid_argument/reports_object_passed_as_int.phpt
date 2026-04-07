@@ -4,4 +4,4 @@ class Foo {}
 function f(int $x): void { var_dump($x); }
 function test(): void { f(new Foo()); }
 ===expect===
-InvalidArgument at 4:26
+InvalidArgument: new Foo()

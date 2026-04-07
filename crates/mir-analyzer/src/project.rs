@@ -875,15 +875,18 @@ fn check_type_hint_classes<'arena, 'src>(
             let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
             if !codebase.type_exists(&resolved) {
                 let (line, col) = crate::parser::span_to_line_col(source, hint.span);
-                issues.push(mir_issues::Issue::new(
-                    mir_issues::IssueKind::UndefinedClass { name: resolved },
-                    mir_issues::Location {
-                        file: file.clone(),
-                        line,
-                        col_start: col,
-                        col_end: col,
-                    },
-                ));
+                issues.push(
+                    mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedClass { name: resolved },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            col_start: col,
+                            col_end: col,
+                        },
+                    )
+                    .with_snippet(crate::parser::span_text(source, hint.span).unwrap_or_default()),
+                );
             }
         }
         TypeHintKind::Nullable(inner) => {
@@ -939,17 +942,20 @@ fn emit_unused_params(
             continue;
         }
         if !ctx.read_vars.contains(name) {
-            issues.push(mir_issues::Issue::new(
-                mir_issues::IssueKind::UnusedParam {
-                    name: name.to_string(),
-                },
-                mir_issues::Location {
-                    file: file.clone(),
-                    line: 1,
-                    col_start: 0,
-                    col_end: 0,
-                },
-            ));
+            issues.push(
+                mir_issues::Issue::new(
+                    mir_issues::IssueKind::UnusedParam {
+                        name: name.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line: 1,
+                        col_start: 0,
+                        col_end: 0,
+                    },
+                )
+                .with_snippet(format!("${}", name)),
+            );
         }
     }
 }
