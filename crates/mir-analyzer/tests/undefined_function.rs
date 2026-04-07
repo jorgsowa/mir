@@ -1,97 +1,35 @@
-// crates/mir-analyzer/tests/undefined_function.rs
-use mir_issues::IssueKind;
-use mir_test_utils::{assert_issue, assert_no_issue, check};
+use mir_test_utils::fixture_test;
 
-#[test]
-fn reports_unknown_function() {
-    let issues = check("<?php\nfunction test(): void {\n    foo();\n}\n");
-    assert_issue(
-        &issues,
-        IssueKind::UndefinedFunction { name: "foo".into() },
-        3,
-        4,
-    );
-}
-
-#[test]
-fn does_not_report_strlen() {
-    let issues = check("<?php\nfunction test(): void {\n    strlen('hello');\n}\n");
-    assert_no_issue(&issues, "UndefinedFunction");
-}
-
-#[test]
-fn does_not_report_array_map() {
-    let issues =
-        check("<?php\nfunction test(): void {\n    array_map(fn($x) => $x, [1, 2, 3]);\n}\n");
-    assert_no_issue(&issues, "UndefinedFunction");
-}
-
-#[test]
-fn does_not_report_user_defined_function() {
-    let issues =
-        check("<?php\nfunction myFn(): void {}\nfunction test(): void {\n    myFn();\n}\n");
-    assert_no_issue(&issues, "UndefinedFunction");
-}
-
-#[test]
-fn reports_global_namespace_unknown_function() {
-    // Leading \ forces global namespace lookup; still unknown
-    let issues = check("<?php\nfunction test(): void {\n    \\nonExistent();\n}\n");
-    assert_issue(
-        &issues,
-        IssueKind::UndefinedFunction {
-            name: "nonExistent".into(),
-        },
-        3,
-        4,
-    );
-}
-
-#[test]
-fn does_not_report_unpack() {
-    // unpack() is a PHP builtin — must be in stubs
-    // NOTE: this test currently FAILS if unpack() stub is missing (see CLAUDE.md gap analysis)
-    let issues =
-        check("<?php\nfunction test(): void {\n    $r = unpack('N*', pack('N*', 1));\n}\n");
-    assert_no_issue(&issues, "UndefinedFunction");
-}
-
-#[test]
-fn does_not_report_suppressed_call() {
-    let src = "<?php\nfunction test(): void {\n    /**\n     * @psalm-suppress UndefinedFunction\n     */\n    noSuchFunction();\n}\n";
-    let issues = check(src);
-    assert_no_issue(&issues, "UndefinedFunction");
-}
-
-#[test]
-fn reports_inside_method_body() {
-    let src = "<?php\nclass A {\n    public function go(): void {\n        missing();\n    }\n}\n";
-    let issues = check(src);
-    assert_issue(
-        &issues,
-        IssueKind::UndefinedFunction {
-            name: "missing".into(),
-        },
-        4,
-        8,
-    );
-}
-
-#[test]
-fn reports_each_call_site_independently() {
-    let src = "<?php\nfunction test(): void {\n    foo();\n    foo();\n}\n";
-    let issues = check(src);
-    // Two separate call sites — one on line 3 and one on line 4
-    assert_issue(
-        &issues,
-        IssueKind::UndefinedFunction { name: "foo".into() },
-        3,
-        4,
-    );
-    assert_issue(
-        &issues,
-        IssueKind::UndefinedFunction { name: "foo".into() },
-        4,
-        4,
-    );
-}
+fixture_test!(unknown_function, "undefined_function/unknown_function.phpt");
+fixture_test!(
+    strlen_not_reported,
+    "undefined_function/strlen_not_reported.phpt"
+);
+fixture_test!(
+    array_map_not_reported,
+    "undefined_function/array_map_not_reported.phpt"
+);
+fixture_test!(
+    user_defined_function_not_reported,
+    "undefined_function/user_defined_function_not_reported.phpt"
+);
+fixture_test!(
+    global_namespace_unknown_function,
+    "undefined_function/global_namespace_unknown_function.phpt"
+);
+fixture_test!(
+    unpack_not_reported,
+    "undefined_function/unpack_not_reported.phpt"
+);
+fixture_test!(
+    suppressed_via_psalm_suppress,
+    "undefined_function/suppressed_via_psalm_suppress.phpt"
+);
+fixture_test!(
+    inside_method_body,
+    "undefined_function/inside_method_body.phpt"
+);
+fixture_test!(
+    multiple_call_sites,
+    "undefined_function/multiple_call_sites.phpt"
+);
