@@ -441,6 +441,75 @@ impl Codebase {
     }
 
     // -----------------------------------------------------------------------
+    // Definition location lookups
+    // -----------------------------------------------------------------------
+
+    /// Look up the definition location of any symbol (class, interface, trait, enum, function).
+    /// Returns the file path and byte offsets.
+    pub fn get_symbol_location(&self, fqcn: &str) -> Option<crate::storage::Location> {
+        if let Some(cls) = self.classes.get(fqcn) {
+            return cls.location.clone();
+        }
+        if let Some(iface) = self.interfaces.get(fqcn) {
+            return iface.location.clone();
+        }
+        if let Some(tr) = self.traits.get(fqcn) {
+            return tr.location.clone();
+        }
+        if let Some(en) = self.enums.get(fqcn) {
+            return en.location.clone();
+        }
+        if let Some(func) = self.functions.get(fqcn) {
+            return func.location.clone();
+        }
+        None
+    }
+
+    /// Look up the definition location of a class member (method, property, constant).
+    pub fn get_member_location(
+        &self,
+        fqcn: &str,
+        member_name: &str,
+    ) -> Option<crate::storage::Location> {
+        // Check methods
+        if let Some(method) = self.get_method(fqcn, member_name) {
+            return method.location.clone();
+        }
+        // Check properties
+        if let Some(prop) = self.get_property(fqcn, member_name) {
+            return prop.location.clone();
+        }
+        // Check class constants
+        if let Some(cls) = self.classes.get(fqcn) {
+            if let Some(c) = cls.own_constants.get(member_name) {
+                return c.location.clone();
+            }
+        }
+        // Check interface constants
+        if let Some(iface) = self.interfaces.get(fqcn) {
+            if let Some(c) = iface.own_constants.get(member_name) {
+                return c.location.clone();
+            }
+        }
+        // Check trait constants
+        if let Some(tr) = self.traits.get(fqcn) {
+            if let Some(c) = tr.own_constants.get(member_name) {
+                return c.location.clone();
+            }
+        }
+        // Check enum constants and cases
+        if let Some(en) = self.enums.get(fqcn) {
+            if let Some(c) = en.own_constants.get(member_name) {
+                return c.location.clone();
+            }
+            if let Some(case) = en.cases.get(member_name) {
+                return case.location.clone();
+            }
+        }
+        None
+    }
+
+    // -----------------------------------------------------------------------
     // Reference tracking (M18 dead-code detection)
     // -----------------------------------------------------------------------
 
