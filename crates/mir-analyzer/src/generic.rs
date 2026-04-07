@@ -61,6 +61,24 @@ pub fn check_template_bounds<'a>(
     violations
 }
 
+/// Build template bindings from a receiver's concrete type params.
+///
+/// Zips `class_template_params` (e.g. `[T]` declared on the class) with
+/// `receiver_type_params` (e.g. `[User]` from `Collection<User>`) to produce
+/// `{ T → User }`. If the receiver supplies fewer type params than the class
+/// declares, the trailing template params are left unbound. If the receiver
+/// supplies more, the extras are ignored.
+pub fn build_class_bindings(
+    class_template_params: &[TemplateParam],
+    receiver_type_params: &[Union],
+) -> HashMap<Arc<str>, Union> {
+    class_template_params
+        .iter()
+        .zip(receiver_type_params.iter())
+        .map(|(tp, ty)| (tp.name.clone(), ty.clone()))
+        .collect()
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
