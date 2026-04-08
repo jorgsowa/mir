@@ -9,5 +9,5 @@ class Foo {
     private function doSomething(array $a): void {}
 }
 ===expect===
-MixedMethodCall: $this->doSomething($ctx)
 UnusedParam: $a
+MixedMethodCall: $this->doSomething($ctx)
