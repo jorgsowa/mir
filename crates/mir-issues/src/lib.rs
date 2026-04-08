@@ -335,8 +335,10 @@ impl IssueKind {
             | IssueKind::UndefinedProperty { .. }
             | IssueKind::InvalidOperand { .. }
             | IssueKind::OverriddenMethodAccess { .. }
-            | IssueKind::MissingThrowsDocblock { .. }
-            | IssueKind::UnusedVariable { .. } => Severity::Warning,
+            | IssueKind::MissingThrowsDocblock { .. } => Severity::Warning,
+
+            // Unused variables — Info so they are hidden by default (like Psalm errorLevel ≤ 6)
+            IssueKind::UnusedVariable { .. } => Severity::Info,
 
             // Possibly-null / possibly-undefined (only shown in strict mode, level ≥ 7)
             IssueKind::PossiblyUndefinedVariable { .. }
