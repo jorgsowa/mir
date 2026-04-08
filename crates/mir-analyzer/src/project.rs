@@ -311,6 +311,65 @@ impl ProjectAnalyzer {
         }
     }
 
+    /// Re-analyze a single file within the existing codebase.
+    ///
+    /// This is the incremental analysis API for LSP:
+    /// 1. Removes old definitions from this file
+    /// 2. Re-runs Pass 1 (definition collection) on the new content
+    /// 3. Re-finalizes the codebase (rebuilds inheritance)
+    /// 4. Re-runs Pass 2 (body analysis) on this file
+    /// 5. Returns the analysis result for this file only
+    pub fn re_analyze_file(&self, file_path: &str, new_content: &str) -> AnalysisResult {
+        // 1. Remove old definitions from this file
+        self.codebase.remove_file_definitions(file_path);
+
+        // 2. Parse new content and run Pass 1
+        let file: Arc<str> = Arc::from(file_path);
+        let arena = bumpalo::Bump::new();
+        let parsed = php_rs_parser::parse(&arena, new_content);
+
+        let mut all_issues = Vec::new();
+
+        // Collect parse errors
+        for err in &parsed.errors {
+            all_issues.push(Issue::new(
+                mir_issues::IssueKind::ParseError {
+                    message: err.to_string(),
+                },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line: 1,
+                    col_start: 0,
+                    col_end: 0,
+                },
+            ));
+        }
+
+        let collector = DefinitionCollector::new(&self.codebase, file.clone(), new_content);
+        all_issues.extend(collector.collect(&parsed.program));
+
+        // 3. Re-finalize (invalidation already done by remove_file_definitions)
+        self.codebase.finalize();
+
+        // 4. Run Pass 2 on this file
+        let (body_issues, symbols) =
+            self.analyze_bodies(&parsed.program, file.clone(), new_content);
+        all_issues.extend(body_issues);
+
+        // 5. Update cache if present
+        if let Some(cache) = &self.cache {
+            let h = hash_content(new_content);
+            cache.evict_with_dependents(&[file_path.to_string()]);
+            cache.put(file_path, h, all_issues.clone());
+        }
+
+        AnalysisResult {
+            issues: all_issues,
+            type_envs: HashMap::new(),
+            symbols,
+        }
+    }
+
     /// Analyze a PHP source string without a real file path.
     /// Useful for tests and LSP single-file mode.
     pub fn analyze_source(source: &str) -> AnalysisResult {
