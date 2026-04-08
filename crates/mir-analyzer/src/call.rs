@@ -240,6 +240,24 @@ impl CallAnalyzer {
             _ => return Union::mixed(),
         };
 
+        // Always analyze arguments — even when the receiver is null/mixed and we
+        // return early — so that variable reads inside args are tracked (read_vars)
+        // and side effects (taint, etc.) are recorded.
+        let arg_types: Vec<Union> = call
+            .args
+            .iter()
+            .map(|arg| {
+                let ty = ea.analyze(&arg.value, ctx);
+                if arg.unpack {
+                    spread_element_type(&ty)
+                } else {
+                    ty
+                }
+            })
+            .collect();
+
+        let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+
         // Null checks
         if obj_ty.contains(|t| matches!(t, Atomic::TNull)) {
             if nullsafe {
@@ -275,21 +293,6 @@ impl CallAnalyzer {
             );
             return Union::mixed();
         }
-
-        let arg_types: Vec<Union> = call
-            .args
-            .iter()
-            .map(|arg| {
-                let ty = ea.analyze(&arg.value, ctx);
-                if arg.unpack {
-                    spread_element_type(&ty)
-                } else {
-                    ty
-                }
-            })
-            .collect();
-
-        let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         let receiver = obj_ty.remove_null();
         let mut result = Union::empty();
