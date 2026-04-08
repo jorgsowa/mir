@@ -138,7 +138,14 @@ pub fn run_fixture(path: &str) {
 
     for exp in &expected {
         let found = actual.iter().any(|a| {
-            a.kind.name() == exp.kind_name && a.snippet.as_deref() == Some(exp.snippet.as_str())
+            if a.kind.name() != exp.kind_name {
+                return false;
+            }
+            if exp.snippet == "<no snippet>" {
+                a.snippet.is_none()
+            } else {
+                a.snippet.as_deref() == Some(exp.snippet.as_str())
+            }
         });
         if !found {
             failures.push(format!("  MISSING  {}: {}", exp.kind_name, exp.snippet));
@@ -147,7 +154,14 @@ pub fn run_fixture(path: &str) {
 
     for act in &actual {
         let expected_it = expected.iter().any(|e| {
-            e.kind_name == act.kind.name() && Some(e.snippet.as_str()) == act.snippet.as_deref()
+            if e.kind_name != act.kind.name() {
+                return false;
+            }
+            if e.snippet == "<no snippet>" {
+                act.snippet.is_none()
+            } else {
+                act.snippet.as_deref() == Some(e.snippet.as_str())
+            }
         });
         if !expected_it {
             let snippet = act.snippet.as_deref().unwrap_or("<no snippet>");
