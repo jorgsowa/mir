@@ -130,8 +130,48 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        // Definition collection is sequential — DashMap handles concurrent writes,
-        // but sequential avoids contention on small projects.
+        // ---- Pre-index pass: use SymbolTable to build FQCN index & file imports ---
+        // SymbolTable is lightweight (no type inference) so we run it in parallel.
+        file_data.par_iter().for_each(|(file, src)| {
+            let arena = bumpalo::Bump::new();
+            let result = php_rs_parser::parse(&arena, src);
+            let table = php_ast::symbol_table::SymbolTable::build(&result.program);
+
+            // Populate known_symbols with all top-level FQCNs
+            for sym in table.symbols() {
+                if sym.parent.is_none() {
+                    self.codebase
+                        .known_symbols
+                        .insert(Arc::from(sym.fqn.as_str()));
+                }
+            }
+
+            // Populate file_imports from SymbolTable imports
+            let mut imports = std::collections::HashMap::new();
+            for imp in table.imports() {
+                imports.insert(imp.local_name().to_string(), imp.name.to_string());
+            }
+            if !imports.is_empty() {
+                self.codebase.file_imports.insert(file.clone(), imports);
+            }
+
+            // Populate file_namespaces from top-level symbol FQNs
+            // (infer namespace from the first namespaced symbol)
+            for sym in table.symbols() {
+                if sym.parent.is_none() {
+                    if let Some(pos) = sym.fqn.rfind('\\') {
+                        let ns = &sym.fqn[..pos];
+                        self.codebase
+                            .file_namespaces
+                            .insert(file.clone(), ns.to_string());
+                        break;
+                    }
+                }
+            }
+        });
+
+        // ---- Pass 1: definition collection (sequential) -------------------------
+        // DashMap handles concurrent writes, but sequential avoids contention.
         for (file, src) in &file_data {
             let arena = bumpalo::Bump::new();
             let result = php_rs_parser::parse(&arena, src);

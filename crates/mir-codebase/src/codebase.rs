@@ -32,6 +32,11 @@ pub struct Codebase {
     /// path of the file that defines it. Populated during Pass 1.
     pub symbol_to_file: DashMap<Arc<str>, Arc<str>>,
 
+    /// Lightweight FQCN index populated by `SymbolTable` before Pass 1.
+    /// Enables O(1) "does this symbol exist?" checks before full definitions
+    /// are available.
+    pub known_symbols: DashSet<Arc<str>>,
+
     /// Per-file `use` alias maps: alias → FQCN.  Populated during Pass 1.
     ///
     /// Key: absolute file path (as `Arc<str>`).
@@ -95,6 +100,7 @@ impl Codebase {
             self.functions.remove(sym.as_ref());
             self.constants.remove(sym.as_ref());
             self.symbol_to_file.remove(sym.as_ref());
+            self.known_symbols.remove(sym.as_ref());
         }
 
         // Remove file-level metadata
