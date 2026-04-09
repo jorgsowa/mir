@@ -52,18 +52,6 @@ impl<'a> DefinitionCollector<'a> {
 
     pub fn collect<'arena, 'src>(mut self, program: &Program<'arena, 'src>) -> Vec<Issue> {
         let _ = self.visit_program(program);
-        // For files using simple (non-braced) namespaces or no namespace at all,
-        // the import table has not been stored yet — do it now.
-        if !self.codebase.file_imports.contains_key(self.file.as_ref()) {
-            self.codebase
-                .file_imports
-                .insert(self.file.clone(), self.use_aliases.clone());
-            if let Some(ns) = &self.namespace {
-                self.codebase
-                    .file_namespaces
-                    .insert(self.file.clone(), ns.clone());
-            }
-        }
         self.issues.into_issues()
     }
 
@@ -277,15 +265,6 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         let saved_aliases = self.use_aliases.clone();
                         self.use_aliases.clear();
                         self.process_stmts(stmts);
-                        // Store the import table for this file so Pass 2 can use it
-                        self.codebase
-                            .file_imports
-                            .insert(self.file.clone(), self.use_aliases.clone());
-                        if let Some(ns_name) = &self.namespace {
-                            self.codebase
-                                .file_namespaces
-                                .insert(self.file.clone(), ns_name.clone());
-                        }
                         self.use_aliases = saved_aliases;
                     }
                     php_ast::ast::NamespaceBody::Simple => {
