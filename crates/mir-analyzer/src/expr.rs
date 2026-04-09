@@ -265,6 +265,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let else_ty =
                             self.with_ctx(&mut else_ctx, |ea, c| ea.analyze(t.else_expr, c));
 
+                        // Propagate variable reads from both branches
+                        for name in then_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
+                            ctx.read_vars.insert(name.clone());
+                        }
+
                         Union::merge(&then_ty, &else_ty)
                     }
                     None => {
@@ -579,8 +584,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                         ty
                     }
-                    ExprKind::Variable(_) => Union::single(Atomic::TObject),
-                    _ => Union::single(Atomic::TObject),
+                    _ => {
+                        self.analyze(n.class, ctx);
+                        Union::single(Atomic::TObject)
+                    }
                 };
                 class_ty
             }
@@ -891,6 +898,11 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                     let arm_body_ty = self.analyze(&arm.body, &mut arm_ctx);
                     result = Union::merge(&result, &arm_body_ty);
+
+                    // Propagate variable reads from arm back to outer scope
+                    for name in &arm_ctx.read_vars {
+                        ctx.read_vars.insert(name.clone());
+                    }
                 }
                 if result.is_empty() {
                     Union::mixed()
