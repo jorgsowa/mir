@@ -35,14 +35,9 @@ impl CallAnalyzer {
         // Resolve function name first (needed for sink check before arg eval)
         let fn_name = match &call.name.kind {
             ExprKind::Identifier(name) => (*name).to_string(),
-            ExprKind::Variable(_) => {
-                // dynamic call — evaluate args anyway
-                for arg in call.args.iter() {
-                    ea.analyze(&arg.value, ctx);
-                }
-                return Union::mixed();
-            }
             _ => {
+                // dynamic call — evaluate name and args for read tracking
+                ea.analyze(call.name, ctx);
                 for arg in call.args.iter() {
                     ea.analyze(&arg.value, ctx);
                 }
