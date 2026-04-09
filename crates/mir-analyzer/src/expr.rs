@@ -21,6 +21,7 @@ pub struct ExpressionAnalyzer<'a> {
     pub codebase: &'a Codebase,
     pub file: Arc<str>,
     pub source: &'a str,
+    pub source_map: &'a php_ast::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
 }
@@ -30,6 +31,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         codebase: &'a Codebase,
         file: Arc<str>,
         source: &'a str,
+        source_map: &'a php_ast::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
     ) -> Self {
@@ -37,6 +39,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             codebase,
             file,
             source,
+            source_map,
             issues,
             symbols,
         }
@@ -736,6 +739,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.codebase,
                         self.file.clone(),
                         self.source,
+                        self.source_map,
                         self.issues,
                         self.symbols,
                     );
@@ -1268,7 +1272,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     // -----------------------------------------------------------------------
 
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
-        let (line, col) = crate::parser::span_to_line_col(self.source, span);
+        let lc = self.source_map.offset_to_line_col(span.start);
+        let (line, col) = (lc.line + 1, lc.col as u16);
         let mut issue = Issue::new(
             kind,
             Location {

@@ -534,8 +534,15 @@ impl ProjectAnalyzer {
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
         let mut buf = IssueBuffer::new();
-        let mut sa =
-            StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf, all_symbols);
+        let sm = php_ast::source_map::SourceMap::new(source);
+        let mut sa = StatementsAnalyzer::new(
+            &self.codebase,
+            file.clone(),
+            source,
+            &sm,
+            &mut buf,
+            all_symbols,
+        );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
@@ -610,10 +617,12 @@ impl ProjectAnalyzer {
             );
 
             let mut buf = IssueBuffer::new();
+            let sm = php_ast::source_map::SourceMap::new(source);
             let mut sa = StatementsAnalyzer::new(
                 &self.codebase,
                 file.clone(),
                 source,
+                &sm,
                 &mut buf,
                 all_symbols,
             );
@@ -784,8 +793,15 @@ impl ProjectAnalyzer {
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
         let mut buf = IssueBuffer::new();
-        let mut sa =
-            StatementsAnalyzer::new(&self.codebase, file.clone(), source, &mut buf, all_symbols);
+        let sm = php_ast::source_map::SourceMap::new(source);
+        let mut sa = StatementsAnalyzer::new(
+            &self.codebase,
+            file.clone(),
+            source,
+            &sm,
+            &mut buf,
+            all_symbols,
+        );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
@@ -871,10 +887,12 @@ impl ProjectAnalyzer {
             );
 
             let mut buf = IssueBuffer::new();
+            let sm = php_ast::source_map::SourceMap::new(source);
             let mut sa = StatementsAnalyzer::new(
                 &self.codebase,
                 file.clone(),
                 source,
+                &sm,
                 &mut buf,
                 all_symbols,
             );
@@ -988,7 +1006,9 @@ fn check_type_hint_classes<'arena, 'src>(
             }
             let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
             if !codebase.type_exists(&resolved) {
-                let (line, col) = crate::parser::span_to_line_col(source, hint.span);
+                let sm = php_ast::source_map::SourceMap::new(source);
+                let lc = sm.offset_to_line_col(hint.span.start);
+                let (line, col) = (lc.line + 1, lc.col as u16);
                 issues.push(
                     mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedClass { name: resolved },
