@@ -21,6 +21,7 @@ pub struct StatementsAnalyzer<'a> {
     pub codebase: &'a Codebase,
     pub file: Arc<str>,
     pub source: &'a str,
+    pub source_map: &'a php_ast::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     /// Accumulated inferred return types for the current function.
@@ -35,6 +36,7 @@ impl<'a> StatementsAnalyzer<'a> {
         codebase: &'a Codebase,
         file: Arc<str>,
         source: &'a str,
+        source_map: &'a php_ast::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
     ) -> Self {
@@ -42,6 +44,7 @@ impl<'a> StatementsAnalyzer<'a> {
             codebase,
             file,
             source,
+            source_map,
             issues,
             symbols,
             return_types: Vec::new(),
@@ -126,7 +129,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 for expr in exprs.iter() {
                     // Taint check (M19): echoing tainted data → XSS
                     if crate::taint::is_expr_tainted(expr, ctx) {
-                        let (line, col) = crate::parser::span_to_line_col(self.source, stmt.span);
+                        let (line, col) = {
+                            let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                            (lc.line + 1, lc.col as u16)
+                        };
                         self.issues.add(mir_issues::Issue::new(
                             IssueKind::TaintedHtml,
                             mir_issues::Location {
@@ -188,8 +194,10 @@ impl<'a> StatementsAnalyzer<'a> {
                                 && !named_object_return_compatible(declared, &check_ty, self.codebase, &self.file)
                                 && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file))
                         {
-                            let (line, col) =
-                                crate::parser::span_to_line_col(self.source, stmt.span);
+                            let (line, col) = {
+                                let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                                (lc.line + 1, lc.col as u16)
+                            };
                             self.issues.add(
                                 mir_issues::Issue::new(
                                     IssueKind::InvalidReturnType {
@@ -216,8 +224,10 @@ impl<'a> StatementsAnalyzer<'a> {
                     // Bare `return;` from a non-void declared function is an error.
                     if let Some(declared) = &ctx.fn_return_type.clone() {
                         if !declared.is_void() && !declared.is_mixed() {
-                            let (line, col) =
-                                crate::parser::span_to_line_col(self.source, stmt.span);
+                            let (line, col) = {
+                                let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                                (lc.line + 1, lc.col as u16)
+                            };
                             self.issues.add(
                                 mir_issues::Issue::new(
                                     IssueKind::InvalidReturnType {
@@ -268,8 +278,10 @@ impl<'a> StatementsAnalyzer<'a> {
                                 // Suppress if class is not in codebase at all (could be extension class)
                                 || (!self.codebase.type_exists(&resolved) && !self.codebase.type_exists(fqcn));
                             if !is_throwable {
-                                let (line, col) =
-                                    crate::parser::span_to_line_col(self.source, stmt.span);
+                                let (line, col) = {
+                                    let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                                    (lc.line + 1, lc.col as u16)
+                                };
                                 self.issues.add(mir_issues::Issue::new(
                                     IssueKind::InvalidThrow {
                                         ty: fqcn.to_string(),
@@ -300,8 +312,10 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || self.codebase.has_unknown_ancestor(&resolved)
                                 || self.codebase.has_unknown_ancestor(fqcn);
                             if !is_throwable {
-                                let (line, col) =
-                                    crate::parser::span_to_line_col(self.source, stmt.span);
+                                let (line, col) = {
+                                    let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                                    (lc.line + 1, lc.col as u16)
+                                };
                                 self.issues.add(mir_issues::Issue::new(
                                     IssueKind::InvalidThrow {
                                         ty: fqcn.to_string(),
@@ -317,8 +331,10 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                         mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
                         _ => {
-                            let (line, col) =
-                                crate::parser::span_to_line_col(self.source, stmt.span);
+                            let (line, col) = {
+                                let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                                (lc.line + 1, lc.col as u16)
+                            };
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::InvalidThrow {
                                     ty: format!("{}", thrown_ty),
@@ -395,8 +411,10 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // Emit RedundantCondition if narrowing proves one branch is statically unreachable.
                 if !pre_diverges && (then_ctx.diverges || else_ctx.diverges) {
-                    let (line, col) =
-                        crate::parser::span_to_line_col(self.source, if_stmt.condition.span);
+                    let lc = self
+                        .source_map
+                        .offset_to_line_col(if_stmt.condition.span.start);
+                    let (line, col) = (lc.line + 1, lc.col as u16);
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::RedundantCondition {
@@ -786,6 +804,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.codebase,
             self.file.clone(),
             self.source,
+            self.source_map,
             self.issues,
             self.symbols,
         )
