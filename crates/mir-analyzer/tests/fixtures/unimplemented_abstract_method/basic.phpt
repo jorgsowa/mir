@@ -7,4 +7,3 @@ class Incomplete extends Base {
 }
 ===expect===
 UnimplementedAbstractMethod: class Incomplete extends Base {
-}

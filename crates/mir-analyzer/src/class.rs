@@ -7,14 +7,12 @@
 ///   - Overriding method return type is covariant with parent
 ///   - Overriding method does not override a final method
 ///   - Class does not extend a final class
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use mir_codebase::storage::{MethodStorage, Visibility};
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
-use php_ast::source_map::SourceMap;
 
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
@@ -24,7 +22,7 @@ pub struct ClassAnalyzer<'a> {
     codebase: &'a Codebase,
     /// Only report issues for classes defined in these files (empty = all files).
     analyzed_files: HashSet<Arc<str>>,
-    /// Source text per file, used to compute line/col and extract snippets.
+    /// Source text per file — used only for snippet extraction.
     sources: HashMap<Arc<str>, &'a str>,
 }
 
@@ -42,7 +40,7 @@ impl<'a> ClassAnalyzer<'a> {
         files: HashSet<Arc<str>>,
         file_data: &'a [(Arc<str>, String)],
     ) -> Self {
-        let sources: HashMap<Arc<str>, &str> = file_data
+        let sources = file_data
             .iter()
             .map(|(f, src)| (f.clone(), src.as_str()))
             .collect();
@@ -82,7 +80,7 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
 
-            let loc = issue_location(&cls.location, fqcn, &self.sources);
+            let loc = issue_location(&cls.location, fqcn);
             let snippet = extract_snippet(&cls.location, &self.sources);
 
             // ---- 1. Final-class extension check --------------------------------
@@ -156,7 +154,7 @@ impl<'a> ClassAnalyzer<'a> {
                     continue; // implemented
                 }
 
-                let loc = issue_location(&cls.location, fqcn, &self.sources);
+                let loc = issue_location(&cls.location, fqcn);
                 let snippet = extract_snippet(&cls.location, &self.sources);
                 let mut issue = Issue::new(
                     IssueKind::UnimplementedAbstractMethod {
@@ -206,7 +204,7 @@ impl<'a> ClassAnalyzer<'a> {
                     .unwrap_or(false);
 
                 if !implemented {
-                    let loc = issue_location(&cls.location, fqcn, &self.sources);
+                    let loc = issue_location(&cls.location, fqcn);
                     let snippet = extract_snippet(&cls.location, &self.sources);
                     let mut issue = Issue::new(
                         IssueKind::UnimplementedInterfaceMethod {
@@ -246,7 +244,7 @@ impl<'a> ClassAnalyzer<'a> {
                 None => continue, // not an override
             };
 
-            let loc = issue_location(&own_method.location, fqcn, &self.sources);
+            let loc = issue_location(&own_method.location, fqcn);
             let snippet = extract_snippet(&own_method.location, &self.sources);
 
             // ---- a. Cannot override a final method -------------------------
@@ -498,30 +496,17 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
 }
 
 /// Build an issue `Location` from a codebase `storage::Location`.
-///
-/// When the source text is available, uses `SourceMap` to convert byte offsets
-/// to line/column numbers.  Otherwise falls back to line 1, col 0.
+/// Line/col are stored directly in the codebase location (populated by the collector).
 fn issue_location(
     storage_loc: &Option<mir_codebase::storage::Location>,
     fqcn: &Arc<str>,
-    sources: &HashMap<Arc<str>, &str>,
 ) -> Location {
     if let Some(loc) = storage_loc {
-        if let Some(src) = sources.get(&loc.file) {
-            let sm = SourceMap::new(src);
-            let lc = sm.offset_to_line_col(loc.start);
-            return Location {
-                file: loc.file.clone(),
-                line: lc.line + 1,
-                col_start: lc.col as u16,
-                col_end: lc.col as u16,
-            };
-        }
         return Location {
             file: loc.file.clone(),
-            line: 1,
-            col_start: 0,
-            col_end: 0,
+            line: loc.line,
+            col_start: loc.col,
+            col_end: loc.col,
         };
     }
     Location {
@@ -545,6 +530,8 @@ fn extract_snippet(
     if text.is_empty() {
         None
     } else {
-        Some(text.to_string())
+        // Use only the first line to avoid multi-line snippets
+        let first_line = text.lines().next().unwrap_or(text);
+        Some(first_line.to_string())
     }
 }

@@ -189,7 +189,8 @@ impl ProjectAnalyzer {
                 ));
             }
 
-            let collector = DefinitionCollector::new(&self.codebase, file.clone(), src);
+            let collector =
+                DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
             let issues = collector.collect(&result.program);
             all_issues.extend(issues);
         }
@@ -235,15 +236,19 @@ impl ProjectAnalyzer {
                         // Miss — analyze and store
                         let arena = bumpalo::Bump::new();
                         let parsed = php_rs_parser::parse(&arena, src);
-                        let (issues, symbols) =
-                            self.analyze_bodies(&parsed.program, file.clone(), src);
+                        let (issues, symbols) = self.analyze_bodies(
+                            &parsed.program,
+                            file.clone(),
+                            src,
+                            &parsed.source_map,
+                        );
                         cache.put(file, h, issues.clone());
                         (issues, symbols)
                     }
                 } else {
                     let arena = bumpalo::Bump::new();
                     let parsed = php_rs_parser::parse(&arena, src);
-                    self.analyze_bodies(&parsed.program, file.clone(), src)
+                    self.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
                 };
                 if let Some(cb) = &self.on_file_done {
                     cb();
@@ -337,8 +342,12 @@ impl ProjectAnalyzer {
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let arena = bumpalo::Bump::new();
                     let result = php_rs_parser::parse(&arena, &src);
-                    let collector =
-                        crate::collector::DefinitionCollector::new(&self.codebase, file, &src);
+                    let collector = crate::collector::DefinitionCollector::new(
+                        &self.codebase,
+                        file,
+                        &src,
+                        &result.source_map,
+                    );
                     let issues = collector.collect(&result.program);
                     all_issues.extend(issues);
                 }
@@ -385,15 +394,24 @@ impl ProjectAnalyzer {
             ));
         }
 
-        let collector = DefinitionCollector::new(&self.codebase, file.clone(), new_content);
+        let collector = DefinitionCollector::new(
+            &self.codebase,
+            file.clone(),
+            new_content,
+            &parsed.source_map,
+        );
         all_issues.extend(collector.collect(&parsed.program));
 
         // 3. Re-finalize (invalidation already done by remove_file_definitions)
         self.codebase.finalize();
 
         // 4. Run Pass 2 on this file
-        let (body_issues, symbols) =
-            self.analyze_bodies(&parsed.program, file.clone(), new_content);
+        let (body_issues, symbols) = self.analyze_bodies(
+            &parsed.program,
+            file.clone(),
+            new_content,
+            &parsed.source_map,
+        );
         all_issues.extend(body_issues);
 
         // 5. Update cache if present
@@ -420,7 +438,8 @@ impl ProjectAnalyzer {
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse(&arena, source);
         let mut all_issues = Vec::new();
-        let collector = DefinitionCollector::new(&analyzer.codebase, file.clone(), source);
+        let collector =
+            DefinitionCollector::new(&analyzer.codebase, file.clone(), source, &result.source_map);
         all_issues.extend(collector.collect(&result.program));
         analyzer.codebase.finalize();
         let mut type_envs = std::collections::HashMap::new();
@@ -429,6 +448,7 @@ impl ProjectAnalyzer {
             &result.program,
             file.clone(),
             source,
+            &result.source_map,
             &mut type_envs,
             &mut all_symbols,
         ));
@@ -446,6 +466,7 @@ impl ProjectAnalyzer {
         program: &php_ast::ast::Program<'arena, 'src>,
         file: Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
     ) -> (Vec<mir_issues::Issue>, Vec<crate::symbol::ResolvedSymbol>) {
         use php_ast::ast::StmtKind;
 
@@ -455,13 +476,27 @@ impl ProjectAnalyzer {
         for stmt in program.stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(decl) => {
-                    self.analyze_fn_decl(decl, &file, source, &mut all_issues, &mut all_symbols);
+                    self.analyze_fn_decl(
+                        decl,
+                        &file,
+                        source,
+                        source_map,
+                        &mut all_issues,
+                        &mut all_symbols,
+                    );
                 }
                 StmtKind::Class(decl) => {
-                    self.analyze_class_decl(decl, &file, source, &mut all_issues, &mut all_symbols);
+                    self.analyze_class_decl(
+                        decl,
+                        &file,
+                        source,
+                        source_map,
+                        &mut all_issues,
+                        &mut all_symbols,
+                    );
                 }
                 StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, &file, source, &mut all_issues);
+                    self.analyze_enum_decl(decl, &file, source, source_map, &mut all_issues);
                 }
                 StmtKind::Namespace(ns) => {
                     if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
@@ -472,6 +507,7 @@ impl ProjectAnalyzer {
                                         decl,
                                         &file,
                                         source,
+                                        source_map,
                                         &mut all_issues,
                                         &mut all_symbols,
                                     );
@@ -481,12 +517,19 @@ impl ProjectAnalyzer {
                                         decl,
                                         &file,
                                         source,
+                                        source_map,
                                         &mut all_issues,
                                         &mut all_symbols,
                                     );
                                 }
                                 StmtKind::Enum(decl) => {
-                                    self.analyze_enum_decl(decl, &file, source, &mut all_issues);
+                                    self.analyze_enum_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        source_map,
+                                        &mut all_issues,
+                                    );
                                 }
                                 _ => {}
                             }
@@ -506,6 +549,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
@@ -514,11 +558,11 @@ impl ProjectAnalyzer {
         // Check parameter and return type hints for undefined classes.
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+            check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
         }
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -574,12 +618,11 @@ impl ProjectAnalyzer {
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
         let mut buf = IssueBuffer::new();
-        let sm = php_ast::source_map::SourceMap::new(source);
         let mut sa = StatementsAnalyzer::new(
             &self.codebase,
             file.clone(),
             source,
-            &sm,
+            source_map,
             &mut buf,
             all_symbols,
         );
@@ -604,6 +647,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::ClassDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
@@ -630,11 +674,18 @@ impl ProjectAnalyzer {
             // Check parameter and return type hints for undefined classes (even abstract methods).
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        &self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -657,12 +708,11 @@ impl ProjectAnalyzer {
             );
 
             let mut buf = IssueBuffer::new();
-            let sm = php_ast::source_map::SourceMap::new(source);
             let mut sa = StatementsAnalyzer::new(
                 &self.codebase,
                 file.clone(),
                 source,
-                &sm,
+                source_map,
                 &mut buf,
                 all_symbols,
             );
@@ -688,6 +738,7 @@ impl ProjectAnalyzer {
         program: &php_ast::ast::Program<'arena, 'src>,
         file: Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
         type_envs: &mut std::collections::HashMap<
             crate::type_env::ScopeId,
             crate::type_env::TypeEnv,
@@ -703,6 +754,7 @@ impl ProjectAnalyzer {
                         decl,
                         &file,
                         source,
+                        source_map,
                         &mut all_issues,
                         type_envs,
                         all_symbols,
@@ -713,13 +765,14 @@ impl ProjectAnalyzer {
                         decl,
                         &file,
                         source,
+                        source_map,
                         &mut all_issues,
                         type_envs,
                         all_symbols,
                     );
                 }
                 StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, &file, source, &mut all_issues);
+                    self.analyze_enum_decl(decl, &file, source, source_map, &mut all_issues);
                 }
                 StmtKind::Namespace(ns) => {
                     if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
@@ -730,6 +783,7 @@ impl ProjectAnalyzer {
                                         decl,
                                         &file,
                                         source,
+                                        source_map,
                                         &mut all_issues,
                                         type_envs,
                                         all_symbols,
@@ -740,13 +794,20 @@ impl ProjectAnalyzer {
                                         decl,
                                         &file,
                                         source,
+                                        source_map,
                                         &mut all_issues,
                                         type_envs,
                                         all_symbols,
                                     );
                                 }
                                 StmtKind::Enum(decl) => {
-                                    self.analyze_enum_decl(decl, &file, source, &mut all_issues);
+                                    self.analyze_enum_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        source_map,
+                                        &mut all_issues,
+                                    );
                                 }
                                 _ => {}
                             }
@@ -760,11 +821,13 @@ impl ProjectAnalyzer {
     }
 
     /// Like `analyze_fn_decl` but also captures a `TypeEnv` for the function scope.
+    #[allow(clippy::too_many_arguments)]
     fn analyze_fn_decl_typed<'arena, 'src>(
         &self,
         decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         type_envs: &mut std::collections::HashMap<
             crate::type_env::ScopeId,
@@ -781,11 +844,11 @@ impl ProjectAnalyzer {
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+            check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
         }
 
         let resolved_fn = self.codebase.resolve_class_name(file.as_ref(), fn_name);
@@ -833,12 +896,11 @@ impl ProjectAnalyzer {
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
         let mut buf = IssueBuffer::new();
-        let sm = php_ast::source_map::SourceMap::new(source);
         let mut sa = StatementsAnalyzer::new(
             &self.codebase,
             file.clone(),
             source,
-            &sm,
+            source_map,
             &mut buf,
             all_symbols,
         );
@@ -868,11 +930,13 @@ impl ProjectAnalyzer {
     }
 
     /// Like `analyze_class_decl` but also captures a `TypeEnv` per method scope.
+    #[allow(clippy::too_many_arguments)]
     fn analyze_class_decl_typed<'arena, 'src>(
         &self,
         decl: &php_ast::ast::ClassDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         type_envs: &mut std::collections::HashMap<
             crate::type_env::ScopeId,
@@ -900,11 +964,18 @@ impl ProjectAnalyzer {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        &self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -927,12 +998,11 @@ impl ProjectAnalyzer {
             );
 
             let mut buf = IssueBuffer::new();
-            let sm = php_ast::source_map::SourceMap::new(source);
             let mut sa = StatementsAnalyzer::new(
                 &self.codebase,
                 file.clone(),
                 source,
-                &sm,
+                source_map,
                 &mut buf,
                 all_symbols,
             );
@@ -986,7 +1056,8 @@ impl ProjectAnalyzer {
         for (file, src) in &file_data {
             let arena = bumpalo::Bump::new();
             let result = php_rs_parser::parse(&arena, src);
-            let collector = DefinitionCollector::new(&self.codebase, file.clone(), src);
+            let collector =
+                DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
             // Ignore any issues emitted during vendor collection
             let _ = collector.collect(&result.program);
         }
@@ -998,6 +1069,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::EnumDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
+        source_map: &php_ast::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
     ) {
         use php_ast::ast::EnumMemberKind;
@@ -1007,11 +1079,18 @@ impl ProjectAnalyzer {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        &self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, &self.codebase, file, source, all_issues);
+                check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
             }
         }
     }
@@ -1034,6 +1113,7 @@ fn check_type_hint_classes<'arena, 'src>(
     codebase: &Codebase,
     file: &Arc<str>,
     source: &str,
+    source_map: &php_ast::source_map::SourceMap,
     issues: &mut Vec<mir_issues::Issue>,
 ) {
     use php_ast::ast::TypeHintKind;
@@ -1046,8 +1126,7 @@ fn check_type_hint_classes<'arena, 'src>(
             }
             let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
             if !codebase.type_exists(&resolved) {
-                let sm = php_ast::source_map::SourceMap::new(source);
-                let lc = sm.offset_to_line_col(hint.span.start);
+                let lc = source_map.offset_to_line_col(hint.span.start);
                 let (line, col) = (lc.line + 1, lc.col as u16);
                 issues.push(
                     mir_issues::Issue::new(
@@ -1064,11 +1143,11 @@ fn check_type_hint_classes<'arena, 'src>(
             }
         }
         TypeHintKind::Nullable(inner) => {
-            check_type_hint_classes(inner, codebase, file, source, issues);
+            check_type_hint_classes(inner, codebase, file, source, source_map, issues);
         }
         TypeHintKind::Union(parts) | TypeHintKind::Intersection(parts) => {
             for part in parts.iter() {
-                check_type_hint_classes(part, codebase, file, source, issues);
+                check_type_hint_classes(part, codebase, file, source, source_map, issues);
             }
         }
         TypeHintKind::Keyword(_, _) => {} // built-in keyword, always valid

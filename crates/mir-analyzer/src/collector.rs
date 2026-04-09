@@ -30,7 +30,7 @@ pub struct DefinitionCollector<'a> {
     codebase: &'a Codebase,
     file: Arc<str>,
     source: &'a str,
-    source_map: php_ast::source_map::SourceMap,
+    source_map: &'a php_ast::source_map::SourceMap,
     namespace: Option<String>,
     /// `use` aliases: alias → FQCN
     use_aliases: std::collections::HashMap<String, String>,
@@ -38,9 +38,14 @@ pub struct DefinitionCollector<'a> {
 }
 
 impl<'a> DefinitionCollector<'a> {
-    pub fn new(codebase: &'a Codebase, file: Arc<str>, source: &'a str) -> Self {
+    pub fn new(
+        codebase: &'a Codebase,
+        file: Arc<str>,
+        source: &'a str,
+        source_map: &'a php_ast::source_map::SourceMap,
+    ) -> Self {
         Self {
-            source_map: php_ast::source_map::SourceMap::new(source),
+            source_map,
             codebase,
             file,
             source,
@@ -213,7 +218,8 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     fn location(&self, start: u32, end: u32) -> Location {
-        Location::new(self.file.clone(), start, end)
+        let lc = self.source_map.offset_to_line_col(start);
+        Location::with_line_col(self.file.clone(), start, end, lc.line + 1, lc.col as u16)
     }
 
     #[allow(dead_code)]
