@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "mir-analyzer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bumpalo",
  "indexmap",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "mir-codebase"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dashmap",
  "indexmap",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "mir-issues"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "mir-types",
  "owo-colors",
@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "mir-php"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "mir-test-utils"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "mir-analyzer",
  "mir-issues",
@@ -557,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "mir-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "indexmap",
  "serde",
