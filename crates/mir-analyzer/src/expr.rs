@@ -77,9 +77,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Null => Union::single(Atomic::TNull),
 
             // Interpolated strings always produce TString
-            ExprKind::InterpolatedString(_)
-            | ExprKind::Heredoc { .. }
-            | ExprKind::Nowdoc { .. } => Union::single(Atomic::TString),
+            ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
+                for part in parts.iter() {
+                    if let php_ast::StringPart::Expr(e) = part {
+                        self.analyze(e, ctx);
+                    }
+                }
+                Union::single(Atomic::TString)
+            }
+
+            ExprKind::Nowdoc { .. } => Union::single(Atomic::TString),
             ExprKind::ShellExec(_) => Union::single(Atomic::TString),
 
             // --- Variables --------------------------------------------------
@@ -330,6 +337,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 for elem in elements.iter() {
                     if elem.unpack {
+                        self.analyze(&elem.value, ctx);
                         can_be_keyed = false;
                         break;
                     }
@@ -374,21 +382,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Fallback: generic TArray — re-evaluate elements to build merged types
                 let mut all_value_types = Union::empty();
                 let mut key_union = Union::empty();
+                let mut has_unpack = false;
                 for elem in elements.iter() {
-                    if elem.unpack {
-                        return Union::single(Atomic::TArray {
-                            key: Box::new(Union::single(Atomic::TMixed)),
-                            value: Box::new(Union::mixed()),
-                        });
-                    }
                     let value_ty = self.analyze(&elem.value, ctx);
-                    all_value_types = Union::merge(&all_value_types, &value_ty);
-                    if let Some(key_expr) = &elem.key {
-                        let key_ty = self.analyze(key_expr, ctx);
-                        key_union = Union::merge(&key_union, &key_ty);
+                    if elem.unpack {
+                        has_unpack = true;
                     } else {
-                        key_union.add_type(Atomic::TInt);
+                        all_value_types = Union::merge(&all_value_types, &value_ty);
+                        if let Some(key_expr) = &elem.key {
+                            let key_ty = self.analyze(key_expr, ctx);
+                            key_union = Union::merge(&key_union, &key_ty);
+                        } else {
+                            key_union.add_type(Atomic::TInt);
+                        }
                     }
+                }
+                if has_unpack {
+                    return Union::single(Atomic::TArray {
+                        key: Box::new(Union::single(Atomic::TMixed)),
+                        value: Box::new(Union::mixed()),
+                    });
                 }
                 if key_union.is_empty() {
                     key_union.add_type(Atomic::TInt);
@@ -402,6 +415,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Array access -----------------------------------------------
             ExprKind::ArrayAccess(aa) => {
                 let arr_ty = self.analyze(aa.array, ctx);
+
+                // Analyze the index expression for variable read tracking
+                if let Some(idx) = &aa.index {
+                    self.analyze(idx, ctx);
+                }
 
                 // Check for null access
                 if arr_ty.contains(|t| matches!(t, Atomic::TNull)) && arr_ty.is_single() {
@@ -463,8 +481,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             // --- isset / empty ----------------------------------------------
-            ExprKind::Isset(_) => Union::single(Atomic::TBool),
-            ExprKind::Empty(_) => Union::single(Atomic::TBool),
+            ExprKind::Isset(exprs) => {
+                for e in exprs.iter() {
+                    self.analyze(e, ctx);
+                }
+                Union::single(Atomic::TBool)
+            }
+            ExprKind::Empty(inner) => {
+                self.analyze(inner, ctx);
+                Union::single(Atomic::TBool)
+            }
 
             // --- print ------------------------------------------------------
             ExprKind::Print(inner) => {
@@ -712,6 +738,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ret
                 };
 
+                // Propagate variable reads from closure back to outer scope
+                for name in &closure_ctx.read_vars {
+                    ctx.read_vars.insert(name.clone());
+                }
+
                 let return_ty = return_ty_hint.unwrap_or(inferred_return);
                 let closure_params: Vec<mir_types::atomic::FnParam> = params
                     .iter()
@@ -770,6 +801,12 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 // Analyze single-expression body
                 let inferred_return = self.analyze(af.body, &mut arrow_ctx);
+
+                // Propagate variable reads from arrow function back to outer scope
+                for name in &arrow_ctx.read_vars {
+                    ctx.read_vars.insert(name.clone());
+                }
+
                 let return_ty = return_ty_hint.unwrap_or(inferred_return);
                 let closure_params: Vec<mir_types::atomic::FnParam> = params
                     .iter()
@@ -869,7 +906,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             // --- Yield -----------------------------------------------------
-            ExprKind::Yield(_) => Union::mixed(),
+            ExprKind::Yield(y) => {
+                if let Some(key) = &y.key {
+                    self.analyze(key, ctx);
+                }
+                if let Some(value) = &y.value {
+                    self.analyze(value, ctx);
+                }
+                Union::mixed()
+            }
 
             // --- Magic constants -------------------------------------------
             ExprKind::MagicConst(kind) => match kind {
@@ -1163,6 +1208,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             ExprKind::ArrayAccess(aa) => {
                 // $arr[$k] = v  — PHP auto-initialises $arr as an array if undefined.
+                // Analyze the index expression for variable read tracking.
+                if let Some(idx) = &aa.index {
+                    self.analyze(idx, ctx);
+                }
                 // Walk the base to find the root variable and update its type to include
                 // the new value, so loop analysis can widen correctly.
                 let mut base = aa.array;
@@ -1189,6 +1238,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             break;
                         }
                         ExprKind::ArrayAccess(inner) => {
+                            if let Some(idx) = &inner.index {
+                                self.analyze(idx, ctx);
+                            }
                             base = inner.array;
                         }
                         _ => break,
