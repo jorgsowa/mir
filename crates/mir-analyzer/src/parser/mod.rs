@@ -81,15 +81,6 @@ impl Default for FileParser {
 // Source location helpers
 // ---------------------------------------------------------------------------
 
-/// Convert a byte-offset `Span` to a `(line, col)` pair given the source.
-pub fn span_to_line_col(src: &str, span: Span) -> (u32, u16) {
-    let offset = span.start as usize;
-    let before = &src[..offset.min(src.len())];
-    let line = before.bytes().filter(|&b| b == b'\n').count() as u32 + 1;
-    let col = before.rfind('\n').map(|p| offset - p - 1).unwrap_or(offset) as u16;
-    (line, col)
-}
-
 /// Extract the exact source text covered by a span.
 pub fn span_text(src: &str, span: Span) -> Option<String> {
     if span.start >= span.end {
