@@ -129,11 +129,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 for expr in exprs.iter() {
                     // Taint check (M19): echoing tainted data → XSS
                     if crate::taint::is_expr_tainted(expr, ctx) {
-                        let (line, col) = {
-                            let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                            (lc.line + 1, lc.col as u16)
-                        };
-                        self.issues.add(mir_issues::Issue::new(
+                        let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                        let (line, col) = (lc.line + 1, lc.col as u16);
+                        let mut issue = mir_issues::Issue::new(
                             IssueKind::TaintedHtml,
                             mir_issues::Location {
                                 file: self.file.clone(),
@@ -141,7 +139,17 @@ impl<'a> StatementsAnalyzer<'a> {
                                 col_start: col,
                                 col_end: col,
                             },
-                        ));
+                        );
+                        // Extract snippet from the echo statement span
+                        let s = stmt.span.start as usize;
+                        let e = (stmt.span.end as usize).min(self.source.len());
+                        if let Some(text) = self.source.get(s..e) {
+                            let trimmed = text.trim();
+                            if !trimmed.is_empty() {
+                                issue = issue.with_snippet(trimmed.to_string());
+                            }
+                        }
+                        self.issues.add(issue);
                     }
                     self.expr_analyzer(ctx).analyze(expr, ctx);
                 }

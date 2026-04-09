@@ -5,4 +5,4 @@ final class Base {
 }
 class Child extends Base {}
 ===expect===
-FinalClassExtended: <no snippet>
+FinalClassExtended: class Child extends Base {}

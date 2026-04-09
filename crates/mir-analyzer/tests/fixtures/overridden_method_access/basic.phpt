@@ -7,4 +7,4 @@ class Child extends Base {
     private function visible(): void {}
 }
 ===expect===
-OverriddenMethodAccess: <no snippet>
+OverriddenMethodAccess: private function visible(): void {}

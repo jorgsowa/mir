@@ -7,12 +7,14 @@
 ///   - Overriding method return type is covariant with parent
 ///   - Overriding method does not override a final method
 ///   - Class does not extend a final class
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use mir_codebase::storage::{MethodStorage, Visibility};
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
+use php_ast::source_map::SourceMap;
 
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
@@ -22,6 +24,8 @@ pub struct ClassAnalyzer<'a> {
     codebase: &'a Codebase,
     /// Only report issues for classes defined in these files (empty = all files).
     analyzed_files: HashSet<Arc<str>>,
+    /// Source text per file, used to compute line/col and extract snippets.
+    sources: HashMap<Arc<str>, &'a str>,
 }
 
 impl<'a> ClassAnalyzer<'a> {
@@ -29,13 +33,23 @@ impl<'a> ClassAnalyzer<'a> {
         Self {
             codebase,
             analyzed_files: HashSet::new(),
+            sources: HashMap::new(),
         }
     }
 
-    pub fn with_files(codebase: &'a Codebase, files: HashSet<Arc<str>>) -> Self {
+    pub fn with_files(
+        codebase: &'a Codebase,
+        files: HashSet<Arc<str>>,
+        file_data: &'a [(Arc<str>, String)],
+    ) -> Self {
+        let sources: HashMap<Arc<str>, &str> = file_data
+            .iter()
+            .map(|(f, src)| (f.clone(), src.as_str()))
+            .collect();
         Self {
             codebase,
             analyzed_files: files,
+            sources,
         }
     }
 
@@ -68,19 +82,24 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
 
-            let loc = dummy_location(fqcn);
+            let loc = issue_location(&cls.location, fqcn, &self.sources);
+            let snippet = extract_snippet(&cls.location, &self.sources);
 
             // ---- 1. Final-class extension check --------------------------------
             if let Some(parent_fqcn) = &cls.parent {
                 if let Some(parent) = self.codebase.classes.get(parent_fqcn.as_ref()) {
                     if parent.is_final {
-                        issues.push(Issue::new(
+                        let mut issue = Issue::new(
                             IssueKind::FinalClassExtended {
                                 parent: parent_fqcn.to_string(),
                                 child: fqcn.to_string(),
                             },
                             loc.clone(),
-                        ));
+                        );
+                        if let Some(ref s) = snippet {
+                            issue = issue.with_snippet(s.clone());
+                        }
+                        issues.push(issue);
                     }
                 }
             }
@@ -137,13 +156,19 @@ impl<'a> ClassAnalyzer<'a> {
                     continue; // implemented
                 }
 
-                issues.push(Issue::new(
+                let loc = issue_location(&cls.location, fqcn, &self.sources);
+                let snippet = extract_snippet(&cls.location, &self.sources);
+                let mut issue = Issue::new(
                     IssueKind::UnimplementedAbstractMethod {
                         class: fqcn.to_string(),
                         method: method_name.to_string(),
                     },
-                    dummy_location(fqcn),
-                ));
+                    loc,
+                );
+                if let Some(ref s) = snippet {
+                    issue = issue.with_snippet(s.clone());
+                }
+                issues.push(issue);
             }
         }
     }
@@ -181,14 +206,20 @@ impl<'a> ClassAnalyzer<'a> {
                     .unwrap_or(false);
 
                 if !implemented {
-                    issues.push(Issue::new(
+                    let loc = issue_location(&cls.location, fqcn, &self.sources);
+                    let snippet = extract_snippet(&cls.location, &self.sources);
+                    let mut issue = Issue::new(
                         IssueKind::UnimplementedInterfaceMethod {
                             class: fqcn.to_string(),
                             interface: iface_fqcn.to_string(),
                             method: method_name.to_string(),
                         },
-                        dummy_location(fqcn),
-                    ));
+                        loc,
+                    );
+                    if let Some(ref s) = snippet {
+                        issue = issue.with_snippet(s.clone());
+                    }
+                    issues.push(issue);
                 }
             }
         }
@@ -200,12 +231,6 @@ impl<'a> ClassAnalyzer<'a> {
 
     fn check_overrides(&self, cls: &mir_codebase::storage::ClassStorage, issues: &mut Vec<Issue>) {
         let fqcn = &cls.fqcn;
-        // Use the actual source file if available, otherwise fall back to fqcn.
-        let class_file: Arc<str> = cls
-            .location
-            .as_ref()
-            .map(|l| l.file.clone())
-            .unwrap_or_else(|| fqcn.clone());
 
         for (method_name, own_method) in &cls.own_methods {
             // PHP does not enforce constructor signature compatibility
@@ -221,34 +246,38 @@ impl<'a> ClassAnalyzer<'a> {
                 None => continue, // not an override
             };
 
-            let loc = Location {
-                file: class_file.clone(),
-                line: 1,
-                col_start: 0,
-                col_end: 0,
-            };
+            let loc = issue_location(&own_method.location, fqcn, &self.sources);
+            let snippet = extract_snippet(&own_method.location, &self.sources);
 
             // ---- a. Cannot override a final method -------------------------
             if parent.is_final {
-                issues.push(Issue::new(
+                let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
                         method: method_name.to_string(),
                         parent: parent.fqcn.to_string(),
                     },
                     loc.clone(),
-                ));
+                );
+                if let Some(ref s) = snippet {
+                    issue = issue.with_snippet(s.clone());
+                }
+                issues.push(issue);
             }
 
             // ---- b. Visibility must not be reduced -------------------------
             if visibility_reduced(own_method.visibility, parent.visibility) {
-                issues.push(Issue::new(
+                let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
                         method: method_name.to_string(),
                     },
                     loc.clone(),
-                ));
+                );
+                if let Some(ref s) = snippet {
+                    issue = issue.with_snippet(s.clone());
+                }
+                issues.push(issue);
             }
 
             // ---- c. Return type must be covariant --------------------------
@@ -468,12 +497,54 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
     )
 }
 
-/// Create a placeholder location (class-level issues don't have a precise span yet).
-fn dummy_location(fqcn: &Arc<str>) -> Location {
+/// Build an issue `Location` from a codebase `storage::Location`.
+///
+/// When the source text is available, uses `SourceMap` to convert byte offsets
+/// to line/column numbers.  Otherwise falls back to line 1, col 0.
+fn issue_location(
+    storage_loc: &Option<mir_codebase::storage::Location>,
+    fqcn: &Arc<str>,
+    sources: &HashMap<Arc<str>, &str>,
+) -> Location {
+    if let Some(loc) = storage_loc {
+        if let Some(src) = sources.get(&loc.file) {
+            let sm = SourceMap::new(src);
+            let lc = sm.offset_to_line_col(loc.start);
+            return Location {
+                file: loc.file.clone(),
+                line: lc.line + 1,
+                col_start: lc.col as u16,
+                col_end: lc.col as u16,
+            };
+        }
+        return Location {
+            file: loc.file.clone(),
+            line: 1,
+            col_start: 0,
+            col_end: 0,
+        };
+    }
     Location {
         file: fqcn.clone(),
         line: 1,
         col_start: 0,
         col_end: 0,
+    }
+}
+
+/// Extract source snippet text from a codebase `storage::Location`.
+fn extract_snippet(
+    storage_loc: &Option<mir_codebase::storage::Location>,
+    sources: &HashMap<Arc<str>, &str>,
+) -> Option<String> {
+    let loc = storage_loc.as_ref()?;
+    let src = sources.get(&loc.file)?;
+    let s = loc.start as usize;
+    let e = (loc.end as usize).min(src.len());
+    let text = src.get(s..e)?.trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
     }
 }

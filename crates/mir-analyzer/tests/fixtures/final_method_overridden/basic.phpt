@@ -7,4 +7,4 @@ class Child extends Base {
     public function locked(): void {}
 }
 ===expect===
-FinalMethodOverridden: <no snippet>
+FinalMethodOverridden: public function locked(): void {}
