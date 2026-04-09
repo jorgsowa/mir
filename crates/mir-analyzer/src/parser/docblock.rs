@@ -1,7 +1,9 @@
 use mir_types::{Atomic, Union};
-/// Docblock parser — extracts `@param`, `@return`, `@var`, `@template`,
-/// `@extends`, `@implements`, `@throws`, `@psalm-*`, and other annotations.
+/// Docblock parser — delegates to `php_rs_parser::phpdoc` for tag extraction,
+/// then converts `PhpDocTag`s into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
+
+use php_ast::PhpDocTag;
 
 // ---------------------------------------------------------------------------
 // DocblockParser
@@ -11,190 +13,149 @@ pub struct DocblockParser;
 
 impl DocblockParser {
     pub fn parse(text: &str) -> ParsedDocblock {
-        let mut result = ParsedDocblock::default();
+        let doc = php_rs_parser::phpdoc::parse(text);
+        let mut result = ParsedDocblock {
+            description: extract_description(text),
+            ..Default::default()
+        };
 
-        // --- Description pre-pass: collect text before the first `@` tag ---
-        {
-            let raw_lines = extract_lines(text);
-            let mut desc_lines: Vec<String> = Vec::new();
-            for l in &raw_lines {
-                let l = l.trim();
-                if l.starts_with('@') {
-                    break;
+        for tag in &doc.tags {
+            match tag {
+                PhpDocTag::Param {
+                    type_str: Some(ty_s),
+                    name: Some(n),
+                    ..
+                } => {
+                    result.params.push((
+                        n.trim_start_matches('$').to_string(),
+                        parse_type_string(ty_s),
+                    ));
                 }
-                if !l.is_empty() {
-                    desc_lines.push(l.to_string());
+                PhpDocTag::Return {
+                    type_str: Some(ty_s),
+                    ..
+                } => {
+                    result.return_type = Some(parse_type_string(ty_s));
                 }
-            }
-            result.description = desc_lines.join(" ");
-        }
-
-        let lines = extract_lines(text);
-
-        for line in lines {
-            let line = line.trim();
-            if line.is_empty() || !line.starts_with('@') {
-                continue;
-            }
-            if let Some(rest) = line.strip_prefix("@param") {
-                let rest = rest.trim();
-                if let Some((ty_str, name)) = parse_param_line(rest) {
-                    let ty = parse_type_string(&ty_str);
-                    result.params.push((name, ty));
-                }
-            } else if let Some(rest) = strip_tag(line, "@return") {
-                let ty = parse_type_string(extract_type_token(rest.trim()));
-                result.return_type = Some(ty);
-            } else if let Some(rest) = line
-                .strip_prefix("@var")
-                .or_else(|| line.strip_prefix("@psalm-var"))
-                .or_else(|| line.strip_prefix("@phpstan-var"))
-            {
-                let rest = rest.trim();
-                let type_str = extract_type_token(rest);
-                let ty = parse_type_string(type_str);
-                result.var_type = Some(ty);
-                // Extract optional variable name: `@var Type $name`
-                let after_type = rest[type_str.len()..].trim();
-                if after_type.starts_with('$') {
-                    result.var_name = Some(
-                        after_type
-                            .trim_start_matches('$')
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or("")
-                            .to_string(),
-                    );
-                }
-            } else if let Some(rest) =
-                strip_tag(line, "@psalm-return").or_else(|| strip_tag(line, "@phpstan-return"))
-            {
-                let ty = parse_type_string(extract_type_token(rest.trim()));
-                result.return_type = Some(ty); // @psalm-return / @phpstan-return overrides @return
-            } else if let Some(rest) = line
-                .strip_prefix("@psalm-param")
-                .or_else(|| line.strip_prefix("@phpstan-param"))
-            {
-                let rest = rest.trim();
-                if let Some((ty_str, name)) = parse_param_line(rest) {
-                    let ty = parse_type_string(&ty_str);
-                    // Override or add
-                    if let Some(entry) = result.params.iter_mut().find(|(n, _)| *n == name) {
-                        entry.1 = ty;
-                    } else {
-                        result.params.push((name, ty));
+                PhpDocTag::Var { type_str, name, .. } => {
+                    if let Some(ty_s) = type_str {
+                        result.var_type = Some(parse_type_string(ty_s));
+                    }
+                    if let Some(n) = name {
+                        result.var_name = Some(n.trim_start_matches('$').to_string());
                     }
                 }
-            } else if let Some(rest) = line.strip_prefix("@template") {
-                let rest = rest.trim();
-                let (name, bound) = parse_template_line(rest);
-                result.templates.push((name, bound));
-            } else if let Some(rest) = line
-                .strip_prefix("@extends")
-                .or_else(|| line.strip_prefix("@psalm-extends"))
-            {
-                result.extends = Some(rest.trim().to_string());
-            } else if let Some(rest) = line
-                .strip_prefix("@implements")
-                .or_else(|| line.strip_prefix("@psalm-implements"))
-            {
-                result.implements.push(rest.trim().to_string());
-            } else if let Some(rest) = line.strip_prefix("@throws") {
-                let class = rest.split_whitespace().next().unwrap_or("").to_string();
-                if !class.is_empty() {
-                    result.throws.push(class);
+                PhpDocTag::Throws {
+                    type_str: Some(ty_s),
+                    ..
+                } => {
+                    let class = ty_s.split_whitespace().next().unwrap_or("").to_string();
+                    if !class.is_empty() {
+                        result.throws.push(class);
+                    }
                 }
-            } else if let Some(rest) = line
-                .strip_prefix("@psalm-assert-if-true")
-                .or_else(|| line.strip_prefix("@phpstan-assert-if-true"))
-            {
-                let rest = rest.trim();
-                if let Some((ty_str, name)) = parse_param_line(rest) {
+                PhpDocTag::Deprecated { description } => {
+                    result.is_deprecated = true;
+                    result.deprecated = Some(description.unwrap_or("").to_string());
+                }
+                PhpDocTag::Template { name, bound }
+                | PhpDocTag::TemplateCovariant { name, bound }
+                | PhpDocTag::TemplateContravariant { name, bound } => {
                     result
-                        .assertions_if_true
-                        .push((name, parse_type_string(&ty_str)));
+                        .templates
+                        .push((name.to_string(), bound.map(parse_type_string)));
                 }
-            } else if let Some(rest) = line
-                .strip_prefix("@psalm-assert-if-false")
-                .or_else(|| line.strip_prefix("@phpstan-assert-if-false"))
-            {
-                let rest = rest.trim();
-                if let Some((ty_str, name)) = parse_param_line(rest) {
-                    result
-                        .assertions_if_false
-                        .push((name, parse_type_string(&ty_str)));
+                PhpDocTag::Extends { type_str } => {
+                    result.extends = Some(type_str.to_string());
                 }
-            } else if let Some(rest) = line
-                .strip_prefix("@psalm-assert")
-                .or_else(|| line.strip_prefix("@phpstan-assert"))
-            {
-                let rest = rest.trim();
-                if let Some((ty_str, name)) = parse_param_line(rest) {
-                    result.assertions.push((name, parse_type_string(&ty_str)));
+                PhpDocTag::Implements { type_str } => {
+                    result.implements.push(type_str.to_string());
                 }
-            } else if line.contains("@psalm-suppress") || line.contains("@phpstan-ignore") {
-                let suppressed = line.split_whitespace().nth(1).unwrap_or("").to_string();
-                if !suppressed.is_empty() {
-                    result.suppressed_issues.push(suppressed);
+                PhpDocTag::Assert {
+                    type_str: Some(ty_s),
+                    name: Some(n),
+                } => {
+                    result.assertions.push((
+                        n.trim_start_matches('$').to_string(),
+                        parse_type_string(ty_s),
+                    ));
                 }
-            } else if let Some(rest) = line.strip_prefix("@deprecated") {
-                result.is_deprecated = true;
-                let msg = rest.trim().to_string();
-                result.deprecated = Some(msg);
-            } else if line.starts_with("@see") || line.starts_with("@link") {
-                let rest = if let Some(r) = line.strip_prefix("@see") {
-                    r
-                } else {
-                    line.strip_prefix("@link").unwrap_or("")
-                };
-                let s = rest.trim().to_string();
-                if !s.is_empty() {
-                    result.see.push(s);
-                }
-            } else if let Some(rest) = line.strip_prefix("@mixin") {
-                let cls = rest.trim().to_string();
-                if !cls.is_empty() {
-                    result.mixins.push(cls);
-                }
-            } else if line.starts_with("@property-read") {
-                if let Some(rest) = line.strip_prefix("@property-read") {
-                    if let Some(prop) = parse_property_line(rest.trim(), true, false) {
-                        result.properties.push(prop);
+                PhpDocTag::Suppress { rules } => {
+                    for rule in rules.split([',', ' ']) {
+                        let rule = rule.trim().to_string();
+                        if !rule.is_empty() {
+                            result.suppressed_issues.push(rule);
+                        }
                     }
                 }
-            } else if line.starts_with("@property-write") {
-                if let Some(rest) = line.strip_prefix("@property-write") {
-                    if let Some(prop) = parse_property_line(rest.trim(), false, true) {
-                        result.properties.push(prop);
+                PhpDocTag::See { reference } => result.see.push(reference.to_string()),
+                PhpDocTag::Link { url } => result.see.push(url.to_string()),
+                PhpDocTag::Mixin { class } => result.mixins.push(class.to_string()),
+                PhpDocTag::Property {
+                    type_str,
+                    name: Some(n),
+                    ..
+                } => result.properties.push(DocProperty {
+                    type_hint: type_str.unwrap_or("").to_string(),
+                    name: n.trim_start_matches('$').to_string(),
+                    read_only: false,
+                    write_only: false,
+                }),
+                PhpDocTag::PropertyRead {
+                    type_str,
+                    name: Some(n),
+                    ..
+                } => result.properties.push(DocProperty {
+                    type_hint: type_str.unwrap_or("").to_string(),
+                    name: n.trim_start_matches('$').to_string(),
+                    read_only: true,
+                    write_only: false,
+                }),
+                PhpDocTag::PropertyWrite {
+                    type_str,
+                    name: Some(n),
+                    ..
+                } => result.properties.push(DocProperty {
+                    type_hint: type_str.unwrap_or("").to_string(),
+                    name: n.trim_start_matches('$').to_string(),
+                    read_only: false,
+                    write_only: true,
+                }),
+                PhpDocTag::Method { signature } => {
+                    if let Some(m) = parse_method_line(signature) {
+                        result.methods.push(m);
                     }
                 }
-            } else if line.starts_with("@property") {
-                if let Some(rest) = line.strip_prefix("@property") {
-                    if let Some(prop) = parse_property_line(rest.trim(), false, false) {
-                        result.properties.push(prop);
+                PhpDocTag::TypeAlias {
+                    name: Some(n),
+                    type_str,
+                } => result.type_aliases.push(DocTypeAlias {
+                    name: n.to_string(),
+                    type_expr: type_str.unwrap_or("").to_string(),
+                }),
+                PhpDocTag::Internal => result.is_internal = true,
+                PhpDocTag::Pure => result.is_pure = true,
+                PhpDocTag::Immutable => result.is_immutable = true,
+                PhpDocTag::Readonly => result.is_readonly = true,
+                PhpDocTag::Generic { tag, body } => match *tag {
+                    "api" | "psalm-api" => result.is_api = true,
+                    "psalm-assert-if-true" | "phpstan-assert-if-true" => {
+                        if let Some((ty_str, name)) = body.and_then(parse_param_line) {
+                            result
+                                .assertions_if_true
+                                .push((name, parse_type_string(&ty_str)));
+                        }
                     }
-                }
-            } else if let Some(rest) = line.strip_prefix("@method") {
-                if let Some(m) = parse_method_line(rest.trim()) {
-                    result.methods.push(m);
-                }
-            } else if let Some(rest) = line
-                .strip_prefix("@psalm-type")
-                .or_else(|| line.strip_prefix("@phpstan-type"))
-            {
-                if let Some(alias) = parse_type_alias_line(rest.trim()) {
-                    result.type_aliases.push(alias);
-                }
-            } else if line.starts_with("@internal") {
-                result.is_internal = true;
-            } else if line.starts_with("@psalm-pure") || line.starts_with("@pure") {
-                result.is_pure = true;
-            } else if line.starts_with("@psalm-immutable") || line.starts_with("@immutable") {
-                result.is_immutable = true;
-            } else if line.starts_with("@readonly") {
-                result.is_readonly = true;
-            } else if line.starts_with("@api") || line.starts_with("@psalm-api") {
-                result.is_api = true;
+                    "psalm-assert-if-false" | "phpstan-assert-if-false" => {
+                        if let Some((ty_str, name)) = body.and_then(parse_param_line) {
+                            result
+                                .assertions_if_false
+                                .push((name, parse_type_string(&ty_str)));
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
             }
         }
 
@@ -501,65 +462,24 @@ fn parse_generic(name: &str, inner: &str) -> Union {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Strip a tag prefix, requiring it be followed by whitespace or end of string.
-/// Also handles plural forms like `@returns` when tag is `@return`.
-fn strip_tag<'a>(line: &'a str, tag: &str) -> Option<&'a str> {
-    // Try exact tag + whitespace boundary
-    if let Some(rest) = line.strip_prefix(tag) {
-        if rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t') {
-            return Some(rest);
+/// Extract the description text (all prose before the first `@` tag) from a raw docblock.
+fn extract_description(text: &str) -> String {
+    let mut desc_lines: Vec<&str> = Vec::new();
+    for line in text.lines() {
+        let l = line.trim();
+        let l = l.trim_start_matches("/**").trim();
+        let l = l.trim_end_matches("*/").trim();
+        let l = l.trim_start_matches("*/").trim();
+        let l = l.strip_prefix("* ").unwrap_or(l.trim_start_matches('*'));
+        let l = l.trim();
+        if l.starts_with('@') {
+            break;
         }
-        // Allow plural form: "@return" matches "@returns "
-        if let Some(after_s) = rest.strip_prefix('s') {
-            if after_s.is_empty() || after_s.starts_with(' ') || after_s.starts_with('\t') {
-                return Some(after_s);
-            }
+        if !l.is_empty() {
+            desc_lines.push(l);
         }
     }
-    None
-}
-
-/// Extract only the type token from a docblock annotation line, stopping before the description.
-/// For example: `string|null The description here` → `string|null`
-///              `array<string, int> Some description` → `array<string, int>`
-fn extract_type_token(s: &str) -> &str {
-    let mut depth = 0i32;
-    let mut end = s.len();
-    let chars: Vec<(usize, char)> = s.char_indices().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let (byte_pos, ch) = chars[i];
-        match ch {
-            '<' | '(' | '{' => depth += 1,
-            '>' | ')' | '}' => depth -= 1,
-            ' ' | '\t' if depth == 0 => {
-                end = byte_pos;
-                break;
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    &s[..end]
-}
-
-fn extract_lines(text: &str) -> Vec<String> {
-    text.lines()
-        .map(|l| {
-            // Strip `/**`, `*/`, leading `*`
-            let l = l.trim();
-            let l = l.trim_start_matches("/**").trim();
-            // Strip trailing `*/` (handles single-line `/** @return int */`)
-            let l = l.trim_end_matches("*/").trim();
-            let l = l.trim_start_matches("*/").trim();
-            let l = if let Some(stripped) = l.strip_prefix("* ") {
-                stripped
-            } else {
-                l.trim_start_matches('*')
-            };
-            l.trim().to_string()
-        })
-        .collect()
+    desc_lines.join(" ")
 }
 
 fn parse_param_line(s: &str) -> Option<(String, String)> {
@@ -571,19 +491,6 @@ fn parse_param_line(s: &str) -> Option<(String, String)> {
         return None;
     }
     Some((ty, name))
-}
-
-fn parse_template_line(s: &str) -> (String, Option<Union>) {
-    // `T` or `T of Bound`
-    let mut parts = s.splitn(3, char::is_whitespace);
-    let name = parts.next().unwrap_or("").trim().to_string();
-    let of_keyword = parts.next().unwrap_or("").trim().to_lowercase();
-    let bound = if of_keyword == "of" {
-        parts.next().map(|b| parse_type_string(b.trim()))
-    } else {
-        None
-    };
-    (name, bound)
 }
 
 fn split_union(s: &str) -> Vec<String> {
@@ -657,39 +564,6 @@ fn normalize_fqcn(s: &str) -> String {
     s.trim_start_matches('\\').to_string()
 }
 
-/// Parse `[Type] $name [description]` for @property tags.
-fn parse_property_line(s: &str, read_only: bool, write_only: bool) -> Option<DocProperty> {
-    // s has already had the tag prefix stripped and trimmed
-    // Formats: `$name`, `Type $name`, `Type $name description`
-    let mut words = s.splitn(3, char::is_whitespace);
-    let first = words.next()?.trim();
-    if first.is_empty() {
-        return None;
-    }
-    if first.starts_with('$') {
-        // No type hint given
-        Some(DocProperty {
-            type_hint: String::new(),
-            name: first.trim_start_matches('$').to_string(),
-            read_only,
-            write_only,
-        })
-    } else {
-        // first word is the type hint
-        let type_hint = first.to_string();
-        let name_word = words.next()?.trim();
-        if name_word.is_empty() {
-            return None;
-        }
-        Some(DocProperty {
-            type_hint,
-            name: name_word.trim_start_matches('$').to_string(),
-            read_only,
-            write_only,
-        })
-    }
-}
-
 /// Parse `[static] [ReturnType] name(...)` for @method tags.
 fn parse_method_line(s: &str) -> Option<DocMethod> {
     let mut words = s.splitn(4, char::is_whitespace);
@@ -738,25 +612,6 @@ fn parse_method_line(s: &str) -> Option<DocMethod> {
         name,
         is_static,
     })
-}
-
-/// Parse `Alias = TypeExpr` for @psalm-type / @phpstan-type tags.
-fn parse_type_alias_line(s: &str) -> Option<DocTypeAlias> {
-    let (name_part, type_part) = if let Some(eq_pos) = s.find('=') {
-        (&s[..eq_pos], &s[eq_pos + 1..])
-    } else {
-        // No `=` — just a name, no type expression
-        return Some(DocTypeAlias {
-            name: s.trim().to_string(),
-            type_expr: String::new(),
-        });
-    };
-    let name = name_part.trim().to_string();
-    let type_expr = type_part.trim().to_string();
-    if name.is_empty() {
-        return None;
-    }
-    Some(DocTypeAlias { name, type_expr })
 }
 
 // ---------------------------------------------------------------------------

@@ -20,7 +20,11 @@ use mir_issues::Issue;
 pub fn hash_content(content: &str) -> String {
     let mut h = Sha256::new();
     h.update(content.as_bytes());
-    format!("{:x}", h.finalize())
+    h.finalize().iter().fold(String::new(), |mut acc, b| {
+        use std::fmt::Write;
+        write!(acc, "{:02x}", b).unwrap();
+        acc
+    })
 }
 
 // ---------------------------------------------------------------------------

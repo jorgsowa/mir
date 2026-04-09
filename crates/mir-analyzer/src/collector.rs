@@ -8,6 +8,8 @@ use std::sync::Arc;
 use php_ast::ast::{
     ClassMemberKind, EnumMemberKind, Program, StmtKind, Visibility as AstVisibility,
 };
+use std::ops::ControlFlow;
+
 use php_ast::visitor::Visitor;
 
 use crate::parser::{find_preceding_docblock, name_to_string, span_to_line_col, type_from_hint};
@@ -47,7 +49,7 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     pub fn collect<'arena, 'src>(mut self, program: &Program<'arena, 'src>) -> Vec<Issue> {
-        self.visit_program(program);
+        let _ = self.visit_program(program);
         // For files using simple (non-braced) namespaces or no namespace at all,
         // the import table has not been stored yet — do it now.
         if !self.codebase.file_imports.contains_key(self.file.as_ref()) {
@@ -256,13 +258,13 @@ impl<'a> DefinitionCollector<'a> {
         stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
     ) {
         for stmt in stmts.iter() {
-            self.visit_stmt(stmt);
+            let _ = self.visit_stmt(stmt);
         }
     }
 }
 
 impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
-    fn visit_stmt(&mut self, stmt: &php_ast::ast::Stmt<'arena, 'src>) {
+    fn visit_stmt(&mut self, stmt: &php_ast::ast::Stmt<'arena, 'src>) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Namespace(ns) => {
                 self.namespace = ns.name.as_ref().map(name_to_string);
@@ -374,7 +376,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             StmtKind::Class(decl) => {
                 let name = match decl.name {
                     Some(n) => n.to_string(),
-                    None => return, // anonymous class — handled at expression level
+                    None => return ControlFlow::Continue(()), // anonymous class — handled at expression level
                 };
                 let fqcn = self.resolve_name(&name);
                 let short_name = name;
@@ -733,12 +735,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
             StmtKind::Block(stmts) => {
                 for stmt in stmts.iter() {
-                    self.visit_stmt(stmt);
+                    let _ = self.visit_stmt(stmt);
                 }
             }
 
             _ => {}
         }
+        ControlFlow::Continue(())
     }
 }
 
