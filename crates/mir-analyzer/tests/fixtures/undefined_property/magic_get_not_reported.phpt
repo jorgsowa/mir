@@ -10,4 +10,3 @@ function test(): void {
     echo $m->anything;
 }
 ===expect===
-UnusedParam: $name
