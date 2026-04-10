@@ -1084,6 +1084,46 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
     })
 }
 
+/// Strict codebase-aware subtype check for generic type parameter positions.
+///
+/// Unlike `named_object_subtype`, this does NOT include the coercion direction (param extends arg).
+/// That relaxation exists for outer argument checking only — applying it inside type parameter
+/// positions would incorrectly accept e.g. `Box<Animal>` → `Box<Cat>` in a covariant context
+/// because `Cat extends Animal` would trigger the coercion acceptance.
+fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
+    use mir_types::Atomic;
+    arg.types.iter().all(|a_atomic| {
+        let arg_fqcn: &Arc<str> = match a_atomic {
+            Atomic::TNamedObject { fqcn, .. } => fqcn,
+            Atomic::TNever => return true,
+            _ => return false,
+        };
+        param.types.iter().any(|p_atomic| {
+            let param_fqcn: &Arc<str> = match p_atomic {
+                Atomic::TNamedObject { fqcn, .. } => fqcn,
+                _ => return false,
+            };
+            let resolved_param = ea
+                .codebase
+                .resolve_class_name(&ea.file, param_fqcn.as_ref());
+            let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
+            // Forward direction only — arg must extend/implement param. No coercion.
+            resolved_param == resolved_arg
+                || arg_fqcn.as_ref() == resolved_param.as_str()
+                || resolved_arg == param_fqcn.as_ref()
+                || ea
+                    .codebase
+                    .extends_or_implements(arg_fqcn.as_ref(), &resolved_param)
+                || ea
+                    .codebase
+                    .extends_or_implements(arg_fqcn.as_ref(), param_fqcn.as_ref())
+                || ea
+                    .codebase
+                    .extends_or_implements(&resolved_arg, &resolved_param)
+        })
+    })
+}
+
 /// Check whether generic type parameters are compatible according to each parameter's declared
 /// variance (`@template-covariant`, `@template-contravariant`, or invariant by default).
 ///
@@ -1117,14 +1157,14 @@ fn generic_type_params_compatible(
                 arg_p.is_subtype_of_simple(param_p)
                     || param_p.is_mixed()
                     || arg_p.is_mixed()
-                    || named_object_subtype(arg_p, param_p, ea)
+                    || strict_named_object_subtype(arg_p, param_p, ea)
             }
             mir_types::Variance::Contravariant => {
                 // C<Animal> satisfies C<Cat> when Animal <: Cat (reversed direction).
                 param_p.is_subtype_of_simple(arg_p)
                     || arg_p.is_mixed()
                     || param_p.is_mixed()
-                    || named_object_subtype(param_p, arg_p, ea)
+                    || strict_named_object_subtype(param_p, arg_p, ea)
             }
             mir_types::Variance::Invariant => {
                 // Exact structural match or mutual subtyping.
