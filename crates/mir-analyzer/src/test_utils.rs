@@ -1,7 +1,12 @@
+//! Test utilities for fixture-based testing.
+//!
+//! Provides helpers to run `.phpt` fixture files against the analyzer
+//! and compare actual vs expected issues.
+
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use mir_analyzer::project::ProjectAnalyzer;
+use crate::project::ProjectAnalyzer;
 use mir_issues::{Issue, IssueKind};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -211,28 +216,6 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue]) {
 
     std::fs::write(path, &new_content)
         .unwrap_or_else(|e| panic!("failed to write fixture {}: {}", path, e));
-}
-
-/// Generate a `#[test]` function that runs a `.phpt` fixture file.
-///
-/// The path is relative to the crate's `tests/fixtures/` directory.
-///
-/// # Example
-/// ```rust,ignore
-/// fixture_test!(new_unknown_class, "undefined_class/new_unknown_class.phpt");
-/// ```
-#[macro_export]
-macro_rules! fixture_test {
-    ($name:ident, $path:expr) => {
-        #[test]
-        fn $name() {
-            mir_test_utils::run_fixture(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/tests/fixtures/",
-                $path
-            ));
-        }
-    };
 }
 
 // ---------------------------------------------------------------------------
