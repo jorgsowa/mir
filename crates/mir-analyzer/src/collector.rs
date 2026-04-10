@@ -213,7 +213,8 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     fn location(&self, start: u32, end: u32) -> Location {
-        Location::new(self.file.clone(), start, end)
+        let lc = self.source_map.offset_to_line_col(start);
+        Location::with_line_col(self.file.clone(), start, end, lc.line + 1, lc.col as u16)
     }
 
     #[allow(dead_code)]

@@ -133,7 +133,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             let lc = self.source_map.offset_to_line_col(stmt.span.start);
                             (lc.line + 1, lc.col as u16)
                         };
-                        self.issues.add(mir_issues::Issue::new(
+                        let mut issue = mir_issues::Issue::new(
                             IssueKind::TaintedHtml,
                             mir_issues::Location {
                                 file: self.file.clone(),
@@ -141,7 +141,18 @@ impl<'a> StatementsAnalyzer<'a> {
                                 col_start: col,
                                 col_end: col,
                             },
-                        ));
+                        );
+                        // Extract snippet from the echo statement span.
+                        let start = stmt.span.start as usize;
+                        let end = stmt.span.end as usize;
+                        if start < self.source.len() {
+                            let end = end.min(self.source.len());
+                            let span_text = &self.source[start..end];
+                            if let Some(first_line) = span_text.lines().next() {
+                                issue = issue.with_snippet(first_line.trim().to_string());
+                            }
+                        }
+                        self.issues.add(issue);
                     }
                     self.expr_analyzer(ctx).analyze(expr, ctx);
                 }

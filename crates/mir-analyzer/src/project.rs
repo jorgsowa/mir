@@ -214,7 +214,7 @@ impl ProjectAnalyzer {
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
         let class_issues =
-            crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set)
+            crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set, &file_data)
                 .analyze_all();
         all_issues.extend(class_issues);
 
