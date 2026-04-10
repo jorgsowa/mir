@@ -5,4 +5,4 @@ abstract class Base {
 }
 class Incomplete extends Base {}
 ===expect===
-UnimplementedAbstractMethod: <no snippet>
+UnimplementedAbstractMethod: class Incomplete extends Base {}

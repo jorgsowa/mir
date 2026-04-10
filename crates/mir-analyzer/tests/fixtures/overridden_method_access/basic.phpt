@@ -7,4 +7,4 @@ class Child extends ParentClass {
     private function doStuff(): void {}
 }
 ===expect===
-OverriddenMethodAccess: <no snippet>
+OverriddenMethodAccess: private function doStuff(): void {}

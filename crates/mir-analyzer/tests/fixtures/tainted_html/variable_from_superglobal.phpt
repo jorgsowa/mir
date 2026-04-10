@@ -5,4 +5,4 @@ function test(): void {
     echo $name;
 }
 ===expect===
-TaintedHtml: <no snippet>
+TaintedHtml: echo $name;
