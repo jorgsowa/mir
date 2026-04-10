@@ -12,7 +12,7 @@ use std::ops::ControlFlow;
 
 use php_ast::visitor::Visitor;
 
-use crate::parser::{find_preceding_docblock, name_to_string, type_from_hint};
+use crate::parser::{name_to_string, type_from_hint};
 use mir_codebase::storage::{
     ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage, InterfaceStorage, Location,
     MethodStorage, PropertyStorage, TemplateParam, TraitStorage, Visibility,
@@ -297,8 +297,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     short_name.clone()
                 };
 
-                let doc = find_preceding_docblock(self.source, stmt.span.start)
-                    .map(|d| crate::parser::DocblockParser::parse(&d))
+                let doc = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| crate::parser::DocblockParser::parse(c.text))
                     .unwrap_or_default();
 
                 let mut params = Vec::new();
@@ -448,8 +450,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
-                let class_doc = find_preceding_docblock(self.source, stmt.span.start)
-                    .map(|d| crate::parser::DocblockParser::parse(&d))
+                let class_doc = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| crate::parser::DocblockParser::parse(c.text))
                     .unwrap_or_default();
 
                 let template_params: Vec<TemplateParam> = class_doc
@@ -740,9 +744,10 @@ impl<'a> DefinitionCollector<'a> {
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
     ) -> MethodStorage {
-        let doc = span
-            .and_then(|s| find_preceding_docblock(self.source, s.start))
-            .map(|d| crate::parser::DocblockParser::parse(&d))
+        let doc = m
+            .doc_comment
+            .as_ref()
+            .map(|c| crate::parser::DocblockParser::parse(c.text))
             .unwrap_or_default();
 
         let mut params = Vec::new();
