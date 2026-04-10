@@ -336,10 +336,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 let template_params = doc
                     .templates
                     .iter()
-                    .map(|(name, bound)| TemplateParam {
+                    .map(|(name, bound, variance)| TemplateParam {
                         name: name.as_str().into(),
                         bound: bound.clone(),
                         defining_entity: fqn.as_str().into(),
+                        variance: *variance,
                     })
                     .collect();
 
@@ -459,10 +460,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 let template_params: Vec<TemplateParam> = class_doc
                     .templates
                     .iter()
-                    .map(|(name, bound)| TemplateParam {
+                    .map(|(name, bound, variance)| TemplateParam {
                         name: name.as_str().into(),
                         bound: bound.clone(),
                         defining_entity: fqcn.as_str().into(),
+                        variance: *variance,
                     })
                     .collect();
 
@@ -494,6 +496,23 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
             StmtKind::Interface(decl) => {
                 let fqcn = self.resolve_name(decl.name);
+
+                let iface_doc = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| crate::parser::DocblockParser::parse(c.text))
+                    .unwrap_or_default();
+
+                let template_params: Vec<TemplateParam> = iface_doc
+                    .templates
+                    .iter()
+                    .map(|(name, bound, variance)| TemplateParam {
+                        name: name.as_str().into(),
+                        bound: bound.clone(),
+                        defining_entity: fqcn.as_str().into(),
+                        variance: *variance,
+                    })
+                    .collect();
 
                 let extends: Vec<Arc<str>> = decl
                     .extends
@@ -541,7 +560,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         extends,
                         own_methods,
                         own_constants,
-                        template_params: vec![],
+                        template_params,
                         all_parents: vec![],
                         location: Some(self.location(stmt.span.start, stmt.span.end)),
                     },
@@ -550,6 +569,23 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
             StmtKind::Trait(decl) => {
                 let fqcn = self.resolve_name(decl.name);
+
+                let trait_doc = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| crate::parser::DocblockParser::parse(c.text))
+                    .unwrap_or_default();
+
+                let trait_template_params: Vec<TemplateParam> = trait_doc
+                    .templates
+                    .iter()
+                    .map(|(name, bound, variance)| TemplateParam {
+                        name: name.as_str().into(),
+                        bound: bound.clone(),
+                        defining_entity: fqcn.as_str().into(),
+                        variance: *variance,
+                    })
+                    .collect();
 
                 let mut own_methods = indexmap::IndexMap::new();
                 let mut own_properties = indexmap::IndexMap::new();
@@ -636,7 +672,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         own_methods,
                         own_properties,
                         own_constants,
-                        template_params: vec![],
+                        template_params: trait_template_params,
                         location: Some(self.location(stmt.span.start, stmt.span.end)),
                     },
                 );
@@ -786,10 +822,11 @@ impl<'a> DefinitionCollector<'a> {
         let template_params: Vec<TemplateParam> = doc
             .templates
             .iter()
-            .map(|(name, bound)| TemplateParam {
+            .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
                 bound: bound.clone(),
                 defining_entity: class_fqcn.into(),
+                variance: *variance,
             })
             .collect();
 

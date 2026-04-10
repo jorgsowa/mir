@@ -20,6 +20,21 @@ pub struct FnParam {
 }
 
 // ---------------------------------------------------------------------------
+// Variance — covariance / contravariance for template type parameters
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum Variance {
+    /// Default: exact type match required (no `@template-covariant` / `@template-contravariant`).
+    #[default]
+    Invariant,
+    /// `@template-covariant T` — `C<Sub>` is assignable to `C<Super>`.
+    Covariant,
+    /// `@template-contravariant T` — `C<Super>` is assignable to `C<Sub>`.
+    Contravariant,
+}
+
+// ---------------------------------------------------------------------------
 // TemplateParam — `@template T` / `@template T of Bound`
 // ---------------------------------------------------------------------------
 
@@ -27,6 +42,7 @@ pub struct FnParam {
 pub struct TemplateParam {
     pub name: Arc<str>,
     pub bound: Option<Union>,
+    pub variance: Variance,
 }
 
 // ---------------------------------------------------------------------------

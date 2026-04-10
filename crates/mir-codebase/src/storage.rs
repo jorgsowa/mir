@@ -37,6 +37,7 @@ pub struct TemplateParam {
     pub bound: Option<Union>,
     /// The entity (class or function FQN) that declared this template param.
     pub defining_entity: Arc<str>,
+    pub variance: mir_types::Variance,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

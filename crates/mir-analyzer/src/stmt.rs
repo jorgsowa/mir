@@ -1072,19 +1072,89 @@ fn named_object_return_compatible(
                 return true;
             }
 
-            // Same after resolution
-            resolved_actual == resolved_declared
-                // Direct string match in any combination
+            // Same class after resolution — check generic type params with variance
+            let is_same_class = resolved_actual == resolved_declared
                 || actual_fqcn.as_ref() == declared_fqcn.as_ref()
                 || actual_fqcn.as_ref() == resolved_declared.as_str()
-                || resolved_actual.as_str() == declared_fqcn.as_ref()
-                // Inheritance check
-                || codebase.extends_or_implements(actual_fqcn.as_ref(), &resolved_declared)
+                || resolved_actual.as_str() == declared_fqcn.as_ref();
+
+            if is_same_class {
+                let actual_type_params = match actual_atom {
+                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    _ => &[],
+                };
+                let declared_type_params = match declared_atom {
+                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    _ => &[],
+                };
+                if !actual_type_params.is_empty() || !declared_type_params.is_empty() {
+                    let class_tps = codebase.get_class_template_params(&resolved_declared);
+                    return return_type_params_compatible(
+                        actual_type_params,
+                        declared_type_params,
+                        &class_tps,
+                    );
+                }
+                return true;
+            }
+
+            // Inheritance check
+            codebase.extends_or_implements(actual_fqcn.as_ref(), &resolved_declared)
                 || codebase.extends_or_implements(actual_fqcn.as_ref(), declared_fqcn.as_ref())
                 || codebase.extends_or_implements(&resolved_actual, &resolved_declared)
                 || codebase.extends_or_implements(&resolved_actual, declared_fqcn.as_ref())
         })
     })
+}
+
+/// Check whether generic return type parameters are compatible according to each parameter's
+/// declared variance. Simpler than the arg-checking version — uses only structural subtyping
+/// since we don't have access to ExpressionAnalyzer here.
+fn return_type_params_compatible(
+    actual_params: &[Union],
+    declared_params: &[Union],
+    template_params: &[mir_codebase::storage::TemplateParam],
+) -> bool {
+    if actual_params.len() != declared_params.len() {
+        return true;
+    }
+    if actual_params.is_empty() {
+        return true;
+    }
+
+    for (i, (actual_p, declared_p)) in actual_params.iter().zip(declared_params.iter()).enumerate()
+    {
+        let variance = template_params
+            .get(i)
+            .map(|tp| tp.variance)
+            .unwrap_or(mir_types::Variance::Invariant);
+
+        let compatible = match variance {
+            mir_types::Variance::Covariant => {
+                actual_p.is_subtype_of_simple(declared_p)
+                    || declared_p.is_mixed()
+                    || actual_p.is_mixed()
+            }
+            mir_types::Variance::Contravariant => {
+                declared_p.is_subtype_of_simple(actual_p)
+                    || actual_p.is_mixed()
+                    || declared_p.is_mixed()
+            }
+            mir_types::Variance::Invariant => {
+                actual_p == declared_p
+                    || actual_p.is_mixed()
+                    || declared_p.is_mixed()
+                    || (actual_p.is_subtype_of_simple(declared_p)
+                        && declared_p.is_subtype_of_simple(actual_p))
+            }
+        };
+
+        if !compatible {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Returns true if the declared return type contains template-like types (unknown FQCNs
