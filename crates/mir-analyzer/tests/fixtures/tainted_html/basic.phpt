@@ -4,4 +4,4 @@ function test(): void {
     echo $_GET['x'];
 }
 ===expect===
-TaintedHtml: <no snippet>
+TaintedHtml: echo $_GET['x'];
