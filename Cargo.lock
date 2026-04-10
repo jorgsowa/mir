@@ -496,7 +496,6 @@ dependencies = [
  "indexmap",
  "mir-codebase",
  "mir-issues",
- "mir-test-utils",
  "mir-types",
  "php-ast",
  "php-rs-parser",
@@ -545,14 +544,6 @@ dependencies = [
  "rayon",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "mir-test-utils"
-version = "0.2.1"
-dependencies = [
- "mir-analyzer",
- "mir-issues",
 ]
 
 [[package]]
