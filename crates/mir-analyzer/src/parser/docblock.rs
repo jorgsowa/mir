@@ -1,4 +1,4 @@
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Union, Variance};
 /// Docblock parser — delegates to `php_rs_parser::phpdoc` for tag extraction,
 /// then converts `PhpDocTag`s into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
@@ -58,12 +58,26 @@ impl DocblockParser {
                     result.is_deprecated = true;
                     result.deprecated = Some(description.unwrap_or("").to_string());
                 }
-                PhpDocTag::Template { name, bound }
-                | PhpDocTag::TemplateCovariant { name, bound }
-                | PhpDocTag::TemplateContravariant { name, bound } => {
-                    result
-                        .templates
-                        .push((name.to_string(), bound.map(parse_type_string)));
+                PhpDocTag::Template { name, bound } => {
+                    result.templates.push((
+                        name.to_string(),
+                        bound.map(parse_type_string),
+                        Variance::Invariant,
+                    ));
+                }
+                PhpDocTag::TemplateCovariant { name, bound } => {
+                    result.templates.push((
+                        name.to_string(),
+                        bound.map(parse_type_string),
+                        Variance::Covariant,
+                    ));
+                }
+                PhpDocTag::TemplateContravariant { name, bound } => {
+                    result.templates.push((
+                        name.to_string(),
+                        bound.map(parse_type_string),
+                        Variance::Contravariant,
+                    ));
                 }
                 PhpDocTag::Extends { type_str } => {
                     result.extends = Some(type_str.to_string());
@@ -202,8 +216,8 @@ pub struct ParsedDocblock {
     pub var_type: Option<Union>,
     /// Optional variable name from `@var Type $name`
     pub var_name: Option<String>,
-    /// `@template T` / `@template T of Bound`
-    pub templates: Vec<(String, Option<Union>)>,
+    /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
+    pub templates: Vec<(String, Option<Union>, Variance)>,
     /// `@extends ClassName<T>`
     pub extends: Option<String>,
     /// `@implements InterfaceName<T>`
@@ -686,6 +700,25 @@ mod tests {
         assert_eq!(parsed.templates.len(), 1);
         assert_eq!(parsed.templates[0].0, "T");
         assert!(parsed.templates[0].1.is_some());
+        assert_eq!(parsed.templates[0].2, Variance::Invariant);
+    }
+
+    #[test]
+    fn parse_template_covariant() {
+        let doc = "/** @template-covariant T */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.templates.len(), 1);
+        assert_eq!(parsed.templates[0].0, "T");
+        assert_eq!(parsed.templates[0].2, Variance::Covariant);
+    }
+
+    #[test]
+    fn parse_template_contravariant() {
+        let doc = "/** @template-contravariant T */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.templates.len(), 1);
+        assert_eq!(parsed.templates[0].0, "T");
+        assert_eq!(parsed.templates[0].2, Variance::Contravariant);
     }
 
     #[test]

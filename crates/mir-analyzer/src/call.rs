@@ -976,10 +976,33 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 .resolve_class_name(&ea.file, param_fqcn.as_ref());
             let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
 
-            if resolved_param == resolved_arg
+            // Same class — check generic type params with variance
+            let is_same_class = resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
-                || resolved_arg == param_fqcn.as_ref()
-                || ea.codebase.extends_or_implements(arg_fqcn.as_ref(), &resolved_param)
+                || resolved_arg == param_fqcn.as_ref();
+
+            if is_same_class {
+                let arg_type_params = match a_atomic {
+                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    _ => &[],
+                };
+                let param_type_params = match p_atomic {
+                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    _ => &[],
+                };
+                if !arg_type_params.is_empty() || !param_type_params.is_empty() {
+                    let class_tps = ea.codebase.get_class_template_params(&resolved_param);
+                    return generic_type_params_compatible(
+                        arg_type_params,
+                        param_type_params,
+                        &class_tps,
+                        ea,
+                    );
+                }
+                return true;
+            }
+
+            if ea.codebase.extends_or_implements(arg_fqcn.as_ref(), &resolved_param)
                 || ea.codebase.extends_or_implements(arg_fqcn.as_ref(), param_fqcn.as_ref())
                 || ea.codebase.extends_or_implements(&resolved_arg, &resolved_param)
                 // ArgumentTypeCoercion (suppressed at level 3): param extends arg — arg is
@@ -1059,6 +1082,65 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             false
         })
     })
+}
+
+/// Check whether generic type parameters are compatible according to each parameter's declared
+/// variance (`@template-covariant`, `@template-contravariant`, or invariant by default).
+///
+/// - Covariant: `C<Sub>` satisfies `C<Super>` when `Sub <: Super`.
+/// - Contravariant: `C<Super>` satisfies `C<Sub>` when `Super <: Sub` (reversed).
+/// - Invariant: exact structural match required.
+fn generic_type_params_compatible(
+    arg_params: &[Union],
+    param_params: &[Union],
+    template_params: &[mir_codebase::storage::TemplateParam],
+    ea: &ExpressionAnalyzer<'_>,
+) -> bool {
+    // Mismatched arity (raw / uninstantiated generic) — be permissive.
+    if arg_params.len() != param_params.len() {
+        return true;
+    }
+    // No type params on either side — trivially compatible.
+    if arg_params.is_empty() {
+        return true;
+    }
+
+    for (i, (arg_p, param_p)) in arg_params.iter().zip(param_params.iter()).enumerate() {
+        let variance = template_params
+            .get(i)
+            .map(|tp| tp.variance)
+            .unwrap_or(mir_types::Variance::Invariant);
+
+        let compatible = match variance {
+            mir_types::Variance::Covariant => {
+                // C<Cat> satisfies C<Animal> when Cat <: Animal.
+                arg_p.is_subtype_of_simple(param_p)
+                    || param_p.is_mixed()
+                    || arg_p.is_mixed()
+                    || named_object_subtype(arg_p, param_p, ea)
+            }
+            mir_types::Variance::Contravariant => {
+                // C<Animal> satisfies C<Cat> when Animal <: Cat (reversed direction).
+                param_p.is_subtype_of_simple(arg_p)
+                    || arg_p.is_mixed()
+                    || param_p.is_mixed()
+                    || named_object_subtype(param_p, arg_p, ea)
+            }
+            mir_types::Variance::Invariant => {
+                // Exact structural match or mutual subtyping.
+                arg_p == param_p
+                    || arg_p.is_mixed()
+                    || param_p.is_mixed()
+                    || (arg_p.is_subtype_of_simple(param_p) && param_p.is_subtype_of_simple(arg_p))
+            }
+        };
+
+        if !compatible {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Returns true if the param type contains a template-like type (a TNamedObject whose FQCN
