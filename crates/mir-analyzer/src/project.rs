@@ -631,7 +631,7 @@ impl ProjectAnalyzer {
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
-        emit_unused_params(&params, &ctx, false, file, all_issues);
+        emit_unused_params(&params, &ctx, "", file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
@@ -722,7 +722,7 @@ impl ProjectAnalyzer {
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
-            emit_unused_params(&params, &ctx, is_ctor, file, all_issues);
+            emit_unused_params(&params, &ctx, method.name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
@@ -921,7 +921,7 @@ impl ProjectAnalyzer {
             crate::type_env::TypeEnv::new(ctx.vars.clone()),
         );
 
-        emit_unused_params(&params, &ctx, false, file, all_issues);
+        emit_unused_params(&params, &ctx, "", file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
@@ -1022,7 +1022,7 @@ impl ProjectAnalyzer {
                 crate::type_env::TypeEnv::new(ctx.vars.clone()),
             );
 
-            emit_unused_params(&params, &ctx, is_ctor, file, all_issues);
+            emit_unused_params(&params, &ctx, method.name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
@@ -1178,26 +1178,30 @@ fn is_pseudo_type(name: &str) -> bool {
     )
 }
 
+/// Magic methods whose parameters are passed by the PHP runtime, not user call sites.
+const MAGIC_METHODS_WITH_RUNTIME_PARAMS: &[&str] = &[
+    "__get",
+    "__set",
+    "__call",
+    "__callStatic",
+    "__isset",
+    "__unset",
+];
+
 /// Emit `UnusedParam` issues for params that were never read in `ctx`.
-/// Skips variadic params, `_`-prefixed names, and constructors.
+/// Skips magic methods whose parameters are passed by the PHP runtime.
 fn emit_unused_params(
     params: &[mir_codebase::FnParam],
     ctx: &crate::context::Context,
-    is_ctor: bool,
+    method_name: &str,
     file: &Arc<str>,
     issues: &mut Vec<mir_issues::Issue>,
 ) {
-    if is_ctor {
+    if MAGIC_METHODS_WITH_RUNTIME_PARAMS.contains(&method_name) {
         return;
     }
     for p in params {
-        if p.is_variadic {
-            continue;
-        }
         let name = p.name.as_ref().trim_start_matches('$');
-        if name.starts_with('_') {
-            continue;
-        }
         if !ctx.read_vars.contains(name) {
             issues.push(
                 mir_issues::Issue::new(
