@@ -59,11 +59,31 @@ pub struct Location {
     /// Byte offset of the start of the declaration in the source.
     pub start: u32,
     pub end: u32,
+    /// 1-based line number of the declaration.
+    pub line: u32,
+    /// 0-based column offset of the declaration.
+    pub col: u16,
 }
 
 impl Location {
     pub fn new(file: Arc<str>, start: u32, end: u32) -> Self {
-        Self { file, start, end }
+        Self {
+            file,
+            start,
+            end,
+            line: 1,
+            col: 0,
+        }
+    }
+
+    pub fn with_line_col(file: Arc<str>, start: u32, end: u32, line: u32, col: u16) -> Self {
+        Self {
+            file,
+            start,
+            end,
+            line,
+            col,
+        }
     }
 }
 
