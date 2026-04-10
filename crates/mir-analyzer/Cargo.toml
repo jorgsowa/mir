@@ -24,6 +24,5 @@ serde_json    = { workspace = true }
 quick-xml     = "0.36"
 
 [dev-dependencies]
-mir-test-utils = { workspace = true }
 mir-issues     = { workspace = true }
 tempfile = "3.27.0"

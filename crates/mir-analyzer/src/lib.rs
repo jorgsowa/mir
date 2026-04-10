@@ -26,3 +26,5 @@ pub use type_env::{ScopeId, TypeEnv};
 
 pub mod composer;
 pub use composer::Psr4Map;
+
+pub mod test_utils;

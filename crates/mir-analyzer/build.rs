@@ -65,7 +65,7 @@ fn main() {
 
             code.push_str(&format!(
                 "    #[test]\n    fn {stem}() {{\n        \
-                 mir_test_utils::run_fixture(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{rel}\"));\n    \
+                 mir_analyzer::test_utils::run_fixture(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{rel}\"));\n    \
                  }}\n"
             ));
         }
