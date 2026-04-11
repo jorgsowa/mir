@@ -118,6 +118,10 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_overrides(&cls, &mut issues);
         }
 
+        // ---- 5. Circular inheritance detection --------------------------------
+        self.check_circular_class_inheritance(&mut issues);
+        self.check_circular_interface_inheritance(&mut issues);
+
         issues
     }
 
@@ -475,11 +479,230 @@ impl<'a> ClassAnalyzer<'a> {
         }
         None
     }
-}
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // Check: circular class inheritance (class A extends B extends A)
+    // -----------------------------------------------------------------------
+
+    fn check_circular_class_inheritance(&self, issues: &mut Vec<Issue>) {
+        let mut globally_done: HashSet<String> = HashSet::new();
+
+        let mut class_keys: Vec<Arc<str>> = self
+            .codebase
+            .classes
+            .iter()
+            .map(|e| e.key().clone())
+            .collect();
+        class_keys.sort();
+
+        for start_fqcn in &class_keys {
+            if globally_done.contains(start_fqcn.as_ref()) {
+                continue;
+            }
+
+            // Walk the parent chain, tracking order for cycle reporting.
+            let mut chain: Vec<Arc<str>> = Vec::new();
+            let mut chain_set: HashSet<String> = HashSet::new();
+            let mut current: Arc<str> = start_fqcn.clone();
+
+            loop {
+                if globally_done.contains(current.as_ref()) {
+                    // Known safe — stop here.
+                    for node in &chain {
+                        globally_done.insert(node.to_string());
+                    }
+                    break;
+                }
+                if !chain_set.insert(current.to_string()) {
+                    // current is already in chain → cycle detected.
+                    let cycle_start = chain
+                        .iter()
+                        .position(|p| p.as_ref() == current.as_ref())
+                        .unwrap_or(0);
+                    let cycle_nodes = &chain[cycle_start..];
+
+                    // Report on the lexicographically last class in the cycle
+                    // that belongs to an analyzed file (or any if filter is empty).
+                    let offender = cycle_nodes
+                        .iter()
+                        .filter(|n| self.class_in_analyzed_files(n))
+                        .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
+
+                    if let Some(offender) = offender {
+                        let cls = self.codebase.classes.get(offender.as_ref());
+                        let loc = issue_location(
+                            cls.as_ref().and_then(|c| c.location.as_ref()),
+                            offender,
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::CircularInheritance {
+                                class: offender.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(
+                            cls.as_ref().and_then(|c| c.location.as_ref()),
+                            &self.sources,
+                        ) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+
+                    for node in &chain {
+                        globally_done.insert(node.to_string());
+                    }
+                    break;
+                }
+
+                chain.push(current.clone());
+
+                let parent = self
+                    .codebase
+                    .classes
+                    .get(current.as_ref())
+                    .and_then(|c| c.parent.clone());
+
+                match parent {
+                    Some(p) => current = p,
+                    None => {
+                        for node in &chain {
+                            globally_done.insert(node.to_string());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Check: circular interface inheritance (interface I1 extends I2 extends I1)
+    // -----------------------------------------------------------------------
+
+    fn check_circular_interface_inheritance(&self, issues: &mut Vec<Issue>) {
+        let mut globally_done: HashSet<String> = HashSet::new();
+
+        let mut iface_keys: Vec<Arc<str>> = self
+            .codebase
+            .interfaces
+            .iter()
+            .map(|e| e.key().clone())
+            .collect();
+        iface_keys.sort();
+
+        for start_fqcn in &iface_keys {
+            if globally_done.contains(start_fqcn.as_ref()) {
+                continue;
+            }
+            let mut in_stack: Vec<Arc<str>> = Vec::new();
+            let mut stack_set: HashSet<String> = HashSet::new();
+            self.dfs_interface_cycle(
+                start_fqcn.clone(),
+                &mut in_stack,
+                &mut stack_set,
+                &mut globally_done,
+                issues,
+            );
+        }
+    }
+
+    fn dfs_interface_cycle(
+        &self,
+        fqcn: Arc<str>,
+        in_stack: &mut Vec<Arc<str>>,
+        stack_set: &mut HashSet<String>,
+        globally_done: &mut HashSet<String>,
+        issues: &mut Vec<Issue>,
+    ) {
+        if globally_done.contains(fqcn.as_ref()) {
+            return;
+        }
+        if stack_set.contains(fqcn.as_ref()) {
+            // Cycle: find cycle nodes from in_stack.
+            let cycle_start = in_stack
+                .iter()
+                .position(|p| p.as_ref() == fqcn.as_ref())
+                .unwrap_or(0);
+            let cycle_nodes = &in_stack[cycle_start..];
+
+            let offender = cycle_nodes
+                .iter()
+                .filter(|n| self.iface_in_analyzed_files(n))
+                .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
+
+            if let Some(offender) = offender {
+                let iface = self.codebase.interfaces.get(offender.as_ref());
+                let loc =
+                    issue_location(iface.as_ref().and_then(|i| i.location.as_ref()), offender);
+                let mut issue = Issue::new(
+                    IssueKind::CircularInheritance {
+                        class: offender.to_string(),
+                    },
+                    loc,
+                );
+                if let Some(snippet) = extract_snippet(
+                    iface.as_ref().and_then(|i| i.location.as_ref()),
+                    &self.sources,
+                ) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+            return;
+        }
+
+        stack_set.insert(fqcn.to_string());
+        in_stack.push(fqcn.clone());
+
+        let extends = self
+            .codebase
+            .interfaces
+            .get(fqcn.as_ref())
+            .map(|i| i.extends.clone())
+            .unwrap_or_default();
+
+        for parent in extends {
+            self.dfs_interface_cycle(parent, in_stack, stack_set, globally_done, issues);
+        }
+
+        in_stack.pop();
+        stack_set.remove(fqcn.as_ref());
+        globally_done.insert(fqcn.to_string());
+    }
+
+    fn class_in_analyzed_files(&self, fqcn: &Arc<str>) -> bool {
+        if self.analyzed_files.is_empty() {
+            return true;
+        }
+        self.codebase
+            .classes
+            .get(fqcn.as_ref())
+            .map(|c| {
+                c.location
+                    .as_ref()
+                    .map(|loc| self.analyzed_files.contains(&loc.file))
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false)
+    }
+
+    fn iface_in_analyzed_files(&self, fqcn: &Arc<str>) -> bool {
+        if self.analyzed_files.is_empty() {
+            return true;
+        }
+        self.codebase
+            .interfaces
+            .get(fqcn.as_ref())
+            .map(|i| {
+                i.location
+                    .as_ref()
+                    .map(|loc| self.analyzed_files.contains(&loc.file))
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false)
+    }
+}
 
 /// Returns true if `child_vis` is strictly less visible than `parent_vis`.
 fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
