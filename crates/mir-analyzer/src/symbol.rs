@@ -13,6 +13,8 @@ use php_ast::Span;
 /// A single resolved symbol observed during Pass 2.
 #[derive(Debug, Clone)]
 pub struct ResolvedSymbol {
+    /// Absolute path of the source file this symbol was resolved in.
+    pub file: Arc<str>,
     /// Byte-offset span in the source file.
     pub span: Span,
     /// What kind of symbol this is.

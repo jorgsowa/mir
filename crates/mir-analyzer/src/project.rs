@@ -429,6 +429,99 @@ impl ProjectAnalyzer {
         }
     }
 
+    /// Incrementally re-analyze a changed file and update a shared
+    /// [`AnalysisResult`] in place.
+    ///
+    /// This is the primary incremental API for LSP `textDocument/didChange`:
+    ///
+    /// 1. Evicts stale issues and symbols for `path` (and its dependents) from
+    ///    `result`.
+    /// 2. Removes the old codebase definitions for `path`.
+    /// 3. Re-parses `path` with `new_source` and re-runs Pass 1 + Pass 2.
+    /// 4. For each file in [`Codebase::dependents_of`]`(path)`, re-analyzes
+    ///    that file as well (shallow: one level of dependents).
+    /// 5. Merges the new issues and symbols back into `result`.
+    ///
+    /// # Prerequisites
+    ///
+    /// Requires that [`analyze`] has been called at least once so that the
+    /// codebase is finalized and the reverse dependency index is populated.
+    pub fn reanalyze_file(&self, path: &str, new_source: &str, result: &mut AnalysisResult) {
+        // Collect the set of files to re-analyze: the changed file + one level
+        // of dependents.
+        let mut to_reanalyze: Vec<(Arc<str>, Option<String>)> = Vec::new();
+        to_reanalyze.push((Arc::from(path), Some(new_source.to_string())));
+
+        for dep in self.codebase.dependents_of(path) {
+            let src = std::fs::read_to_string(dep.as_ref()).ok();
+            to_reanalyze.push((dep, src));
+        }
+
+        // Evict stale entries from result for every file we are about to re-analyze.
+        let files_to_evict: Vec<Arc<str>> = to_reanalyze.iter().map(|(f, _)| f.clone()).collect();
+        result
+            .issues
+            .retain(|i| !files_to_evict.contains(&i.location.file));
+        result.symbols.retain(|s| !files_to_evict.contains(&s.file));
+
+        // Remove codebase definitions for the primary file and rebuild.
+        self.codebase.remove_file_definitions(path);
+
+        // Re-run Pass 1 + Pass 2 for each file.
+        for (file, src_opt) in &to_reanalyze {
+            let src = match src_opt {
+                Some(s) => s.clone(),
+                None => continue, // dependent file could not be read — skip
+            };
+
+            // If this is the primary changed file, definitions were already removed.
+            // For dependents we keep existing definitions (they didn't change).
+            if file.as_ref() != path {
+                self.codebase.remove_file_definitions(file.as_ref());
+            }
+
+            let arena = bumpalo::Bump::new();
+            let parsed = php_rs_parser::parse(&arena, &src);
+
+            // Parse errors
+            for err in &parsed.errors {
+                result.issues.push(Issue::new(
+                    mir_issues::IssueKind::ParseError {
+                        message: err.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line: 1,
+                        col_start: 0,
+                        col_end: 0,
+                    },
+                ));
+            }
+
+            // Pass 1: re-collect definitions
+            let collector =
+                DefinitionCollector::new(&self.codebase, file.clone(), &src, &parsed.source_map);
+            result.issues.extend(collector.collect(&parsed.program));
+
+            // Re-finalize after each file so Pass 2 sees an up-to-date graph.
+            self.codebase.invalidate_finalization();
+            self.codebase.finalize();
+
+            // Pass 2: re-analyze bodies
+            let (body_issues, symbols) =
+                self.analyze_bodies(&parsed.program, file.clone(), &src, &parsed.source_map);
+            result.issues.extend(body_issues);
+            result.symbols.extend(symbols);
+        }
+
+        // Rebuild the reverse dep index so subsequent calls stay accurate.
+        let rev = build_reverse_deps(&self.codebase);
+        self.codebase.set_dependents(rev.clone());
+        if let Some(cache) = &self.cache {
+            cache.set_reverse_deps(rev);
+        }
+    }
+
     /// Analyze a PHP source string without a real file path.
     /// Useful for tests and LSP single-file mode.
     pub fn analyze_source(source: &str) -> AnalysisResult {
