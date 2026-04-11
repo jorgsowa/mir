@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use mir_codebase::DefinitionQuery;
 use mir_types::Union;
 use php_ast::Span;
 
@@ -36,4 +37,26 @@ pub enum SymbolKind {
     FunctionCall(Arc<str>),
     /// A class reference (`new Foo`, `instanceof Foo`, type hints).
     ClassReference(Arc<str>),
+}
+
+impl From<&SymbolKind> for DefinitionQuery {
+    fn from(kind: &SymbolKind) -> Self {
+        match kind {
+            SymbolKind::Variable(_) => DefinitionQuery::Variable,
+            SymbolKind::MethodCall { class, method } => DefinitionQuery::MethodCall {
+                class: class.clone(),
+                method: method.clone(),
+            },
+            SymbolKind::StaticCall { class, method } => DefinitionQuery::StaticCall {
+                class: class.clone(),
+                method: method.clone(),
+            },
+            SymbolKind::PropertyAccess { class, property } => DefinitionQuery::PropertyAccess {
+                class: class.clone(),
+                property: property.clone(),
+            },
+            SymbolKind::FunctionCall(fqn) => DefinitionQuery::FunctionCall(fqn.clone()),
+            SymbolKind::ClassReference(fqcn) => DefinitionQuery::ClassReference(fqcn.clone()),
+        }
+    }
 }

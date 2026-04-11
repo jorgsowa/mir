@@ -1377,4 +1377,19 @@ impl AnalysisResult {
             .filter(|i| i.severity == mir_issues::Severity::Warning)
             .count()
     }
+
+    /// Look up the definition site for a resolved symbol.
+    ///
+    /// Delegates to [`mir_codebase::Codebase::resolve_definition`] via a
+    /// [`mir_codebase::DefinitionQuery`] derived from `symbol.kind`.
+    /// Returns `None` for variable references and for symbols not found in
+    /// the codebase.
+    pub fn resolve_definition(
+        &self,
+        symbol: &crate::symbol::ResolvedSymbol,
+        codebase: &mir_codebase::Codebase,
+    ) -> Option<mir_codebase::storage::Location> {
+        let query = mir_codebase::DefinitionQuery::from(&symbol.kind);
+        codebase.resolve_definition(&query)
+    }
 }

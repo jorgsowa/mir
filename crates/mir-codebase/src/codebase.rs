@@ -770,4 +770,77 @@ impl Codebase {
 
         table
     }
+
+    // -----------------------------------------------------------------------
+    // Definition-location lookup
+    // -----------------------------------------------------------------------
+
+    /// Resolve a symbol reference to the source location where it is defined.
+    ///
+    /// Returns `None` for `Variable` references (they have no definition site
+    /// in the codebase) and for symbols that could not be found.
+    ///
+    /// The returned [`storage::Location`] uses byte offsets and a 1-based line
+    /// number — consumers (e.g. an LSP server) can convert these to the wire
+    /// format they need.
+    pub fn resolve_definition(&self, query: &DefinitionQuery) -> Option<crate::storage::Location> {
+        match query {
+            DefinitionQuery::MethodCall { class, method }
+            | DefinitionQuery::StaticCall { class, method } => self
+                .get_method(class.as_ref(), method.as_ref())
+                .and_then(|m| m.location),
+
+            DefinitionQuery::FunctionCall(fqn) => self
+                .functions
+                .get(fqn.as_ref())
+                .and_then(|f| f.location.clone()),
+
+            DefinitionQuery::ClassReference(fqcn) => {
+                if let Some(cls) = self.classes.get(fqcn.as_ref()) {
+                    return cls.location.clone();
+                }
+                if let Some(iface) = self.interfaces.get(fqcn.as_ref()) {
+                    return iface.location.clone();
+                }
+                if let Some(tr) = self.traits.get(fqcn.as_ref()) {
+                    return tr.location.clone();
+                }
+                if let Some(en) = self.enums.get(fqcn.as_ref()) {
+                    return en.location.clone();
+                }
+                None
+            }
+
+            DefinitionQuery::PropertyAccess { class, property } => self
+                .get_property(class.as_ref(), property.as_ref())
+                .and_then(|p| p.location),
+
+            DefinitionQuery::Variable => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DefinitionQuery — codebase-side symbol identity for definition lookups
+// ---------------------------------------------------------------------------
+
+/// Describes a resolved symbol reference without carrying AST spans.
+///
+/// Mirrors the variants of `mir_analyzer::symbol::SymbolKind` but lives in
+/// `mir-codebase` so that `Codebase::resolve_definition` does not create an
+/// upward dependency on `mir-analyzer`.
+#[derive(Debug, Clone)]
+pub enum DefinitionQuery {
+    /// Instance or static method call: `$obj->method()` / `Class::method()`
+    MethodCall { class: Arc<str>, method: Arc<str> },
+    /// Static method call: `Class::method()`
+    StaticCall { class: Arc<str>, method: Arc<str> },
+    /// Free function call: `foo()`
+    FunctionCall(Arc<str>),
+    /// Class/interface/trait/enum reference: `new Foo`, `instanceof Foo`
+    ClassReference(Arc<str>),
+    /// Property access: `$obj->prop`
+    PropertyAccess { class: Arc<str>, property: Arc<str> },
+    /// Variable reference — has no codebase definition site.
+    Variable,
 }
