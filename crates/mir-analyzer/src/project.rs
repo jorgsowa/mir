@@ -205,9 +205,10 @@ impl ProjectAnalyzer {
             self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);
         }
 
-        // ---- Build reverse dep graph and persist it for the next run ---------
+        // ---- Build reverse dep graph, persist for cache and store on codebase --
+        let rev = build_reverse_deps(&self.codebase);
+        self.codebase.set_dependents(rev.clone());
         if let Some(cache) = &self.cache {
-            let rev = build_reverse_deps(&self.codebase);
             cache.set_reverse_deps(rev);
         }
 

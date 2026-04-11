@@ -54,6 +54,13 @@ pub struct Codebase {
     /// namespace data that mir already collects, instead of reimplementing it.
     pub file_namespaces: DashMap<Arc<str>, String>,
 
+    /// Reverse dependency index: maps a file path to the set of files that
+    /// import or depend on it (via `use`, `extends`, `implements`, or trait
+    /// `use`). Populated by `ProjectAnalyzer` after Pass 1.
+    ///
+    /// Use [`Codebase::dependents_of`] to query this map.
+    pub dependents: DashMap<Arc<str>, DashSet<Arc<str>>>,
+
     /// Whether finalize() has been called.
     finalized: std::sync::atomic::AtomicBool,
 }
@@ -106,6 +113,7 @@ impl Codebase {
         // Remove file-level metadata
         self.file_imports.remove(file_path);
         self.file_namespaces.remove(file_path);
+        self.dependents.remove(file_path);
 
         self.invalidate_finalization();
     }
@@ -296,6 +304,42 @@ impl Codebase {
     /// subclass is expected to implement the method, matching Psalm errorLevel=3 behaviour.
     pub fn is_abstract_class(&self, fqcn: &str) -> bool {
         self.classes.get(fqcn).is_some_and(|c| c.is_abstract)
+    }
+
+    // -----------------------------------------------------------------------
+    // Reverse dependency index
+    // -----------------------------------------------------------------------
+
+    /// Return the set of files that directly depend on `file` (via `use`,
+    /// `extends`, `implements`, or trait `use`).
+    ///
+    /// The returned paths are absolute file paths as stored in `symbol_to_file`.
+    /// Returns an empty `Vec` when `file` has no known dependents (e.g. it is a
+    /// leaf file or the index has not been built yet).
+    pub fn dependents_of(&self, file: &str) -> Vec<Arc<str>> {
+        self.dependents
+            .get(file)
+            .map(|set| set.iter().map(|e| e.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Overwrite the reverse dependency index with the provided map.
+    ///
+    /// Called by `ProjectAnalyzer` after Pass 1 + codebase finalization, when
+    /// the full import/extends/implements graph is available.
+    pub fn set_dependents(
+        &self,
+        map: std::collections::HashMap<String, std::collections::HashSet<String>>,
+    ) {
+        self.dependents.clear();
+        for (defining_file, dependent_files) in map {
+            let key: Arc<str> = Arc::from(defining_file.as_str());
+            let set = DashSet::new();
+            for dep in dependent_files {
+                set.insert(Arc::from(dep.as_str()));
+            }
+            self.dependents.insert(key, set);
+        }
     }
 
     /// Return the declared template params for `fqcn` (class or interface), or
