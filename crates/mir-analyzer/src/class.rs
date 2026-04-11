@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{MethodStorage, Visibility};
 use mir_codebase::Codebase;
-use mir_issues::{Issue, IssueKind, Location};
+use mir_issues::{Issue, IssueKind, Location, RelatedLocation};
 
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
@@ -158,13 +158,24 @@ impl<'a> ClassAnalyzer<'a> {
                 }
 
                 let loc = issue_location(cls.location.as_ref(), fqcn);
+                let mut related = Vec::new();
+                if let Some(rel_loc) = method.location.as_ref() {
+                    related.push(RelatedLocation {
+                        location: issue_location(Some(rel_loc), &method.fqcn),
+                        message: format!(
+                            "abstract method '{}' declared in '{}'",
+                            method_name, ancestor_fqcn
+                        ),
+                    });
+                }
                 let mut issue = Issue::new(
                     IssueKind::UnimplementedAbstractMethod {
                         class: fqcn.to_string(),
                         method: method_name.to_string(),
                     },
                     loc,
-                );
+                )
+                .with_related(related);
                 if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
@@ -198,7 +209,7 @@ impl<'a> ClassAnalyzer<'a> {
                 None => continue,
             };
 
-            for (method_name, _method) in &iface.own_methods {
+            for (method_name, iface_method) in &iface.own_methods {
                 // Check if the class provides a concrete implementation
                 let implemented = cls
                     .get_method(method_name.as_ref())
@@ -207,6 +218,16 @@ impl<'a> ClassAnalyzer<'a> {
 
                 if !implemented {
                     let loc = issue_location(cls.location.as_ref(), fqcn);
+                    let mut related = Vec::new();
+                    if let Some(rel_loc) = iface_method.location.as_ref() {
+                        related.push(RelatedLocation {
+                            location: issue_location(Some(rel_loc), &iface_method.fqcn),
+                            message: format!(
+                                "method '{}' required by interface '{}'",
+                                method_name, iface_fqcn
+                            ),
+                        });
+                    }
                     let mut issue = Issue::new(
                         IssueKind::UnimplementedInterfaceMethod {
                             class: fqcn.to_string(),
@@ -214,7 +235,8 @@ impl<'a> ClassAnalyzer<'a> {
                             method: method_name.to_string(),
                         },
                         loc,
-                    );
+                    )
+                    .with_related(related);
                     if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources) {
                         issue = issue.with_snippet(snippet);
                     }
@@ -246,6 +268,18 @@ impl<'a> ClassAnalyzer<'a> {
             };
 
             let loc = issue_location(own_method.location.as_ref(), fqcn);
+
+            // Build a related location pointing at the parent method definition,
+            // shared by all override-mismatch issues below.
+            let parent_related: Vec<RelatedLocation> = parent
+                .location
+                .as_ref()
+                .map(|rel_loc| RelatedLocation {
+                    location: issue_location(Some(rel_loc), &parent.fqcn),
+                    message: format!("parent method '{}' defined here", method_name),
+                })
+                .into_iter()
+                .collect();
 
             // ---- a. Cannot override a final method -------------------------
             if parent.is_final {
@@ -315,7 +349,8 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc.clone(),
                         )
-                        .with_snippet(method_name.to_string()),
+                        .with_snippet(method_name.to_string())
+                        .with_related(parent_related.clone()),
                     );
                 }
             }
@@ -345,7 +380,8 @@ impl<'a> ClassAnalyzer<'a> {
                         },
                         loc.clone(),
                     )
-                    .with_snippet(method_name.to_string()),
+                    .with_snippet(method_name.to_string())
+                    .with_related(parent_related.clone()),
                 );
             }
 
@@ -396,7 +432,8 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc.clone(),
                         )
-                        .with_snippet(method_name.to_string()),
+                        .with_snippet(method_name.to_string())
+                        .with_related(parent_related.clone()),
                     );
                     break; // one issue per method is enough
                 }

@@ -47,6 +47,19 @@ impl fmt::Display for Location {
 }
 
 // ---------------------------------------------------------------------------
+// RelatedLocation — secondary diagnostic span
+// ---------------------------------------------------------------------------
+
+/// A secondary location attached to an [`Issue`] to give context for the
+/// diagnostic (e.g. "parent method declared here", "interface requires this").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RelatedLocation {
+    pub location: Location,
+    /// Short human-readable label, e.g. `"declared here"`.
+    pub message: String,
+}
+
+// ---------------------------------------------------------------------------
 // IssueKind
 // ---------------------------------------------------------------------------
 
@@ -725,6 +738,9 @@ pub struct Issue {
     pub location: Location,
     pub snippet: Option<String>,
     pub suppressed: bool,
+    /// Secondary diagnostic spans — e.g. "parent method declared here".
+    /// Maps to `Diagnostic.relatedInformation` in the LSP protocol.
+    pub related: Vec<RelatedLocation>,
 }
 
 impl Issue {
@@ -736,11 +752,17 @@ impl Issue {
             location,
             snippet: None,
             suppressed: false,
+            related: Vec::new(),
         }
     }
 
     pub fn with_snippet(mut self, snippet: impl Into<String>) -> Self {
         self.snippet = Some(snippet.into());
+        self
+    }
+
+    pub fn with_related(mut self, related: Vec<RelatedLocation>) -> Self {
+        self.related = related;
         self
     }
 
@@ -764,7 +786,16 @@ impl fmt::Display for Issue {
             sev,
             self.kind.name().bold(),
             self.kind.message()
-        )
+        )?;
+        for rel in &self.related {
+            write!(
+                f,
+                "\n  {} note: {}",
+                rel.location.bright_black(),
+                rel.message
+            )?;
+        }
+        Ok(())
     }
 }
 
