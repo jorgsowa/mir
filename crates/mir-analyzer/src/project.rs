@@ -141,6 +141,64 @@ impl ProjectAnalyzer {
                 std::collections::HashMap::new();
             let mut file_ns_set = false;
 
+            // Index a flat list of stmts under a given namespace prefix.
+            let index_stmts =
+                |stmts: &[php_ast::ast::Stmt<'_, '_>],
+                 ns: Option<&str>,
+                 imports: &mut std::collections::HashMap<String, String>| {
+                    for stmt in stmts.iter() {
+                        match &stmt.kind {
+                            StmtKind::Use(use_decl) => {
+                                for item in use_decl.uses.iter() {
+                                    let full_name = crate::parser::name_to_string(&item.name);
+                                    let alias = item.alias.unwrap_or_else(|| {
+                                        full_name.rsplit('\\').next().unwrap_or(&full_name)
+                                    });
+                                    imports.insert(alias.to_string(), full_name);
+                                }
+                            }
+                            StmtKind::Class(decl) => {
+                                if let Some(n) = decl.name {
+                                    let fqcn = match ns {
+                                        Some(ns) => format!("{}\\{}", ns, n),
+                                        None => n.to_string(),
+                                    };
+                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                                }
+                            }
+                            StmtKind::Interface(decl) => {
+                                let fqcn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                            }
+                            StmtKind::Trait(decl) => {
+                                let fqcn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                            }
+                            StmtKind::Enum(decl) => {
+                                let fqcn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                            }
+                            StmtKind::Function(decl) => {
+                                let fqn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqn.as_str()));
+                            }
+                            _ => {}
+                        }
+                    }
+                };
+
             for stmt in result.program.stmts.iter() {
                 match &stmt.kind {
                     StmtKind::Namespace(ns) => {
@@ -154,59 +212,16 @@ impl ProjectAnalyzer {
                                 file_ns_set = true;
                             }
                         }
-                    }
-                    StmtKind::Use(use_decl) => {
-                        for item in use_decl.uses.iter() {
-                            let full_name = crate::parser::name_to_string(&item.name);
-                            let alias = item.alias.unwrap_or_else(|| {
-                                full_name.rsplit('\\').next().unwrap_or(&full_name)
-                            });
-                            imports.insert(alias.to_string(), full_name);
+                        // Bracketed namespace: walk inner stmts for Use/Class/etc.
+                        if let php_ast::ast::NamespaceBody::Braced(inner_stmts) = &ns.body {
+                            index_stmts(inner_stmts, current_namespace.as_deref(), &mut imports);
                         }
                     }
-                    StmtKind::Class(decl) => {
-                        if let Some(n) = decl.name {
-                            let fqcn = if let Some(ref ns) = current_namespace {
-                                format!("{}\\{}", ns, n)
-                            } else {
-                                n.to_string()
-                            };
-                            self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                        }
-                    }
-                    StmtKind::Interface(decl) => {
-                        let fqcn = if let Some(ref ns) = current_namespace {
-                            format!("{}\\{}", ns, decl.name)
-                        } else {
-                            decl.name.to_string()
-                        };
-                        self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                    }
-                    StmtKind::Trait(decl) => {
-                        let fqcn = if let Some(ref ns) = current_namespace {
-                            format!("{}\\{}", ns, decl.name)
-                        } else {
-                            decl.name.to_string()
-                        };
-                        self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                    }
-                    StmtKind::Enum(decl) => {
-                        let fqcn = if let Some(ref ns) = current_namespace {
-                            format!("{}\\{}", ns, decl.name)
-                        } else {
-                            decl.name.to_string()
-                        };
-                        self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                    }
-                    StmtKind::Function(decl) => {
-                        let fqn = if let Some(ref ns) = current_namespace {
-                            format!("{}\\{}", ns, decl.name)
-                        } else {
-                            decl.name.to_string()
-                        };
-                        self.codebase.known_symbols.insert(Arc::from(fqn.as_str()));
-                    }
-                    _ => {}
+                    _ => index_stmts(
+                        std::slice::from_ref(stmt),
+                        current_namespace.as_deref(),
+                        &mut imports,
+                    ),
                 }
             }
 
