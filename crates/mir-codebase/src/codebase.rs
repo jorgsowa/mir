@@ -735,7 +735,12 @@ impl Codebase {
                 }
             } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
                 for (name, method) in &iface.own_methods {
-                    table.insert(name.clone(), method.clone());
+                    // Interface methods are implicitly abstract — mark them so that
+                    // ClassAnalyzer::check_interface_methods_implemented can detect
+                    // a concrete class that fails to provide an implementation.
+                    let mut m = method.clone();
+                    m.is_abstract = true;
+                    table.insert(name.clone(), m);
                 }
             }
         }
