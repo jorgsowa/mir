@@ -294,6 +294,9 @@ pub enum IssueKind {
     MixedPropertyFetch {
         property: String,
     },
+    CircularInheritance {
+        class: String,
+    },
 }
 
 impl IssueKind {
@@ -320,7 +323,8 @@ impl IssueKind {
             | IssueKind::TaintedInput { .. }
             | IssueKind::TaintedHtml
             | IssueKind::TaintedSql
-            | IssueKind::TaintedShell => Severity::Error,
+            | IssueKind::TaintedShell
+            | IssueKind::CircularInheritance { .. } => Severity::Error,
 
             // Warnings (shown at default error level)
             IssueKind::NullArgument { .. }
@@ -441,6 +445,7 @@ impl IssueKind {
             IssueKind::MixedAssignment { .. } => "MixedAssignment",
             IssueKind::MixedMethodCall { .. } => "MixedMethodCall",
             IssueKind::MixedPropertyFetch { .. } => "MixedPropertyFetch",
+            IssueKind::CircularInheritance { .. } => "CircularInheritance",
         }
     }
 
@@ -701,6 +706,9 @@ impl IssueKind {
             }
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${} fetched on mixed type", property)
+            }
+            IssueKind::CircularInheritance { class } => {
+                format!("Class {} has a circular inheritance chain", class)
             }
         }
     }
