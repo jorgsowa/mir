@@ -1,0 +1,3 @@
+[submodule "crates/mir-analyzer/phpstorm-stubs"]
+	path = crates/mir-analyzer/phpstorm-stubs
+	url = https://github.com/JetBrains/phpstorm-stubs.git
