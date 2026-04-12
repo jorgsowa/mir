@@ -1683,4 +1683,47 @@ mod tests {
             "col_end should be at least col_start + 1"
         );
     }
+
+    #[test]
+    fn utf16_conversion_multiline_span() {
+        // Test span that starts on one line and ends on another
+        let source = "<?php\n$x = [\n  'a',\n  'b'\n];";
+        //           Line 1: <?php
+        //           Line 2: $x = [
+        //           Line 3:   'a',
+        //           Line 4:   'b'
+        //           Line 5: ];
+
+        // Start of array bracket on line 2
+        let bracket_open = source.find('[').unwrap();
+        let (line_start, _col_start) = test_offset_conversion(source, bracket_open as u32);
+        assert_eq!(line_start, 2);
+
+        // End of array bracket on line 5
+        let bracket_close = source.rfind(']').unwrap();
+        let (line_end, col_end) = test_offset_conversion(source, bracket_close as u32);
+        assert_eq!(line_end, 5);
+        assert_eq!(col_end, 0); // ']' is at column 0 on line 5
+    }
+
+    #[test]
+    fn col_end_handles_emoji_in_span() {
+        // Test that col_end correctly handles emoji spanning
+        let source = "<?php\n$greeting = \"Hello 🎉\";";
+
+        // Find emoji position
+        let emoji_pos = source.find('🎉').unwrap();
+        let hello_pos = source.find("Hello").unwrap();
+
+        // Column at "Hello" on line 2
+        let (line, col) = test_offset_conversion(source, hello_pos as u32);
+        assert_eq!(line, 2);
+        assert_eq!(col, 13); // Position of 'H' after "$greeting = \""
+
+        // Column at emoji
+        let (line, col) = test_offset_conversion(source, emoji_pos as u32);
+        assert_eq!(line, 2);
+        // Should be after "Hello " (13 + 5 + 1 = 19 UTF-16 units)
+        assert_eq!(col, 19);
+    }
 }
