@@ -89,7 +89,7 @@ impl CallAnalyzer {
                         // Variadic by-ref: mark every remaining argument (e.g. sscanf output vars).
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
-                                let var_name = name.as_ref().trim_start_matches('$');
+                                let var_name = name.as_str().trim_start_matches('$');
                                 if !ctx.var_is_defined(var_name) {
                                     ctx.set_var(var_name, Union::mixed());
                                 }
@@ -97,7 +97,7 @@ impl CallAnalyzer {
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_ref().trim_start_matches('$');
+                            let var_name = name.as_str().trim_start_matches('$');
                             if !ctx.var_is_defined(var_name) {
                                 ctx.set_var(var_name, Union::mixed());
                             }
@@ -166,13 +166,13 @@ impl CallAnalyzer {
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
-                                let var_name = name.as_ref().trim_start_matches('$');
+                                let var_name = name.as_str().trim_start_matches('$');
                                 ctx.set_var(var_name, Union::mixed());
                             }
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_ref().trim_start_matches('$');
+                            let var_name = name.as_str().trim_start_matches('$');
                             ctx.set_var(var_name, Union::mixed());
                         }
                     }
@@ -231,7 +231,7 @@ impl CallAnalyzer {
 
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => (*name).to_string(),
-            ExprKind::Variable(name) => name.as_ref().to_string(),
+            ExprKind::Variable(name) => name.as_str().to_string(),
             _ => return Union::mixed(),
         };
 

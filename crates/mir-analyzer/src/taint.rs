@@ -69,7 +69,7 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
 pub fn is_expr_tainted<'arena, 'src>(expr: &Expr<'arena, 'src>, ctx: &Context) -> bool {
     match &expr.kind {
         ExprKind::Variable(name) => {
-            let n = name.as_ref().trim_start_matches('$');
+            let n = name.as_str().trim_start_matches('$');
             is_superglobal(n) || ctx.is_tainted(n)
         }
 

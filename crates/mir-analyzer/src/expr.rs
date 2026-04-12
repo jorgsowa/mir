@@ -21,7 +21,7 @@ pub struct ExpressionAnalyzer<'a> {
     pub codebase: &'a Codebase,
     pub file: Arc<str>,
     pub source: &'a str,
-    pub source_map: &'a php_ast::source_map::SourceMap,
+    pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
 }
@@ -31,7 +31,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         codebase: &'a Codebase,
         file: Arc<str>,
         source: &'a str,
-        source_map: &'a php_ast::source_map::SourceMap,
+        source_map: &'a php_rs_parser::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
     ) -> Self {
@@ -94,7 +94,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Variables --------------------------------------------------
             ExprKind::Variable(name) => {
-                let name_str = name.as_ref().trim_start_matches('$');
+                let name_str = name.as_str().trim_start_matches('$');
                 if !ctx.var_is_defined(name_str) {
                     if ctx.var_possibly_defined(name_str) {
                         self.emit(
@@ -858,7 +858,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Extract the variable name of the subject for narrowing
                 let subject_var = match &m.subject.kind {
                     ExprKind::Variable(name) => {
-                        Some(name.as_ref().trim_start_matches('$').to_string())
+                        Some(name.as_str().trim_start_matches('$').to_string())
                     }
                     _ => None,
                 };
@@ -1148,7 +1148,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) {
         match &target.kind {
             ExprKind::Variable(name) => {
-                let name_str = name.as_ref().trim_start_matches('$').to_string();
+                let name_str = name.as_str().trim_start_matches('$').to_string();
                 ctx.set_var(name_str, ty);
             }
             ExprKind::Array(elements) => {
@@ -1234,7 +1234,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 loop {
                     match &base.kind {
                         ExprKind::Variable(name) => {
-                            let name_str = name.as_ref().trim_start_matches('$');
+                            let name_str = name.as_str().trim_start_matches('$');
                             if !ctx.var_is_defined(name_str) {
                                 ctx.vars.insert(
                                     name_str.to_string(),
@@ -1422,7 +1422,7 @@ pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
 
 pub fn extract_simple_var<'arena, 'src>(expr: &php_ast::ast::Expr<'arena, 'src>) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.as_ref().trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_simple_var(inner),
         _ => None,
     }

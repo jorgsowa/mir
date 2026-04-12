@@ -30,7 +30,7 @@ pub struct DefinitionCollector<'a> {
     codebase: &'a Codebase,
     file: Arc<str>,
     source: &'a str,
-    source_map: &'a php_ast::source_map::SourceMap,
+    source_map: &'a php_rs_parser::source_map::SourceMap,
     namespace: Option<String>,
     /// `use` aliases: alias → FQCN
     use_aliases: std::collections::HashMap<String, String>,
@@ -42,7 +42,7 @@ impl<'a> DefinitionCollector<'a> {
         codebase: &'a Codebase,
         file: Arc<str>,
         source: &'a str,
-        source_map: &'a php_ast::source_map::SourceMap,
+        source_map: &'a php_rs_parser::source_map::SourceMap,
     ) -> Self {
         Self {
             source_map,

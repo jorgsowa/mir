@@ -130,43 +130,103 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        // ---- Pre-index pass: use SymbolTable to build FQCN index & file imports ---
-        // SymbolTable is lightweight (no type inference) so we run it in parallel.
+        // ---- Pre-index pass: walk the AST to build FQCN index, file imports, and namespaces ---
         file_data.par_iter().for_each(|(file, src)| {
+            use php_ast::ast::StmtKind;
             let arena = bumpalo::Bump::new();
             let result = php_rs_parser::parse(&arena, src);
-            let table = php_ast::symbol_table::SymbolTable::build(&result.program);
 
-            // Populate known_symbols with all top-level FQCNs
-            for sym in table.symbols() {
-                if sym.parent.is_none() {
-                    self.codebase
-                        .known_symbols
-                        .insert(Arc::from(sym.fqn.as_str()));
+            let mut current_namespace: Option<String> = None;
+            let mut imports: std::collections::HashMap<String, String> =
+                std::collections::HashMap::new();
+            let mut file_ns_set = false;
+
+            // Index a flat list of stmts under a given namespace prefix.
+            let index_stmts =
+                |stmts: &[php_ast::ast::Stmt<'_, '_>],
+                 ns: Option<&str>,
+                 imports: &mut std::collections::HashMap<String, String>| {
+                    for stmt in stmts.iter() {
+                        match &stmt.kind {
+                            StmtKind::Use(use_decl) => {
+                                for item in use_decl.uses.iter() {
+                                    let full_name = crate::parser::name_to_string(&item.name);
+                                    let alias = item.alias.unwrap_or_else(|| {
+                                        full_name.rsplit('\\').next().unwrap_or(&full_name)
+                                    });
+                                    imports.insert(alias.to_string(), full_name);
+                                }
+                            }
+                            StmtKind::Class(decl) => {
+                                if let Some(n) = decl.name {
+                                    let fqcn = match ns {
+                                        Some(ns) => format!("{}\\{}", ns, n),
+                                        None => n.to_string(),
+                                    };
+                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                                }
+                            }
+                            StmtKind::Interface(decl) => {
+                                let fqcn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                            }
+                            StmtKind::Trait(decl) => {
+                                let fqcn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                            }
+                            StmtKind::Enum(decl) => {
+                                let fqcn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                            }
+                            StmtKind::Function(decl) => {
+                                let fqn = match ns {
+                                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                                    None => decl.name.to_string(),
+                                };
+                                self.codebase.known_symbols.insert(Arc::from(fqn.as_str()));
+                            }
+                            _ => {}
+                        }
+                    }
+                };
+
+            for stmt in result.program.stmts.iter() {
+                match &stmt.kind {
+                    StmtKind::Namespace(ns) => {
+                        current_namespace =
+                            ns.name.as_ref().map(|n| crate::parser::name_to_string(n));
+                        if !file_ns_set {
+                            if let Some(ref ns_str) = current_namespace {
+                                self.codebase
+                                    .file_namespaces
+                                    .insert(file.clone(), ns_str.clone());
+                                file_ns_set = true;
+                            }
+                        }
+                        // Bracketed namespace: walk inner stmts for Use/Class/etc.
+                        if let php_ast::ast::NamespaceBody::Braced(inner_stmts) = &ns.body {
+                            index_stmts(inner_stmts, current_namespace.as_deref(), &mut imports);
+                        }
+                    }
+                    _ => index_stmts(
+                        std::slice::from_ref(stmt),
+                        current_namespace.as_deref(),
+                        &mut imports,
+                    ),
                 }
             }
 
-            // Populate file_imports from SymbolTable imports
-            let mut imports = std::collections::HashMap::new();
-            for imp in table.imports() {
-                imports.insert(imp.local_name().to_string(), imp.name.to_string());
-            }
             if !imports.is_empty() {
                 self.codebase.file_imports.insert(file.clone(), imports);
-            }
-
-            // Populate file_namespaces from top-level symbol FQNs
-            // (infer namespace from the first namespaced symbol)
-            for sym in table.symbols() {
-                if sym.parent.is_none() {
-                    if let Some(pos) = sym.fqn.rfind('\\') {
-                        let ns = &sym.fqn[..pos];
-                        self.codebase
-                            .file_namespaces
-                            .insert(file.clone(), ns.to_string());
-                        break;
-                    }
-                }
             }
         });
 
@@ -466,7 +526,7 @@ impl ProjectAnalyzer {
         program: &php_ast::ast::Program<'arena, 'src>,
         file: Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
     ) -> (Vec<mir_issues::Issue>, Vec<crate::symbol::ResolvedSymbol>) {
         use php_ast::ast::StmtKind;
 
@@ -550,7 +610,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
@@ -649,7 +709,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::ClassDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
     ) {
@@ -741,7 +801,7 @@ impl ProjectAnalyzer {
         program: &php_ast::ast::Program<'arena, 'src>,
         file: Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
         type_envs: &mut std::collections::HashMap<
             crate::type_env::ScopeId,
             crate::type_env::TypeEnv,
@@ -830,7 +890,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         type_envs: &mut std::collections::HashMap<
             crate::type_env::ScopeId,
@@ -939,7 +999,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::ClassDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
         type_envs: &mut std::collections::HashMap<
             crate::type_env::ScopeId,
@@ -1073,7 +1133,7 @@ impl ProjectAnalyzer {
         decl: &php_ast::ast::EnumDecl<'arena, 'src>,
         file: &Arc<str>,
         source: &str,
-        source_map: &php_ast::source_map::SourceMap,
+        source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<mir_issues::Issue>,
     ) {
         use php_ast::ast::EnumMemberKind;
@@ -1117,7 +1177,7 @@ fn check_type_hint_classes<'arena, 'src>(
     codebase: &Codebase,
     file: &Arc<str>,
     source: &str,
-    source_map: &php_ast::source_map::SourceMap,
+    source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<mir_issues::Issue>,
 ) {
     use php_ast::ast::TypeHintKind;
