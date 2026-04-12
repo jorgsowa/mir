@@ -72,6 +72,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 - `UnusedVariable` / `UnusedParam` detection
 - Reduce `UndefinedMethod` / `InvalidArgument` false positives
 - `PossiblyUndefinedVariable` detection
+- Plugin system
 - PHP version–aware stub filtering (load only stubs valid for the target version)
 
 ## License
