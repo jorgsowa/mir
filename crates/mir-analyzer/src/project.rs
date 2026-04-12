@@ -1479,4 +1479,19 @@ impl AnalysisResult {
             .filter(|i| i.severity == mir_issues::Severity::Warning)
             .count()
     }
+
+    /// Group issues by source file.
+    ///
+    /// Returns a map from absolute file path to the slice of issues that belong
+    /// to that file. Useful for LSP `textDocument/publishDiagnostics`, which
+    /// pushes diagnostics per document.
+    pub fn issues_by_file(&self) -> HashMap<std::sync::Arc<str>, Vec<&Issue>> {
+        let mut map: HashMap<std::sync::Arc<str>, Vec<&Issue>> = HashMap::new();
+        for issue in &self.issues {
+            map.entry(issue.location.file.clone())
+                .or_default()
+                .push(issue);
+        }
+        map
+    }
 }
