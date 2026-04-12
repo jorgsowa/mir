@@ -13,11 +13,21 @@ cargo install mir-cli
 ### Build from source
 
 ```bash
-git clone https://github.com/your-org/mir.git
+git clone --recurse-submodules https://github.com/jorgsowa/mir.git
 cd mir
 cargo build --release
 # Binary is at target/release/mir
 ```
+
+> **Important:** The `--recurse-submodules` flag initializes the
+> [phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) submodule that
+> provides PHP built-in definitions. Without it the build succeeds but mir will
+> not recognise any PHP built-in functions, classes, or constants.
+>
+> If you already cloned without it:
+> ```bash
+> git submodule update --init
+> ```
 
 You can then copy the binary to a directory on your `$PATH`:
 
