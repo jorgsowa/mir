@@ -84,7 +84,13 @@ impl<'a> ClassAnalyzer<'a> {
             if let Some(parent_fqcn) = &cls.parent {
                 if let Some(parent) = self.codebase.classes.get(parent_fqcn.as_ref()) {
                     if parent.is_final {
-                        let loc = issue_location(cls.location.as_ref(), fqcn);
+                        let loc = issue_location(
+                            cls.location.as_ref(),
+                            fqcn,
+                            cls.location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
                         let mut issue = Issue::new(
                             IssueKind::FinalClassExtended {
                                 parent: parent_fqcn.to_string(),
@@ -157,7 +163,13 @@ impl<'a> ClassAnalyzer<'a> {
                     continue; // implemented
                 }
 
-                let loc = issue_location(cls.location.as_ref(), fqcn);
+                let loc = issue_location(
+                    cls.location.as_ref(),
+                    fqcn,
+                    cls.location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                );
                 let mut issue = Issue::new(
                     IssueKind::UnimplementedAbstractMethod {
                         class: fqcn.to_string(),
@@ -206,7 +218,13 @@ impl<'a> ClassAnalyzer<'a> {
                     .unwrap_or(false);
 
                 if !implemented {
-                    let loc = issue_location(cls.location.as_ref(), fqcn);
+                    let loc = issue_location(
+                        cls.location.as_ref(),
+                        fqcn,
+                        cls.location
+                            .as_ref()
+                            .and_then(|l| self.sources.get(&l.file).copied()),
+                    );
                     let mut issue = Issue::new(
                         IssueKind::UnimplementedInterfaceMethod {
                             class: fqcn.to_string(),
@@ -245,7 +263,14 @@ impl<'a> ClassAnalyzer<'a> {
                 None => continue, // not an override
             };
 
-            let loc = issue_location(own_method.location.as_ref(), fqcn);
+            let loc = issue_location(
+                own_method.location.as_ref(),
+                fqcn,
+                own_method
+                    .location
+                    .as_ref()
+                    .and_then(|l| self.sources.get(&l.file).copied()),
+            );
 
             // ---- a. Cannot override a final method -------------------------
             if parent.is_final {
@@ -533,6 +558,9 @@ impl<'a> ClassAnalyzer<'a> {
                         let loc = issue_location(
                             cls.as_ref().and_then(|c| c.location.as_ref()),
                             offender,
+                            cls.as_ref()
+                                .and_then(|c| c.location.as_ref())
+                                .and_then(|l| self.sources.get(&l.file).copied()),
                         );
                         let mut issue = Issue::new(
                             IssueKind::CircularInheritance {
@@ -633,8 +661,14 @@ impl<'a> ClassAnalyzer<'a> {
 
             if let Some(offender) = offender {
                 let iface = self.codebase.interfaces.get(offender.as_ref());
-                let loc =
-                    issue_location(iface.as_ref().and_then(|i| i.location.as_ref()), offender);
+                let loc = issue_location(
+                    iface.as_ref().and_then(|i| i.location.as_ref()),
+                    offender,
+                    iface
+                        .as_ref()
+                        .and_then(|i| i.location.as_ref())
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                );
                 let mut issue = Issue::new(
                     IssueKind::CircularInheritance {
                         class: offender.to_string(),
@@ -718,17 +752,78 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
 
 /// Build an issue location from the stored codebase Location (which now carries line/col).
 /// Falls back to a dummy location using the FQCN as the file path when no Location is stored.
+/// Convert a codebase storage::Location to a mir-issues::Location with proper UTF-16 columns.
 fn issue_location(
     storage_loc: Option<&mir_codebase::storage::Location>,
     fqcn: &Arc<str>,
+    source: Option<&str>,
 ) -> Location {
     match storage_loc {
-        Some(loc) => Location {
-            file: loc.file.clone(),
-            line: loc.line,
-            col_start: loc.col,
-            col_end: loc.col,
-        },
+        Some(loc) => {
+            // Calculate col_end from the end byte offset if source is available
+            let col_end = if let Some(src) = source {
+                if loc.end > loc.start {
+                    let end_offset = (loc.end as usize).min(src.len());
+                    // Find the line start containing the end offset
+                    let line_start = src[..end_offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
+                    // Count UTF-16 code units from line start to end offset
+                    let utf16_col_end: u16 = src[line_start..end_offset]
+                        .chars()
+                        .map(|c| c.len_utf16() as u16)
+                        .sum();
+
+                    // Convert col_start to UTF-16 as well
+                    let col_start_offset = (loc.start as usize).min(src.len());
+                    let col_start_line = src[..col_start_offset]
+                        .rfind('\n')
+                        .map(|p| p + 1)
+                        .unwrap_or(0);
+                    let col_start_utf16 = src[col_start_line..col_start_offset]
+                        .chars()
+                        .map(|c| c.len_utf16() as u16)
+                        .sum::<u16>();
+
+                    // If on same line, use utf16_col_end; otherwise just use it
+                    utf16_col_end.max(col_start_utf16 + 1)
+                } else {
+                    // Convert col to UTF-16
+                    let col_start_offset = (loc.start as usize).min(src.len());
+                    let col_start_line = src[..col_start_offset]
+                        .rfind('\n')
+                        .map(|p| p + 1)
+                        .unwrap_or(0);
+                    src[col_start_line..col_start_offset]
+                        .chars()
+                        .map(|c| c.len_utf16() as u16)
+                        .sum::<u16>()
+                        + 1
+                }
+            } else {
+                loc.col + 1
+            };
+
+            // Convert col_start to UTF-16
+            let col_start = if let Some(src) = source {
+                let col_start_offset = (loc.start as usize).min(src.len());
+                let col_start_line = src[..col_start_offset]
+                    .rfind('\n')
+                    .map(|p| p + 1)
+                    .unwrap_or(0);
+                src[col_start_line..col_start_offset]
+                    .chars()
+                    .map(|c| c.len_utf16() as u16)
+                    .sum()
+            } else {
+                loc.col
+            };
+
+            Location {
+                file: loc.file.clone(),
+                line: loc.line,
+                col_start,
+                col_end,
+            }
+        }
         None => Location {
             file: fqcn.clone(),
             line: 1,
