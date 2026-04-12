@@ -821,6 +821,23 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 }
             }
 
+            // Collect top-level define('NAME', value) calls as global constants.
+            // phpstorm-stubs uses this form extensively in *_defines.php files.
+            StmtKind::Expression(expr) => {
+                if let php_ast::ast::ExprKind::FunctionCall(call) = &expr.kind {
+                    if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
+                        if fn_name.eq_ignore_ascii_case("define") {
+                            if let Some(name_arg) = call.args.first() {
+                                if let php_ast::ast::ExprKind::String(name) = &name_arg.value.kind {
+                                    let fqn: Arc<str> = Arc::from(&**name);
+                                    self.codebase.constants.insert(fqn, Union::mixed());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             _ => {}
         }
         ControlFlow::Continue(())
