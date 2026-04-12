@@ -19,5 +19,7 @@ mir src/
 - **Security** — taint tracking from `$_GET`/`$_POST` to HTML/SQL/shell sinks
 - **Generics** — `@template` bounds and substitution
 
-mir understands ~580 PHP built-in functions and produces output compatible with
-Psalm baselines (`--baseline psalm-baseline.xml`).
+mir understands 500+ PHP built-in functions, 100+ built-in classes, 20+ interfaces, and 200+
+constants — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs)
+across 33 PHP extensions — and produces output compatible with Psalm baselines
+(`--baseline psalm-baseline.xml`).
