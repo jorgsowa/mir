@@ -3,7 +3,7 @@ use mir_types::{Atomic, Union, Variance};
 /// then converts `PhpDocTag`s into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
 
-use php_ast::PhpDocTag;
+use php_rs_parser::phpdoc::PhpDocTag;
 
 // ---------------------------------------------------------------------------
 // DocblockParser
@@ -56,7 +56,12 @@ impl DocblockParser {
                 }
                 PhpDocTag::Deprecated { description } => {
                     result.is_deprecated = true;
-                    result.deprecated = Some(description.unwrap_or("").to_string());
+                    result.deprecated = Some(
+                        description
+                            .as_ref()
+                            .map(|d| d.to_string())
+                            .unwrap_or_default(),
+                    );
                 }
                 PhpDocTag::Template { name, bound } => {
                     result.templates.push((
@@ -154,14 +159,14 @@ impl DocblockParser {
                 PhpDocTag::Generic { tag, body } => match *tag {
                     "api" | "psalm-api" => result.is_api = true,
                     "psalm-assert-if-true" | "phpstan-assert-if-true" => {
-                        if let Some((ty_str, name)) = body.and_then(parse_param_line) {
+                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
                             result
                                 .assertions_if_true
                                 .push((name, parse_type_string(&ty_str)));
                         }
                     }
                     "psalm-assert-if-false" | "phpstan-assert-if-false" => {
-                        if let Some((ty_str, name)) = body.and_then(parse_param_line) {
+                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
                             result
                                 .assertions_if_false
                                 .push((name, parse_type_string(&ty_str)));

@@ -21,7 +21,7 @@ pub struct StatementsAnalyzer<'a> {
     pub codebase: &'a Codebase,
     pub file: Arc<str>,
     pub source: &'a str,
-    pub source_map: &'a php_ast::source_map::SourceMap,
+    pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     /// Accumulated inferred return types for the current function.
@@ -36,7 +36,7 @@ impl<'a> StatementsAnalyzer<'a> {
         codebase: &'a Codebase,
         file: Arc<str>,
         source: &'a str,
-        source_map: &'a php_ast::source_map::SourceMap,
+        source_map: &'a php_rs_parser::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
     ) -> Self {
@@ -564,7 +564,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // Extract the subject variable name for narrowing (if it's a simple var)
                 let subject_var: Option<String> = match &sw.expr.kind {
                     php_ast::ast::ExprKind::Variable(name) => {
-                        Some(name.as_ref().trim_start_matches('$').to_string())
+                        Some(name.as_str().trim_start_matches('$').to_string())
                     }
                     _ => None,
                 };
@@ -746,7 +746,7 @@ impl<'a> StatementsAnalyzer<'a> {
             StmtKind::Unset(vars) => {
                 for var in vars.iter() {
                     if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
-                        ctx.unset_var(name.as_ref().trim_start_matches('$'));
+                        ctx.unset_var(name.as_str().trim_start_matches('$'));
                     }
                 }
             }
@@ -763,7 +763,7 @@ impl<'a> StatementsAnalyzer<'a> {
             StmtKind::Global(vars) => {
                 for var in vars.iter() {
                     if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
-                        ctx.set_var(name.as_ref().trim_start_matches('$'), Union::mixed());
+                        ctx.set_var(name.as_str().trim_start_matches('$'), Union::mixed());
                     }
                 }
             }

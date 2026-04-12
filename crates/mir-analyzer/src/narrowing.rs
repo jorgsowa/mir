@@ -463,7 +463,7 @@ fn extract_var_name<'a, 'arena, 'src>(
     expr: &'a php_ast::ast::Expr<'arena, 'src>,
 ) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.as_ref().trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
         _ => None,
     }
