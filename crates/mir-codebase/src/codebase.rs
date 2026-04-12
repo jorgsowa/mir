@@ -20,6 +20,13 @@ pub struct Codebase {
     pub functions: DashMap<Arc<str>, FunctionStorage>,
     pub constants: DashMap<Arc<str>, Union>,
 
+    /// Types of `@var`-annotated global variables, collected in Pass 1.
+    /// Key: variable name without the `$` prefix.
+    pub global_vars: DashMap<Arc<str>, Union>,
+    /// Maps file path → variable names declared with `@var` in that file.
+    /// Used by `remove_file_definitions` to purge stale entries on re-analysis.
+    file_global_vars: DashMap<Arc<str>, Vec<Arc<str>>>,
+
     /// Methods referenced during Pass 2 — key format: `"ClassName::methodName"`.
     /// Used by the dead-code detector (M18).
     pub referenced_methods: DashSet<Arc<str>>,
@@ -107,7 +114,28 @@ impl Codebase {
         self.file_imports.remove(file_path);
         self.file_namespaces.remove(file_path);
 
+        // Remove @var-annotated global variables declared in this file
+        if let Some((_, var_names)) = self.file_global_vars.remove(file_path) {
+            for name in var_names {
+                self.global_vars.remove(name.as_ref());
+            }
+        }
+
         self.invalidate_finalization();
+    }
+
+    // -----------------------------------------------------------------------
+    // Global variable registry
+    // -----------------------------------------------------------------------
+
+    /// Record an `@var`-annotated global variable type discovered in Pass 1.
+    /// If the same variable is annotated in multiple files, the last write wins.
+    pub fn register_global_var(&self, file: &Arc<str>, name: Arc<str>, ty: Union) {
+        self.file_global_vars
+            .entry(file.clone())
+            .or_default()
+            .push(name.clone());
+        self.global_vars.insert(name, ty);
     }
 
     // -----------------------------------------------------------------------
