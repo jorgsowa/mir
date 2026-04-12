@@ -68,7 +68,7 @@ fn load_phpstorm_stubs(codebase: &Codebase) {
 pub fn is_builtin_function(name: &str) -> bool {
     static BUILTIN_FUNCTIONS: LazyLock<HashSet<Box<str>>> = LazyLock::new(|| {
         let codebase = Codebase::new();
-        load_functions(&codebase);
+        load_stubs(&codebase);
         codebase
             .functions
             .iter()
@@ -4915,6 +4915,19 @@ mod tests {
         assert!(
             is_builtin_function("preg_match"),
             "preg_match should be a builtin"
+        );
+    }
+
+    #[test]
+    fn is_builtin_function_covers_phpstorm_stubs_only_functions() {
+        if PHPSTORM_STUB_FILES.is_empty() {
+            return; // submodule not initialized — skip
+        }
+        // These are only in phpstorm-stubs, not in the hand-written set.
+        assert!(is_builtin_function("bcadd"), "bcadd should be a builtin");
+        assert!(
+            is_builtin_function("sodium_crypto_secretbox"),
+            "sodium_crypto_secretbox should be a builtin"
         );
     }
 

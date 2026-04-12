@@ -137,6 +137,8 @@ fn generate_phpstorm_stubs(manifest_dir: &Path, out_dir: &Path) {
         return;
     }
 
+    // Watch the submodule pointer; individual file changes are tracked by
+    // rustc via the include_str!() calls in the generated file.
     println!("cargo:rerun-if-changed=phpstorm-stubs");
 
     let mut code = String::from(
@@ -148,6 +150,8 @@ fn generate_phpstorm_stubs(manifest_dir: &Path, out_dir: &Path) {
     for dir_name in STUB_DIRS {
         let dir = stubs_root.join(dir_name);
         if dir.is_dir() {
+            // Per-directory watch so adding a new .php file triggers a rebuild.
+            println!("cargo:rerun-if-changed={}", dir.display());
             collect_php_files(&dir, &stubs_root, &mut code);
         }
     }
