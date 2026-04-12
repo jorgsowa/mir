@@ -1167,6 +1167,41 @@ impl Default for ProjectAnalyzer {
 }
 
 // ---------------------------------------------------------------------------
+// UTF-16 offset conversion utility
+// ---------------------------------------------------------------------------
+
+/// Convert a byte offset to a UTF-16 column on a given line.
+/// Returns (line, col_utf16) where col is 0-based UTF-16 code unit count.
+fn offset_to_line_col_utf16(
+    source: &str,
+    offset: u32,
+    source_map: &php_rs_parser::source_map::SourceMap,
+) -> (u32, u16) {
+    let lc = source_map.offset_to_line_col(offset);
+    let line = lc.line + 1;
+
+    // Find the start of the line containing this offset
+    let byte_offset = offset as usize;
+    let line_start_byte = if byte_offset == 0 {
+        0
+    } else {
+        // Find the position after the last newline before this offset
+        source[..byte_offset]
+            .rfind('\n')
+            .map(|p| p + 1)
+            .unwrap_or(0)
+    };
+
+    // Count UTF-16 code units from line start to the offset
+    let col_utf16 = source[line_start_byte..byte_offset]
+        .chars()
+        .map(|c| c.len_utf16() as u16)
+        .sum();
+
+    (line, col_utf16)
+}
+
+// ---------------------------------------------------------------------------
 // Type-hint class existence checker
 // ---------------------------------------------------------------------------
 
@@ -1190,16 +1225,23 @@ fn check_type_hint_classes<'arena, 'src>(
             }
             let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
             if !codebase.type_exists(&resolved) {
-                let lc = source_map.offset_to_line_col(hint.span.start);
-                let (line, col) = (lc.line + 1, lc.col as u16);
+                let (line, col_start) =
+                    offset_to_line_col_utf16(source, hint.span.start, source_map);
+                let col_end = if hint.span.start < hint.span.end {
+                    let (_end_line, end_col) =
+                        offset_to_line_col_utf16(source, hint.span.end, source_map);
+                    end_col
+                } else {
+                    col_start
+                };
                 issues.push(
                     mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedClass { name: resolved },
                         mir_issues::Location {
                             file: file.clone(),
                             line,
-                            col_start: col,
-                            col_end: col,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
                         },
                     )
                     .with_snippet(crate::parser::span_text(source, hint.span).unwrap_or_default()),
