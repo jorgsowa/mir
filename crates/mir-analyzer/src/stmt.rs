@@ -129,17 +129,20 @@ impl<'a> StatementsAnalyzer<'a> {
                 for expr in exprs.iter() {
                     // Taint check (M19): echoing tainted data → XSS
                     if crate::taint::is_expr_tainted(expr, ctx) {
-                        let (line, col) = {
-                            let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                            (lc.line + 1, lc.col as u16)
+                        let (line, col_start) = self.offset_to_line_col_utf16(stmt.span.start);
+                        let col_end = if stmt.span.start < stmt.span.end {
+                            let (_end_line, end_col) = self.offset_to_line_col_utf16(stmt.span.end);
+                            end_col
+                        } else {
+                            col_start
                         };
                         let mut issue = mir_issues::Issue::new(
                             IssueKind::TaintedHtml,
                             mir_issues::Location {
                                 file: self.file.clone(),
                                 line,
-                                col_start: col,
-                                col_end: col,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
                             },
                         );
                         // Extract snippet from the echo statement span.
@@ -205,9 +208,13 @@ impl<'a> StatementsAnalyzer<'a> {
                                 && !named_object_return_compatible(declared, &check_ty, self.codebase, &self.file)
                                 && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file))
                         {
-                            let (line, col) = {
-                                let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                                (lc.line + 1, lc.col as u16)
+                            let (line, col_start) = self.offset_to_line_col_utf16(stmt.span.start);
+                            let col_end = if stmt.span.start < stmt.span.end {
+                                let (_end_line, end_col) =
+                                    self.offset_to_line_col_utf16(stmt.span.end);
+                                end_col
+                            } else {
+                                col_start
                             };
                             self.issues.add(
                                 mir_issues::Issue::new(
@@ -218,8 +225,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
-                                        col_start: col,
-                                        col_end: col,
+                                        col_start,
+                                        col_end: col_end.max(col_start + 1),
                                     },
                                 )
                                 .with_snippet(
@@ -235,9 +242,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     // Bare `return;` from a non-void declared function is an error.
                     if let Some(declared) = &ctx.fn_return_type.clone() {
                         if !declared.is_void() && !declared.is_mixed() {
-                            let (line, col) = {
-                                let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                                (lc.line + 1, lc.col as u16)
+                            let (line, col_start) = self.offset_to_line_col_utf16(stmt.span.start);
+                            let col_end = if stmt.span.start < stmt.span.end {
+                                let (_end_line, end_col) =
+                                    self.offset_to_line_col_utf16(stmt.span.end);
+                                end_col
+                            } else {
+                                col_start
                             };
                             self.issues.add(
                                 mir_issues::Issue::new(
@@ -248,8 +259,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
-                                        col_start: col,
-                                        col_end: col,
+                                        col_start,
+                                        col_end: col_end.max(col_start + 1),
                                     },
                                 )
                                 .with_snippet(
@@ -289,9 +300,14 @@ impl<'a> StatementsAnalyzer<'a> {
                                 // Suppress if class is not in codebase at all (could be extension class)
                                 || (!self.codebase.type_exists(&resolved) && !self.codebase.type_exists(fqcn));
                             if !is_throwable {
-                                let (line, col) = {
-                                    let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                                    (lc.line + 1, lc.col as u16)
+                                let (line, col_start) =
+                                    self.offset_to_line_col_utf16(stmt.span.start);
+                                let col_end = if stmt.span.start < stmt.span.end {
+                                    let (_end_line, end_col) =
+                                        self.offset_to_line_col_utf16(stmt.span.end);
+                                    end_col
+                                } else {
+                                    col_start
                                 };
                                 self.issues.add(mir_issues::Issue::new(
                                     IssueKind::InvalidThrow {
@@ -300,8 +316,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
-                                        col_start: col,
-                                        col_end: col,
+                                        col_start,
+                                        col_end: col_end.max(col_start + 1),
                                     },
                                 ));
                             }
@@ -323,9 +339,14 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || self.codebase.has_unknown_ancestor(&resolved)
                                 || self.codebase.has_unknown_ancestor(fqcn);
                             if !is_throwable {
-                                let (line, col) = {
-                                    let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                                    (lc.line + 1, lc.col as u16)
+                                let (line, col_start) =
+                                    self.offset_to_line_col_utf16(stmt.span.start);
+                                let col_end = if stmt.span.start < stmt.span.end {
+                                    let (_end_line, end_col) =
+                                        self.offset_to_line_col_utf16(stmt.span.end);
+                                    end_col
+                                } else {
+                                    col_start
                                 };
                                 self.issues.add(mir_issues::Issue::new(
                                     IssueKind::InvalidThrow {
@@ -334,17 +355,21 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
-                                        col_start: col,
-                                        col_end: col,
+                                        col_start,
+                                        col_end: col_end.max(col_start + 1),
                                     },
                                 ));
                             }
                         }
                         mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
                         _ => {
-                            let (line, col) = {
-                                let lc = self.source_map.offset_to_line_col(stmt.span.start);
-                                (lc.line + 1, lc.col as u16)
+                            let (line, col_start) = self.offset_to_line_col_utf16(stmt.span.start);
+                            let col_end = if stmt.span.start < stmt.span.end {
+                                let (_end_line, end_col) =
+                                    self.offset_to_line_col_utf16(stmt.span.end);
+                                end_col
+                            } else {
+                                col_start
                             };
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::InvalidThrow {
@@ -353,8 +378,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                 mir_issues::Location {
                                     file: self.file.clone(),
                                     line,
-                                    col_start: col,
-                                    col_end: col,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
                                 },
                             ));
                         }
@@ -422,10 +447,15 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // Emit RedundantCondition if narrowing proves one branch is statically unreachable.
                 if !pre_diverges && (then_ctx.diverges || else_ctx.diverges) {
-                    let lc = self
-                        .source_map
-                        .offset_to_line_col(if_stmt.condition.span.start);
-                    let (line, col) = (lc.line + 1, lc.col as u16);
+                    let (line, col_start) =
+                        self.offset_to_line_col_utf16(if_stmt.condition.span.start);
+                    let col_end = if if_stmt.condition.span.start < if_stmt.condition.span.end {
+                        let (_end_line, end_col) =
+                            self.offset_to_line_col_utf16(if_stmt.condition.span.end);
+                        end_col
+                    } else {
+                        col_start
+                    };
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::RedundantCondition {
@@ -434,8 +464,8 @@ impl<'a> StatementsAnalyzer<'a> {
                             mir_issues::Location {
                                 file: self.file.clone(),
                                 line,
-                                col_start: col,
-                                col_end: col,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
                             },
                         )
                         .with_snippet(
@@ -826,6 +856,33 @@ impl<'a> StatementsAnalyzer<'a> {
             self.issues,
             self.symbols,
         )
+    }
+
+    /// Convert a byte offset to a UTF-16 column on a given line.
+    /// Returns (line, col_utf16) where col is 0-based UTF-16 code unit count.
+    fn offset_to_line_col_utf16(&self, offset: u32) -> (u32, u16) {
+        let lc = self.source_map.offset_to_line_col(offset);
+        let line = lc.line + 1;
+
+        // Find the start of the line containing this offset
+        let byte_offset = offset as usize;
+        let line_start_byte = if byte_offset == 0 {
+            0
+        } else {
+            // Find the position after the last newline before this offset
+            self.source[..byte_offset]
+                .rfind('\n')
+                .map(|p| p + 1)
+                .unwrap_or(0)
+        };
+
+        // Count UTF-16 code units from line start to the offset
+        let col_utf16 = self.source[line_start_byte..byte_offset]
+            .chars()
+            .map(|c| c.len_utf16() as u16)
+            .sum();
+
+        (line, col_utf16)
     }
 
     // -----------------------------------------------------------------------

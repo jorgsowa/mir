@@ -1271,16 +1271,52 @@ impl<'a> ExpressionAnalyzer<'a> {
     // Issue emission
     // -----------------------------------------------------------------------
 
+    /// Convert a byte offset to a UTF-16 column on a given line.
+    /// Returns (line, col_utf16) where col is 0-based UTF-16 code unit count.
+    fn offset_to_line_col_utf16(&self, offset: u32) -> (u32, u16) {
+        let lc = self.source_map.offset_to_line_col(offset);
+        let line = lc.line + 1;
+
+        // Find the start of the line containing this offset
+        let byte_offset = offset as usize;
+        let line_start_byte = if byte_offset == 0 {
+            0
+        } else {
+            // Find the position after the last newline before this offset
+            self.source[..byte_offset]
+                .rfind('\n')
+                .map(|p| p + 1)
+                .unwrap_or(0)
+        };
+
+        // Count UTF-16 code units from line start to the offset
+        let col_utf16 = self.source[line_start_byte..byte_offset]
+            .chars()
+            .map(|c| c.len_utf16() as u16)
+            .sum();
+
+        (line, col_utf16)
+    }
+
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
-        let lc = self.source_map.offset_to_line_col(span.start);
-        let (line, col) = (lc.line + 1, lc.col as u16);
+        let (line, col_start) = self.offset_to_line_col_utf16(span.start);
+
+        // Calculate col_end: if span.end is on the same line, use its UTF-16 column;
+        // otherwise use col_start (single-line range for diagnostics)
+        let col_end = if span.start < span.end {
+            let (_end_line, end_col) = self.offset_to_line_col_utf16(span.end);
+            end_col
+        } else {
+            col_start
+        };
+
         let mut issue = Issue::new(
             kind,
             Location {
                 file: self.file.clone(),
                 line,
-                col_start: col,
-                col_end: col,
+                col_start,
+                col_end: col_end.max(col_start + 1),
             },
         );
         issue.severity = severity;
