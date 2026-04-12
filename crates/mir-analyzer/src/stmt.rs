@@ -89,6 +89,19 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                     }
                 }
+
+                // Post-narrow: `@var Type $varname` before `global $varname` — the Global
+                // handler unconditionally sets the variable to mixed, so re-apply the
+                // annotation after it runs.
+                if let php_ast::ast::StmtKind::Global(vars) = &stmt.kind {
+                    for var in vars.iter() {
+                        if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
+                            if name.as_str().trim_start_matches('$') == var_name.as_str() {
+                                ctx.set_var(var_name.as_str(), var_ty.clone());
+                            }
+                        }
+                    }
+                }
             }
 
             if !suppressions.is_empty() {
