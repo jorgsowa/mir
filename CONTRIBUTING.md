@@ -45,23 +45,22 @@ Tests include:
 ### Writing a fixture test
 
 Fixture files live under `crates/mir-analyzer/tests/fixtures/<category>/`.
-Each file is a `.phpt` that contains PHP source followed by an expected-issues
-section:
+Each file is a `.phpt` that contains PHP source followed by expected issues:
 
 ```
---PHP--
+===source===
 <?php
 
 function foo(): int {
     return "oops";
 }
---ISSUES--
-InvalidReturnType
+===expect===
+InvalidReturnType: function foo expects return type int, string provided
 ```
 
-The `--ISSUES--` section lists one issue kind per line. The test passes when
-the analyzer emits exactly those kinds (order does not matter). An empty
-`--ISSUES--` section asserts that the snippet is clean.
+The `===expect===` section lists expected issues, one per line. Each line is
+formatted as `IssueKind: message`. The test passes when the analyzer emits
+exactly those issues. An empty `===expect===` section asserts the snippet is clean.
 
 Run only the fixture tests:
 
