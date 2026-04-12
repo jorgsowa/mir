@@ -763,7 +763,14 @@ impl<'a> StatementsAnalyzer<'a> {
             StmtKind::Global(vars) => {
                 for var in vars.iter() {
                     if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
-                        ctx.set_var(name.as_str().trim_start_matches('$'), Union::mixed());
+                        let var_name = name.as_str().trim_start_matches('$');
+                        let ty = self
+                            .codebase
+                            .global_vars
+                            .get(var_name)
+                            .map(|r| r.clone())
+                            .unwrap_or_else(Union::mixed);
+                        ctx.set_var(var_name, ty);
                     }
                 }
             }

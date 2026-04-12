@@ -258,6 +258,52 @@ impl<'a> DefinitionCollector<'a> {
             let _ = self.visit_stmt(stmt);
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Global variable registry
+    // -----------------------------------------------------------------------
+
+    /// Scan a single statement: if it is `global $x` with a preceding
+    /// `/** @var Type $x */` docblock, register the type in the codebase.
+    fn try_collect_global_var_annotation(&self, stmt: &php_ast::ast::Stmt<'_, '_>) {
+        let php_ast::ast::StmtKind::Global(vars) = &stmt.kind else {
+            return;
+        };
+        let Some(doc_text) = crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+        else {
+            return;
+        };
+        let parsed = crate::parser::DocblockParser::parse(&doc_text);
+        let Some(var_type) = parsed.var_type else {
+            return;
+        };
+        let resolved_ty = self.resolve_union_doc(var_type);
+
+        for var in vars.iter() {
+            if let php_ast::ast::ExprKind::Variable(raw_name) = &var.kind {
+                let name = raw_name.as_str().trim_start_matches('$');
+                // If @var specifies a variable name, only register when it matches.
+                if let Some(ref ann_name) = parsed.var_name {
+                    if ann_name != name {
+                        continue;
+                    }
+                }
+                self.codebase
+                    .register_global_var(&self.file, Arc::from(name), resolved_ty.clone());
+            }
+        }
+    }
+
+    /// Scan a list of statements and register any `@var`-annotated `global`
+    /// declarations. Used for function bodies where the visitor does not recurse.
+    fn scan_stmts_for_global_vars<'arena, 'src>(
+        &self,
+        stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
+    ) {
+        for stmt in stmts.iter() {
+            self.try_collect_global_var_annotation(stmt);
+        }
+    }
 }
 
 impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
@@ -362,6 +408,14 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     .symbol_to_file
                     .insert(Arc::from(fqn.as_str()), self.file.clone());
                 self.codebase.functions.insert(fqn.into(), storage);
+
+                // Scan the function body for `@var`-annotated global declarations.
+                self.scan_stmts_for_global_vars(&decl.body);
+            }
+
+            StmtKind::Global(_) => {
+                // Top-level `global $x` — unusual in PHP but valid.
+                self.try_collect_global_var_annotation(stmt);
             }
 
             StmtKind::Class(decl) => {
