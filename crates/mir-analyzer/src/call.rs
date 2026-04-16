@@ -123,7 +123,15 @@ impl CallAnalyzer {
 
         // Look up user-defined function in codebase
         if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
-            ea.codebase.mark_function_referenced(&func.fqn.clone());
+            // Use the name expression span, not the full call span, so the LSP
+            // highlights only the function identifier.
+            let name_span = call.name.span;
+            ea.codebase.mark_function_referenced_at(
+                &func.fqn,
+                ea.file.clone(),
+                name_span.start,
+                name_span.end,
+            );
             let is_deprecated = func.is_deprecated;
             let params = func.params.clone();
             let template_params = func.template_params.clone();
@@ -302,8 +310,16 @@ impl CallAnalyzer {
                     let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     if let Some(method) = ea.codebase.get_method(fqcn, &method_name) {
-                        // Record reference for dead-code detection (M18)
-                        ea.codebase.mark_method_referenced(fqcn, &method_name);
+                        // Record reference for dead-code detection (M18).
+                        // Use call.method.span (the identifier only), not the full call
+                        // span, so the LSP highlights just the method name.
+                        ea.codebase.mark_method_referenced_at(
+                            fqcn,
+                            &method_name,
+                            ea.file.clone(),
+                            call.method.span.start,
+                            call.method.span.end,
+                        );
                         // Emit DeprecatedMethodCall if the method is marked @deprecated
                         if method.is_deprecated {
                             ea.emit(
@@ -427,8 +443,16 @@ impl CallAnalyzer {
                     let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     if let Some(method) = ea.codebase.get_method(fqcn, &method_name) {
-                        // Record reference for dead-code detection (M18)
-                        ea.codebase.mark_method_referenced(fqcn, &method_name);
+                        // Record reference for dead-code detection (M18).
+                        // Use call.method.span (the identifier only), not the full call
+                        // span, so the LSP highlights just the method name.
+                        ea.codebase.mark_method_referenced_at(
+                            fqcn,
+                            &method_name,
+                            ea.file.clone(),
+                            call.method.span.start,
+                            call.method.span.end,
+                        );
                         // Emit DeprecatedMethodCall if the method is marked @deprecated
                         if method.is_deprecated {
                             ea.emit(
@@ -619,7 +643,13 @@ impl CallAnalyzer {
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
-            ea.codebase.mark_method_referenced(&fqcn, method_name);
+            ea.codebase.mark_method_referenced_at(
+                &fqcn,
+                method_name,
+                ea.file.clone(),
+                span.start,
+                span.end,
+            );
             // Emit DeprecatedMethodCall if the method is marked @deprecated
             if method.is_deprecated {
                 ea.emit(
