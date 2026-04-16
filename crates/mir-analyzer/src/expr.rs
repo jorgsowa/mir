@@ -48,6 +48,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// Record a resolved symbol.
     pub fn record_symbol(&mut self, span: php_ast::Span, kind: SymbolKind, resolved_type: Union) {
         self.symbols.push(ResolvedSymbol {
+            file: self.file.clone(),
             span,
             kind,
             resolved_type,
@@ -582,8 +583,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                         });
                         self.record_symbol(
                             n.class.span,
-                            SymbolKind::ClassReference(fqcn),
+                            SymbolKind::ClassReference(fqcn.clone()),
                             ty.clone(),
+                        );
+                        // Record class instantiation as a reference so LSP
+                        // "find references" for a class includes new Foo() sites.
+                        self.codebase.mark_class_referenced_at(
+                            &fqcn,
+                            self.file.clone(),
+                            n.class.span.start,
+                            n.class.span.end,
                         );
                         ty
                     }
@@ -1108,7 +1117,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if self.codebase.classes.contains_key(fqcn.as_ref()) {
                         if let Some(prop) = self.codebase.get_property(fqcn.as_ref(), prop_name) {
                             // Record reference for dead-code detection (M18)
-                            self.codebase.mark_property_referenced(fqcn, prop_name);
+                            self.codebase.mark_property_referenced_at(
+                                fqcn,
+                                prop_name,
+                                self.file.clone(),
+                                span.start,
+                                span.end,
+                            );
                             return prop.ty.clone().unwrap_or_else(Union::mixed);
                         }
                         // Only emit UndefinedProperty if all ancestors are known and no __get magic.

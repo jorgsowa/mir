@@ -1,6 +1,11 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
+
+/// Maps symbol key → { file_path → {(start_byte, end_byte)} }.
+/// Used by `Codebase::symbol_reference_locations`.
+type ReferenceLocations = DashMap<Arc<str>, HashMap<Arc<str>, HashSet<(u32, u32)>>>;
 
 use crate::storage::{
     ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage, TraitStorage,
@@ -34,6 +39,16 @@ pub struct Codebase {
     pub referenced_properties: DashSet<Arc<str>>,
     /// Free functions referenced during Pass 2 — key: fully-qualified name.
     pub referenced_functions: DashSet<Arc<str>>,
+
+    /// Maps symbol key → { file_path → {(start_byte, end_byte)} }.
+    /// Key format mirrors referenced_methods / referenced_properties / referenced_functions.
+    /// The inner HashMap groups all spans from the same file under a single key,
+    /// avoiding Arc<str> duplication per span and enabling O(1) per-file cleanup.
+    /// HashSet deduplicates spans from union receivers (e.g. Foo|Foo->method()).
+    pub symbol_reference_locations: ReferenceLocations,
+    /// Reverse index: file_path → unique symbol keys referenced in that file.
+    /// Used by remove_file_definitions for O(1) cleanup without a full map scan.
+    pub file_symbol_references: DashMap<Arc<str>, HashSet<Arc<str>>>,
 
     /// Maps every FQCN (class, interface, trait, enum, function) to the absolute
     /// path of the file that defines it. Populated during Pass 1.
@@ -84,11 +99,12 @@ impl Codebase {
     // Incremental: remove all definitions from a single file
     // -----------------------------------------------------------------------
 
-    /// Remove all definitions that were defined in the given file.
+    /// Remove all definitions and outgoing reference locations contributed by the given file.
     /// This clears classes, interfaces, traits, enums, functions, and constants
-    /// whose defining file matches `file_path`, as well as the file's import
-    /// and namespace entries. After calling this, `invalidate_finalization()`
-    /// is called so the next `finalize()` rebuilds inheritance.
+    /// whose defining file matches `file_path`, the file's import and namespace entries,
+    /// and all entries in symbol_reference_locations that originated from this file.
+    /// After calling this, `invalidate_finalization()` is called so the next `finalize()`
+    /// rebuilds inheritance.
     pub fn remove_file_definitions(&self, file_path: &str) {
         // Collect all symbols defined in this file
         let symbols: Vec<Arc<str>> = self
@@ -118,6 +134,16 @@ impl Codebase {
         if let Some((_, var_names)) = self.file_global_vars.remove(file_path) {
             for name in var_names {
                 self.global_vars.remove(name.as_ref());
+            }
+        }
+
+        // Remove reference locations contributed by this file.
+        // Use the reverse index to avoid a full scan of all symbols.
+        if let Some((_, symbol_keys)) = self.file_symbol_references.remove(file_path) {
+            for key in symbol_keys {
+                if let Some(mut locs) = self.symbol_reference_locations.get_mut(&key) {
+                    locs.remove(file_path);
+                }
             }
         }
 
@@ -614,6 +640,122 @@ impl Codebase {
         self.referenced_functions.contains(fqn)
     }
 
+    /// Record a method reference with its source location.
+    /// Also updates the referenced_methods DashSet for dead-code detection.
+    pub fn mark_method_referenced_at(
+        &self,
+        fqcn: &str,
+        method_name: &str,
+        file: Arc<str>,
+        start: u32,
+        end: u32,
+    ) {
+        let key: Arc<str> = Arc::from(format!("{}::{}", fqcn, method_name.to_lowercase()).as_str());
+        self.referenced_methods.insert(key.clone());
+        self.symbol_reference_locations
+            .entry(key.clone())
+            .or_default()
+            .entry(file.clone())
+            .or_default()
+            .insert((start, end));
+        self.file_symbol_references
+            .entry(file)
+            .or_default()
+            .insert(key);
+    }
+
+    /// Record a property reference with its source location.
+    /// Also updates the referenced_properties DashSet for dead-code detection.
+    pub fn mark_property_referenced_at(
+        &self,
+        fqcn: &str,
+        prop_name: &str,
+        file: Arc<str>,
+        start: u32,
+        end: u32,
+    ) {
+        let key: Arc<str> = Arc::from(format!("{}::{}", fqcn, prop_name).as_str());
+        self.referenced_properties.insert(key.clone());
+        self.symbol_reference_locations
+            .entry(key.clone())
+            .or_default()
+            .entry(file.clone())
+            .or_default()
+            .insert((start, end));
+        self.file_symbol_references
+            .entry(file)
+            .or_default()
+            .insert(key);
+    }
+
+    /// Record a function reference with its source location.
+    /// Also updates the referenced_functions DashSet for dead-code detection.
+    pub fn mark_function_referenced_at(&self, fqn: &str, file: Arc<str>, start: u32, end: u32) {
+        let key: Arc<str> = Arc::from(fqn);
+        self.referenced_functions.insert(key.clone());
+        self.symbol_reference_locations
+            .entry(key.clone())
+            .or_default()
+            .entry(file.clone())
+            .or_default()
+            .insert((start, end));
+        self.file_symbol_references
+            .entry(file)
+            .or_default()
+            .insert(key);
+    }
+
+    /// Record a class reference (e.g. `new Foo()`) with its source location.
+    /// Does not update any dead-code DashSet — class instantiation tracking is
+    /// separate from method/property/function dead-code detection.
+    pub fn mark_class_referenced_at(&self, fqcn: &str, file: Arc<str>, start: u32, end: u32) {
+        let key: Arc<str> = Arc::from(fqcn);
+        self.symbol_reference_locations
+            .entry(key.clone())
+            .or_default()
+            .entry(file.clone())
+            .or_default()
+            .insert((start, end));
+        self.file_symbol_references
+            .entry(file)
+            .or_default()
+            .insert(key);
+    }
+
+    /// Replay cached reference locations for a file into symbol_reference_locations
+    /// and file_symbol_references. Called on cache hits to avoid re-running Pass 2
+    /// just to rebuild the reference index.
+    /// `locs` is a slice of `(symbol_key, start_byte, end_byte)` as stored in the cache.
+    pub fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u32)]) {
+        for (symbol_key, start, end) in locs {
+            let key: Arc<str> = Arc::from(symbol_key.as_str());
+            self.symbol_reference_locations
+                .entry(key.clone())
+                .or_default()
+                .entry(file.clone())
+                .or_default()
+                .insert((*start, *end));
+            self.file_symbol_references
+                .entry(file.clone())
+                .or_default()
+                .insert(key);
+        }
+    }
+
+    /// Return all reference locations for `symbol` as a flat `Vec<(file, start, end)>`.
+    /// Returns an empty Vec if the symbol has no recorded references.
+    pub fn get_reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u32)> {
+        match self.symbol_reference_locations.get(symbol) {
+            None => Vec::new(),
+            Some(by_file) => by_file
+                .iter()
+                .flat_map(|(file, spans)| {
+                    spans.iter().map(|&(start, end)| (file.clone(), start, end))
+                })
+                .collect(),
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Finalization
     // -----------------------------------------------------------------------
@@ -797,5 +939,194 @@ impl Codebase {
         }
 
         table
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn arc(s: &str) -> Arc<str> {
+        Arc::from(s)
+    }
+
+    #[test]
+    fn method_referenced_at_groups_spans_by_file() {
+        let cb = Codebase::new();
+        cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 0, 5);
+        cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 10, 15);
+        cb.mark_method_referenced_at("Foo", "bar", arc("b.php"), 20, 25);
+
+        let locs = cb.symbol_reference_locations.get("Foo::bar").unwrap();
+        assert_eq!(locs.len(), 2, "two files, not three spans");
+        assert!(locs[&arc("a.php")].contains(&(0, 5)));
+        assert!(locs[&arc("a.php")].contains(&(10, 15)));
+        assert_eq!(locs[&arc("a.php")].len(), 2);
+        assert!(locs[&arc("b.php")].contains(&(20, 25)));
+        assert!(
+            cb.is_method_referenced("Foo", "bar"),
+            "DashSet also updated"
+        );
+    }
+
+    #[test]
+    fn duplicate_spans_are_deduplicated() {
+        let cb = Codebase::new();
+        // Same call site recorded twice (e.g. union receiver Foo|Foo)
+        cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 0, 5);
+        cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 0, 5);
+
+        let locs = cb.symbol_reference_locations.get("Foo::bar").unwrap();
+        assert_eq!(locs[&arc("a.php")].len(), 1, "duplicate span deduplicated");
+    }
+
+    #[test]
+    fn method_key_is_lowercased() {
+        let cb = Codebase::new();
+        cb.mark_method_referenced_at("Cls", "MyMethod", arc("f.php"), 0, 3);
+        assert!(cb.symbol_reference_locations.contains_key("Cls::mymethod"));
+    }
+
+    #[test]
+    fn property_referenced_at_records_location() {
+        let cb = Codebase::new();
+        cb.mark_property_referenced_at("Bar", "count", arc("x.php"), 5, 10);
+
+        let locs = cb.symbol_reference_locations.get("Bar::count").unwrap();
+        assert!(locs[&arc("x.php")].contains(&(5, 10)));
+        assert!(cb.is_property_referenced("Bar", "count"));
+    }
+
+    #[test]
+    fn function_referenced_at_records_location() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("my_fn", arc("a.php"), 10, 15);
+
+        let locs = cb.symbol_reference_locations.get("my_fn").unwrap();
+        assert!(locs[&arc("a.php")].contains(&(10, 15)));
+        assert!(cb.is_function_referenced("my_fn"));
+    }
+
+    #[test]
+    fn class_referenced_at_records_location() {
+        let cb = Codebase::new();
+        cb.mark_class_referenced_at("Foo", arc("a.php"), 5, 8);
+
+        let locs = cb.symbol_reference_locations.get("Foo").unwrap();
+        assert!(locs[&arc("a.php")].contains(&(5, 8)));
+    }
+
+    #[test]
+    fn get_reference_locations_flattens_all_files() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("fn1", arc("a.php"), 0, 5);
+        cb.mark_function_referenced_at("fn1", arc("b.php"), 10, 15);
+
+        let mut locs = cb.get_reference_locations("fn1");
+        locs.sort_by_key(|(_, s, _)| *s);
+        assert_eq!(locs.len(), 2);
+        assert_eq!(locs[0], (arc("a.php"), 0, 5));
+        assert_eq!(locs[1], (arc("b.php"), 10, 15));
+    }
+
+    #[test]
+    fn replay_reference_locations_restores_index() {
+        let cb = Codebase::new();
+        let locs = vec![
+            ("Foo::bar".to_string(), 0u32, 5u32),
+            ("Foo::bar".to_string(), 10, 15),
+            ("greet".to_string(), 20, 25),
+        ];
+        cb.replay_reference_locations(arc("a.php"), &locs);
+
+        let bar_locs = cb.symbol_reference_locations.get("Foo::bar").unwrap();
+        assert!(bar_locs[&arc("a.php")].contains(&(0, 5)));
+        assert!(bar_locs[&arc("a.php")].contains(&(10, 15)));
+
+        let greet_locs = cb.symbol_reference_locations.get("greet").unwrap();
+        assert!(greet_locs[&arc("a.php")].contains(&(20, 25)));
+
+        let keys = cb.file_symbol_references.get(&arc("a.php")).unwrap();
+        assert!(keys.contains(&Arc::from("Foo::bar")));
+        assert!(keys.contains(&Arc::from("greet")));
+    }
+
+    #[test]
+    fn remove_file_clears_its_spans_only() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("fn1", arc("a.php"), 0, 5);
+        cb.mark_function_referenced_at("fn1", arc("b.php"), 10, 15);
+
+        cb.remove_file_definitions("a.php");
+
+        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert!(!locs.contains_key("a.php"), "a.php spans removed");
+        assert!(
+            locs[&arc("b.php")].contains(&(10, 15)),
+            "b.php spans untouched"
+        );
+        assert!(!cb.file_symbol_references.contains_key("a.php"));
+    }
+
+    #[test]
+    fn remove_file_does_not_affect_other_files() {
+        let cb = Codebase::new();
+        cb.mark_property_referenced_at("Cls", "prop", arc("x.php"), 1, 4);
+        cb.mark_property_referenced_at("Cls", "prop", arc("y.php"), 7, 10);
+
+        cb.remove_file_definitions("x.php");
+
+        let locs = cb.symbol_reference_locations.get("Cls::prop").unwrap();
+        assert!(!locs.contains_key("x.php"));
+        assert!(locs[&arc("y.php")].contains(&(7, 10)));
+    }
+
+    #[test]
+    fn remove_file_definitions_on_never_analyzed_file_is_noop() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("fn1", arc("a.php"), 0, 5);
+
+        // "ghost.php" was never analyzed — removing it must not panic or corrupt state.
+        cb.remove_file_definitions("ghost.php");
+
+        // Existing data must be untouched.
+        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert!(locs[&arc("a.php")].contains(&(0, 5)));
+        assert!(!cb.file_symbol_references.contains_key("ghost.php"));
+    }
+
+    #[test]
+    fn replay_reference_locations_with_empty_list_is_noop() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("fn1", arc("a.php"), 0, 5);
+
+        // Replaying an empty list must not touch existing entries.
+        cb.replay_reference_locations(arc("b.php"), &[]);
+
+        assert!(
+            !cb.file_symbol_references.contains_key("b.php"),
+            "empty replay must not create a file_symbol_references entry"
+        );
+        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert!(
+            locs[&arc("a.php")].contains(&(0, 5)),
+            "existing spans untouched"
+        );
+    }
+
+    #[test]
+    fn replay_reference_locations_twice_does_not_duplicate_spans() {
+        let cb = Codebase::new();
+        let locs = vec![("fn1".to_string(), 0u32, 5u32)];
+
+        cb.replay_reference_locations(arc("a.php"), &locs);
+        cb.replay_reference_locations(arc("a.php"), &locs);
+
+        let by_file = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert_eq!(
+            by_file[&arc("a.php")].len(),
+            1,
+            "replaying the same location twice must not create duplicate spans"
+        );
     }
 }
