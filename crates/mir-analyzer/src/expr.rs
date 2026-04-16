@@ -48,6 +48,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// Record a resolved symbol.
     pub fn record_symbol(&mut self, span: php_ast::Span, kind: SymbolKind, resolved_type: Union) {
         self.symbols.push(ResolvedSymbol {
+            file: self.file.clone(),
             span,
             kind,
             resolved_type,
