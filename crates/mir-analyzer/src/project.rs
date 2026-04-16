@@ -290,8 +290,12 @@ impl ProjectAnalyzer {
                 // Cache lookup
                 let result = if let Some(cache) = &self.cache {
                     let h = hash_content(src);
-                    if let Some(cached) = cache.get(file, &h) {
-                        (cached, Vec::new())
+                    if let Some((cached_issues, ref_locs)) = cache.get(file, &h) {
+                        // Hit — replay reference locations so symbol_reference_locations
+                        // is populated without re-running analyze_bodies.
+                        self.codebase
+                            .replay_reference_locations(file.clone(), &ref_locs);
+                        (cached_issues, Vec::new())
                     } else {
                         // Miss — analyze and store
                         let arena = bumpalo::Bump::new();
@@ -302,7 +306,8 @@ impl ProjectAnalyzer {
                             src,
                             &parsed.source_map,
                         );
-                        cache.put(file, h, issues.clone());
+                        let ref_locs = extract_reference_locations(&self.codebase, file);
+                        cache.put(file, h, issues.clone(), ref_locs);
                         (issues, symbols)
                     }
                 } else {
@@ -478,7 +483,8 @@ impl ProjectAnalyzer {
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
-            cache.put(file_path, h, all_issues.clone());
+            let ref_locs = extract_reference_locations(&self.codebase, &file);
+            cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
 
         AnalysisResult {
@@ -1458,6 +1464,29 @@ fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
 
 // ---------------------------------------------------------------------------
 
+/// Extract the reference locations recorded for `file` from the codebase into
+/// a flat `Vec<(symbol_key, start, end)>` suitable for caching.
+fn extract_reference_locations(codebase: &Codebase, file: &Arc<str>) -> Vec<(String, u32, u32)> {
+    let Some(symbol_keys) = codebase.file_symbol_references.get(file.as_ref()) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for key in symbol_keys.iter() {
+        let Some(by_file) = codebase.symbol_reference_locations.get(key.as_ref()) else {
+            continue;
+        };
+        let Some(spans) = by_file.get(file.as_ref()) else {
+            continue;
+        };
+        for &(s, e) in spans.iter() {
+            out.push((key.to_string(), s, e));
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
     pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
@@ -1493,5 +1522,26 @@ impl AnalysisResult {
                 .push(issue);
         }
         map
+    }
+
+    /// Return the innermost resolved symbol whose span contains `byte_offset`
+    /// in `file`, or `None` if no symbol was recorded at that position.
+    ///
+    /// When multiple symbols overlap (e.g. a method call whose span contains a
+    /// property access span), the one with the smallest span is returned so the
+    /// caller gets the most specific symbol at the cursor.
+    ///
+    /// Typical use: LSP `textDocument/references` and `textDocument/hover`.
+    pub fn symbol_at(
+        &self,
+        file: &str,
+        byte_offset: u32,
+    ) -> Option<&crate::symbol::ResolvedSymbol> {
+        self.symbols
+            .iter()
+            .filter(|s| {
+                s.file.as_ref() == file && s.span.start <= byte_offset && byte_offset < s.span.end
+            })
+            .min_by_key(|s| s.span.end - s.span.start)
     }
 }

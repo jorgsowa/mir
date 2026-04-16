@@ -12,6 +12,10 @@ use sha2::{Digest, Sha256};
 
 use mir_issues::Issue;
 
+/// Cached analysis result returned on a cache hit: issues and reference location
+/// triples `(symbol_key, start_byte, end_byte)`.
+pub type CacheHit = (Vec<Issue>, Vec<(String, u32, u32)>);
+
 // ---------------------------------------------------------------------------
 // Hash helper
 // ---------------------------------------------------------------------------
@@ -35,6 +39,11 @@ pub fn hash_content(content: &str) -> String {
 struct CacheEntry {
     content_hash: String,
     issues: Vec<Issue>,
+    /// Reference locations recorded during Pass 2: (symbol_key, start_byte, end_byte).
+    /// Stored so that cache hits can replay symbol_reference_locations without re-running
+    /// analyze_bodies.
+    #[serde(default)]
+    reference_locations: Vec<(String, u32, u32)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -81,27 +90,39 @@ impl AnalysisCache {
         Self::open(&project_root.join(".mir-cache"))
     }
 
-    /// Return cached issues for `file_path` if its `content_hash` matches.
-    /// Returns `None` if there is no entry or the file has changed.
-    pub fn get(&self, file_path: &str, content_hash: &str) -> Option<Vec<Issue>> {
+    /// Return cached issues and reference locations for `file_path` if its
+    /// `content_hash` matches. Returns `None` if there is no entry or the file
+    /// has changed. The second element of the tuple is the list of
+    /// `(symbol_key, start_byte, end_byte)` entries to replay into
+    /// `Codebase::symbol_reference_locations`.
+    pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
         let entries = self.entries.lock().unwrap();
         entries.get(file_path).and_then(|e| {
             if e.content_hash == content_hash {
-                Some(e.issues.clone())
+                Some((e.issues.clone(), e.reference_locations.clone()))
             } else {
                 None
             }
         })
     }
 
-    /// Store `issues` for `file_path` with the given `content_hash`.
-    pub fn put(&self, file_path: &str, content_hash: String, issues: Vec<Issue>) {
+    /// Store `issues` and `reference_locations` for `file_path` with the given
+    /// `content_hash`. `reference_locations` is a list of
+    /// `(symbol_key, start_byte, end_byte)` recorded during Pass 2.
+    pub fn put(
+        &self,
+        file_path: &str,
+        content_hash: String,
+        issues: Vec<Issue>,
+        reference_locations: Vec<(String, u32, u32)>,
+    ) {
         let mut entries = self.entries.lock().unwrap();
         entries.insert(
             file_path.to_string(),
             CacheEntry {
                 content_hash,
                 issues,
+                reference_locations,
             },
         );
         *self.dirty.lock().unwrap() = true;
@@ -200,7 +221,7 @@ mod tests {
     }
 
     fn seed(cache: &AnalysisCache, file: &str) {
-        cache.put(file, "hash".to_string(), vec![]);
+        cache.put(file, "hash".to_string(), vec![], vec![]);
     }
 
     #[test]
@@ -290,6 +311,33 @@ mod tests {
         assert!(
             cache.get("B", "hash").is_some(),
             "B unrelated, should survive"
+        );
+    }
+
+    #[test]
+    fn old_cache_without_reference_locations_deserializes_to_empty() {
+        // Cache entries written before the reference_locations field was added
+        // must still be readable. The #[serde(default)] attribute covers this,
+        // but we verify it explicitly so a future refactor can't silently break it.
+        let dir = TempDir::new().unwrap();
+        let cache_file = dir.path().join("cache.json");
+
+        // Write a cache file in the old format (no reference_locations field).
+        std::fs::write(
+            &cache_file,
+            r#"{"entries":{"a.php":{"content_hash":"abc","issues":[]}},"reverse_deps":{}}"#,
+        )
+        .unwrap();
+
+        let cache = AnalysisCache::open(dir.path());
+        let hit = cache
+            .get("a.php", "abc")
+            .expect("old cache entry should deserialize successfully");
+
+        assert!(hit.0.is_empty(), "no issues");
+        assert!(
+            hit.1.is_empty(),
+            "reference_locations should default to empty vec, not fail"
         );
     }
 }
