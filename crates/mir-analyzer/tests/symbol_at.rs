@@ -437,6 +437,128 @@ fn full_flow_cursor_to_reference_locations() {
 }
 
 #[test]
+fn symbol_at_function_call_span_is_identifier_only() {
+    // Cursor on '(' (one past the identifier) must NOT find the function symbol.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
+    let file = write(&dir, "span_fn.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let sym_recorded = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .expect("FunctionCall(greet) must be recorded");
+
+    // span should cover only "greet" (5 bytes), not the full "greet()" call
+    assert_eq!(
+        sym_recorded.span.end - sym_recorded.span.start,
+        5,
+        "FunctionCall symbol span must be identifier-only (5 bytes for 'greet')"
+    );
+
+    // Cursor at span.end (the '(' character) must not find the function symbol
+    let past_name = sym_recorded.span.end;
+    let found = result
+        .symbols
+        .iter()
+        .filter(|s| {
+            s.file.as_ref() == file_str
+                && s.span.start <= past_name
+                && past_name < s.span.end
+                && matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet")
+        })
+        .count();
+    assert_eq!(found, 0, "cursor at '(' must not match the function symbol");
+}
+
+#[test]
+fn symbol_at_method_call_span_is_identifier_only() {
+    // Cursor on '(' (one past the method identifier) must NOT find the method symbol.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
+    let file = write(&dir, "span_method.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let sym_recorded = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run"))
+        .expect("MethodCall(run) must be recorded");
+
+    // span should cover only "run" (3 bytes), not "run()" or "$s->run()"
+    assert_eq!(
+        sym_recorded.span.end - sym_recorded.span.start,
+        3,
+        "MethodCall symbol span must be identifier-only (3 bytes for 'run')"
+    );
+
+    // Cursor at span.end (the '(' character) must not find the method symbol
+    let past_name = sym_recorded.span.end;
+    let found = result
+        .symbols
+        .iter()
+        .filter(|s| {
+            s.file.as_ref() == file_str
+                && s.span.start <= past_name
+                && past_name < s.span.end
+                && matches!(&s.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run")
+        })
+        .count();
+    assert_eq!(found, 0, "cursor at '(' must not match the method symbol");
+}
+
+#[test]
+fn symbol_at_static_call_span_is_identifier_only() {
+    // Cursor on '(' (one past the static method identifier) must NOT find the symbol.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::sq(3); }\n";
+    let file = write(&dir, "span_static.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let sym_recorded = result
+        .symbols
+        .iter()
+        .find(
+            |s| matches!(&s.kind, SymbolKind::StaticCall { method, .. } if method.as_ref() == "sq"),
+        )
+        .expect("StaticCall(sq) must be recorded");
+
+    // span should cover only "sq" (2 bytes), not "Math::sq(3)"
+    assert_eq!(
+        sym_recorded.span.end - sym_recorded.span.start,
+        2,
+        "StaticCall symbol span must be identifier-only (2 bytes for 'sq')"
+    );
+
+    // Cursor at span.end (the '(' character) must not find the static call symbol
+    let past_name = sym_recorded.span.end;
+    let found = result
+        .symbols
+        .iter()
+        .filter(|s| {
+            s.file.as_ref() == file_str
+                && s.span.start <= past_name
+                && past_name < s.span.end
+                && matches!(&s.kind, SymbolKind::StaticCall { method, .. } if method.as_ref() == "sq")
+        })
+        .count();
+    assert_eq!(
+        found, 0,
+        "cursor at '(' must not match the static call symbol"
+    );
+}
+
+#[test]
 fn symbol_at_finds_property_access() {
     let dir = TempDir::new().unwrap();
     let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";

@@ -282,6 +282,39 @@ fn re_analyze_removes_stale_reference_locations() {
 }
 
 #[test]
+fn static_method_call_span_covers_only_name() {
+    let dir = TempDir::new().unwrap();
+    // "<?php\n"                                                   = 6 bytes
+    // "class Math { public static function sq(int $n): int { return $n * $n; } }\n"
+    //                                                             = 75 bytes (offset 6)
+    // "function caller(): void { Math::sq(3); }\n"
+    //                                    ^-- 'sq' starts at offset 6+75+26 = 107
+    //  "function caller(): void { Math::" = 32 chars → offset 6+75+32 = 113? let's not hardcode
+    let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::sq(3); }\n";
+    let file = write(&dir, "static_span.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs = analyzer
+        .codebase()
+        .symbol_reference_locations
+        .get("Math::sq")
+        .expect("Math::sq should be in symbol_reference_locations");
+
+    let spans = &locs[&file_arc];
+    assert_eq!(spans.len(), 1);
+    let &(start, end) = spans.iter().next().unwrap();
+    // The span should cover only the 2-byte identifier "sq", not the full call
+    assert_eq!(
+        end - start,
+        2,
+        "span should cover only 'sq' (2 bytes), got start={start} end={end}"
+    );
+}
+
+#[test]
 fn cache_hit_replays_reference_locations() {
     let dir = TempDir::new().unwrap();
     let cache_dir = dir.path().join("cache");
