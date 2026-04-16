@@ -208,7 +208,7 @@ impl CallAnalyzer {
             };
 
             ea.record_symbol(
-                span,
+                call.name.span,
                 SymbolKind::FunctionCall(func.fqn.clone()),
                 return_ty.clone(),
             );
@@ -592,11 +592,13 @@ impl CallAnalyzer {
         } else {
             result
         };
-        // Record method call symbol using the first named object in the receiver
+        // Record method call symbol using the first named object in the receiver.
+        // Use call.method.span (the identifier only), not the full call span, so
+        // the LSP highlights just the method name.
         for atomic in &obj_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 ea.record_symbol(
-                    span,
+                    call.method.span,
                     SymbolKind::MethodCall {
                         class: fqcn.clone(),
                         method: Arc::from(method_name.as_str()),
@@ -643,12 +645,16 @@ impl CallAnalyzer {
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
+            // Compute the method name span: class.span covers the class identifier,
+            // then "::" is 2 bytes, then the method name follows.
+            let method_start = call.class.span.end + 2;
+            let method_end = method_start + method_name.len() as u32;
             ea.codebase.mark_method_referenced_at(
                 &fqcn,
                 method_name,
                 ea.file.clone(),
-                span.start,
-                span.end,
+                method_start,
+                method_end,
             );
             // Emit DeprecatedMethodCall if the method is marked @deprecated
             if method.is_deprecated {
@@ -684,8 +690,9 @@ impl CallAnalyzer {
                 .unwrap_or_else(Union::mixed);
             let fqcn_arc: std::sync::Arc<str> = Arc::from(fqcn.as_str());
             let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
+            let method_span = Span::new(method_start, method_end);
             ea.record_symbol(
-                span,
+                method_span,
                 SymbolKind::StaticCall {
                     class: fqcn_arc,
                     method: Arc::from(method_name),
