@@ -284,12 +284,10 @@ fn re_analyze_removes_stale_reference_locations() {
 #[test]
 fn static_method_call_span_covers_only_name() {
     let dir = TempDir::new().unwrap();
-    // "<?php\n"                                                   = 6 bytes
-    // "class Math { public static function sq(int $n): int { return $n * $n; } }\n"
-    //                                                             = 75 bytes (offset 6)
+    // "<?php\n"                                                                    = 6 bytes
+    // "class Math { public static function sq(int $n): int { return $n * $n; } }\n" = 74 bytes
     // "function caller(): void { Math::sq(3); }\n"
-    //                                    ^-- 'sq' starts at offset 6+75+26 = 107
-    //  "function caller(): void { Math::" = 32 chars → offset 6+75+32 = 113? let's not hardcode
+    //                                    ^-- 'sq' starts at byte 6+74+32 = 112
     let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::sq(3); }\n";
     let file = write(&dir, "static_span.php", src);
     let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
