@@ -81,7 +81,7 @@ fn parse_vendor_entries(root: &Path) -> Vec<(String, PathBuf)> {
         }
     }
 
-    entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
     entries
 }
 
@@ -128,7 +128,7 @@ impl Psr4Map {
             }
         }
 
-        project_entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+        project_entries.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
         let vendor_entries = parse_vendor_entries(root);
 
