@@ -24,27 +24,23 @@ fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
 #[test]
 fn symbol_at_finds_function_call() {
     let dir = TempDir::new().unwrap();
-    // "<?php\n"                               = 6 bytes  (offsets 0-5)
-    // "function greet(): void {}\n"           = 26 bytes (offsets 6-31)
-    // "function caller(): void { greet(); }\n"
-    //   'greet' starts at offset 32 + len("function caller(): void { ") = 32 + 26 = 58
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
     let file = write(&dir, "a.php", src);
-    let file_str = file.to_str().unwrap().to_string();
+    let file_str = file.to_str().unwrap();
 
-    let result = ProjectAnalyzer::analyze_source(src);
-    // Find the offset of "greet" in the caller body
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet()
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at the greet() call");
 
-    let _sym = result.symbol_at(&file_str, offset);
-    // symbol_at uses the file path recorded during analysis; analyze_source uses
-    // "<source>" as the synthetic file name.
-    // Verify by checking with the synthetic path used internally.
-    let sym_any = result
-        .symbols
-        .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"));
-    assert!(sym_any.is_some(), "FunctionCall(greet) should be recorded");
+    assert!(
+        matches!(&sym.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"),
+        "expected FunctionCall(greet), got {:?}",
+        sym.kind
+    );
 }
 
 #[test]
@@ -52,13 +48,170 @@ fn symbol_at_returns_none_for_unknown_offset() {
     let dir = TempDir::new().unwrap();
     let src = "<?php\nfunction foo(): void {}\n";
     let file = write(&dir, "b.php", src);
-    let file_str = file.to_str().unwrap().to_string();
+    let file_str = file.to_str().unwrap();
 
-    let result = ProjectAnalyzer::analyze_source(src);
-    // Offset 0 is '<?', which resolves to no symbol
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Offset 0 is '<?php', before any symbol spans
     assert!(
-        result.symbol_at(&file_str, 0).is_none(),
+        result.symbol_at(file_str, 0).is_none(),
         "no symbol at offset 0 (opening tag)"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// symbol_at — span boundary behaviour
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_matches_at_span_start() {
+    let dir = TempDir::new().unwrap();
+    // "<?php\n"                               = 6 bytes
+    // "function greet(): void {}\n"           = 26 bytes  → total 32
+    // "function caller(): void { greet(); }\n"
+    //                            ^-- greet starts at 32 + 26 = 58
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
+    let file = write(&dir, "c.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Locate the exact span start from the recorded symbol
+    let sym_recorded = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .expect("FunctionCall(greet) must be recorded");
+    let span_start = sym_recorded.span.start;
+
+    // symbol_at with offset == span.start must find the symbol
+    let sym = result
+        .symbol_at(file_str, span_start)
+        .expect("symbol_at should find symbol at span.start");
+    assert!(matches!(&sym.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"));
+}
+
+#[test]
+fn symbol_at_matches_at_last_byte_of_span() {
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
+    let file = write(&dir, "d.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let sym_recorded = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .expect("FunctionCall(greet) must be recorded");
+    // span.end is exclusive, so span.end - 1 is the last byte inside the span
+    let last_byte = sym_recorded.span.end - 1;
+
+    let sym = result
+        .symbol_at(file_str, last_byte)
+        .expect("symbol_at should find symbol at span.end - 1");
+    assert!(matches!(&sym.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"));
+}
+
+#[test]
+fn symbol_at_returns_none_one_past_span_end() {
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
+    let file = write(&dir, "e.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let sym_recorded = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .expect("FunctionCall(greet) must be recorded");
+    // span.end is the first byte after the span — no symbol should cover it
+    // (the '(' character follows, which has no symbol)
+    let past_end = sym_recorded.span.end;
+
+    let found = result
+        .symbols
+        .iter()
+        .filter(|s| {
+            s.file.as_ref() == file_str && s.span.start <= past_end && past_end < s.span.end
+        })
+        .count();
+    assert_eq!(
+        found, 0,
+        "no symbol should cover the byte immediately after the identifier"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// symbol_at — multi-file isolation
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_isolates_symbols_by_file() {
+    let dir = TempDir::new().unwrap();
+    // Both files define and call a function named "run" so their symbol spans
+    // overlap in byte-offset space. symbol_at must not confuse them.
+    let file_a = write(
+        &dir,
+        "a.php",
+        "<?php\nfunction run(): void {}\nfunction a(): void { run(); }\n",
+    );
+    let file_b = write(
+        &dir,
+        "b.php",
+        "<?php\nfunction run(): void {}\nfunction b(): void { run(); }\n",
+    );
+    let file_a_str = file_a.to_str().unwrap();
+    let file_b_str = file_b.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(&[file_a.clone(), file_b.clone()]);
+
+    // Collect all FunctionCall(run) symbols per file
+    let in_a: Vec<_> = result
+        .symbols
+        .iter()
+        .filter(|s| {
+            s.file.as_ref() == file_a_str
+                && matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "run")
+        })
+        .collect();
+    let in_b: Vec<_> = result
+        .symbols
+        .iter()
+        .filter(|s| {
+            s.file.as_ref() == file_b_str
+                && matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "run")
+        })
+        .collect();
+
+    assert_eq!(in_a.len(), 1, "exactly one run() call recorded in a.php");
+    assert_eq!(in_b.len(), 1, "exactly one run() call recorded in b.php");
+
+    // symbol_at for each file must return only that file's symbol
+    let sym_a = result
+        .symbol_at(file_a_str, in_a[0].span.start)
+        .expect("symbol_at should find run() in a.php");
+    assert_eq!(
+        sym_a.file.as_ref(),
+        file_a_str,
+        "returned symbol must belong to a.php"
+    );
+
+    let sym_b = result
+        .symbol_at(file_b_str, in_b[0].span.start)
+        .expect("symbol_at should find run() in b.php");
+    assert_eq!(
+        sym_b.file.as_ref(),
+        file_b_str,
+        "returned symbol must belong to b.php"
     );
 }
 
@@ -68,23 +221,25 @@ fn symbol_at_returns_none_for_unknown_offset() {
 
 #[test]
 fn symbol_at_returns_innermost_symbol() {
-    // If the same offset matches multiple symbols with different span widths,
-    // the one with the smallest span (most specific) should be returned.
+    let dir = TempDir::new().unwrap();
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
-    let result = ProjectAnalyzer::analyze_source(src);
+    let file = write(&dir, "f.php", src);
+    let file_str = file.to_str().unwrap();
 
-    // Find offset of "run" in "$s->run()"
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Find the offset of "run" in "$s->run()"
     let offset = src.rfind("run").unwrap() as u32;
 
-    // There should be a MethodCall symbol at this offset
-    let sym = result.symbols.iter().find(|s| {
-        s.span.start <= offset
-            && offset < s.span.end
-            && matches!(&s.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run")
-    });
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at the run() call");
+
     assert!(
-        sym.is_some(),
-        "MethodCall(run) should be recorded at 'run' offset"
+        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run"),
+        "expected MethodCall(run) as the innermost symbol, got {:?}",
+        sym.kind
     );
 }
 
@@ -96,7 +251,7 @@ fn symbol_at_returns_innermost_symbol() {
 fn codebase_key_for_function_call_matches_reference_index() {
     let dir = TempDir::new().unwrap();
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "c.php", src);
+    let file = write(&dir, "g.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -112,7 +267,6 @@ fn codebase_key_for_function_call_matches_reference_index() {
         .expect("FunctionCall should have a codebase key");
     assert_eq!(key, "greet");
 
-    // The key must exist in symbol_reference_locations
     assert!(
         analyzer
             .codebase()
@@ -126,7 +280,7 @@ fn codebase_key_for_function_call_matches_reference_index() {
 fn codebase_key_for_method_call_is_lowercased() {
     let dir = TempDir::new().unwrap();
     let src = "<?php\nclass Svc { public function Run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->Run(); }\n";
-    let file = write(&dir, "d.php", src);
+    let file = write(&dir, "h.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -155,7 +309,7 @@ fn codebase_key_for_method_call_is_lowercased() {
 fn codebase_key_for_static_call_matches_reference_index() {
     let dir = TempDir::new().unwrap();
     let src = "<?php\nclass Math { public static function square(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::square(3); }\n";
-    let file = write(&dir, "e.php", src);
+    let file = write(&dir, "i.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -180,10 +334,38 @@ fn codebase_key_for_static_call_matches_reference_index() {
 }
 
 #[test]
+fn codebase_key_for_property_access_matches_reference_index() {
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
+    let file = write(&dir, "j.php", src);
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let sym = result
+        .symbols
+        .iter()
+        .find(|s| {
+            matches!(&s.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "count")
+        })
+        .expect("PropertyAccess(count) must be recorded");
+
+    let key = sym.codebase_key().unwrap();
+    assert_eq!(key, "Counter::count");
+    assert!(
+        analyzer
+            .codebase()
+            .symbol_reference_locations
+            .contains_key(key.as_str()),
+        "codebase_key for PropertyAccess should match an entry in symbol_reference_locations"
+    );
+}
+
+#[test]
 fn codebase_key_for_class_reference_matches_reference_index() {
     let dir = TempDir::new().unwrap();
     let src = "<?php\nclass Widget {}\nfunction make(): void { $w = new Widget(); }\n";
-    let file = write(&dir, "f.php", src);
+    let file = write(&dir, "k.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -230,19 +412,13 @@ fn codebase_key_for_variable_is_none() {
 #[test]
 fn full_flow_cursor_to_reference_locations() {
     let dir = TempDir::new().unwrap();
-    // Craft src so we can find the exact byte offset of the call.
     let src = "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); }\n";
-    // "<?php\n"                                     6 bytes
-    // "function ping(): void {}\n"                 25 bytes  → ping defined at 6..10
-    // "function caller(): void { ping(); ping(); }\n"
-    //   first call:  offset 6+25+26 = 57  (len("function caller(): void { ") = 26)
-    let file = write(&dir, "g.php", src);
+    let file = write(&dir, "l.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
     let file_str = file.to_str().unwrap();
 
-    // Find the offset of the first "ping" call in the caller body
     let first_call_offset = src.find("{ ping").unwrap() as u32 + 2;
 
     let sym = result
