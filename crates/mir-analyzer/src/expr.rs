@@ -636,12 +636,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if prop_name == "<dynamic>" {
                     return Union::mixed();
                 }
-                let resolved = self.resolve_property_type(&obj_ty, &prop_name, expr.span);
+                // Use pa.property.span (the identifier only), not the full expression span,
+                // so the LSP highlights just the property name (e.g. `count` in `$c->count`).
+                let resolved = self.resolve_property_type(&obj_ty, &prop_name, pa.property.span);
                 // Record property access symbol for each named object in the receiver type
                 for atomic in &obj_ty.types {
                     if let Atomic::TNamedObject { fqcn, .. } = atomic {
                         self.record_symbol(
-                            expr.span,
+                            pa.property.span,
                             SymbolKind::PropertyAccess {
                                 class: fqcn.clone(),
                                 property: Arc::from(prop_name.as_str()),
@@ -663,8 +665,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 // ?-> strips null from receiver
                 let non_null_ty = obj_ty.remove_null();
-                let mut prop_ty = self.resolve_property_type(&non_null_ty, &prop_name, expr.span);
+                // Use pa.property.span (the identifier only), not the full expression span,
+                // so the LSP highlights just the property name (e.g. `val` in `$b?->val`).
+                let mut prop_ty =
+                    self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span);
                 prop_ty.add_type(Atomic::TNull); // result is nullable because receiver may be null
+                                                 // Record symbol so symbol_at() resolves ?-> accesses the same way as ->.
+                for atomic in &non_null_ty.types {
+                    if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                        self.record_symbol(
+                            pa.property.span,
+                            SymbolKind::PropertyAccess {
+                                class: fqcn.clone(),
+                                property: Arc::from(prop_name.as_str()),
+                            },
+                            prop_ty.clone(),
+                        );
+                        break;
+                    }
+                }
                 prop_ty
             }
 
@@ -1113,35 +1132,34 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Union {
         for atomic in &obj_ty.types {
             match atomic {
-                Atomic::TNamedObject { fqcn, .. } => {
-                    if self.codebase.classes.contains_key(fqcn.as_ref()) {
-                        if let Some(prop) = self.codebase.get_property(fqcn.as_ref(), prop_name) {
-                            // Record reference for dead-code detection (M18)
-                            self.codebase.mark_property_referenced_at(
-                                fqcn,
-                                prop_name,
-                                self.file.clone(),
-                                span.start,
-                                span.end,
-                            );
-                            return prop.ty.clone().unwrap_or_else(Union::mixed);
-                        }
-                        // Only emit UndefinedProperty if all ancestors are known and no __get magic.
-                        if !self.codebase.has_unknown_ancestor(fqcn.as_ref())
-                            && !self.codebase.has_magic_get(fqcn.as_ref())
-                        {
-                            self.emit(
-                                IssueKind::UndefinedProperty {
-                                    class: fqcn.to_string(),
-                                    property: prop_name.to_string(),
-                                },
-                                Severity::Warning,
-                                span,
-                            );
-                        }
-                        return Union::mixed();
+                Atomic::TNamedObject { fqcn, .. }
+                    if self.codebase.classes.contains_key(fqcn.as_ref()) =>
+                {
+                    if let Some(prop) = self.codebase.get_property(fqcn.as_ref(), prop_name) {
+                        // Record reference for dead-code detection (M18)
+                        self.codebase.mark_property_referenced_at(
+                            fqcn,
+                            prop_name,
+                            self.file.clone(),
+                            span.start,
+                            span.end,
+                        );
+                        return prop.ty.clone().unwrap_or_else(Union::mixed);
                     }
-                    // Class not in codebase (external/vendor) — skip silently.
+                    // Only emit UndefinedProperty if all ancestors are known and no __get magic.
+                    if !self.codebase.has_unknown_ancestor(fqcn.as_ref())
+                        && !self.codebase.has_magic_get(fqcn.as_ref())
+                    {
+                        self.emit(
+                            IssueKind::UndefinedProperty {
+                                class: fqcn.to_string(),
+                                property: prop_name.to_string(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                    return Union::mixed();
                 }
                 Atomic::TMixed => return Union::mixed(),
                 _ => {}

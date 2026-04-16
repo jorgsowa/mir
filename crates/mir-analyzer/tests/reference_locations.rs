@@ -73,6 +73,100 @@ fn function_call_span_covers_only_name() {
 }
 
 #[test]
+fn method_call_span_covers_only_name() {
+    let dir = TempDir::new().unwrap();
+    // "<?php\n"                                          = 6 bytes
+    // "class Svc { public function run(): void {} }\n"   = 45 bytes  (offset 6)
+    // "function caller(): void { $s = new Svc(); $s->run(); }\n"
+    //                                             ^-- 'run' starts at offset 97
+    let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
+    let file = write(&dir, "h.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs = analyzer
+        .codebase()
+        .symbol_reference_locations
+        .get("Svc::run")
+        .expect("Svc::run should be in symbol_reference_locations");
+
+    let spans = &locs[&file_arc];
+    assert_eq!(spans.len(), 1);
+    let &(start, end) = spans.iter().next().unwrap();
+    // The span should cover only the 3-byte identifier "run", not the full call
+    assert_eq!(
+        end - start,
+        3,
+        "span should cover only 'run' (3 bytes), got start={start} end={end}"
+    );
+}
+
+#[test]
+fn property_access_span_covers_only_name() {
+    let dir = TempDir::new().unwrap();
+    // "<?php\n"                                          = 6 bytes
+    // "class Counter { public int $count = 0; }\n"      = 41 bytes  (offset 6)
+    // "function read(Counter $c): int { return $c->count; }\n"
+    //                                              ^-- 'count' starts at offset 91
+    let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
+    let file = write(&dir, "i.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs = analyzer
+        .codebase()
+        .symbol_reference_locations
+        .get("Counter::count")
+        .expect("Counter::count should be in symbol_reference_locations");
+
+    let spans = &locs[&file_arc];
+    assert_eq!(spans.len(), 1);
+    let &(start, end) = spans.iter().next().unwrap();
+    // The span should cover only the 5-byte identifier "count", not the full "$c->count"
+    assert_eq!(
+        end - start,
+        5,
+        "span should cover only 'count' (5 bytes), got start={start} end={end}"
+    );
+}
+
+#[test]
+fn nullsafe_property_access_records_reference_location() {
+    let dir = TempDir::new().unwrap();
+    // "<?php\n"                                     = 6 bytes
+    // "class Box { public int $val = 0; }\n"        = 35 bytes  (offset 6)
+    // "function read(?Box $b): void { $b?->val; }\n"
+    //                                        ^-- 'val' starts at offset 77
+    let src =
+        "<?php\nclass Box { public int $val = 0; }\nfunction read(?Box $b): void { $b?->val; }\n";
+    let file = write(&dir, "j.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs = analyzer
+        .codebase()
+        .symbol_reference_locations
+        .get("Box::val")
+        .expect("Box::val should be in symbol_reference_locations after $b?->val");
+
+    let spans = &locs[&file_arc];
+    assert_eq!(spans.len(), 1);
+    let &(start, end) = spans.iter().next().unwrap();
+    // The span should cover only the 3-byte identifier "val", not "$b?->val"
+    assert_eq!(
+        end - start,
+        3,
+        "span should cover only 'val' (3 bytes), got start={start} end={end}"
+    );
+}
+
+#[test]
 fn method_call_records_reference_location() {
     let dir = TempDir::new().unwrap();
     let file = write(
