@@ -211,9 +211,13 @@ impl<'a> ClassAnalyzer<'a> {
             };
 
             for (method_name, _method) in &iface.own_methods {
+                // PHP method names are case-insensitive; normalize before lookup so that
+                // a hand-written stub key like "jsonSerialize" matches the collector's
+                // lowercased key "jsonserialize" stored in cls.all_methods.
+                let method_name_lower = method_name.to_lowercase();
                 // Check if the class provides a concrete implementation
                 let implemented = cls
-                    .get_method(method_name.as_ref())
+                    .get_method(&method_name_lower)
                     .map(|m| !m.is_abstract)
                     .unwrap_or(false);
 
