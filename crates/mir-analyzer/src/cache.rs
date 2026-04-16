@@ -313,4 +313,31 @@ mod tests {
             "B unrelated, should survive"
         );
     }
+
+    #[test]
+    fn old_cache_without_reference_locations_deserializes_to_empty() {
+        // Cache entries written before the reference_locations field was added
+        // must still be readable. The #[serde(default)] attribute covers this,
+        // but we verify it explicitly so a future refactor can't silently break it.
+        let dir = TempDir::new().unwrap();
+        let cache_file = dir.path().join("cache.json");
+
+        // Write a cache file in the old format (no reference_locations field).
+        std::fs::write(
+            &cache_file,
+            r#"{"entries":{"a.php":{"content_hash":"abc","issues":[]}},"reverse_deps":{}}"#,
+        )
+        .unwrap();
+
+        let cache = AnalysisCache::open(dir.path());
+        let hit = cache
+            .get("a.php", "abc")
+            .expect("old cache entry should deserialize successfully");
+
+        assert!(hit.0.is_empty(), "no issues");
+        assert!(
+            hit.1.is_empty(),
+            "reference_locations should default to empty vec, not fail"
+        );
+    }
 }

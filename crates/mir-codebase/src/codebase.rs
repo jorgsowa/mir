@@ -1080,4 +1080,53 @@ mod tests {
         assert!(!locs.contains_key("x.php"));
         assert!(locs[&arc("y.php")].contains(&(7, 10)));
     }
+
+    #[test]
+    fn remove_file_definitions_on_never_analyzed_file_is_noop() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("fn1", arc("a.php"), 0, 5);
+
+        // "ghost.php" was never analyzed — removing it must not panic or corrupt state.
+        cb.remove_file_definitions("ghost.php");
+
+        // Existing data must be untouched.
+        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert!(locs[&arc("a.php")].contains(&(0, 5)));
+        assert!(!cb.file_symbol_references.contains_key("ghost.php"));
+    }
+
+    #[test]
+    fn replay_reference_locations_with_empty_list_is_noop() {
+        let cb = Codebase::new();
+        cb.mark_function_referenced_at("fn1", arc("a.php"), 0, 5);
+
+        // Replaying an empty list must not touch existing entries.
+        cb.replay_reference_locations(arc("b.php"), &[]);
+
+        assert!(
+            !cb.file_symbol_references.contains_key("b.php"),
+            "empty replay must not create a file_symbol_references entry"
+        );
+        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert!(
+            locs[&arc("a.php")].contains(&(0, 5)),
+            "existing spans untouched"
+        );
+    }
+
+    #[test]
+    fn replay_reference_locations_twice_does_not_duplicate_spans() {
+        let cb = Codebase::new();
+        let locs = vec![("fn1".to_string(), 0u32, 5u32)];
+
+        cb.replay_reference_locations(arc("a.php"), &locs);
+        cb.replay_reference_locations(arc("a.php"), &locs);
+
+        let by_file = cb.symbol_reference_locations.get("fn1").unwrap();
+        assert_eq!(
+            by_file[&arc("a.php")].len(),
+            1,
+            "replaying the same location twice must not create duplicate spans"
+        );
+    }
 }
