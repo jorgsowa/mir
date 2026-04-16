@@ -1523,4 +1523,25 @@ impl AnalysisResult {
         }
         map
     }
+
+    /// Return the innermost resolved symbol whose span contains `byte_offset`
+    /// in `file`, or `None` if no symbol was recorded at that position.
+    ///
+    /// When multiple symbols overlap (e.g. a method call whose span contains a
+    /// property access span), the one with the smallest span is returned so the
+    /// caller gets the most specific symbol at the cursor.
+    ///
+    /// Typical use: LSP `textDocument/references` and `textDocument/hover`.
+    pub fn symbol_at(
+        &self,
+        file: &str,
+        byte_offset: u32,
+    ) -> Option<&crate::symbol::ResolvedSymbol> {
+        self.symbols
+            .iter()
+            .filter(|s| {
+                s.file.as_ref() == file && s.span.start <= byte_offset && byte_offset < s.span.end
+            })
+            .min_by_key(|s| s.span.end - s.span.start)
+    }
 }

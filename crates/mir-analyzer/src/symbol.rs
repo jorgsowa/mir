@@ -13,12 +13,38 @@ use php_ast::Span;
 /// A single resolved symbol observed during Pass 2.
 #[derive(Debug, Clone)]
 pub struct ResolvedSymbol {
+    /// Absolute path of the file this symbol was found in.
+    pub file: Arc<str>,
     /// Byte-offset span in the source file.
     pub span: Span,
     /// What kind of symbol this is.
     pub kind: SymbolKind,
     /// The resolved type at this location.
     pub resolved_type: Union,
+}
+
+impl ResolvedSymbol {
+    /// Return the key used in `Codebase::symbol_reference_locations` for this
+    /// symbol, or `None` for kinds that are not tracked there (e.g. variables).
+    ///
+    /// Key format mirrors `mark_*_referenced_at`:
+    /// - method / static call : `"ClassName::methodname"` (method lowercased)
+    /// - property access      : `"ClassName::propName"`
+    /// - function call        : fully-qualified function name
+    /// - class reference      : fully-qualified class name
+    pub fn codebase_key(&self) -> Option<String> {
+        match &self.kind {
+            SymbolKind::MethodCall { class, method } | SymbolKind::StaticCall { class, method } => {
+                Some(format!("{}::{}", class, method.to_lowercase()))
+            }
+            SymbolKind::PropertyAccess { class, property } => {
+                Some(format!("{}::{}", class, property))
+            }
+            SymbolKind::FunctionCall(fqn) => Some(fqn.to_string()),
+            SymbolKind::ClassReference(fqcn) => Some(fqcn.to_string()),
+            SymbolKind::Variable(_) => None,
+        }
+    }
 }
 
 /// The kind of symbol that was resolved.
