@@ -435,3 +435,70 @@ fn full_flow_cursor_to_reference_locations() {
         "two calls to ping() should produce two reference locations"
     );
 }
+
+#[test]
+fn symbol_at_finds_property_access() {
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
+    let file = write(&dir, "m.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Point cursor at 'count' in '$c->count'
+    let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at $c->count");
+
+    assert!(
+        matches!(&sym.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
+        "expected PropertyAccess(count), got {:?}",
+        sym.kind
+    );
+
+    // Verify the full LSP flow: cursor → key → reference locations
+    let key = sym.codebase_key().expect("PropertyAccess must have a key");
+    assert_eq!(key, "Counter::count");
+    let locs = analyzer.codebase().get_reference_locations(&key);
+    assert_eq!(
+        locs.len(),
+        1,
+        "one property access should produce one reference location"
+    );
+}
+
+#[test]
+fn symbol_at_finds_nullsafe_property_access() {
+    let dir = TempDir::new().unwrap();
+    let src =
+        "<?php\nclass Box { public int $val = 0; }\nfunction read(?Box $b): void { $b?->val; }\n";
+    let file = write(&dir, "n.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Point cursor at 'val' in '$b?->val'
+    let offset = src.find("?->val").unwrap() as u32 + 3; // +3 skips '?->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at $b?->val");
+
+    assert!(
+        matches!(&sym.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "val"),
+        "expected PropertyAccess(val) for nullsafe access, got {:?}",
+        sym.kind
+    );
+
+    // Verify the full LSP flow: cursor → key → reference locations
+    let key = sym.codebase_key().expect("PropertyAccess must have a key");
+    assert_eq!(key, "Box::val");
+    let locs = analyzer.codebase().get_reference_locations(&key);
+    assert_eq!(
+        locs.len(),
+        1,
+        "one nullsafe property access should produce one reference location"
+    );
+}
