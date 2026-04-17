@@ -101,6 +101,7 @@ impl Context {
         parent_fqcn: Option<Arc<str>>,
         static_fqcn: Option<Arc<str>>,
         strict_types: bool,
+        is_static: bool,
     ) -> Self {
         Self::for_method(
             params,
@@ -110,10 +111,12 @@ impl Context {
             static_fqcn,
             strict_types,
             false,
+            is_static,
         )
     }
 
     /// Like `for_function` but also sets `inside_constructor`.
+    #[allow(clippy::too_many_arguments)]
     pub fn for_method(
         params: &[mir_codebase::FnParam],
         return_type: Option<Union>,
@@ -122,10 +125,11 @@ impl Context {
         static_fqcn: Option<Arc<str>>,
         strict_types: bool,
         inside_constructor: bool,
+        is_static: bool,
     ) -> Self {
         let mut ctx = Self::new();
         ctx.fn_return_type = return_type;
-        ctx.self_fqcn = self_fqcn;
+        ctx.self_fqcn = self_fqcn.clone();
         ctx.parent_fqcn = parent_fqcn;
         ctx.static_fqcn = static_fqcn;
         ctx.strict_types = strict_types;
@@ -160,6 +164,20 @@ impl Context {
             ctx.assigned_vars.insert(name.clone());
             ctx.param_names.insert(name);
         }
+
+        // Inject $this for non-static methods so that $this->method() can be
+        // resolved without hitting the mixed-receiver early-return guard.
+        if !is_static {
+            if let Some(fqcn) = self_fqcn {
+                let this_ty = mir_types::Union::single(mir_types::Atomic::TNamedObject {
+                    fqcn,
+                    type_params: vec![],
+                });
+                ctx.vars.insert("this".to_string(), this_ty);
+                ctx.assigned_vars.insert("this".to_string());
+            }
+        }
+
         ctx
     }
 

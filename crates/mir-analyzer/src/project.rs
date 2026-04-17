@@ -683,7 +683,7 @@ impl ProjectAnalyzer {
             }
         };
 
-        let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
+        let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             &self.codebase,
@@ -773,6 +773,7 @@ impl ProjectAnalyzer {
                 Some(Arc::from(fqcn)),
                 false,
                 is_ctor,
+                method.is_static,
             );
 
             let mut buf = IssueBuffer::new();
@@ -963,7 +964,7 @@ impl ProjectAnalyzer {
             }
         };
 
-        let mut ctx = Context::for_function(&params, return_ty, None, None, None, false);
+        let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             &self.codebase,
@@ -1064,6 +1065,7 @@ impl ProjectAnalyzer {
                 Some(Arc::from(fqcn)),
                 false,
                 is_ctor,
+                method.is_static,
             );
 
             let mut buf = IssueBuffer::new();
@@ -1343,6 +1345,11 @@ fn emit_unused_variables(
             continue;
         }
         if SUPERGLOBALS.contains(&name.as_str()) {
+            continue;
+        }
+        // $this is implicitly used whenever the method accesses properties or
+        // calls other methods — never report it as unused.
+        if name == "this" {
             continue;
         }
         if name.starts_with('_') {

@@ -10,4 +10,3 @@ class Foo {
 }
 ===expect===
 UnusedParam: $a
-MixedMethodCall: $this->doSomething($ctx)

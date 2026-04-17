@@ -742,9 +742,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
                     .map(|u| resolve_named_objects_in_union(u, self.codebase, &self.file));
 
-                // Build closure context — capture declared use-vars from outer scope
-                // Note: is_static only prevents $this binding; self_fqcn is still accessible
-                // for resolving `self::` references and private/protected visibility checks.
+                // Build closure context — capture declared use-vars from outer scope.
+                // Static closures (`static function() {}`) do not bind $this even when
+                // declared inside a non-static method.
                 let mut closure_ctx = crate::context::Context::for_function(
                     &params,
                     return_ty_hint.clone(),
@@ -752,6 +752,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ctx.parent_fqcn.clone(),
                     ctx.static_fqcn.clone(),
                     ctx.strict_types,
+                    c.is_static,
                 );
                 for use_var in c.use_vars.iter() {
                     let name = use_var.name.trim_start_matches('$');
@@ -820,9 +821,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
                     .map(|u| resolve_named_objects_in_union(u, self.codebase, &self.file));
 
-                // Arrow functions implicitly capture the outer scope by value
-                // Note: is_static only prevents $this binding; self_fqcn is still accessible
-                // for resolving `self::` references and private/protected visibility checks.
+                // Arrow functions implicitly capture the outer scope by value.
+                // Static arrow functions (`static fn() =>`) do not bind $this.
                 let mut arrow_ctx = crate::context::Context::for_function(
                     &params,
                     return_ty_hint.clone(),
@@ -830,6 +830,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ctx.parent_fqcn.clone(),
                     ctx.static_fqcn.clone(),
                     ctx.strict_types,
+                    af.is_static,
                 );
                 // Copy outer vars into arrow context (implicit capture)
                 for (name, ty) in &ctx.vars {
