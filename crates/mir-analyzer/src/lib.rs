@@ -8,6 +8,7 @@ pub mod expr;
 pub mod generic;
 pub mod narrowing;
 pub mod parser;
+pub mod pass1_cache;
 pub mod project;
 pub mod stmt;
 pub mod stubs;

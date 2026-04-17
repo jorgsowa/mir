@@ -154,6 +154,15 @@ impl Codebase {
     // Global variable registry
     // -----------------------------------------------------------------------
 
+    /// Return all `@var`-annotated global variable names declared in `file`.
+    /// Used to build per-file Pass 1 snapshots for the definition cache.
+    pub fn file_global_vars_for_file(&self, file: &Arc<str>) -> Vec<Arc<str>> {
+        self.file_global_vars
+            .get(file.as_ref())
+            .map(|v| v.clone())
+            .unwrap_or_default()
+    }
+
     /// Record an `@var`-annotated global variable type discovered in Pass 1.
     /// If the same variable is annotated in multiple files, the last write wins.
     pub fn register_global_var(&self, file: &Arc<str>, name: Arc<str>, ty: Union) {

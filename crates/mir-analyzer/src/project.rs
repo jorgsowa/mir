@@ -29,6 +29,9 @@ pub struct ProjectAnalyzer {
     stubs_loaded: std::sync::atomic::AtomicBool,
     /// When true, run dead code detection at the end of analysis.
     pub find_dead_code: bool,
+    /// Optional Pass 1 definition cache — when `Some`, unchanged files skip
+    /// parsing and definition collection on subsequent runs.
+    pass1_cache: Option<crate::pass1_cache::Pass1Cache>,
 }
 
 impl ProjectAnalyzer {
@@ -40,6 +43,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            pass1_cache: None,
         }
     }
 
@@ -52,6 +56,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            pass1_cache: Some(crate::pass1_cache::Pass1Cache::open(cache_dir)),
         }
     }
 
@@ -70,6 +75,7 @@ impl ProjectAnalyzer {
             psr4: Some(psr4),
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            pass1_cache: None,
         };
         Ok((analyzer, map))
     }
@@ -134,9 +140,25 @@ impl ProjectAnalyzer {
         // Parse each file once; both the FQCN/namespace/import index and the full
         // definition collection run in the same rayon closure, eliminating the
         // second sequential parse of every file. DashMap handles concurrent writes.
-        let pass1_results: Vec<(Vec<Issue>, Vec<Issue>)> = file_data
+        //
+        // When the Pass 1 cache is active, unchanged files skip parsing entirely:
+        // the snapshot is replayed and `None` is returned for the content hash.
+        // A cache miss returns `Some(hash)` so a snapshot can be built after the
+        // parallel pass completes.
+        let pass1_results: Vec<(Vec<Issue>, Vec<Issue>, Option<String>)> = file_data
             .par_iter()
             .map(|(file, src)| {
+                // Compute hash only when the pass1 cache is active.
+                let content_hash = self.pass1_cache.as_ref().map(|_| hash_content(src));
+
+                // Cache hit: replay stored definitions and skip parsing.
+                if let (Some(p1_cache), Some(ref hash)) = (&self.pass1_cache, &content_hash) {
+                    if let Some(snapshot) = p1_cache.get(file, hash) {
+                        snapshot.replay(&self.codebase, file);
+                        return (snapshot.parse_errors, snapshot.definition_issues, None);
+                    }
+                }
+
                 use php_ast::ast::StmtKind;
                 let arena = bumpalo::Bump::new();
                 let result = php_rs_parser::parse(&arena, src);
@@ -265,11 +287,42 @@ impl ProjectAnalyzer {
                     DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
                 let issues = collector.collect(&result.program);
 
-                (file_parse_errors, issues)
+                (file_parse_errors, issues, content_hash)
             })
             .collect();
 
-        for (file_parse_errors, issues) in pass1_results {
+        // Persist new Pass 1 snapshots for cache misses (before finalize() so that
+        // the derived all_methods/all_parents fields are still empty in the snapshot).
+        if let Some(p1_cache) = &self.pass1_cache {
+            // Build reverse index: defining-file → [fqcns defined there].
+            let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
+            for entry in self.codebase.symbol_to_file.iter() {
+                file_to_fqcns
+                    .entry(entry.value().clone())
+                    .or_default()
+                    .push(entry.key().clone());
+            }
+            for ((file, _src), (per_file_parse_errors, def_issues, maybe_hash)) in
+                file_data.iter().zip(pass1_results.iter())
+            {
+                if let Some(hash) = maybe_hash {
+                    let empty: Vec<Arc<str>> = Vec::new();
+                    let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
+                    let snapshot = crate::pass1_cache::build_snapshot(
+                        &self.codebase,
+                        file,
+                        hash.clone(),
+                        fqcns,
+                        per_file_parse_errors.clone(),
+                        def_issues.clone(),
+                    );
+                    p1_cache.put(file.as_ref(), snapshot);
+                }
+            }
+            p1_cache.flush();
+        }
+
+        for (file_parse_errors, issues, _) in pass1_results {
             parse_errors.extend(file_parse_errors);
             all_issues.extend(issues);
         }
