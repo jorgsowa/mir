@@ -161,7 +161,7 @@ impl CallAnalyzer {
                     arg_names: &call
                         .args
                         .iter()
-                        .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                        .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
                         .collect::<Vec<_>>(),
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
@@ -238,8 +238,7 @@ impl CallAnalyzer {
         let obj_ty = ea.analyze(call.object, ctx);
 
         let method_name = match &call.method.kind {
-            ExprKind::Identifier(name) => (*name).to_string(),
-            ExprKind::Variable(name) => name.as_str().to_string(),
+            ExprKind::Identifier(name) | ExprKind::Variable(name) => name.as_str(),
             _ => return Union::mixed(),
         };
 
@@ -268,7 +267,7 @@ impl CallAnalyzer {
             } else if obj_ty.is_single() {
                 ea.emit(
                     IssueKind::NullMethodCall {
-                        method: method_name.clone(),
+                        method: method_name.to_string(),
                     },
                     Severity::Error,
                     span,
@@ -277,7 +276,7 @@ impl CallAnalyzer {
             } else {
                 ea.emit(
                     IssueKind::PossiblyNullMethodCall {
-                        method: method_name.clone(),
+                        method: method_name.to_string(),
                     },
                     Severity::Info,
                     span,
@@ -289,7 +288,7 @@ impl CallAnalyzer {
         if obj_ty.is_mixed() {
             ea.emit(
                 IssueKind::MixedMethodCall {
-                    method: method_name.clone(),
+                    method: method_name.to_string(),
                 },
                 Severity::Info,
                 span,
@@ -309,13 +308,13 @@ impl CallAnalyzer {
                     // Resolve short names to FQCN — docblock types may not be fully qualified.
                     let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
-                    if let Some(method) = ea.codebase.get_method(fqcn, &method_name) {
+                    if let Some(method) = ea.codebase.get_method(fqcn, method_name) {
                         // Record reference for dead-code detection (M18).
                         // Use call.method.span (the identifier only), not the full call
                         // span, so the LSP highlights just the method name.
                         ea.codebase.mark_method_referenced_at(
                             fqcn,
-                            &method_name,
+                            method_name,
                             ea.file.clone(),
                             call.method.span.start,
                             call.method.span.end,
@@ -325,7 +324,7 @@ impl CallAnalyzer {
                             ea.emit(
                                 IssueKind::DeprecatedMethodCall {
                                     class: fqcn.to_string(),
-                                    method: method_name.clone(),
+                                    method: method_name.to_string(),
                                 },
                                 Severity::Info,
                                 span,
@@ -338,12 +337,12 @@ impl CallAnalyzer {
                         let arg_names: Vec<Option<String>> = call
                             .args
                             .iter()
-                            .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                            .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
                             .collect();
                         check_args(
                             ea,
                             CheckArgsParams {
-                                fn_name: &method_name,
+                                fn_name: method_name,
                                 params: &method.params,
                                 arg_types: &arg_types,
                                 arg_spans: &arg_spans,
@@ -424,7 +423,7 @@ impl CallAnalyzer {
                             ea.emit(
                                 IssueKind::UndefinedMethod {
                                     class: fqcn.to_string(),
-                                    method: method_name.clone(),
+                                    method: method_name.to_string(),
                                 },
                                 Severity::Error,
                                 span,
@@ -442,13 +441,13 @@ impl CallAnalyzer {
                     // Resolve short names to FQCN — docblock types may not be fully qualified.
                     let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
-                    if let Some(method) = ea.codebase.get_method(fqcn, &method_name) {
+                    if let Some(method) = ea.codebase.get_method(fqcn, method_name) {
                         // Record reference for dead-code detection (M18).
                         // Use call.method.span (the identifier only), not the full call
                         // span, so the LSP highlights just the method name.
                         ea.codebase.mark_method_referenced_at(
                             fqcn,
-                            &method_name,
+                            method_name,
                             ea.file.clone(),
                             call.method.span.start,
                             call.method.span.end,
@@ -458,7 +457,7 @@ impl CallAnalyzer {
                             ea.emit(
                                 IssueKind::DeprecatedMethodCall {
                                     class: fqcn.to_string(),
-                                    method: method_name.clone(),
+                                    method: method_name.to_string(),
                                 },
                                 Severity::Info,
                                 span,
@@ -471,12 +470,12 @@ impl CallAnalyzer {
                         let arg_names: Vec<Option<String>> = call
                             .args
                             .iter()
-                            .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                            .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
                             .collect();
                         check_args(
                             ea,
                             CheckArgsParams {
-                                fn_name: &method_name,
+                                fn_name: method_name,
                                 params: &method.params,
                                 arg_types: &arg_types,
                                 arg_spans: &arg_spans,
@@ -557,7 +556,7 @@ impl CallAnalyzer {
                             ea.emit(
                                 IssueKind::UndefinedMethod {
                                     class: fqcn.to_string(),
-                                    method: method_name.clone(),
+                                    method: method_name.to_string(),
                                 },
                                 Severity::Error,
                                 span,
@@ -601,7 +600,7 @@ impl CallAnalyzer {
                     call.method.span,
                     SymbolKind::MethodCall {
                         class: fqcn.clone(),
-                        method: Arc::from(method_name.as_str()),
+                        method: Arc::from(method_name),
                     },
                     final_ty.clone(),
                 );
@@ -621,7 +620,10 @@ impl CallAnalyzer {
         ctx: &mut Context,
         span: Span,
     ) -> Union {
-        let method_name = call.method.as_ref();
+        let method_name = match &call.method.kind {
+            ExprKind::Identifier(name) | ExprKind::Variable(name) => name.as_str(),
+            _ => return Union::mixed(),
+        };
 
         let fqcn = match &call.class.kind {
             ExprKind::Identifier(name) => ea.codebase.resolve_class_name(&ea.file, name.as_ref()),
@@ -670,7 +672,7 @@ impl CallAnalyzer {
             let arg_names: Vec<Option<String>> = call
                 .args
                 .iter()
-                .map(|a| a.name.as_ref().map(|n| n.to_string()))
+                .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
                 .collect();
             check_args(
                 ea,
