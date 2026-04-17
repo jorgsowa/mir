@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-17
+
+### Added
+
+- **`issues_by_file()` on `AnalysisResult`** — group analysis issues by their source file path for easier per-file reporting. (#154)
+- **Symbol reference location tracking** — `AnalysisResult::symbol_at` resolves the symbol under a given position, enabling LSP go-to-definition and find-references. (#185)
+- **`ResolvedSymbol::file` and `codebase_key`** — extended resolved symbol information with the source file and codebase key for cross-file navigation. (#185)
+
+### Changed
+
+- Upgraded php-rs-parser and php-ast to 0.7. (#195)
+
+### Fixed
+
+- Property access symbols now use the identifier span and nullsafe accesses (`?->`) are tracked. (#189)
+- Function, method, and static call symbols now use the identifier span rather than the full call expression span. (#192)
+- `$this` is now injected into method context so `$this->method()` calls are correctly resolved by `symbol_at`. (#193)
+
 ## [0.4.1] - 2026-04-12
 
 ### Fixed
