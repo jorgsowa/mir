@@ -130,128 +130,147 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        // ---- Pre-index pass: walk the AST to build FQCN index, file imports, and namespaces ---
-        file_data.par_iter().for_each(|(file, src)| {
-            use php_ast::ast::StmtKind;
-            let arena = bumpalo::Bump::new();
-            let result = php_rs_parser::parse(&arena, src);
+        // ---- Pass 1: combined pre-index + definition collection (parallel) -----
+        // Parse each file once; both the FQCN/namespace/import index and the full
+        // definition collection run in the same rayon closure, eliminating the
+        // second sequential parse of every file. DashMap handles concurrent writes.
+        let pass1_results: Vec<(Vec<Issue>, Vec<Issue>)> = file_data
+            .par_iter()
+            .map(|(file, src)| {
+                use php_ast::ast::StmtKind;
+                let arena = bumpalo::Bump::new();
+                let result = php_rs_parser::parse(&arena, src);
 
-            let mut current_namespace: Option<String> = None;
-            let mut imports: std::collections::HashMap<String, String> =
-                std::collections::HashMap::new();
-            let mut file_ns_set = false;
+                // --- Pre-index: build FQCN index, file imports, and namespaces ---
+                let mut current_namespace: Option<String> = None;
+                let mut imports: std::collections::HashMap<String, String> =
+                    std::collections::HashMap::new();
+                let mut file_ns_set = false;
 
-            // Index a flat list of stmts under a given namespace prefix.
-            let index_stmts =
-                |stmts: &[php_ast::ast::Stmt<'_, '_>],
-                 ns: Option<&str>,
-                 imports: &mut std::collections::HashMap<String, String>| {
-                    for stmt in stmts.iter() {
-                        match &stmt.kind {
-                            StmtKind::Use(use_decl) => {
-                                for item in use_decl.uses.iter() {
-                                    let full_name = crate::parser::name_to_string(&item.name);
-                                    let alias = item.alias.unwrap_or_else(|| {
-                                        full_name.rsplit('\\').next().unwrap_or(&full_name)
-                                    });
-                                    imports.insert(alias.to_string(), full_name);
+                // Index a flat list of stmts under a given namespace prefix.
+                let index_stmts =
+                    |stmts: &[php_ast::ast::Stmt<'_, '_>],
+                     ns: Option<&str>,
+                     imports: &mut std::collections::HashMap<String, String>| {
+                        for stmt in stmts.iter() {
+                            match &stmt.kind {
+                                StmtKind::Use(use_decl) => {
+                                    for item in use_decl.uses.iter() {
+                                        let full_name = crate::parser::name_to_string(&item.name);
+                                        let alias = item.alias.unwrap_or_else(|| {
+                                            full_name.rsplit('\\').next().unwrap_or(&full_name)
+                                        });
+                                        imports.insert(alias.to_string(), full_name);
+                                    }
                                 }
-                            }
-                            StmtKind::Class(decl) => {
-                                if let Some(n) = decl.name {
+                                StmtKind::Class(decl) => {
+                                    if let Some(n) = decl.name {
+                                        let fqcn = match ns {
+                                            Some(ns) => format!("{}\\{}", ns, n),
+                                            None => n.to_string(),
+                                        };
+                                        self.codebase
+                                            .known_symbols
+                                            .insert(Arc::from(fqcn.as_str()));
+                                    }
+                                }
+                                StmtKind::Interface(decl) => {
                                     let fqcn = match ns {
-                                        Some(ns) => format!("{}\\{}", ns, n),
-                                        None => n.to_string(),
+                                        Some(ns) => format!("{}\\{}", ns, decl.name),
+                                        None => decl.name.to_string(),
                                     };
                                     self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
                                 }
+                                StmtKind::Trait(decl) => {
+                                    let fqcn = match ns {
+                                        Some(ns) => format!("{}\\{}", ns, decl.name),
+                                        None => decl.name.to_string(),
+                                    };
+                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                                }
+                                StmtKind::Enum(decl) => {
+                                    let fqcn = match ns {
+                                        Some(ns) => format!("{}\\{}", ns, decl.name),
+                                        None => decl.name.to_string(),
+                                    };
+                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                                }
+                                StmtKind::Function(decl) => {
+                                    let fqn = match ns {
+                                        Some(ns) => format!("{}\\{}", ns, decl.name),
+                                        None => decl.name.to_string(),
+                                    };
+                                    self.codebase.known_symbols.insert(Arc::from(fqn.as_str()));
+                                }
+                                _ => {}
                             }
-                            StmtKind::Interface(decl) => {
-                                let fqcn = match ns {
-                                    Some(ns) => format!("{}\\{}", ns, decl.name),
-                                    None => decl.name.to_string(),
-                                };
-                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                            }
-                            StmtKind::Trait(decl) => {
-                                let fqcn = match ns {
-                                    Some(ns) => format!("{}\\{}", ns, decl.name),
-                                    None => decl.name.to_string(),
-                                };
-                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                            }
-                            StmtKind::Enum(decl) => {
-                                let fqcn = match ns {
-                                    Some(ns) => format!("{}\\{}", ns, decl.name),
-                                    None => decl.name.to_string(),
-                                };
-                                self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                            }
-                            StmtKind::Function(decl) => {
-                                let fqn = match ns {
-                                    Some(ns) => format!("{}\\{}", ns, decl.name),
-                                    None => decl.name.to_string(),
-                                };
-                                self.codebase.known_symbols.insert(Arc::from(fqn.as_str()));
-                            }
-                            _ => {}
                         }
-                    }
-                };
+                    };
 
-            for stmt in result.program.stmts.iter() {
-                match &stmt.kind {
-                    StmtKind::Namespace(ns) => {
-                        current_namespace =
-                            ns.name.as_ref().map(|n| crate::parser::name_to_string(n));
-                        if !file_ns_set {
-                            if let Some(ref ns_str) = current_namespace {
-                                self.codebase
-                                    .file_namespaces
-                                    .insert(file.clone(), ns_str.clone());
-                                file_ns_set = true;
+                for stmt in result.program.stmts.iter() {
+                    match &stmt.kind {
+                        StmtKind::Namespace(ns) => {
+                            current_namespace =
+                                ns.name.as_ref().map(|n| crate::parser::name_to_string(n));
+                            if !file_ns_set {
+                                if let Some(ref ns_str) = current_namespace {
+                                    self.codebase
+                                        .file_namespaces
+                                        .insert(file.clone(), ns_str.clone());
+                                    file_ns_set = true;
+                                }
+                            }
+                            // Bracketed namespace: walk inner stmts for Use/Class/etc.
+                            if let php_ast::ast::NamespaceBody::Braced(inner_stmts) = &ns.body {
+                                index_stmts(
+                                    inner_stmts,
+                                    current_namespace.as_deref(),
+                                    &mut imports,
+                                );
                             }
                         }
-                        // Bracketed namespace: walk inner stmts for Use/Class/etc.
-                        if let php_ast::ast::NamespaceBody::Braced(inner_stmts) = &ns.body {
-                            index_stmts(inner_stmts, current_namespace.as_deref(), &mut imports);
-                        }
+                        _ => index_stmts(
+                            std::slice::from_ref(stmt),
+                            current_namespace.as_deref(),
+                            &mut imports,
+                        ),
                     }
-                    _ => index_stmts(
-                        std::slice::from_ref(stmt),
-                        current_namespace.as_deref(),
-                        &mut imports,
-                    ),
                 }
-            }
 
-            if !imports.is_empty() {
-                self.codebase.file_imports.insert(file.clone(), imports);
-            }
-        });
+                if !imports.is_empty() {
+                    self.codebase.file_imports.insert(file.clone(), imports);
+                }
 
-        // ---- Pass 1: definition collection (sequential) -------------------------
-        // DashMap handles concurrent writes, but sequential avoids contention.
-        for (file, src) in &file_data {
-            let arena = bumpalo::Bump::new();
-            let result = php_rs_parser::parse(&arena, src);
+                // --- Parse errors ---
+                let file_parse_errors: Vec<Issue> = result
+                    .errors
+                    .iter()
+                    .map(|err| {
+                        Issue::new(
+                            mir_issues::IssueKind::ParseError {
+                                message: err.to_string(),
+                            },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line: 1,
+                                col_start: 0,
+                                col_end: 0,
+                            },
+                        )
+                    })
+                    .collect();
 
-            for err in &result.errors {
-                let msg: String = err.to_string();
-                parse_errors.push(Issue::new(
-                    mir_issues::IssueKind::ParseError { message: msg },
-                    mir_issues::Location {
-                        file: file.clone(),
-                        line: 1,
-                        col_start: 0,
-                        col_end: 0,
-                    },
-                ));
-            }
+                // --- Definition collection ---
+                let collector =
+                    DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
+                let issues = collector.collect(&result.program);
 
-            let collector =
-                DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
-            let issues = collector.collect(&result.program);
+                (file_parse_errors, issues)
+            })
+            .collect();
+
+        for (file_parse_errors, issues) in pass1_results {
+            parse_errors.extend(file_parse_errors);
             all_issues.extend(issues);
         }
 
@@ -1115,23 +1134,18 @@ impl ProjectAnalyzer {
     /// Pass 1 only: collect type definitions from `paths` into the codebase without
     /// analyzing method bodies or emitting issues. Used to load vendor types.
     pub fn collect_types_only(&self, paths: &[PathBuf]) {
-        let file_data: Vec<(Arc<str>, String)> = paths
-            .par_iter()
-            .filter_map(|path| {
-                std::fs::read_to_string(path)
-                    .ok()
-                    .map(|src| (Arc::from(path.to_string_lossy().as_ref()), src))
-            })
-            .collect();
-
-        for (file, src) in &file_data {
+        paths.par_iter().for_each(|path| {
+            let Ok(src) = std::fs::read_to_string(path) else {
+                return;
+            };
+            let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
             let arena = bumpalo::Bump::new();
-            let result = php_rs_parser::parse(&arena, src);
+            let result = php_rs_parser::parse(&arena, &src);
             let collector =
-                DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
+                DefinitionCollector::new(&self.codebase, file, &src, &result.source_map);
             // Ignore any issues emitted during vendor collection
             let _ = collector.collect(&result.program);
-        }
+        });
     }
 
     /// Check type hints in enum methods for undefined classes.
