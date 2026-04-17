@@ -9,7 +9,7 @@ use owo_colors::OwoColorize;
 mod config;
 
 use config::{Baseline, Config, ErrorLevel};
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{PhpVersion, ProjectAnalyzer};
 use mir_issues::{Issue, Severity};
 
 // ---------------------------------------------------------------------------
@@ -176,6 +176,13 @@ fn main() {
         config.php_version = Some(ver.clone());
     }
 
+    // Resolve PHP version: CLI/config string → PhpVersion (default 8.0)
+    let php_version = config
+        .php_version
+        .as_deref()
+        .and_then(PhpVersion::parse)
+        .unwrap_or(PhpVersion::PHP_80);
+
     // Configure rayon thread pool
     if let Some(n) = cli.threads {
         rayon::ThreadPoolBuilder::new()
@@ -204,6 +211,7 @@ fn main() {
         }
 
         analyzer.find_dead_code = cli.find_dead_code;
+        analyzer.php_version = php_version;
 
         let vendor_files = map.vendor_files();
 
@@ -388,6 +396,7 @@ fn main() {
     };
 
     analyzer.find_dead_code = cli.find_dead_code;
+    analyzer.php_version = php_version;
 
     // Load type stubs first (needed before collect_types_only)
     analyzer.load_stubs();

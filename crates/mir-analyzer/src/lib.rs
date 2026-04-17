@@ -13,6 +13,7 @@ pub mod stmt;
 pub mod stubs;
 pub mod taint;
 
+pub use mir_types::PhpVersion;
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
 pub use project::{AnalysisResult, ProjectAnalyzer};

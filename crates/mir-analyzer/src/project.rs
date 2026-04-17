@@ -12,6 +12,7 @@ use mir_issues::Issue;
 use mir_types::Union;
 
 use crate::collector::DefinitionCollector;
+use mir_types::PhpVersion;
 
 // ---------------------------------------------------------------------------
 // ProjectAnalyzer
@@ -29,6 +30,8 @@ pub struct ProjectAnalyzer {
     stubs_loaded: std::sync::atomic::AtomicBool,
     /// When true, run dead code detection at the end of analysis.
     pub find_dead_code: bool,
+    /// Target PHP version for stub filtering.
+    pub php_version: PhpVersion,
 }
 
 impl ProjectAnalyzer {
@@ -40,6 +43,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: PhpVersion::PHP_80,
         }
     }
 
@@ -52,6 +56,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: PhpVersion::PHP_80,
         }
     }
 
@@ -70,6 +75,7 @@ impl ProjectAnalyzer {
             psr4: Some(psr4),
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: PhpVersion::PHP_80,
         };
         Ok((analyzer, map))
     }
@@ -85,7 +91,7 @@ impl ProjectAnalyzer {
             .stubs_loaded
             .swap(true, std::sync::atomic::Ordering::SeqCst)
         {
-            crate::stubs::load_stubs(&self.codebase);
+            crate::stubs::load_stubs(&self.codebase, self.php_version);
         }
     }
 
