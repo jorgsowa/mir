@@ -530,7 +530,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let arg_names: Vec<Option<String>> = n
                     .args
                     .iter()
-                    .map(|a| a.name.as_ref().map(|nm| nm.to_string()))
+                    .map(|a| a.name.as_ref().map(|nm| nm.to_string_repr().into_owned()))
                     .collect();
 
                 let class_ty = match &n.class.kind {
@@ -694,7 +694,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ClassConstAccess(cca) => {
                 // Foo::CONST or Foo::class
-                if cca.member.as_ref() == "class" {
+                if cca.member.name_str() == Some("class") {
                     // Resolve the class name so Foo::class gives the correct FQCN string
                     let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
                         let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
