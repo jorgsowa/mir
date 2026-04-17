@@ -216,6 +216,36 @@ fn symbol_at_isolates_symbols_by_file() {
 }
 
 // ---------------------------------------------------------------------------
+// symbol_at — $this receiver (issue #191)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_finds_this_method_call() {
+    // $this->method() was previously invisible to symbol_at because $this was
+    // not typed in the method context, causing analyze_method_call to hit the
+    // mixed-receiver guard and return early without recording a symbol.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n";
+    let file = write(&dir, "this_call.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Point cursor at 'helper' in '$this->helper()'
+    let offset = src.find("->helper").unwrap() as u32 + 2; // +2 skips '->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve $this->helper() (issue #191)");
+
+    assert!(
+        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "helper"),
+        "expected MethodCall(helper) for $this->helper(), got {:?}",
+        sym.kind
+    );
+}
+
+// ---------------------------------------------------------------------------
 // symbol_at — most-specific span is returned
 // ---------------------------------------------------------------------------
 
