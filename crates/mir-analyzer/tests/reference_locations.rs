@@ -353,3 +353,56 @@ fn cache_hit_replays_reference_locations() {
         );
     }
 }
+
+#[test]
+fn this_method_call_records_reference_location() {
+    // $this->method() calls were previously invisible to the reference index
+    // because $this was untyped and the mixed-receiver guard fired before
+    // record_symbol could be called (issue #191).
+    let dir = TempDir::new().unwrap();
+    let file = write(
+        &dir,
+        "this_ref.php",
+        "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n",
+    );
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    assert!(
+        analyzer
+            .codebase()
+            .symbol_reference_locations
+            .contains_key("Svc::helper"),
+        "$this->helper() should record a reference to Svc::helper in symbol_reference_locations"
+    );
+}
+
+#[test]
+fn this_method_call_span_covers_only_name() {
+    // The recorded span for $this->helper() must cover only the method name
+    // identifier, matching the behaviour for non-$this receivers.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n";
+    let file = write(&dir, "this_span.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs = analyzer
+        .codebase()
+        .symbol_reference_locations
+        .get("Svc::helper")
+        .expect("Svc::helper should be in symbol_reference_locations");
+
+    let spans = &locs[&file_arc];
+    assert_eq!(spans.len(), 1, "one $this->helper() call → one span");
+
+    let &(start, end) = spans.iter().next().unwrap();
+    assert_eq!(
+        end - start,
+        6, // "helper" = 6 bytes
+        "span must cover only the identifier 'helper' (6 bytes), got start={start} end={end}"
+    );
+}
