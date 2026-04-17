@@ -245,6 +245,92 @@ fn symbol_at_finds_this_method_call() {
     );
 }
 
+#[test]
+fn symbol_at_finds_this_property_access() {
+    // $this->prop was invisible for the same reason as $this->method() — $this
+    // was untyped so the mixed-receiver guard fired before record_symbol.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Counter { public int $count = 0;\npublic function inc(): void { $this->count++; } }\n";
+    let file = write(&dir, "this_prop.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve $this->count");
+
+    assert!(
+        matches!(&sym.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
+        "expected PropertyAccess(count) for $this->count, got {:?}",
+        sym.kind
+    );
+
+    let key = sym
+        .codebase_key()
+        .expect("PropertyAccess must have a codebase key");
+    assert_eq!(key, "Counter::count");
+}
+
+#[test]
+fn symbol_at_this_method_call_full_lsp_flow() {
+    // Verify the full LSP flow: cursor → codebase_key → get_reference_locations.
+    // Two calls to $this->helper() from the same method must both be indexed.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc {\n  public function helper(): void {}\n  public function run(): void { $this->helper(); $this->helper(); }\n}\n";
+    let file = write(&dir, "this_flow.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let offset = src.find("->helper").unwrap() as u32 + 2;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find first $this->helper()");
+
+    let key = sym
+        .codebase_key()
+        .expect("MethodCall must have a codebase key");
+    assert!(
+        key.ends_with("::helper"),
+        "codebase_key must end with '::helper', got: {key}"
+    );
+
+    let locs = analyzer.codebase().get_reference_locations(&key);
+    assert_eq!(
+        locs.len(),
+        2,
+        "two $this->helper() calls must produce two reference locations"
+    );
+}
+
+#[test]
+fn symbol_at_this_in_non_static_closure() {
+    // A non-static closure inside a non-static method inherits $this, so
+    // $this->method() calls inside the closure should also be resolved.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc {\n  public function helper(): void {}\n  public function run(): void { $fn = function() { $this->helper(); }; $fn(); }\n}\n";
+    let file = write(&dir, "closure_this.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let offset = src.find("->helper").unwrap() as u32 + 2;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve $this->helper() inside a non-static closure");
+
+    assert!(
+        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "helper"),
+        "expected MethodCall(helper) inside closure, got {:?}",
+        sym.kind
+    );
+}
+
 // ---------------------------------------------------------------------------
 // symbol_at — most-specific span is returned
 // ---------------------------------------------------------------------------
