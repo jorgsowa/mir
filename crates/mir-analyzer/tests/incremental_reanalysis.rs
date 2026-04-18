@@ -183,7 +183,8 @@ fn re_analyze_file_skips_finalize_on_body_only_change() {
         },
     );
 
-    // Re-analyze A.php with a body-only change (same class signature, new method body).
+    // Re-analyze A.php with a signature change that does not affect inheritance
+    // (return type void → int).  finalize() is not needed for such changes.
     let new_content = "<?php\nclass A { public function foo(): int { return 1; } }\n";
     analyzer.re_analyze_file(&file_path, new_content);
 
