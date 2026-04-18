@@ -5,12 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- **Column encoding** — `IssueLocation.col_start`/`col_end` (in `mir-issues`) and `Location.col` (in `mir-codebase`) now store 0-based **Unicode code-point counts** (one column per character as seen on screen) instead of UTF-16 code units. For the vast majority of PHP code this is identical; the difference only arises for supplementary-plane characters (e.g. emoji in identifiers). CLI output and GitHub Actions annotations now show human-visible column numbers. LSP clients must convert to UTF-16 at the protocol boundary — that conversion belongs in the LSP crate, not in the core analyzer.
-
 ## [0.5.0] - 2026-04-17
 
 ### Added

@@ -66,7 +66,7 @@ Source positions flow through several layers, each with a different encoding res
 | Parser | `php-rs-parser` | UTF-8 byte offset | `offset_to_line_col` returns the raw byte distance from the line start. Correct for a parser; consumers must convert. |
 | Core data model | `mir-issues`, `mir-codebase` | **Unicode char count** | `IssueLocation.col_start`/`col_end` and `Location.col` are 0-based counts of Unicode code points (one slot per character as seen on screen). |
 | CLI output | `mir-cli` | Unicode char count (direct) | Column numbers in terminal, GitHub Actions annotations, and JSON output match what editors display in their status bar. |
-| LSP server | `mir-lsp` (separate crate) | UTF-16 code units | The [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position) requires UTF-16. Convert at the protocol boundary: `src[line_start..byte_offset].chars().map(|c| c.len_utf16()).sum()`. LSP 3.17 also supports `positionEncoding` negotiation for UTF-8 and UTF-32. |
+| LSP server | _(outside mir)_ | UTF-16 code units | The [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position) requires UTF-16. Convert at the protocol boundary: `src[line_start..byte_offset].chars().map(|c| c.len_utf16()).sum()`. LSP 3.17 also supports `positionEncoding` negotiation for UTF-8 and UTF-32. |
 
 For pure-ASCII PHP files all three encodings are identical. They diverge only for multi-byte identifiers:
 
