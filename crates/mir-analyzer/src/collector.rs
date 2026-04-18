@@ -664,6 +664,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 let mut own_methods = indexmap::IndexMap::new();
                 let mut own_properties = indexmap::IndexMap::new();
                 let mut own_constants = indexmap::IndexMap::new();
+                let mut trait_uses: Vec<Arc<str>> = vec![];
 
                 for member in decl.members.iter() {
                     match &member.kind {
@@ -731,7 +732,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 },
                             );
                         }
-                        ClassMemberKind::TraitUse(_) => {}
+                        ClassMemberKind::TraitUse(tu) => {
+                            for t in tu.traits.iter() {
+                                trait_uses.push(self.resolve_name(&name_to_string(t)).into());
+                            }
+                        }
                     }
                 }
 
@@ -747,6 +752,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         own_properties,
                         own_constants,
                         template_params: trait_template_params,
+                        traits: trait_uses,
                         location: Some(self.location(stmt.span.start, stmt.span.end)),
                     },
                 );

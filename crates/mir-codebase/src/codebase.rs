@@ -623,12 +623,10 @@ impl Codebase {
             let ancestors = cls.all_parents.clone();
             drop(cls);
 
-            // 2. Own trait methods
+            // 2. Own trait methods (recursive into trait-of-trait)
             for tr_fqcn in &own_traits {
-                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
-                    if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-                        return Some(m.clone());
-                    }
+                if let Some(m) = self.get_method_in_trait(tr_fqcn, method_name) {
+                    return Some(m);
                 }
             }
 
@@ -641,10 +639,8 @@ impl Codebase {
                     let anc_traits = anc.traits.clone();
                     drop(anc);
                     for tr_fqcn in &anc_traits {
-                        if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
-                            if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-                                return Some(m.clone());
-                            }
+                        if let Some(m) = self.get_method_in_trait(tr_fqcn, method_name) {
+                            return Some(m);
                         }
                     }
                 } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
@@ -1261,6 +1257,37 @@ impl Codebase {
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    /// Look up `method_name` in a trait's own methods, then recursively in any
+    /// traits that the trait itself uses (`use OtherTrait;` inside a trait body).
+    /// A visited set prevents infinite loops on pathological mutual trait use.
+    fn get_method_in_trait(&self, tr_fqcn: &Arc<str>, method_name: &str) -> Option<MethodStorage> {
+        let mut visited = std::collections::HashSet::new();
+        self.get_method_in_trait_inner(tr_fqcn, method_name, &mut visited)
+    }
+
+    fn get_method_in_trait_inner(
+        &self,
+        tr_fqcn: &Arc<str>,
+        method_name: &str,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> Option<MethodStorage> {
+        if !visited.insert(tr_fqcn.to_string()) {
+            return None; // cycle guard
+        }
+        let tr = self.traits.get(tr_fqcn.as_ref())?;
+        if let Some(m) = lookup_method(&tr.own_methods, method_name) {
+            return Some(m.clone());
+        }
+        let used_traits = tr.traits.clone();
+        drop(tr);
+        for used_fqcn in &used_traits {
+            if let Some(m) = self.get_method_in_trait_inner(used_fqcn, method_name, visited) {
+                return Some(m);
+            }
+        }
+        None
+    }
 
     fn collect_class_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
         let mut result = Vec::new();
