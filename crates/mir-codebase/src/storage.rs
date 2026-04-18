@@ -243,6 +243,8 @@ pub struct TraitStorage {
     pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub template_params: Vec<TemplateParam>,
+    /// Traits used by this trait (`use OtherTrait;` inside a trait body).
+    pub traits: Vec<Arc<str>>,
     pub location: Option<Location>,
 }
 
