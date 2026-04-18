@@ -15,16 +15,34 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 /// Creates a unique temp file, analyzes it, deletes it, and returns all
 /// unsuppressed issues.
 pub fn check(src: &str) -> Vec<Issue> {
+    check_with_opts(src, false)
+}
+
+/// Like [`check`] but also runs the dead-code detector
+/// (`UnusedMethod`, `UnusedProperty`).
+pub fn check_dead_code(src: &str) -> Vec<Issue> {
+    check_with_opts(src, true)
+}
+
+fn check_with_opts(src: &str, find_dead_code: bool) -> Vec<Issue> {
     let id = COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp: PathBuf = std::env::temp_dir().join(format!("mir_test_{}.php", id));
     std::fs::write(&tmp, src)
         .unwrap_or_else(|e| panic!("failed to write temp PHP file {}: {}", tmp.display(), e));
-    let result = ProjectAnalyzer::new().analyze(std::slice::from_ref(&tmp));
+    let mut analyzer = ProjectAnalyzer::new();
+    analyzer.find_dead_code = find_dead_code;
+    let result = analyzer.analyze(std::slice::from_ref(&tmp));
+    let tmp_str = tmp.to_string_lossy().into_owned();
     std::fs::remove_file(&tmp).ok();
     result
         .issues
         .into_iter()
         .filter(|i| !i.suppressed)
+        // When dead-code analysis is enabled the analyzer walks the entire
+        // codebase (including PHP stubs).  Filter to issues originating from
+        // the test file only so that stub-side false positives don't pollute
+        // the fixture output.
+        .filter(|i| !find_dead_code || i.location.file.as_ref() == tmp_str.as_str())
         .collect()
 }
 
@@ -126,18 +144,28 @@ fn parse_expected_line(line: &str, fixture_path: &str) -> ExpectedIssue {
 ///
 /// Called by the auto-generated test functions in `build.rs`.
 pub fn run_fixture(path: &str) {
+    run_fixture_with_opts(path, false);
+}
+
+/// Like [`run_fixture`] but also enables the dead-code detector for issue kinds
+/// such as `UnusedMethod` and `UnusedProperty` that require it.
+pub fn run_fixture_dead_code(path: &str) {
+    run_fixture_with_opts(path, true);
+}
+
+fn run_fixture_with_opts(path: &str, find_dead_code: bool) {
     let content = std::fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("failed to read fixture {}: {}", path, e));
 
     if std::env::var("UPDATE_FIXTURES").as_deref() == Ok("1") {
         let source = parse_phpt_source_only(&content, path);
-        let actual = check(&source);
+        let actual = check_with_opts(&source, find_dead_code);
         rewrite_fixture(path, &content, &actual);
         return;
     }
 
     let (source, expected) = parse_phpt(&content, path);
-    let actual = check(&source);
+    let actual = check_with_opts(&source, find_dead_code);
 
     let mut failures: Vec<String> = Vec::new();
 

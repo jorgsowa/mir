@@ -29,6 +29,9 @@ fn main() {
         .collect();
     categories.sort_by_key(|e| e.file_name());
 
+    // Categories that require the dead-code detector to be enabled.
+    const DEAD_CODE_CATEGORIES: &[&str] = &["unused_method", "unused_property"];
+
     for cat_entry in categories {
         let cat_dir_name = cat_entry.file_name().to_string_lossy().into_owned();
         let cat_mod_name = cat_dir_name.replace('-', "_");
@@ -52,6 +55,13 @@ fn main() {
             continue;
         }
 
+        let use_dead_code = DEAD_CODE_CATEGORIES.contains(&cat_dir_name.as_str());
+        let runner = if use_dead_code {
+            "mir_analyzer::test_utils::run_fixture_dead_code"
+        } else {
+            "mir_analyzer::test_utils::run_fixture"
+        };
+
         code.push_str(&format!("\nmod {cat_mod_name} {{\n"));
 
         for fixture in fixtures {
@@ -69,7 +79,7 @@ fn main() {
 
             code.push_str(&format!(
                 "    #[test]\n    fn {stem}() {{\n        \
-                 mir_analyzer::test_utils::run_fixture(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{rel}\"));\n    \
+                 {runner}(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{rel}\"));\n    \
                  }}\n"
             ));
         }
