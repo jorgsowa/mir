@@ -6,7 +6,7 @@ use php_ast::ast::StmtKind;
 
 use mir_codebase::Codebase;
 use mir_issues::{IssueBuffer, IssueKind};
-use mir_types::{Atomic, Union};
+use mir_types::{ArrayKey, Atomic, Union};
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
@@ -409,14 +409,73 @@ impl<'a> StatementsAnalyzer<'a> {
                 // ElseIf branches (flatten into separate else-if chain)
                 let mut elseif_ctxs: Vec<Context> = vec![];
                 for elseif in if_stmt.elseif_branches.iter() {
-                    let mut branch_ctx = ctx.fork();
+                    // Start from the pre-if context narrowed by the if condition being false
+                    // (an elseif body only runs when the if condition is false).
+                    let mut pre_elseif = ctx.fork();
+                    narrow_from_condition(
+                        &if_stmt.condition,
+                        &mut pre_elseif,
+                        false,
+                        self.codebase,
+                        &self.file,
+                    );
+                    let pre_elseif_diverges = pre_elseif.diverges;
+
+                    // Check reachability of the elseif body (condition narrowed true)
+                    // and its implicit "skip" path (condition narrowed false) to detect
+                    // redundant elseif conditions.
+                    let mut elseif_true_ctx = pre_elseif.clone();
                     narrow_from_condition(
                         &elseif.condition,
-                        &mut branch_ctx,
+                        &mut elseif_true_ctx,
                         true,
                         self.codebase,
                         &self.file,
                     );
+                    let mut elseif_false_ctx = pre_elseif.clone();
+                    narrow_from_condition(
+                        &elseif.condition,
+                        &mut elseif_false_ctx,
+                        false,
+                        self.codebase,
+                        &self.file,
+                    );
+                    if !pre_elseif_diverges
+                        && (elseif_true_ctx.diverges || elseif_false_ctx.diverges)
+                    {
+                        let (line, col_start) =
+                            self.offset_to_line_col(elseif.condition.span.start);
+                        let col_end = if elseif.condition.span.start < elseif.condition.span.end {
+                            let (_end_line, end_col) =
+                                self.offset_to_line_col(elseif.condition.span.end);
+                            end_col
+                        } else {
+                            col_start
+                        };
+                        let elseif_cond_type = self
+                            .expr_analyzer(ctx)
+                            .analyze(&elseif.condition, &mut ctx.fork());
+                        self.issues.add(
+                            mir_issues::Issue::new(
+                                IssueKind::RedundantCondition {
+                                    ty: format!("{}", elseif_cond_type),
+                                },
+                                mir_issues::Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
+                                },
+                            )
+                            .with_snippet(
+                                crate::parser::span_text(self.source, elseif.condition.span)
+                                    .unwrap_or_default(),
+                            ),
+                        );
+                    }
+
+                    // Analyze the elseif body using the narrowed-true context.
+                    let mut branch_ctx = elseif_true_ctx;
                     self.expr_analyzer(&branch_ctx)
                         .analyze(&elseif.condition, &mut branch_ctx);
                     if !branch_ctx.diverges {
@@ -469,10 +528,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     );
                 }
 
-                // Merge all branches
+                // Merge all branches: start with the if/else pair, then fold each
+                // elseif in as an additional possible execution path.  Using the
+                // accumulated ctx (not pre_ctx) as the "else" argument ensures every
+                // branch contributes to the final type environment.
                 *ctx = Context::merge_branches(&pre_ctx, then_ctx, Some(else_ctx));
                 for ec in elseif_ctxs {
-                    *ctx = Context::merge_branches(&pre_ctx, ec, None);
+                    *ctx = Context::merge_branches(&pre_ctx, ec, Some(ctx.clone()));
                 }
             }
 
@@ -1015,18 +1077,29 @@ fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
                 return (Union::single(Atomic::TInt), *value.clone());
             }
             Atomic::TKeyedArray { properties, .. } => {
+                let mut keys = Union::empty();
                 let mut values = Union::empty();
-                for (_k, prop) in properties {
+                for (k, prop) in properties {
+                    let key_atomic = match k {
+                        ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
+                        ArrayKey::Int(i) => Atomic::TLiteralInt(*i),
+                    };
+                    keys = Union::merge(&keys, &Union::single(key_atomic));
                     values = Union::merge(&values, &prop.ty);
                 }
-                // Empty keyed array (e.g. `$arr = []` before push) — treat value as mixed
-                // to avoid propagating Union::empty() as a variable type.
+                // Empty keyed array (e.g. `$arr = []` before push) — treat both as
+                // mixed to avoid propagating Union::empty() as a variable type.
+                let keys = if keys.is_empty() {
+                    Union::mixed()
+                } else {
+                    keys
+                };
                 let values = if values.is_empty() {
                     Union::mixed()
                 } else {
                     values
                 };
-                return (Union::single(Atomic::TMixed), values);
+                return (keys, values);
             }
             Atomic::TString => {
                 return (Union::single(Atomic::TInt), Union::single(Atomic::TString));
