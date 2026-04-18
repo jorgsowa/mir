@@ -1,4 +1,5 @@
 pub mod codebase;
+pub mod interner;
 pub mod members;
 pub mod storage;
 

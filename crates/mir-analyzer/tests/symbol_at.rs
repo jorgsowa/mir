@@ -384,10 +384,10 @@ fn codebase_key_for_function_call_matches_reference_index() {
     assert_eq!(key, "greet");
 
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key(key.as_str()),
+            .get_reference_locations(key.as_str())
+            .is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -413,10 +413,10 @@ fn codebase_key_for_method_call_is_lowercased() {
         "method part of key must be lowercased, got: {key}"
     );
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key(key.as_str()),
+            .get_reference_locations(key.as_str())
+            .is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -441,10 +441,10 @@ fn codebase_key_for_static_call_matches_reference_index() {
     let key = sym.codebase_key().unwrap();
     assert_eq!(key, "Math::square");
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key(key.as_str()),
+            .get_reference_locations(key.as_str())
+            .is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -469,10 +469,10 @@ fn codebase_key_for_property_access_matches_reference_index() {
     let key = sym.codebase_key().unwrap();
     assert_eq!(key, "Counter::count");
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key(key.as_str()),
+            .get_reference_locations(key.as_str())
+            .is_empty(),
         "codebase_key for PropertyAccess should match an entry in symbol_reference_locations"
     );
 }
@@ -495,10 +495,10 @@ fn codebase_key_for_class_reference_matches_reference_index() {
     let key = sym.codebase_key().unwrap();
     assert_eq!(key, "Widget");
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key(key.as_str()),
+            .get_reference_locations(key.as_str())
+            .is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
