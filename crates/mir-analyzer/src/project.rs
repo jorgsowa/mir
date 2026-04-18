@@ -80,6 +80,13 @@ impl ProjectAnalyzer {
         Ok((analyzer, map))
     }
 
+    /// Enable disk-backed caching for both Pass 1 and Pass 2.
+    /// Must be called before `analyze()` to take effect.
+    pub fn enable_cache(&mut self, cache_dir: &std::path::Path) {
+        self.cache = Some(crate::cache::AnalysisCache::open(cache_dir));
+        self.pass1_cache = Some(crate::pass1_cache::Pass1Cache::open(cache_dir));
+    }
+
     /// Expose codebase for external use (e.g., pre-loading stubs from CLI).
     pub fn codebase(&self) -> &Arc<Codebase> {
         &self.codebase
@@ -1187,18 +1194,60 @@ impl ProjectAnalyzer {
     /// Pass 1 only: collect type definitions from `paths` into the codebase without
     /// analyzing method bodies or emitting issues. Used to load vendor types.
     pub fn collect_types_only(&self, paths: &[PathBuf]) {
-        paths.par_iter().for_each(|path| {
-            let Ok(src) = std::fs::read_to_string(path) else {
-                return;
-            };
-            let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
-            let arena = bumpalo::Bump::new();
-            let result = php_rs_parser::parse(&arena, &src);
-            let collector =
-                DefinitionCollector::new(&self.codebase, file, &src, &result.source_map);
-            // Ignore any issues emitted during vendor collection
-            let _ = collector.collect(&result.program);
-        });
+        use std::collections::HashMap;
+
+        let file_data: Vec<(Arc<str>, String)> = paths
+            .par_iter()
+            .filter_map(|path| {
+                let src = std::fs::read_to_string(path).ok()?;
+                Some((Arc::from(path.to_string_lossy().as_ref()), src))
+            })
+            .collect();
+
+        let miss_hashes: Vec<Option<String>> = file_data
+            .par_iter()
+            .map(|(file, src)| {
+                let content_hash = self.pass1_cache.as_ref().map(|_| hash_content(src));
+                if let (Some(p1_cache), Some(ref hash)) = (&self.pass1_cache, &content_hash) {
+                    if let Some(snapshot) = p1_cache.get(file, hash) {
+                        snapshot.replay(&self.codebase, file);
+                        return None;
+                    }
+                }
+                let arena = bumpalo::Bump::new();
+                let result = php_rs_parser::parse(&arena, src);
+                let collector =
+                    DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
+                let _ = collector.collect(&result.program);
+                content_hash
+            })
+            .collect();
+
+        if let Some(p1_cache) = &self.pass1_cache {
+            let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
+            for entry in self.codebase.symbol_to_file.iter() {
+                file_to_fqcns
+                    .entry(entry.value().clone())
+                    .or_default()
+                    .push(entry.key().clone());
+            }
+            for ((file, _src), maybe_hash) in file_data.iter().zip(miss_hashes.iter()) {
+                if let Some(hash) = maybe_hash {
+                    let empty: Vec<Arc<str>> = Vec::new();
+                    let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
+                    let snapshot = crate::pass1_cache::build_snapshot(
+                        &self.codebase,
+                        file,
+                        hash.clone(),
+                        fqcns,
+                        vec![],
+                        vec![],
+                    );
+                    p1_cache.put(file.as_ref(), snapshot);
+                }
+            }
+            p1_cache.flush();
+        }
     }
 
     /// Check type hints in enum methods for undefined classes.

@@ -11,10 +11,6 @@
 //!   derived `all_methods` / `all_parents` fields in `ClassStorage` are
 //!   intentionally empty.  `finalize()` recomputes them from the replayed
 //!   data exactly as it does for freshly-parsed files.
-//! * Global PHP constants (`StmtKind::Const` / `define()`) are not
-//!   included in snapshots because `DefinitionCollector` does not add them
-//!   to `symbol_to_file`; this matches the existing behaviour of
-//!   `Codebase::remove_file_definitions`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -52,6 +48,8 @@ pub struct Pass1Snapshot {
     pub functions: Vec<(Arc<str>, FunctionStorage)>,
     /// `@var`-annotated global variables defined in this file.
     pub global_vars: Vec<(Arc<str>, Union)>,
+    /// Global PHP constants (`const FOO = 1` / `define('FOO', 1)`) defined in this file.
+    pub constants: Vec<(Arc<str>, Union)>,
     /// Parse errors emitted for this file.
     pub parse_errors: Vec<Issue>,
     /// Issues from definition collection (typically empty).
@@ -99,6 +97,9 @@ impl Pass1Snapshot {
         }
         for (name, ty) in &self.global_vars {
             codebase.register_global_var(file, name.clone(), ty.clone());
+        }
+        for (name, ty) in &self.constants {
+            codebase.register_constant(file, name.clone(), ty.clone());
         }
     }
 }
@@ -161,6 +162,17 @@ pub fn build_snapshot(
         })
         .collect();
 
+    let const_names = codebase.file_constants_for_file(file);
+    let constants: Vec<(Arc<str>, Union)> = const_names
+        .iter()
+        .filter_map(|name| {
+            codebase
+                .constants
+                .get(name.as_ref())
+                .map(|ty| (name.clone(), ty.clone()))
+        })
+        .collect();
+
     Pass1Snapshot {
         content_hash,
         namespace,
@@ -171,20 +183,10 @@ pub fn build_snapshot(
         enums,
         functions,
         global_vars,
+        constants,
         parse_errors,
         definition_issues,
     }
-}
-
-// ---------------------------------------------------------------------------
-// Pass1Status
-// ---------------------------------------------------------------------------
-
-/// Whether a file was a Pass 1 cache hit or miss.
-pub enum Pass1Status {
-    Hit,
-    /// Cache miss — carries the SHA-256 content hash for snapshot building.
-    Miss(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +207,7 @@ pub struct Pass1Cache {
 impl Pass1Cache {
     /// Open (or create) a cache backed by `{cache_dir}/pass1.bin`.
     pub fn open(cache_dir: &Path) -> Self {
+        std::fs::create_dir_all(cache_dir).ok();
         let cache_path = cache_dir.join("pass1.bin");
         let entries = Self::load_from_disk(&cache_path);
         Self {
@@ -246,20 +249,41 @@ impl Pass1Cache {
             .write()
             .unwrap()
             .insert(file.to_string(), snapshot);
-        self.dirty.store(true, Ordering::Relaxed);
+        self.dirty.store(true, Ordering::Release);
+    }
+
+    /// Remove cache entries for files that no longer exist on disk.
+    /// Called automatically by `flush()` to prevent unbounded cache growth.
+    fn gc_unreachable(&self) {
+        let to_remove: Vec<String> = {
+            let entries = self.entries.read().unwrap();
+            entries
+                .keys()
+                .filter(|path| !std::path::Path::new(path).exists())
+                .cloned()
+                .collect()
+        };
+        if !to_remove.is_empty() {
+            let mut entries = self.entries.write().unwrap();
+            for path in to_remove {
+                entries.remove(&path);
+            }
+            self.dirty.store(true, Ordering::Release);
+        }
     }
 
     /// Persist the in-memory cache to `{cache_dir}/pass1.bin`.
     /// No-op when nothing has changed since the last flush.
     pub fn flush(&self) {
-        if !self.dirty.load(Ordering::Relaxed) {
+        self.gc_unreachable();
+        if !self.dirty.load(Ordering::Acquire) {
             return;
         }
         let config = bincode::config::standard();
         let entries = self.entries.read().unwrap();
         if let Ok(bytes) = bincode::serde::encode_to_vec(&*entries, config) {
             std::fs::write(&self.cache_path, bytes).ok();
-            self.dirty.store(false, Ordering::Relaxed);
+            self.dirty.store(false, Ordering::Release);
         }
     }
 }

@@ -811,7 +811,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     } else {
                         item.name.into()
                     };
-                    self.codebase.constants.insert(fqn, Union::mixed());
+                    self.codebase
+                        .register_constant(&self.file, fqn, Union::mixed());
                 }
             }
 
@@ -830,7 +831,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             if let Some(name_arg) = call.args.first() {
                                 if let php_ast::ast::ExprKind::String(name) = &name_arg.value.kind {
                                     let fqn: Arc<str> = Arc::from(&**name);
-                                    self.codebase.constants.insert(fqn, Union::mixed());
+                                    self.codebase.register_constant(
+                                        &self.file,
+                                        fqn,
+                                        Union::mixed(),
+                                    );
                                 }
                             }
                         }

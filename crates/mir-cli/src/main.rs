@@ -120,6 +120,10 @@ fn main() {
             if cache_file.exists() {
                 std::fs::remove_file(&cache_file).expect("Failed to remove cache file");
             }
+            let pass1_file = cache_dir.join("pass1.bin");
+            if pass1_file.exists() {
+                std::fs::remove_file(&pass1_file).expect("Failed to remove pass1 cache file");
+            }
             if !cli.quiet {
                 eprintln!("mir: cache cleared ({})", cache_dir.display());
             }
@@ -199,7 +203,7 @@ fn main() {
         // Apply --cache-dir if specified (skip when --no-cache is set)
         if let Some(cache_dir) = &cli.cache_dir {
             if !cli.no_cache {
-                analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
+                analyzer.enable_cache(cache_dir);
             }
         }
 

@@ -32,6 +32,11 @@ pub struct Codebase {
     /// Used by `remove_file_definitions` to purge stale entries on re-analysis.
     file_global_vars: DashMap<Arc<str>, Vec<Arc<str>>>,
 
+    /// Global PHP constants (`const FOO = 1` / `define('FOO', 1)`) keyed by value.
+    /// Separate from `constants` to provide a per-file reverse index used by
+    /// `remove_file_definitions` and Pass 1 snapshot building.
+    file_constants: DashMap<Arc<str>, Vec<Arc<str>>>,
+
     /// Methods referenced during Pass 2 — key format: `"ClassName::methodName"`.
     /// Used by the dead-code detector (M18).
     pub referenced_methods: DashSet<Arc<str>>,
@@ -137,6 +142,13 @@ impl Codebase {
             }
         }
 
+        // Remove file-level constants declared in this file
+        if let Some((_, const_names)) = self.file_constants.remove(file_path) {
+            for name in const_names {
+                self.constants.remove(name.as_ref());
+            }
+        }
+
         // Remove reference locations contributed by this file.
         // Use the reverse index to avoid a full scan of all symbols.
         if let Some((_, symbol_keys)) = self.file_symbol_references.remove(file_path) {
@@ -171,6 +183,28 @@ impl Codebase {
             .or_default()
             .push(name.clone());
         self.global_vars.insert(name, ty);
+    }
+
+    // -----------------------------------------------------------------------
+    // Global constant registry
+    // -----------------------------------------------------------------------
+
+    /// Record a global PHP constant (`const FOO = 1` / `define('FOO', 1)`) discovered in Pass 1.
+    pub fn register_constant(&self, file: &Arc<str>, name: Arc<str>, ty: Union) {
+        self.file_constants
+            .entry(file.clone())
+            .or_default()
+            .push(name.clone());
+        self.constants.insert(name, ty);
+    }
+
+    /// Return all global constant names declared in `file`.
+    /// Used to build per-file Pass 1 snapshots for the definition cache.
+    pub fn file_constants_for_file(&self, file: &Arc<str>) -> Vec<Arc<str>> {
+        self.file_constants
+            .get(file.as_ref())
+            .map(|v| v.clone())
+            .unwrap_or_default()
     }
 
     // -----------------------------------------------------------------------
