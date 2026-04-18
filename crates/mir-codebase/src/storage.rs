@@ -62,7 +62,7 @@ pub struct Location {
     pub end: u32,
     /// 1-based line number of the declaration.
     pub line: u32,
-    /// 0-based UTF-16 column offset of the declaration start.
+    /// 0-based Unicode char-count (code-point) column offset of the declaration start.
     pub col: u16,
 }
 

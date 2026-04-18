@@ -57,6 +57,24 @@ git submodule update --remote crates/mir-analyzer/phpstorm-stubs
 
 A smaller set of Rust-coded stubs in `crates/mir-analyzer/src/stubs.rs` runs after phpstorm-stubs and overrides or extends where precise parameter shapes matter (e.g. by-reference variadic params on `sscanf`, PHPUnit assertion helpers).
 
+## Column encoding convention
+
+Source positions flow through several layers, each with a different encoding responsibility:
+
+| Layer | Crate | Encoding | Notes |
+|-------|-------|----------|-------|
+| Parser | `php-rs-parser` | UTF-8 byte offset | `offset_to_line_col` returns the raw byte distance from the line start. Correct for a parser; consumers must convert. |
+| Core data model | `mir-issues`, `mir-codebase` | **Unicode char count** | `IssueLocation.col_start`/`col_end` and `Location.col` are 0-based counts of Unicode code points (one slot per character as seen on screen). |
+| CLI output | `mir-cli` | Unicode char count (direct) | Column numbers in terminal, GitHub Actions annotations, and JSON output match what editors display in their status bar. |
+| LSP server | `mir-lsp` (separate crate) | UTF-16 code units | The [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position) requires UTF-16. Convert at the protocol boundary: `src[line_start..byte_offset].chars().map(|c| c.len_utf16()).sum()`. LSP 3.17 also supports `positionEncoding` negotiation for UTF-8 and UTF-32. |
+
+For pure-ASCII PHP files all three encodings are identical. They diverge only for multi-byte identifiers:
+
+- **Accented Latin / Cyrillic / CJK** (e.g. `$café`) — UTF-8 bytes > char count = UTF-16 units.
+- **Emoji / supplementary-plane characters** (e.g. `$🎉`) — UTF-8 bytes > UTF-16 units > char count.
+
+PHP 8 allows any Unicode letter in identifiers, so the distinction matters for correctness even if uncommon in practice.
+
 ## Crate layout
 
 | Crate | Purpose |
