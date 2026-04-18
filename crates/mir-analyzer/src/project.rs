@@ -458,6 +458,20 @@ impl ProjectAnalyzer {
     /// 4. Re-runs Pass 2 (body analysis) on this file
     /// 5. Returns the analysis result for this file only
     pub fn re_analyze_file(&self, file_path: &str, new_content: &str) -> AnalysisResult {
+        // Fast path: content unchanged and cache has a valid entry — skip full re-analysis.
+        if let Some(cache) = &self.cache {
+            let h = hash_content(new_content);
+            if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
+                let file: Arc<str> = Arc::from(file_path);
+                self.codebase.replay_reference_locations(file, &ref_locs);
+                return AnalysisResult {
+                    issues,
+                    type_envs: HashMap::new(),
+                    symbols: Default::default(),
+                };
+            }
+        }
+
         // 1. Remove old definitions from this file
         self.codebase.remove_file_definitions(file_path);
 
