@@ -27,17 +27,12 @@ fn function_call_records_reference_location() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
-        .codebase()
-        .symbol_reference_locations
-        .get("greet")
-        .expect("greet should be in symbol_reference_locations");
-
+    let locs = analyzer.codebase().get_reference_locations("greet");
     assert!(
-        locs.contains_key(&file_arc),
+        locs.iter().any(|(f, _, _)| f == &file_arc),
         "reference location should be recorded for the analyzed file"
     );
-    assert!(!locs[&file_arc].is_empty(), "at least one span recorded");
+    assert!(!locs.is_empty(), "at least one span recorded");
 }
 
 #[test]
@@ -55,15 +50,15 @@ fn function_call_span_covers_only_name() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let locs: Vec<_> = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("greet")
-        .expect("greet should be in symbol_reference_locations");
+        .get_reference_locations("greet")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
 
-    let spans = &locs[&file_arc];
-    assert_eq!(spans.len(), 1);
-    let &(start, end) = spans.iter().next().unwrap();
+    assert_eq!(locs.len(), 1);
+    let (_, start, end) = locs[0];
     // The span should cover only the 5-byte identifier "greet", not the full call
     assert_eq!(
         end - start,
@@ -86,15 +81,15 @@ fn method_call_span_covers_only_name() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let locs: Vec<_> = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("Svc::run")
-        .expect("Svc::run should be in symbol_reference_locations");
+        .get_reference_locations("Svc::run")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
 
-    let spans = &locs[&file_arc];
-    assert_eq!(spans.len(), 1);
-    let &(start, end) = spans.iter().next().unwrap();
+    assert_eq!(locs.len(), 1);
+    let (_, start, end) = locs[0];
     // The span should cover only the 3-byte identifier "run", not the full call
     assert_eq!(
         end - start,
@@ -117,15 +112,15 @@ fn property_access_span_covers_only_name() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let locs: Vec<_> = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("Counter::count")
-        .expect("Counter::count should be in symbol_reference_locations");
+        .get_reference_locations("Counter::count")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
 
-    let spans = &locs[&file_arc];
-    assert_eq!(spans.len(), 1);
-    let &(start, end) = spans.iter().next().unwrap();
+    assert_eq!(locs.len(), 1);
+    let (_, start, end) = locs[0];
     // The span should cover only the 5-byte identifier "count", not the full "$c->count"
     assert_eq!(
         end - start,
@@ -149,15 +144,15 @@ fn nullsafe_property_access_records_reference_location() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let locs: Vec<_> = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("Box::val")
-        .expect("Box::val should be in symbol_reference_locations after $b?->val");
+        .get_reference_locations("Box::val")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
 
-    let spans = &locs[&file_arc];
-    assert_eq!(spans.len(), 1);
-    let &(start, end) = spans.iter().next().unwrap();
+    assert_eq!(locs.len(), 1);
+    let (_, start, end) = locs[0];
     // The span should cover only the 3-byte identifier "val", not "$b?->val"
     assert_eq!(
         end - start,
@@ -179,10 +174,10 @@ fn method_call_records_reference_location() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key("Svc::run"),
+            .get_reference_locations("Svc::run")
+            .is_empty(),
         "Svc::run should be in symbol_reference_locations"
     );
 }
@@ -200,17 +195,14 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let count = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("ping")
-        .expect("ping should be in symbol_reference_locations");
+        .get_reference_locations("ping")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .count();
 
-    assert_eq!(
-        locs[&file_arc].len(),
-        3,
-        "three calls should produce three spans"
-    );
+    assert_eq!(count, 3, "three calls should produce three spans");
 }
 
 #[test]
@@ -226,14 +218,9 @@ fn new_expression_records_class_reference() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
-        .codebase()
-        .symbol_reference_locations
-        .get("Widget")
-        .expect("Widget should be in symbol_reference_locations after new Widget()");
-
+    let locs = analyzer.codebase().get_reference_locations("Widget");
     assert!(
-        locs.contains_key(&file_arc),
+        locs.iter().any(|(f, _, _)| f == &file_arc),
         "new Widget() should record a reference to Widget"
     );
 }
@@ -255,10 +242,9 @@ fn re_analyze_removes_stale_reference_locations() {
     assert!(
         analyzer
             .codebase()
-            .symbol_reference_locations
-            .get("helper")
-            .map(|m| m.contains_key(&file_arc))
-            .unwrap_or(false),
+            .get_reference_locations("helper")
+            .iter()
+            .any(|(f, _, _)| f == &file_arc),
         "initial analysis should record location"
     );
 
@@ -270,10 +256,9 @@ fn re_analyze_removes_stale_reference_locations() {
 
     let stale = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("helper")
-        .map(|m| m.contains_key(&file_arc))
-        .unwrap_or(false);
+        .get_reference_locations("helper")
+        .iter()
+        .any(|(f, _, _)| f == &file_arc);
 
     assert!(
         !stale,
@@ -295,15 +280,15 @@ fn static_method_call_span_covers_only_name() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let locs: Vec<_> = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("Math::sq")
-        .expect("Math::sq should be in symbol_reference_locations");
+        .get_reference_locations("Math::sq")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
 
-    let spans = &locs[&file_arc];
-    assert_eq!(spans.len(), 1);
-    let &(start, end) = spans.iter().next().unwrap();
+    assert_eq!(locs.len(), 1);
+    let (_, start, end) = locs[0];
     // The span should cover only the 2-byte identifier "sq", not the full call
     assert_eq!(
         end - start,
@@ -328,10 +313,10 @@ fn cache_hit_replays_reference_locations() {
         let analyzer = ProjectAnalyzer::with_cache(&cache_dir);
         analyzer.analyze(std::slice::from_ref(&file));
         assert!(
-            analyzer
+            !analyzer
                 .codebase()
-                .symbol_reference_locations
-                .contains_key("cached_fn"),
+                .get_reference_locations("cached_fn")
+                .is_empty(),
             "first run should record reference"
         );
     }
@@ -341,17 +326,88 @@ fn cache_hit_replays_reference_locations() {
         let analyzer = ProjectAnalyzer::with_cache(&cache_dir);
         analyzer.analyze(std::slice::from_ref(&file));
 
-        let locs = analyzer
-            .codebase()
-            .symbol_reference_locations
-            .get("cached_fn")
-            .expect("cache hit should replay reference locations");
-
+        let locs = analyzer.codebase().get_reference_locations("cached_fn");
         assert!(
-            locs.contains_key(&file_arc),
+            !locs.is_empty(),
+            "cache hit should replay reference locations"
+        );
+        assert!(
+            locs.iter().any(|(f, _, _)| f == &file_arc),
             "replayed locations should include the correct file"
         );
     }
+}
+
+#[test]
+fn compact_index_preserves_reference_locations() {
+    // After analyze() calls compact_reference_index(), queries must return the
+    // same results as before compaction.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); }\n";
+    let file = write(&dir, "compact.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    // analyze() calls compact_reference_index() internally; verify results are intact.
+    let locs: Vec<_> = analyzer
+        .codebase()
+        .get_reference_locations("ping")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
+
+    assert_eq!(locs.len(), 2, "two calls → two spans in compact index");
+    assert!(
+        analyzer
+            .codebase()
+            .file_has_symbol_references(file.to_str().unwrap()),
+        "file_has_symbol_references must return true after compaction"
+    );
+}
+
+#[test]
+fn compact_index_survives_re_analyze() {
+    // re_analyze_file() must work correctly even when the index was compacted
+    // by a preceding full analyze() call.
+    let dir = TempDir::new().unwrap();
+    let file = write(
+        &dir,
+        "reanalyze.php",
+        "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n",
+    );
+    let file_str = file.to_str().unwrap().to_string();
+    let file_arc: Arc<str> = Arc::from(file_str.as_str());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    // Index is now compact; verify initial state.
+    assert!(
+        analyzer
+            .codebase()
+            .get_reference_locations("helper")
+            .iter()
+            .any(|(f, _, _)| f == &file_arc),
+        "initial reference should be recorded"
+    );
+
+    // Re-analyze without the call — compact index must be expanded, stale entry removed.
+    analyzer.re_analyze_file(
+        &file_str,
+        "<?php\nfunction helper(): void {}\nfunction caller(): void {}\n",
+    );
+
+    let stale = analyzer
+        .codebase()
+        .get_reference_locations("helper")
+        .iter()
+        .any(|(f, _, _)| f == &file_arc);
+    assert!(
+        !stale,
+        "stale span must be removed after re-analysis through compact index"
+    );
 }
 
 #[test]
@@ -370,11 +426,11 @@ fn this_method_call_records_reference_location() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     assert!(
-        analyzer
+        !analyzer
             .codebase()
-            .symbol_reference_locations
-            .contains_key("Svc::helper"),
-        "$this->helper() should record a reference to Svc::helper in symbol_reference_locations"
+            .get_reference_locations("Svc::helper")
+            .is_empty(),
+        "$this->helper() should record a reference to Svc::helper"
     );
 }
 
@@ -390,16 +446,16 @@ fn this_method_call_span_covers_only_name() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer
+    let locs: Vec<_> = analyzer
         .codebase()
-        .symbol_reference_locations
-        .get("Svc::helper")
-        .expect("Svc::helper should be in symbol_reference_locations");
+        .get_reference_locations("Svc::helper")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
 
-    let spans = &locs[&file_arc];
-    assert_eq!(spans.len(), 1, "one $this->helper() call → one span");
+    assert_eq!(locs.len(), 1, "one $this->helper() call → one span");
 
-    let &(start, end) = spans.iter().next().unwrap();
+    let (_, start, end) = locs[0];
     assert_eq!(
         end - start,
         6, // "helper" = 6 bytes
