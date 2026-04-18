@@ -144,19 +144,25 @@ impl<'a> ClassAnalyzer<'a> {
 
         // Walk every ancestor class and collect abstract methods
         for ancestor_fqcn in &cls.all_parents {
-            let ancestor = match self.codebase.classes.get(ancestor_fqcn.as_ref()) {
-                Some(a) => a,
-                None => continue,
+            // Collect abstract method names first, then drop the DashMap guard before
+            // calling get_method (which re-enters the same DashMap).
+            let abstract_methods: Vec<Arc<str>> = {
+                let Some(ancestor) = self.codebase.classes.get(ancestor_fqcn.as_ref()) else {
+                    continue;
+                };
+                ancestor
+                    .own_methods
+                    .iter()
+                    .filter(|(_, m)| m.is_abstract)
+                    .map(|(name, _)| name.clone())
+                    .collect()
             };
 
-            for (method_name, method) in &ancestor.own_methods {
-                if !method.is_abstract {
-                    continue;
-                }
-
+            for method_name in abstract_methods {
                 // Check if the concrete class (or any closer ancestor) provides it
-                if cls
-                    .get_method(method_name.as_ref())
+                if self
+                    .codebase
+                    .get_method(fqcn.as_ref(), method_name.as_ref())
                     .map(|m| !m.is_abstract)
                     .unwrap_or(false)
                 {
@@ -205,19 +211,23 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for iface_fqcn in &all_ifaces {
-            let iface = match self.codebase.interfaces.get(iface_fqcn.as_ref()) {
-                Some(i) => i,
-                None => continue,
-            };
+            // Collect method names first, then drop the interface guard before calling
+            // get_method (which re-enters self.codebase.interfaces when walking ancestors).
+            let method_names: Vec<Arc<str>> =
+                match self.codebase.interfaces.get(iface_fqcn.as_ref()) {
+                    Some(iface) => iface.own_methods.keys().cloned().collect(),
+                    None => continue,
+                };
 
-            for (method_name, _method) in &iface.own_methods {
+            for method_name in method_names {
                 // PHP method names are case-insensitive; normalize before lookup so that
                 // a hand-written stub key like "jsonSerialize" matches the collector's
-                // lowercased key "jsonserialize" stored in cls.all_methods.
+                // lowercased key "jsonserialize" stored in own_methods.
                 let method_name_lower = method_name.to_lowercase();
                 // Check if the class provides a concrete implementation
-                let implemented = cls
-                    .get_method(&method_name_lower)
+                let implemented = self
+                    .codebase
+                    .get_method(fqcn.as_ref(), &method_name_lower)
                     .map(|m| !m.is_abstract)
                     .unwrap_or(false);
 

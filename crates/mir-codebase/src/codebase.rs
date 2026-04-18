@@ -25,6 +25,22 @@ use mir_types::Union;
 // Private helper — shared insert logic for reference tracking
 // ---------------------------------------------------------------------------
 
+/// Case-insensitive method lookup within a single `own_methods` map.
+///
+/// Tries an exact key match first (O(1)), then falls back to a linear
+/// case-insensitive scan for stubs that store keys in original case.
+#[inline]
+fn lookup_method<'a>(
+    map: &'a indexmap::IndexMap<Arc<str>, MethodStorage>,
+    name: &str,
+) -> Option<&'a MethodStorage> {
+    map.get(name).or_else(|| {
+        map.iter()
+            .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
+            .map(|(_, v)| v)
+    })
+}
+
 /// Append `(sym_id, file_id, start, end)` to the reference index, skipping
 /// exact duplicates so union receivers like `Foo|Foo->method()` don't inflate
 /// the span list.
@@ -419,63 +435,87 @@ impl Codebase {
         None
     }
 
-    /// Resolve a method, walking up the inheritance chain.
+    /// Resolve a method, walking up the full inheritance chain (own → traits → ancestors).
     pub fn get_method(&self, fqcn: &str, method_name: &str) -> Option<MethodStorage> {
         // PHP method names are case-insensitive — normalize to lowercase for all lookups.
         let method_lower = method_name.to_lowercase();
         let method_name = method_lower.as_str();
-        // Check class methods first
+
+        // --- Class: own methods → own traits → ancestor classes/traits/interfaces ---
         if let Some(cls) = self.classes.get(fqcn) {
-            if let Some(m) = cls.get_method(method_name) {
+            // 1. Own methods (highest priority)
+            if let Some(m) = lookup_method(&cls.own_methods, method_name) {
                 return Some(m.clone());
             }
-        }
-        // Check interface methods (including parent interfaces via all_parents)
-        if let Some(iface) = self.interfaces.get(fqcn) {
-            if let Some(m) = iface.own_methods.get(method_name).or_else(|| {
-                iface
-                    .own_methods
-                    .iter()
-                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
-                    .map(|(_, v)| v)
-            }) {
-                return Some(m.clone());
-            }
-            // Traverse parent interfaces
-            let parents = iface.all_parents.clone();
-            for parent_fqcn in &parents {
-                if let Some(parent_iface) = self.interfaces.get(parent_fqcn.as_ref()) {
-                    if let Some(m) = parent_iface.own_methods.get(method_name).or_else(|| {
-                        parent_iface
-                            .own_methods
-                            .iter()
-                            .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
-                            .map(|(_, v)| v)
-                    }) {
+            // Collect chain info before dropping the DashMap guard.
+            let own_traits = cls.traits.clone();
+            let ancestors = cls.all_parents.clone();
+            drop(cls);
+
+            // 2. Own trait methods
+            for tr_fqcn in &own_traits {
+                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    if let Some(m) = lookup_method(&tr.own_methods, method_name) {
                         return Some(m.clone());
                     }
                 }
             }
+
+            // 3. Ancestor chain (all_parents is closest-first: parent, grandparent, …)
+            for ancestor_fqcn in &ancestors {
+                if let Some(anc) = self.classes.get(ancestor_fqcn.as_ref()) {
+                    if let Some(m) = lookup_method(&anc.own_methods, method_name) {
+                        return Some(m.clone());
+                    }
+                    let anc_traits = anc.traits.clone();
+                    drop(anc);
+                    for tr_fqcn in &anc_traits {
+                        if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                            if let Some(m) = lookup_method(&tr.own_methods, method_name) {
+                                return Some(m.clone());
+                            }
+                        }
+                    }
+                } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
+                    if let Some(m) = lookup_method(&iface.own_methods, method_name) {
+                        let mut m = m.clone();
+                        m.is_abstract = true;
+                        return Some(m);
+                    }
+                }
+                // Traits listed in all_parents are already covered via their owning class above.
+            }
+            return None;
         }
-        // Check trait methods (when a variable is annotated with a trait type)
-        if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(m) = tr.own_methods.get(method_name).or_else(|| {
-                tr.own_methods
-                    .iter()
-                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
-                    .map(|(_, v)| v)
-            }) {
+
+        // --- Interface: own methods + parent interfaces ---
+        if let Some(iface) = self.interfaces.get(fqcn) {
+            if let Some(m) = lookup_method(&iface.own_methods, method_name) {
                 return Some(m.clone());
             }
+            let parents = iface.all_parents.clone();
+            drop(iface);
+            for parent_fqcn in &parents {
+                if let Some(parent_iface) = self.interfaces.get(parent_fqcn.as_ref()) {
+                    if let Some(m) = lookup_method(&parent_iface.own_methods, method_name) {
+                        return Some(m.clone());
+                    }
+                }
+            }
+            return None;
         }
-        // Check enum methods
+
+        // --- Trait (variable annotated with a trait type) ---
+        if let Some(tr) = self.traits.get(fqcn) {
+            if let Some(m) = lookup_method(&tr.own_methods, method_name) {
+                return Some(m.clone());
+            }
+            return None;
+        }
+
+        // --- Enum ---
         if let Some(e) = self.enums.get(fqcn) {
-            if let Some(m) = e.own_methods.get(method_name).or_else(|| {
-                e.own_methods
-                    .iter()
-                    .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(method_name))
-                    .map(|(_, v)| v)
-            }) {
+            if let Some(m) = lookup_method(&e.own_methods, method_name) {
                 return Some(m.clone());
             }
             // PHP 8.1 built-in enum methods: cases(), from(), tryFrom()
@@ -501,6 +541,7 @@ impl Codebase {
                 });
             }
         }
+
         None
     }
 
@@ -572,37 +613,7 @@ impl Codebase {
     /// Returns true if the class (or any ancestor/trait) defines a `__get` magic method.
     /// Such classes allow arbitrary property access, suppressing UndefinedProperty.
     pub fn has_magic_get(&self, fqcn: &str) -> bool {
-        if let Some(cls) = self.classes.get(fqcn) {
-            if cls.own_methods.contains_key("__get") || cls.all_methods.contains_key("__get") {
-                return true;
-            }
-            // Check traits
-            let traits = cls.traits.clone();
-            drop(cls);
-            for tr in &traits {
-                if let Some(t) = self.traits.get(tr.as_ref()) {
-                    if t.own_methods.contains_key("__get") {
-                        return true;
-                    }
-                }
-            }
-            // Check ancestors
-            let all_parents = {
-                if let Some(c) = self.classes.get(fqcn) {
-                    c.all_parents.clone()
-                } else {
-                    vec![]
-                }
-            };
-            for ancestor in &all_parents {
-                if let Some(anc) = self.classes.get(ancestor.as_ref()) {
-                    if anc.own_methods.contains_key("__get") {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        self.get_method(fqcn, "__get").is_some()
     }
 
     /// Returns true if the class (or any of its ancestors) has a parent/interface/trait
@@ -1063,15 +1074,7 @@ impl Codebase {
             }
         }
 
-        // 2. Build method dispatch tables for classes (own methods override inherited)
-        for fqcn in &class_keys {
-            let all_methods = self.build_method_table(fqcn);
-            if let Some(mut cls) = self.classes.get_mut(fqcn.as_ref()) {
-                cls.all_methods = all_methods;
-            }
-        }
-
-        // 3. Resolve all_parents for interfaces
+        // 2. Resolve all_parents for interfaces
         let iface_keys: Vec<Arc<str>> = self.interfaces.iter().map(|e| e.key().clone()).collect();
         for fqcn in &iface_keys {
             let parents = self.collect_interface_ancestors(fqcn);
@@ -1156,76 +1159,6 @@ impl Codebase {
             out.push(e.clone());
             self.collect_interface_ancestors_inner(&e, out, visited);
         }
-    }
-
-    /// Build the full method dispatch table for a class, with own methods taking
-    /// priority over inherited ones.
-    fn build_method_table(&self, fqcn: &str) -> indexmap::IndexMap<Arc<str>, MethodStorage> {
-        use indexmap::IndexMap;
-        let mut table: IndexMap<Arc<str>, MethodStorage> = IndexMap::new();
-
-        // Walk ancestor chain (broad-first from root → child, so child overrides root)
-        let ancestors = {
-            if let Some(cls) = self.classes.get(fqcn) {
-                cls.all_parents.clone()
-            } else {
-                return table;
-            }
-        };
-
-        // Insert ancestor methods (deepest ancestor first, so closer ancestors override).
-        // Also insert trait methods from ancestor classes.
-        for ancestor_fqcn in ancestors.iter().rev() {
-            if let Some(ancestor) = self.classes.get(ancestor_fqcn.as_ref()) {
-                // First insert ancestor's own trait methods (lower priority)
-                let ancestor_traits = ancestor.traits.clone();
-                for trait_fqcn in ancestor_traits.iter().rev() {
-                    if let Some(tr) = self.traits.get(trait_fqcn.as_ref()) {
-                        for (name, method) in &tr.own_methods {
-                            table.insert(name.clone(), method.clone());
-                        }
-                    }
-                }
-                // Then ancestor's own methods (override trait methods)
-                for (name, method) in &ancestor.own_methods {
-                    table.insert(name.clone(), method.clone());
-                }
-            } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
-                for (name, method) in &iface.own_methods {
-                    // Interface methods are implicitly abstract — mark them so that
-                    // ClassAnalyzer::check_interface_methods_implemented can detect
-                    // a concrete class that fails to provide an implementation.
-                    let mut m = method.clone();
-                    m.is_abstract = true;
-                    table.insert(name.clone(), m);
-                }
-            }
-        }
-
-        // Insert the class's own trait methods
-        let trait_list = {
-            if let Some(cls) = self.classes.get(fqcn) {
-                cls.traits.clone()
-            } else {
-                vec![]
-            }
-        };
-        for trait_fqcn in &trait_list {
-            if let Some(tr) = self.traits.get(trait_fqcn.as_ref()) {
-                for (name, method) in &tr.own_methods {
-                    table.insert(name.clone(), method.clone());
-                }
-            }
-        }
-
-        // Own methods override everything
-        if let Some(cls) = self.classes.get(fqcn) {
-            for (name, method) in &cls.own_methods {
-                table.insert(name.clone(), method.clone());
-            }
-        }
-
-        table
     }
 }
 

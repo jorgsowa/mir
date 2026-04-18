@@ -3234,7 +3234,6 @@ fn empty_class(
         is_abstract: false,
         is_final: false,
         is_readonly: false,
-        all_methods: indexmap::IndexMap::new(),
         all_parents: vec![],
         is_deprecated: false,
         is_internal: false,
