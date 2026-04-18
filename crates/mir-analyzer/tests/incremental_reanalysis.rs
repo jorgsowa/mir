@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use mir_analyzer::ProjectAnalyzer;
 use tempfile::TempDir;
@@ -134,4 +135,70 @@ fn re_analyze_file_fixes_error() {
         .filter(|i| i.kind.name() == "UndefinedFunction")
         .count();
     assert_eq!(undef_count2, 0, "after fix, no UndefinedFunction expected");
+}
+
+/// Verify that `re_analyze_file` takes the content-hash fast path when the
+/// cache already holds a valid entry for the unchanged content.
+///
+/// Strategy: after the initial analysis caches an `UndefinedFunction` issue,
+/// we manually insert the "missing" function into the codebase so that a slow-
+/// path re-analysis would find it and return *no* issues.  Re-analyzing with
+/// the same content then lets us distinguish the two paths:
+/// - fast path (cache hit)  → cached `UndefinedFunction` issue still returned
+/// - slow path (re-analyze) → no issue (function now exists in codebase)
+#[test]
+fn re_analyze_file_uses_cache_on_unchanged_content() {
+    let src_dir = TempDir::new().unwrap();
+    let cache_dir = TempDir::new().unwrap();
+
+    // Content that calls an undefined function → produces UndefinedFunction
+    let content = "<?php\nfunction test(): void { ghost_fn(); }\n";
+    let file_a = write(&src_dir, "A.php", content);
+    let file_path = file_a.to_string_lossy().to_string();
+
+    let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
+    let result1 = analyzer.analyze(std::slice::from_ref(&file_a));
+
+    let undef_count = result1
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedFunction")
+        .count();
+    assert!(
+        undef_count > 0,
+        "initial analysis should report UndefinedFunction"
+    );
+
+    // Insert ghost_fn() into the codebase so a slow-path re-analysis would
+    // find it and produce no issues.
+    analyzer.codebase().functions.insert(
+        Arc::from("ghost_fn"),
+        mir_codebase::FunctionStorage {
+            fqn: Arc::from("ghost_fn"),
+            short_name: Arc::from("ghost_fn"),
+            params: vec![],
+            return_type: None,
+            inferred_return_type: None,
+            template_params: vec![],
+            assertions: vec![],
+            throws: vec![],
+            is_deprecated: false,
+            is_pure: false,
+            location: None,
+        },
+    );
+
+    // Re-analyze with identical content — must hit the cache.
+    let result2 = analyzer.re_analyze_file(&file_path, content);
+
+    let undef_count2 = result2
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedFunction")
+        .count();
+    assert_eq!(
+        undef_count2, undef_count,
+        "cache hit should return the same cached issues; slow-path would return 0 \
+         because ghost_fn was inserted into the codebase"
+    );
 }
