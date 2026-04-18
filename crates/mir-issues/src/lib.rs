@@ -36,7 +36,9 @@ impl fmt::Display for Severity {
 pub struct Location {
     pub file: Arc<str>,
     pub line: u32,
+    /// 0-based Unicode char-count (code-point) column of the issue start.
     pub col_start: u16,
+    /// 0-based Unicode char-count (code-point) column of the issue end (exclusive).
     pub col_end: u16,
 }
 

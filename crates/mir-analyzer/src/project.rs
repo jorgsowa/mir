@@ -1189,12 +1189,12 @@ impl Default for ProjectAnalyzer {
 }
 
 // ---------------------------------------------------------------------------
-// UTF-16 offset conversion utility
+// Offset to char-count column conversion
 // ---------------------------------------------------------------------------
 
-/// Convert a byte offset to a UTF-16 column on a given line.
-/// Returns (line, col_utf16) where col is 0-based UTF-16 code unit count.
-fn offset_to_line_col_utf16(
+/// Convert a byte offset to a Unicode char-count column on a given line.
+/// Returns (line, col) where col is a 0-based Unicode code-point count.
+fn offset_to_line_col(
     source: &str,
     offset: u32,
     source_map: &php_rs_parser::source_map::SourceMap,
@@ -1202,25 +1202,19 @@ fn offset_to_line_col_utf16(
     let lc = source_map.offset_to_line_col(offset);
     let line = lc.line + 1;
 
-    // Find the start of the line containing this offset
     let byte_offset = offset as usize;
     let line_start_byte = if byte_offset == 0 {
         0
     } else {
-        // Find the position after the last newline before this offset
         source[..byte_offset]
             .rfind('\n')
             .map(|p| p + 1)
             .unwrap_or(0)
     };
 
-    // Count UTF-16 code units from line start to the offset
-    let col_utf16 = source[line_start_byte..byte_offset]
-        .chars()
-        .map(|c| c.len_utf16() as u16)
-        .sum();
+    let col = source[line_start_byte..byte_offset].chars().count() as u16;
 
-    (line, col_utf16)
+    (line, col)
 }
 
 // ---------------------------------------------------------------------------
@@ -1247,11 +1241,10 @@ fn check_type_hint_classes<'arena, 'src>(
             }
             let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
             if !codebase.type_exists(&resolved) {
-                let (line, col_start) =
-                    offset_to_line_col_utf16(source, hint.span.start, source_map);
+                let (line, col_start) = offset_to_line_col(source, hint.span.start, source_map);
                 let col_end = if hint.span.start < hint.span.end {
                     let (_end_line, end_col) =
-                        offset_to_line_col_utf16(source, hint.span.end, source_map);
+                        offset_to_line_col(source, hint.span.end, source_map);
                     end_col
                 } else {
                     col_start

@@ -1305,40 +1305,34 @@ impl<'a> ExpressionAnalyzer<'a> {
     // Issue emission
     // -----------------------------------------------------------------------
 
-    /// Convert a byte offset to a UTF-16 column on a given line.
-    /// Returns (line, col_utf16) where col is 0-based UTF-16 code unit count.
-    fn offset_to_line_col_utf16(&self, offset: u32) -> (u32, u16) {
+    /// Convert a byte offset to a Unicode char-count column on a given line.
+    /// Returns (line, col) where col is a 0-based Unicode code-point count.
+    fn offset_to_line_col(&self, offset: u32) -> (u32, u16) {
         let lc = self.source_map.offset_to_line_col(offset);
         let line = lc.line + 1;
 
-        // Find the start of the line containing this offset
         let byte_offset = offset as usize;
         let line_start_byte = if byte_offset == 0 {
             0
         } else {
-            // Find the position after the last newline before this offset
             self.source[..byte_offset]
                 .rfind('\n')
                 .map(|p| p + 1)
                 .unwrap_or(0)
         };
 
-        // Count UTF-16 code units from line start to the offset
-        let col_utf16 = self.source[line_start_byte..byte_offset]
-            .chars()
-            .map(|c| c.len_utf16() as u16)
-            .sum();
+        let col = self.source[line_start_byte..byte_offset].chars().count() as u16;
 
-        (line, col_utf16)
+        (line, col)
     }
 
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
-        let (line, col_start) = self.offset_to_line_col_utf16(span.start);
+        let (line, col_start) = self.offset_to_line_col(span.start);
 
-        // Calculate col_end: if span.end is on the same line, use its UTF-16 column;
+        // Calculate col_end: if span.end is on the same line, use its char-count column;
         // otherwise use col_start (single-line range for diagnostics)
         let col_end = if span.start < span.end {
-            let (_end_line, end_col) = self.offset_to_line_col_utf16(span.end);
+            let (_end_line, end_col) = self.offset_to_line_col(span.end);
             end_col
         } else {
             col_start
@@ -1601,7 +1595,7 @@ mod tests {
         result.source_map
     }
 
-    /// Helper to test offset_to_line_col_utf16 conversion
+    /// Helper to test offset_to_line_col conversion (Unicode char-count columns).
     fn test_offset_conversion(source: &str, offset: u32) -> (u32, u16) {
         let source_map = create_source_map(source);
         let lc = source_map.offset_to_line_col(offset);
@@ -1617,92 +1611,93 @@ mod tests {
                 .unwrap_or(0)
         };
 
-        let col_utf16 = source[line_start_byte..byte_offset]
-            .chars()
-            .map(|c| c.len_utf16() as u16)
-            .sum();
+        let col = source[line_start_byte..byte_offset].chars().count() as u16;
 
-        (line, col_utf16)
+        (line, col)
     }
 
     #[test]
-    fn utf16_conversion_simple_ascii() {
-        // Test simple ASCII on a single line
+    fn col_conversion_simple_ascii() {
         let source = "<?php\n$var = 123;";
-        //               0123456789012345
 
-        // Position of '$' on line 2 should be column 0 (byte 6)
+        // '$' on line 2, column 0
         let (line, col) = test_offset_conversion(source, 6);
         assert_eq!(line, 2);
         assert_eq!(col, 0);
 
-        // Position of 'v' should be column 1 (byte 7)
+        // 'v' on line 2, column 1
         let (line, col) = test_offset_conversion(source, 7);
         assert_eq!(line, 2);
         assert_eq!(col, 1);
     }
 
     #[test]
-    fn utf16_conversion_emoji_utf16_units() {
-        // Test that emoji (2 UTF-16 units) are counted correctly
-        let source = "<?php\n$x = 1;\n$y = \"🎉\";";
-        //                              emoji starts around byte 23
-
-        // Find the exact byte position of the emoji
-        let quote_pos = source.find('"').unwrap();
-        let emoji_pos = quote_pos + 1; // After opening quote
-
-        // Position before emoji (the quote)
-        let (line, _col) = test_offset_conversion(source, quote_pos as u32);
-        assert_eq!(line, 3);
-
-        // Position at emoji start
-        let (line, col) = test_offset_conversion(source, emoji_pos as u32);
-        assert_eq!(line, 3);
-        // Column should include the quote before it
-        let expected_col = (quote_pos - source[..quote_pos].rfind('\n').unwrap_or(0) - 1) as u16;
-        assert_eq!(col, expected_col + 1);
-    }
-
-    #[test]
-    fn utf16_conversion_different_lines() {
+    fn col_conversion_different_lines() {
         let source = "<?php\n$x = 1;\n$y = 2;";
-        //          Line 1: <?php (bytes 0-4, newline at 5)
-        //          Line 2: $x = 1; (bytes 6-12, newline at 13)
-        //          Line 3: $y = 2; (bytes 14-20)
+        // Line 1: <?php     (bytes 0-4, newline at 5)
+        // Line 2: $x = 1;  (bytes 6-12, newline at 13)
+        // Line 3: $y = 2;  (bytes 14-20)
 
-        // Position on line 1, byte 0
         let (line, col) = test_offset_conversion(source, 0);
-        assert_eq!(line, 1);
-        assert_eq!(col, 0);
+        assert_eq!((line, col), (1, 0));
 
-        // Position on line 2, byte 6 (first char after newline)
         let (line, col) = test_offset_conversion(source, 6);
-        assert_eq!(line, 2);
-        assert_eq!(col, 0);
+        assert_eq!((line, col), (2, 0));
 
-        // Position on line 3, byte 14 (first char after second newline)
         let (line, col) = test_offset_conversion(source, 14);
-        assert_eq!(line, 3);
-        assert_eq!(col, 0); // '$' is the first character on line 3
+        assert_eq!((line, col), (3, 0));
     }
 
     #[test]
-    fn utf16_conversion_accented_characters() {
-        // Test accented characters (é, ñ, etc.)
+    fn col_conversion_accented_characters() {
+        // é is 2 UTF-8 bytes but 1 Unicode char (and 1 UTF-16 unit — same result either way)
         let source = "<?php\n$café = 1;";
-        //               012345678901234567
-        // é is 2 bytes in UTF-8 but 1 UTF-16 code unit
+        // Line 2: $ c a f é ...
+        // bytes:  6 7 8 9 10(2 bytes)
 
-        // Position at 'f' (byte 9)
+        // 'f' at byte 9 → char col 3
         let (line, col) = test_offset_conversion(source, 9);
-        assert_eq!(line, 2);
-        assert_eq!(col, 3); // $, c, a, f
+        assert_eq!((line, col), (2, 3));
 
-        // Position at 'é' (byte 10, start of é which is 2 bytes)
+        // 'é' at byte 10 → char col 4
         let (line, col) = test_offset_conversion(source, 10);
+        assert_eq!((line, col), (2, 4));
+    }
+
+    #[test]
+    fn col_conversion_emoji_counts_as_one_char() {
+        // 🎉 (U+1F389) is 4 UTF-8 bytes and 2 UTF-16 units, but 1 Unicode char.
+        // A char after the emoji must land at col 7, not col 8.
+        let source = "<?php\n$y = \"🎉x\";";
+        // Line 2: $ y   =   " 🎉 x " ;
+        // chars:  0 1 2 3 4 5  6  7 8 9
+
+        let emoji_start = source.find("🎉").unwrap();
+        let after_emoji = emoji_start + "🎉".len(); // skip 4 bytes
+
+        // position at 'x' (right after the emoji)
+        let (line, col) = test_offset_conversion(source, after_emoji as u32);
         assert_eq!(line, 2);
-        assert_eq!(col, 4); // $ c a f = 4 UTF-16 units
+        assert_eq!(col, 7); // emoji counts as 1, not 2
+    }
+
+    #[test]
+    fn col_conversion_emoji_start_position() {
+        // The opening quote is at col 5; the emoji immediately follows at col 6.
+        let source = "<?php\n$y = \"🎉\";";
+        // Line 2: $ y   =   " 🎉 " ;
+        // chars:  0 1 2 3 4 5  6  7 8
+
+        let quote_pos = source.find('"').unwrap();
+        let emoji_pos = quote_pos + 1; // byte after opening quote = emoji start
+
+        let (line, col) = test_offset_conversion(source, quote_pos as u32);
+        assert_eq!(line, 2);
+        assert_eq!(col, 5); // '"' is the 6th char on line 2 (0-based: col 5)
+
+        let (line, col) = test_offset_conversion(source, emoji_pos as u32);
+        assert_eq!(line, 2);
+        assert_eq!(col, 6); // emoji follows the quote
     }
 
     #[test]
@@ -1719,7 +1714,7 @@ mod tests {
     }
 
     #[test]
-    fn utf16_conversion_multiline_span() {
+    fn col_conversion_multiline_span() {
         // Test span that starts on one line and ends on another
         let source = "<?php\n$x = [\n  'a',\n  'b'\n];";
         //           Line 1: <?php
@@ -1757,7 +1752,7 @@ mod tests {
         // Column at emoji
         let (line, col) = test_offset_conversion(source, emoji_pos as u32);
         assert_eq!(line, 2);
-        // Should be after "Hello " (13 + 5 + 1 = 19 UTF-16 units)
+        // Should be after "Hello " (13 + 5 + 1 = 19 chars)
         assert_eq!(col, 19);
     }
 }

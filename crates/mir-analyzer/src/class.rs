@@ -754,9 +754,9 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
     )
 }
 
-/// Build an issue location from the stored codebase Location (which now carries line/col).
-/// Falls back to a dummy location using the FQCN as the file path when no Location is stored.
-/// Convert a codebase storage::Location to a mir-issues::Location with proper UTF-16 columns.
+/// Build an issue location from the stored codebase Location (which carries line/col as
+/// Unicode char-count columns). Falls back to a dummy location using the FQCN as the file
+/// path when no Location is stored.
 fn issue_location(
     storage_loc: Option<&mir_codebase::storage::Location>,
     fqcn: &Arc<str>,
@@ -764,59 +764,45 @@ fn issue_location(
 ) -> Location {
     match storage_loc {
         Some(loc) => {
-            // Calculate col_end from the end byte offset if source is available
+            // Calculate col_end from the end byte offset if source is available.
             let col_end = if let Some(src) = source {
                 if loc.end > loc.start {
                     let end_offset = (loc.end as usize).min(src.len());
-                    // Find the line start containing the end offset
+                    // Find the line start containing the end offset.
                     let line_start = src[..end_offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
-                    // Count UTF-16 code units from line start to end offset
-                    let utf16_col_end: u16 = src[line_start..end_offset]
-                        .chars()
-                        .map(|c| c.len_utf16() as u16)
-                        .sum();
+                    // Count Unicode chars from line start to end offset.
+                    let col_end = src[line_start..end_offset].chars().count() as u16;
 
-                    // Convert col_start to UTF-16 as well
+                    // Count Unicode chars from line start to start offset.
                     let col_start_offset = (loc.start as usize).min(src.len());
                     let col_start_line = src[..col_start_offset]
                         .rfind('\n')
                         .map(|p| p + 1)
                         .unwrap_or(0);
-                    let col_start_utf16 = src[col_start_line..col_start_offset]
-                        .chars()
-                        .map(|c| c.len_utf16() as u16)
-                        .sum::<u16>();
+                    let col_start = src[col_start_line..col_start_offset].chars().count() as u16;
 
-                    // If on same line, use utf16_col_end; otherwise just use it
-                    utf16_col_end.max(col_start_utf16 + 1)
+                    col_end.max(col_start + 1)
                 } else {
-                    // Convert col to UTF-16
+                    // Single-char span: end = start + 1.
                     let col_start_offset = (loc.start as usize).min(src.len());
                     let col_start_line = src[..col_start_offset]
                         .rfind('\n')
                         .map(|p| p + 1)
                         .unwrap_or(0);
-                    src[col_start_line..col_start_offset]
-                        .chars()
-                        .map(|c| c.len_utf16() as u16)
-                        .sum::<u16>()
-                        + 1
+                    src[col_start_line..col_start_offset].chars().count() as u16 + 1
                 }
             } else {
                 loc.col + 1
             };
 
-            // Convert col_start to UTF-16
+            // col_start: use loc.col (already a char-count) or recompute from source.
             let col_start = if let Some(src) = source {
                 let col_start_offset = (loc.start as usize).min(src.len());
                 let col_start_line = src[..col_start_offset]
                     .rfind('\n')
                     .map(|p| p + 1)
                     .unwrap_or(0);
-                src[col_start_line..col_start_offset]
-                    .chars()
-                    .map(|c| c.len_utf16() as u16)
-                    .sum()
+                src[col_start_line..col_start_offset].chars().count() as u16
             } else {
                 loc.col
             };
