@@ -137,6 +137,72 @@ fn re_analyze_file_fixes_error() {
     assert_eq!(undef_count2, 0, "after fix, no UndefinedFunction expected");
 }
 
+/// Verify that `re_analyze_file` skips `finalize()` when only method bodies change.
+///
+/// Strategy: after the initial analysis (which populates `all_parents` for every
+/// class), we manually insert a new class `C extends A` into the codebase with
+/// `all_parents = []`.  A full re-analysis of `A.php` with a body-only edit would
+/// call `finalize()`, which would walk the hierarchy and set `C::all_parents = [A]`.
+/// The structural-snapshot fast path skips `finalize()`, so `all_parents` stays
+/// empty — proving the skip was taken.
+#[test]
+fn re_analyze_file_skips_finalize_on_body_only_change() {
+    let src_dir = TempDir::new().unwrap();
+
+    let file_a = write(
+        &src_dir,
+        "A.php",
+        "<?php\nclass A { public function foo(): void {} }\n",
+    );
+    let file_path = file_a.to_string_lossy().to_string();
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file_a));
+
+    // Insert class C that extends A, but leave all_parents empty.
+    // A slow-path finalize() would populate it to [A]; the fast path skips finalize.
+    analyzer.codebase().classes.insert(
+        Arc::from("C"),
+        mir_codebase::ClassStorage {
+            fqcn: Arc::from("C"),
+            short_name: Arc::from("C"),
+            parent: Some(Arc::from("A")),
+            interfaces: vec![],
+            traits: vec![],
+            own_methods: indexmap::IndexMap::new(),
+            own_properties: indexmap::IndexMap::new(),
+            own_constants: indexmap::IndexMap::new(),
+            template_params: vec![],
+            is_abstract: false,
+            is_final: false,
+            is_readonly: false,
+            all_parents: vec![],
+            is_deprecated: false,
+            is_internal: false,
+            location: None,
+        },
+    );
+
+    // Re-analyze A.php with a body-only change (same class signature, new method body).
+    let new_content = "<?php\nclass A { public function foo(): int { return 1; } }\n";
+    analyzer.re_analyze_file(&file_path, new_content);
+
+    // Fast path: finalize() was skipped, so C::all_parents is still empty.
+    // Slow path: finalize() would have set C::all_parents = [A].
+    let c_all_parents = analyzer
+        .codebase()
+        .classes
+        .get("C")
+        .map(|c| c.all_parents.clone())
+        .unwrap_or_default();
+    assert!(
+        c_all_parents.is_empty(),
+        "finalize() should have been skipped for a body-only change; \
+         C::all_parents should still be [] but got {:?}",
+        c_all_parents
+    );
+}
+
 /// Verify that `re_analyze_file` takes the content-hash fast path when the
 /// cache already holds a valid entry for the unchanged content.
 ///

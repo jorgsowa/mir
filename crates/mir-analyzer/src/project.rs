@@ -472,10 +472,14 @@ impl ProjectAnalyzer {
             }
         }
 
-        // 1. Remove old definitions from this file
+        // 1. Snapshot inheritance structure before removing old definitions.
+        //    This lets us skip finalize() later if only method bodies changed.
+        let structural_snapshot = self.codebase.file_structural_snapshot(file_path);
+
+        // 2. Remove old definitions from this file
         self.codebase.remove_file_definitions(file_path);
 
-        // 2. Parse new content and run Pass 1
+        // 3. Parse new content and run Pass 1
         let file: Arc<str> = Arc::from(file_path);
         let arena = bumpalo::Bump::new();
         let parsed = php_rs_parser::parse(&arena, new_content);
@@ -505,10 +509,23 @@ impl ProjectAnalyzer {
         );
         all_issues.extend(collector.collect(&parsed.program));
 
-        // 3. Re-finalize (invalidation already done by remove_file_definitions)
-        self.codebase.finalize();
+        // 4. Re-finalize, or skip if only method bodies changed.
+        //    finalize() rebuilds all_parents for every class/interface in the
+        //    codebase by walking the full inheritance graph — this is expensive.
+        //    If the inheritance structure of this file is unchanged (same parent,
+        //    interfaces, traits), restore all_parents from the snapshot and skip
+        //    the full walk.
+        if self
+            .codebase
+            .structural_unchanged_after_pass1(file_path, &structural_snapshot)
+        {
+            self.codebase
+                .restore_all_parents(file_path, &structural_snapshot);
+        } else {
+            self.codebase.finalize();
+        }
 
-        // 4. Run Pass 2 on this file
+        // 5. Run Pass 2 on this file
         let (body_issues, symbols) = self.analyze_bodies(
             &parsed.program,
             file.clone(),
@@ -517,7 +534,7 @@ impl ProjectAnalyzer {
         );
         all_issues.extend(body_issues);
 
-        // 5. Update cache if present
+        // 6. Update cache if present
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
