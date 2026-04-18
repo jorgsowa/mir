@@ -110,14 +110,15 @@ impl Pass1Snapshot {
 
 /// Construct a `Pass1Snapshot` for `file` from the codebase after Pass 1.
 ///
-/// `fqcns` is every FQCN defined in this file — obtained from the reverse
-/// of `Codebase::symbol_to_file`.  Must be called after the parallel Pass 1
-/// completes but **before** `Codebase::finalize()`.
+/// `symbol_keys` is every FQN defined in this file (classes, interfaces, traits,
+/// enums, and functions) — obtained from the reverse of `Codebase::symbol_to_file`.
+/// Must be called after the parallel Pass 1 completes but **before**
+/// `Codebase::finalize()`.
 pub fn build_snapshot(
     codebase: &Codebase,
     file: &Arc<str>,
     content_hash: String,
-    fqcns: &[Arc<str>],
+    symbol_keys: &[Arc<str>],
     parse_errors: Vec<Issue>,
     definition_issues: Vec<Issue>,
 ) -> Pass1Snapshot {
@@ -137,22 +138,22 @@ pub fn build_snapshot(
     let mut enums = Vec::new();
     let mut functions = Vec::new();
 
-    for fqcn in fqcns {
-        if let Some(s) = codebase.classes.get(fqcn.as_ref()) {
-            classes.push((fqcn.clone(), s.clone()));
-        } else if let Some(s) = codebase.interfaces.get(fqcn.as_ref()) {
-            interfaces.push((fqcn.clone(), s.clone()));
-        } else if let Some(s) = codebase.traits.get(fqcn.as_ref()) {
-            traits.push((fqcn.clone(), s.clone()));
-        } else if let Some(s) = codebase.enums.get(fqcn.as_ref()) {
-            enums.push((fqcn.clone(), s.clone()));
-        } else if let Some(s) = codebase.functions.get(fqcn.as_ref()) {
-            functions.push((fqcn.clone(), s.clone()));
+    for key in symbol_keys {
+        if let Some(s) = codebase.classes.get(key.as_ref()) {
+            classes.push((key.clone(), s.clone()));
+        } else if let Some(s) = codebase.interfaces.get(key.as_ref()) {
+            interfaces.push((key.clone(), s.clone()));
+        } else if let Some(s) = codebase.traits.get(key.as_ref()) {
+            traits.push((key.clone(), s.clone()));
+        } else if let Some(s) = codebase.enums.get(key.as_ref()) {
+            enums.push((key.clone(), s.clone()));
+        } else if let Some(s) = codebase.functions.get(key.as_ref()) {
+            functions.push((key.clone(), s.clone()));
         }
     }
 
-    let gvar_names = codebase.file_global_vars_for_file(file);
-    let global_vars: Vec<(Arc<str>, Union)> = gvar_names
+    let global_var_names = codebase.file_global_vars_for_file(file);
+    let global_vars: Vec<(Arc<str>, Union)> = global_var_names
         .iter()
         .filter_map(|name| {
             codebase
@@ -254,7 +255,7 @@ impl Pass1Cache {
 
     /// Remove cache entries for files that no longer exist on disk.
     /// Called automatically by `flush()` to prevent unbounded cache growth.
-    fn gc_unreachable(&self) {
+    fn evict_deleted_files(&self) {
         let to_remove: Vec<String> = {
             let entries = self.entries.read().unwrap();
             entries
@@ -279,12 +280,13 @@ impl Pass1Cache {
         if !self.dirty.load(Ordering::Acquire) {
             return;
         }
-        self.gc_unreachable();
+        self.evict_deleted_files();
         let config = bincode::config::standard();
         let entries = self.entries.read().unwrap();
         if let Ok(bytes) = bincode::serde::encode_to_vec(&*entries, config) {
-            std::fs::write(&self.cache_path, bytes).ok();
-            self.dirty.store(false, Ordering::Release);
+            if std::fs::write(&self.cache_path, &bytes).is_ok() {
+                self.dirty.store(false, Ordering::Release);
+            }
         }
     }
 }

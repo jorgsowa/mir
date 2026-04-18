@@ -32,9 +32,9 @@ pub struct Codebase {
     /// Used by `remove_file_definitions` to purge stale entries on re-analysis.
     file_global_vars: DashMap<Arc<str>, Vec<Arc<str>>>,
 
-    /// Global PHP constants (`const FOO = 1` / `define('FOO', 1)`) keyed by value.
-    /// Separate from `constants` to provide a per-file reverse index used by
-    /// `remove_file_definitions` and Pass 1 snapshot building.
+    /// Maps file path → constant names declared in that file.
+    /// Provides the per-file reverse index used by `remove_file_definitions`
+    /// and Pass 1 snapshot building.
     file_constants: DashMap<Arc<str>, Vec<Arc<str>>>,
 
     /// Methods referenced during Pass 2 — key format: `"ClassName::methodName"`.

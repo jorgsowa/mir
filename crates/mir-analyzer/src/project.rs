@@ -14,6 +14,17 @@ use mir_types::Union;
 use crate::collector::DefinitionCollector;
 
 // ---------------------------------------------------------------------------
+// Per-file Pass 1 closure outcome
+// ---------------------------------------------------------------------------
+
+/// Per-file result produced by the Pass 1 parallel closure.
+///
+/// Fields: `(parse_errors, definition_issues, is_cache_miss)`.
+/// `is_cache_miss` is `true` when the file was freshly parsed and a snapshot
+/// must be stored; `false` on a cache hit or when no pass1 cache is active.
+type FilePass1Outcome = (Vec<Issue>, Vec<Issue>, bool);
+
+// ---------------------------------------------------------------------------
 // ProjectAnalyzer
 // ---------------------------------------------------------------------------
 
@@ -49,15 +60,9 @@ impl ProjectAnalyzer {
 
     /// Create a `ProjectAnalyzer` with a disk-backed cache stored under `cache_dir`.
     pub fn with_cache(cache_dir: &Path) -> Self {
-        Self {
-            codebase: Arc::new(Codebase::new()),
-            cache: Some(AnalysisCache::open(cache_dir)),
-            on_file_done: None,
-            psr4: None,
-            stubs_loaded: std::sync::atomic::AtomicBool::new(false),
-            find_dead_code: false,
-            pass1_cache: Some(crate::pass1_cache::Pass1Cache::open(cache_dir)),
-        }
+        let mut analyzer = Self::new();
+        analyzer.enable_cache(cache_dir);
+        analyzer
     }
 
     /// Create a `ProjectAnalyzer` from a project root containing `composer.json`.
@@ -102,37 +107,66 @@ impl ProjectAnalyzer {
         }
     }
 
+    /// Pre-index a single file's AST: populate `known_symbols`, `file_namespaces`,
+    /// and `file_imports` in the codebase.
+    ///
+    /// Must be called before `DefinitionCollector` so that FQCN lookups during
+    /// definition collection resolve names against the correct namespace and imports.
+    /// This is the same step that runs inside the parallel Pass 1 closure in
+    /// `analyze()`; extracting it here allows `re_analyze_file()` to keep the
+    /// codebase consistent after incremental edits.
+    fn pre_index_file(&self, file: &Arc<str>, program: &php_ast::ast::Program<'_, '_>) {
+        use php_ast::ast::StmtKind;
+
+        let mut current_namespace: Option<String> = None;
+        let mut imports: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        let mut file_ns_set = false;
+
+        for stmt in program.stmts.iter() {
+            match &stmt.kind {
+                StmtKind::Namespace(ns) => {
+                    current_namespace = ns.name.as_ref().map(|n| crate::parser::name_to_string(n));
+                    if !file_ns_set {
+                        if let Some(ref ns_str) = current_namespace {
+                            self.codebase
+                                .file_namespaces
+                                .insert(file.clone(), ns_str.clone());
+                            file_ns_set = true;
+                        }
+                    }
+                    if let php_ast::ast::NamespaceBody::Braced(inner_stmts) = &ns.body {
+                        index_stmts(
+                            &self.codebase,
+                            inner_stmts,
+                            current_namespace.as_deref(),
+                            &mut imports,
+                        );
+                    }
+                }
+                _ => index_stmts(
+                    &self.codebase,
+                    std::slice::from_ref(stmt),
+                    current_namespace.as_deref(),
+                    &mut imports,
+                ),
+            }
+        }
+
+        if !imports.is_empty() {
+            self.codebase.file_imports.insert(file.clone(), imports);
+        }
+    }
+
     /// Run the full analysis pipeline on a set of file paths.
     pub fn analyze(&self, paths: &[PathBuf]) -> AnalysisResult {
         let mut all_issues = Vec::new();
-        let mut parse_errors = Vec::new();
 
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
         self.load_stubs();
 
-        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
-        // Uses the reverse dep graph persisted from the previous run.
-        if let Some(cache) = &self.cache {
-            let changed: Vec<String> = paths
-                .iter()
-                .filter_map(|p| {
-                    let path_str = p.to_string_lossy().into_owned();
-                    let content = std::fs::read_to_string(p).ok()?;
-                    let h = hash_content(&content);
-                    if cache.get(&path_str, &h).is_none() {
-                        Some(path_str)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            if !changed.is_empty() {
-                cache.evict_with_dependents(&changed);
-            }
-        }
-
-        // ---- Pass 1: read files in parallel ----------------------------------
-        let file_data: Vec<(Arc<str>, String)> = paths
+        // ---- Read all files in parallel (single read shared by all passes) ----
+        let file_sources: Vec<(Arc<str>, String)> = paths
             .par_iter()
             .filter_map(|path| match std::fs::read_to_string(path) {
                 Ok(src) => Some((Arc::from(path.to_string_lossy().as_ref()), src)),
@@ -143,132 +177,64 @@ impl ProjectAnalyzer {
             })
             .collect();
 
+        // ---- Pre-compute content hashes once (shared by pass1, invalidation, pass2) ----
+        // Only computed when at least one cache is active; None otherwise.
+        let hash_needed = self.pass1_cache.is_some() || self.cache.is_some();
+        let content_hashes: Vec<Option<String>> = if hash_needed {
+            file_sources
+                .par_iter()
+                .map(|(_, src)| Some(hash_content(src)))
+                .collect()
+        } else {
+            vec![None; file_sources.len()]
+        };
+
+        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
+        // Uses already-read content — no second filesystem read.
+        if let Some(cache) = &self.cache {
+            let changed: Vec<String> = file_sources
+                .iter()
+                .enumerate()
+                .filter_map(|(i, (path, _))| {
+                    let h = content_hashes[i].as_deref()?;
+                    if cache.get(path, h).is_none() {
+                        Some(path.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if !changed.is_empty() {
+                cache.evict_with_dependents(&changed);
+            }
+        }
+
         // ---- Pass 1: combined pre-index + definition collection (parallel) -----
-        // Parse each file once; both the FQCN/namespace/import index and the full
-        // definition collection run in the same rayon closure, eliminating the
-        // second sequential parse of every file. DashMap handles concurrent writes.
+        // Parse each file once; the pre-index and definition collection both run
+        // in the same rayon closure. DashMap handles concurrent writes.
         //
         // When the Pass 1 cache is active, unchanged files skip parsing entirely:
-        // the snapshot is replayed and `None` is returned for the content hash.
-        // A cache miss returns `Some(hash)` so a snapshot can be built after the
-        // parallel pass completes.
-        let pass1_results: Vec<(Vec<Issue>, Vec<Issue>, Option<String>)> = file_data
+        // the snapshot is replayed and `is_miss = false` is returned.
+        // A cache miss returns `is_miss = true` so a snapshot is built afterward.
+        let pass1_results: Vec<FilePass1Outcome> = file_sources
             .par_iter()
-            .map(|(file, src)| {
-                // Compute hash only when the pass1 cache is active.
-                let content_hash = self.pass1_cache.as_ref().map(|_| hash_content(src));
+            .enumerate()
+            .map(|(i, (file, src))| {
+                let content_hash = content_hashes[i].as_deref();
 
                 // Cache hit: replay stored definitions and skip parsing.
-                if let (Some(p1_cache), Some(ref hash)) = (&self.pass1_cache, &content_hash) {
-                    if let Some(snapshot) = p1_cache.get(file, hash) {
+                if let (Some(pass1_cache), Some(hash)) = (&self.pass1_cache, content_hash) {
+                    if let Some(snapshot) = pass1_cache.get(file, hash) {
                         snapshot.replay(&self.codebase, file);
-                        return (snapshot.parse_errors, snapshot.definition_issues, None);
+                        return (snapshot.parse_errors, snapshot.definition_issues, false);
                     }
                 }
 
-                use php_ast::ast::StmtKind;
                 let arena = bumpalo::Bump::new();
                 let result = php_rs_parser::parse(&arena, src);
 
-                // --- Pre-index: build FQCN index, file imports, and namespaces ---
-                let mut current_namespace: Option<String> = None;
-                let mut imports: std::collections::HashMap<String, String> =
-                    std::collections::HashMap::new();
-                let mut file_ns_set = false;
-
-                // Index a flat list of stmts under a given namespace prefix.
-                let index_stmts =
-                    |stmts: &[php_ast::ast::Stmt<'_, '_>],
-                     ns: Option<&str>,
-                     imports: &mut std::collections::HashMap<String, String>| {
-                        for stmt in stmts.iter() {
-                            match &stmt.kind {
-                                StmtKind::Use(use_decl) => {
-                                    for item in use_decl.uses.iter() {
-                                        let full_name = crate::parser::name_to_string(&item.name);
-                                        let alias = item.alias.unwrap_or_else(|| {
-                                            full_name.rsplit('\\').next().unwrap_or(&full_name)
-                                        });
-                                        imports.insert(alias.to_string(), full_name);
-                                    }
-                                }
-                                StmtKind::Class(decl) => {
-                                    if let Some(n) = decl.name {
-                                        let fqcn = match ns {
-                                            Some(ns) => format!("{}\\{}", ns, n),
-                                            None => n.to_string(),
-                                        };
-                                        self.codebase
-                                            .known_symbols
-                                            .insert(Arc::from(fqcn.as_str()));
-                                    }
-                                }
-                                StmtKind::Interface(decl) => {
-                                    let fqcn = match ns {
-                                        Some(ns) => format!("{}\\{}", ns, decl.name),
-                                        None => decl.name.to_string(),
-                                    };
-                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                                }
-                                StmtKind::Trait(decl) => {
-                                    let fqcn = match ns {
-                                        Some(ns) => format!("{}\\{}", ns, decl.name),
-                                        None => decl.name.to_string(),
-                                    };
-                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                                }
-                                StmtKind::Enum(decl) => {
-                                    let fqcn = match ns {
-                                        Some(ns) => format!("{}\\{}", ns, decl.name),
-                                        None => decl.name.to_string(),
-                                    };
-                                    self.codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
-                                }
-                                StmtKind::Function(decl) => {
-                                    let fqn = match ns {
-                                        Some(ns) => format!("{}\\{}", ns, decl.name),
-                                        None => decl.name.to_string(),
-                                    };
-                                    self.codebase.known_symbols.insert(Arc::from(fqn.as_str()));
-                                }
-                                _ => {}
-                            }
-                        }
-                    };
-
-                for stmt in result.program.stmts.iter() {
-                    match &stmt.kind {
-                        StmtKind::Namespace(ns) => {
-                            current_namespace =
-                                ns.name.as_ref().map(|n| crate::parser::name_to_string(n));
-                            if !file_ns_set {
-                                if let Some(ref ns_str) = current_namespace {
-                                    self.codebase
-                                        .file_namespaces
-                                        .insert(file.clone(), ns_str.clone());
-                                    file_ns_set = true;
-                                }
-                            }
-                            // Bracketed namespace: walk inner stmts for Use/Class/etc.
-                            if let php_ast::ast::NamespaceBody::Braced(inner_stmts) = &ns.body {
-                                index_stmts(
-                                    inner_stmts,
-                                    current_namespace.as_deref(),
-                                    &mut imports,
-                                );
-                            }
-                        }
-                        _ => index_stmts(
-                            std::slice::from_ref(stmt),
-                            current_namespace.as_deref(),
-                            &mut imports,
-                        ),
-                    }
-                }
-
-                if !imports.is_empty() {
-                    self.codebase.file_imports.insert(file.clone(), imports);
-                }
+                // --- Pre-index: populate known_symbols, file_namespaces, file_imports ---
+                self.pre_index_file(file, &result.program);
 
                 // --- Parse errors ---
                 let file_parse_errors: Vec<Issue> = result
@@ -292,52 +258,47 @@ impl ProjectAnalyzer {
                 // --- Definition collection ---
                 let collector =
                     DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
-                let issues = collector.collect(&result.program);
+                let definition_issues = collector.collect(&result.program);
 
-                (file_parse_errors, issues, content_hash)
+                (file_parse_errors, definition_issues, content_hash.is_some())
             })
             .collect();
 
         // Persist new Pass 1 snapshots for cache misses (before finalize() so that
         // the derived all_methods/all_parents fields are still empty in the snapshot).
-        if let Some(p1_cache) = &self.pass1_cache {
+        if let Some(pass1_cache) = &self.pass1_cache {
             // Only build the reverse index when there is at least one miss.
-            let has_misses = pass1_results.iter().any(|(_, _, h)| h.is_some());
+            let has_misses = pass1_results.iter().any(|(_, _, is_miss)| *is_miss);
             if has_misses {
-                let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
-                for entry in self.codebase.symbol_to_file.iter() {
-                    file_to_fqcns
-                        .entry(entry.value().clone())
-                        .or_default()
-                        .push(entry.key().clone());
-                }
-                for ((file, _src), (per_file_parse_errors, def_issues, maybe_hash)) in
-                    file_data.iter().zip(pass1_results.iter())
-                {
-                    if let Some(hash) = maybe_hash {
-                        let empty: Vec<Arc<str>> = Vec::new();
-                        let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
+                let symbols_by_file = build_symbols_by_file(&self.codebase);
+                for i in 0..file_sources.len() {
+                    let (file, _) = &file_sources[i];
+                    let (per_file_parse_errors, definition_issues, is_miss) = &pass1_results[i];
+                    if *is_miss {
+                        let hash = content_hashes[i].clone().unwrap_or_default();
+                        let symbol_keys = symbols_by_file
+                            .get(file)
+                            .map(|v| v.as_slice())
+                            .unwrap_or(&[]);
                         let snapshot = crate::pass1_cache::build_snapshot(
                             &self.codebase,
                             file,
-                            hash.clone(),
-                            fqcns,
+                            hash,
+                            symbol_keys,
                             per_file_parse_errors.clone(),
-                            def_issues.clone(),
+                            definition_issues.clone(),
                         );
-                        p1_cache.put(file.as_ref(), snapshot);
+                        pass1_cache.put(file.as_ref(), snapshot);
                     }
                 }
             }
-            p1_cache.flush();
+            pass1_cache.flush();
         }
 
-        for (file_parse_errors, issues, _) in pass1_results {
-            parse_errors.extend(file_parse_errors);
-            all_issues.extend(issues);
+        for (file_parse_errors, definition_issues, _) in pass1_results {
+            all_issues.extend(file_parse_errors);
+            all_issues.extend(definition_issues);
         }
-
-        all_issues.extend(parse_errors);
 
         // ---- Finalize codebase (resolve inheritance, build dispatch tables) --
         self.codebase.finalize();
@@ -355,10 +316,13 @@ impl ProjectAnalyzer {
 
         // ---- Class-level checks (M11) ----------------------------------------
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
-            file_data.iter().map(|(f, _)| f.clone()).collect();
-        let class_issues =
-            crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set, &file_data)
-                .analyze_all();
+            file_sources.iter().map(|(f, _)| f.clone()).collect();
+        let class_issues = crate::class::ClassAnalyzer::with_files(
+            &self.codebase,
+            analyzed_file_set,
+            &file_sources,
+        )
+        .analyze_all();
         all_issues.extend(class_issues);
 
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
@@ -366,12 +330,15 @@ impl ProjectAnalyzer {
         // rayon closure so there is no cross-thread borrow.
         // When a cache is present, files whose content hash matches a stored
         // entry skip re-analysis entirely (M17).
-        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
+        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_sources
             .par_iter()
-            .map(|(file, src)| {
-                // Cache lookup
+            .enumerate()
+            .map(|(i, (file, src))| {
+                // Cache lookup — use the precomputed hash to avoid a third hash per file.
                 let result = if let Some(cache) = &self.cache {
-                    let h = hash_content(src);
+                    let h: String = content_hashes[i]
+                        .clone()
+                        .expect("hash always computed when cache is active");
                     if let Some((cached_issues, ref_locs)) = cache.get(file, &h) {
                         // Hit — replay reference locations so symbol_reference_locations
                         // is populated without re-running analyze_bodies.
@@ -445,11 +412,11 @@ impl ProjectAnalyzer {
         use std::collections::HashSet;
 
         let max_depth = 10; // prevent infinite chains
-        let mut loaded: HashSet<String> = HashSet::new();
+        let mut loaded_fqcns: HashSet<String> = HashSet::new();
 
         for _ in 0..max_depth {
-            // Collect all referenced FQCNs that aren't in the codebase
-            let mut to_load: Vec<(String, PathBuf)> = Vec::new();
+            // Collect class/interface FQCNs referenced but not yet in the codebase.
+            let mut pending_files: Vec<(String, PathBuf)> = Vec::new();
 
             for entry in self.codebase.classes.iter() {
                 let cls = entry.value();
@@ -457,9 +424,9 @@ impl ProjectAnalyzer {
                 // Check parent class
                 if let Some(parent) = &cls.parent {
                     let fqcn = parent.as_ref();
-                    if !self.codebase.classes.contains_key(fqcn) && !loaded.contains(fqcn) {
+                    if !self.codebase.classes.contains_key(fqcn) && !loaded_fqcns.contains(fqcn) {
                         if let Some(path) = psr4.resolve(fqcn) {
-                            to_load.push((fqcn.to_string(), path));
+                            pending_files.push((fqcn.to_string(), path));
                         }
                     }
                 }
@@ -469,35 +436,63 @@ impl ProjectAnalyzer {
                     let fqcn = iface.as_ref();
                     if !self.codebase.classes.contains_key(fqcn)
                         && !self.codebase.interfaces.contains_key(fqcn)
-                        && !loaded.contains(fqcn)
+                        && !loaded_fqcns.contains(fqcn)
                     {
                         if let Some(path) = psr4.resolve(fqcn) {
-                            to_load.push((fqcn.to_string(), path));
+                            pending_files.push((fqcn.to_string(), path));
                         }
                     }
                 }
             }
 
-            if to_load.is_empty() {
+            if pending_files.is_empty() {
                 break;
             }
 
             // Load each discovered file (Pass 1 only)
-            for (fqcn, path) in to_load {
-                loaded.insert(fqcn);
+            for (fqcn, path) in pending_files {
+                loaded_fqcns.insert(fqcn);
                 if let Ok(src) = std::fs::read_to_string(&path) {
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let arena = bumpalo::Bump::new();
                     let result = php_rs_parser::parse(&arena, &src);
+                    self.pre_index_file(&file, &result.program);
                     let collector = crate::collector::DefinitionCollector::new(
                         &self.codebase,
-                        file,
+                        file.clone(),
                         &src,
                         &result.source_map,
                     );
                     let issues = collector.collect(&result.program);
                     all_issues.extend(issues);
+
+                    // Cache this lazy-loaded file before re-finalize so that the
+                    // snapshot captures empty all_methods/all_parents (as required).
+                    if let Some(pass1_cache) = &self.pass1_cache {
+                        let content_hash = hash_content(&src);
+                        let symbol_keys: Vec<Arc<str>> = self
+                            .codebase
+                            .symbol_to_file
+                            .iter()
+                            .filter(|e| e.value().as_ref() == file.as_ref())
+                            .map(|e| e.key().clone())
+                            .collect();
+                        let snapshot = crate::pass1_cache::build_snapshot(
+                            &self.codebase,
+                            &file,
+                            content_hash,
+                            &symbol_keys,
+                            vec![],
+                            vec![],
+                        );
+                        pass1_cache.put(file.as_ref(), snapshot);
+                    }
                 }
+            }
+
+            // Flush newly cached lazy-loaded files before re-finalizing.
+            if let Some(pass1_cache) = &self.pass1_cache {
+                pass1_cache.flush();
             }
 
             // Re-finalize to include newly loaded classes in the inheritance graph.
@@ -526,20 +521,29 @@ impl ProjectAnalyzer {
 
         let mut all_issues = Vec::new();
 
-        // Collect parse errors
-        for err in &parsed.errors {
-            all_issues.push(Issue::new(
-                mir_issues::IssueKind::ParseError {
-                    message: err.to_string(),
-                },
-                mir_issues::Location {
-                    file: file.clone(),
-                    line: 1,
-                    col_start: 0,
-                    col_end: 0,
-                },
-            ));
-        }
+        // Collect parse errors — kept separate so they can be stored in the snapshot.
+        let parse_errors: Vec<Issue> = parsed
+            .errors
+            .iter()
+            .map(|err| {
+                Issue::new(
+                    mir_issues::IssueKind::ParseError {
+                        message: err.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line: 1,
+                        col_start: 0,
+                        col_end: 0,
+                    },
+                )
+            })
+            .collect();
+
+        // Re-run the pre-index step so file_namespaces and file_imports are
+        // repopulated. Without this, name resolution in Pass 2 falls back to
+        // global scope and the cached snapshot stores empty namespace/imports.
+        self.pre_index_file(&file, &parsed.program);
 
         let collector = DefinitionCollector::new(
             &self.codebase,
@@ -547,24 +551,17 @@ impl ProjectAnalyzer {
             new_content,
             &parsed.source_map,
         );
-        all_issues.extend(collector.collect(&parsed.program));
+        let definition_issues = collector.collect(&parsed.program);
 
-        // 3. Re-finalize (invalidation already done by remove_file_definitions)
-        self.codebase.finalize();
+        all_issues.extend(parse_errors.iter().cloned());
+        all_issues.extend(definition_issues.iter().cloned());
 
-        // 4. Run Pass 2 on this file
-        let (body_issues, symbols) = self.analyze_bodies(
-            &parsed.program,
-            file.clone(),
-            new_content,
-            &parsed.source_map,
-        );
-        all_issues.extend(body_issues);
-
-        // 5. Update caches if present
+        // 3. Persist Pass 1 snapshot before finalize() so that the derived
+        //    all_methods/all_parents fields in ClassStorage are still empty,
+        //    matching the invariant documented in pass1_cache.rs.
         let content_hash = hash_content(new_content);
-        if let Some(p1_cache) = &self.pass1_cache {
-            let fqcns: Vec<Arc<str>> = self
+        if let Some(pass1_cache) = &self.pass1_cache {
+            let symbol_keys: Vec<Arc<str>> = self
                 .codebase
                 .symbol_to_file
                 .iter()
@@ -575,13 +572,27 @@ impl ProjectAnalyzer {
                 &self.codebase,
                 &file,
                 content_hash.clone(),
-                &fqcns,
-                vec![],
-                vec![],
+                &symbol_keys,
+                parse_errors,
+                definition_issues,
             );
-            p1_cache.put(file_path, snapshot);
-            p1_cache.flush();
+            pass1_cache.put(file_path, snapshot);
+            pass1_cache.flush();
         }
+
+        // 4. Re-finalize (invalidation already done by remove_file_definitions)
+        self.codebase.finalize();
+
+        // 5. Run Pass 2 on this file
+        let (body_issues, symbols) = self.analyze_bodies(
+            &parsed.program,
+            file.clone(),
+            new_content,
+            &parsed.source_map,
+        );
+        all_issues.extend(body_issues);
+
+        // 6. Update Pass 2 cache if present
         if let Some(cache) = &self.cache {
             cache.evict_with_dependents(&[file_path.to_string()]);
             let ref_locs = extract_reference_locations(&self.codebase, &file);
@@ -1216,9 +1227,7 @@ impl ProjectAnalyzer {
     /// Pass 1 only: collect type definitions from `paths` into the codebase without
     /// analyzing method bodies or emitting issues. Used to load vendor types.
     pub fn collect_types_only(&self, paths: &[PathBuf]) {
-        use std::collections::HashMap;
-
-        let file_data: Vec<(Arc<str>, String)> = paths
+        let file_sources: Vec<(Arc<str>, String)> = paths
             .par_iter()
             .filter_map(|path| {
                 let src = std::fs::read_to_string(path).ok()?;
@@ -1226,18 +1235,20 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        let miss_hashes: Vec<Option<String>> = file_data
+        // None = cache hit (replayed) or no cache configured; Some(hash) = cache miss (freshly parsed).
+        let content_hashes: Vec<Option<String>> = file_sources
             .par_iter()
             .map(|(file, src)| {
                 let content_hash = self.pass1_cache.as_ref().map(|_| hash_content(src));
-                if let (Some(p1_cache), Some(ref hash)) = (&self.pass1_cache, &content_hash) {
-                    if let Some(snapshot) = p1_cache.get(file, hash) {
+                if let (Some(pass1_cache), Some(ref hash)) = (&self.pass1_cache, &content_hash) {
+                    if let Some(snapshot) = pass1_cache.get(file, hash) {
                         snapshot.replay(&self.codebase, file);
                         return None;
                     }
                 }
                 let arena = bumpalo::Bump::new();
                 let result = php_rs_parser::parse(&arena, src);
+                self.pre_index_file(file, &result.program);
                 let collector =
                     DefinitionCollector::new(&self.codebase, file.clone(), src, &result.source_map);
                 let _ = collector.collect(&result.program);
@@ -1245,33 +1256,29 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        if let Some(p1_cache) = &self.pass1_cache {
-            let has_misses = miss_hashes.iter().any(|h| h.is_some());
+        if let Some(pass1_cache) = &self.pass1_cache {
+            let has_misses = content_hashes.iter().any(|h| h.is_some());
             if has_misses {
-                let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
-                for entry in self.codebase.symbol_to_file.iter() {
-                    file_to_fqcns
-                        .entry(entry.value().clone())
-                        .or_default()
-                        .push(entry.key().clone());
-                }
-                for ((file, _src), maybe_hash) in file_data.iter().zip(miss_hashes.iter()) {
-                    if let Some(hash) = maybe_hash {
-                        let empty: Vec<Arc<str>> = Vec::new();
-                        let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
+                let symbols_by_file = build_symbols_by_file(&self.codebase);
+                for ((file, _src), content_hash) in file_sources.iter().zip(content_hashes.iter()) {
+                    if let Some(hash) = content_hash {
+                        let symbol_keys = symbols_by_file
+                            .get(file)
+                            .map(|v| v.as_slice())
+                            .unwrap_or(&[]);
                         let snapshot = crate::pass1_cache::build_snapshot(
                             &self.codebase,
                             file,
                             hash.clone(),
-                            fqcns,
+                            symbol_keys,
                             vec![],
                             vec![],
                         );
-                        p1_cache.put(file.as_ref(), snapshot);
+                        pass1_cache.put(file.as_ref(), snapshot);
                     }
                 }
             }
-            p1_cache.flush();
+            pass1_cache.flush();
         }
     }
 
@@ -1550,8 +1557,88 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// build_reverse_deps
+// build_symbols_by_file / build_reverse_deps
 // ---------------------------------------------------------------------------
+
+/// Index a flat list of statements under a given namespace prefix.
+///
+/// Populates `codebase.known_symbols` with every class/interface/trait/enum/function
+/// name and collects `use`-alias declarations into `imports`.  Called once per
+/// namespace block during the pre-index step.
+fn index_stmts(
+    codebase: &Codebase,
+    stmts: &[php_ast::ast::Stmt<'_, '_>],
+    ns: Option<&str>,
+    imports: &mut std::collections::HashMap<String, String>,
+) {
+    use php_ast::ast::StmtKind;
+    for stmt in stmts.iter() {
+        match &stmt.kind {
+            StmtKind::Use(use_decl) => {
+                for item in use_decl.uses.iter() {
+                    let full_name = crate::parser::name_to_string(&item.name);
+                    let alias = item
+                        .alias
+                        .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
+                    imports.insert(alias.to_string(), full_name);
+                }
+            }
+            StmtKind::Class(decl) => {
+                if let Some(n) = decl.name {
+                    let fqcn = match ns {
+                        Some(ns) => format!("{}\\{}", ns, n),
+                        None => n.to_string(),
+                    };
+                    codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+                }
+            }
+            StmtKind::Interface(decl) => {
+                let fqcn = match ns {
+                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                    None => decl.name.to_string(),
+                };
+                codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+            }
+            StmtKind::Trait(decl) => {
+                let fqcn = match ns {
+                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                    None => decl.name.to_string(),
+                };
+                codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+            }
+            StmtKind::Enum(decl) => {
+                let fqcn = match ns {
+                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                    None => decl.name.to_string(),
+                };
+                codebase.known_symbols.insert(Arc::from(fqcn.as_str()));
+            }
+            StmtKind::Function(decl) => {
+                let fqn = match ns {
+                    Some(ns) => format!("{}\\{}", ns, decl.name),
+                    None => decl.name.to_string(),
+                };
+                codebase.known_symbols.insert(Arc::from(fqn.as_str()));
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Invert `Codebase::symbol_to_file` into a `file → Vec<symbol>` map.
+///
+/// Only covers symbols tracked in `symbol_to_file` (classes, interfaces, traits,
+/// enums, functions) — not constants or global variables, which have their own
+/// per-file reverse indices in `Codebase`.
+fn build_symbols_by_file(codebase: &Codebase) -> HashMap<Arc<str>, Vec<Arc<str>>> {
+    let mut map: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
+    for entry in codebase.symbol_to_file.iter() {
+        map.entry(entry.value().clone())
+            .or_default()
+            .push(entry.key().clone());
+    }
+    map
+}
 
 /// Build a reverse dependency graph from the codebase after Pass 1.
 ///
