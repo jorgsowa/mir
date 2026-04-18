@@ -556,7 +556,6 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     is_abstract: decl.modifiers.is_abstract,
                     is_final: decl.modifiers.is_final,
                     is_readonly: decl.modifiers.is_readonly,
-                    all_methods: indexmap::IndexMap::new(),
                     all_parents: vec![],
                     is_deprecated: class_doc.is_deprecated,
                     is_internal: class_doc.is_internal,

@@ -67,23 +67,7 @@ impl Codebase {
     ) {
         // --- Class ---
         if let Some(cls) = self.classes.get(fqcn) {
-            // Methods: all_methods already includes inherited + trait methods.
-            for (name, method) in &cls.all_methods {
-                let key = (name.to_string(), MemberKind::Method);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Method,
-                        ty: method.effective_return_type().cloned(),
-                        visibility: method.visibility,
-                        is_static: method.is_static,
-                        declaring_class: method.fqcn.clone(),
-                        is_deprecated: method.is_deprecated,
-                        params: method.params.clone(),
-                    });
-                }
-            }
-            // Also check own_methods for anything not in all_methods
+            // Own methods (highest priority — first in, wins via `seen` dedup)
             for (name, method) in &cls.own_methods {
                 let key = (name.to_string(), MemberKind::Method);
                 if seen.insert(key) {
@@ -100,9 +84,12 @@ impl Codebase {
                 }
             }
 
-            // Properties: walk own + ancestors (all_parents includes parent chain + traits)
+            // Collect chain before dropping the DashMap guard.
+            let own_traits = cls.traits.clone();
             let all_parents = cls.all_parents.clone();
-            // Own properties first
+            let cls_fqcn = cls.fqcn.clone();
+
+            // Own properties and constants
             for (name, prop) in &cls.own_properties {
                 let key = (name.to_string(), MemberKind::Property);
                 if seen.insert(key) {
@@ -112,13 +99,12 @@ impl Codebase {
                         ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
                         visibility: prop.visibility,
                         is_static: prop.is_static,
-                        declaring_class: cls.fqcn.clone(),
+                        declaring_class: cls_fqcn.clone(),
                         is_deprecated: false,
                         params: vec![],
                     });
                 }
             }
-            // Own constants
             for (name, con) in &cls.own_constants {
                 let key = (name.to_string(), MemberKind::Constant);
                 if seen.insert(key) {
@@ -128,7 +114,7 @@ impl Codebase {
                         ty: Some(con.ty.clone()),
                         visibility: con.visibility.unwrap_or(Visibility::Public),
                         is_static: true,
-                        declaring_class: cls.fqcn.clone(),
+                        declaring_class: cls_fqcn.clone(),
                         is_deprecated: false,
                         params: vec![],
                     });
@@ -136,9 +122,60 @@ impl Codebase {
             }
             drop(cls);
 
-            // Ancestor properties and constants
+            // Own trait methods and properties
+            for tr_fqcn in &own_traits {
+                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    for (name, method) in &tr.own_methods {
+                        let key = (name.to_string(), MemberKind::Method);
+                        if seen.insert(key) {
+                            out.push(MemberInfo {
+                                name: name.clone(),
+                                kind: MemberKind::Method,
+                                ty: method.effective_return_type().cloned(),
+                                visibility: method.visibility,
+                                is_static: method.is_static,
+                                declaring_class: method.fqcn.clone(),
+                                is_deprecated: method.is_deprecated,
+                                params: method.params.clone(),
+                            });
+                        }
+                    }
+                    for (name, prop) in &tr.own_properties {
+                        let key = (name.to_string(), MemberKind::Property);
+                        if seen.insert(key) {
+                            out.push(MemberInfo {
+                                name: name.clone(),
+                                kind: MemberKind::Property,
+                                ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
+                                visibility: prop.visibility,
+                                is_static: prop.is_static,
+                                declaring_class: tr.fqcn.clone(),
+                                is_deprecated: false,
+                                params: vec![],
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Ancestor classes, their traits, and interfaces from all_parents
             for ancestor_fqcn in &all_parents {
                 if let Some(ancestor) = self.classes.get(ancestor_fqcn.as_ref()) {
+                    for (name, method) in &ancestor.own_methods {
+                        let key = (name.to_string(), MemberKind::Method);
+                        if seen.insert(key) {
+                            out.push(MemberInfo {
+                                name: name.clone(),
+                                kind: MemberKind::Method,
+                                ty: method.effective_return_type().cloned(),
+                                visibility: method.visibility,
+                                is_static: method.is_static,
+                                declaring_class: method.fqcn.clone(),
+                                is_deprecated: method.is_deprecated,
+                                params: method.params.clone(),
+                            });
+                        }
+                    }
                     for (name, prop) in &ancestor.own_properties {
                         let key = (name.to_string(), MemberKind::Property);
                         if seen.insert(key) {
@@ -169,53 +206,75 @@ impl Codebase {
                             });
                         }
                     }
-                }
-                // Trait properties
-                if let Some(tr) = self.traits.get(ancestor_fqcn.as_ref()) {
-                    for (name, prop) in &tr.own_properties {
-                        let key = (name.to_string(), MemberKind::Property);
+                    let anc_traits = ancestor.traits.clone();
+                    drop(ancestor);
+                    for tr_fqcn in &anc_traits {
+                        if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                            for (name, method) in &tr.own_methods {
+                                let key = (name.to_string(), MemberKind::Method);
+                                if seen.insert(key) {
+                                    out.push(MemberInfo {
+                                        name: name.clone(),
+                                        kind: MemberKind::Method,
+                                        ty: method.effective_return_type().cloned(),
+                                        visibility: method.visibility,
+                                        is_static: method.is_static,
+                                        declaring_class: method.fqcn.clone(),
+                                        is_deprecated: method.is_deprecated,
+                                        params: method.params.clone(),
+                                    });
+                                }
+                            }
+                            for (name, prop) in &tr.own_properties {
+                                let key = (name.to_string(), MemberKind::Property);
+                                if seen.insert(key) {
+                                    out.push(MemberInfo {
+                                        name: name.clone(),
+                                        kind: MemberKind::Property,
+                                        ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
+                                        visibility: prop.visibility,
+                                        is_static: prop.is_static,
+                                        declaring_class: tr.fqcn.clone(),
+                                        is_deprecated: false,
+                                        params: vec![],
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
+                    for (name, method) in &iface.own_methods {
+                        let key = (name.to_string(), MemberKind::Method);
                         if seen.insert(key) {
                             out.push(MemberInfo {
                                 name: name.clone(),
-                                kind: MemberKind::Property,
-                                ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                                visibility: prop.visibility,
-                                is_static: prop.is_static,
-                                declaring_class: tr.fqcn.clone(),
+                                kind: MemberKind::Method,
+                                ty: method.effective_return_type().cloned(),
+                                visibility: method.visibility,
+                                is_static: method.is_static,
+                                declaring_class: method.fqcn.clone(),
+                                is_deprecated: method.is_deprecated,
+                                params: method.params.clone(),
+                            });
+                        }
+                    }
+                    for (name, con) in &iface.own_constants {
+                        let key = (name.to_string(), MemberKind::Constant);
+                        if seen.insert(key) {
+                            out.push(MemberInfo {
+                                name: name.clone(),
+                                kind: MemberKind::Constant,
+                                ty: Some(con.ty.clone()),
+                                visibility: con.visibility.unwrap_or(Visibility::Public),
+                                is_static: true,
+                                declaring_class: iface.fqcn.clone(),
                                 is_deprecated: false,
                                 params: vec![],
                             });
                         }
                     }
                 }
-            }
-
-            // Trait properties for directly-used traits (not in all_parents)
-            let traits = {
-                if let Some(cls) = self.classes.get(fqcn) {
-                    cls.traits.clone()
-                } else {
-                    vec![]
-                }
-            };
-            for trait_fqcn in &traits {
-                if let Some(tr) = self.traits.get(trait_fqcn.as_ref()) {
-                    for (name, prop) in &tr.own_properties {
-                        let key = (name.to_string(), MemberKind::Property);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Property,
-                                ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                                visibility: prop.visibility,
-                                is_static: prop.is_static,
-                                declaring_class: tr.fqcn.clone(),
-                                is_deprecated: false,
-                                params: vec![],
-                            });
-                        }
-                    }
-                }
+                // Traits in all_parents are already covered via their owning class's .traits above.
             }
 
             return;
@@ -404,7 +463,6 @@ mod tests {
                 is_abstract: false,
                 is_final: false,
                 is_readonly: false,
-                all_methods: IndexMap::new(),
                 all_parents: vec![],
                 is_deprecated: false,
                 is_internal: false,
@@ -433,7 +491,6 @@ mod tests {
                 is_abstract: false,
                 is_final: false,
                 is_readonly: false,
-                all_methods: IndexMap::new(),
                 all_parents: vec![],
                 is_deprecated: false,
                 is_internal: false,
@@ -477,7 +534,6 @@ mod tests {
                 is_abstract: false,
                 is_final: false,
                 is_readonly: false,
-                all_methods: IndexMap::new(),
                 all_parents: vec![],
                 is_deprecated: false,
                 is_internal: false,
@@ -502,7 +558,6 @@ mod tests {
                 is_abstract: false,
                 is_final: false,
                 is_readonly: false,
-                all_methods: IndexMap::new(),
                 all_parents: vec![],
                 is_deprecated: false,
                 is_internal: false,
