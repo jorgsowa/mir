@@ -1,16 +1,85 @@
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
 
-/// Maps symbol key → { file_path → {(start_byte, end_byte)} }.
-/// Used by `Codebase::symbol_reference_locations`.
-type ReferenceLocations = DashMap<Arc<str>, HashMap<Arc<str>, HashSet<(u32, u32)>>>;
+use crate::interner::Interner;
+
+/// Maps symbol ID → flat list of `(file_id, start_byte, end_byte)`.
+///
+/// Entries are appended during Pass 2. Duplicates (e.g. from union receivers like
+/// `Foo|Foo->method()`) are filtered at insert time. IDs come from
+/// `Codebase::symbol_interner` / `Codebase::file_interner`.
+///
+/// Compared with the previous `DashMap<u32, HashMap<u32, HashSet<(u32, u32)>>>`,
+/// this eliminates two levels of hash-map overhead (a `HashMap` per symbol and a
+/// `HashSet` per file). Each entry is now 12 bytes (`u32` × 3) with no per-entry
+/// allocator overhead beyond the `Vec` backing store.
+type ReferenceLocations = DashMap<u32, Vec<(u32, u32, u32)>>;
 
 use crate::storage::{
     ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage, TraitStorage,
 };
 use mir_types::Union;
+
+// ---------------------------------------------------------------------------
+// Private helper — shared insert logic for reference tracking
+// ---------------------------------------------------------------------------
+
+/// Append `(sym_id, file_id, start, end)` to the reference index, skipping
+/// exact duplicates so union receivers like `Foo|Foo->method()` don't inflate
+/// the span list.
+///
+/// Both maps are updated atomically under their respective DashMap shard locks.
+#[inline]
+fn record_ref(
+    sym_locs: &ReferenceLocations,
+    file_refs: &DashMap<u32, Vec<u32>>,
+    sym_id: u32,
+    file_id: u32,
+    start: u32,
+    end: u32,
+) {
+    {
+        let mut entries = sym_locs.entry(sym_id).or_default();
+        let span = (file_id, start, end);
+        if !entries.contains(&span) {
+            entries.push(span);
+        }
+    }
+    {
+        let mut refs = file_refs.entry(file_id).or_default();
+        if !refs.contains(&sym_id) {
+            refs.push(sym_id);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compact CSR reference index (post-Pass-2 read-optimised form)
+// ---------------------------------------------------------------------------
+
+/// Read-optimised Compressed Sparse Row representation of the reference index.
+///
+/// Built once by [`Codebase::compact_reference_index`] after Pass 2 finishes.
+/// After compaction the build-phase [`DashMap`]s are cleared, freeing the
+/// per-entry allocator overhead (~72 bytes per (symbol, file) pair).
+///
+/// Two CSR views are maintained over the same flat `entries` array:
+/// - by symbol: `entries[sym_offsets[id]..sym_offsets[id+1]]`
+/// - by file: `by_file[file_offsets[id]..file_offsets[id+1]]` (indirect indices)
+#[derive(Debug, Default)]
+struct CompactRefIndex {
+    /// All spans sorted by `(sym_id, file_id, start, end)`, deduplicated.
+    /// Each entry is 16 bytes; total size = `n_refs × 16` with no hash overhead.
+    entries: Vec<(u32, u32, u32, u32)>,
+    /// CSR offsets keyed by sym_id (length = max_sym_id + 2).
+    sym_offsets: Vec<u32>,
+    /// Indices into `entries` sorted by `(file_id, sym_id, start, end)`.
+    /// Allows O(log n) file-keyed lookups without duplicating the payload.
+    by_file: Vec<u32>,
+    /// CSR offsets keyed by file_id into `by_file` (length = max_file_id + 2).
+    file_offsets: Vec<u32>,
+}
 
 // ---------------------------------------------------------------------------
 // Codebase — thread-safe global symbol registry
@@ -32,23 +101,38 @@ pub struct Codebase {
     /// Used by `remove_file_definitions` to purge stale entries on re-analysis.
     file_global_vars: DashMap<Arc<str>, Vec<Arc<str>>>,
 
-    /// Methods referenced during Pass 2 — key format: `"ClassName::methodName"`.
+    /// Methods referenced during Pass 2 — stored as interned symbol IDs.
     /// Used by the dead-code detector (M18).
-    pub referenced_methods: DashSet<Arc<str>>,
-    /// Properties referenced during Pass 2 — key format: `"ClassName::propName"`.
-    pub referenced_properties: DashSet<Arc<str>>,
-    /// Free functions referenced during Pass 2 — key: fully-qualified name.
-    pub referenced_functions: DashSet<Arc<str>>,
+    referenced_methods: DashSet<u32>,
+    /// Properties referenced during Pass 2 — stored as interned symbol IDs.
+    referenced_properties: DashSet<u32>,
+    /// Free functions referenced during Pass 2 — stored as interned symbol IDs.
+    referenced_functions: DashSet<u32>,
 
-    /// Maps symbol key → { file_path → {(start_byte, end_byte)} }.
-    /// Key format mirrors referenced_methods / referenced_properties / referenced_functions.
-    /// The inner HashMap groups all spans from the same file under a single key,
-    /// avoiding Arc<str> duplication per span and enabling O(1) per-file cleanup.
+    /// Interner for symbol keys (`"ClassName::method"`, `"ClassName::prop"`, FQN).
+    /// Replaces repeated `Arc<str>` copies (16 bytes) with compact `u32` IDs (4 bytes).
+    pub symbol_interner: Interner,
+    /// Interner for file paths. Same memory rationale as `symbol_interner`.
+    pub file_interner: Interner,
+
+    /// Maps symbol ID → { file ID → {(start_byte, end_byte)} }.
+    /// IDs come from `symbol_interner` / `file_interner`.
+    /// The inner HashMap groups spans by file for O(1) per-file cleanup.
     /// HashSet deduplicates spans from union receivers (e.g. Foo|Foo->method()).
-    pub symbol_reference_locations: ReferenceLocations,
-    /// Reverse index: file_path → unique symbol keys referenced in that file.
-    /// Used by remove_file_definitions for O(1) cleanup without a full map scan.
-    pub file_symbol_references: DashMap<Arc<str>, HashSet<Arc<str>>>,
+    symbol_reference_locations: ReferenceLocations,
+    /// Reverse index: file ID → symbol IDs referenced in that file.
+    /// Used by `remove_file_definitions` to avoid a full scan of all symbols.
+    /// A `Vec` rather than `HashSet`: duplicate sym_ids are guarded at insert time
+    /// (same as `symbol_reference_locations`) for the same structural simplicity.
+    file_symbol_references: DashMap<u32, Vec<u32>>,
+
+    /// Compact CSR view of the reference index, built by `compact_reference_index()`.
+    /// When `Some`, the build-phase DashMaps above are empty and this is the
+    /// authoritative source for all reference queries.
+    compact_ref_index: std::sync::RwLock<Option<CompactRefIndex>>,
+    /// `true` iff `compact_ref_index` is `Some`. Checked atomically before
+    /// acquiring any lock, so the fast path during Pass 2 is a single load.
+    is_compacted: std::sync::atomic::AtomicBool,
 
     /// Maps every FQCN (class, interface, trait, enum, function) to the absolute
     /// path of the file that defines it. Populated during Pass 1.
@@ -83,6 +167,119 @@ pub struct Codebase {
 impl Codebase {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    // -----------------------------------------------------------------------
+    // Compact reference index
+    // -----------------------------------------------------------------------
+
+    /// Convert the build-phase `DashMap` reference index into a compact CSR form.
+    ///
+    /// Call this once after Pass 2 completes on all files. The method:
+    /// 1. Drains the two build-phase `DashMap`s into a single flat `Vec`.
+    /// 2. Sorts and deduplicates entries.
+    /// 3. Builds two CSR offset arrays (by symbol and by file).
+    /// 4. Clears the `DashMap`s (freeing their allocations).
+    ///
+    /// After this call all reference queries use the compact index. Incremental
+    /// re-analysis via [`Self::re_analyze_file`] will automatically decompress the
+    /// index back into `DashMap`s on the first write, then recompact can be called
+    /// again at the end of that analysis pass.
+    pub fn compact_reference_index(&self) {
+        // Collect all entries from the build-phase DashMap.
+        let mut entries: Vec<(u32, u32, u32, u32)> = self
+            .symbol_reference_locations
+            .iter()
+            .flat_map(|entry| {
+                let sym_id = *entry.key();
+                entry
+                    .value()
+                    .iter()
+                    .map(move |&(file_id, start, end)| (sym_id, file_id, start, end))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        if entries.is_empty() {
+            return;
+        }
+
+        // Sort by (sym_id, file_id, start, end) and drop exact duplicates.
+        entries.sort_unstable();
+        entries.dedup();
+
+        let n = entries.len();
+
+        // ---- Build symbol-keyed CSR offsets --------------------------------
+        let max_sym = entries.iter().map(|&(s, ..)| s).max().unwrap_or(0) as usize;
+        let mut sym_offsets = vec![0u32; max_sym + 2];
+        for &(sym_id, ..) in &entries {
+            sym_offsets[sym_id as usize + 1] += 1;
+        }
+        for i in 1..sym_offsets.len() {
+            sym_offsets[i] += sym_offsets[i - 1];
+        }
+
+        // ---- Build file-keyed indirect index --------------------------------
+        // `by_file[i]` is an index into `entries`; the slice is sorted by
+        // `(file_id, sym_id, start, end)` so CSR offsets can be computed cheaply.
+        let max_file = entries.iter().map(|&(_, f, ..)| f).max().unwrap_or(0) as usize;
+        let mut by_file: Vec<u32> = (0..n as u32).collect();
+        by_file.sort_unstable_by_key(|&i| {
+            let (sym_id, file_id, start, end) = entries[i as usize];
+            (file_id, sym_id, start, end)
+        });
+
+        let mut file_offsets = vec![0u32; max_file + 2];
+        for &idx in &by_file {
+            let file_id = entries[idx as usize].1;
+            file_offsets[file_id as usize + 1] += 1;
+        }
+        for i in 1..file_offsets.len() {
+            file_offsets[i] += file_offsets[i - 1];
+        }
+
+        *self.compact_ref_index.write().unwrap() = Some(CompactRefIndex {
+            entries,
+            sym_offsets,
+            by_file,
+            file_offsets,
+        });
+        self.is_compacted
+            .store(true, std::sync::atomic::Ordering::Release);
+
+        // Free build-phase allocations.
+        self.symbol_reference_locations.clear();
+        self.file_symbol_references.clear();
+    }
+
+    /// Decompress the compact index back into the build-phase `DashMap`s.
+    ///
+    /// Called automatically by write methods when the compact index is live.
+    /// This makes incremental re-analysis transparent: callers never need to
+    /// know whether the index is compacted or not.
+    fn ensure_expanded(&self) {
+        // Fast path: not compacted — one atomic load, no lock.
+        if !self.is_compacted.load(std::sync::atomic::Ordering::Acquire) {
+            return;
+        }
+        // Slow path: acquire write lock and decompress.
+        let mut guard = self.compact_ref_index.write().unwrap();
+        if let Some(ci) = guard.take() {
+            for &(sym_id, file_id, start, end) in &ci.entries {
+                record_ref(
+                    &self.symbol_reference_locations,
+                    &self.file_symbol_references,
+                    sym_id,
+                    file_id,
+                    start,
+                    end,
+                );
+            }
+            self.is_compacted
+                .store(false, std::sync::atomic::Ordering::Release);
+        }
+        // If another thread already decompressed (guard is now None), we're done.
     }
 
     /// Reset the finalization flag so that `finalize()` will run again.
@@ -137,12 +334,17 @@ impl Codebase {
             }
         }
 
+        // Ensure the reference index is in DashMap form so the removal below works.
+        self.ensure_expanded();
+
         // Remove reference locations contributed by this file.
         // Use the reverse index to avoid a full scan of all symbols.
-        if let Some((_, symbol_keys)) = self.file_symbol_references.remove(file_path) {
-            for key in symbol_keys {
-                if let Some(mut locs) = self.symbol_reference_locations.get_mut(&key) {
-                    locs.remove(file_path);
+        if let Some(file_id) = self.file_interner.get_id(file_path) {
+            if let Some((_, sym_ids)) = self.file_symbol_references.remove(&file_id) {
+                for sym_id in sym_ids {
+                    if let Some(mut entries) = self.symbol_reference_locations.get_mut(&sym_id) {
+                        entries.retain(|&(fid, _, _)| fid != file_id);
+                    }
                 }
             }
         }
@@ -611,33 +813,45 @@ impl Codebase {
 
     /// Mark a method as referenced from user code.
     pub fn mark_method_referenced(&self, fqcn: &str, method_name: &str) {
-        let key: Arc<str> = Arc::from(format!("{}::{}", fqcn, method_name.to_lowercase()).as_str());
-        self.referenced_methods.insert(key);
+        let key = format!("{}::{}", fqcn, method_name.to_lowercase());
+        let id = self.symbol_interner.intern_str(&key);
+        self.referenced_methods.insert(id);
     }
 
     /// Mark a property as referenced from user code.
     pub fn mark_property_referenced(&self, fqcn: &str, prop_name: &str) {
-        let key: Arc<str> = Arc::from(format!("{}::{}", fqcn, prop_name).as_str());
-        self.referenced_properties.insert(key);
+        let key = format!("{}::{}", fqcn, prop_name);
+        let id = self.symbol_interner.intern_str(&key);
+        self.referenced_properties.insert(id);
     }
 
     /// Mark a free function as referenced from user code.
     pub fn mark_function_referenced(&self, fqn: &str) {
-        self.referenced_functions.insert(Arc::from(fqn));
+        let id = self.symbol_interner.intern_str(fqn);
+        self.referenced_functions.insert(id);
     }
 
     pub fn is_method_referenced(&self, fqcn: &str, method_name: &str) -> bool {
         let key = format!("{}::{}", fqcn, method_name.to_lowercase());
-        self.referenced_methods.contains(key.as_str())
+        match self.symbol_interner.get_id(&key) {
+            Some(id) => self.referenced_methods.contains(&id),
+            None => false,
+        }
     }
 
     pub fn is_property_referenced(&self, fqcn: &str, prop_name: &str) -> bool {
         let key = format!("{}::{}", fqcn, prop_name);
-        self.referenced_properties.contains(key.as_str())
+        match self.symbol_interner.get_id(&key) {
+            Some(id) => self.referenced_properties.contains(&id),
+            None => false,
+        }
     }
 
     pub fn is_function_referenced(&self, fqn: &str) -> bool {
-        self.referenced_functions.contains(fqn)
+        match self.symbol_interner.get_id(fqn) {
+            Some(id) => self.referenced_functions.contains(&id),
+            None => false,
+        }
     }
 
     /// Record a method reference with its source location.
@@ -650,18 +864,19 @@ impl Codebase {
         start: u32,
         end: u32,
     ) {
-        let key: Arc<str> = Arc::from(format!("{}::{}", fqcn, method_name.to_lowercase()).as_str());
-        self.referenced_methods.insert(key.clone());
-        self.symbol_reference_locations
-            .entry(key.clone())
-            .or_default()
-            .entry(file.clone())
-            .or_default()
-            .insert((start, end));
-        self.file_symbol_references
-            .entry(file)
-            .or_default()
-            .insert(key);
+        let key = format!("{}::{}", fqcn, method_name.to_lowercase());
+        self.ensure_expanded();
+        let sym_id = self.symbol_interner.intern_str(&key);
+        let file_id = self.file_interner.intern(file);
+        self.referenced_methods.insert(sym_id);
+        record_ref(
+            &self.symbol_reference_locations,
+            &self.file_symbol_references,
+            sym_id,
+            file_id,
+            start,
+            end,
+        );
     }
 
     /// Record a property reference with its source location.
@@ -674,86 +889,158 @@ impl Codebase {
         start: u32,
         end: u32,
     ) {
-        let key: Arc<str> = Arc::from(format!("{}::{}", fqcn, prop_name).as_str());
-        self.referenced_properties.insert(key.clone());
-        self.symbol_reference_locations
-            .entry(key.clone())
-            .or_default()
-            .entry(file.clone())
-            .or_default()
-            .insert((start, end));
-        self.file_symbol_references
-            .entry(file)
-            .or_default()
-            .insert(key);
+        let key = format!("{}::{}", fqcn, prop_name);
+        self.ensure_expanded();
+        let sym_id = self.symbol_interner.intern_str(&key);
+        let file_id = self.file_interner.intern(file);
+        self.referenced_properties.insert(sym_id);
+        record_ref(
+            &self.symbol_reference_locations,
+            &self.file_symbol_references,
+            sym_id,
+            file_id,
+            start,
+            end,
+        );
     }
 
     /// Record a function reference with its source location.
     /// Also updates the referenced_functions DashSet for dead-code detection.
     pub fn mark_function_referenced_at(&self, fqn: &str, file: Arc<str>, start: u32, end: u32) {
-        let key: Arc<str> = Arc::from(fqn);
-        self.referenced_functions.insert(key.clone());
-        self.symbol_reference_locations
-            .entry(key.clone())
-            .or_default()
-            .entry(file.clone())
-            .or_default()
-            .insert((start, end));
-        self.file_symbol_references
-            .entry(file)
-            .or_default()
-            .insert(key);
+        self.ensure_expanded();
+        let sym_id = self.symbol_interner.intern_str(fqn);
+        let file_id = self.file_interner.intern(file);
+        self.referenced_functions.insert(sym_id);
+        record_ref(
+            &self.symbol_reference_locations,
+            &self.file_symbol_references,
+            sym_id,
+            file_id,
+            start,
+            end,
+        );
     }
 
     /// Record a class reference (e.g. `new Foo()`) with its source location.
     /// Does not update any dead-code DashSet — class instantiation tracking is
     /// separate from method/property/function dead-code detection.
     pub fn mark_class_referenced_at(&self, fqcn: &str, file: Arc<str>, start: u32, end: u32) {
-        let key: Arc<str> = Arc::from(fqcn);
-        self.symbol_reference_locations
-            .entry(key.clone())
-            .or_default()
-            .entry(file.clone())
-            .or_default()
-            .insert((start, end));
-        self.file_symbol_references
-            .entry(file)
-            .or_default()
-            .insert(key);
+        self.ensure_expanded();
+        let sym_id = self.symbol_interner.intern_str(fqcn);
+        let file_id = self.file_interner.intern(file);
+        record_ref(
+            &self.symbol_reference_locations,
+            &self.file_symbol_references,
+            sym_id,
+            file_id,
+            start,
+            end,
+        );
     }
 
-    /// Replay cached reference locations for a file into symbol_reference_locations
-    /// and file_symbol_references. Called on cache hits to avoid re-running Pass 2
-    /// just to rebuild the reference index.
+    /// Replay cached reference locations for a file into the reference index.
+    /// Called on cache hits to avoid re-running Pass 2 just to rebuild the index.
     /// `locs` is a slice of `(symbol_key, start_byte, end_byte)` as stored in the cache.
     pub fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u32)]) {
+        if locs.is_empty() {
+            return;
+        }
+        self.ensure_expanded();
+        let file_id = self.file_interner.intern(file);
         for (symbol_key, start, end) in locs {
-            let key: Arc<str> = Arc::from(symbol_key.as_str());
-            self.symbol_reference_locations
-                .entry(key.clone())
-                .or_default()
-                .entry(file.clone())
-                .or_default()
-                .insert((*start, *end));
-            self.file_symbol_references
-                .entry(file.clone())
-                .or_default()
-                .insert(key);
+            let sym_id = self.symbol_interner.intern_str(symbol_key);
+            record_ref(
+                &self.symbol_reference_locations,
+                &self.file_symbol_references,
+                sym_id,
+                file_id,
+                *start,
+                *end,
+            );
         }
     }
 
     /// Return all reference locations for `symbol` as a flat `Vec<(file, start, end)>`.
     /// Returns an empty Vec if the symbol has no recorded references.
     pub fn get_reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u32)> {
-        match self.symbol_reference_locations.get(symbol) {
-            None => Vec::new(),
-            Some(by_file) => by_file
+        let Some(sym_id) = self.symbol_interner.get_id(symbol) else {
+            return Vec::new();
+        };
+        // Fast path: compact CSR index.
+        if let Some(ref ci) = *self.compact_ref_index.read().unwrap() {
+            let id = sym_id as usize;
+            if id + 1 >= ci.sym_offsets.len() {
+                return Vec::new();
+            }
+            let start = ci.sym_offsets[id] as usize;
+            let end = ci.sym_offsets[id + 1] as usize;
+            return ci.entries[start..end]
                 .iter()
-                .flat_map(|(file, spans)| {
-                    spans.iter().map(|&(start, end)| (file.clone(), start, end))
-                })
-                .collect(),
+                .map(|&(_, file_id, s, e)| (self.file_interner.get(file_id), s, e))
+                .collect();
         }
+        // Slow path: build-phase DashMap.
+        let Some(entries) = self.symbol_reference_locations.get(&sym_id) else {
+            return Vec::new();
+        };
+        entries
+            .iter()
+            .map(|&(file_id, start, end)| (self.file_interner.get(file_id), start, end))
+            .collect()
+    }
+
+    /// Extract all reference locations recorded for `file` as `(symbol_key, start, end)` triples.
+    /// Used by the cache layer to persist per-file reference data between runs.
+    pub fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u32)> {
+        let Some(file_id) = self.file_interner.get_id(file) else {
+            return Vec::new();
+        };
+        // Fast path: compact CSR index.
+        if let Some(ref ci) = *self.compact_ref_index.read().unwrap() {
+            let id = file_id as usize;
+            if id + 1 >= ci.file_offsets.len() {
+                return Vec::new();
+            }
+            let start = ci.file_offsets[id] as usize;
+            let end = ci.file_offsets[id + 1] as usize;
+            return ci.by_file[start..end]
+                .iter()
+                .map(|&entry_idx| {
+                    let (sym_id, _, s, e) = ci.entries[entry_idx as usize];
+                    (self.symbol_interner.get(sym_id), s, e)
+                })
+                .collect();
+        }
+        // Slow path: build-phase DashMaps.
+        let Some(sym_ids) = self.file_symbol_references.get(&file_id) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for &sym_id in sym_ids.iter() {
+            let Some(entries) = self.symbol_reference_locations.get(&sym_id) else {
+                continue;
+            };
+            let sym_key = self.symbol_interner.get(sym_id);
+            for &(entry_file_id, start, end) in entries.iter() {
+                if entry_file_id == file_id {
+                    out.push((sym_key.clone(), start, end));
+                }
+            }
+        }
+        out
+    }
+
+    /// Returns true if the given file has any recorded symbol references.
+    pub fn file_has_symbol_references(&self, file: &str) -> bool {
+        let Some(file_id) = self.file_interner.get_id(file) else {
+            return false;
+        };
+        // Check compact index first.
+        if let Some(ref ci) = *self.compact_ref_index.read().unwrap() {
+            let id = file_id as usize;
+            return id + 1 < ci.file_offsets.len() && ci.file_offsets[id] < ci.file_offsets[id + 1];
+        }
+        self.file_symbol_references.contains_key(&file_id)
     }
 
     // -----------------------------------------------------------------------
@@ -957,12 +1244,19 @@ mod tests {
         cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 10, 15);
         cb.mark_method_referenced_at("Foo", "bar", arc("b.php"), 20, 25);
 
-        let locs = cb.symbol_reference_locations.get("Foo::bar").unwrap();
-        assert_eq!(locs.len(), 2, "two files, not three spans");
-        assert!(locs[&arc("a.php")].contains(&(0, 5)));
-        assert!(locs[&arc("a.php")].contains(&(10, 15)));
-        assert_eq!(locs[&arc("a.php")].len(), 2);
-        assert!(locs[&arc("b.php")].contains(&(20, 25)));
+        let locs = cb.get_reference_locations("Foo::bar");
+        let files: std::collections::HashSet<&str> =
+            locs.iter().map(|(f, _, _)| f.as_ref()).collect();
+        assert_eq!(files.len(), 2, "two files, not three spans");
+        assert!(locs.contains(&(arc("a.php"), 0, 5)));
+        assert!(locs.contains(&(arc("a.php"), 10, 15)));
+        assert_eq!(
+            locs.iter()
+                .filter(|(f, _, _)| f.as_ref() == "a.php")
+                .count(),
+            2
+        );
+        assert!(locs.contains(&(arc("b.php"), 20, 25)));
         assert!(
             cb.is_method_referenced("Foo", "bar"),
             "DashSet also updated"
@@ -976,15 +1270,19 @@ mod tests {
         cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 0, 5);
         cb.mark_method_referenced_at("Foo", "bar", arc("a.php"), 0, 5);
 
-        let locs = cb.symbol_reference_locations.get("Foo::bar").unwrap();
-        assert_eq!(locs[&arc("a.php")].len(), 1, "duplicate span deduplicated");
+        let count = cb
+            .get_reference_locations("Foo::bar")
+            .iter()
+            .filter(|(f, _, _)| f.as_ref() == "a.php")
+            .count();
+        assert_eq!(count, 1, "duplicate span deduplicated");
     }
 
     #[test]
     fn method_key_is_lowercased() {
         let cb = Codebase::new();
         cb.mark_method_referenced_at("Cls", "MyMethod", arc("f.php"), 0, 3);
-        assert!(cb.symbol_reference_locations.contains_key("Cls::mymethod"));
+        assert!(!cb.get_reference_locations("Cls::mymethod").is_empty());
     }
 
     #[test]
@@ -992,8 +1290,9 @@ mod tests {
         let cb = Codebase::new();
         cb.mark_property_referenced_at("Bar", "count", arc("x.php"), 5, 10);
 
-        let locs = cb.symbol_reference_locations.get("Bar::count").unwrap();
-        assert!(locs[&arc("x.php")].contains(&(5, 10)));
+        assert!(cb
+            .get_reference_locations("Bar::count")
+            .contains(&(arc("x.php"), 5, 10)));
         assert!(cb.is_property_referenced("Bar", "count"));
     }
 
@@ -1002,8 +1301,9 @@ mod tests {
         let cb = Codebase::new();
         cb.mark_function_referenced_at("my_fn", arc("a.php"), 10, 15);
 
-        let locs = cb.symbol_reference_locations.get("my_fn").unwrap();
-        assert!(locs[&arc("a.php")].contains(&(10, 15)));
+        assert!(cb
+            .get_reference_locations("my_fn")
+            .contains(&(arc("a.php"), 10, 15)));
         assert!(cb.is_function_referenced("my_fn"));
     }
 
@@ -1012,8 +1312,9 @@ mod tests {
         let cb = Codebase::new();
         cb.mark_class_referenced_at("Foo", arc("a.php"), 5, 8);
 
-        let locs = cb.symbol_reference_locations.get("Foo").unwrap();
-        assert!(locs[&arc("a.php")].contains(&(5, 8)));
+        assert!(cb
+            .get_reference_locations("Foo")
+            .contains(&(arc("a.php"), 5, 8)));
     }
 
     #[test]
@@ -1039,16 +1340,15 @@ mod tests {
         ];
         cb.replay_reference_locations(arc("a.php"), &locs);
 
-        let bar_locs = cb.symbol_reference_locations.get("Foo::bar").unwrap();
-        assert!(bar_locs[&arc("a.php")].contains(&(0, 5)));
-        assert!(bar_locs[&arc("a.php")].contains(&(10, 15)));
+        let bar_locs = cb.get_reference_locations("Foo::bar");
+        assert!(bar_locs.contains(&(arc("a.php"), 0, 5)));
+        assert!(bar_locs.contains(&(arc("a.php"), 10, 15)));
 
-        let greet_locs = cb.symbol_reference_locations.get("greet").unwrap();
-        assert!(greet_locs[&arc("a.php")].contains(&(20, 25)));
+        assert!(cb
+            .get_reference_locations("greet")
+            .contains(&(arc("a.php"), 20, 25)));
 
-        let keys = cb.file_symbol_references.get(&arc("a.php")).unwrap();
-        assert!(keys.contains(&Arc::from("Foo::bar")));
-        assert!(keys.contains(&Arc::from("greet")));
+        assert!(cb.file_has_symbol_references("a.php"));
     }
 
     #[test]
@@ -1059,13 +1359,16 @@ mod tests {
 
         cb.remove_file_definitions("a.php");
 
-        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
-        assert!(!locs.contains_key("a.php"), "a.php spans removed");
+        let locs = cb.get_reference_locations("fn1");
         assert!(
-            locs[&arc("b.php")].contains(&(10, 15)),
+            !locs.iter().any(|(f, _, _)| f.as_ref() == "a.php"),
+            "a.php spans removed"
+        );
+        assert!(
+            locs.contains(&(arc("b.php"), 10, 15)),
             "b.php spans untouched"
         );
-        assert!(!cb.file_symbol_references.contains_key("a.php"));
+        assert!(!cb.file_has_symbol_references("a.php"));
     }
 
     #[test]
@@ -1076,9 +1379,9 @@ mod tests {
 
         cb.remove_file_definitions("x.php");
 
-        let locs = cb.symbol_reference_locations.get("Cls::prop").unwrap();
-        assert!(!locs.contains_key("x.php"));
-        assert!(locs[&arc("y.php")].contains(&(7, 10)));
+        let locs = cb.get_reference_locations("Cls::prop");
+        assert!(!locs.iter().any(|(f, _, _)| f.as_ref() == "x.php"));
+        assert!(locs.contains(&(arc("y.php"), 7, 10)));
     }
 
     #[test]
@@ -1090,9 +1393,10 @@ mod tests {
         cb.remove_file_definitions("ghost.php");
 
         // Existing data must be untouched.
-        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
-        assert!(locs[&arc("a.php")].contains(&(0, 5)));
-        assert!(!cb.file_symbol_references.contains_key("ghost.php"));
+        assert!(cb
+            .get_reference_locations("fn1")
+            .contains(&(arc("a.php"), 0, 5)));
+        assert!(!cb.file_has_symbol_references("ghost.php"));
     }
 
     #[test]
@@ -1104,12 +1408,12 @@ mod tests {
         cb.replay_reference_locations(arc("b.php"), &[]);
 
         assert!(
-            !cb.file_symbol_references.contains_key("b.php"),
-            "empty replay must not create a file_symbol_references entry"
+            !cb.file_has_symbol_references("b.php"),
+            "empty replay must not create a file entry"
         );
-        let locs = cb.symbol_reference_locations.get("fn1").unwrap();
         assert!(
-            locs[&arc("a.php")].contains(&(0, 5)),
+            cb.get_reference_locations("fn1")
+                .contains(&(arc("a.php"), 0, 5)),
             "existing spans untouched"
         );
     }
@@ -1122,10 +1426,13 @@ mod tests {
         cb.replay_reference_locations(arc("a.php"), &locs);
         cb.replay_reference_locations(arc("a.php"), &locs);
 
-        let by_file = cb.symbol_reference_locations.get("fn1").unwrap();
+        let count = cb
+            .get_reference_locations("fn1")
+            .iter()
+            .filter(|(f, _, _)| f.as_ref() == "a.php")
+            .count();
         assert_eq!(
-            by_file[&arc("a.php")].len(),
-            1,
+            count, 1,
             "replaying the same location twice must not create duplicate spans"
         );
     }

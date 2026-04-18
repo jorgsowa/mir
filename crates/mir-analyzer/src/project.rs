@@ -352,6 +352,11 @@ impl ProjectAnalyzer {
             cache.flush();
         }
 
+        // ---- Compact the reference index ------------------------------------
+        // Convert build-phase DashMaps into a CSR structure, freeing the
+        // per-entry HashMap/HashSet overhead accumulated during Pass 2.
+        self.codebase.compact_reference_index();
+
         // ---- Dead-code detection (M18) --------------------------------------
         if self.find_dead_code {
             let dead_code_issues =
@@ -1481,22 +1486,11 @@ fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
 /// Extract the reference locations recorded for `file` from the codebase into
 /// a flat `Vec<(symbol_key, start, end)>` suitable for caching.
 fn extract_reference_locations(codebase: &Codebase, file: &Arc<str>) -> Vec<(String, u32, u32)> {
-    let Some(symbol_keys) = codebase.file_symbol_references.get(file.as_ref()) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for key in symbol_keys.iter() {
-        let Some(by_file) = codebase.symbol_reference_locations.get(key.as_ref()) else {
-            continue;
-        };
-        let Some(spans) = by_file.get(file.as_ref()) else {
-            continue;
-        };
-        for &(s, e) in spans.iter() {
-            out.push((key.to_string(), s, e));
-        }
-    }
-    out
+    codebase
+        .extract_file_reference_locations(file.as_ref())
+        .into_iter()
+        .map(|(sym, start, end)| (sym.to_string(), start, end))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
