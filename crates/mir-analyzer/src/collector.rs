@@ -219,7 +219,21 @@ impl<'a> DefinitionCollector<'a> {
 
     fn location(&self, start: u32, end: u32) -> Location {
         let lc = self.source_map.offset_to_line_col(start);
-        Location::with_line_col(self.file.clone(), start, end, lc.line + 1, lc.col as u16)
+        let line = lc.line + 1;
+        let byte_offset = start as usize;
+        let line_start = if byte_offset == 0 {
+            0
+        } else {
+            self.source[..byte_offset]
+                .rfind('\n')
+                .map(|p| p + 1)
+                .unwrap_or(0)
+        };
+        let col = self.source[line_start..byte_offset]
+            .chars()
+            .map(|c| c.len_utf16() as u16)
+            .sum();
+        Location::with_line_col(self.file.clone(), start, end, line, col)
     }
 
     #[allow(dead_code)]
