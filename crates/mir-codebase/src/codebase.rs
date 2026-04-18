@@ -119,14 +119,14 @@ impl Codebase {
             .map(|entry| entry.key().clone())
             .collect();
 
-        // Remove each symbol from its respective map and from symbol_to_file
+        // Remove each symbol from its respective map and from symbol_to_file.
+        // Constants are NOT in symbol_to_file; they are removed below via file_constants.
         for sym in &symbols {
             self.classes.remove(sym.as_ref());
             self.interfaces.remove(sym.as_ref());
             self.traits.remove(sym.as_ref());
             self.enums.remove(sym.as_ref());
             self.functions.remove(sym.as_ref());
-            self.constants.remove(sym.as_ref());
             self.symbol_to_file.remove(sym.as_ref());
             self.known_symbols.remove(sym.as_ref());
         }

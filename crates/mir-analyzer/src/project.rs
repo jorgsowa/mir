@@ -301,29 +301,32 @@ impl ProjectAnalyzer {
         // Persist new Pass 1 snapshots for cache misses (before finalize() so that
         // the derived all_methods/all_parents fields are still empty in the snapshot).
         if let Some(p1_cache) = &self.pass1_cache {
-            // Build reverse index: defining-file → [fqcns defined there].
-            let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
-            for entry in self.codebase.symbol_to_file.iter() {
-                file_to_fqcns
-                    .entry(entry.value().clone())
-                    .or_default()
-                    .push(entry.key().clone());
-            }
-            for ((file, _src), (per_file_parse_errors, def_issues, maybe_hash)) in
-                file_data.iter().zip(pass1_results.iter())
-            {
-                if let Some(hash) = maybe_hash {
-                    let empty: Vec<Arc<str>> = Vec::new();
-                    let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
-                    let snapshot = crate::pass1_cache::build_snapshot(
-                        &self.codebase,
-                        file,
-                        hash.clone(),
-                        fqcns,
-                        per_file_parse_errors.clone(),
-                        def_issues.clone(),
-                    );
-                    p1_cache.put(file.as_ref(), snapshot);
+            // Only build the reverse index when there is at least one miss.
+            let has_misses = pass1_results.iter().any(|(_, _, h)| h.is_some());
+            if has_misses {
+                let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
+                for entry in self.codebase.symbol_to_file.iter() {
+                    file_to_fqcns
+                        .entry(entry.value().clone())
+                        .or_default()
+                        .push(entry.key().clone());
+                }
+                for ((file, _src), (per_file_parse_errors, def_issues, maybe_hash)) in
+                    file_data.iter().zip(pass1_results.iter())
+                {
+                    if let Some(hash) = maybe_hash {
+                        let empty: Vec<Arc<str>> = Vec::new();
+                        let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
+                        let snapshot = crate::pass1_cache::build_snapshot(
+                            &self.codebase,
+                            file,
+                            hash.clone(),
+                            fqcns,
+                            per_file_parse_errors.clone(),
+                            def_issues.clone(),
+                        );
+                        p1_cache.put(file.as_ref(), snapshot);
+                    }
                 }
             }
             p1_cache.flush();
@@ -558,12 +561,31 @@ impl ProjectAnalyzer {
         );
         all_issues.extend(body_issues);
 
-        // 5. Update cache if present
+        // 5. Update caches if present
+        let content_hash = hash_content(new_content);
+        if let Some(p1_cache) = &self.pass1_cache {
+            let fqcns: Vec<Arc<str>> = self
+                .codebase
+                .symbol_to_file
+                .iter()
+                .filter(|e| e.value().as_ref() == file_path)
+                .map(|e| e.key().clone())
+                .collect();
+            let snapshot = crate::pass1_cache::build_snapshot(
+                &self.codebase,
+                &file,
+                content_hash.clone(),
+                &fqcns,
+                vec![],
+                vec![],
+            );
+            p1_cache.put(file_path, snapshot);
+            p1_cache.flush();
+        }
         if let Some(cache) = &self.cache {
-            let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
             let ref_locs = extract_reference_locations(&self.codebase, &file);
-            cache.put(file_path, h, all_issues.clone(), ref_locs);
+            cache.put(file_path, content_hash, all_issues.clone(), ref_locs);
         }
 
         AnalysisResult {
@@ -1224,26 +1246,29 @@ impl ProjectAnalyzer {
             .collect();
 
         if let Some(p1_cache) = &self.pass1_cache {
-            let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
-            for entry in self.codebase.symbol_to_file.iter() {
-                file_to_fqcns
-                    .entry(entry.value().clone())
-                    .or_default()
-                    .push(entry.key().clone());
-            }
-            for ((file, _src), maybe_hash) in file_data.iter().zip(miss_hashes.iter()) {
-                if let Some(hash) = maybe_hash {
-                    let empty: Vec<Arc<str>> = Vec::new();
-                    let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
-                    let snapshot = crate::pass1_cache::build_snapshot(
-                        &self.codebase,
-                        file,
-                        hash.clone(),
-                        fqcns,
-                        vec![],
-                        vec![],
-                    );
-                    p1_cache.put(file.as_ref(), snapshot);
+            let has_misses = miss_hashes.iter().any(|h| h.is_some());
+            if has_misses {
+                let mut file_to_fqcns: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
+                for entry in self.codebase.symbol_to_file.iter() {
+                    file_to_fqcns
+                        .entry(entry.value().clone())
+                        .or_default()
+                        .push(entry.key().clone());
+                }
+                for ((file, _src), maybe_hash) in file_data.iter().zip(miss_hashes.iter()) {
+                    if let Some(hash) = maybe_hash {
+                        let empty: Vec<Arc<str>> = Vec::new();
+                        let fqcns = file_to_fqcns.get(file).unwrap_or(&empty);
+                        let snapshot = crate::pass1_cache::build_snapshot(
+                            &self.codebase,
+                            file,
+                            hash.clone(),
+                            fqcns,
+                            vec![],
+                            vec![],
+                        );
+                        p1_cache.put(file.as_ref(), snapshot);
+                    }
                 }
             }
             p1_cache.flush();

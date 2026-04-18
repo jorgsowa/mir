@@ -274,11 +274,12 @@ impl Pass1Cache {
 
     /// Persist the in-memory cache to `{cache_dir}/pass1.bin`.
     /// No-op when nothing has changed since the last flush.
+    /// When a write is needed, also runs GC to evict entries for deleted files.
     pub fn flush(&self) {
-        self.gc_unreachable();
         if !self.dirty.load(Ordering::Acquire) {
             return;
         }
+        self.gc_unreachable();
         let config = bincode::config::standard();
         let entries = self.entries.read().unwrap();
         if let Ok(bytes) = bincode::serde::encode_to_vec(&*entries, config) {
