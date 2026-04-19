@@ -6,4 +6,4 @@ class A {
     }
 }
 ===expect===
-UndefinedClass: UnknownClass
+UndefinedClass: Class UnknownClass does not exist

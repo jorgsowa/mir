@@ -5,4 +5,4 @@ function foo(): int {
     return 42;
 }
 ===expect===
-UnusedVariable: <no snippet>
+UnusedVariable: Variable $unused is never read

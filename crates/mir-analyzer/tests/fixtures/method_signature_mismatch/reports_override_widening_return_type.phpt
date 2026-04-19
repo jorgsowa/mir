@@ -7,4 +7,4 @@ class Child extends Base {
     public function f(): int|string { return 1; }
 }
 ===expect===
-MethodSignatureMismatch: f
+MethodSignatureMismatch: Method Child::f() signature mismatch: return type 'int|string' is not a subtype of parent 'int'

@@ -16,4 +16,4 @@ function test(): void {
     $box->transform('hello');
 }
 ===expect===
-ShadowedTemplateParam: $box->transform('hello')
+ShadowedTemplateParam: Method template parameter 'T' shadows class-level template parameter with the same name

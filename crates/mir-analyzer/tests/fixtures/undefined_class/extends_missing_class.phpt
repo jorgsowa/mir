@@ -2,4 +2,4 @@
 <?php
 class Foo extends MissingBase {}
 ===expect===
-UndefinedClass: MissingBase
+UndefinedClass: Class MissingBase does not exist

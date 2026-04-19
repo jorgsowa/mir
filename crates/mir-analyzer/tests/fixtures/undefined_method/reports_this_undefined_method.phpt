@@ -6,4 +6,4 @@ class Svc {
     }
 }
 ===expect===
-UndefinedMethod: $this->nonExistent()
+UndefinedMethod: Method Svc::nonExistent() does not exist

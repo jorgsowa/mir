@@ -9,4 +9,3 @@ function test(?Foo $obj): void {
     }
 }
 ===expect===
-

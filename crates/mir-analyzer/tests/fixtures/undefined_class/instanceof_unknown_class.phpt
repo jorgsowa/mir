@@ -4,4 +4,4 @@ function test($x): bool {
     return $x instanceof NoSuchClass;
 }
 ===expect===
-UndefinedClass: NoSuchClass
+UndefinedClass: Class NoSuchClass does not exist

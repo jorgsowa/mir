@@ -9,4 +9,3 @@ function test(?array $arr): void {
     }
 }
 ===expect===
-
