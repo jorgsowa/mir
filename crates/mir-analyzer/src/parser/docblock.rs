@@ -302,10 +302,10 @@ pub fn parse_type_string(s: &str) -> Union {
         }
     }
 
-    // Intersection: `A&B` (simplified — treat as first type for now)
+    // Intersection: `A&B&C` — PHP 8.1+ pure intersection type
     if s.contains('&') && !is_inside_generics(s) {
-        let first = s.split('&').next().unwrap_or(s);
-        return parse_type_string(first.trim());
+        let parts: Vec<Union> = s.split('&').map(|p| parse_type_string(p.trim())).collect();
+        return Union::single(Atomic::TIntersection { parts });
     }
 
     // Array shorthand: `Type[]` or `Type[][]`

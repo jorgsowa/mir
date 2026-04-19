@@ -188,6 +188,10 @@ pub enum Atomic {
     TEnumString,
     /// `trait-string`
     TTraitString,
+
+    // --- Intersection ---
+    /// `A&B&C` — PHP 8.1+ pure intersection type
+    TIntersection { parts: Vec<Union> },
 }
 
 impl Atomic {
@@ -298,6 +302,7 @@ impl Atomic {
                 | Atomic::TStaticObject { .. }
                 | Atomic::TSelf { .. }
                 | Atomic::TParent { .. }
+                | Atomic::TIntersection { .. }
         )
     }
 
@@ -356,6 +361,7 @@ impl Atomic {
             Atomic::TInterfaceString => "interface-string",
             Atomic::TEnumString => "enum-string",
             Atomic::TTraitString => "trait-string",
+            Atomic::TIntersection { .. } => "intersection",
         }
     }
 }
