@@ -7,4 +7,4 @@ function test(): void {
     var_dump($a, $b);
 }
 ===expect===
-PossiblyInvalidArrayOffset: [$a, $b] = get()
+PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array<mixed, mixed>|false'

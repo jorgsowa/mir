@@ -2,4 +2,4 @@
 <?php
 interface MyInterface extends MissingParentInterface {}
 ===expect===
-UndefinedClass: MissingParentInterface
+UndefinedClass: Class MissingParentInterface does not exist

@@ -9,4 +9,4 @@ function test(Foo $foo): void {
     $foo->oldMethod();
 }
 ===expect===
-DeprecatedMethodCall: $foo->oldMethod()
+DeprecatedMethodCall: Call to deprecated method Foo::oldMethod

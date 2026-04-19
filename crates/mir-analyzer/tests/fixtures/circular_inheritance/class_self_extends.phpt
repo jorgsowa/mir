@@ -2,4 +2,4 @@
 <?php
 class A extends A {}
 ===expect===
-CircularInheritance: class A extends A {}
+CircularInheritance: Class A has a circular inheritance chain

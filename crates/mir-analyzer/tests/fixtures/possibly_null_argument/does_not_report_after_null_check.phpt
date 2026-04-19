@@ -8,4 +8,4 @@ function test(?string $value): void {
     }
 }
 ===expect===
-UnusedParam: $name
+UnusedParam: Parameter $name is never used

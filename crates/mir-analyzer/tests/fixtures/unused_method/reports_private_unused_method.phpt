@@ -4,4 +4,4 @@ class Foo {
     private function helper(): void {}
 }
 ===expect===
-UnusedMethod: <no snippet>
+UnusedMethod: Private method Foo::helper() is never called

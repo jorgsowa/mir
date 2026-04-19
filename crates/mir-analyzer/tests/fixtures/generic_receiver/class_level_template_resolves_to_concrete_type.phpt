@@ -15,4 +15,4 @@ function test(): void {
     $first->nonExistentMethod();
 }
 ===expect===
-UndefinedMethod: $first->nonExistentMethod()
+UndefinedMethod: Method User::nonExistentMethod() does not exist

@@ -9,4 +9,4 @@ class Bar {
     }
 }
 ===expect===
-NullMethodCall: $obj->doSomething($ctx)
+NullMethodCall: Cannot call method doSomething() on null

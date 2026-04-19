@@ -6,4 +6,4 @@ function test(): void {
     $f->missing();
 }
 ===expect===
-UndefinedMethod: $f->missing()
+UndefinedMethod: Method Foo::missing() does not exist

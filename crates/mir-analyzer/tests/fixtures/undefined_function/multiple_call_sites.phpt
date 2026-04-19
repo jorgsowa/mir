@@ -5,5 +5,5 @@ function test(): void {
     foo();
 }
 ===expect===
-UndefinedFunction: foo()
-UndefinedFunction: foo()
+UndefinedFunction: Function foo() is not defined
+UndefinedFunction: Function foo() is not defined

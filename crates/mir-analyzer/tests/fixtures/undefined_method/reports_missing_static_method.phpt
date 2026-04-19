@@ -5,4 +5,4 @@ function test(): void {
     Foo::missing();
 }
 ===expect===
-UndefinedMethod: Foo::missing()
+UndefinedMethod: Method Foo::missing() does not exist

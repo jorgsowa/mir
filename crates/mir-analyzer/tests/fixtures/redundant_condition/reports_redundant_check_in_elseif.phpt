@@ -12,4 +12,4 @@ function foo(string|null $x): void {
     }
 }
 ===expect===
-RedundantCondition: is_string($x)
+RedundantCondition: Condition is always true/false for type 'bool'

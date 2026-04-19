@@ -7,5 +7,5 @@ function test(): void {
     oldGreet('Alice');
 }
 ===expect===
-UnusedParam: $name
-DeprecatedCall: oldGreet('Alice')
+UnusedParam: Parameter $name is never used
+DeprecatedCall: Call to deprecated function oldGreet

@@ -5,4 +5,4 @@ function test(): void {
     var_dump($a);
 }
 ===expect===
-PossiblyInvalidArrayOffset: [$a] = unpack('N', pack('N', 1))
+PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'

@@ -6,4 +6,4 @@ function outer(): void {
     }
 }
 ===expect===
-UndefinedClass: UnknownClass
+UndefinedClass: Class UnknownClass does not exist

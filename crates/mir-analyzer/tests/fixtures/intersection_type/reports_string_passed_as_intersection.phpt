@@ -9,4 +9,4 @@ function test(): void {
     f("hello");
 }
 ===expect===
-InvalidArgument: "hello"
+InvalidArgument: Argument $x of f() expects 'Iterator&Countable', got '"hello"'

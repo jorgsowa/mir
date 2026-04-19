@@ -4,4 +4,4 @@ function test(): void {
     \nonExistent();
 }
 ===expect===
-UndefinedFunction: \nonExistent()
+UndefinedFunction: Function nonExistent() is not defined

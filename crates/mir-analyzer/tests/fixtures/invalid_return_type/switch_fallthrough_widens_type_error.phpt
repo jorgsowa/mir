@@ -12,4 +12,4 @@ function foo(int $x): int {
     return $y;
 }
 ===expect===
-InvalidReturnType: return $y;
+InvalidReturnType: Return type '"not an int"|0' is not compatible with declared 'int'

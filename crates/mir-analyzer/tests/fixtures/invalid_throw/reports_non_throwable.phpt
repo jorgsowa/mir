@@ -6,4 +6,4 @@ function test(): void {
     throw new NotAnException();
 }
 ===expect===
-InvalidThrow: <no snippet>
+InvalidThrow: Thrown type 'NotAnException' does not extend Throwable

@@ -4,4 +4,4 @@ function f(): void {
     return null;
 }
 ===expect===
-InvalidReturnType: return null;
+InvalidReturnType: Return type 'null' is not compatible with declared 'void'

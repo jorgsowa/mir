@@ -10,4 +10,3 @@ class Task implements Runnable {
     use RunsTrait;
 }
 ===expect===
-

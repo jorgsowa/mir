@@ -5,4 +5,4 @@ function foo(bool $c): string {
     return $r;
 }
 ===expect===
-PossiblyUndefinedVariable: $r
+PossiblyUndefinedVariable: Variable $r might not be defined
