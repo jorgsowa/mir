@@ -31,9 +31,9 @@ use mir_types::Union;
 /// case-insensitive scan for stubs that store keys in original case.
 #[inline]
 fn lookup_method<'a>(
-    map: &'a indexmap::IndexMap<Arc<str>, MethodStorage>,
+    map: &'a indexmap::IndexMap<Arc<str>, Arc<MethodStorage>>,
     name: &str,
-) -> Option<&'a MethodStorage> {
+) -> Option<&'a Arc<MethodStorage>> {
     map.get(name).or_else(|| {
         map.iter()
             .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
@@ -607,7 +607,7 @@ impl Codebase {
     }
 
     /// Resolve a method, walking up the full inheritance chain (own → traits → ancestors).
-    pub fn get_method(&self, fqcn: &str, method_name: &str) -> Option<MethodStorage> {
+    pub fn get_method(&self, fqcn: &str, method_name: &str) -> Option<Arc<MethodStorage>> {
         // PHP method names are case-insensitive — normalize to lowercase for all lookups.
         let method_lower = method_name.to_lowercase();
         let method_name = method_lower.as_str();
@@ -616,7 +616,7 @@ impl Codebase {
         if let Some(cls) = self.classes.get(fqcn) {
             // 1. Own methods (highest priority)
             if let Some(m) = lookup_method(&cls.own_methods, method_name) {
-                return Some(m.clone());
+                return Some(Arc::clone(m));
             }
             // Collect chain info before dropping the DashMap guard.
             let own_traits = cls.traits.clone();
@@ -634,7 +634,7 @@ impl Codebase {
             for ancestor_fqcn in &ancestors {
                 if let Some(anc) = self.classes.get(ancestor_fqcn.as_ref()) {
                     if let Some(m) = lookup_method(&anc.own_methods, method_name) {
-                        return Some(m.clone());
+                        return Some(Arc::clone(m));
                     }
                     let anc_traits = anc.traits.clone();
                     drop(anc);
@@ -645,9 +645,9 @@ impl Codebase {
                     }
                 } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
                     if let Some(m) = lookup_method(&iface.own_methods, method_name) {
-                        let mut m = m.clone();
-                        m.is_abstract = true;
-                        return Some(m);
+                        let mut ms = (**m).clone();
+                        ms.is_abstract = true;
+                        return Some(Arc::new(ms));
                     }
                 }
                 // Traits listed in all_parents are already covered via their owning class above.
@@ -658,14 +658,14 @@ impl Codebase {
         // --- Interface: own methods + parent interfaces ---
         if let Some(iface) = self.interfaces.get(fqcn) {
             if let Some(m) = lookup_method(&iface.own_methods, method_name) {
-                return Some(m.clone());
+                return Some(Arc::clone(m));
             }
             let parents = iface.all_parents.clone();
             drop(iface);
             for parent_fqcn in &parents {
                 if let Some(parent_iface) = self.interfaces.get(parent_fqcn.as_ref()) {
                     if let Some(m) = lookup_method(&parent_iface.own_methods, method_name) {
-                        return Some(m.clone());
+                        return Some(Arc::clone(m));
                     }
                 }
             }
@@ -675,7 +675,7 @@ impl Codebase {
         // --- Trait (variable annotated with a trait type) ---
         if let Some(tr) = self.traits.get(fqcn) {
             if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-                return Some(m.clone());
+                return Some(Arc::clone(m));
             }
             return None;
         }
@@ -683,11 +683,11 @@ impl Codebase {
         // --- Enum ---
         if let Some(e) = self.enums.get(fqcn) {
             if let Some(m) = lookup_method(&e.own_methods, method_name) {
-                return Some(m.clone());
+                return Some(Arc::clone(m));
             }
             // PHP 8.1 built-in enum methods: cases(), from(), tryFrom()
             if matches!(method_name, "cases" | "from" | "tryfrom") {
-                return Some(crate::storage::MethodStorage {
+                return Some(Arc::new(crate::storage::MethodStorage {
                     fqcn: Arc::from(fqcn),
                     name: Arc::from(method_name),
                     params: vec![],
@@ -705,7 +705,7 @@ impl Codebase {
                     is_pure: false,
                     is_deprecated: false,
                     location: None,
-                });
+                }));
             }
         }
 
@@ -1261,7 +1261,11 @@ impl Codebase {
     /// Look up `method_name` in a trait's own methods, then recursively in any
     /// traits that the trait itself uses (`use OtherTrait;` inside a trait body).
     /// A visited set prevents infinite loops on pathological mutual trait use.
-    fn get_method_in_trait(&self, tr_fqcn: &Arc<str>, method_name: &str) -> Option<MethodStorage> {
+    fn get_method_in_trait(
+        &self,
+        tr_fqcn: &Arc<str>,
+        method_name: &str,
+    ) -> Option<Arc<MethodStorage>> {
         let mut visited = std::collections::HashSet::new();
         self.get_method_in_trait_inner(tr_fqcn, method_name, &mut visited)
     }
@@ -1271,13 +1275,13 @@ impl Codebase {
         tr_fqcn: &Arc<str>,
         method_name: &str,
         visited: &mut std::collections::HashSet<String>,
-    ) -> Option<MethodStorage> {
+    ) -> Option<Arc<MethodStorage>> {
         if !visited.insert(tr_fqcn.to_string()) {
             return None; // cycle guard
         }
         let tr = self.traits.get(tr_fqcn.as_ref())?;
         if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-            return Some(m.clone());
+            return Some(Arc::clone(m));
         }
         let used_traits = tr.traits.clone();
         drop(tr);

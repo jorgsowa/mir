@@ -180,7 +180,7 @@ pub struct ClassStorage {
     pub parent: Option<Arc<str>>,
     pub interfaces: Vec<Arc<str>>,
     pub traits: Vec<Arc<str>>,
-    pub own_methods: IndexMap<Arc<str>, MethodStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
     pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub template_params: Vec<TemplateParam>,
@@ -198,11 +198,11 @@ impl ClassStorage {
     pub fn get_method(&self, name: &str) -> Option<&MethodStorage> {
         // PHP method names are case-insensitive; caller should pass lowercase name.
         // Only searches own_methods — inherited method resolution is done by Codebase::get_method.
-        self.own_methods.get(name).or_else(|| {
+        self.own_methods.get(name).map(Arc::as_ref).or_else(|| {
             self.own_methods
                 .iter()
                 .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
-                .map(|(_, v)| v)
+                .map(|(_, v)| v.as_ref())
         })
     }
 
@@ -224,7 +224,7 @@ pub struct InterfaceStorage {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
     pub extends: Vec<Arc<str>>,
-    pub own_methods: IndexMap<Arc<str>, MethodStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub template_params: Vec<TemplateParam>,
     pub all_parents: Vec<Arc<str>>,
@@ -239,7 +239,7 @@ pub struct InterfaceStorage {
 pub struct TraitStorage {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
-    pub own_methods: IndexMap<Arc<str>, MethodStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
     pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub template_params: Vec<TemplateParam>,
@@ -266,7 +266,7 @@ pub struct EnumStorage {
     pub scalar_type: Option<Union>,
     pub interfaces: Vec<Arc<str>>,
     pub cases: IndexMap<Arc<str>, EnumCaseStorage>,
-    pub own_methods: IndexMap<Arc<str>, MethodStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub location: Option<Location>,
 }
