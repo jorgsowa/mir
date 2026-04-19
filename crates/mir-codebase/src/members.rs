@@ -446,7 +446,7 @@ mod tests {
         let mut parent_methods = IndexMap::new();
         parent_methods.insert(
             Arc::from("parentMethod"),
-            make_method("parentMethod", "Parent"),
+            Arc::new(make_method("parentMethod", "Parent")),
         );
         cb.classes.insert(
             Arc::from("Parent"),
@@ -474,7 +474,7 @@ mod tests {
         let mut child_methods = IndexMap::new();
         child_methods.insert(
             Arc::from("childMethod"),
-            make_method("childMethod", "Child"),
+            Arc::new(make_method("childMethod", "Child")),
         );
         cb.classes.insert(
             Arc::from("Child"),
@@ -518,7 +518,7 @@ mod tests {
         let cb = Codebase::new();
 
         let mut a_methods = IndexMap::new();
-        a_methods.insert(Arc::from("aMethod"), make_method("aMethod", "A"));
+        a_methods.insert(Arc::from("aMethod"), Arc::new(make_method("aMethod", "A")));
         cb.classes.insert(
             Arc::from("A"),
             ClassStorage {
@@ -542,7 +542,7 @@ mod tests {
         );
 
         let mut b_methods = IndexMap::new();
-        b_methods.insert(Arc::from("bMethod"), make_method("bMethod", "B"));
+        b_methods.insert(Arc::from("bMethod"), Arc::new(make_method("bMethod", "B")));
         cb.classes.insert(
             Arc::from("B"),
             ClassStorage {

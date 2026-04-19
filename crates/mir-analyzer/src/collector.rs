@@ -491,8 +491,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 }
                             }
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods
-                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods.insert(
+                                Arc::from(method.name.to_lowercase().as_str()),
+                                Arc::new(method),
+                            );
                         }
                         ClassMemberKind::Property(p) => {
                             let prop = PropertyStorage {
@@ -601,8 +603,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     match &member.kind {
                         ClassMemberKind::Method(m) => {
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods
-                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods.insert(
+                                Arc::from(method.name.to_lowercase().as_str()),
+                                Arc::new(method),
+                            );
                         }
                         ClassMemberKind::ClassConst(c) => {
                             own_constants.insert(
@@ -695,8 +699,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 }
                             }
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods
-                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods.insert(
+                                Arc::from(method.name.to_lowercase().as_str()),
+                                Arc::new(method),
+                            );
                         }
                         ClassMemberKind::Property(p) => {
                             own_properties.insert(
@@ -792,8 +798,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         }
                         EnumMemberKind::Method(m) => {
                             let method = self.build_method_storage(m, &fqcn, Some(&member.span));
-                            own_methods
-                                .insert(Arc::from(method.name.to_lowercase().as_str()), method);
+                            own_methods.insert(
+                                Arc::from(method.name.to_lowercase().as_str()),
+                                Arc::new(method),
+                            );
                         }
                         EnumMemberKind::ClassConst(c) => {
                             own_constants.insert(

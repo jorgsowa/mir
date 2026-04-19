@@ -3261,11 +3261,11 @@ fn stub_method(
     params: Vec<FnParam>,
     ret: Union,
     vis: Visibility,
-) -> (Arc<str>, MethodStorage) {
+) -> (Arc<str>, Arc<MethodStorage>) {
     let key: Arc<str> = Arc::from(name);
     (
         key.clone(),
-        MethodStorage {
+        Arc::new(MethodStorage {
             name: key,
             fqcn: Arc::from(class_fqcn),
             params,
@@ -3283,7 +3283,7 @@ fn stub_method(
             is_internal: false,
             is_pure: false,
             location: None,
-        },
+        }),
     )
 }
 
@@ -3442,7 +3442,7 @@ fn load_classes(codebase: &Codebase) {
         for (method_name, params, ret) in exc_methods {
             let is_ctor = *method_name == "__construct";
             let mut m = stub_method(class_name, method_name, params.clone(), ret.clone(), Public).1;
-            m.is_constructor = is_ctor;
+            Arc::make_mut(&mut m).is_constructor = is_ctor;
             cls.own_methods.insert(Arc::from(*method_name), m);
         }
         codebase.classes.insert(Arc::from(*class_name), cls);
@@ -3514,7 +3514,7 @@ fn load_classes(codebase: &Codebase) {
         ] {
             let is_ctor = *name == "__construct";
             let mut m = stub_method(class_name, name, params.clone(), ret.clone(), Public).1;
-            m.is_constructor = is_ctor;
+            Arc::make_mut(&mut m).is_constructor = is_ctor;
             dt.own_methods.insert(Arc::from(*name), m);
         }
         codebase.classes.insert(Arc::from(*class_name), dt);
