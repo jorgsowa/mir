@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-04-19
+
+### Added
+
+- **`StaticDynMethodCall` support** — dynamic static dispatch (`Foo::$method()`) is now handled as a distinct AST variant; evaluates arguments for taint propagation and returns `mixed`. (#216)
+
+### Changed
+
+- Upgraded php-rs-parser and php-ast to 0.8; migrated `FileParser` to `ParserContext` for O(1) arena reset on repeated parses. (#216)
+
+### Performance
+
+- **`MethodStorage` stored as `Arc`** — `own_methods` in all storage types now holds `Arc<MethodStorage>`, making method lookups an atomic refcount bump instead of a deep clone. (#213)
+- **Skip re-analysis on unchanged content** — `re_analyze_file` returns cached results immediately when the file content hash matches, avoiding all four analysis phases on repeated LSP saves. (#204)
+- **Skip `finalize()` on body-only changes** — `re_analyze_file` captures a structural snapshot before removal; if inheritance fields are unchanged after Pass 1, restores `all_parents` directly and skips the full class-hierarchy walk. (#205)
+
+### Fixed
+
+- **Trait-of-trait method resolution** — `get_method()` now walks the full transitive trait chain with a cycle guard, eliminating false `UnimplementedInterfaceMethod` errors for methods contributed by indirectly used traits. (#209)
+- **`elseif` narrowing and branch merge** — elseif branches now correctly narrow on the parent `if` condition being false, and all elseif branches are folded into the post-if merge (previously only the last branch survived). (#211)
+- **`TKeyedArray` foreach key type** — `infer_foreach_types` now derives `TLiteralString` / `TLiteralInt` keys from `ArrayKey` entries instead of always returning `TMixed`. (#211)
+- **Switch fallthrough contexts** — non-diverging case contexts are now collected and merged into the post-switch type environment; chain-fallthrough into a diverging case is correctly propagated. (#212)
+
 ## [0.5.1] - 2026-04-18
 
 ### Performance
