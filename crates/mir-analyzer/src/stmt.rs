@@ -916,12 +916,82 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             // ---- Nested declarations (inside function bodies) ----------------
-            StmtKind::Function(_)
-            | StmtKind::Class(_)
-            | StmtKind::Interface(_)
-            | StmtKind::Trait(_)
-            | StmtKind::Enum(_) => {
-                // Nested declarations are collected in Pass 1 — skip here
+            StmtKind::Function(decl) => {
+                // Nested named function — analyze its body in the same issue buffer
+                // so that undefined-function/class calls inside it are reported.
+                let params: Vec<mir_codebase::FnParam> = decl
+                    .params
+                    .iter()
+                    .map(|p| mir_codebase::FnParam {
+                        name: std::sync::Arc::from(p.name.trim_start_matches('$')),
+                        ty: None,
+                        default: p.default.as_ref().map(|_| Union::mixed()),
+                        is_variadic: p.variadic,
+                        is_byref: p.by_ref,
+                        is_optional: p.default.is_some() || p.variadic,
+                    })
+                    .collect();
+                let mut fn_ctx =
+                    Context::for_function(&params, None, None, None, None, ctx.strict_types, true);
+                let mut sa = StatementsAnalyzer::new(
+                    self.codebase,
+                    self.file.clone(),
+                    self.source,
+                    self.source_map,
+                    self.issues,
+                    self.symbols,
+                );
+                sa.analyze_stmts(&decl.body, &mut fn_ctx);
+            }
+
+            StmtKind::Class(decl) => {
+                // Nested class declaration — analyze each method body in the same
+                // issue buffer so that undefined-function/class calls are reported.
+                let class_name = decl.name.unwrap_or("<anonymous>");
+                let resolved = self.codebase.resolve_class_name(&self.file, class_name);
+                let fqcn: Arc<str> = Arc::from(resolved.as_str());
+                let parent_fqcn = self
+                    .codebase
+                    .classes
+                    .get(fqcn.as_ref())
+                    .and_then(|c| c.parent.clone());
+
+                for member in decl.members.iter() {
+                    let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+                        continue;
+                    };
+                    let Some(body) = &method.body else { continue };
+                    let (params, return_ty) = self
+                        .codebase
+                        .get_method(fqcn.as_ref(), method.name)
+                        .as_deref()
+                        .map(|m| (m.params.clone(), m.return_type.clone()))
+                        .unwrap_or_default();
+                    let is_ctor = method.name == "__construct";
+                    let mut method_ctx = Context::for_method(
+                        &params,
+                        return_ty,
+                        Some(fqcn.clone()),
+                        parent_fqcn.clone(),
+                        Some(fqcn.clone()),
+                        ctx.strict_types,
+                        is_ctor,
+                        method.is_static,
+                    );
+                    let mut sa = StatementsAnalyzer::new(
+                        self.codebase,
+                        self.file.clone(),
+                        self.source,
+                        self.source_map,
+                        self.issues,
+                        self.symbols,
+                    );
+                    sa.analyze_stmts(body, &mut method_ctx);
+                }
+            }
+
+            StmtKind::Interface(_) | StmtKind::Trait(_) | StmtKind::Enum(_) => {
+                // Interfaces/traits/enums are collected in Pass 1 — skip here
             }
 
             // ---- Namespace / use (at file level, already handled in Pass 1) --
