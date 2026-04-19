@@ -149,6 +149,17 @@ impl fmt::Display for Atomic {
             Atomic::TInterfaceString => write!(f, "interface-string"),
             Atomic::TEnumString => write!(f, "enum-string"),
             Atomic::TTraitString => write!(f, "trait-string"),
+
+            Atomic::TIntersection { parts } => {
+                let mut iter = parts.iter();
+                if let Some(first) = iter.next() {
+                    write!(f, "{}", first)?;
+                    for part in iter {
+                        write!(f, "&{}", part)?;
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }

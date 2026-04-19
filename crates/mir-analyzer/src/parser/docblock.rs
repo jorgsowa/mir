@@ -302,10 +302,10 @@ pub fn parse_type_string(s: &str) -> Union {
         }
     }
 
-    // Intersection: `A&B` (simplified — treat as first type for now)
+    // Intersection: `A&B&C` — PHP 8.1+ pure intersection type
     if s.contains('&') && !is_inside_generics(s) {
-        let first = s.split('&').next().unwrap_or(s);
-        return parse_type_string(first.trim());
+        let parts: Vec<Union> = s.split('&').map(|p| parse_type_string(p.trim())).collect();
+        return Union::single(Atomic::TIntersection { parts });
     }
 
     // Array shorthand: `Type[]` or `Type[][]`
@@ -810,5 +810,86 @@ mod tests {
         assert_eq!(parsed.type_aliases.len(), 1);
         assert_eq!(parsed.type_aliases[0].name, "MyAlias");
         assert_eq!(parsed.type_aliases[0].type_expr, "string|int");
+    }
+
+    #[test]
+    fn parse_intersection_two_parts() {
+        let u = parse_type_string("Iterator&Countable");
+        assert_eq!(u.types.len(), 1);
+        assert!(matches!(u.types[0], Atomic::TIntersection { ref parts } if parts.len() == 2));
+        if let Atomic::TIntersection { parts } = &u.types[0] {
+            assert!(parts[0].contains(
+                |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Iterator")
+            ));
+            assert!(parts[1].contains(
+                |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Countable")
+            ));
+        }
+    }
+
+    #[test]
+    fn parse_intersection_three_parts() {
+        let u = parse_type_string("Iterator&Countable&Stringable");
+        assert_eq!(u.types.len(), 1);
+        let Atomic::TIntersection { parts } = &u.types[0] else {
+            panic!("expected TIntersection");
+        };
+        assert_eq!(parts.len(), 3);
+        assert!(parts[0].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Iterator")
+        ));
+        assert!(parts[1].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Countable")
+        ));
+        assert!(parts[2].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Stringable")
+        ));
+    }
+
+    #[test]
+    fn parse_intersection_in_union_with_null() {
+        let u = parse_type_string("Iterator&Countable|null");
+        assert!(u.is_nullable());
+        let intersection = u
+            .types
+            .iter()
+            .find_map(|t| {
+                if let Atomic::TIntersection { parts } = t {
+                    Some(parts)
+                } else {
+                    None
+                }
+            })
+            .expect("expected TIntersection");
+        assert_eq!(intersection.len(), 2);
+        assert!(intersection[0].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Iterator")
+        ));
+        assert!(intersection[1].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Countable")
+        ));
+    }
+
+    #[test]
+    fn parse_intersection_in_union_with_scalar() {
+        let u = parse_type_string("Iterator&Countable|string");
+        assert!(u.contains(|t| matches!(t, Atomic::TString)));
+        let intersection = u
+            .types
+            .iter()
+            .find_map(|t| {
+                if let Atomic::TIntersection { parts } = t {
+                    Some(parts)
+                } else {
+                    None
+                }
+            })
+            .expect("expected TIntersection");
+        assert!(intersection[0].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Iterator")
+        ));
+        assert!(intersection[1].contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Countable")
+        ));
     }
 }
