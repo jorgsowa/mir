@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -204,6 +205,7 @@ fn main() {
         }
 
         analyzer.find_dead_code = cli.find_dead_code;
+        apply_stub_config(&mut analyzer, &config, &config_base);
 
         let vendor_files = map.vendor_files();
 
@@ -388,6 +390,7 @@ fn main() {
     };
 
     analyzer.find_dead_code = cli.find_dead_code;
+    apply_stub_config(&mut analyzer, &config, &config_base);
 
     // Load type stubs first (needed before collect_types_only)
     analyzer.load_stubs();
@@ -694,6 +697,82 @@ fn run_output(
     let has_errors = display_issues.iter().any(|i| i.severity == Severity::Error);
     if has_errors {
         process::exit(1);
+    }
+}
+
+/// Parse a PHP version string like `"8.2"` into a `(major, minor)` tuple.
+fn parse_php_version(s: &str) -> Option<(u8, u8)> {
+    let mut parts = s.splitn(2, '.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().unwrap_or("0").parse().ok()?;
+    Some((major, minor))
+}
+
+/// Build the effective enabled-extension set from config + optional composer auto-detection.
+///
+/// Returns `None` when no filtering is requested (load all), or `Some(set)` with the
+/// lowercase extension names that should be loaded.
+fn build_extension_set(
+    config: &Config,
+    composer_root: Option<&std::path::Path>,
+) -> Option<HashSet<String>> {
+    let has_explicit =
+        !config.enable_extensions.is_empty() || !config.disable_extensions.is_empty();
+
+    // Try to auto-detect extensions from composer.json
+    let composer_exts = composer_root.and_then(mir_analyzer::composer::parse_required_extensions);
+
+    if composer_exts.is_none() && !has_explicit {
+        // No filtering requested — load all embedded extensions.
+        return None;
+    }
+
+    let mut set: HashSet<String> = composer_exts.unwrap_or_default();
+
+    // Apply explicit enable/disable overrides from config.
+    for ext in &config.enable_extensions {
+        set.insert(ext.clone());
+    }
+    for ext in &config.disable_extensions {
+        set.remove(ext.as_str());
+    }
+
+    Some(set)
+}
+
+/// Apply stub configuration from `Config` to a `ProjectAnalyzer`.
+/// `config_base` is the directory containing `mir.xml`, used to resolve relative paths.
+fn apply_stub_config(
+    analyzer: &mut ProjectAnalyzer,
+    config: &Config,
+    config_base: &std::path::Path,
+) {
+    // PHP version
+    if let Some(ver) = config.php_version.as_deref().and_then(parse_php_version) {
+        analyzer.php_version = Some(ver);
+    }
+
+    // Extension set — use config_base as composer root for auto-detection
+    analyzer.enabled_extensions = build_extension_set(config, Some(config_base));
+
+    // Stub files (resolve relative paths against config_base)
+    for f in &config.stub_files {
+        let p = PathBuf::from(f);
+        analyzer.stub_files.push(if p.is_absolute() {
+            p
+        } else {
+            config_base.join(f)
+        });
+    }
+
+    // Stub directories
+    for d in &config.stub_dirs {
+        let p = PathBuf::from(d);
+        analyzer.stub_dirs.push(if p.is_absolute() {
+            p
+        } else {
+            config_base.join(d)
+        });
     }
 }
 

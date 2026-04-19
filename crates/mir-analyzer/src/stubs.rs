@@ -10,7 +10,10 @@
 ///    things that need custom handling (precise by-ref/variadic params, return
 ///    type shorthands, PHPUnit helpers, etc.).
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
+
+use crate::stub_cache;
 
 use mir_codebase::storage::{
     ClassStorage, FnParam, FunctionStorage, InterfaceStorage, MethodStorage, Visibility,
@@ -22,26 +25,135 @@ use mir_types::{Atomic, Union};
 include!(concat!(env!("OUT_DIR"), "/phpstorm_stubs.rs"));
 
 // ---------------------------------------------------------------------------
-// Public entry point
+// Extension version gates
 // ---------------------------------------------------------------------------
 
+/// Minimum PHP version required for each phpstorm-stubs extension directory.
+/// Extensions not listed here are always loaded (they exist in all supported PHP versions).
+/// Values are `(major, minor)` tuples.
+const EXTENSION_MIN_PHP: &[(&str, (u8, u8))] = &[
+    ("random", (8, 2)), // \Random\Engine, \Random\Randomizer added in PHP 8.2
+];
+
+/// Extensions always loaded regardless of the enabled-extension set.
+/// These form the baseline PHP runtime every project depends on.
+const ALWAYS_LOAD_EXTENSIONS: &[&str] = &[
+    "core",
+    "standard",
+    "spl",
+    "date",
+    "json",
+    "pcre",
+    "reflection",
+    "filter",
+];
+
+// ---------------------------------------------------------------------------
+// Stub load configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for stub loading, passed to [`load_stubs_configured`].
+pub struct StubConfig<'a> {
+    /// Target PHP version for extension version gating. `None` disables gating.
+    pub php_version: Option<(u8, u8)>,
+    /// Allowlist of lowercase extension names to load from phpstorm-stubs.
+    /// `None` loads all embedded extensions (default behavior).
+    /// The [`ALWAYS_LOAD_EXTENSIONS`] set is always included.
+    pub enabled_extensions: Option<&'a HashSet<String>>,
+    /// Additional stub files to parse (absolute paths).
+    pub stub_files: &'a [PathBuf],
+    /// Additional stub directories to walk and parse (absolute paths).
+    pub stub_dirs: &'a [PathBuf],
+    /// Directory for the stub snapshot cache. `None` disables caching.
+    /// When set, a warm cache skips all PHP parsing for stubs entirely.
+    pub cache_dir: Option<&'a Path>,
+}
+
+// ---------------------------------------------------------------------------
+// Public entry points
+// ---------------------------------------------------------------------------
+
+/// Load PHP built-in stubs with default settings (all extensions, no user stubs, no cache).
+/// Kept for backward compatibility; prefer [`load_stubs_configured`] for new callers.
 pub fn load_stubs(codebase: &Codebase) {
-    // Layer 1: parse phpstorm-stubs for comprehensive built-in coverage.
-    load_phpstorm_stubs(codebase);
-    // Layer 2: hand-written stubs override/supplement where needed.
-    load_functions(codebase);
-    load_classes(codebase);
-    load_interfaces(codebase);
+    load_stubs_configured(
+        codebase,
+        &StubConfig {
+            php_version: None,
+            enabled_extensions: None,
+            stub_files: &[],
+            stub_dirs: &[],
+            cache_dir: None,
+        },
+    );
+}
+
+/// Load stubs with full configuration: filtered phpstorm-stubs + user-provided stubs.
+/// When `config.cache_dir` is set, attempts to restore from a snapshot on cache hit,
+/// and saves a new snapshot on cache miss.
+pub fn load_stubs_configured(codebase: &Codebase, config: &StubConfig<'_>) {
+    if let Some(cache_dir) = config.cache_dir {
+        let key = stub_cache::cache_key(
+            config.php_version,
+            config.enabled_extensions,
+            config.stub_files,
+            config.stub_dirs,
+        );
+        if let Some(snap) = stub_cache::load(cache_dir, &key) {
+            stub_cache::apply(codebase, snap);
+            return;
+        }
+        // Cache miss — parse normally, then save snapshot.
+        load_phpstorm_stubs(codebase, config.php_version, config.enabled_extensions);
+        load_user_stubs(codebase, config.stub_files, config.stub_dirs);
+        load_functions(codebase);
+        load_classes(codebase);
+        load_interfaces(codebase);
+        stub_cache::save(cache_dir, &key, stub_cache::capture(codebase));
+    } else {
+        load_phpstorm_stubs(codebase, config.php_version, config.enabled_extensions);
+        load_user_stubs(codebase, config.stub_files, config.stub_dirs);
+        load_functions(codebase);
+        load_classes(codebase);
+        load_interfaces(codebase);
+    }
 }
 
 // ---------------------------------------------------------------------------
 // phpstorm-stubs loader
 // ---------------------------------------------------------------------------
 
-/// Parse every embedded phpstorm-stub file through the standard PHP parser and
-/// `DefinitionCollector`, populating `codebase` with PHP built-in definitions.
-fn load_phpstorm_stubs(codebase: &Codebase) {
+/// Parse embedded phpstorm-stub files, optionally filtered by PHP version and extension set.
+fn load_phpstorm_stubs(
+    codebase: &Codebase,
+    php_version: Option<(u8, u8)>,
+    enabled: Option<&HashSet<String>>,
+) {
     for (filename, content) in PHPSTORM_STUB_FILES {
+        // Extension name = first path segment, lowercased (e.g. "PDO/PDO.php" → "pdo").
+        let ext_lc = filename.split('/').next().unwrap_or("").to_lowercase();
+
+        // Skip if the extension requires a newer PHP than the target version.
+        if let Some(ver) = php_version {
+            if let Some(&(maj, min)) = EXTENSION_MIN_PHP
+                .iter()
+                .find(|(n, _)| *n == ext_lc)
+                .map(|(_, v)| v)
+            {
+                if ver < (maj, min) {
+                    continue;
+                }
+            }
+        }
+
+        // Skip if an extension allowlist is active and this extension isn't on it
+        // (always-load extensions bypass the allowlist).
+        if let Some(allowed) = enabled {
+            if !ALWAYS_LOAD_EXTENSIONS.contains(&ext_lc.as_str()) && !allowed.contains(&ext_lc) {
+                continue;
+            }
+        }
+
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse(&arena, content);
         let file: Arc<str> = Arc::from(*filename);
@@ -49,6 +161,52 @@ fn load_phpstorm_stubs(codebase: &Codebase) {
             crate::collector::DefinitionCollector::new(codebase, file, content, &result.source_map);
         // Ignore stub parse issues — they don't affect user code analysis.
         let _ = collector.collect(&result.program);
+    }
+}
+
+/// Parse user-provided stub files and directories into `codebase`.
+pub fn load_user_stubs(codebase: &Codebase, files: &[PathBuf], dirs: &[PathBuf]) {
+    for path in files {
+        parse_stub_file(codebase, path);
+    }
+    for dir in dirs {
+        walk_stub_dir(codebase, dir);
+    }
+}
+
+fn parse_stub_file(codebase: &Codebase, path: &Path) {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("mir: cannot read stub file {}: {}", path.display(), e);
+            return;
+        }
+    };
+    let arena = bumpalo::Bump::new();
+    let result = php_rs_parser::parse(&arena, &content);
+    let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+    let collector =
+        crate::collector::DefinitionCollector::new(codebase, file, &content, &result.source_map);
+    let _ = collector.collect(&result.program);
+}
+
+fn walk_stub_dir(codebase: &Codebase, dir: &Path) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("mir: cannot read stub directory {}: {}", dir.display(), e);
+            return;
+        }
+    };
+    let mut paths: Vec<std::path::PathBuf> =
+        entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+    paths.sort_unstable();
+    for path in paths {
+        if path.is_dir() {
+            walk_stub_dir(codebase, &path);
+        } else if path.extension().is_some_and(|e| e == "php") {
+            parse_stub_file(codebase, &path);
+        }
     }
 }
 

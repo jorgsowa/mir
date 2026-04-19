@@ -1,10 +1,9 @@
 /// Project-level orchestration: file discovery, pass 1, pass 2.
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rayon::prelude::*;
-
-use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
 use mir_codebase::Codebase;
@@ -29,6 +28,15 @@ pub struct ProjectAnalyzer {
     stubs_loaded: std::sync::atomic::AtomicBool,
     /// When true, run dead code detection at the end of analysis.
     pub find_dead_code: bool,
+    /// Target PHP version for extension version gating. `None` = no gating.
+    pub php_version: Option<(u8, u8)>,
+    /// Allowlist of lowercase extension names to load from phpstorm-stubs.
+    /// `None` = load all embedded extensions.
+    pub enabled_extensions: Option<HashSet<String>>,
+    /// Additional stub files to parse (absolute paths).
+    pub stub_files: Vec<PathBuf>,
+    /// Additional stub directories to walk and parse (absolute paths).
+    pub stub_dirs: Vec<PathBuf>,
 }
 
 impl ProjectAnalyzer {
@@ -40,6 +48,10 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: None,
+            enabled_extensions: None,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         }
     }
 
@@ -52,6 +64,10 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: None,
+            enabled_extensions: None,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         }
     }
 
@@ -70,6 +86,10 @@ impl ProjectAnalyzer {
             psr4: Some(psr4),
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: None,
+            enabled_extensions: None,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         };
         Ok((analyzer, map))
     }
@@ -85,7 +105,17 @@ impl ProjectAnalyzer {
             .stubs_loaded
             .swap(true, std::sync::atomic::Ordering::SeqCst)
         {
-            crate::stubs::load_stubs(&self.codebase);
+            let cache_dir = self.cache.as_ref().map(|c| c.cache_dir());
+            crate::stubs::load_stubs_configured(
+                &self.codebase,
+                &crate::stubs::StubConfig {
+                    php_version: self.php_version,
+                    enabled_extensions: self.enabled_extensions.as_ref(),
+                    stub_files: &self.stub_files,
+                    stub_dirs: &self.stub_dirs,
+                    cache_dir,
+                },
+            );
         }
     }
 

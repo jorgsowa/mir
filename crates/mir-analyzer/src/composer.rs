@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -172,6 +173,26 @@ impl Psr4Map {
             }
         }
         None
+    }
+}
+
+/// Parse `ext-*` requirements from `composer.json` in the given root directory.
+///
+/// Returns the set of lowercase extension names (without the `ext-` prefix),
+/// or `None` if `composer.json` is absent or contains no `ext-*` requirements.
+/// Callers should add their own always-load set on top of this.
+pub fn parse_required_extensions(root: &Path) -> Option<HashSet<String>> {
+    let content = std::fs::read_to_string(root.join("composer.json")).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let require = value.get("require")?.as_object()?;
+    let exts: HashSet<String> = require
+        .keys()
+        .filter_map(|k| k.to_lowercase().strip_prefix("ext-").map(str::to_string))
+        .collect();
+    if exts.is_empty() {
+        None
+    } else {
+        Some(exts)
     }
 }
 
@@ -364,6 +385,38 @@ mod tests {
         let map = Psr4Map::from_composer(&root).unwrap();
         let result = map.resolve("App\\Models\\User");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn required_extensions_ext_keys() {
+        let root = make_temp_project("required_extensions");
+        fs::write(
+            root.join("composer.json"),
+            r#"{"require":{"php":"^8.2","ext-pdo":"*","ext-curl":"*","laravel/framework":"^11.0"}}"#,
+        )
+        .unwrap();
+
+        let exts = super::parse_required_extensions(&root).unwrap();
+        assert!(exts.contains("pdo"), "missing pdo");
+        assert!(exts.contains("curl"), "missing curl");
+        assert!(
+            !exts.contains("laravel/framework"),
+            "should not include non-ext"
+        );
+        assert_eq!(exts.len(), 2);
+    }
+
+    #[test]
+    fn required_extensions_no_exts_returns_none() {
+        let root = make_temp_project("required_extensions_none");
+        fs::write(
+            root.join("composer.json"),
+            r#"{"require":{"php":"^8.2","laravel/framework":"^11.0"}}"#,
+        )
+        .unwrap();
+
+        let exts = super::parse_required_extensions(&root);
+        assert!(exts.is_none(), "expected None when no ext-* requirements");
     }
 
     #[test]

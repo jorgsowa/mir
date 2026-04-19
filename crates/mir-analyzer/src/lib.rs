@@ -10,6 +10,7 @@ pub mod narrowing;
 pub mod parser;
 pub mod project;
 pub mod stmt;
+pub mod stub_cache;
 pub mod stubs;
 pub mod taint;
 
@@ -25,6 +26,6 @@ pub use symbol::{ResolvedSymbol, SymbolKind};
 pub use type_env::{ScopeId, TypeEnv};
 
 pub mod composer;
-pub use composer::Psr4Map;
+pub use composer::{parse_required_extensions, Psr4Map};
 
 pub mod test_utils;

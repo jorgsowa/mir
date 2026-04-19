@@ -128,6 +128,11 @@ impl AnalysisCache {
         *self.dirty.lock().unwrap() = true;
     }
 
+    /// Return the directory where cache files are stored.
+    pub fn cache_dir(&self) -> &Path {
+        &self.cache_dir
+    }
+
     /// Persist the in-memory cache to `{cache_dir}/cache.json`.
     /// This is a no-op if nothing changed since the last flush.
     pub fn flush(&self) {

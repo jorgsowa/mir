@@ -38,12 +38,20 @@ pub struct Config {
     pub issue_handlers: HashMap<String, ErrorLevel>,
     /// Global error level 1–8 (lower = stricter). 1 = errors only, 2 = +warnings, 3+ = +info.
     pub error_level: u8,
-    /// Target PHP version string (e.g. `"8.2"`).
+    /// Target PHP version string (e.g. `"8.2"`). Accepts both root attribute and child element.
     pub php_version: Option<String>,
     /// Whether dead-code detection is enabled.
     pub find_unused_code: bool,
     /// Whether unused-variable checking is enabled.
     pub find_unused_variables: bool,
+    /// External stub files to load (from `<stubs><file name="..."/>`). Psalm-compatible.
+    pub stub_files: Vec<String>,
+    /// External stub directories to load (from `<stubs><directory name="..."/>`). mir extension.
+    pub stub_dirs: Vec<String>,
+    /// PHP extensions to enable on top of auto-detected ones (from `<enableExtensions>`).
+    pub enable_extensions: Vec<String>,
+    /// PHP extensions to disable (from `<disableExtensions>`).
+    pub disable_extensions: Vec<String>,
 }
 
 impl Default for Config {
@@ -56,6 +64,10 @@ impl Default for Config {
             php_version: None,
             find_unused_code: false,
             find_unused_variables: false,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
+            enable_extensions: Vec::new(),
+            disable_extensions: Vec::new(),
         }
     }
 }
@@ -127,6 +139,19 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             Ok(Event::Start(e)) => {
                 let name = bytes_to_string(e.name().as_ref());
 
+                // phpVersion as attribute on the root element (Psalm-compatible).
+                // <mir phpVersion="8.2"> or <psalm phpVersion="8.2">
+                if path.is_empty() && (name == "mir" || name == "psalm") {
+                    for attr in e.attributes().flatten() {
+                        if bytes_to_string(attr.key.as_ref()) == "phpVersion" {
+                            let val = bytes_to_string(&attr.value);
+                            if !val.is_empty() && config.php_version.is_none() {
+                                config.php_version = Some(val);
+                            }
+                        }
+                    }
+                }
+
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
                 if path
                     .last()
@@ -146,6 +171,16 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 // <directory name="..."> inside <projectFiles> or <ignoreFiles>
                 if name == "directory" {
                     collect_directory(&e, &path, &mut config);
+                }
+
+                // <file name="..."> or <directory name="..."> inside <stubs>
+                if name == "file" || name == "directory" {
+                    collect_stub_entry(&e, &path, &mut config);
+                }
+
+                // <extension name="..."> inside <enableExtensions> or <disableExtensions>
+                if name == "extension" {
+                    collect_extension(&e, &path, &mut config);
                 }
 
                 text_buf.clear();
@@ -173,6 +208,16 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
 
                 if name == "directory" {
                     collect_directory(&e, &path, &mut config);
+                }
+
+                // <file name="..."> inside <stubs>
+                if name == "file" || name == "directory" {
+                    collect_stub_entry(&e, &path, &mut config);
+                }
+
+                // <extension name="..."> inside <enableExtensions> or <disableExtensions>
+                if name == "extension" {
+                    collect_extension(&e, &path, &mut config);
                 }
             }
 
@@ -229,6 +274,48 @@ fn collect_directory<'a>(
             match parent {
                 "projectFiles" => config.project_dirs.push(val),
                 "ignoreFiles" => config.ignore_dirs.push(val),
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Handle `<file name="..."/>` and `<directory name="..."/>` inside `<stubs>`.
+fn collect_stub_entry<'a>(
+    e: &quick_xml::events::BytesStart<'a>,
+    path: &[String],
+    config: &mut Config,
+) {
+    let parent = path.last().map(|s| s.as_str()).unwrap_or("");
+    if parent != "stubs" {
+        return;
+    }
+    let elem = bytes_to_string(e.name().as_ref());
+    for attr in e.attributes().flatten() {
+        if bytes_to_string(attr.key.as_ref()) == "name" {
+            let val = bytes_to_string(&attr.value);
+            match elem.as_str() {
+                "file" => config.stub_files.push(val),
+                "directory" => config.stub_dirs.push(val),
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Handle `<extension name="..."/>` inside `<enableExtensions>` or `<disableExtensions>`.
+fn collect_extension<'a>(
+    e: &quick_xml::events::BytesStart<'a>,
+    path: &[String],
+    config: &mut Config,
+) {
+    let parent = path.last().map(|s| s.as_str()).unwrap_or("");
+    for attr in e.attributes().flatten() {
+        if bytes_to_string(attr.key.as_ref()) == "name" {
+            let val = bytes_to_string(&attr.value).to_lowercase();
+            match parent {
+                "enableExtensions" => config.enable_extensions.push(val),
+                "disableExtensions" => config.disable_extensions.push(val),
                 _ => {}
             }
         }
