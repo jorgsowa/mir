@@ -1,2 +1,3 @@
 /target
 /book
+crates/mir-analyzer/benches/fixtures/
