@@ -56,6 +56,10 @@ impl fmt::Display for Location {
 #[non_exhaustive]
 pub enum IssueKind {
     // --- Undefined ----------------------------------------------------------
+    InvalidScope {
+        /// `true` when inside a class but in a static method; `false` when outside a class.
+        in_class: bool,
+    },
     UndefinedVariable {
         name: String,
     },
@@ -306,7 +310,8 @@ impl IssueKind {
     pub fn default_severity(&self) -> Severity {
         match self {
             // Errors (always blocking)
-            IssueKind::UndefinedVariable { .. }
+            IssueKind::InvalidScope { .. }
+            | IssueKind::UndefinedVariable { .. }
             | IssueKind::UndefinedFunction { .. }
             | IssueKind::UndefinedMethod { .. }
             | IssueKind::UndefinedClass { .. }
@@ -383,6 +388,7 @@ impl IssueKind {
     /// Identifier name used in config and `@psalm-suppress` / `@suppress` annotations.
     pub fn name(&self) -> &'static str {
         match self {
+            IssueKind::InvalidScope { .. } => "InvalidScope",
             IssueKind::UndefinedVariable { .. } => "UndefinedVariable",
             IssueKind::UndefinedFunction { .. } => "UndefinedFunction",
             IssueKind::UndefinedMethod { .. } => "UndefinedMethod",
@@ -454,6 +460,13 @@ impl IssueKind {
     /// Human-readable message for this issue.
     pub fn message(&self) -> String {
         match self {
+            IssueKind::InvalidScope { in_class } => {
+                if *in_class {
+                    "$this cannot be used in a static method".to_string()
+                } else {
+                    "$this cannot be used outside of a class".to_string()
+                }
+            }
             IssueKind::UndefinedVariable { name } => format!("Variable ${} is not defined", name),
             IssueKind::UndefinedFunction { name } => format!("Function {}() is not defined", name),
             IssueKind::UndefinedMethod { class, method } => {
