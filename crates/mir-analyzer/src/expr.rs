@@ -723,6 +723,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 CallAnalyzer::analyze_static_method_call(self, smc, ctx, expr.span)
             }
 
+            ExprKind::StaticDynMethodCall(smc) => {
+                CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx)
+            }
+
             // --- Function calls --------------------------------------------
             ExprKind::FunctionCall(fc) => {
                 CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span)
