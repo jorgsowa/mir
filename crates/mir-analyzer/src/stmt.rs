@@ -664,6 +664,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 let mut all_cases_diverge = true;
                 let has_default = sw.cases.iter().any(|c| c.value.is_none());
+                let mut fallthrough_ctxs: Vec<Context> = Vec::new();
 
                 for case in sw.cases.iter() {
                     let mut case_ctx = pre_ctx.fork();
@@ -705,6 +706,9 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                     if !case_ctx.diverges {
                         all_cases_diverge = false;
+                        // Case fell through to the end of the switch without a break/return/throw.
+                        // Collect its context so it contributes to the post-switch state.
+                        fallthrough_ctxs.push(case_ctx);
                     }
                 }
 
@@ -715,7 +719,11 @@ impl<'a> StatementsAnalyzer<'a> {
                 // Build the post-switch merged context:
                 // Start with pre_ctx if no default case (switch might not match anything)
                 // or if not all cases diverge via return/throw.
-                let mut merged = if has_default && all_cases_diverge && break_ctxs.is_empty() {
+                let mut merged = if has_default
+                    && all_cases_diverge
+                    && break_ctxs.is_empty()
+                    && fallthrough_ctxs.is_empty()
+                {
                     // All paths return/throw — post-switch is unreachable
                     let mut m = pre_ctx.clone();
                     m.diverges = true;
@@ -728,6 +736,9 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 for bctx in break_ctxs {
                     merged = Context::merge_branches(&pre_ctx, bctx, Some(merged));
+                }
+                for fctx in fallthrough_ctxs {
+                    merged = Context::merge_branches(&pre_ctx, fctx, Some(merged));
                 }
 
                 *ctx = merged;
