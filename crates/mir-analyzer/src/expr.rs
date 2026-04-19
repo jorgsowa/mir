@@ -105,7 +105,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Severity::Info,
                             expr.span,
                         );
-                    } else if name_str != "this" {
+                    } else if name_str == "this" {
+                        self.emit(
+                            IssueKind::InvalidScope {
+                                in_class: ctx.self_fqcn.is_some(),
+                            },
+                            Severity::Error,
+                            expr.span,
+                        );
+                    } else {
                         self.emit(
                             IssueKind::UndefinedVariable {
                                 name: name_str.to_string(),
@@ -116,7 +124,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 ctx.read_vars.insert(name_str.to_string());
-                let ty = ctx.get_var(name_str);
+                let ty = if name_str == "this" && !ctx.var_is_defined("this") {
+                    Union::never()
+                } else {
+                    ctx.get_var(name_str)
+                };
                 self.record_symbol(
                     expr.span,
                     SymbolKind::Variable(name_str.to_string()),
