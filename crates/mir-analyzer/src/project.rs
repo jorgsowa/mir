@@ -619,6 +619,9 @@ impl ProjectAnalyzer {
                 StmtKind::Enum(decl) => {
                     self.analyze_enum_decl(decl, &file, source, source_map, &mut all_issues);
                 }
+                StmtKind::Interface(decl) => {
+                    self.analyze_interface_decl(decl, &file, source, source_map, &mut all_issues);
+                }
                 StmtKind::Namespace(ns) => {
                     if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
                         for inner in stmts.iter() {
@@ -645,6 +648,15 @@ impl ProjectAnalyzer {
                                 }
                                 StmtKind::Enum(decl) => {
                                     self.analyze_enum_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        source_map,
+                                        &mut all_issues,
+                                    );
+                                }
+                                StmtKind::Interface(decl) => {
+                                    self.analyze_interface_decl(
                                         decl,
                                         &file,
                                         source,
@@ -789,6 +801,13 @@ impl ProjectAnalyzer {
             .get(fqcn)
             .and_then(|c| c.parent.clone());
 
+        if let Some(parent) = &decl.extends {
+            check_name_class(parent, &self.codebase, file, source, source_map, all_issues);
+        }
+        for iface in decl.implements.iter() {
+            check_name_class(iface, &self.codebase, file, source, source_map, all_issues);
+        }
+
         for member in decl.members.iter() {
             let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
@@ -900,6 +919,9 @@ impl ProjectAnalyzer {
                 StmtKind::Enum(decl) => {
                     self.analyze_enum_decl(decl, &file, source, source_map, &mut all_issues);
                 }
+                StmtKind::Interface(decl) => {
+                    self.analyze_interface_decl(decl, &file, source, source_map, &mut all_issues);
+                }
                 StmtKind::Namespace(ns) => {
                     if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
                         for inner in stmts.iter() {
@@ -928,6 +950,15 @@ impl ProjectAnalyzer {
                                 }
                                 StmtKind::Enum(decl) => {
                                     self.analyze_enum_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        source_map,
+                                        &mut all_issues,
+                                    );
+                                }
+                                StmtKind::Interface(decl) => {
+                                    self.analyze_interface_decl(
                                         decl,
                                         &file,
                                         source,
@@ -1083,6 +1114,13 @@ impl ProjectAnalyzer {
             .get(fqcn)
             .and_then(|c| c.parent.clone());
 
+        if let Some(parent) = &decl.extends {
+            check_name_class(parent, &self.codebase, file, source, source_map, all_issues);
+        }
+        for iface in decl.implements.iter() {
+            check_name_class(iface, &self.codebase, file, source, source_map, all_issues);
+        }
+
         for member in decl.members.iter() {
             let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
@@ -1197,8 +1235,46 @@ impl ProjectAnalyzer {
         all_issues: &mut Vec<mir_issues::Issue>,
     ) {
         use php_ast::ast::EnumMemberKind;
+        for iface in decl.implements.iter() {
+            check_name_class(iface, &self.codebase, file, source, source_map, all_issues);
+        }
         for member in decl.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
+            for param in method.params.iter() {
+                if let Some(hint) = &param.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        &self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+            }
+            if let Some(hint) = &method.return_type {
+                check_type_hint_classes(hint, &self.codebase, file, source, source_map, all_issues);
+            }
+        }
+    }
+
+    /// Check extends clauses in interface declarations for undefined types.
+    fn analyze_interface_decl<'arena, 'src>(
+        &self,
+        decl: &php_ast::ast::InterfaceDecl<'arena, 'src>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<mir_issues::Issue>,
+    ) {
+        use php_ast::ast::ClassMemberKind;
+        for parent in decl.extends.iter() {
+            check_name_class(parent, &self.codebase, file, source, source_map, all_issues);
+        }
+        for member in decl.members.iter() {
+            let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
             for param in method.params.iter() {
@@ -1310,6 +1386,37 @@ fn check_type_hint_classes<'arena, 'src>(
             }
         }
         TypeHintKind::Keyword(_, _) => {} // built-in keyword, always valid
+    }
+}
+
+/// Check a single `Name` AST node from an `extends` or `implements` clause and
+/// emit `UndefinedClass` if the named type is not in the codebase.
+fn check_name_class(
+    name: &php_ast::ast::Name<'_, '_>,
+    codebase: &Codebase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    let name_str = crate::parser::name_to_string(name);
+    let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
+    if !codebase.type_exists(&resolved) {
+        let span = name.span();
+        let (line, col_start) = offset_to_line_col(source, span.start, source_map);
+        let (_, col_end) = offset_to_line_col(source, span.end, source_map);
+        issues.push(
+            mir_issues::Issue::new(
+                mir_issues::IssueKind::UndefinedClass { name: resolved },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line,
+                    col_start,
+                    col_end: col_end.max(col_start + 1),
+                },
+            )
+            .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
+        );
     }
 }
 
