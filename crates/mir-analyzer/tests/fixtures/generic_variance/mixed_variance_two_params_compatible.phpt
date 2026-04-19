@@ -15,4 +15,3 @@ function test(): void {
     f($p);
 }
 ===expect===
-

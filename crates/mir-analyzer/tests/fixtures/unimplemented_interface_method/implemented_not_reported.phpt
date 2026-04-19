@@ -7,4 +7,3 @@ class Task implements Runnable {
     public function run(): void {}
 }
 ===expect===
-

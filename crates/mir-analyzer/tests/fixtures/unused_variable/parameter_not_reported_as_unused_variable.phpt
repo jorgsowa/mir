@@ -4,4 +4,4 @@ function foo(int $param): int {
     return 42;
 }
 ===expect===
-UnusedParam: $param
+UnusedParam: Parameter $param is never used

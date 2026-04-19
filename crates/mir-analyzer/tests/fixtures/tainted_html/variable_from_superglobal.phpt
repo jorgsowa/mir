@@ -5,4 +5,4 @@ function test(): void {
     echo $name;
 }
 ===expect===
-TaintedHtml: echo $name;
+TaintedHtml: Tainted HTML output — possible XSS

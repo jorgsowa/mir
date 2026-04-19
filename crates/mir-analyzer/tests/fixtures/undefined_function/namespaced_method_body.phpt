@@ -8,4 +8,4 @@ namespace MyApp {
     }
 }
 ===expect===
-UndefinedFunction: nonexistent_function()
+UndefinedFunction: Function nonexistent_function() is not defined

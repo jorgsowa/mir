@@ -2,5 +2,5 @@
 <?php
 function f(UnknownClass $x): void {}
 ===expect===
-UnusedParam: $x
-UndefinedClass: UnknownClass
+UnusedParam: Parameter $x is never used
+UndefinedClass: Class UnknownClass does not exist

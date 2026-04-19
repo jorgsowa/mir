@@ -7,4 +7,4 @@ class Baz {
     }
 }
 ===expect===
-PossiblyNullMethodCall: $obj->doSomething($ctx)
+PossiblyNullMethodCall: Cannot call method doSomething() on possibly null value

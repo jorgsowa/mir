@@ -4,4 +4,4 @@ class Foo {
     private string $name = 'bar';
 }
 ===expect===
-UnusedProperty: <no snippet>
+UnusedProperty: Private property Foo::$name is never read
