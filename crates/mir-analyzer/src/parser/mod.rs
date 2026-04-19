@@ -4,7 +4,7 @@ pub mod type_from_hint;
 use std::sync::Arc;
 
 use php_ast::Span;
-use php_rs_parser::parse;
+use php_rs_parser::ParserContext;
 use thiserror::Error;
 
 pub use docblock::{DocblockParser, ParsedDocblock};
@@ -35,25 +35,25 @@ pub struct ParsedFile<'arena, 'src> {
 // ---------------------------------------------------------------------------
 
 pub struct FileParser {
-    pub arena: bumpalo::Bump,
+    ctx: ParserContext,
 }
 
 impl FileParser {
     pub fn new() -> Self {
         Self {
-            arena: bumpalo::Bump::new(),
+            ctx: ParserContext::new(),
         }
     }
 
-    /// Parse a PHP source string.
-    /// The returned `ParsedFile` borrows from both `self.arena` and `src`.
-    /// The arena must outlive the parsed file.
+    /// Parse a PHP source string, reusing the internal arena (O(1) reset).
+    /// The returned `ParsedFile` borrows from both `self` and `src`.
+    /// The previous `ParsedFile` must be dropped before calling `parse` again.
     pub fn parse<'arena, 'src>(
-        &'arena self,
+        &'arena mut self,
         src: &'src str,
         file: Arc<str>,
     ) -> ParsedFile<'arena, 'src> {
-        let result = parse(&self.arena, src);
+        let result = self.ctx.reparse(src);
         let errors = result
             .errors
             .iter()
