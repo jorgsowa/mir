@@ -909,11 +909,13 @@ fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>) {
                 && !array_list_compatible(arg_ty, param_ty, ea)
                 // Skip when param is more specific than arg (coercion, not hard error):
                 // e.g. string → non-empty-string, int → positive-int, string → string|null
-                && !param_ty.is_subtype_of_simple(arg_ty)
+                // Only applies when arg is a single type; union args like int|string passed to
+                // an int param must still error even though int <: int|string.
+                && !(arg_ty.is_single() && param_ty.is_subtype_of_simple(arg_ty))
                 // Skip when non-null part of param is a subtype of arg (e.g. non-empty-string|null ← string)
-                && !param_ty.remove_null().is_subtype_of_simple(arg_ty)
+                && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_of_simple(arg_ty))
                 // Skip when any atomic in param is a subtype of arg (e.g. non-empty-string|list ← string)
-                && !param_ty.types.iter().any(|p| Union::single(p.clone()).is_subtype_of_simple(arg_ty))
+                && !(arg_ty.is_single() && param_ty.types.iter().any(|p| Union::single(p.clone()).is_subtype_of_simple(arg_ty)))
                 // Skip when arg is compatible after removing null/false (PossiblyNull/FalseArgument
                 // handles these separately and they may appear in the baseline)
                 && !arg_ty.remove_null().is_subtype_of_simple(param_ty)
