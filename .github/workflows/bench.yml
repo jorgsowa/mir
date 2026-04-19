@@ -1,0 +1,145 @@
+name: Benchmarks
+
+# Run on every push to main that touches Rust source (saves a new baseline),
+# and on every PR that touches Rust source (compares against the latest main
+# baseline and posts a comment).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+# Keep the fixture version in sync with download-fixtures.sh.
+env:
+  LARAVEL_FIXTURE_VERSION: v11.44.7
+
+jobs:
+  bench:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write   # needed to post the comparison comment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Caches registry index, downloaded crates, and compiled artifacts.
+      # The bench profile inherits [profile.release] (lto=thin, codegen-units=1)
+      # so the first compile is slow; this makes subsequent runs fast.
+      - uses: Swatinem/rust-cache@v2
+
+      # critcmp reads Criterion's raw JSON and produces a before/after table.
+      # Cache the compiled binary so we don't rebuild it on every run.
+      - name: Cache critcmp
+        id: critcmp-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/critcmp
+          key: critcmp-${{ runner.os }}-v1
+
+      - name: Install critcmp
+        if: steps.critcmp-cache.outputs.cache-hit != 'true'
+        run: cargo install critcmp
+
+      # Cache the cloned + composer-installed fixture. Key includes the pinned
+      # version so a version bump in download-fixtures.sh automatically
+      # invalidates the cache.
+      - name: Cache Laravel fixture
+        id: fixture-cache
+        uses: actions/cache@v4
+        with:
+          path: crates/mir-analyzer/benches/fixtures
+          key: laravel-fixture-${{ env.LARAVEL_FIXTURE_VERSION }}
+
+      # PHP + Composer are only needed when the fixture cache is cold.
+      - name: Set up PHP
+        if: steps.fixture-cache.outputs.cache-hit != 'true'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Download and install benchmark fixture
+        if: steps.fixture-cache.outputs.cache-hit != 'true'
+        run: bash crates/mir-analyzer/benches/download-fixtures.sh
+
+      # Reduce measurement noise on the shared runner:
+      #   - ASLR off → stable memory-layout addresses across samples
+      #   - Performance governor → no frequency scaling mid-measurement
+      #   - No turbo boost → eliminates burst-clock outliers
+      # These are best-effort; governors and turbo knobs are silently
+      # unavailable in most cloud VMs.
+      - name: Tune system for stable measurements
+        run: |
+          echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+          echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
+          echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+
+      # PRs: restore the most recent main baseline so critcmp can compare.
+      - name: Restore main baseline
+        if: github.event_name == 'pull_request'
+        id: restore-baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: target/criterion
+          # Exact key won't match (PR SHA ≠ any main SHA); falls through to
+          # restore-keys prefix match which picks the most recent main run.
+          key: criterion-baseline-main-${{ github.sha }}
+          restore-keys: criterion-baseline-main-
+
+      - name: Run benchmarks
+        env:
+          # 'main' on push, 'pr' on pull_request — used by --save-baseline.
+          BASELINE_NAME: ${{ github.event_name == 'pull_request' && 'pr' || 'main' }}
+        run: |
+          cargo bench -p mir-analyzer --bench analyze_real_world \
+            -- --save-baseline "$BASELINE_NAME" --noplot
+
+      # Push to main: persist the new baseline for future PR comparisons.
+      - name: Save main baseline
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: target/criterion
+          key: criterion-baseline-main-${{ github.sha }}
+
+      # PRs: compare and post. Skip gracefully if no baseline was restored
+      # (first benchmark run ever, or cache was evicted).
+      - name: Compare baselines
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.restore-baseline.outputs.cache-hit == 'true'
+        run: critcmp main pr | tee critcmp-output.txt
+
+      - name: Post comparison comment
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.restore-baseline.outputs.cache-hit == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const table = fs.readFileSync('critcmp-output.txt', 'utf8');
+            const logsUrl =
+              `https://github.com/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`;
+            const body =
+              `## Benchmark results (PR vs \`main\`)\n` +
+              `\`\`\`\n${table}\`\`\`\n` +
+              `*Peak memory and total-allocation stats are printed to stderr — ` +
+              `see the [workflow logs](${logsUrl}) for those numbers.*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
