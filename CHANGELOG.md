@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-19
+
+### Added
+
+- **Recurse into nested function and class bodies** — the analyzer now descends into nested function declarations and class definitions inside method/function bodies, catching issues in inner scopes that were previously invisible. (#223)
+- **`UndefinedClass` for `extends`/`implements`** — emit `UndefinedClass` when a class extends or implements a type that does not exist in the codebase or stubs. (#224)
+- **`InvalidScope` for `$this` in invalid context** — emit `InvalidScope` when `$this` is used outside of an object method (e.g., in a static method or free function). (#220)
+- **Real-world Criterion benchmark suite** — added a benchmark that runs analysis over a realistic PHP codebase for continuous performance regression tracking. (#219)
+
+### Fixed
+
+- **Intersection type hints** — `type_from_hint` now correctly resolves intersection types (`A&B`), fixing false positives in type-narrowing and parameter checks. (#221)
+
 ## [0.5.2] - 2026-04-19
 
 ### Added
