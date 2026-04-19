@@ -811,4 +811,43 @@ mod tests {
         assert_eq!(parsed.type_aliases[0].name, "MyAlias");
         assert_eq!(parsed.type_aliases[0].type_expr, "string|int");
     }
+
+    #[test]
+    fn parse_intersection_two_parts() {
+        let u = parse_type_string("Iterator&Countable");
+        assert_eq!(u.types.len(), 1);
+        assert!(matches!(u.types[0], Atomic::TIntersection { ref parts } if parts.len() == 2));
+        if let Atomic::TIntersection { parts } = &u.types[0] {
+            assert!(parts[0].contains(
+                |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Iterator")
+            ));
+            assert!(parts[1].contains(
+                |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Countable")
+            ));
+        }
+    }
+
+    #[test]
+    fn parse_intersection_three_parts() {
+        let u = parse_type_string("A&B&C");
+        assert_eq!(u.types.len(), 1);
+        assert!(matches!(u.types[0], Atomic::TIntersection { ref parts } if parts.len() == 3));
+    }
+
+    #[test]
+    fn parse_intersection_in_union_with_null() {
+        // Docblock `Iterator&Countable|null` — union of intersection and null
+        let u = parse_type_string("Iterator&Countable|null");
+        // The `|` splits first, so we get TIntersection and TNull
+        assert!(u.is_nullable());
+        assert!(u.contains(|t| matches!(t, Atomic::TIntersection { .. })));
+    }
+
+    #[test]
+    fn parse_intersection_in_union_with_scalar() {
+        // Docblock `Iterator&Countable|string`
+        let u = parse_type_string("Iterator&Countable|string");
+        assert!(u.contains(|t| matches!(t, Atomic::TIntersection { .. })));
+        assert!(u.contains(|t| matches!(t, Atomic::TString)));
+    }
 }
