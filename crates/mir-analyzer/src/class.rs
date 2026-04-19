@@ -503,16 +503,16 @@ impl<'a> ClassAnalyzer<'a> {
         &self,
         cls: &mir_codebase::storage::ClassStorage,
         method_name: &str,
-    ) -> Option<MethodStorage> {
+    ) -> Option<Arc<MethodStorage>> {
         // Walk all_parents in order (closest ancestor first)
         for ancestor_fqcn in &cls.all_parents {
             if let Some(ancestor_cls) = self.codebase.classes.get(ancestor_fqcn.as_ref()) {
                 if let Some(m) = ancestor_cls.own_methods.get(method_name) {
-                    return Some(m.clone());
+                    return Some(Arc::clone(m));
                 }
             } else if let Some(iface) = self.codebase.interfaces.get(ancestor_fqcn.as_ref()) {
                 if let Some(m) = iface.own_methods.get(method_name) {
-                    return Some(m.clone());
+                    return Some(Arc::clone(m));
                 }
             }
         }

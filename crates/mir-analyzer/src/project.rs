@@ -813,9 +813,10 @@ impl ProjectAnalyzer {
 
             let Some(body) = &method.body else { continue };
 
-            let method_storage = self.codebase.get_method(fqcn, method.name);
-            let (params, return_ty) = method_storage
-                .as_ref()
+            let (params, return_ty) = self
+                .codebase
+                .get_method(fqcn, method.name)
+                .as_deref()
                 .map(|m| (m.params.clone(), m.return_type.clone()))
                 .unwrap_or_default();
 
@@ -850,7 +851,7 @@ impl ProjectAnalyzer {
 
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
                 if let Some(m) = cls.own_methods.get_mut(method.name) {
-                    m.inferred_return_type = Some(inferred);
+                    Arc::make_mut(m).inferred_return_type = Some(inferred);
                 }
             }
         }
@@ -1105,9 +1106,10 @@ impl ProjectAnalyzer {
 
             let Some(body) = &method.body else { continue };
 
-            let method_storage = self.codebase.get_method(fqcn, method.name);
-            let (params, return_ty) = method_storage
-                .as_ref()
+            let (params, return_ty) = self
+                .codebase
+                .get_method(fqcn, method.name)
+                .as_deref()
                 .map(|m| (m.params.clone(), m.return_type.clone()))
                 .unwrap_or_default();
 
@@ -1151,7 +1153,7 @@ impl ProjectAnalyzer {
 
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
                 if let Some(m) = cls.own_methods.get_mut(method.name) {
-                    m.inferred_return_type = Some(inferred);
+                    Arc::make_mut(m).inferred_return_type = Some(inferred);
                 }
             }
         }
