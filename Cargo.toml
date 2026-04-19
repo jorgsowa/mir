@@ -24,8 +24,8 @@ mir-codebase   = { path = "crates/mir-codebase",   version = "0.5.1" }
 mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.5.1" }
 
 # PHP parsing
-php-rs-parser = "0.7"
-php-ast       = "0.7"
+php-rs-parser = "0.8"
+php-ast       = "0.8"
 bumpalo       = { version = "3", features = ["collections"] }
 
 # Data structures

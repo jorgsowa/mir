@@ -2,7 +2,9 @@
 /// the inferred return type.
 use std::sync::Arc;
 
-use php_ast::ast::{ExprKind, FunctionCallExpr, MethodCallExpr, StaticMethodCallExpr};
+use php_ast::ast::{
+    ExprKind, FunctionCallExpr, MethodCallExpr, StaticDynMethodCallExpr, StaticMethodCallExpr,
+};
 use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, MethodStorage, Visibility};
@@ -621,7 +623,7 @@ impl CallAnalyzer {
         span: Span,
     ) -> Union {
         let method_name = match &call.method.kind {
-            ExprKind::Identifier(name) | ExprKind::Variable(name) => name.as_str(),
+            ExprKind::Identifier(name) => name.as_str(),
             _ => return Union::mixed(),
         };
 
@@ -725,6 +727,22 @@ impl CallAnalyzer {
             // Unknown/external class or class with unscanned ancestor — do not emit false positive
             Union::mixed()
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Dynamic static method calls: ClassName::$variable(args)
+    // -----------------------------------------------------------------------
+
+    pub fn analyze_static_dyn_method_call<'a, 'arena, 'src>(
+        ea: &mut ExpressionAnalyzer<'a>,
+        call: &StaticDynMethodCallExpr<'arena, 'src>,
+        ctx: &mut Context,
+    ) -> Union {
+        // Evaluate args for side-effects / taint propagation.
+        for arg in call.args.iter() {
+            ea.analyze(&arg.value, ctx);
+        }
+        Union::mixed()
     }
 }
 
