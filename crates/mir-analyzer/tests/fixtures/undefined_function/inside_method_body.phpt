@@ -6,4 +6,4 @@ class A {
     }
 }
 ===expect===
-UndefinedFunction: missing()
+UndefinedFunction: Function missing() is not defined

@@ -52,10 +52,10 @@ fn check_with_opts(src: &str, find_dead_code: bool) -> Vec<Issue> {
 
 /// One expected issue from a `.phpt` fixture's `===expect===` section.
 ///
-/// Format: `KindName: snippet`
+/// Format: `KindName: full human-readable message`
 pub struct ExpectedIssue {
     pub kind_name: String,
-    pub snippet: String,
+    pub message: String,
 }
 
 /// Parse a `.phpt` fixture file into `(php_source, expected_issues)`.
@@ -66,8 +66,8 @@ pub struct ExpectedIssue {
 /// <?php
 /// ...
 /// ===expect===
-/// UndefinedClass: UnknownClass
-/// UndefinedFunction: foo()
+/// UndefinedClass: Class 'UnknownClass' not found
+/// UndefinedFunction: Function 'foo' not found
 /// ```
 /// An empty `===expect===` section means no issues are expected.
 pub fn parse_phpt(content: &str, path: &str) -> (String, Vec<ExpectedIssue>) {
@@ -121,18 +121,18 @@ fn parse_phpt_source_only(content: &str, path: &str) -> String {
 }
 
 fn parse_expected_line(line: &str, fixture_path: &str) -> ExpectedIssue {
-    // Format: "KindName: snippet"
+    // Format: "KindName: full human-readable message"
     let parts: Vec<&str> = line.splitn(2, ": ").collect();
     assert_eq!(
         parts.len(),
         2,
-        "fixture {}: invalid expect line {:?} — expected \"KindName: snippet\"",
+        "fixture {}: invalid expect line {:?} — expected \"KindName: message\"",
         fixture_path,
         line
     );
     ExpectedIssue {
         kind_name: parts[0].trim().to_string(),
-        snippet: parts[1].trim().to_string(),
+        message: parts[1].trim().to_string(),
     }
 }
 
@@ -170,38 +170,22 @@ fn run_fixture_with_opts(path: &str, find_dead_code: bool) {
     let mut failures: Vec<String> = Vec::new();
 
     for exp in &expected {
-        let found = actual.iter().any(|a| {
-            if a.kind.name() != exp.kind_name {
-                return false;
-            }
-            if exp.snippet == "<no snippet>" {
-                a.snippet.is_none()
-            } else {
-                a.snippet.as_deref() == Some(exp.snippet.as_str())
-            }
-        });
+        let found = actual
+            .iter()
+            .any(|a| a.kind.name() == exp.kind_name && a.kind.message() == exp.message.as_str());
         if !found {
-            failures.push(format!("  MISSING  {}: {}", exp.kind_name, exp.snippet));
+            failures.push(format!("  MISSING  {}: {}", exp.kind_name, exp.message));
         }
     }
 
     for act in &actual {
-        let expected_it = expected.iter().any(|e| {
-            if e.kind_name != act.kind.name() {
-                return false;
-            }
-            if e.snippet == "<no snippet>" {
-                act.snippet.is_none()
-            } else {
-                act.snippet.as_deref() == Some(e.snippet.as_str())
-            }
-        });
+        let expected_it = expected
+            .iter()
+            .any(|e| e.kind_name == act.kind.name() && e.message == act.kind.message());
         if !expected_it {
-            let snippet = act.snippet.as_deref().unwrap_or("<no snippet>");
             failures.push(format!(
-                "  UNEXPECTED {}: {}  — {}",
+                "  UNEXPECTED {}: {}",
                 act.kind.name(),
-                snippet,
                 act.kind.message(),
             ));
         }
@@ -238,8 +222,11 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue]) {
     sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
 
     for issue in sorted {
-        let snippet = issue.snippet.as_deref().unwrap_or("<no snippet>");
-        new_content.push_str(&format!("{}: {}\n", issue.kind.name(), snippet));
+        new_content.push_str(&format!(
+            "{}: {}\n",
+            issue.kind.name(),
+            issue.kind.message()
+        ));
     }
 
     std::fs::write(path, &new_content)
@@ -307,10 +294,7 @@ fn fmt_issues(issues: &[Issue]) -> String {
     }
     issues
         .iter()
-        .map(|i| {
-            let snippet = i.snippet.as_deref().unwrap_or("<no snippet>");
-            format!("  {}: {}  — {}", i.kind.name(), snippet, i.kind.message(),)
-        })
+        .map(|i| format!("  {}: {}", i.kind.name(), i.kind.message()))
         .collect::<Vec<_>>()
         .join("\n")
 }

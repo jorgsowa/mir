@@ -4,4 +4,4 @@ function test(): void {
     $this->close();
 }
 ===expect===
-InvalidScope: $this
+InvalidScope: $this cannot be used outside of a class

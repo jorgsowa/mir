@@ -14,4 +14,3 @@ abstract class Base implements Runnable {
 }
 class Task extends Base {}
 ===expect===
-

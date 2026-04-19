@@ -2,4 +2,4 @@
 <?php
 class Bar implements MissingInterface {}
 ===expect===
-UndefinedClass: MissingInterface
+UndefinedClass: Class MissingInterface does not exist

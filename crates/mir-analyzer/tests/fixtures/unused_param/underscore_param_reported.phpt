@@ -6,4 +6,4 @@ class Foo {
     }
 }
 ===expect===
-UnusedParam: $_unused
+UnusedParam: Parameter $_unused is never used
