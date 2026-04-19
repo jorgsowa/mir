@@ -662,9 +662,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 // the case's context for merging into the post-switch result.
                 self.break_ctx_stack.push(Vec::new());
 
-                let mut all_cases_diverge = true;
                 let has_default = sw.cases.iter().any(|c| c.value.is_none());
 
+                // First pass: analyse each case body independently from pre_ctx.
+                // Break statements inside a body save their context to break_ctx_stack
+                // automatically; we just collect the per-case contexts here.
+                let mut case_results: Vec<Context> = Vec::new();
                 for case in sw.cases.iter() {
                     let mut case_ctx = pre_ctx.fork();
                     if let Some(val) = &case.value {
@@ -703,8 +706,40 @@ impl<'a> StatementsAnalyzer<'a> {
                     for stmt in case.body.iter() {
                         self.analyze_stmt(stmt, &mut case_ctx);
                     }
-                    if !case_ctx.diverges {
+                    case_results.push(case_ctx);
+                }
+
+                // Second pass: propagate divergence backwards through the fallthrough
+                // chain. A non-diverging case (no break/return/throw) flows into the
+                // next case at runtime, so if that next case effectively diverges, this
+                // case effectively diverges too.
+                //
+                // Example:
+                //   case 1: $y = "a";   // no break — chains into case 2
+                //   case 2: return;     // diverges
+                //
+                // Case 1 is effectively diverging because its only exit is through
+                // case 2's return. Adding case 1 to fallthrough_ctxs would be wrong.
+                let n = case_results.len();
+                let mut effective_diverges = vec![false; n];
+                for i in (0..n).rev() {
+                    if case_results[i].diverges {
+                        effective_diverges[i] = true;
+                    } else if i + 1 < n {
+                        // Non-diverging body: falls through to the next case.
+                        effective_diverges[i] = effective_diverges[i + 1];
+                    }
+                    // else: last case with no break/return — falls to end of switch.
+                }
+
+                // Build fallthrough_ctxs from cases that truly exit via the end of
+                // the switch (not through a subsequent diverging case).
+                let mut all_cases_diverge = true;
+                let mut fallthrough_ctxs: Vec<Context> = Vec::new();
+                for (i, case_ctx) in case_results.into_iter().enumerate() {
+                    if !effective_diverges[i] {
                         all_cases_diverge = false;
+                        fallthrough_ctxs.push(case_ctx);
                     }
                 }
 
@@ -715,7 +750,11 @@ impl<'a> StatementsAnalyzer<'a> {
                 // Build the post-switch merged context:
                 // Start with pre_ctx if no default case (switch might not match anything)
                 // or if not all cases diverge via return/throw.
-                let mut merged = if has_default && all_cases_diverge && break_ctxs.is_empty() {
+                let mut merged = if has_default
+                    && all_cases_diverge
+                    && break_ctxs.is_empty()
+                    && fallthrough_ctxs.is_empty()
+                {
                     // All paths return/throw — post-switch is unreachable
                     let mut m = pre_ctx.clone();
                     m.diverges = true;
@@ -728,6 +767,9 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 for bctx in break_ctxs {
                     merged = Context::merge_branches(&pre_ctx, bctx, Some(merged));
+                }
+                for fctx in fallthrough_ctxs {
+                    merged = Context::merge_branches(&pre_ctx, fctx, Some(merged));
                 }
 
                 *ctx = merged;
