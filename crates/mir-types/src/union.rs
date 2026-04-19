@@ -758,4 +758,78 @@ mod tests {
         assert_eq!(resolved.types.len(), 1);
         assert!(matches!(resolved.types[0], Atomic::TString));
     }
+
+    #[test]
+    fn intersection_is_object() {
+        let parts = vec![
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("Iterator"),
+                type_params: vec![],
+            }),
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("Countable"),
+                type_params: vec![],
+            }),
+        ];
+        let atomic = Atomic::TIntersection { parts };
+        assert!(atomic.is_object());
+        assert!(!atomic.can_be_falsy());
+        assert!(atomic.can_be_truthy());
+    }
+
+    #[test]
+    fn intersection_display_two_parts() {
+        let parts = vec![
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("Iterator"),
+                type_params: vec![],
+            }),
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("Countable"),
+                type_params: vec![],
+            }),
+        ];
+        let u = Union::single(Atomic::TIntersection { parts });
+        assert_eq!(format!("{}", u), "Iterator&Countable");
+    }
+
+    #[test]
+    fn intersection_display_three_parts() {
+        let parts = vec![
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("A"),
+                type_params: vec![],
+            }),
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("B"),
+                type_params: vec![],
+            }),
+            Union::single(Atomic::TNamedObject {
+                fqcn: Arc::from("C"),
+                type_params: vec![],
+            }),
+        ];
+        let u = Union::single(Atomic::TIntersection { parts });
+        assert_eq!(format!("{}", u), "A&B&C");
+    }
+
+    #[test]
+    fn intersection_in_nullable_union_display() {
+        let intersection = Atomic::TIntersection {
+            parts: vec![
+                Union::single(Atomic::TNamedObject {
+                    fqcn: Arc::from("Iterator"),
+                    type_params: vec![],
+                }),
+                Union::single(Atomic::TNamedObject {
+                    fqcn: Arc::from("Countable"),
+                    type_params: vec![],
+                }),
+            ],
+        };
+        let mut u = Union::single(intersection);
+        u.add_type(Atomic::TNull);
+        assert!(u.is_nullable());
+        assert!(u.contains(|t| matches!(t, Atomic::TIntersection { .. })));
+    }
 }

@@ -23,11 +23,14 @@ pub fn type_from_hint(hint: &TypeHint<'_, '_>, context_fqcn: Option<&str>) -> Un
             u
         }
         TypeHintKind::Intersection(parts) => {
-            // Simplification: use first part for now.
-            if let Some(first) = parts.first() {
-                type_from_hint(first, context_fqcn)
-            } else {
+            let resolved: Vec<Union> = parts
+                .iter()
+                .map(|p| type_from_hint(p, context_fqcn))
+                .collect();
+            if resolved.is_empty() {
                 Union::mixed()
+            } else {
+                Union::single(Atomic::TIntersection { parts: resolved })
             }
         }
         TypeHintKind::Keyword(builtin, _span) => builtin_type_to_union(*builtin, context_fqcn),
