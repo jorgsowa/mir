@@ -226,6 +226,20 @@ fn bench_reanalysis(c: &mut Criterion) {
         print_alloc_stats("reanalysis/laravel_high_fanout");
         std::fs::write(&model_path, original).unwrap();
     }
+    if let Some(original) = &leaf_original {
+        let cache_mem: TempDir = tempfile::tempdir().unwrap();
+        warm_cache(&cache_mem, &vendor_files, &project_files);
+        std::fs::write(&leaf_path, format!("{}\n// memory-check", original)).unwrap();
+        reset_alloc_counters();
+        {
+            let analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
+            analyzer.load_stubs();
+            analyzer.collect_types_only(&vendor_files);
+            let _ = analyzer.analyze(&project_files);
+        }
+        print_alloc_stats("reanalysis/laravel_leaf_file");
+        std::fs::write(&leaf_path, original).unwrap();
+    }
 
     // Separate cache dirs so the two variants don't interfere with each other.
     let cache_model: TempDir = tempfile::tempdir().unwrap();
@@ -321,6 +335,32 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         return;
     }
 
+    // Memory stats: vendor pre-loaded outside the timed section, measure only analyze().
+    if let Some(original) = &model_original {
+        let cache_mem: TempDir = tempfile::tempdir().unwrap();
+        warm_cache(&cache_mem, &vendor_files, &project_files);
+        std::fs::write(&model_path, format!("{}\n// memory-check", original)).unwrap();
+        let mem_analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
+        mem_analyzer.load_stubs();
+        mem_analyzer.collect_types_only(&vendor_files);
+        reset_alloc_counters();
+        let _ = mem_analyzer.analyze(&project_files);
+        print_alloc_stats("reanalysis_project_only/laravel_high_fanout");
+        std::fs::write(&model_path, original).unwrap();
+    }
+    if let Some(original) = &leaf_original {
+        let cache_mem: TempDir = tempfile::tempdir().unwrap();
+        warm_cache(&cache_mem, &vendor_files, &project_files);
+        std::fs::write(&leaf_path, format!("{}\n// memory-check", original)).unwrap();
+        let mem_analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
+        mem_analyzer.load_stubs();
+        mem_analyzer.collect_types_only(&vendor_files);
+        reset_alloc_counters();
+        let _ = mem_analyzer.analyze(&project_files);
+        print_alloc_stats("reanalysis_project_only/laravel_leaf_file");
+        std::fs::write(&leaf_path, original).unwrap();
+    }
+
     let cache_model: TempDir = tempfile::tempdir().unwrap();
     let cache_leaf: TempDir = tempfile::tempdir().unwrap();
     if model_original.is_some() {
@@ -402,6 +442,14 @@ fn bench_vendor_collection(c: &mut Criterion) {
 
     // Bug fix: collect from vendor/ only, not the entire repo root.
     let vendor_files = ProjectAnalyzer::discover_files(&root.join("vendor"));
+
+    reset_alloc_counters();
+    {
+        let analyzer = ProjectAnalyzer::new();
+        analyzer.load_stubs();
+        analyzer.collect_types_only(&vendor_files);
+    }
+    print_alloc_stats("vendor_collection/laravel");
 
     let mut group = c.benchmark_group("vendor_collection");
     group.sample_size(10);

@@ -37,6 +37,13 @@ jobs:
       # so the first compile is slow; this makes subsequent runs fast.
       - uses: Swatinem/rust-cache@v2
 
+      # Criterion stores benchmark results (JSON baselines) in target/criterion.
+      # The rust-cache above may restore stale criterion data from a previous run.
+      # Always wipe it so the only baseline present is the one we explicitly restore
+      # below (on PRs) or the one we're about to create (on pushes to main).
+      - name: Clear stale criterion cache
+        run: rm -rf target/criterion
+
       # critcmp reads Criterion's raw JSON and produces a before/after table.
       # Cache the compiled binary so we don't rebuild it on every run.
       - name: Cache critcmp
@@ -103,6 +110,9 @@ jobs:
         run: |
           cargo bench -p mir-analyzer --bench analyze_real_world \
             -- --save-baseline "$BASELINE_NAME" --noplot 2>&1 | tee bench-output.txt
+          # Save memory stats alongside the Criterion baseline so PRs can diff them.
+          grep '\[memory\]' bench-output.txt | sed 's/^[[:space:]]*//' \
+            > "target/criterion/memory-${BASELINE_NAME}.txt" || true
           echo '## Benchmark output' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat bench-output.txt >> "$GITHUB_STEP_SUMMARY"
@@ -128,6 +138,17 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat critcmp-output.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '## Memory (PR vs `main`)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo 'main:' >> "$GITHUB_STEP_SUMMARY"
+          cat target/criterion/memory-main.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null \
+            || echo '(unavailable)' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'PR:' >> "$GITHUB_STEP_SUMMARY"
+          cat target/criterion/memory-pr.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null \
+            || echo '(unavailable)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post no-baseline notice
         if: >-
@@ -152,14 +173,61 @@ jobs:
           script: |
             const fs = require('fs');
             const table = fs.readFileSync('critcmp-output.txt', 'utf8');
-            const logsUrl =
-              `https://github.com/${context.repo.owner}/${context.repo.repo}` +
-              `/actions/runs/${context.runId}`;
-            const body =
-              `## Benchmark results (PR vs \`main\`)\n` +
-              `\`\`\`\n${table}\`\`\`\n` +
-              `*Peak memory and total-allocation stats are printed to stderr — ` +
-              `see the [workflow logs](${logsUrl}) for those numbers.*`;
+
+            function parseMemory(path) {
+              if (!fs.existsSync(path)) return {};
+              const re = /\[memory\]\s+(.+?):\s+peak live ([\d.]+) MiB,\s+total allocated ([\d.]+) MiB/g;
+              const out = {};
+              let m;
+              const text = fs.readFileSync(path, 'utf8');
+              while ((m = re.exec(text)) !== null)
+                out[m[1].trim()] = { peak: parseFloat(m[2]), total: parseFloat(m[3]) };
+              return out;
+            }
+
+            function buildMemoryTable(mainS, prS) {
+              const keys = [...new Set([...Object.keys(mainS), ...Object.keys(prS)])].sort();
+              if (!keys.length) return null;
+              const rows = keys.map(k => {
+                const m = mainS[k], p = prS[k];
+                const mp = m ? `${m.peak.toFixed(1)} MiB` : 'N/A';
+                const pp = p ? `${p.peak.toFixed(1)} MiB` : 'N/A';
+                const mt = m ? `${m.total.toFixed(1)} MiB` : 'N/A';
+                const pt = p ? `${p.total.toFixed(1)} MiB` : 'N/A';
+                let delta = 'N/A';
+                if (m && p) {
+                  const d = p.peak - m.peak;
+                  const pct = m.peak ? d / m.peak * 100 : 0;
+                  const s = d >= 0 ? '+' : '';
+                  delta = `${s}${d.toFixed(1)} MiB (${s}${pct.toFixed(1)}%)`;
+                }
+                return { k, mp, pp, delta, mt, pt };
+              });
+              const pad = (s, n, r = false) => r ? String(s).padStart(n) : String(s).padEnd(n);
+              const cols = {
+                k:  Math.max(...rows.map(r => r.k.length),  'benchmark'.length),
+                mp: Math.max(...rows.map(r => r.mp.length), 'peak(main)'.length),
+                pp: Math.max(...rows.map(r => r.pp.length), 'peak(pr)'.length),
+                d:  Math.max(...rows.map(r => r.delta.length), 'Δ peak'.length),
+                mt: Math.max(...rows.map(r => r.mt.length), 'total(main)'.length),
+                pt: Math.max(...rows.map(r => r.pt.length), 'total(pr)'.length),
+              };
+              const fmt = r =>
+                `${pad(r.k,cols.k)}  ${pad(r.mp,cols.mp,true)}  ${pad(r.pp,cols.pp,true)}  ${pad(r.delta,cols.d,true)}  ${pad(r.mt,cols.mt,true)}  ${pad(r.pt,cols.pt,true)}`;
+              const hdr = fmt({k:'benchmark', mp:'peak(main)', pp:'peak(pr)', delta:'Δ peak', mt:'total(main)', pt:'total(pr)'});
+              return [hdr, '-'.repeat(hdr.length), ...rows.map(fmt)].join('\n');
+            }
+
+            const memTable = buildMemoryTable(
+              parseMemory('target/criterion/memory-main.txt'),
+              parseMemory('target/criterion/memory-pr.txt'),
+            );
+
+            let body = `## Benchmark results (PR vs \`main\`)\n\`\`\`\n${table}\`\`\`\n`;
+            if (memTable) {
+              body += `\n## Memory (PR vs \`main\`)\n\`\`\`\n${memTable}\n\`\`\`\n`;
+            }
+
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
