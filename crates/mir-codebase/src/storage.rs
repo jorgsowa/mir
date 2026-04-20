@@ -184,6 +184,8 @@ pub struct ClassStorage {
     pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub template_params: Vec<TemplateParam>,
+    /// Type arguments from `@extends ParentClass<T1, T2>` — maps parent's template params to concrete types.
+    pub extends_type_args: Vec<Union>,
     pub is_abstract: bool,
     pub is_final: bool,
     pub is_readonly: bool,

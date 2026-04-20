@@ -364,6 +364,10 @@ impl CallAnalyzer {
                         // Build class-level bindings from receiver's concrete type params (e.g. Collection<User> → T=User)
                         let class_tps = ea.codebase.get_class_template_params(fqcn);
                         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
+                        // Add bindings from @extends type args (e.g. class UserRepo extends BaseRepo<User> → T=User)
+                        for (k, v) in ea.codebase.get_inherited_template_bindings(fqcn) {
+                            bindings.entry(k).or_insert(v);
+                        }
 
                         // Extend with method-level bindings; warn on name collision (method shadows class template)
                         if !method.template_params.is_empty() {
@@ -497,6 +501,10 @@ impl CallAnalyzer {
                         // Build class-level bindings from receiver's concrete type params (e.g. Collection<User> → T=User)
                         let class_tps = ea.codebase.get_class_template_params(fqcn);
                         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
+                        // Add bindings from @extends type args (e.g. class UserRepo extends BaseRepo<User> → T=User)
+                        for (k, v) in ea.codebase.get_inherited_template_bindings(fqcn) {
+                            bindings.entry(k).or_insert(v);
+                        }
 
                         // Extend with method-level bindings; warn on name collision (method shadows class template)
                         if !method.template_params.is_empty() {

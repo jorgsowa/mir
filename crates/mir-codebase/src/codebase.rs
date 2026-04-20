@@ -777,6 +777,46 @@ impl Codebase {
         vec![]
     }
 
+    /// Walk the parent chain collecting template bindings from `@extends` type args.
+    ///
+    /// For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`, this returns
+    /// `{ T → User }` where `T` is `BaseRepo`'s declared template parameter.
+    pub fn get_inherited_template_bindings(
+        &self,
+        fqcn: &str,
+    ) -> std::collections::HashMap<Arc<str>, Union> {
+        let mut bindings = std::collections::HashMap::new();
+        let mut current = fqcn.to_string();
+
+        loop {
+            let (parent_fqcn, extends_type_args) = {
+                let cls = match self.classes.get(current.as_str()) {
+                    Some(c) => c,
+                    None => break,
+                };
+                let parent = match &cls.parent {
+                    Some(p) => p.clone(),
+                    None => break,
+                };
+                let args = cls.extends_type_args.clone();
+                (parent, args)
+            };
+
+            if !extends_type_args.is_empty() {
+                let parent_tps = self.get_class_template_params(&parent_fqcn);
+                for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
+                    bindings
+                        .entry(tp.name.clone())
+                        .or_insert_with(|| ty.clone());
+                }
+            }
+
+            current = parent_fqcn.to_string();
+        }
+
+        bindings
+    }
+
     /// Returns true if the class (or any ancestor/trait) defines a `__get` magic method.
     /// Such classes allow arbitrary property access, suppressing UndefinedProperty.
     pub fn has_magic_get(&self, fqcn: &str) -> bool {
