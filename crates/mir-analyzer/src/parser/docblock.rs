@@ -85,10 +85,10 @@ impl DocblockParser {
                     ));
                 }
                 PhpDocTag::Extends { type_str } => {
-                    result.extends = Some(type_str.to_string());
+                    result.extends = Some(parse_type_string(type_str));
                 }
                 PhpDocTag::Implements { type_str } => {
-                    result.implements.push(type_str.to_string());
+                    result.implements.push(parse_type_string(type_str));
                 }
                 PhpDocTag::Assert {
                     type_str: Some(ty_s),
@@ -224,9 +224,9 @@ pub struct ParsedDocblock {
     /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
     pub templates: Vec<(String, Option<Union>, Variance)>,
     /// `@extends ClassName<T>`
-    pub extends: Option<String>,
+    pub extends: Option<Union>,
     /// `@implements InterfaceName<T>`
-    pub implements: Vec<String>,
+    pub implements: Vec<Union>,
     /// `@throws ClassName`
     pub throws: Vec<String>,
     /// `@psalm-assert Type $var`
