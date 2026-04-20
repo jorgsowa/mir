@@ -874,26 +874,31 @@ fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>) {
             } else {
                 raw_param_ty
             };
-            // Null check: param is not nullable but arg could be null
-            if !param_ty.is_nullable() && arg_ty.is_nullable() {
+            // Null check: param is not nullable but arg could be null.
+            // Check definite null (single TNull) before possibly-null union to emit the
+            // correct severity: a literal `null` is InvalidArgument, not PossiblyNullArgument.
+            if !param_ty.is_nullable()
+                && !param_ty.is_mixed()
+                && arg_ty.is_single()
+                && arg_ty.contains(|t| matches!(t, Atomic::TNull))
+            {
+                ea.emit(
+                    IssueKind::InvalidArgument {
+                        param: param.name.to_string(),
+                        fn_name: fn_name.to_string(),
+                        expected: format!("{}", param_ty),
+                        actual: format!("{}", arg_ty),
+                    },
+                    Severity::Error,
+                    arg_span,
+                );
+            } else if !param_ty.is_nullable() && !param_ty.is_mixed() && arg_ty.is_nullable() {
                 ea.emit(
                     IssueKind::PossiblyNullArgument {
                         param: param.name.to_string(),
                         fn_name: fn_name.to_string(),
                     },
                     Severity::Info,
-                    arg_span,
-                );
-            } else if !param_ty.is_nullable()
-                && arg_ty.contains(|t| matches!(t, Atomic::TNull))
-                && arg_ty.is_single()
-            {
-                ea.emit(
-                    IssueKind::NullArgument {
-                        param: param.name.to_string(),
-                        fn_name: fn_name.to_string(),
-                    },
-                    Severity::Error,
                     arg_span,
                 );
             }
