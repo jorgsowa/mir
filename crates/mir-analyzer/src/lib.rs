@@ -28,3 +28,5 @@ pub mod composer;
 pub use composer::Psr4Map;
 
 pub mod test_utils;
+
+pub(crate) mod generated;
