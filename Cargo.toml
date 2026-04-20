@@ -6,6 +6,7 @@ members = [
     "crates/mir-codebase",
     "crates/mir-analyzer",
     "crates/mir-cli",
+    "crates/mir-stubs-gen",
 ]
 
 [workspace.package]
@@ -48,13 +49,14 @@ owo-colors  = "4"
 # Error handling
 thiserror = "2"
 anyhow    = "1"
+toml      = "0.8"
 
 # Diagnostics
 miette = { version = "7", features = ["fancy"] }
 
 # Hashing / caching
 sha2    = "0.11"
-bincode = "2"
+bincode = { version = "2", features = ["serde"] }
 
 [profile.release]
 lto           = "thin"

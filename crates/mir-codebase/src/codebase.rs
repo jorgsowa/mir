@@ -214,6 +214,33 @@ impl Codebase {
     }
 
     // -----------------------------------------------------------------------
+    // Stub injection
+    // -----------------------------------------------------------------------
+
+    /// Insert all definitions from `slice` into this codebase.
+    ///
+    /// Called by generated stub modules (`src/generated/stubs_*.rs`) to register
+    /// their pre-compiled definitions. Later insertions overwrite earlier ones,
+    /// so custom stubs loaded after PHPStorm stubs act as overrides.
+    pub fn inject_stub_slice(&self, slice: crate::storage::StubSlice) {
+        for cls in slice.classes {
+            self.classes.insert(cls.fqcn.clone(), cls);
+        }
+        for iface in slice.interfaces {
+            self.interfaces.insert(iface.fqcn.clone(), iface);
+        }
+        for tr in slice.traits {
+            self.traits.insert(tr.fqcn.clone(), tr);
+        }
+        for en in slice.enums {
+            self.enums.insert(en.fqcn.clone(), en);
+        }
+        for func in slice.functions {
+            self.functions.insert(func.fqn.clone(), func);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Compact reference index
     // -----------------------------------------------------------------------
 

@@ -299,3 +299,20 @@ impl FunctionStorage {
             .or(self.inferred_return_type.as_ref())
     }
 }
+
+// ---------------------------------------------------------------------------
+// StubSlice — serializable bundle of definitions from one extension's stubs
+// ---------------------------------------------------------------------------
+
+/// A snapshot of all PHP definitions contributed by a single stub file set.
+///
+/// Produced by `mir-stubs-gen` at code-generation time and deserialized at
+/// runtime to inject definitions into the `Codebase`.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct StubSlice {
+    pub classes: Vec<ClassStorage>,
+    pub interfaces: Vec<InterfaceStorage>,
+    pub traits: Vec<TraitStorage>,
+    pub enums: Vec<EnumStorage>,
+    pub functions: Vec<FunctionStorage>,
+}
