@@ -572,6 +572,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 n.class.span,
                             );
                         } else if self.codebase.type_exists(&fqcn) {
+                            if let Some(cls) = self.codebase.classes.get(fqcn.as_ref()) {
+                                if cls.is_deprecated {
+                                    self.emit(
+                                        IssueKind::DeprecatedClass {
+                                            name: fqcn.to_string(),
+                                        },
+                                        Severity::Info,
+                                        n.class.span,
+                                    );
+                                }
+                            }
                             // Check constructor arguments
                             if let Some(ctor) = self.codebase.get_method(&fqcn, "__construct") {
                                 crate::call::check_constructor_args(

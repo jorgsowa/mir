@@ -80,7 +80,7 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
 
-            // ---- 1. Final-class extension check --------------------------------
+            // ---- 1. Final-class extension check / deprecated parent check ------
             if let Some(parent_fqcn) = &cls.parent {
                 if let Some(parent) = self.codebase.classes.get(parent_fqcn.as_ref()) {
                     if parent.is_final {
@@ -95,6 +95,26 @@ impl<'a> ClassAnalyzer<'a> {
                             IssueKind::FinalClassExtended {
                                 parent: parent_fqcn.to_string(),
                                 child: fqcn.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources)
+                        {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                    if parent.is_deprecated {
+                        let loc = issue_location(
+                            cls.location.as_ref(),
+                            fqcn,
+                            cls.location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::DeprecatedClass {
+                                name: parent_fqcn.to_string(),
                             },
                             loc,
                         );
