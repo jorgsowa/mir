@@ -102,7 +102,11 @@ jobs:
           BASELINE_NAME: ${{ github.event_name == 'pull_request' && 'pr' || 'main' }}
         run: |
           cargo bench -p mir-analyzer --bench analyze_real_world \
-            -- --save-baseline "$BASELINE_NAME" --noplot
+            -- --save-baseline "$BASELINE_NAME" --noplot 2>&1 | tee bench-output.txt
+          echo '## Benchmark output' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat bench-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       # Push to main: persist the new baseline for future PR comparisons.
       - name: Save main baseline
@@ -117,13 +121,32 @@ jobs:
       - name: Compare baselines
         if: >-
           github.event_name == 'pull_request' &&
-          steps.restore-baseline.outputs.cache-hit == 'true'
-        run: critcmp main pr | tee critcmp-output.txt
+          steps.restore-baseline.outputs.cache-matched-key != ''
+        run: |
+          critcmp main pr | tee critcmp-output.txt
+          echo '## Benchmark results (PR vs `main`)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat critcmp-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post no-baseline notice
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.restore-baseline.outputs.cache-matched-key == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## Benchmark results\n\nNo `main` baseline found — comparison skipped. A baseline will be saved when this PR merges.',
+            });
 
       - name: Post comparison comment
         if: >-
           github.event_name == 'pull_request' &&
-          steps.restore-baseline.outputs.cache-hit == 'true'
+          steps.restore-baseline.outputs.cache-matched-key != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -137,7 +160,7 @@ jobs:
               `\`\`\`\n${table}\`\`\`\n` +
               `*Peak memory and total-allocation stats are printed to stderr — ` +
               `see the [workflow logs](${logsUrl}) for those numbers.*`;
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
