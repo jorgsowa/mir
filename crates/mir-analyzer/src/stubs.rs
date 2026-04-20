@@ -9,7 +9,8 @@
 /// 2. **Hand-written supplements** — override or extend the phpstorm set for
 ///    things that need custom handling (precise by-ref/variadic params, return
 ///    type shorthands, PHPUnit helpers, etc.).
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, LazyLock};
 
 use mir_codebase::storage::{
     ClassStorage, FnParam, FunctionStorage, InterfaceStorage, MethodStorage, Visibility,
@@ -62,8 +63,11 @@ fn load_phpstorm_stubs(codebase: &Codebase) {
 
 /// Returns `true` if `name` is a known PHP built-in function.
 ///
-/// Uses a sorted static array generated at compile time from `PhpStormStubsMap.php`,
-/// so no `Codebase` construction is needed.
+/// Fast path: binary search on `BUILTIN_FN_NAMES`, a sorted compile-time slice
+/// generated from `PhpStormStubsMap.php` by `build.rs`.
+///
+/// Fallback (phpstorm-stubs submodule absent, e.g. CI without submodule init):
+/// builds a `Codebase` from hand-written stubs and checks membership there.
 ///
 /// # Example
 /// ```
@@ -71,7 +75,16 @@ fn load_phpstorm_stubs(codebase: &Codebase) {
 /// assert!(!mir_analyzer::stubs::is_builtin_function("my_custom_function"));
 /// ```
 pub fn is_builtin_function(name: &str) -> bool {
-    BUILTIN_FN_NAMES.binary_search(&name).is_ok()
+    if !BUILTIN_FN_NAMES.is_empty() {
+        return BUILTIN_FN_NAMES.binary_search(&name).is_ok();
+    }
+    // Fallback when phpstorm-stubs submodule is absent: load hand-written stubs.
+    static FALLBACK: LazyLock<HashSet<Arc<str>>> = LazyLock::new(|| {
+        let codebase = Codebase::new();
+        load_stubs(&codebase);
+        codebase.functions.iter().map(|e| e.key().clone()).collect()
+    });
+    FALLBACK.contains(name)
 }
 
 // ---------------------------------------------------------------------------
