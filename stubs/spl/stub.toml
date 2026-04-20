@@ -1,0 +1,6 @@
+[extension]
+name        = "spl"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-spl"
+description = "Standard PHP Library stubs (data structures, iterators, exceptions)"

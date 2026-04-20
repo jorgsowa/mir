@@ -1,0 +1,6 @@
+[extension]
+name        = "ctype"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-ctype"
+description = "ctype extension stubs"

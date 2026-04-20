@@ -1,0 +1,5 @@
+[extension]
+name        = "standard"
+version     = "1.0.0"
+php-min     = "8.0"
+description = "PHP standard library stubs (strings, arrays, math, I/O, etc.)"

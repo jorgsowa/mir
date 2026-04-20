@@ -1,0 +1,6 @@
+[extension]
+name        = "date"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-date"
+description = "date extension stubs"

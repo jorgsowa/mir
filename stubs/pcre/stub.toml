@@ -1,0 +1,6 @@
+[extension]
+name        = "pcre"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-pcre"
+description = "pcre extension stubs"
