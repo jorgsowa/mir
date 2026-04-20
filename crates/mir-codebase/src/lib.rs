@@ -7,5 +7,6 @@ pub use codebase::{Codebase, StructuralSnapshot};
 pub use members::{MemberInfo, MemberKind};
 pub use storage::{
     ClassStorage, ConstantStorage, EnumCaseStorage, EnumStorage, FnParam, FunctionStorage,
-    InterfaceStorage, MethodStorage, PropertyStorage, TemplateParam, TraitStorage, Visibility,
+    InterfaceStorage, MethodStorage, PropertyStorage, StubSlice, TemplateParam, TraitStorage,
+    Visibility,
 };
