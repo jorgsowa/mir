@@ -364,11 +364,7 @@ impl ProjectAnalyzer {
             all_issues.extend(dead_code_issues);
         }
 
-        AnalysisResult {
-            issues: all_issues,
-            type_envs: std::collections::HashMap::new(),
-            symbols: all_symbols,
-        }
+        AnalysisResult::build(all_issues, std::collections::HashMap::new(), all_symbols)
     }
 
     /// Lazily load class definitions for referenced-but-unknown FQCNs via PSR-4.
@@ -464,11 +460,7 @@ impl ProjectAnalyzer {
             if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
                 self.codebase.replay_reference_locations(file, &ref_locs);
-                return AnalysisResult {
-                    issues,
-                    type_envs: HashMap::new(),
-                    symbols: Default::default(),
-                };
+                return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
         }
 
@@ -542,11 +534,7 @@ impl ProjectAnalyzer {
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
 
-        AnalysisResult {
-            issues: all_issues,
-            type_envs: HashMap::new(),
-            symbols,
-        }
+        AnalysisResult::build(all_issues, HashMap::new(), symbols)
     }
 
     /// Analyze a PHP source string without a real file path.
@@ -573,11 +561,7 @@ impl ProjectAnalyzer {
             &mut type_envs,
             &mut all_symbols,
         ));
-        AnalysisResult {
-            issues: all_issues,
-            type_envs,
-            symbols: all_symbols,
-        }
+        AnalysisResult::build(all_issues, type_envs, all_symbols)
     }
 
     /// Pass 2: walk all function/method bodies in one file, return issues, and
@@ -1707,8 +1691,39 @@ fn extract_reference_locations(codebase: &Codebase, file: &Arc<str>) -> Vec<(Str
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
     pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
-    /// Per-expression resolved symbols from Pass 2.
+    /// Per-expression resolved symbols from Pass 2, sorted by file path.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
+    /// Maps each file path to the contiguous range within `symbols` that belongs
+    /// to it. Built once after analysis; allows `symbol_at` to scan only the
+    /// relevant file's slice rather than the entire codebase-wide vector.
+    symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>>,
+}
+
+impl AnalysisResult {
+    fn build(
+        issues: Vec<Issue>,
+        type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        mut symbols: Vec<crate::symbol::ResolvedSymbol>,
+    ) -> Self {
+        // Sort by file so each file's symbols form a contiguous slice.
+        symbols.sort_unstable_by(|a, b| a.file.as_ref().cmp(b.file.as_ref()));
+        let mut symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>> = HashMap::new();
+        let mut i = 0;
+        while i < symbols.len() {
+            let file = Arc::clone(&symbols[i].file);
+            let start = i;
+            while i < symbols.len() && symbols[i].file == file {
+                i += 1;
+            }
+            symbols_by_file.insert(file, start..i);
+        }
+        Self {
+            issues,
+            type_envs,
+            symbols,
+            symbols_by_file,
+        }
+    }
 }
 
 impl AnalysisResult {
@@ -1754,11 +1769,10 @@ impl AnalysisResult {
         file: &str,
         byte_offset: u32,
     ) -> Option<&crate::symbol::ResolvedSymbol> {
-        self.symbols
+        let range = self.symbols_by_file.get(file)?;
+        self.symbols[range.clone()]
             .iter()
-            .filter(|s| {
-                s.file.as_ref() == file && s.span.start <= byte_offset && byte_offset < s.span.end
-            })
+            .filter(|s| s.span.start <= byte_offset && byte_offset < s.span.end)
             .min_by_key(|s| s.span.end - s.span.start)
     }
 }
