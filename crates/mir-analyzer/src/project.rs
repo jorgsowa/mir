@@ -110,27 +110,6 @@ impl ProjectAnalyzer {
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
         self.load_stubs();
 
-        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
-        // Uses the reverse dep graph persisted from the previous run.
-        if let Some(cache) = &self.cache {
-            let changed: Vec<String> = paths
-                .iter()
-                .filter_map(|p| {
-                    let path_str = p.to_string_lossy().into_owned();
-                    let content = std::fs::read_to_string(p).ok()?;
-                    let h = hash_content(&content);
-                    if cache.get(&path_str, &h).is_none() {
-                        Some(path_str)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            if !changed.is_empty() {
-                cache.evict_with_dependents(&changed);
-            }
-        }
-
         // ---- Pass 1: read files in parallel ----------------------------------
         let file_data: Vec<(Arc<str>, String)> = paths
             .par_iter()
@@ -142,6 +121,39 @@ impl ProjectAnalyzer {
                 }
             })
             .collect();
+
+        // ---- Compute content hashes once (parallel) when caching is enabled.
+        // Shared between pre-Pass-2 invalidation and the Pass 2 cache lookup so
+        // each file is hashed exactly once per run.
+        let file_hashes: Option<HashMap<Arc<str>, String>> = if self.cache.is_some() {
+            Some(
+                file_data
+                    .par_iter()
+                    .map(|(f, src)| (f.clone(), hash_content(src)))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
+        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
+        // Uses the reverse dep graph persisted from the previous run.
+        if let (Some(cache), Some(hashes)) = (&self.cache, &file_hashes) {
+            let changed: Vec<String> = file_data
+                .iter()
+                .filter_map(|(f, _)| {
+                    let h = hashes.get(f)?;
+                    if cache.get(f, h).is_none() {
+                        Some(f.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if !changed.is_empty() {
+                cache.evict_with_dependents(&changed);
+            }
+        }
 
         // ---- Pass 1: combined pre-index + definition collection (parallel) -----
         // Parse each file once; both the FQCN/namespace/import index and the full
@@ -321,10 +333,12 @@ impl ProjectAnalyzer {
         let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
             .par_iter()
             .map(|(file, src)| {
-                // Cache lookup
-                let result = if let Some(cache) = &self.cache {
-                    let h = hash_content(src);
-                    if let Some((cached_issues, ref_locs)) = cache.get(file, &h) {
+                // Cache lookup — reuse the hash computed in the pre-invalidation step.
+                let result = if let (Some(cache), Some(hashes)) = (&self.cache, &file_hashes) {
+                    let h = hashes
+                        .get(file)
+                        .expect("file_hashes populated for every file when cache is enabled");
+                    if let Some((cached_issues, ref_locs)) = cache.get(file, h) {
                         // Hit — replay reference locations so symbol_reference_locations
                         // is populated without re-running analyze_bodies.
                         self.codebase
@@ -341,7 +355,7 @@ impl ProjectAnalyzer {
                             &parsed.source_map,
                         );
                         let ref_locs = extract_reference_locations(&self.codebase, file);
-                        cache.put(file, h, issues.clone(), ref_locs);
+                        cache.put(file, h.clone(), issues.clone(), ref_locs);
                         (issues, symbols)
                     }
                 } else {
