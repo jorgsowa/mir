@@ -673,6 +673,39 @@ impl ProjectAnalyzer {
             }
         }
 
+        // Analyze top-level executable statements in global scope.
+        {
+            use crate::context::Context;
+            use crate::stmt::StatementsAnalyzer;
+            use mir_issues::IssueBuffer;
+
+            let mut ctx = Context::new();
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                &self.codebase,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                &mut all_symbols,
+            );
+            for stmt in program.stmts.iter() {
+                match &stmt.kind {
+                    StmtKind::Function(_)
+                    | StmtKind::Class(_)
+                    | StmtKind::Enum(_)
+                    | StmtKind::Interface(_)
+                    | StmtKind::Trait(_)
+                    | StmtKind::Namespace(_)
+                    | StmtKind::Use(_)
+                    | StmtKind::Declare(_) => {}
+                    _ => sa.analyze_stmt(stmt, &mut ctx),
+                }
+            }
+            drop(sa);
+            all_issues.extend(buf.into_issues());
+        }
+
         (all_issues, all_symbols)
     }
 
@@ -974,6 +1007,42 @@ impl ProjectAnalyzer {
                 _ => {}
             }
         }
+
+        // Analyze top-level executable statements in global scope (e.g. function calls
+        // outside any function/class body). Declaration nodes are skipped since they
+        // were already handled above.
+        {
+            use crate::context::Context;
+            use crate::stmt::StatementsAnalyzer;
+            use mir_issues::IssueBuffer;
+
+            let mut ctx = Context::new();
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                &self.codebase,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+            );
+            for stmt in program.stmts.iter() {
+                match &stmt.kind {
+                    StmtKind::Function(_)
+                    | StmtKind::Class(_)
+                    | StmtKind::Enum(_)
+                    | StmtKind::Interface(_)
+                    | StmtKind::Trait(_)
+                    | StmtKind::Namespace(_)
+                    | StmtKind::Use(_)
+                    | StmtKind::Declare(_) => {}
+                    _ => sa.analyze_stmt(stmt, &mut ctx),
+                }
+            }
+            drop(sa);
+            all_issues.extend(buf.into_issues());
+        }
+
         all_issues
     }
 
