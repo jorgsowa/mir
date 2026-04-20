@@ -400,6 +400,10 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.codebase,
                     &self.file,
                 );
+                // Capture narrowing-only unreachability before body analysis —
+                // body divergence (continue/return/throw) must not trigger
+                // RedundantCondition for valid conditions.
+                let then_unreachable_from_narrowing = then_ctx.diverges;
                 // Skip analyzing a statically-unreachable branch (prevents false
                 // positives in dead branches caused by overly conservative types).
                 if !then_ctx.diverges {
@@ -493,6 +497,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.codebase,
                     &self.file,
                 );
+                let else_unreachable_from_narrowing = else_ctx.diverges;
                 if !else_ctx.diverges {
                     if let Some(else_branch) = &if_stmt.else_branch {
                         self.analyze_stmt(else_branch, &mut else_ctx);
@@ -500,7 +505,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
 
                 // Emit RedundantCondition if narrowing proves one branch is statically unreachable.
-                if !pre_diverges && (then_ctx.diverges || else_ctx.diverges) {
+                if !pre_diverges
+                    && (then_unreachable_from_narrowing || else_unreachable_from_narrowing)
+                {
                     let (line, col_start) = self.offset_to_line_col(if_stmt.condition.span.start);
                     let col_end = if if_stmt.condition.span.start < if_stmt.condition.span.end {
                         let (_end_line, end_col) =
