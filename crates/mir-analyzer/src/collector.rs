@@ -348,7 +348,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
             StmtKind::Use(use_decl) => {
                 for item in use_decl.uses.iter() {
-                    let full_name = name_to_string(&item.name);
+                    let full_name = name_to_string(&item.name)
+                        .trim_start_matches('\\')
+                        .to_string();
                     let alias = item
                         .alias
                         .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
