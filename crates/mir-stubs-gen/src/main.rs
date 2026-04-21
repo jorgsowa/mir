@@ -94,7 +94,7 @@ fn main() {
 
         println!("generating stubs_{ext_name} (version {})", meta.version);
 
-        let slice = collect_stubs(ext_dir);
+        let slice = collect_stubs(ext_dir, &workspace_root);
 
         let encoded: Vec<u8> = bincode::serde::encode_to_vec(&slice, bincode::config::standard())
             .expect("bincode encode failed");
@@ -129,7 +129,7 @@ fn main() {
 // PHP stub collection
 // ---------------------------------------------------------------------------
 
-fn collect_stubs(ext_dir: &Path) -> StubSlice {
+fn collect_stubs(ext_dir: &Path, workspace_root: &Path) -> StubSlice {
     let codebase = Codebase::new();
 
     let mut php_files: Vec<PathBuf> = collect_php_files(ext_dir);
@@ -141,7 +141,10 @@ fn collect_stubs(ext_dir: &Path) -> StubSlice {
 
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse(&arena, &content);
-        let filename: Arc<str> = Arc::from(php_path.to_string_lossy().as_ref());
+        // Use a workspace-relative filename so generated stubs are byte-identical
+        // regardless of where the repo is checked out.
+        let rel = php_path.strip_prefix(workspace_root).unwrap_or(php_path);
+        let filename: Arc<str> = Arc::from(rel.to_string_lossy().as_ref());
         let collector = mir_analyzer::collector::DefinitionCollector::new(
             &codebase,
             filename,
