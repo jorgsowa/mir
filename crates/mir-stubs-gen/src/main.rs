@@ -158,37 +158,58 @@ fn collect_stubs(ext_dir: &Path, workspace_root: &Path) -> StubSlice {
     }
 
     // Strip source locations so generated files are portable across machines.
+    // Sort each collection by name so DashMap iteration order doesn't leak into
+    // the serialized output — without this, consecutive regen runs produce
+    // different bytes and `verify-stub-hashes.sh` can't gate on byte-identity.
+    let mut classes: Vec<_> = codebase
+        .classes
+        .iter()
+        .map(|e| strip_class_location(e.value().clone()))
+        .collect();
+    classes.sort_by(|a, b| a.fqcn.cmp(&b.fqcn));
+
+    let mut interfaces: Vec<_> = codebase
+        .interfaces
+        .iter()
+        .map(|e| strip_interface_location(e.value().clone()))
+        .collect();
+    interfaces.sort_by(|a, b| a.fqcn.cmp(&b.fqcn));
+
+    let mut traits: Vec<_> = codebase
+        .traits
+        .iter()
+        .map(|e| strip_trait_location(e.value().clone()))
+        .collect();
+    traits.sort_by(|a, b| a.fqcn.cmp(&b.fqcn));
+
+    let mut enums: Vec<_> = codebase
+        .enums
+        .iter()
+        .map(|e| strip_enum_location(e.value().clone()))
+        .collect();
+    enums.sort_by(|a, b| a.fqcn.cmp(&b.fqcn));
+
+    let mut functions: Vec<_> = codebase
+        .functions
+        .iter()
+        .map(|e| strip_fn_location(e.value().clone()))
+        .collect();
+    functions.sort_by(|a, b| a.fqn.cmp(&b.fqn));
+
+    let mut constants: Vec<_> = codebase
+        .constants
+        .iter()
+        .map(|e| (e.key().clone(), e.value().clone()))
+        .collect();
+    constants.sort_by(|a, b| a.0.cmp(&b.0));
+
     StubSlice {
-        classes: codebase
-            .classes
-            .iter()
-            .map(|e| strip_class_location(e.value().clone()))
-            .collect(),
-        interfaces: codebase
-            .interfaces
-            .iter()
-            .map(|e| strip_interface_location(e.value().clone()))
-            .collect(),
-        traits: codebase
-            .traits
-            .iter()
-            .map(|e| strip_trait_location(e.value().clone()))
-            .collect(),
-        enums: codebase
-            .enums
-            .iter()
-            .map(|e| strip_enum_location(e.value().clone()))
-            .collect(),
-        functions: codebase
-            .functions
-            .iter()
-            .map(|e| strip_fn_location(e.value().clone()))
-            .collect(),
-        constants: codebase
-            .constants
-            .iter()
-            .map(|e| (e.key().clone(), e.value().clone()))
-            .collect(),
+        classes,
+        interfaces,
+        traits,
+        enums,
+        functions,
+        constants,
     }
 }
 
