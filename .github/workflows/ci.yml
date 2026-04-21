@@ -6,35 +6,25 @@ on:
   pull_request:
 
 jobs:
-  fmt:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
         run: cargo fmt --all -- --check
-
-  clippy:
-    needs: fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - uses: Swatinem/rust-cache@v2
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
   stubs-up-to-date:
-    needs: fmt
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +44,7 @@ jobs:
           fi
 
   test:
-    needs: [clippy, stubs-up-to-date]
+    needs: stubs-up-to-date
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
