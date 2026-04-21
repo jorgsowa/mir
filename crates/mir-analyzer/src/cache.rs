@@ -1,6 +1,6 @@
 /// Per-file analysis result cache backed by a JSON file on disk.
 ///
-/// Cache key: file path.  Cache validity: SHA-256 hash of file content.
+/// Cache key: file path.  Cache validity: BLAKE3 hash of file content.
 /// If the content hash matches what was stored, the cached issues are returned
 /// and Pass 2 analysis is skipped for that file.
 use std::collections::{HashMap, HashSet};
@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use mir_issues::Issue;
 
@@ -20,15 +19,9 @@ pub type CacheHit = (Vec<Issue>, Vec<(String, u32, u32)>);
 // Hash helper
 // ---------------------------------------------------------------------------
 
-/// Compute the SHA-256 hex digest of `content`.
+/// Compute the BLAKE3 hex digest of `content`.
 pub fn hash_content(content: &str) -> String {
-    let mut h = Sha256::new();
-    h.update(content.as_bytes());
-    h.finalize().iter().fold(String::new(), |mut acc, b| {
-        use std::fmt::Write;
-        write!(acc, "{:02x}", b).unwrap();
-        acc
-    })
+    blake3::hash(content.as_bytes()).to_hex().to_string()
 }
 
 // ---------------------------------------------------------------------------
