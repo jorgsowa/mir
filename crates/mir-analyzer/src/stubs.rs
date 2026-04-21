@@ -65,6 +65,25 @@ pub fn load_stubs(codebase: &Codebase) {
     crate::generated::stubs_xml::register(codebase);
     crate::generated::stubs_zip::register(codebase);
     crate::generated::stubs_zlib::register(codebase);
+    crate::generated::stubs_calendar::register(codebase);
+    crate::generated::stubs_exif::register(codebase);
+    crate::generated::stubs_ftp::register(codebase);
+    crate::generated::stubs_gd::register(codebase);
+    crate::generated::stubs_gettext::register(codebase);
+    crate::generated::stubs_opcache::register(codebase);
+    crate::generated::stubs_pgsql::register(codebase);
+    crate::generated::stubs_phar::register(codebase);
+    crate::generated::stubs_readline::register(codebase);
+    crate::generated::stubs_shmop::register(codebase);
+    crate::generated::stubs_soap::register(codebase);
+    crate::generated::stubs_sqlite3::register(codebase);
+    crate::generated::stubs_sysvmsg::register(codebase);
+    crate::generated::stubs_sysvsem::register(codebase);
+    crate::generated::stubs_sysvshm::register(codebase);
+    crate::generated::stubs_tidy::register(codebase);
+    crate::generated::stubs_xmlreader::register(codebase);
+    crate::generated::stubs_xmlwriter::register(codebase);
+    crate::generated::stubs_xsl::register(codebase);
     // Layer 3: remaining hand-written stubs (to be migrated to PHP stubs incrementally).
     load_functions(codebase);
     load_classes(codebase);
