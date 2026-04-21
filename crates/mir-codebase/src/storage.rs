@@ -315,4 +315,6 @@ pub struct StubSlice {
     pub traits: Vec<TraitStorage>,
     pub enums: Vec<EnumStorage>,
     pub functions: Vec<FunctionStorage>,
+    #[serde(default)]
+    pub constants: Vec<(Arc<str>, Union)>,
 }

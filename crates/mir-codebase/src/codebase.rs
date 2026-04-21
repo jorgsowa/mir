@@ -238,6 +238,9 @@ impl Codebase {
         for func in slice.functions {
             self.functions.insert(func.fqn.clone(), func);
         }
+        for (name, ty) in slice.constants {
+            self.constants.insert(name, ty);
+        }
     }
 
     // -----------------------------------------------------------------------
