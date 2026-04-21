@@ -1,0 +1,6 @@
+[extension]
+name        = "json"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-json"
+description = "json extension stubs"
