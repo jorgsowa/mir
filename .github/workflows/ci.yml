@@ -6,26 +6,58 @@ on:
   pull_request:
 
 jobs:
-  lint:
+  fmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
+          components: rustfmt
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+  clippy:
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+  stubs-up-to-date:
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Regenerate stubs
+        run: cargo run -p mir-stubs-gen
+
+      - name: Verify generated files match committed stubs
+        run: |
+          if ! git diff --exit-code -- crates/mir-analyzer/src/generated; then
+            echo "::error::Generated stub files are out of date. Run 'cargo run -p mir-stubs-gen' and commit the changes."
+            exit 1
+          fi
+
   test:
+    needs: [clippy, stubs-up-to-date]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: true
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
