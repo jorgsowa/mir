@@ -156,7 +156,9 @@ impl ProjectAnalyzer {
                             match &stmt.kind {
                                 StmtKind::Use(use_decl) => {
                                     for item in use_decl.uses.iter() {
-                                        let full_name = crate::parser::name_to_string(&item.name);
+                                        let full_name = crate::parser::name_to_string(&item.name)
+                                            .trim_start_matches('\\')
+                                            .to_string();
                                         let alias = item.alias.unwrap_or_else(|| {
                                             full_name.rsplit('\\').next().unwrap_or(&full_name)
                                         });
