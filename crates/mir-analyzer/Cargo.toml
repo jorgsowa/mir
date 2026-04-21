@@ -22,12 +22,12 @@ sha2          = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
 bincode       = { workspace = true }
-quick-xml     = "0.36"
+quick-xml     = "0.39"
 
 [dev-dependencies]
 mir-issues     = { workspace = true }
 tempfile = "3.27.0"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name    = "analyze_real_world"

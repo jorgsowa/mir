@@ -178,7 +178,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
 
             Ok(Event::Text(t)) => {
                 text_buf = t
-                    .unescape()
+                    .xml_content()
                     .map_err(|e| ConfigError::Parse(e.to_string()))?
                     .to_string();
             }
@@ -387,7 +387,7 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
             }
             Ok(Event::Text(t)) => {
                 let s = t
-                    .unescape()
+                    .xml_content()
                     .map_err(|e| ConfigError::Parse(e.to_string()))?;
                 let trimmed = s.trim().to_string();
                 if !trimmed.is_empty() {
