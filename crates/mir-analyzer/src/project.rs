@@ -110,27 +110,6 @@ impl ProjectAnalyzer {
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
         self.load_stubs();
 
-        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
-        // Uses the reverse dep graph persisted from the previous run.
-        if let Some(cache) = &self.cache {
-            let changed: Vec<String> = paths
-                .iter()
-                .filter_map(|p| {
-                    let path_str = p.to_string_lossy().into_owned();
-                    let content = std::fs::read_to_string(p).ok()?;
-                    let h = hash_content(&content);
-                    if cache.get(&path_str, &h).is_none() {
-                        Some(path_str)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            if !changed.is_empty() {
-                cache.evict_with_dependents(&changed);
-            }
-        }
-
         // ---- Pass 1: read files in parallel ----------------------------------
         let file_data: Vec<(Arc<str>, String)> = paths
             .par_iter()
@@ -142,6 +121,27 @@ impl ProjectAnalyzer {
                 }
             })
             .collect();
+
+        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
+        // Uses the reverse dep graph persisted from the previous run. Hashes are
+        // recomputed inline inside Pass 2; avoiding a shared HashMap + global
+        // sync barrier keeps Pass 2's parallel pipeline unblocked.
+        if let Some(cache) = &self.cache {
+            let changed: Vec<String> = file_data
+                .par_iter()
+                .filter_map(|(f, src)| {
+                    let h = hash_content(src);
+                    if cache.get(f, &h).is_none() {
+                        Some(f.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if !changed.is_empty() {
+                cache.evict_with_dependents(&changed);
+            }
+        }
 
         // ---- Pass 1: combined pre-index + definition collection (parallel) -----
         // Parse each file once; both the FQCN/namespace/import index and the full
