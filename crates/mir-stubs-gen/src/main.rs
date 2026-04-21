@@ -178,6 +178,11 @@ fn collect_stubs(ext_dir: &Path) -> StubSlice {
             .iter()
             .map(|e| strip_fn_location(e.value().clone()))
             .collect(),
+        constants: codebase
+            .constants
+            .iter()
+            .map(|e| (e.key().clone(), e.value().clone()))
+            .collect(),
     }
 }
 

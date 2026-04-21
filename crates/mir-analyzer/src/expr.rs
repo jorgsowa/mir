@@ -139,8 +139,37 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::VariableVariable(_) => Union::mixed(), // $$x — unknowable
 
-            ExprKind::Identifier(_name) => {
-                // Bare identifier used as value (e.g. class constant, global const)
+            ExprKind::Identifier(name) => {
+                // Bare identifier used as value — a global constant reference.
+                let name_str: &str = name.as_ref();
+
+                // Strip leading backslash for absolute constant references (e.g. \PHP_EOL)
+                let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
+
+                // Try namespace-qualified name first, then fall back to global
+                let found = {
+                    let ns_qualified = self
+                        .codebase
+                        .file_namespaces
+                        .get(self.file.as_ref())
+                        .map(|ns| format!("{}\\{}", *ns, name_str));
+
+                    ns_qualified
+                        .as_deref()
+                        .map(|q| self.codebase.constants.contains_key(q))
+                        .unwrap_or(false)
+                        || self.codebase.constants.contains_key(name_str)
+                };
+
+                if !found {
+                    self.emit(
+                        IssueKind::UndefinedConstant {
+                            name: name_str.to_string(),
+                        },
+                        Severity::Error,
+                        expr.span,
+                    );
+                }
                 Union::mixed()
             }
 
@@ -727,6 +756,43 @@ impl<'a> ExpressionAnalyzer<'a> {
                     };
                     return Union::single(Atomic::TClassString(fqcn));
                 }
+
+                let const_name = match cca.member.name_str() {
+                    Some(n) => n.to_string(),
+                    None => return Union::mixed(),
+                };
+
+                let fqcn = match &cca.class.kind {
+                    ExprKind::Identifier(id) => {
+                        let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
+                        // self/static/parent: can't validate without full type narrowing
+                        if matches!(resolved.as_str(), "self" | "static" | "parent") {
+                            return Union::mixed();
+                        }
+                        resolved
+                    }
+                    _ => return Union::mixed(),
+                };
+
+                if !self.codebase.type_exists(&fqcn) {
+                    // UndefinedClass is reported elsewhere; avoid double-reporting
+                    return Union::mixed();
+                }
+
+                if self
+                    .codebase
+                    .get_class_constant(&fqcn, &const_name)
+                    .is_none()
+                    && !self.codebase.has_unknown_ancestor(&fqcn)
+                {
+                    self.emit(
+                        IssueKind::UndefinedConstant {
+                            name: format!("{}::{}", fqcn, const_name),
+                        },
+                        Severity::Error,
+                        expr.span,
+                    );
+                }
                 Union::mixed()
             }
 
@@ -1080,6 +1146,25 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Union::single(Atomic::TBool);
         }
 
+        // `instanceof` right-hand side is a class name, not a value expression to analyze.
+        if b.op == B::Instanceof {
+            let _left_ty = self.analyze(b.left, ctx);
+            if let ExprKind::Identifier(name) = &b.right.kind {
+                let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
+                let fqcn: std::sync::Arc<str> = std::sync::Arc::from(resolved.as_str());
+                if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                    && !self.codebase.type_exists(&fqcn)
+                {
+                    self.emit(
+                        IssueKind::UndefinedClass { name: resolved },
+                        Severity::Error,
+                        b.right.span,
+                    );
+                }
+            }
+            return Union::single(Atomic::TBool);
+        }
+
         let left_ty = self.analyze(b.left, ctx);
         let right_ty = self.analyze(b.right, ctx);
 
@@ -1105,24 +1190,6 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::LessOrEqual
             | BinaryOp::GreaterOrEqual => Union::single(Atomic::TBool),
 
-            BinaryOp::Instanceof => {
-                // Check that the class on the right side of `instanceof` exists.
-                if let ExprKind::Identifier(name) = &b.right.kind {
-                    let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
-                    let fqcn: std::sync::Arc<str> = std::sync::Arc::from(resolved.as_str());
-                    if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                        && !self.codebase.type_exists(&fqcn)
-                    {
-                        self.emit(
-                            IssueKind::UndefinedClass { name: resolved },
-                            Severity::Error,
-                            b.right.span,
-                        );
-                    }
-                }
-                Union::single(Atomic::TBool)
-            }
-
             // Spaceship returns -1|0|1
             BinaryOp::Spaceship => Union::single(Atomic::TIntRange {
                 min: Some(-1),
@@ -1145,6 +1212,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // Pipe (FirstClassCallable-style) — rare
             BinaryOp::Pipe => right_ty,
+
+            // Handled before analyze(b.right) — unreachable here
+            BinaryOp::Instanceof => Union::single(Atomic::TBool),
         }
     }
 
