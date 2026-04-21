@@ -187,8 +187,29 @@ fn main() {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     // --- Composer auto-detection -------------------------------------------
-    if cli.paths.is_empty() && cwd.join("composer.json").exists() {
-        let (mut analyzer, map) = match ProjectAnalyzer::from_composer(&cwd) {
+    // Trigger when: no paths given and cwd has composer.json, OR a single
+    // directory argument is given that contains a composer.json.
+    let composer_root: Option<PathBuf> = if cli.paths.is_empty() {
+        if cwd.join("composer.json").exists() {
+            Some(cwd.clone())
+        } else {
+            None
+        }
+    } else if cli.paths.len() == 1 {
+        let p = cli.paths[0]
+            .canonicalize()
+            .unwrap_or_else(|_| cli.paths[0].clone());
+        if p.is_dir() && p.join("composer.json").exists() {
+            Some(p)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if let Some(ref composer_root) = composer_root {
+        let (mut analyzer, map) = match ProjectAnalyzer::from_composer(composer_root) {
             Ok(pair) => pair,
             Err(e) => {
                 eprintln!("mir: composer error: {}", e);
@@ -222,7 +243,7 @@ fn main() {
             .collect();
 
         // Filter out ignored directories from project files
-        let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let cwd_abs = composer_root.clone();
         let files: Vec<PathBuf> = map
             .project_files()
             .into_iter()
