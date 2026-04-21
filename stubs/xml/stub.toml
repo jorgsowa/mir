@@ -1,0 +1,6 @@
+[extension]
+name        = "xml"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-xml"
+description = "xml extension stubs"

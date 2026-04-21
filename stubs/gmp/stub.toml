@@ -1,0 +1,6 @@
+[extension]
+name        = "gmp"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-gmp"
+description = "gmp extension stubs"

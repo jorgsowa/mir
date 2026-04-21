@@ -1,0 +1,6 @@
+[extension]
+name        = "zip"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-zip"
+description = "zip extension stubs"

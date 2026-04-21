@@ -1,0 +1,6 @@
+[extension]
+name        = "simplexml"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-simplexml"
+description = "SimpleXML extension stubs"
