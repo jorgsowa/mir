@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "mir-analyzer"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bincode",
  "blake3",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "mir-codebase"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bincode",
  "dashmap",
@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "mir-issues"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "mir-types",
  "owo-colors",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "mir-php"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "mir-stubs-gen"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bincode",
  "blake3",
@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "mir-types"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "indexmap",
  "serde",
