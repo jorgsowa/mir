@@ -1,0 +1,6 @@
+[extension]
+name        = "soap"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-soap"
+description = "soap extension stubs (imported from phpstorm-stubs)"

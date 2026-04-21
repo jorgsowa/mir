@@ -32,39 +32,7 @@ pub fn load_stubs(codebase: &Codebase) {
     // Layer 1: parse phpstorm-stubs for comprehensive built-in coverage.
     load_phpstorm_stubs(codebase);
     // Layer 2: generated stubs from stubs/{ext}/*.php — override with precise types.
-    crate::generated::stubs_core::register(codebase);
-    crate::generated::stubs_standard::register(codebase);
-    crate::generated::stubs_spl::register(codebase);
-    crate::generated::stubs_bcmath::register(codebase);
-    crate::generated::stubs_ctype::register(codebase);
-    crate::generated::stubs_curl::register(codebase);
-    crate::generated::stubs_date::register(codebase);
-    crate::generated::stubs_dom::register(codebase);
-    crate::generated::stubs_fileinfo::register(codebase);
-    crate::generated::stubs_filter::register(codebase);
-    crate::generated::stubs_gmp::register(codebase);
-    crate::generated::stubs_hash::register(codebase);
-    crate::generated::stubs_iconv::register(codebase);
-    crate::generated::stubs_intl::register(codebase);
-    crate::generated::stubs_json::register(codebase);
-    crate::generated::stubs_libxml::register(codebase);
-    crate::generated::stubs_mbstring::register(codebase);
-    crate::generated::stubs_mysqli::register(codebase);
-    crate::generated::stubs_openssl::register(codebase);
-    crate::generated::stubs_pcntl::register(codebase);
-    crate::generated::stubs_pcre::register(codebase);
-    crate::generated::stubs_pdo::register(codebase);
-    crate::generated::stubs_posix::register(codebase);
-    crate::generated::stubs_random::register(codebase);
-    crate::generated::stubs_reflection::register(codebase);
-    crate::generated::stubs_session::register(codebase);
-    crate::generated::stubs_simplexml::register(codebase);
-    crate::generated::stubs_sockets::register(codebase);
-    crate::generated::stubs_sodium::register(codebase);
-    crate::generated::stubs_tokenizer::register(codebase);
-    crate::generated::stubs_xml::register(codebase);
-    crate::generated::stubs_zip::register(codebase);
-    crate::generated::stubs_zlib::register(codebase);
+    crate::generated::register_all(codebase);
     // Layer 3: remaining hand-written stubs (to be migrated to PHP stubs incrementally).
     load_functions(codebase);
     load_classes(codebase);

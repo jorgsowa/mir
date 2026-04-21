@@ -1,0 +1,6 @@
+[extension]
+name        = "sysvmsg"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-sysvmsg"
+description = "sysvmsg extension stubs (imported from phpstorm-stubs)"

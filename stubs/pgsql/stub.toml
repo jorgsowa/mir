@@ -1,0 +1,6 @@
+[extension]
+name        = "pgsql"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-pgsql"
+description = "pgsql extension stubs (imported from phpstorm-stubs)"

@@ -1,0 +1,6 @@
+[extension]
+name        = "calendar"
+version     = "1.0.0"
+php-min     = "8.0"
+composer    = "ext-calendar"
+description = "calendar extension stubs (imported from phpstorm-stubs)"
