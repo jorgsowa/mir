@@ -11,12 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **PHP-first stub pipeline** — stubs are now authored as PHP source files under `stubs/{ext}/` with `stub.toml` manifests and transformed into Rust via the new `mir-stubs-gen` codegen tool, replacing the monolithic hand-written `stubs.rs`. (#243)
 - **First-party stubs for 30 PHP extensions** — bundled stubs cover common extensions (curl, pdo, json, mbstring, etc.), loaded into the codebase at startup. (#246)
+- **19 additional bundled-with-PHP extensions** — calendar, exif, ftp, gd, gettext, opcache, pgsql, phar, readline, shmop, soap, sqlite3, sysvmsg, sysvsem, sysvshm, tidy, xmlreader, xmlwriter, xsl. (#251)
 - **`UndefinedConstant` issue** — the analyzer now emits `UndefinedConstant` for references to undefined global and class constants. (#242)
 - **Target PHP version plumbed into `ProjectAnalyzer`** — the analyzer accepts a target PHP version to gate version-specific behavior. (#249)
 
 ### Changed
 
 - Upgraded php-rs-parser and php-ast to 0.9; upgraded toml, quick-xml, and criterion to latest. (#245)
+
+### Performance
+
+- **BLAKE3 for cache hashing** — replaced SHA-256 with BLAKE3 for the incremental cache and deduplicated per-file hashing. (#244)
 
 ### Fixed
 
