@@ -8,6 +8,7 @@ pub mod expr;
 pub mod generic;
 pub mod narrowing;
 pub mod parser;
+pub mod php_version;
 pub mod project;
 pub mod stmt;
 pub mod stubs;
@@ -15,6 +16,7 @@ pub mod taint;
 
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
+pub use php_version::{ParsePhpVersionError, PhpVersion};
 pub use project::{AnalysisResult, ProjectAnalyzer};
 pub use stubs::is_builtin_function;
 

@@ -9,7 +9,7 @@ use owo_colors::OwoColorize;
 mod config;
 
 use config::{Baseline, Config, ErrorLevel};
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{PhpVersion, ProjectAnalyzer};
 use mir_issues::{Issue, Severity};
 
 // ---------------------------------------------------------------------------
@@ -407,6 +407,15 @@ fn main() {
     } else {
         ProjectAnalyzer::new()
     };
+
+    // Resolve target PHP version: CLI overrides config; malformed values warn
+    // and fall back to the default rather than aborting analysis.
+    if let Some(raw) = &config.php_version {
+        match raw.parse::<PhpVersion>() {
+            Ok(v) => analyzer = analyzer.with_php_version(v),
+            Err(e) => eprintln!("mir: {}; using default PHP {}", e, analyzer.php_version),
+        }
+    }
 
     analyzer.find_dead_code = cli.find_dead_code;
 

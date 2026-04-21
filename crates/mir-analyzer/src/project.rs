@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
+use crate::php_version::PhpVersion;
 use mir_codebase::Codebase;
 use mir_issues::Issue;
 use mir_types::Union;
@@ -29,6 +30,9 @@ pub struct ProjectAnalyzer {
     stubs_loaded: std::sync::atomic::AtomicBool,
     /// When true, run dead code detection at the end of analysis.
     pub find_dead_code: bool,
+    /// Target PHP language version. Used for version-conditional decisions
+    /// such as stub filtering.
+    pub php_version: PhpVersion,
 }
 
 impl ProjectAnalyzer {
@@ -40,6 +44,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: PhpVersion::default(),
         }
     }
 
@@ -52,6 +57,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: PhpVersion::default(),
         }
     }
 
@@ -70,8 +76,15 @@ impl ProjectAnalyzer {
             psr4: Some(psr4),
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
+            php_version: PhpVersion::default(),
         };
         Ok((analyzer, map))
+    }
+
+    /// Set the target PHP version.
+    pub fn with_php_version(mut self, version: PhpVersion) -> Self {
+        self.php_version = version;
+        self
     }
 
     /// Expose codebase for external use (e.g., pre-loading stubs from CLI).
