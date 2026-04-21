@@ -1,6 +1,7 @@
 // Generated from stubs/simplexml/ — version 1.0.0 | php >= 8.0
 // Run `cargo run -p mir-stubs-gen -- simplexml` to regenerate
 // DO NOT EDIT DIRECTLY
+// input-hash: blake3:20b3e271de5d9295d7c70630a7c3deb4ac1d50e3c5c3dabebc924d74988e9afa
 
 static DATA: &[u8] = &[
     0x02, 0x11, 0x53, 0x69, 0x6d, 0x70, 0x6c, 0x65, 0x58, 0x4d, 0x4c, 0x49, 0x74, 0x65, 0x72, 0x61,
