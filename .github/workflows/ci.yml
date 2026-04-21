@@ -29,19 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install b3sum
+        run: sudo apt-get update && sudo apt-get install -y b3sum
 
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Regenerate stubs
-        run: cargo run -p mir-stubs-gen
-
-      - name: Verify generated files match committed stubs
-        run: |
-          if ! git diff --exit-code -- crates/mir-analyzer/src/generated; then
-            echo "::error::Generated stub files are out of date. Run 'cargo run -p mir-stubs-gen' and commit the changes."
-            exit 1
-          fi
+      - name: Verify stub input-hashes match generated headers
+        run: ./scripts/verify-stub-hashes.sh
 
   test:
     needs: stubs-up-to-date

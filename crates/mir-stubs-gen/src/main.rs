@@ -94,6 +94,8 @@ fn main() {
 
         println!("generating stubs_{ext_name} (version {})", meta.version);
 
+        let input_hash = hash_input_tree(ext_dir);
+
         let slice = collect_stubs(ext_dir, &workspace_root);
 
         let encoded: Vec<u8> = bincode::serde::encode_to_vec(&slice, bincode::config::standard())
@@ -108,6 +110,7 @@ fn main() {
             &ext_name,
             &meta.version,
             &meta.php_min,
+            &input_hash,
             &encoded,
         );
 
@@ -275,6 +278,45 @@ fn collect_php_files(dir: &Path) -> Vec<PathBuf> {
 }
 
 // ---------------------------------------------------------------------------
+// Input hash — blake3 over sorted (relative-path, content) pairs for stubs/{ext}/
+// ---------------------------------------------------------------------------
+
+/// Deterministic hash over stubs/{ext}/: for each file in sorted relative-path
+/// order, feeds `relpath \0 content \0` into blake3. The format is trivially
+/// reproducible from a shell script so CI can verify without compiling.
+fn hash_input_tree(ext_dir: &Path) -> String {
+    let mut files: Vec<PathBuf> = Vec::new();
+    collect_all_files(ext_dir, &mut files);
+    files.sort();
+
+    let mut hasher = blake3::Hasher::new();
+    for path in &files {
+        let rel = path.strip_prefix(ext_dir).unwrap_or(path);
+        let rel_str = rel.to_string_lossy();
+        let content = std::fs::read(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        hasher.update(rel_str.as_bytes());
+        hasher.update(&[0u8]);
+        hasher.update(&content);
+        hasher.update(&[0u8]);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn collect_all_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_all_files(&path, out);
+            } else {
+                out.push(path);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Generated file writer
 // ---------------------------------------------------------------------------
 
@@ -284,6 +326,7 @@ fn write_generated_file(
     ext_name: &str,
     version: &str,
     php_min: &str,
+    input_hash: &str,
     encoded: &[u8],
 ) {
     let mut code = String::new();
@@ -299,6 +342,7 @@ fn write_generated_file(
     )
     .unwrap();
     writeln!(code, "// DO NOT EDIT DIRECTLY").unwrap();
+    writeln!(code, "// input-hash: blake3:{input_hash}").unwrap();
     writeln!(code).unwrap();
 
     // Embed the bincode-encoded StubSlice as a byte array.
