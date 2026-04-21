@@ -238,6 +238,9 @@ impl Codebase {
         for func in slice.functions {
             self.functions.insert(func.fqn.clone(), func);
         }
+        for (name, ty) in slice.constants {
+            self.constants.insert(name, ty);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -628,6 +631,98 @@ impl Codebase {
                     return Some(p.clone());
                 }
             }
+        }
+
+        None
+    }
+
+    /// Resolve a class constant by name, walking up the inheritance chain.
+    pub fn get_class_constant(
+        &self,
+        fqcn: &str,
+        const_name: &str,
+    ) -> Option<crate::storage::ConstantStorage> {
+        // Class: own → traits → ancestors → interfaces
+        if let Some(cls) = self.classes.get(fqcn) {
+            if let Some(c) = cls.own_constants.get(const_name) {
+                return Some(c.clone());
+            }
+            let all_parents = cls.all_parents.clone();
+            let interfaces = cls.interfaces.clone();
+            let traits = cls.traits.clone();
+            drop(cls);
+
+            for tr_fqcn in &traits {
+                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    if let Some(c) = tr.own_constants.get(const_name) {
+                        return Some(c.clone());
+                    }
+                }
+            }
+
+            for ancestor_fqcn in &all_parents {
+                if let Some(ancestor) = self.classes.get(ancestor_fqcn.as_ref()) {
+                    if let Some(c) = ancestor.own_constants.get(const_name) {
+                        return Some(c.clone());
+                    }
+                }
+                if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
+                    if let Some(c) = iface.own_constants.get(const_name) {
+                        return Some(c.clone());
+                    }
+                }
+            }
+
+            for iface_fqcn in &interfaces {
+                if let Some(iface) = self.interfaces.get(iface_fqcn.as_ref()) {
+                    if let Some(c) = iface.own_constants.get(const_name) {
+                        return Some(c.clone());
+                    }
+                }
+            }
+
+            return None;
+        }
+
+        // Interface: own → parent interfaces
+        if let Some(iface) = self.interfaces.get(fqcn) {
+            if let Some(c) = iface.own_constants.get(const_name) {
+                return Some(c.clone());
+            }
+            let parents = iface.all_parents.clone();
+            drop(iface);
+            for p in &parents {
+                if let Some(parent_iface) = self.interfaces.get(p.as_ref()) {
+                    if let Some(c) = parent_iface.own_constants.get(const_name) {
+                        return Some(c.clone());
+                    }
+                }
+            }
+            return None;
+        }
+
+        // Enum: own constants + cases
+        if let Some(en) = self.enums.get(fqcn) {
+            if let Some(c) = en.own_constants.get(const_name) {
+                return Some(c.clone());
+            }
+            if en.cases.contains_key(const_name) {
+                return Some(crate::storage::ConstantStorage {
+                    name: Arc::from(const_name),
+                    ty: mir_types::Union::mixed(),
+                    visibility: None,
+                    location: None,
+                });
+            }
+            return None;
+        }
+
+        // Trait: own constants only
+        if let Some(tr) = self.traits.get(fqcn) {
+            if let Some(c) = tr.own_constants.get(const_name) {
+                return Some(c.clone());
+            }
+            return None;
         }
 
         None
