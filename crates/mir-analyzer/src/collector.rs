@@ -15,7 +15,7 @@ use php_ast::visitor::Visitor;
 use crate::parser::{name_to_string, type_from_hint};
 use mir_codebase::storage::{
     ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage, InterfaceStorage, Location,
-    MethodStorage, PropertyStorage, TemplateParam, TraitStorage, Visibility,
+    MethodStorage, PropertyStorage, StubSlice, TemplateParam, TraitStorage, Visibility,
 };
 use mir_codebase::{ClassStorage, Codebase};
 use mir_issues::{Issue, IssueBuffer, Location as IssueLocation};
@@ -27,7 +27,12 @@ use mir_types::Union;
 
 #[allow(dead_code)]
 pub struct DefinitionCollector<'a> {
-    codebase: &'a Codebase,
+    /// Optional codebase target. When `Some`, [`Self::collect`] will inject the
+    /// accumulated slice into it (backward-compat shim for existing callers).
+    /// When `None`, only [`Self::collect_slice`] is valid and the collector is
+    /// a pure function from AST to [`StubSlice`].
+    codebase: Option<&'a Codebase>,
+    slice: StubSlice,
     file: Arc<str>,
     source: &'a str,
     source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -38,15 +43,35 @@ pub struct DefinitionCollector<'a> {
 }
 
 impl<'a> DefinitionCollector<'a> {
+    /// Backward-compat constructor: the collector will inject its accumulated
+    /// slice into `codebase` when [`Self::collect`] is called.
     pub fn new(
         codebase: &'a Codebase,
         file: Arc<str>,
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,
     ) -> Self {
+        let mut s = Self::new_for_slice(file, source, source_map);
+        s.codebase = Some(codebase);
+        s
+    }
+
+    /// Pure-function constructor: the collector accumulates a [`StubSlice`]
+    /// without touching any shared state. Use [`Self::collect_slice`] to
+    /// retrieve it.
+    pub fn new_for_slice(
+        file: Arc<str>,
+        source: &'a str,
+        source_map: &'a php_rs_parser::source_map::SourceMap,
+    ) -> Self {
+        let slice = StubSlice {
+            file: Some(file.clone()),
+            ..StubSlice::default()
+        };
         Self {
             source_map,
-            codebase,
+            codebase: None,
+            slice,
             file,
             source,
             namespace: None,
@@ -55,9 +80,25 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
+    /// Shim: build the slice then inject it into the target codebase (if one
+    /// was supplied via [`Self::new`]). Returns the issues accumulated during
+    /// Pass 1.
     pub fn collect<'arena, 'src>(mut self, program: &Program<'arena, 'src>) -> Vec<Issue> {
         let _ = self.visit_program(program);
-        self.issues.into_issues()
+        let issues = self.issues.into_issues();
+        if let Some(codebase) = self.codebase {
+            codebase.inject_stub_slice(self.slice);
+        }
+        issues
+    }
+
+    /// Pure variant: returns the collected slice and any issues.
+    pub fn collect_slice<'arena, 'src>(
+        mut self,
+        program: &Program<'arena, 'src>,
+    ) -> (StubSlice, Vec<Issue>) {
+        let _ = self.visit_program(program);
+        (self.slice, self.issues.into_issues())
     }
 
     // -----------------------------------------------------------------------
@@ -286,7 +327,7 @@ impl<'a> DefinitionCollector<'a> {
 
     /// Scan a single statement: if it is `global $x` with a preceding
     /// `/** @var Type $x */` docblock, register the type in the codebase.
-    fn try_collect_global_var_annotation(&self, stmt: &php_ast::ast::Stmt<'_, '_>) {
+    fn try_collect_global_var_annotation(&mut self, stmt: &php_ast::ast::Stmt<'_, '_>) {
         let php_ast::ast::StmtKind::Global(vars) = &stmt.kind else {
             return;
         };
@@ -309,8 +350,9 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                 }
-                self.codebase
-                    .register_global_var(&self.file, Arc::from(name), resolved_ty.clone());
+                self.slice
+                    .global_vars
+                    .push((Arc::from(name), resolved_ty.clone()));
             }
         }
     }
@@ -318,7 +360,7 @@ impl<'a> DefinitionCollector<'a> {
     /// Scan a list of statements and register any `@var`-annotated `global`
     /// declarations. Used for function bodies where the visitor does not recurse.
     fn scan_stmts_for_global_vars<'arena, 'src>(
-        &self,
+        &mut self,
         stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
     ) {
         for stmt in stmts.iter() {
@@ -427,10 +469,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 };
 
-                self.codebase
-                    .symbol_to_file
-                    .insert(Arc::from(fqn.as_str()), self.file.clone());
-                self.codebase.functions.insert(fqn.into(), storage);
+                self.slice.functions.push(storage);
 
                 // Scan the function body for `@var`-annotated global declarations.
                 self.scan_stmts_for_global_vars(&decl.body);
@@ -586,10 +625,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 };
 
-                self.codebase
-                    .symbol_to_file
-                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
-                self.codebase.classes.insert(fqcn.into(), storage);
+                self.slice.classes.push(storage);
             }
 
             StmtKind::Interface(decl) => {
@@ -649,22 +685,16 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
-                self.codebase
-                    .symbol_to_file
-                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
-                self.codebase.interfaces.insert(
-                    fqcn.clone().into(),
-                    InterfaceStorage {
-                        fqcn: fqcn.into(),
-                        short_name: decl.name.into(),
-                        extends,
-                        own_methods,
-                        own_constants,
-                        template_params,
-                        all_parents: vec![],
-                        location: Some(self.location(stmt.span.start, stmt.span.end)),
-                    },
-                );
+                self.slice.interfaces.push(InterfaceStorage {
+                    fqcn: fqcn.into(),
+                    short_name: decl.name.into(),
+                    extends,
+                    own_methods,
+                    own_constants,
+                    template_params,
+                    all_parents: vec![],
+                    location: Some(self.location(stmt.span.start, stmt.span.end)),
+                });
             }
 
             StmtKind::Trait(decl) => {
@@ -768,22 +798,16 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
-                self.codebase
-                    .symbol_to_file
-                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
-                self.codebase.traits.insert(
-                    fqcn.clone().into(),
-                    TraitStorage {
-                        fqcn: fqcn.into(),
-                        short_name: decl.name.into(),
-                        own_methods,
-                        own_properties,
-                        own_constants,
-                        template_params: trait_template_params,
-                        traits: trait_uses,
-                        location: Some(self.location(stmt.span.start, stmt.span.end)),
-                    },
-                );
+                self.slice.traits.push(TraitStorage {
+                    fqcn: fqcn.into(),
+                    short_name: decl.name.into(),
+                    own_methods,
+                    own_properties,
+                    own_constants,
+                    template_params: trait_template_params,
+                    traits: trait_uses,
+                    location: Some(self.location(stmt.span.start, stmt.span.end)),
+                });
             }
 
             StmtKind::Enum(decl) => {
@@ -842,22 +866,16 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
-                self.codebase
-                    .symbol_to_file
-                    .insert(Arc::from(fqcn.as_str()), self.file.clone());
-                self.codebase.enums.insert(
-                    fqcn.clone().into(),
-                    mir_codebase::EnumStorage {
-                        fqcn: fqcn.into(),
-                        short_name: decl.name.into(),
-                        scalar_type,
-                        interfaces,
-                        cases,
-                        own_methods,
-                        own_constants,
-                        location: Some(self.location(stmt.span.start, stmt.span.end)),
-                    },
-                );
+                self.slice.enums.push(mir_codebase::EnumStorage {
+                    fqcn: fqcn.into(),
+                    short_name: decl.name.into(),
+                    scalar_type,
+                    interfaces,
+                    cases,
+                    own_methods,
+                    own_constants,
+                    location: Some(self.location(stmt.span.start, stmt.span.end)),
+                });
             }
 
             StmtKind::Const(items) => {
@@ -867,7 +885,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     } else {
                         item.name.into()
                     };
-                    self.codebase.constants.insert(fqn, Union::mixed());
+                    self.slice.constants.push((fqn, Union::mixed()));
                 }
             }
 
@@ -886,7 +904,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             if let Some(name_arg) = call.args.first() {
                                 if let php_ast::ast::ExprKind::String(name) = &name_arg.value.kind {
                                     let fqn: Arc<str> = Arc::from(&**name);
-                                    self.codebase.constants.insert(fqn, Union::mixed());
+                                    self.slice.constants.push((fqn, Union::mixed()));
                                 }
                             }
                         }
@@ -976,5 +994,142 @@ impl<'a> DefinitionCollector<'a> {
             is_pure: doc.is_pure,
             location: span.map(|s| self.location(s.start, s.end)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mir_codebase::codebase_from_parts;
+
+    const SAMPLE: &str = r#"<?php
+namespace App\Demo;
+
+use Stringable;
+
+/**
+ * @template T
+ */
+class Widget implements Stringable {
+    public function __construct(public string $name) {}
+    public function render(): string { return $this->name; }
+}
+
+interface Renderable {
+    public function render(): string;
+}
+
+trait Colored {
+    public string $color;
+}
+
+enum Size {
+    case Small;
+    case Large;
+}
+
+function make_widget(string $n): Widget {
+    /** @var int $counter */
+    global $counter;
+    return new Widget($n);
+}
+
+const MY_CONST = 42;
+"#;
+
+    fn parse_and_collect_old(file: &str, src: &str, codebase: &Codebase) {
+        let arena = bumpalo::Bump::new();
+        let result = php_rs_parser::parse(&arena, src);
+        let collector =
+            DefinitionCollector::new(codebase, Arc::from(file), src, &result.source_map);
+        let _ = collector.collect(&result.program);
+        codebase.finalize();
+    }
+
+    fn parse_and_collect_slice(file: &str, src: &str) -> StubSlice {
+        let arena = bumpalo::Bump::new();
+        let result = php_rs_parser::parse(&arena, src);
+        let collector =
+            DefinitionCollector::new_for_slice(Arc::from(file), src, &result.source_map);
+        let (slice, _) = collector.collect_slice(&result.program);
+        slice
+    }
+
+    #[test]
+    fn codebase_from_parts_produces_same_result_as_mutation() {
+        let file = "test.php";
+
+        let slice = parse_and_collect_slice(file, SAMPLE);
+        let cb_new = codebase_from_parts(vec![slice]);
+
+        let cb_old = Codebase::new();
+        parse_and_collect_old(file, SAMPLE, &cb_old);
+
+        fn sorted<T: Ord + Clone, I: IntoIterator<Item = T>>(xs: I) -> Vec<T> {
+            let mut v: Vec<T> = xs.into_iter().collect();
+            v.sort();
+            v
+        }
+
+        let ck = |cb: &Codebase| sorted(cb.classes.iter().map(|e| e.key().clone()));
+        let ik = |cb: &Codebase| sorted(cb.interfaces.iter().map(|e| e.key().clone()));
+        let tk = |cb: &Codebase| sorted(cb.traits.iter().map(|e| e.key().clone()));
+        let ek = |cb: &Codebase| sorted(cb.enums.iter().map(|e| e.key().clone()));
+        let fk = |cb: &Codebase| sorted(cb.functions.iter().map(|e| e.key().clone()));
+        let nk = |cb: &Codebase| sorted(cb.constants.iter().map(|e| e.key().clone()));
+        let sk = |cb: &Codebase| {
+            sorted(
+                cb.symbol_to_file
+                    .iter()
+                    .map(|e| (e.key().clone(), e.value().clone())),
+            )
+        };
+        let gk = |cb: &Codebase| sorted(cb.global_vars.iter().map(|e| e.key().clone()));
+
+        assert_eq!(ck(&cb_new), ck(&cb_old), "classes differ");
+        assert_eq!(ik(&cb_new), ik(&cb_old), "interfaces differ");
+        assert_eq!(tk(&cb_new), tk(&cb_old), "traits differ");
+        assert_eq!(ek(&cb_new), ek(&cb_old), "enums differ");
+        assert_eq!(fk(&cb_new), fk(&cb_old), "functions differ");
+        assert_eq!(nk(&cb_new), nk(&cb_old), "constants differ");
+        assert_eq!(sk(&cb_new), sk(&cb_old), "symbol_to_file differs");
+        assert_eq!(gk(&cb_new), gk(&cb_old), "global_vars differ");
+
+        // Sanity: file-based fields actually got populated.
+        assert!(!cb_new.symbol_to_file.is_empty());
+        assert!(cb_new.global_vars.contains_key("counter"));
+
+        // Deep-equal one concrete entry per symbol kind to catch any drift in
+        // storage contents that key-only comparison would miss.
+        let fqcn = "App\\Demo\\Widget";
+        assert_eq!(
+            cb_new.classes.get(fqcn).unwrap().value(),
+            cb_old.classes.get(fqcn).unwrap().value(),
+            "ClassStorage differs for {fqcn}"
+        );
+        let fn_fqn = "App\\Demo\\make_widget";
+        assert_eq!(
+            cb_new.functions.get(fn_fqn).unwrap().value(),
+            cb_old.functions.get(fn_fqn).unwrap().value(),
+            "FunctionStorage differs for {fn_fqn}"
+        );
+        let iface = "App\\Demo\\Renderable";
+        assert_eq!(
+            cb_new.interfaces.get(iface).unwrap().value(),
+            cb_old.interfaces.get(iface).unwrap().value(),
+            "InterfaceStorage differs for {iface}"
+        );
+        let tr = "App\\Demo\\Colored";
+        assert_eq!(
+            cb_new.traits.get(tr).unwrap().value(),
+            cb_old.traits.get(tr).unwrap().value(),
+            "TraitStorage differs for {tr}"
+        );
+        let enum_fqcn = "App\\Demo\\Size";
+        assert_eq!(
+            cb_new.enums.get(enum_fqcn).unwrap().value(),
+            cb_old.enums.get(enum_fqcn).unwrap().value(),
+            "EnumStorage differs for {enum_fqcn}"
+        );
     }
 }
