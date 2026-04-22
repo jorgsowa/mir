@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1]
+
+### Added
+
+- `StubSlice::file` and `StubSlice::global_vars` fields so a slice can describe the source file it came from and the `@var`-annotated globals it declares.
+- `CodebaseBuilder` and `codebase_from_parts` in `mir-codebase` — compose a finalized `Codebase` from per-file `StubSlice`s without mutating shared state during collection.
+- `DefinitionCollector::new_for_slice` and `DefinitionCollector::collect_slice` — a pure-function entry point that returns a `StubSlice` instead of writing to a `Codebase`. Enables downstream consumers (e.g. salsa queries) to treat Pass 1 as a pure computation.
+
+### Changed
+
+- `DefinitionCollector` now builds a `StubSlice` internally; the existing `new` + `collect` API is preserved as a shim that injects the slice on completion.
+- `Codebase::inject_stub_slice` now populates `symbol_to_file` and `global_vars` when the slice has a `file` set.
+
 ## [0.7.0] - 2026-04-21
 
 ### Added

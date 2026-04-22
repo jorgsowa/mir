@@ -317,4 +317,13 @@ pub struct StubSlice {
     pub functions: Vec<FunctionStorage>,
     #[serde(default)]
     pub constants: Vec<(Arc<str>, Union)>,
+    /// Source file this slice was collected from. `None` for bundled stub slices
+    /// that were pre-computed and are not tied to a specific on-disk file.
+    #[serde(default)]
+    pub file: Option<Arc<str>>,
+    /// Types of `@var`-annotated global variables collected from this file.
+    /// Populated by `DefinitionCollector`; merged into `Codebase::global_vars`
+    /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
+    #[serde(default)]
+    pub global_vars: Vec<(Arc<str>, Union)>,
 }

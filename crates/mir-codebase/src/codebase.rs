@@ -223,23 +223,44 @@ impl Codebase {
     /// their pre-compiled definitions. Later insertions overwrite earlier ones,
     /// so custom stubs loaded after PHPStorm stubs act as overrides.
     pub fn inject_stub_slice(&self, slice: crate::storage::StubSlice) {
+        let file = slice.file.clone();
         for cls in slice.classes {
+            if let Some(f) = &file {
+                self.symbol_to_file.insert(cls.fqcn.clone(), f.clone());
+            }
             self.classes.insert(cls.fqcn.clone(), cls);
         }
         for iface in slice.interfaces {
+            if let Some(f) = &file {
+                self.symbol_to_file.insert(iface.fqcn.clone(), f.clone());
+            }
             self.interfaces.insert(iface.fqcn.clone(), iface);
         }
         for tr in slice.traits {
+            if let Some(f) = &file {
+                self.symbol_to_file.insert(tr.fqcn.clone(), f.clone());
+            }
             self.traits.insert(tr.fqcn.clone(), tr);
         }
         for en in slice.enums {
+            if let Some(f) = &file {
+                self.symbol_to_file.insert(en.fqcn.clone(), f.clone());
+            }
             self.enums.insert(en.fqcn.clone(), en);
         }
         for func in slice.functions {
+            if let Some(f) = &file {
+                self.symbol_to_file.insert(func.fqn.clone(), f.clone());
+            }
             self.functions.insert(func.fqn.clone(), func);
         }
         for (name, ty) in slice.constants {
             self.constants.insert(name, ty);
+        }
+        if let Some(f) = &file {
+            for (name, ty) in slice.global_vars {
+                self.register_global_var(f, name, ty);
+            }
         }
     }
 
@@ -1524,6 +1545,61 @@ impl Codebase {
             self.collect_interface_ancestors_inner(&e, out, visited);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// CodebaseBuilder — compose a finalized Codebase from per-file StubSlices
+// ---------------------------------------------------------------------------
+
+/// Incremental builder that accumulates [`crate::storage::StubSlice`] values
+/// into a fresh [`Codebase`] and finalizes it on demand.
+///
+/// Designed for callers (e.g. salsa queries in downstream consumers) that want
+/// to treat Pass-1 definition collection as a pure function from source to
+/// `StubSlice`, then compose the slices into a full codebase outside the
+/// collector.
+pub struct CodebaseBuilder {
+    cb: Codebase,
+}
+
+impl CodebaseBuilder {
+    pub fn new() -> Self {
+        Self {
+            cb: Codebase::new(),
+        }
+    }
+
+    /// Inject a single slice. Later injections overwrite earlier definitions
+    /// with the same FQN, matching [`Codebase::inject_stub_slice`] semantics.
+    pub fn add(&mut self, slice: crate::storage::StubSlice) {
+        self.cb.inject_stub_slice(slice);
+    }
+
+    /// Finalize inheritance graphs and return the built `Codebase`.
+    pub fn finalize(self) -> Codebase {
+        self.cb.finalize();
+        self.cb
+    }
+
+    /// Access the in-progress codebase without consuming the builder.
+    pub fn codebase(&self) -> &Codebase {
+        &self.cb
+    }
+}
+
+impl Default for CodebaseBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// One-shot: build a finalized [`Codebase`] from a set of per-file slices.
+pub fn codebase_from_parts(parts: Vec<crate::storage::StubSlice>) -> Codebase {
+    let mut b = CodebaseBuilder::new();
+    for p in parts {
+        b.add(p);
+    }
+    b.finalize()
 }
 
 #[cfg(test)]
