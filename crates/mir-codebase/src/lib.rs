@@ -3,7 +3,7 @@ pub mod interner;
 pub mod members;
 pub mod storage;
 
-pub use codebase::{Codebase, StructuralSnapshot};
+pub use codebase::{codebase_from_parts, Codebase, CodebaseBuilder, StructuralSnapshot};
 pub use members::{MemberInfo, MemberKind};
 pub use storage::{
     ClassStorage, ConstantStorage, EnumCaseStorage, EnumStorage, FnParam, FunctionStorage,

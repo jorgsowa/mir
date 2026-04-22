@@ -210,6 +210,8 @@ fn collect_stubs(ext_dir: &Path, workspace_root: &Path) -> StubSlice {
         enums,
         functions,
         constants,
+        file: None,
+        global_vars: Vec::new(),
     }
 }
 
