@@ -174,7 +174,7 @@ impl<'a> ClassAnalyzer<'a> {
                     .own_methods
                     .iter()
                     .filter(|(_, m)| m.is_abstract)
-                    .map(|(name, _)| name.clone())
+                    .map(|(_, m)| m.name.clone())
                     .collect()
             };
 
@@ -235,7 +235,7 @@ impl<'a> ClassAnalyzer<'a> {
             // get_method (which re-enters self.codebase.interfaces when walking ancestors).
             let method_names: Vec<Arc<str>> =
                 match self.codebase.interfaces.get(iface_fqcn.as_ref()) {
-                    Some(iface) => iface.own_methods.keys().cloned().collect(),
+                    Some(iface) => iface.own_methods.values().map(|m| m.name.clone()).collect(),
                     None => continue,
                 };
 

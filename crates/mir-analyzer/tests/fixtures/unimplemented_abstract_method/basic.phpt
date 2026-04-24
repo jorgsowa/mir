@@ -5,4 +5,4 @@ abstract class Base {
 }
 class Incomplete extends Base {}
 ===expect===
-UnimplementedAbstractMethod: Class Incomplete must implement abstract method dowork()
+UnimplementedAbstractMethod: Class Incomplete must implement abstract method doWork()
