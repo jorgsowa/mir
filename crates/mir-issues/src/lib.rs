@@ -126,6 +126,24 @@ pub enum IssueKind {
         expected: String,
         actual: String,
     },
+    TooFewArguments {
+        fn_name: String,
+        expected: usize,
+        actual: usize,
+    },
+    TooManyArguments {
+        fn_name: String,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidNamedArgument {
+        fn_name: String,
+        name: String,
+    },
+    InvalidPassByReference {
+        fn_name: String,
+        param: String,
+    },
     InvalidPropertyAssignment {
         property: String,
         expected: String,
@@ -332,6 +350,10 @@ impl IssueKind {
             | IssueKind::UndefinedConstant { .. }
             | IssueKind::InvalidReturnType { .. }
             | IssueKind::InvalidArgument { .. }
+            | IssueKind::TooFewArguments { .. }
+            | IssueKind::TooManyArguments { .. }
+            | IssueKind::InvalidNamedArgument { .. }
+            | IssueKind::InvalidPassByReference { .. }
             | IssueKind::InvalidThrow { .. }
             | IssueKind::UnimplementedAbstractMethod { .. }
             | IssueKind::UnimplementedInterfaceMethod { .. }
@@ -423,6 +445,10 @@ impl IssueKind {
             IssueKind::NullableReturnStatement { .. } => "NullableReturnStatement",
             IssueKind::InvalidReturnType { .. } => "InvalidReturnType",
             IssueKind::InvalidArgument { .. } => "InvalidArgument",
+            IssueKind::TooFewArguments { .. } => "TooFewArguments",
+            IssueKind::TooManyArguments { .. } => "TooManyArguments",
+            IssueKind::InvalidNamedArgument { .. } => "InvalidNamedArgument",
+            IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
             IssueKind::InvalidCast { .. } => "InvalidCast",
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
@@ -544,6 +570,35 @@ impl IssueKind {
                 format!(
                     "Argument ${} of {}() expects '{}', got '{}'",
                     param, fn_name, expected, actual
+                )
+            }
+            IssueKind::TooFewArguments {
+                fn_name,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Too few arguments for {}(): expected {}, got {}",
+                    fn_name, expected, actual
+                )
+            }
+            IssueKind::TooManyArguments {
+                fn_name,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Too many arguments for {}(): expected {}, got {}",
+                    fn_name, expected, actual
+                )
+            }
+            IssueKind::InvalidNamedArgument { fn_name, name } => {
+                format!("{}() has no parameter named ${}", fn_name, name)
+            }
+            IssueKind::InvalidPassByReference { fn_name, param } => {
+                format!(
+                    "Argument ${} of {}() must be passed by reference",
+                    param, fn_name
                 )
             }
             IssueKind::InvalidPropertyAssignment {

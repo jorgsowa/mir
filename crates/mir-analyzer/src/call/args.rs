@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use php_ast::ast::{Expr, ExprKind};
 use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, MethodStorage, Visibility};
@@ -18,6 +19,7 @@ pub struct CheckArgsParams<'a> {
     pub arg_types: &'a [Union],
     pub arg_spans: &'a [Span],
     pub arg_names: &'a [Option<String>],
+    pub arg_can_be_byref: &'a [bool],
     pub call_span: Span,
     pub has_spread: bool,
 }
@@ -145,6 +147,18 @@ pub(crate) fn check_method_visibility(
     }
 }
 
+pub(crate) fn expr_can_be_passed_by_reference(expr: &Expr<'_, '_>) -> bool {
+    matches!(
+        expr.kind,
+        ExprKind::Variable(_)
+            | ExprKind::ArrayAccess(_)
+            | ExprKind::PropertyAccess(_)
+            | ExprKind::NullsafePropertyAccess(_)
+            | ExprKind::StaticPropertyAccess(_)
+            | ExprKind::StaticPropertyAccessDynamic { .. }
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Argument type checking
 // ---------------------------------------------------------------------------
@@ -156,68 +170,137 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         arg_types,
         arg_spans,
         arg_names,
+        arg_can_be_byref,
         call_span,
         has_spread,
     } = p;
 
-    let has_named = arg_names.iter().any(|n| n.is_some());
-    let mut param_to_arg: Vec<Option<(Union, Span)>> = vec![None; params.len()];
+    let variadic_index = params.iter().position(|p| p.is_variadic);
+    let max_positional = variadic_index.unwrap_or(params.len());
+    let mut param_to_arg: Vec<Option<(Union, Span, usize)>> = vec![None; params.len()];
+    let mut arg_bindings: Vec<(usize, Union, Span, usize)> = Vec::new();
+    let mut positional = 0usize;
+    let mut seen_named = false;
+    let mut has_shape_error = false;
 
-    if has_named {
-        let mut positional = 0usize;
-        for (i, (ty, span)) in arg_types.iter().zip(arg_spans.iter()).enumerate() {
-            if let Some(Some(name)) = arg_names.get(i) {
-                if let Some(pi) = params.iter().position(|p| p.name.as_ref() == name.as_str()) {
-                    param_to_arg[pi] = Some((ty.clone(), *span));
+    for (i, (ty, span)) in arg_types.iter().zip(arg_spans.iter()).enumerate() {
+        if has_spread && i > 0 {
+            break;
+        }
+
+        if let Some(Some(name)) = arg_names.get(i) {
+            seen_named = true;
+            if let Some(pi) = params.iter().position(|p| p.name.as_ref() == name.as_str()) {
+                if param_to_arg[pi].is_some() {
+                    has_shape_error = true;
+                    ea.emit(
+                        IssueKind::InvalidNamedArgument {
+                            fn_name: fn_name.to_string(),
+                            name: name.to_string(),
+                        },
+                        Severity::Error,
+                        *span,
+                    );
+                    continue;
                 }
+                param_to_arg[pi] = Some((ty.clone(), *span, i));
+                arg_bindings.push((pi, ty.clone(), *span, i));
+            } else if let Some(vi) = variadic_index {
+                arg_bindings.push((vi, ty.clone(), *span, i));
             } else {
-                while positional < params.len() && param_to_arg[positional].is_some() {
-                    positional += 1;
-                }
-                if positional < params.len() {
-                    param_to_arg[positional] = Some((ty.clone(), *span));
-                    positional += 1;
-                }
+                has_shape_error = true;
+                ea.emit(
+                    IssueKind::InvalidNamedArgument {
+                        fn_name: fn_name.to_string(),
+                        name: name.to_string(),
+                    },
+                    Severity::Error,
+                    *span,
+                );
             }
+            continue;
         }
-    } else {
-        for (i, (ty, span)) in arg_types.iter().zip(arg_spans.iter()).enumerate() {
-            if i < params.len() {
-                param_to_arg[i] = Some((ty.clone(), *span));
-            }
+
+        if seen_named && !has_spread {
+            has_shape_error = true;
+            ea.emit(
+                IssueKind::InvalidNamedArgument {
+                    fn_name: fn_name.to_string(),
+                    name: format!("#{}", i + 1),
+                },
+                Severity::Error,
+                *span,
+            );
+            continue;
         }
+
+        while positional < max_positional && param_to_arg[positional].is_some() {
+            positional += 1;
+        }
+
+        let Some(pi) = (if positional < max_positional {
+            Some(positional)
+        } else {
+            variadic_index
+        }) else {
+            continue;
+        };
+
+        if pi < max_positional {
+            param_to_arg[pi] = Some((ty.clone(), *span, i));
+            positional += 1;
+        }
+        arg_bindings.push((pi, ty.clone(), *span, i));
     }
 
     let required_count = params
         .iter()
         .filter(|p| !p.is_optional && !p.is_variadic)
         .count();
-    let provided_count = if params.iter().any(|p| p.is_variadic) {
-        arg_types.len()
-    } else {
-        arg_types.len().min(params.len())
-    };
+    let provided_count = param_to_arg
+        .iter()
+        .take(required_count)
+        .filter(|slot| slot.is_some())
+        .count();
 
-    if provided_count < required_count && !has_spread {
+    if provided_count < required_count && !has_spread && !has_shape_error {
         ea.emit(
-            IssueKind::InvalidArgument {
-                param: format!("#{}", provided_count + 1),
+            IssueKind::TooFewArguments {
                 fn_name: fn_name.to_string(),
-                expected: format!("{} argument(s)", required_count),
-                actual: format!("{} provided", provided_count),
+                expected: required_count,
+                actual: arg_types.len(),
             },
             Severity::Error,
             call_span,
         );
-        return;
     }
 
-    for (param, slot) in params.iter().zip(param_to_arg.iter()) {
-        let (arg_ty, arg_span) = match slot {
-            Some(pair) => pair,
-            None => continue,
-        };
-        let arg_span = *arg_span;
+    if variadic_index.is_none() && arg_types.len() > params.len() && !has_spread && !has_shape_error
+    {
+        ea.emit(
+            IssueKind::TooManyArguments {
+                fn_name: fn_name.to_string(),
+                expected: params.len(),
+                actual: arg_types.len(),
+            },
+            Severity::Error,
+            arg_spans.get(params.len()).copied().unwrap_or(call_span),
+        );
+    }
+
+    for (param_idx, arg_ty, arg_span, arg_idx) in arg_bindings {
+        let param = &params[param_idx];
+
+        if param.is_byref && !arg_can_be_byref.get(arg_idx).copied().unwrap_or(false) {
+            ea.emit(
+                IssueKind::InvalidPassByReference {
+                    fn_name: fn_name.to_string(),
+                    param: param.name.to_string(),
+                },
+                Severity::Error,
+                arg_span,
+            );
+        }
 
         if let Some(raw_param_ty) = &param.ty {
             let param_ty_owned;
@@ -266,17 +349,17 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
             if !arg_ty.is_subtype_of_simple(param_ty)
                 && !param_ty.is_mixed()
                 && !arg_ty.is_mixed()
-                && !named_object_subtype(arg_ty, param_ty, ea)
+                && !named_object_subtype(&arg_ty, param_ty, ea)
                 && !param_contains_template_or_unknown(param_ty, ea)
-                && !param_contains_template_or_unknown(arg_ty, ea)
-                && !array_list_compatible(arg_ty, param_ty, ea)
-                && !(arg_ty.is_single() && param_ty.is_subtype_of_simple(arg_ty))
-                && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_of_simple(arg_ty))
+                && !param_contains_template_or_unknown(&arg_ty, ea)
+                && !array_list_compatible(&arg_ty, param_ty, ea)
+                && !(arg_ty.is_single() && param_ty.is_subtype_of_simple(&arg_ty))
+                && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_of_simple(&arg_ty))
                 && !(arg_ty.is_single()
                     && param_ty
                         .types
                         .iter()
-                        .any(|p| Union::single(p.clone()).is_subtype_of_simple(arg_ty)))
+                        .any(|p| Union::single(p.clone()).is_subtype_of_simple(&arg_ty)))
                 && !arg_ty.remove_null().is_subtype_of_simple(param_ty)
                 && !arg_ty.remove_false().is_subtype_of_simple(param_ty)
                 && !named_object_subtype(&arg_ty.remove_null(), param_ty, ea)

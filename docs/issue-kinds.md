@@ -31,6 +31,10 @@ All issue types mir can emit, grouped by category.
 |------|-------------|
 | `InvalidReturnType` | Return value doesn't match declared return type |
 | `InvalidArgument` | Argument type doesn't match parameter type |
+| `TooFewArguments` | Call provides fewer arguments than required |
+| `TooManyArguments` | Call provides more arguments than accepted |
+| `InvalidNamedArgument` | Named argument does not match a callable parameter |
+| `InvalidPassByReference` | By-reference parameter receives a non-referenceable expression |
 | `InvalidPropertyAssignment` | Assigned value incompatible with property type |
 | `InvalidCast` | Explicit cast that can never succeed |
 | `InvalidOperand` | Operator applied to incompatible types |

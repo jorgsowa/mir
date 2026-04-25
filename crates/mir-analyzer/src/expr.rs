@@ -578,6 +578,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .iter()
                     .map(|a| a.name.as_ref().map(|nm| nm.to_string_repr().into_owned()))
                     .collect();
+                let arg_can_be_byref: Vec<bool> = n
+                    .args
+                    .iter()
+                    .map(|a| crate::call::expr_can_be_passed_by_reference(&a.value))
+                    .collect();
 
                 let class_ty = match &n.class.kind {
                     ExprKind::Identifier(name) => {
@@ -629,6 +634,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         arg_types: &arg_types,
                                         arg_spans: &arg_spans,
                                         arg_names: &arg_names,
+                                        arg_can_be_byref: &arg_can_be_byref,
                                         call_span: expr.span,
                                         has_spread: n.args.iter().any(|a| a.unpack),
                                     },
@@ -1323,6 +1329,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         match &target.kind {
             ExprKind::Variable(name) => {
                 let name_str = name.as_str().trim_start_matches('$').to_string();
+                if ctx.byref_param_names.contains(&name_str) {
+                    ctx.read_vars.insert(name_str.clone());
+                }
                 ctx.set_var(name_str, ty);
             }
             ExprKind::Array(elements) => {
