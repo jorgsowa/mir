@@ -66,6 +66,34 @@ impl<'a> StatementsAnalyzer<'a> {
             let suppressions = self.extract_statement_suppressions(stmt.span);
             let before = self.issues.issue_count();
 
+            if ctx.diverges {
+                let (line, col_start) = self.offset_to_line_col(stmt.span.start);
+                let col_end = if stmt.span.start < stmt.span.end {
+                    let (_end_line, end_col) = self.offset_to_line_col(stmt.span.end);
+                    end_col
+                } else {
+                    col_start + 1
+                };
+                self.issues.add(
+                    Issue::new(
+                        IssueKind::UnreachableCode,
+                        Location {
+                            file: self.file.clone(),
+                            line,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    )
+                    .with_snippet(
+                        crate::parser::span_text(self.source, stmt.span).unwrap_or_default(),
+                    ),
+                );
+                if !suppressions.is_empty() {
+                    self.issues.suppress_range(before, &suppressions);
+                }
+                break;
+            }
+
             // Extract @var annotation for this statement.
             let var_annotation = self.extract_var_annotation(stmt.span);
 
