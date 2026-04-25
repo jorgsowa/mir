@@ -18,7 +18,7 @@ use mir_codebase::storage::{
     MethodStorage, PropertyStorage, StubSlice, TemplateParam, TraitStorage, Visibility,
 };
 use mir_codebase::{ClassStorage, Codebase};
-use mir_issues::{Issue, IssueBuffer, Location as IssueLocation};
+use mir_issues::{Issue, IssueBuffer};
 use mir_types::Union;
 
 // ---------------------------------------------------------------------------
@@ -272,28 +272,6 @@ impl<'a> DefinitionCollector<'a> {
         };
         let col = self.source[line_start..byte_offset].chars().count() as u16;
         Location::with_line_col(self.file.clone(), start, end, line, col)
-    }
-
-    #[allow(dead_code)]
-    fn issue_location(&self, start: u32) -> IssueLocation {
-        let lc = self.source_map.offset_to_line_col(start);
-        let line = lc.line + 1;
-        let byte_offset = start as usize;
-        let line_start = if byte_offset == 0 {
-            0
-        } else {
-            self.source[..byte_offset]
-                .rfind('\n')
-                .map(|p| p + 1)
-                .unwrap_or(0)
-        };
-        let col = self.source[line_start..byte_offset].chars().count() as u16;
-        IssueLocation {
-            file: self.file.clone(),
-            line,
-            col_start: col,
-            col_end: col,
-        }
     }
 
     // -----------------------------------------------------------------------

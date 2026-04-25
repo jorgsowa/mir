@@ -288,6 +288,24 @@ fn narrow_or_instanceof_true<'arena, 'src>(
     }
 }
 
+/// Apply a pre-computed narrowed type to a variable.
+///
+/// If `mark_diverges` is true and the narrowed type is empty (the current type
+/// can never satisfy the constraint), the branch is marked unreachable.
+fn set_narrowed(
+    ctx: &mut Context,
+    name: &str,
+    current: &Union,
+    narrowed: Union,
+    mark_diverges: bool,
+) {
+    if !narrowed.is_empty() {
+        ctx.set_var(name, narrowed);
+    } else if mark_diverges && !current.is_empty() && !current.is_mixed() {
+        ctx.diverges = true;
+    }
+}
+
 fn narrow_var_null(ctx: &mut Context, name: &str, is_null: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_null {
@@ -295,12 +313,7 @@ fn narrow_var_null(ctx: &mut Context, name: &str, is_null: bool) {
     } else {
         current.remove_null()
     };
-    if !narrowed.is_empty() {
-        ctx.set_var(name, narrowed);
-    } else if !current.is_empty() && !current.is_mixed() {
-        // The type cannot satisfy this nullness constraint → dead branch.
-        ctx.diverges = true;
-    }
+    set_narrowed(ctx, name, &current, narrowed, true);
 }
 
 fn narrow_var_bool(ctx: &mut Context, name: &str, value: bool, is_value: bool) {
@@ -316,9 +329,7 @@ fn narrow_var_bool(ctx: &mut Context, name: &str, value: bool, is_value: bool) {
     } else {
         current.filter(|t| !matches!(t, Atomic::TFalse))
     };
-    if !narrowed.is_empty() {
-        ctx.set_var(name, narrowed);
-    }
+    set_narrowed(ctx, name, &current, narrowed, false);
 }
 
 fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true: bool) {
@@ -417,30 +428,21 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
         }
         _ => return,
     };
-    if !narrowed.is_empty() {
-        ctx.set_var(var_name, narrowed);
-    } else if !current.is_empty() && !current.is_mixed() {
-        // The type cannot satisfy this type-function constraint → dead branch.
-        ctx.diverges = true;
-    }
+    set_narrowed(ctx, var_name, &current, narrowed, true);
 }
 
 fn narrow_var_literal_string(ctx: &mut Context, name: &str, value: &str, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_value {
-        // Keep the specific literal, plus catch-all types that could contain it
         current.filter(|t| match t {
             Atomic::TLiteralString(s) => s.as_ref() == value,
             Atomic::TString | Atomic::TScalar | Atomic::TMixed => true,
             _ => false,
         })
     } else {
-        // Remove only this specific literal; leave TString/TMixed intact
         current.filter(|t| !matches!(t, Atomic::TLiteralString(s) if s.as_ref() == value))
     };
-    if !narrowed.is_empty() {
-        ctx.set_var(name, narrowed);
-    }
+    set_narrowed(ctx, name, &current, narrowed, false);
 }
 
 fn narrow_var_literal_int(ctx: &mut Context, name: &str, value: i64, is_value: bool) {
@@ -454,9 +456,7 @@ fn narrow_var_literal_int(ctx: &mut Context, name: &str, value: i64, is_value: b
     } else {
         current.filter(|t| !matches!(t, Atomic::TLiteralInt(n) if *n == value))
     };
-    if !narrowed.is_empty() {
-        ctx.set_var(name, narrowed);
-    }
+    set_narrowed(ctx, name, &current, narrowed, false);
 }
 
 fn extract_var_name<'a, 'arena, 'src>(
