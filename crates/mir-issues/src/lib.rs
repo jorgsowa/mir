@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
 
@@ -815,6 +816,7 @@ impl fmt::Display for Issue {
 #[derive(Debug, Default)]
 pub struct IssueBuffer {
     issues: Vec<Issue>,
+    seen: HashSet<(&'static str, Arc<str>, u32, u16)>,
     /// Issue names suppressed at the file level (from `@psalm-suppress` / `@suppress` on the file docblock)
     file_suppressions: Vec<String>,
 }
@@ -825,16 +827,15 @@ impl IssueBuffer {
     }
 
     pub fn add(&mut self, issue: Issue) {
-        // Deduplicate: skip if the same issue (kind + location) was already added.
-        if self.issues.iter().any(|existing| {
-            existing.kind.name() == issue.kind.name()
-                && existing.location.file == issue.location.file
-                && existing.location.line == issue.location.line
-                && existing.location.col_start == issue.location.col_start
-        }) {
-            return;
+        let key = (
+            issue.kind.name(),
+            issue.location.file.clone(),
+            issue.location.line,
+            issue.location.col_start,
+        );
+        if self.seen.insert(key) {
+            self.issues.push(issue);
         }
-        self.issues.push(issue);
     }
 
     pub fn add_suppression(&mut self, name: impl Into<String>) {
