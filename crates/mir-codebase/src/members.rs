@@ -8,7 +8,7 @@ use std::sync::Arc;
 use mir_types::{Atomic, Union};
 
 use crate::codebase::Codebase;
-use crate::storage::Visibility;
+use crate::storage::{ConstantStorage, MethodStorage, PropertyStorage, Visibility};
 
 /// A single member visible on a type.
 #[derive(Debug, Clone)]
@@ -40,6 +40,78 @@ pub enum MemberKind {
     EnumCase,
 }
 
+// ---------------------------------------------------------------------------
+// Push helpers — each deduplicates via `seen` before inserting
+// ---------------------------------------------------------------------------
+
+type Seen = std::collections::HashSet<(String, MemberKind)>;
+
+fn push_method(
+    name: &Arc<str>,
+    method: &MethodStorage,
+    out: &mut Vec<MemberInfo>,
+    seen: &mut Seen,
+) {
+    if seen.insert((name.to_string(), MemberKind::Method)) {
+        out.push(MemberInfo {
+            name: name.clone(),
+            kind: MemberKind::Method,
+            ty: method.effective_return_type().cloned(),
+            visibility: method.visibility,
+            is_static: method.is_static,
+            declaring_class: method.fqcn.clone(),
+            deprecated: method.deprecated.clone(),
+            params: method.params.clone(),
+        });
+    }
+}
+
+fn push_property(
+    name: &Arc<str>,
+    prop: &PropertyStorage,
+    declaring_class: Arc<str>,
+    out: &mut Vec<MemberInfo>,
+    seen: &mut Seen,
+) {
+    if seen.insert((name.to_string(), MemberKind::Property)) {
+        out.push(MemberInfo {
+            name: name.clone(),
+            kind: MemberKind::Property,
+            ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
+            visibility: prop.visibility,
+            is_static: prop.is_static,
+            declaring_class,
+            deprecated: None,
+            params: vec![],
+        });
+    }
+}
+
+fn push_constant(
+    name: &Arc<str>,
+    con: &ConstantStorage,
+    declaring_class: Arc<str>,
+    out: &mut Vec<MemberInfo>,
+    seen: &mut Seen,
+) {
+    if seen.insert((name.to_string(), MemberKind::Constant)) {
+        out.push(MemberInfo {
+            name: name.clone(),
+            kind: MemberKind::Constant,
+            ty: Some(con.ty.clone()),
+            visibility: con.visibility.unwrap_or(Visibility::Public),
+            is_static: true,
+            declaring_class,
+            deprecated: None,
+            params: vec![],
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Codebase query
+// ---------------------------------------------------------------------------
+
 impl Codebase {
     /// Return all members (methods, properties, constants) visible on the given type.
     ///
@@ -59,222 +131,73 @@ impl Codebase {
     }
 
     /// Collect all visible members for a single FQCN.
-    fn collect_members_for_fqcn(
-        &self,
-        fqcn: &str,
-        out: &mut Vec<MemberInfo>,
-        seen: &mut std::collections::HashSet<(String, MemberKind)>,
-    ) {
+    fn collect_members_for_fqcn(&self, fqcn: &str, out: &mut Vec<MemberInfo>, seen: &mut Seen) {
         // --- Class ---
         if let Some(cls) = self.classes.get(fqcn) {
-            // Own methods (highest priority — first in, wins via `seen` dedup)
-            for (name, method) in &cls.own_methods {
-                let key = (name.to_string(), MemberKind::Method);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Method,
-                        ty: method.effective_return_type().cloned(),
-                        visibility: method.visibility,
-                        is_static: method.is_static,
-                        declaring_class: method.fqcn.clone(),
-                        deprecated: method.deprecated.clone(),
-                        params: method.params.clone(),
-                    });
-                }
-            }
-
-            // Collect chain before dropping the DashMap guard.
-            let own_traits = cls.traits.clone();
-            let all_parents = cls.all_parents.clone();
             let cls_fqcn = cls.fqcn.clone();
 
-            // Own properties and constants
+            for (name, method) in &cls.own_methods {
+                push_method(name, method, out, seen);
+            }
             for (name, prop) in &cls.own_properties {
-                let key = (name.to_string(), MemberKind::Property);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Property,
-                        ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                        visibility: prop.visibility,
-                        is_static: prop.is_static,
-                        declaring_class: cls_fqcn.clone(),
-                        deprecated: None,
-                        params: vec![],
-                    });
-                }
+                push_property(name, prop, cls_fqcn.clone(), out, seen);
             }
             for (name, con) in &cls.own_constants {
-                let key = (name.to_string(), MemberKind::Constant);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Constant,
-                        ty: Some(con.ty.clone()),
-                        visibility: con.visibility.unwrap_or(Visibility::Public),
-                        is_static: true,
-                        declaring_class: cls_fqcn.clone(),
-                        deprecated: None,
-                        params: vec![],
-                    });
-                }
+                push_constant(name, con, cls_fqcn.clone(), out, seen);
             }
+
+            // Collect chain before dropping the DashMap guard to avoid deadlock.
+            let own_traits = cls.traits.clone();
+            let all_parents = cls.all_parents.clone();
             drop(cls);
 
-            // Own trait methods and properties
             for tr_fqcn in &own_traits {
                 if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    let tr_fqcn = tr.fqcn.clone();
                     for (name, method) in &tr.own_methods {
-                        let key = (name.to_string(), MemberKind::Method);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Method,
-                                ty: method.effective_return_type().cloned(),
-                                visibility: method.visibility,
-                                is_static: method.is_static,
-                                declaring_class: method.fqcn.clone(),
-                                deprecated: method.deprecated.clone(),
-                                params: method.params.clone(),
-                            });
-                        }
+                        push_method(name, method, out, seen);
                     }
                     for (name, prop) in &tr.own_properties {
-                        let key = (name.to_string(), MemberKind::Property);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Property,
-                                ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                                visibility: prop.visibility,
-                                is_static: prop.is_static,
-                                declaring_class: tr.fqcn.clone(),
-                                deprecated: None,
-                                params: vec![],
-                            });
-                        }
+                        push_property(name, prop, tr_fqcn.clone(), out, seen);
                     }
                 }
             }
 
-            // Ancestor classes, their traits, and interfaces from all_parents
             for ancestor_fqcn in &all_parents {
                 if let Some(ancestor) = self.classes.get(ancestor_fqcn.as_ref()) {
+                    let anc_fqcn = ancestor.fqcn.clone();
                     for (name, method) in &ancestor.own_methods {
-                        let key = (name.to_string(), MemberKind::Method);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Method,
-                                ty: method.effective_return_type().cloned(),
-                                visibility: method.visibility,
-                                is_static: method.is_static,
-                                declaring_class: method.fqcn.clone(),
-                                deprecated: method.deprecated.clone(),
-                                params: method.params.clone(),
-                            });
-                        }
+                        push_method(name, method, out, seen);
                     }
                     for (name, prop) in &ancestor.own_properties {
-                        let key = (name.to_string(), MemberKind::Property);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Property,
-                                ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                                visibility: prop.visibility,
-                                is_static: prop.is_static,
-                                declaring_class: ancestor.fqcn.clone(),
-                                deprecated: None,
-                                params: vec![],
-                            });
-                        }
+                        push_property(name, prop, anc_fqcn.clone(), out, seen);
                     }
                     for (name, con) in &ancestor.own_constants {
-                        let key = (name.to_string(), MemberKind::Constant);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Constant,
-                                ty: Some(con.ty.clone()),
-                                visibility: con.visibility.unwrap_or(Visibility::Public),
-                                is_static: true,
-                                declaring_class: ancestor.fqcn.clone(),
-                                deprecated: None,
-                                params: vec![],
-                            });
-                        }
+                        push_constant(name, con, anc_fqcn.clone(), out, seen);
                     }
                     let anc_traits = ancestor.traits.clone();
                     drop(ancestor);
                     for tr_fqcn in &anc_traits {
                         if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                            let tr_fqcn = tr.fqcn.clone();
                             for (name, method) in &tr.own_methods {
-                                let key = (name.to_string(), MemberKind::Method);
-                                if seen.insert(key) {
-                                    out.push(MemberInfo {
-                                        name: name.clone(),
-                                        kind: MemberKind::Method,
-                                        ty: method.effective_return_type().cloned(),
-                                        visibility: method.visibility,
-                                        is_static: method.is_static,
-                                        declaring_class: method.fqcn.clone(),
-                                        deprecated: method.deprecated.clone(),
-                                        params: method.params.clone(),
-                                    });
-                                }
+                                push_method(name, method, out, seen);
                             }
                             for (name, prop) in &tr.own_properties {
-                                let key = (name.to_string(), MemberKind::Property);
-                                if seen.insert(key) {
-                                    out.push(MemberInfo {
-                                        name: name.clone(),
-                                        kind: MemberKind::Property,
-                                        ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                                        visibility: prop.visibility,
-                                        is_static: prop.is_static,
-                                        declaring_class: tr.fqcn.clone(),
-                                        deprecated: None,
-                                        params: vec![],
-                                    });
-                                }
+                                push_property(name, prop, tr_fqcn.clone(), out, seen);
                             }
                         }
                     }
                 } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
+                    let iface_fqcn = iface.fqcn.clone();
                     for (name, method) in &iface.own_methods {
-                        let key = (name.to_string(), MemberKind::Method);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Method,
-                                ty: method.effective_return_type().cloned(),
-                                visibility: method.visibility,
-                                is_static: method.is_static,
-                                declaring_class: method.fqcn.clone(),
-                                deprecated: method.deprecated.clone(),
-                                params: method.params.clone(),
-                            });
-                        }
+                        push_method(name, method, out, seen);
                     }
                     for (name, con) in &iface.own_constants {
-                        let key = (name.to_string(), MemberKind::Constant);
-                        if seen.insert(key) {
-                            out.push(MemberInfo {
-                                name: name.clone(),
-                                kind: MemberKind::Constant,
-                                ty: Some(con.ty.clone()),
-                                visibility: con.visibility.unwrap_or(Visibility::Public),
-                                is_static: true,
-                                declaring_class: iface.fqcn.clone(),
-                                deprecated: None,
-                                params: vec![],
-                            });
-                        }
+                        push_constant(name, con, iface_fqcn.clone(), out, seen);
                     }
                 }
-                // Traits in all_parents are already covered via their owning class's .traits above.
+                // Traits in all_parents are covered via their owning class's .traits above.
             }
 
             return;
@@ -282,40 +205,16 @@ impl Codebase {
 
         // --- Interface ---
         if let Some(iface) = self.interfaces.get(fqcn) {
+            let iface_fqcn = iface.fqcn.clone();
             for (name, method) in &iface.own_methods {
-                let key = (name.to_string(), MemberKind::Method);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Method,
-                        ty: method.effective_return_type().cloned(),
-                        visibility: method.visibility,
-                        is_static: method.is_static,
-                        declaring_class: method.fqcn.clone(),
-                        deprecated: method.deprecated.clone(),
-                        params: method.params.clone(),
-                    });
-                }
+                push_method(name, method, out, seen);
             }
             for (name, con) in &iface.own_constants {
-                let key = (name.to_string(), MemberKind::Constant);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Constant,
-                        ty: Some(con.ty.clone()),
-                        visibility: con.visibility.unwrap_or(Visibility::Public),
-                        is_static: true,
-                        declaring_class: iface.fqcn.clone(),
-                        deprecated: None,
-                        params: vec![],
-                    });
-                }
+                push_constant(name, con, iface_fqcn.clone(), out, seen);
             }
             let parents = iface.all_parents.clone();
             drop(iface);
             for parent_fqcn in &parents {
-                // Recurse into parent interfaces
                 self.collect_members_for_fqcn(parent_fqcn, out, seen);
             }
             return;
@@ -323,88 +222,38 @@ impl Codebase {
 
         // --- Enum ---
         if let Some(en) = self.enums.get(fqcn) {
-            // Enum cases
+            let en_fqcn = en.fqcn.clone();
             for (name, case) in &en.cases {
-                let key = (name.to_string(), MemberKind::EnumCase);
-                if seen.insert(key) {
+                if seen.insert((name.to_string(), MemberKind::EnumCase)) {
                     out.push(MemberInfo {
                         name: name.clone(),
                         kind: MemberKind::EnumCase,
                         ty: case.value.clone(),
                         visibility: Visibility::Public,
                         is_static: true,
-                        declaring_class: en.fqcn.clone(),
+                        declaring_class: en_fqcn.clone(),
                         deprecated: None,
                         params: vec![],
                     });
                 }
             }
-            // Enum methods
             for (name, method) in &en.own_methods {
-                let key = (name.to_string(), MemberKind::Method);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Method,
-                        ty: method.effective_return_type().cloned(),
-                        visibility: method.visibility,
-                        is_static: method.is_static,
-                        declaring_class: method.fqcn.clone(),
-                        deprecated: method.deprecated.clone(),
-                        params: method.params.clone(),
-                    });
-                }
+                push_method(name, method, out, seen);
             }
-            // Enum constants
             for (name, con) in &en.own_constants {
-                let key = (name.to_string(), MemberKind::Constant);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Constant,
-                        ty: Some(con.ty.clone()),
-                        visibility: con.visibility.unwrap_or(Visibility::Public),
-                        is_static: true,
-                        declaring_class: en.fqcn.clone(),
-                        deprecated: None,
-                        params: vec![],
-                    });
-                }
+                push_constant(name, con, en_fqcn.clone(), out, seen);
             }
             return;
         }
 
         // --- Trait (rare: variable typed as a trait) ---
         if let Some(tr) = self.traits.get(fqcn) {
+            let tr_fqcn = tr.fqcn.clone();
             for (name, method) in &tr.own_methods {
-                let key = (name.to_string(), MemberKind::Method);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Method,
-                        ty: method.effective_return_type().cloned(),
-                        visibility: method.visibility,
-                        is_static: method.is_static,
-                        declaring_class: method.fqcn.clone(),
-                        deprecated: method.deprecated.clone(),
-                        params: method.params.clone(),
-                    });
-                }
+                push_method(name, method, out, seen);
             }
             for (name, prop) in &tr.own_properties {
-                let key = (name.to_string(), MemberKind::Property);
-                if seen.insert(key) {
-                    out.push(MemberInfo {
-                        name: name.clone(),
-                        kind: MemberKind::Property,
-                        ty: prop.ty.clone().or_else(|| prop.inferred_ty.clone()),
-                        visibility: prop.visibility,
-                        is_static: prop.is_static,
-                        declaring_class: tr.fqcn.clone(),
-                        deprecated: None,
-                        params: vec![],
-                    });
-                }
+                push_property(name, prop, tr_fqcn.clone(), out, seen);
             }
         }
     }
