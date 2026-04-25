@@ -457,6 +457,24 @@ mod tests {
     }
 
     #[test]
+    fn symbol_to_file_paths_are_resolvable_via_stub_vfs() {
+        let cb = Codebase::new();
+        load_stubs(&cb);
+        let vfs = StubVfs::new();
+
+        for entry in cb.symbol_to_file.iter() {
+            let path = entry.value();
+            assert!(
+                vfs.get(path.as_ref()).is_some(),
+                "symbol '{}' points to '{}' which StubVfs cannot resolve — \
+                 go-to-definition would silently break for this symbol",
+                entry.key(),
+                path
+            );
+        }
+    }
+
+    #[test]
     fn phpstorm_stubs_loaded_when_submodule_present() {
         // This test only makes assertions when phpstorm-stubs is available.
         if PHPSTORM_STUB_FILES.is_empty() {
