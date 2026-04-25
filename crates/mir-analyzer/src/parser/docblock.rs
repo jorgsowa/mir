@@ -158,6 +158,11 @@ impl DocblockParser {
                 PhpDocTag::Readonly => result.is_readonly = true,
                 PhpDocTag::Generic { tag, body } => match *tag {
                     "api" | "psalm-api" => result.is_api = true,
+                    "psalm-assert" | "phpstan-assert" => {
+                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                            result.assertions.push((name, parse_type_string(&ty_str)));
+                        }
+                    }
                     "psalm-assert-if-true" | "phpstan-assert-if-true" => {
                         if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
                             result
@@ -170,6 +175,41 @@ impl DocblockParser {
                             result
                                 .assertions_if_false
                                 .push((name, parse_type_string(&ty_str)));
+                        }
+                    }
+                    "psalm-property" => {
+                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                            result.properties.push(DocProperty {
+                                type_hint: ty_str,
+                                name,
+                                read_only: false,
+                                write_only: false,
+                            });
+                        }
+                    }
+                    "psalm-property-read" => {
+                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                            result.properties.push(DocProperty {
+                                type_hint: ty_str,
+                                name,
+                                read_only: true,
+                                write_only: false,
+                            });
+                        }
+                    }
+                    "psalm-property-write" => {
+                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                            result.properties.push(DocProperty {
+                                type_hint: ty_str,
+                                name,
+                                read_only: false,
+                                write_only: true,
+                            });
+                        }
+                    }
+                    "psalm-method" => {
+                        if let Some(method) = body.as_deref().and_then(parse_method_line) {
+                            result.methods.push(method);
                         }
                     }
                     _ => {}
@@ -199,6 +239,16 @@ pub struct DocMethod {
     pub return_type: String,
     pub name: String,
     pub is_static: bool,
+    pub params: Vec<DocMethodParam>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct DocMethodParam {
+    pub name: String,
+    pub type_hint: String,
+    pub is_variadic: bool,
+    pub is_byref: bool,
+    pub is_optional: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -585,51 +635,75 @@ fn normalize_fqcn(s: &str) -> String {
 
 /// Parse `[static] [ReturnType] name(...)` for @method tags.
 fn parse_method_line(s: &str) -> Option<DocMethod> {
-    let mut words = s.splitn(4, char::is_whitespace);
-    let first = words.next()?.trim();
-    if first.is_empty() {
+    let mut rest = s.trim();
+    if rest.is_empty() {
         return None;
     }
-    let is_static = first.eq_ignore_ascii_case("static");
-    let (return_type, name_part) = if is_static {
-        let ret = words.next()?.trim().to_string();
-        let nm = words.next()?.trim().to_string();
-        (ret, nm)
-    } else {
-        // Check if next token looks like a method name (contains '(')
-        let second = words
-            .next()
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default();
-        if second.is_empty() {
-            // Only one word — treat as name with no return type
-            let name = first.split('(').next().unwrap_or(first).to_string();
-            return Some(DocMethod {
-                return_type: String::new(),
-                name,
-                is_static: false,
-            });
-        }
-        if first.contains('(') {
-            // first word is `name(...)`, no return type
-            let name = first.split('(').next().unwrap_or(first).to_string();
-            return Some(DocMethod {
-                return_type: String::new(),
-                name,
-                is_static: false,
-            });
-        }
-        (first.to_string(), second)
-    };
-    let name = name_part
-        .split('(')
+    let is_static = rest
+        .split_whitespace()
         .next()
-        .unwrap_or(&name_part)
-        .to_string();
+        .map(|w| w.eq_ignore_ascii_case("static"))
+        .unwrap_or(false);
+    if is_static {
+        rest = rest["static".len()..].trim_start();
+    }
+
+    let open = rest.find('(').unwrap_or(rest.len());
+    let prefix = rest[..open].trim();
+    let mut parts: Vec<&str> = prefix.split_whitespace().collect();
+    let name = parts.pop()?.to_string();
+    if name.is_empty() {
+        return None;
+    }
+    let return_type = parts.join(" ");
     Some(DocMethod {
         return_type,
         name,
         is_static,
+        params: parse_method_params(rest),
+    })
+}
+
+fn parse_method_params(name_part: &str) -> Vec<DocMethodParam> {
+    let Some(open) = name_part.find('(') else {
+        return vec![];
+    };
+    let Some(close) = name_part.rfind(')') else {
+        return vec![];
+    };
+    let inner = name_part[open + 1..close].trim();
+    if inner.is_empty() {
+        return vec![];
+    }
+
+    split_generics(inner)
+        .into_iter()
+        .filter_map(|param| parse_method_param(&param))
+        .collect()
+}
+
+fn parse_method_param(param: &str) -> Option<DocMethodParam> {
+    let before_default = param.split('=').next()?.trim();
+    let is_optional = param.contains('=');
+    let mut tokens: Vec<&str> = before_default.split_whitespace().collect();
+    let raw_name = tokens.pop()?;
+    let is_variadic = raw_name.contains("...");
+    let is_byref = raw_name.contains('&');
+    let name = raw_name
+        .trim_start_matches('&')
+        .trim_start_matches("...")
+        .trim_start_matches('&')
+        .trim_start_matches('$')
+        .to_string();
+    if name.is_empty() {
+        return None;
+    }
+    Some(DocMethodParam {
+        name,
+        type_hint: tokens.join(" "),
+        is_variadic,
+        is_byref,
+        is_optional: is_optional || is_variadic,
     })
 }
 

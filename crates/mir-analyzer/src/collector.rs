@@ -14,8 +14,9 @@ use php_ast::visitor::Visitor;
 
 use crate::parser::{name_to_string, type_from_hint};
 use mir_codebase::storage::{
-    ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage, InterfaceStorage, Location,
-    MethodStorage, PropertyStorage, StubSlice, TemplateParam, TraitStorage, Visibility,
+    Assertion, AssertionKind, ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage,
+    InterfaceStorage, Location, MethodStorage, PropertyStorage, StubSlice, TemplateParam,
+    TraitStorage, Visibility,
 };
 use mir_codebase::{ClassStorage, Codebase};
 use mir_issues::{Issue, IssueBuffer};
@@ -254,8 +255,62 @@ impl<'a> DefinitionCollector<'a> {
         self.resolve_union_inner(union, false)
     }
 
+    fn resolve_union_doc_with_aliases(
+        &self,
+        union: Union,
+        aliases: &std::collections::HashMap<String, Union>,
+    ) -> Union {
+        if aliases.is_empty() {
+            return self.resolve_union_doc(union);
+        }
+
+        use mir_types::Atomic;
+        let from_docblock = union.from_docblock;
+        let mut result = Union::empty();
+        result.possibly_undefined = union.possibly_undefined;
+        result.from_docblock = from_docblock;
+
+        for atomic in union.types {
+            match atomic {
+                Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
+                    if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
+                        result = Union::merge(&result, alias_ty);
+                    } else {
+                        result.add_type(self.resolve_atomic_inner(
+                            Atomic::TNamedObject { fqcn, type_params },
+                            false,
+                        ));
+                    }
+                }
+                other => result.add_type(self.resolve_atomic_inner(other, false)),
+            }
+        }
+
+        result
+    }
+
     fn resolve_union_opt(&self, opt: Option<Union>) -> Option<Union> {
         opt.map(|u| self.resolve_union(u))
+    }
+
+    fn build_assertions(&self, doc: &crate::parser::ParsedDocblock) -> Vec<Assertion> {
+        let mut assertions = Vec::new();
+        assertions.extend(doc.assertions.iter().map(|(param, ty)| Assertion {
+            kind: AssertionKind::Assert,
+            param: Arc::from(param.as_str()),
+            ty: self.resolve_union_doc(ty.clone()),
+        }));
+        assertions.extend(doc.assertions_if_true.iter().map(|(param, ty)| Assertion {
+            kind: AssertionKind::AssertIfTrue,
+            param: Arc::from(param.as_str()),
+            ty: self.resolve_union_doc(ty.clone()),
+        }));
+        assertions.extend(doc.assertions_if_false.iter().map(|(param, ty)| Assertion {
+            kind: AssertionKind::AssertIfFalse,
+            param: Arc::from(param.as_str()),
+            ty: self.resolve_union_doc(ty.clone()),
+        }));
+        assertions
     }
 
     fn location(&self, start: u32, end: u32) -> Location {
@@ -283,6 +338,125 @@ impl<'a> DefinitionCollector<'a> {
             Some(AstVisibility::Public) | None => Visibility::Public,
             Some(AstVisibility::Protected) => Visibility::Protected,
             Some(AstVisibility::Private) => Visibility::Private,
+        }
+    }
+
+    fn build_type_aliases(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+    ) -> std::collections::HashMap<String, Union> {
+        let mut aliases = std::collections::HashMap::new();
+        for alias in &doc.type_aliases {
+            if alias.name.is_empty() || alias.type_expr.is_empty() {
+                continue;
+            }
+            let mut ty = crate::parser::docblock::parse_type_string(&alias.type_expr);
+            ty.from_docblock = true;
+            aliases.insert(alias.name.clone(), self.resolve_union_doc(ty));
+        }
+        aliases
+    }
+
+    fn add_docblock_members(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+        aliases: &std::collections::HashMap<String, Union>,
+        class_fqcn: &str,
+        own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodStorage>>,
+        own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyStorage>,
+        location: Option<Location>,
+    ) {
+        for prop in &doc.properties {
+            if prop.name.is_empty() || own_properties.contains_key(prop.name.as_str()) {
+                continue;
+            }
+            let ty = if prop.type_hint.is_empty() {
+                None
+            } else {
+                let mut parsed = crate::parser::docblock::parse_type_string(&prop.type_hint);
+                parsed.from_docblock = true;
+                Some(self.resolve_union_doc_with_aliases(parsed, aliases))
+            };
+            own_properties.insert(
+                Arc::from(prop.name.as_str()),
+                PropertyStorage {
+                    name: Arc::from(prop.name.as_str()),
+                    ty,
+                    inferred_ty: None,
+                    visibility: Visibility::Public,
+                    is_static: false,
+                    is_readonly: prop.read_only,
+                    default: None,
+                    location: location.clone(),
+                },
+            );
+        }
+
+        for method in &doc.methods {
+            if method.name.is_empty() {
+                continue;
+            }
+            let key = Arc::from(method.name.to_lowercase().as_str());
+            if own_methods.contains_key(&key) {
+                continue;
+            }
+            let return_type = if method.return_type.is_empty() {
+                None
+            } else {
+                let mut parsed = crate::parser::docblock::parse_type_string(&method.return_type);
+                parsed.from_docblock = true;
+                Some(Self::fill_self_static_parent(
+                    self.resolve_union_doc_with_aliases(parsed, aliases),
+                    class_fqcn,
+                ))
+            };
+            let params = method
+                .params
+                .iter()
+                .map(|p| {
+                    let ty = if p.type_hint.is_empty() {
+                        None
+                    } else {
+                        let mut parsed = crate::parser::docblock::parse_type_string(&p.type_hint);
+                        parsed.from_docblock = true;
+                        Some(self.resolve_union_doc_with_aliases(parsed, aliases))
+                    };
+                    FnParam {
+                        name: Arc::from(p.name.as_str()),
+                        ty,
+                        default: if p.is_optional {
+                            Some(Union::mixed())
+                        } else {
+                            None
+                        },
+                        is_variadic: p.is_variadic,
+                        is_byref: p.is_byref,
+                        is_optional: p.is_optional,
+                    }
+                })
+                .collect();
+            own_methods.insert(
+                key,
+                Arc::new(MethodStorage {
+                    name: Arc::from(method.name.as_str()),
+                    fqcn: Arc::from(class_fqcn),
+                    params,
+                    return_type,
+                    inferred_return_type: None,
+                    visibility: Visibility::Public,
+                    is_static: method.is_static,
+                    is_abstract: false,
+                    is_final: false,
+                    is_constructor: false,
+                    template_params: vec![],
+                    assertions: vec![],
+                    throws: vec![],
+                    deprecated: None,
+                    is_internal: false,
+                    is_pure: false,
+                    location: location.clone(),
+                }),
+            );
         }
     }
 
@@ -442,7 +616,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     return_type,
                     inferred_return_type: None,
                     template_params,
-                    assertions: vec![],
+                    assertions: self.build_assertions(&doc),
                     throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
                     deprecated: doc.deprecated.as_deref().map(Arc::from),
                     is_pure: doc.is_pure,
@@ -483,6 +657,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 let mut own_constants = indexmap::IndexMap::new();
                 let mut trait_uses: Vec<Arc<str>> = vec![];
 
+                let class_doc = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| crate::parser::DocblockParser::parse(c.text))
+                    .unwrap_or_default();
+                let type_aliases = self.build_type_aliases(&class_doc);
+
                 for member in decl.members.iter() {
                     match &member.kind {
                         ClassMemberKind::Method(m) => {
@@ -511,7 +692,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     }
                                 }
                             }
-                            let method = self.build_method_storage(m, &fqcn, Some(&member.span));
+                            let method = self.build_method_storage(
+                                m,
+                                &fqcn,
+                                Some(&member.span),
+                                Some(&type_aliases),
+                            );
                             own_methods.insert(
                                 Arc::from(method.name.to_lowercase().as_str()),
                                 Arc::new(method),
@@ -549,11 +735,14 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
-                let class_doc = decl
-                    .doc_comment
-                    .as_ref()
-                    .map(|c| crate::parser::DocblockParser::parse(c.text))
-                    .unwrap_or_default();
+                self.add_docblock_members(
+                    &class_doc,
+                    &type_aliases,
+                    &fqcn,
+                    &mut own_methods,
+                    &mut own_properties,
+                    Some(self.location(stmt.span.start, stmt.span.end)),
+                );
 
                 let template_params: Vec<TemplateParam> = class_doc
                     .templates
@@ -594,6 +783,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     own_methods,
                     own_properties,
                     own_constants,
+                    mixins: class_doc
+                        .mixins
+                        .iter()
+                        .map(|m| self.resolve_type_name(&Arc::from(m.as_str()), true))
+                        .collect(),
                     template_params,
                     extends_type_args,
                     is_abstract: decl.modifiers.is_abstract,
@@ -640,7 +834,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 for member in decl.members.iter() {
                     match &member.kind {
                         ClassMemberKind::Method(m) => {
-                            let method = self.build_method_storage(m, &fqcn, Some(&member.span));
+                            let method =
+                                self.build_method_storage(m, &fqcn, Some(&member.span), None);
                             own_methods.insert(
                                 Arc::from(method.name.to_lowercase().as_str()),
                                 Arc::new(method),
@@ -730,7 +925,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     }
                                 }
                             }
-                            let method = self.build_method_storage(m, &fqcn, Some(&member.span));
+                            let method =
+                                self.build_method_storage(m, &fqcn, Some(&member.span), None);
                             own_methods.insert(
                                 Arc::from(method.name.to_lowercase().as_str()),
                                 Arc::new(method),
@@ -823,7 +1019,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             );
                         }
                         EnumMemberKind::Method(m) => {
-                            let method = self.build_method_storage(m, &fqcn, Some(&member.span));
+                            let method =
+                                self.build_method_storage(m, &fqcn, Some(&member.span), None);
                             own_methods.insert(
                                 Arc::from(method.name.to_lowercase().as_str()),
                                 Arc::new(method),
@@ -902,6 +1099,7 @@ impl<'a> DefinitionCollector<'a> {
         m: &php_ast::ast::MethodDecl<'_, '_>,
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
+        aliases: Option<&std::collections::HashMap<String, Union>>,
     ) -> MethodStorage {
         let doc = m
             .doc_comment
@@ -914,7 +1112,11 @@ impl<'a> DefinitionCollector<'a> {
             let ty = doc
                 .get_param_type(p.name)
                 .cloned()
-                .map(|u| self.resolve_union_doc(u))
+                .map(|u| {
+                    aliases
+                        .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
+                        .unwrap_or_else(|| self.resolve_union_doc(u))
+                })
                 .or_else(|| {
                     self.resolve_union_opt(
                         p.type_hint
@@ -935,7 +1137,9 @@ impl<'a> DefinitionCollector<'a> {
         let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
-                let resolved = self.resolve_union_doc(ty);
+                let resolved = aliases
+                    .map(|a| self.resolve_union_doc_with_aliases(ty.clone(), a))
+                    .unwrap_or_else(|| self.resolve_union_doc(ty));
                 Some(Self::fill_self_static_parent(resolved, class_fqcn))
             }
             (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, Some(class_fqcn)))),
@@ -965,7 +1169,7 @@ impl<'a> DefinitionCollector<'a> {
             is_final: m.is_final,
             is_constructor: m.name == "__construct",
             template_params,
-            assertions: vec![],
+            assertions: self.build_assertions(&doc),
             throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
             deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_internal: doc.is_internal,

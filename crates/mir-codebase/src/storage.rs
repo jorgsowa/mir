@@ -183,6 +183,8 @@ pub struct ClassStorage {
     pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
     pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
+    #[serde(default)]
+    pub mixins: Vec<Arc<str>>,
     pub template_params: Vec<TemplateParam>,
     /// Type arguments from `@extends ParentClass<T1, T2>` — maps parent's template params to concrete types.
     pub extends_type_args: Vec<Union>,
