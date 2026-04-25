@@ -30,9 +30,9 @@ pub struct ProjectAnalyzer {
     stubs_loaded: std::sync::atomic::AtomicBool,
     /// When true, run dead code detection at the end of analysis.
     pub find_dead_code: bool,
-    /// Target PHP language version. Used for version-conditional decisions
-    /// such as stub filtering.
-    pub php_version: PhpVersion,
+    /// Target PHP language version. `None` means "not configured"; resolved to
+    /// `PhpVersion::LATEST` when passed down to `StatementsAnalyzer`.
+    pub php_version: Option<PhpVersion>,
 }
 
 impl ProjectAnalyzer {
@@ -44,7 +44,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
-            php_version: PhpVersion::default(),
+            php_version: None,
         }
     }
 
@@ -57,7 +57,7 @@ impl ProjectAnalyzer {
             psr4: None,
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
-            php_version: PhpVersion::default(),
+            php_version: None,
         }
     }
 
@@ -76,15 +76,21 @@ impl ProjectAnalyzer {
             psr4: Some(psr4),
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
-            php_version: PhpVersion::default(),
+            php_version: None,
         };
         Ok((analyzer, map))
     }
 
     /// Set the target PHP version.
     pub fn with_php_version(mut self, version: PhpVersion) -> Self {
-        self.php_version = version;
+        self.php_version = Some(version);
         self
+    }
+
+    /// Resolve the configured PHP version, defaulting to `PhpVersion::LATEST`
+    /// when none has been set.
+    fn resolved_php_version(&self) -> PhpVersion {
+        self.php_version.unwrap_or(PhpVersion::LATEST)
     }
 
     /// Expose codebase for external use (e.g., pre-loading stubs from CLI).
@@ -687,7 +693,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 &mut all_symbols,
-                self.php_version,
+                self.resolved_php_version(),
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -792,7 +798,7 @@ impl ProjectAnalyzer {
             source_map,
             &mut buf,
             all_symbols,
-            self.php_version,
+            self.resolved_php_version(),
         );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -906,7 +912,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 all_symbols,
-                self.php_version,
+                self.resolved_php_version(),
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -1040,7 +1046,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 all_symbols,
-                self.php_version,
+                self.resolved_php_version(),
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -1145,7 +1151,7 @@ impl ProjectAnalyzer {
             source_map,
             &mut buf,
             all_symbols,
-            self.php_version,
+            self.resolved_php_version(),
         );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -1270,7 +1276,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 all_symbols,
-                self.php_version,
+                self.resolved_php_version(),
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
