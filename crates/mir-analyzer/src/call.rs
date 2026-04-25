@@ -660,16 +660,13 @@ impl CallAnalyzer {
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
-            // Compute the method name span: class.span covers the class identifier,
-            // then "::" is 2 bytes, then the method name follows.
-            let method_start = call.class.span.end + 2;
-            let method_end = method_start + method_name.len() as u32;
+            let method_span = call.method.span;
             ea.codebase.mark_method_referenced_at(
                 &fqcn,
                 method_name,
                 ea.file.clone(),
-                method_start,
-                method_end,
+                method_span.start,
+                method_span.end,
             );
             // Emit DeprecatedMethodCall if the method is marked @deprecated
             if let Some(msg) = method.deprecated.clone() {
@@ -706,7 +703,6 @@ impl CallAnalyzer {
                 .unwrap_or_else(Union::mixed);
             let fqcn_arc: std::sync::Arc<str> = Arc::from(fqcn.as_str());
             let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
-            let method_span = Span::new(method_start, method_end);
             ea.record_symbol(
                 method_span,
                 SymbolKind::StaticCall {
