@@ -181,6 +181,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Assign(a) => {
                 let rhs_tainted = crate::taint::is_expr_tainted(a.value, ctx);
                 let rhs_ty = self.analyze(a.value, ctx);
+                if rhs_ty.is_never() {
+                    return rhs_ty;
+                }
                 match a.op {
                     AssignOp::Assign => {
                         self.assign_to_target(a.target, rhs_ty.clone(), ctx, expr.span);
