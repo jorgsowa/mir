@@ -1,6 +1,7 @@
 use php_ast::ast::{ExprKind, FunctionCallExpr};
 use php_ast::Span;
 
+use mir_codebase::storage::AssertionKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::Union;
 
@@ -158,6 +159,23 @@ impl CallAnalyzer {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_str().trim_start_matches('$');
                             ctx.set_var(var_name, Union::mixed());
+                        }
+                    }
+                }
+            }
+
+            for assertion in func
+                .assertions
+                .iter()
+                .filter(|a| a.kind == AssertionKind::Assert)
+            {
+                if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
+                    if let Some(arg) = call.args.get(index) {
+                        if let ExprKind::Variable(name) = &arg.value.kind {
+                            ctx.set_var(
+                                name.as_str().trim_start_matches('$'),
+                                assertion.ty.clone(),
+                            );
                         }
                     }
                 }

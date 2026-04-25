@@ -172,6 +172,7 @@ fn re_analyze_file_skips_finalize_on_body_only_change() {
             own_methods: indexmap::IndexMap::new(),
             own_properties: indexmap::IndexMap::new(),
             own_constants: indexmap::IndexMap::new(),
+            mixins: vec![],
             template_params: vec![],
             extends_type_args: vec![],
             is_abstract: false,

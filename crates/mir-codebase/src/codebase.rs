@@ -619,6 +619,13 @@ impl Codebase {
             if let Some(p) = cls.own_properties.get(prop_name) {
                 return Some(p.clone());
             }
+            let mixins = cls.mixins.clone();
+            drop(cls);
+            for mixin in &mixins {
+                if let Some(p) = self.get_property(mixin.as_ref(), prop_name) {
+                    return Some(p);
+                }
+            }
         }
 
         // Walk all ancestors (collected during finalize)
@@ -764,16 +771,24 @@ impl Codebase {
             // Collect chain info before dropping the DashMap guard.
             let own_traits = cls.traits.clone();
             let ancestors = cls.all_parents.clone();
+            let mixins = cls.mixins.clone();
             drop(cls);
 
-            // 2. Own trait methods (recursive into trait-of-trait)
+            // 2. Docblock mixins (delegated magic lookup)
+            for mixin_fqcn in &mixins {
+                if let Some(m) = self.get_method(mixin_fqcn, method_name) {
+                    return Some(m);
+                }
+            }
+
+            // 3. Own trait methods (recursive into trait-of-trait)
             for tr_fqcn in &own_traits {
                 if let Some(m) = self.get_method_in_trait(tr_fqcn, method_name) {
                     return Some(m);
                 }
             }
 
-            // 3. Ancestor chain (all_parents is closest-first: parent, grandparent, …)
+            // 4. Ancestor chain (all_parents is closest-first: parent, grandparent, …)
             for ancestor_fqcn in &ancestors {
                 if let Some(anc) = self.classes.get(ancestor_fqcn.as_ref()) {
                     if let Some(m) = lookup_method(&anc.own_methods, method_name) {

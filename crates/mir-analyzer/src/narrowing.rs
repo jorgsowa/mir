@@ -4,6 +4,7 @@
 /// module updates the `Context` to narrow variable types accordingly.
 use php_ast::ast::{BinaryOp, ExprKind, UnaryPrefixOp};
 
+use mir_codebase::storage::AssertionKind;
 use mir_codebase::Codebase;
 use mir_types::{Atomic, Union};
 
@@ -160,6 +161,8 @@ pub fn narrow_from_condition<'arena, 'src>(
                     if let Some(arg_expr) = call.args.first() {
                         narrow_from_condition(&arg_expr.value, ctx, is_true, codebase, file);
                     }
+                } else if apply_docblock_assertions(call, ctx, is_true, codebase, file, fn_name) {
+                    // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
                         narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
@@ -206,6 +209,57 @@ pub fn narrow_from_condition<'arena, 'src>(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+fn apply_docblock_assertions<'arena, 'src>(
+    call: &php_ast::ast::FunctionCallExpr<'arena, 'src>,
+    ctx: &mut Context,
+    is_true: bool,
+    codebase: &Codebase,
+    file: &str,
+    fn_name: &str,
+) -> bool {
+    let fn_name = fn_name
+        .strip_prefix('\\')
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| fn_name.to_string());
+    let resolved_fn_name = {
+        let qualified = codebase.resolve_class_name(file, &fn_name);
+        if codebase.functions.contains_key(qualified.as_str()) {
+            qualified
+        } else if codebase.functions.contains_key(fn_name.as_str()) {
+            fn_name.clone()
+        } else {
+            qualified
+        }
+    };
+
+    let Some(func) = codebase.functions.get(resolved_fn_name.as_str()) else {
+        return false;
+    };
+    let expected_kind = if is_true {
+        AssertionKind::AssertIfTrue
+    } else {
+        AssertionKind::AssertIfFalse
+    };
+
+    let mut applied = false;
+    for assertion in func
+        .assertions
+        .iter()
+        .filter(|a| a.kind == expected_kind || (is_true && a.kind == AssertionKind::Assert))
+    {
+        if let Some(index) = func.params.iter().position(|p| p.name == assertion.param) {
+            if let Some(arg) = call.args.get(index) {
+                if let Some(var_name) = extract_var_name(&arg.value) {
+                    ctx.set_var(&var_name, assertion.ty.clone());
+                    applied = true;
+                }
+            }
+        }
+    }
+
+    applied
+}
 
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
