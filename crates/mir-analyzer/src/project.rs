@@ -119,11 +119,17 @@ impl ProjectAnalyzer {
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
         self.load_stubs();
 
-        // ---- Pass 1: read files in parallel ----------------------------------
-        let file_data: Vec<(Arc<str>, String)> = paths
+        // ---- Pass 1: read files and hash them in parallel -------------------
+        // The triple (path, content, blake3_hash) is carried through the pipeline
+        // so the hash is computed once and reused in both the cache pre-check and
+        // Pass 2 cache lookup, avoiding a second BLAKE3 pass over every file.
+        let file_data: Vec<(Arc<str>, String, String)> = paths
             .par_iter()
             .filter_map(|path| match std::fs::read_to_string(path) {
-                Ok(src) => Some((Arc::from(path.to_string_lossy().as_ref()), src)),
+                Ok(src) => {
+                    let h = hash_content(&src);
+                    Some((Arc::from(path.to_string_lossy().as_ref()), src, h))
+                }
                 Err(e) => {
                     eprintln!("Cannot read {}: {}", path.display(), e);
                     None
@@ -135,9 +141,8 @@ impl ProjectAnalyzer {
         if let Some(cache) = &self.cache {
             let changed: Vec<String> = file_data
                 .par_iter()
-                .filter_map(|(f, src)| {
-                    let h = hash_content(src);
-                    if cache.get(f, &h).is_none() {
+                .filter_map(|(f, _, h)| {
+                    if cache.get(f, h).is_none() {
                         Some(f.to_string())
                     } else {
                         None
@@ -152,7 +157,7 @@ impl ProjectAnalyzer {
         // ---- Pass 1: combined pre-index + definition collection (parallel) -----
         let pass1_results: Vec<(Vec<Issue>, Vec<Issue>)> = file_data
             .par_iter()
-            .map(|(file, src)| {
+            .map(|(file, src, _h)| {
                 use php_ast::ast::StmtKind;
                 let arena = bumpalo::Bump::new();
                 let result = php_rs_parser::parse(&arena, src);
@@ -308,7 +313,7 @@ impl ProjectAnalyzer {
 
         // ---- Class-level checks (M11) ----------------------------------------
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
-            file_data.iter().map(|(f, _)| f.clone()).collect();
+            file_data.iter().map(|(f, _, _)| f.clone()).collect();
         let class_issues =
             crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set, &file_data)
                 .analyze_all();
@@ -317,11 +322,10 @@ impl ProjectAnalyzer {
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
         let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
             .par_iter()
-            .map(|(file, src)| {
+            .map(|(file, src, h)| {
                 let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
                 let result = if let Some(cache) = &self.cache {
-                    let h = hash_content(src);
-                    if let Some((cached_issues, ref_locs)) = cache.get(file, &h) {
+                    if let Some((cached_issues, ref_locs)) = cache.get(file, h) {
                         self.codebase
                             .replay_reference_locations(file.clone(), &ref_locs);
                         (cached_issues, Vec::new())
@@ -335,7 +339,7 @@ impl ProjectAnalyzer {
                             &parsed.source_map,
                         );
                         let ref_locs = extract_reference_locations(&self.codebase, file);
-                        cache.put(file, h, issues.clone(), ref_locs);
+                        cache.put(file, h.clone(), issues.clone(), ref_locs);
                         (issues, symbols)
                     }
                 } else {

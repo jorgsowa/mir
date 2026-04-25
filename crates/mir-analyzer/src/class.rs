@@ -38,11 +38,11 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn with_files(
         codebase: &'a Codebase,
         files: HashSet<Arc<str>>,
-        file_data: &'a [(Arc<str>, String)],
+        file_data: &'a [(Arc<str>, String, String)],
     ) -> Self {
         let sources: HashMap<Arc<str>, &'a str> = file_data
             .iter()
-            .map(|(f, s)| (f.clone(), s.as_str()))
+            .map(|(f, s, _)| (f.clone(), s.as_str()))
             .collect();
         Self {
             codebase,
