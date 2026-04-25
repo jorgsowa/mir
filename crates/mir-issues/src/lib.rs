@@ -361,9 +361,11 @@ impl IssueKind {
             | IssueKind::MissingThrowsDocblock { .. }
             | IssueKind::UnusedVariable { .. } => Severity::Warning,
 
-            // Possibly-null / possibly-undefined (only shown in strict mode, level ≥ 7)
-            IssueKind::PossiblyUndefinedVariable { .. }
-            | IssueKind::PossiblyNullArgument { .. }
+            // PossiblyUndefined: shown at default error level (same as Warning)
+            IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
+
+            // Possibly-null (only shown in strict mode, level ≥ 7)
+            IssueKind::PossiblyNullArgument { .. }
             | IssueKind::PossiblyNullPropertyFetch { .. }
             | IssueKind::PossiblyNullMethodCall { .. }
             | IssueKind::PossiblyNullArrayAccess => Severity::Info,

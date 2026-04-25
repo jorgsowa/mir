@@ -106,7 +106,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             IssueKind::PossiblyUndefinedVariable {
                                 name: name_str.to_string(),
                             },
-                            Severity::Info,
+                            Severity::Warning,
                             expr.span,
                         );
                     } else if name_str == "this" {
