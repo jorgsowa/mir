@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-04-25
+
+### Added
+
+- Cross-file `.phpt` fixture format with `===file:Name.php===` sections and optional `composer.json` for PSR-4 lazy-loading scenarios; 21 new cross-file fixtures added.
+- `===config===` section in `.phpt` fixtures for per-fixture settings (`php_version`, `find_dead_code`); dead-code fixtures now declare this in config instead of relying on a hard-coded category list.
+- New `stub_behavior/` fixtures covering `stdClass`, `preg_match`, `sscanf`, `array_map` null callback, and `array_keys` optional filter.
+- Correctness tests for `inject_stub_slice` covering symbol overwrite, `symbol_to_file` updates, `global_vars` cleanup on `remove_file_definitions`, and `StubVfs` roundtrip navigability.
+
+### Changed
+
+- Switched stubs from generated Rust files (`mir-stubs-gen`) to phpstorm-stubs loaded at build time via `CUSTOM_STUB_FILES`; the `mir-stubs-gen` crate is removed.
+- Unified single-file and multi-file `.phpt` fixture parsers into a single `parse_phpt` function; existing `===source===` markers renamed to `===file===`.
+
+### Fixed
+
+- `UnimplementedAbstractMethod` and `UnimplementedInterfaceMethod` errors now report the method name with its original declared casing instead of the lowercase-normalized form.
+
 ## [0.7.2] - 2026-04-24
 
 ### Changed
