@@ -175,6 +175,7 @@ fn re_analyze_file_skips_finalize_on_body_only_change() {
             mixins: vec![],
             template_params: vec![],
             extends_type_args: vec![],
+            implements_type_args: vec![],
             is_abstract: false,
             is_final: false,
             is_readonly: false,

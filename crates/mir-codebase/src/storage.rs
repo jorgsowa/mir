@@ -188,6 +188,9 @@ pub struct ClassStorage {
     pub template_params: Vec<TemplateParam>,
     /// Type arguments from `@extends ParentClass<T1, T2>` — maps parent's template params to concrete types.
     pub extends_type_args: Vec<Union>,
+    /// Type arguments from `@implements Interface<T1, T2>`.
+    #[serde(default)]
+    pub implements_type_args: Vec<(Arc<str>, Vec<Union>)>,
     pub is_abstract: bool,
     pub is_final: bool,
     pub is_readonly: bool,

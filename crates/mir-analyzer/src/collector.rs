@@ -774,6 +774,26 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     })
                     .unwrap_or_default();
 
+                let implements_type_args: Vec<(Arc<str>, Vec<mir_types::Union>)> = class_doc
+                    .implements
+                    .iter()
+                    .filter_map(|ty| {
+                        if let Some(mir_types::Atomic::TNamedObject { fqcn, type_params }) =
+                            ty.types.first()
+                        {
+                            Some((
+                                self.resolve_type_name(fqcn, true),
+                                type_params
+                                    .iter()
+                                    .map(|tp| self.resolve_union(tp.clone()))
+                                    .collect(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
                 let storage = ClassStorage {
                     fqcn: fqcn.clone().into(),
                     short_name: short_name.into(),
@@ -790,6 +810,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         .collect(),
                     template_params,
                     extends_type_args,
+                    implements_type_args,
                     is_abstract: decl.modifiers.is_abstract,
                     is_final: decl.modifiers.is_final,
                     is_readonly: decl.modifiers.is_readonly,

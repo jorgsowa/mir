@@ -287,7 +287,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                         param: param.name.to_string(),
                         fn_name: fn_name.to_string(),
                         expected: format!("{}", param_ty),
-                        actual: format!("{}", arg_ty),
+                        actual: invalid_argument_actual_type(arg_ty, param_ty, ea),
                     },
                     Severity::Error,
                     arg_span,
@@ -300,6 +300,66 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
 // ---------------------------------------------------------------------------
 // Subtype helpers (private to this module)
 // ---------------------------------------------------------------------------
+
+fn invalid_argument_actual_type(
+    arg_ty: &Union,
+    param_ty: &Union,
+    ea: &ExpressionAnalyzer<'_>,
+) -> String {
+    if let Some(projected) = project_generic_ancestor_type(arg_ty, param_ty, ea) {
+        return format!("{}", projected);
+    }
+    format!("{}", arg_ty)
+}
+
+fn project_generic_ancestor_type(
+    arg_ty: &Union,
+    param_ty: &Union,
+    ea: &ExpressionAnalyzer<'_>,
+) -> Option<Union> {
+    if !arg_ty.is_single() {
+        return None;
+    }
+    let arg_fqcn = match arg_ty.types.first()? {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            if !type_params.is_empty() {
+                return None;
+            }
+            fqcn
+        }
+        Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => fqcn,
+        _ => return None,
+    };
+    let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
+
+    for param_atomic in &param_ty.types {
+        let (param_fqcn, param_type_params) = match param_atomic {
+            Atomic::TNamedObject { fqcn, type_params } => (fqcn, type_params),
+            _ => continue,
+        };
+        if param_type_params.is_empty() {
+            continue;
+        }
+
+        let resolved_param = ea
+            .codebase
+            .resolve_class_name(&ea.file, param_fqcn.as_ref());
+        let ancestor_args = generic_ancestor_type_args(arg_fqcn.as_ref(), &resolved_param, ea)
+            .or_else(|| generic_ancestor_type_args(&resolved_arg, &resolved_param, ea))
+            .or_else(|| generic_ancestor_type_args(arg_fqcn.as_ref(), param_fqcn.as_ref(), ea))
+            .or_else(|| generic_ancestor_type_args(&resolved_arg, param_fqcn.as_ref(), ea))?;
+        if ancestor_args.is_empty() {
+            continue;
+        }
+
+        return Some(Union::single(Atomic::TNamedObject {
+            fqcn: param_fqcn.clone(),
+            type_params: ancestor_args,
+        }));
+    }
+
+    None
+}
 
 /// Returns true if every atomic in `arg` can be assigned to some atomic in `param`
 /// using codebase-aware class hierarchy checks.
@@ -407,7 +467,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 return true;
             }
 
-            if ea
+            let arg_extends_param = ea
                 .codebase
                 .extends_or_implements(arg_fqcn.as_ref(), &resolved_param)
                 || ea
@@ -415,10 +475,45 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     .extends_or_implements(arg_fqcn.as_ref(), param_fqcn.as_ref())
                 || ea
                     .codebase
-                    .extends_or_implements(&resolved_arg, &resolved_param)
-                || ea
-                    .codebase
-                    .extends_or_implements(param_fqcn.as_ref(), &resolved_arg)
+                    .extends_or_implements(&resolved_arg, &resolved_param);
+
+            if arg_extends_param {
+                let param_type_params = match p_atomic {
+                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    _ => &[],
+                };
+                if !param_type_params.is_empty() {
+                    let ancestor_args =
+                        generic_ancestor_type_args(arg_fqcn.as_ref(), &resolved_param, ea)
+                            .or_else(|| {
+                                generic_ancestor_type_args(&resolved_arg, &resolved_param, ea)
+                            })
+                            .or_else(|| {
+                                generic_ancestor_type_args(
+                                    arg_fqcn.as_ref(),
+                                    param_fqcn.as_ref(),
+                                    ea,
+                                )
+                            })
+                            .or_else(|| {
+                                generic_ancestor_type_args(&resolved_arg, param_fqcn.as_ref(), ea)
+                            });
+                    if let Some(arg_as_param_params) = ancestor_args {
+                        let class_tps = ea.codebase.get_class_template_params(&resolved_param);
+                        return generic_type_params_compatible(
+                            &arg_as_param_params,
+                            param_type_params,
+                            &class_tps,
+                            ea,
+                        );
+                    }
+                }
+                return true;
+            }
+
+            if ea
+                .codebase
+                .extends_or_implements(param_fqcn.as_ref(), &resolved_arg)
                 || ea
                     .codebase
                     .extends_or_implements(param_fqcn.as_ref(), arg_fqcn.as_ref())
@@ -426,7 +521,13 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     .codebase
                     .extends_or_implements(&resolved_param, &resolved_arg)
             {
-                return true;
+                let param_type_params = match p_atomic {
+                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    _ => &[],
+                };
+                if param_type_params.is_empty() {
+                    return true;
+                }
             }
 
             if !arg_fqcn.contains('\\') && !ea.codebase.type_exists(&resolved_arg) {
@@ -568,6 +669,65 @@ fn generic_type_params_compatible(
     }
 
     true
+}
+
+fn generic_ancestor_type_args(
+    child: &str,
+    ancestor: &str,
+    ea: &ExpressionAnalyzer<'_>,
+) -> Option<Vec<Union>> {
+    let mut seen = std::collections::HashSet::new();
+    generic_ancestor_type_args_inner(child, ancestor, ea, &mut seen)
+}
+
+fn generic_ancestor_type_args_inner(
+    child: &str,
+    ancestor: &str,
+    ea: &ExpressionAnalyzer<'_>,
+    seen: &mut std::collections::HashSet<String>,
+) -> Option<Vec<Union>> {
+    if child == ancestor {
+        return Some(vec![]);
+    }
+    if !seen.insert(child.to_string()) {
+        return None;
+    }
+
+    let cls = ea.codebase.classes.get(child)?;
+    let parent = cls.parent.clone();
+    let extends_type_args = cls.extends_type_args.clone();
+    let implements_type_args = cls.implements_type_args.clone();
+    drop(cls);
+
+    for (iface, args) in implements_type_args {
+        if iface.as_ref() == ancestor {
+            return Some(args);
+        }
+    }
+
+    let parent = parent?;
+    if parent.as_ref() == ancestor {
+        return Some(extends_type_args);
+    }
+
+    let parent_args = generic_ancestor_type_args_inner(parent.as_ref(), ancestor, ea, seen)?;
+    if parent_args.is_empty() {
+        return Some(parent_args);
+    }
+
+    let parent_template_params = ea.codebase.get_class_template_params(parent.as_ref());
+    let bindings: std::collections::HashMap<Arc<str>, Union> = parent_template_params
+        .iter()
+        .zip(extends_type_args.iter())
+        .map(|(tp, ty)| (tp.name.clone(), ty.clone()))
+        .collect();
+
+    Some(
+        parent_args
+            .into_iter()
+            .map(|ty| ty.substitute_templates(&bindings))
+            .collect(),
+    )
 }
 
 fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
