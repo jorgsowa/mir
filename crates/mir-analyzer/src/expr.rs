@@ -742,8 +742,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                 prop_ty
             }
 
-            ExprKind::StaticPropertyAccess(_spa) => {
-                // Class::$prop
+            ExprKind::StaticPropertyAccess(spa) => {
+                if let ExprKind::Identifier(id) = &spa.class.kind {
+                    let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
+                    if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                        && !self.codebase.type_exists(&resolved)
+                    {
+                        self.emit(
+                            IssueKind::UndefinedClass { name: resolved },
+                            Severity::Error,
+                            spa.class.span,
+                        );
+                    }
+                }
                 Union::mixed()
             }
 
@@ -778,7 +789,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
 
                 if !self.codebase.type_exists(&fqcn) {
-                    // UndefinedClass is reported elsewhere; avoid double-reporting
+                    self.emit(
+                        IssueKind::UndefinedClass { name: fqcn },
+                        Severity::Error,
+                        cca.class.span,
+                    );
                     return Union::mixed();
                 }
 
