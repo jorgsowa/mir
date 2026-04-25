@@ -293,10 +293,11 @@ impl<'a> DefinitionCollector<'a> {
     fn process_stmts<'arena, 'src>(
         &mut self,
         stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
-    ) {
+    ) -> ControlFlow<()> {
         for stmt in stmts.iter() {
-            let _ = self.visit_stmt(stmt);
+            self.visit_stmt(stmt)?;
         }
+        ControlFlow::Continue(())
     }
 
     // -----------------------------------------------------------------------
@@ -357,8 +358,9 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         // Save and restore use aliases per namespace block
                         let saved_aliases = self.use_aliases.clone();
                         self.use_aliases.clear();
-                        self.process_stmts(stmts);
+                        let flow = self.process_stmts(stmts);
                         self.use_aliases = saved_aliases;
+                        flow?;
                     }
                     php_ast::ast::NamespaceBody::Simple => {
                         // Simple namespace — affects all subsequent declarations
@@ -868,9 +870,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             }
 
             StmtKind::Block(stmts) => {
-                for stmt in stmts.iter() {
-                    let _ = self.visit_stmt(stmt);
-                }
+                return self.process_stmts(stmts);
             }
 
             // Collect top-level define('NAME', value) calls as global constants.
