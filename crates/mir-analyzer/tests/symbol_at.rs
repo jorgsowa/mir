@@ -740,3 +740,36 @@ fn symbol_at_finds_nullsafe_property_access() {
         "one nullsafe property access should produce one reference location"
     );
 }
+
+#[test]
+fn symbol_at_finds_nullsafe_method_call() {
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(?Svc $s): void { $s?->run(); }\n";
+    let file = write(&dir, "o.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    // Point cursor at 'run' in '$s?->run()'
+    let offset = src.find("?->run").unwrap() as u32 + 3; // +3 skips '?->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at $s?->run()");
+
+    assert!(
+        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run"),
+        "expected MethodCall(run) for nullsafe call, got {:?}",
+        sym.kind
+    );
+
+    // Verify the full LSP flow: cursor → key → reference locations
+    let key = sym.codebase_key().expect("MethodCall must have a key");
+    assert_eq!(key, "Svc::run");
+    let locs = analyzer.codebase().get_reference_locations(&key);
+    assert_eq!(
+        locs.len(),
+        1,
+        "one nullsafe method call should produce one reference location"
+    );
+}

@@ -462,3 +462,34 @@ fn this_method_call_span_covers_only_name() {
         "span must cover only the identifier 'helper' (6 bytes), got start={start} end={end}"
     );
 }
+
+#[test]
+fn nullsafe_method_call_records_reference_location() {
+    let dir = TempDir::new().unwrap();
+    // "<?php\n"                                       = 6 bytes
+    // "class Svc { public function run(): void {} }\n" = 45 bytes  (offset 6)
+    // "function caller(?Svc $s): void { $s?->run(); }\n"
+    //                                          ^-- 'run' starts at offset 88
+    let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(?Svc $s): void { $s?->run(); }\n";
+    let file = write(&dir, "nullsafe_method.php", src);
+    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs: Vec<_> = analyzer
+        .codebase()
+        .get_reference_locations("Svc::run")
+        .into_iter()
+        .filter(|(f, _, _)| f == &file_arc)
+        .collect();
+
+    assert_eq!(locs.len(), 1);
+    let (_, start, end) = locs[0];
+    // The span should cover only the 3-byte identifier "run", not "$s?->run()"
+    assert_eq!(
+        end - start,
+        3,
+        "span should cover only 'run' (3 bytes), got start={start} end={end}"
+    );
+}
