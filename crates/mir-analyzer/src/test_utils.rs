@@ -1,20 +1,17 @@
 //! Test utilities for fixture-based testing.
 //!
-//! Provides helpers to run `.phpt` fixture files against the analyzer
-//! and compare actual vs expected issues.
-//!
 //! # Fixture formats
 //!
-//! **Single-file** (original format, 250 existing fixtures):
+//! **Single-file** (`===file===`, appears exactly once):
 //! ```text
-//! ===source===
+//! ===file===
 //! <?php
 //! ...
 //! ===expect===
 //! UndefinedMethod: Method Foo::bar() does not exist
 //! ```
 //!
-//! **Multi-file** (cross-file scenarios):
+//! **Multi-file** (`===file:name===`, one or more):
 //! ```text
 //! ===file:Base.php===
 //! <?php
@@ -26,10 +23,19 @@
 //! Child.php: UndefinedMethod: Method Child::bar() does not exist
 //! ```
 //!
-//! In multi-file fixtures every expect line is prefixed with the originating
-//! filename (`Name.php: Kind: message`) for unambiguous attribution.
+//! **With config** (optional `===config===` section, must appear before file sections):
+//! ```text
+//! ===config===
+//! php_version=8.1
+//! find_dead_code=true
+//! ===file===
+//! <?php
+//! ...
+//! ===expect===
+//! ...
+//! ```
 //!
-//! **Multi-file with Composer/PSR-4**:
+//! **With Composer/PSR-4**:
 //! ```text
 //! ===file:composer.json===
 //! {"autoload":{"psr-4":{"App\\":"src/"}}}
@@ -44,61 +50,53 @@
 //! Child.php: UndefinedMethod: Method Child::bar() does not exist
 //! ```
 //!
-//! When `composer.json` is present, a `Psr4Map` is built from it. Files under
-//! PSR-4-mapped directories (e.g. `src/`) are written to disk but **not**
-//! passed to `analyze()` — they must be discovered lazily, exactly as they
-//! would be in a real project.
+//! # Validation rules
+//!
+//! - `===file===` (bare, no name) must appear **at most once** per fixture.
+//! - `===file===` and `===file:name===` cannot appear in the same fixture.
+//! - A fixture with no file section at all fails immediately.
+//! - `===config===` must appear **at most once** per fixture.
+//! - Every key in `===config===` must be a recognised key (`php_version`,
+//!   `find_dead_code`); unknown keys fail the test.
+//! - `php_version` is parsed via [`PhpVersion::from_str`] (same parser as the
+//!   real CLI config); invalid values fail the test.
+//! - `find_dead_code` accepts only the literals `true` or `false`.
+//!
+//! # Expect format
+//!
+//! Single-file fixtures use `KindName: message`.
+//! Multi-file fixtures use `FileName.php: KindName: message`.
+//!
+//! Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use crate::project::ProjectAnalyzer;
+use crate::{project::ProjectAnalyzer, PhpVersion};
 use mir_issues::{Issue, IssueKind};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 // ---------------------------------------------------------------------------
-// Single-file inline analysis
+// Fixture configuration
+// ---------------------------------------------------------------------------
+
+#[derive(Default)]
+struct FixtureConfig {
+    php_version: Option<PhpVersion>,
+    find_dead_code: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Public inline-analysis API
 // ---------------------------------------------------------------------------
 
 /// Run the full analyzer on an inline PHP string and return all unsuppressed issues.
 pub fn check(src: &str) -> Vec<Issue> {
-    check_with_opts(src, false)
+    run_analyzer(&[("test.php", src)], &FixtureConfig::default())
 }
-
-/// Like [`check`] but also runs the dead-code detector
-/// (`UnusedMethod`, `UnusedProperty`).
-pub fn check_dead_code(src: &str) -> Vec<Issue> {
-    check_with_opts(src, true)
-}
-
-fn check_with_opts(src: &str, find_dead_code: bool) -> Vec<Issue> {
-    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp: PathBuf = std::env::temp_dir().join(format!("mir_test_{}.php", id));
-    std::fs::write(&tmp, src)
-        .unwrap_or_else(|e| panic!("failed to write temp PHP file {}: {}", tmp.display(), e));
-    let mut analyzer = ProjectAnalyzer::new();
-    analyzer.find_dead_code = find_dead_code;
-    let result = analyzer.analyze(std::slice::from_ref(&tmp));
-    let tmp_str = tmp.to_string_lossy().into_owned();
-    std::fs::remove_file(&tmp).ok();
-    result
-        .issues
-        .into_iter()
-        .filter(|i| !i.suppressed)
-        // When dead-code analysis is enabled the analyzer walks the entire
-        // codebase (including PHP stubs).  Filter to issues originating from
-        // the test file only so that stub-side false positives don't pollute
-        // the fixture output.
-        .filter(|i| !find_dead_code || i.location.file.as_ref() == tmp_str.as_str())
-        .collect()
-}
-
-// ---------------------------------------------------------------------------
-// Multi-file inline analysis
-// ---------------------------------------------------------------------------
 
 /// Analyze a set of named PHP files together, returning all unsuppressed issues.
 ///
@@ -109,19 +107,277 @@ fn check_with_opts(src: &str, find_dead_code: bool) -> Vec<Issue> {
 /// Files under PSR-4-mapped directories are left for lazy discovery and are
 /// **not** passed to `analyze()` explicitly.
 pub fn check_files(files: &[(&str, &str)]) -> Vec<Issue> {
-    check_files_with_opts(files, false)
+    run_analyzer(files, &FixtureConfig::default())
 }
 
-/// Like [`check_files`] but also enables the dead-code detector.
-pub fn check_files_dead_code(files: &[(&str, &str)]) -> Vec<Issue> {
-    check_files_with_opts(files, true)
+// ---------------------------------------------------------------------------
+// Fixture data types
+// ---------------------------------------------------------------------------
+
+/// One expected issue from a `.phpt` fixture's `===expect===` section.
+pub(crate) struct ExpectedIssue {
+    pub file: Option<String>,
+    pub kind_name: String,
+    pub message: String,
 }
 
-fn check_files_with_opts(files: &[(&str, &str)], find_dead_code: bool) -> Vec<Issue> {
+/// Parsed representation of a `.phpt` fixture.
+pub(crate) struct ParsedFixture {
+    /// `(filename, content)` pairs — always at least one entry.
+    pub files: Vec<(String, String)>,
+    pub expected: Vec<ExpectedIssue>,
+    pub is_multi: bool,
+    config: FixtureConfig,
+}
+
+// ---------------------------------------------------------------------------
+// Fixture parsing
+// ---------------------------------------------------------------------------
+
+const BARE_FILE: &str = "===file===";
+const FILE_PREFIX: &str = "===file:";
+const CONFIG_MARKER: &str = "===config===";
+const EXPECT_MARKER: &str = "===expect===";
+
+/// Parse a `.phpt` fixture file.
+pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
+    // --- Locate expect (required, exactly once) ---
+    let expect_count = count_occurrences(content, EXPECT_MARKER);
+    assert_eq!(
+        expect_count, 1,
+        "fixture {path}: ===expect=== must appear exactly once, found {expect_count} times"
+    );
+    let expect_pos = content.find(EXPECT_MARKER).unwrap();
+    let header_region = &content[..expect_pos];
+    let expect_content = content[expect_pos + EXPECT_MARKER.len()..].trim();
+
+    // --- Validate config section ---
+    let config_count = count_occurrences(header_region, CONFIG_MARKER);
+    assert!(
+        config_count <= 1,
+        "fixture {path}: ===config=== must appear at most once, found {config_count} times"
+    );
+
+    // --- Count and validate file markers ---
+    // Config must appear before any file marker so its text is never silently
+    // included in the PHP source of the first file.
+    if config_count == 1 {
+        if let (Some(cfg_pos), Some(first_file_pos)) = (
+            header_region.find(CONFIG_MARKER),
+            header_region.find("===file"),
+        ) {
+            assert!(
+                cfg_pos < first_file_pos,
+                "fixture {path}: ===config=== must appear before the first ===file=== / ===file:name=== marker"
+            );
+        }
+    }
+
+    // ---
+    let bare_count = count_occurrences(header_region, BARE_FILE);
+    // FILE_PREFIX ("===file:") won't match BARE_FILE ("===file===") since after
+    // "file" one has ':' and the other '='.
+    let named_count = count_occurrences(header_region, FILE_PREFIX);
+
+    assert!(
+        !(bare_count > 0 && named_count > 0),
+        "fixture {path}: cannot mix ===file=== and ===file:name=== markers in the same fixture"
+    );
+    assert!(
+        bare_count > 0 || named_count > 0,
+        "fixture {path}: no ===file=== or ===file:name=== section found"
+    );
+    assert!(
+        bare_count <= 1,
+        "fixture {path}: ===file=== must appear at most once, found {bare_count} times"
+    );
+
+    let is_multi = named_count > 0;
+
+    // --- Extract file content(s) ---
+    let files = if is_multi {
+        extract_named_files(header_region, path)
+    } else {
+        let bare_pos = header_region.find(BARE_FILE).unwrap();
+        let src = header_region[bare_pos + BARE_FILE.len()..]
+            .trim()
+            .to_string();
+        vec![("test.php".to_string(), src)]
+    };
+
+    // --- Parse config section ---
+    let config = if config_count == 1 {
+        let cfg_pos = header_region.find(CONFIG_MARKER).unwrap();
+        let after_cfg = cfg_pos + CONFIG_MARKER.len();
+        // Config body ends at the first ===file marker (bare or named).
+        let cfg_end = header_region[after_cfg..]
+            .find("===file")
+            .map(|r| after_cfg + r)
+            .unwrap_or(header_region.len());
+        let cfg_text = header_region[after_cfg..cfg_end].trim();
+        parse_config_section(cfg_text, path)
+    } else {
+        FixtureConfig::default()
+    };
+
+    // --- Parse expect lines ---
+    let expected = expect_content
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(|l| {
+            if is_multi {
+                parse_multi_expect_line(l, path)
+            } else {
+                parse_single_expect_line(l, path)
+            }
+        })
+        .collect();
+
+    ParsedFixture {
+        files,
+        expected,
+        is_multi,
+        config,
+    }
+}
+
+fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
+    let mut config = FixtureConfig::default();
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let (key, value) = line.split_once('=').unwrap_or_else(|| {
+            panic!("fixture {path}: invalid config line {line:?} — expected key=value")
+        });
+        match key.trim() {
+            "php_version" => {
+                let v = value.trim().parse::<PhpVersion>().unwrap_or_else(|e| {
+                    panic!("fixture {path}: invalid php_version: {e}")
+                });
+                config.php_version = Some(v);
+            }
+            "find_dead_code" => {
+                config.find_dead_code = match value.trim() {
+                    "true" => true,
+                    "false" => false,
+                    other => panic!(
+                        "fixture {path}: find_dead_code must be `true` or `false`, got {other:?}"
+                    ),
+                };
+            }
+            other => panic!(
+                "fixture {path}: unknown config key {other:?} — valid keys: php_version, find_dead_code"
+            ),
+        }
+    }
+    config
+}
+
+fn extract_named_files(region: &str, path: &str) -> Vec<(String, String)> {
+    let mut files = Vec::new();
+    let mut search_from = 0;
+
+    while let Some(marker_rel) = region[search_from..].find(FILE_PREFIX) {
+        let marker_abs = search_from + marker_rel;
+        let after_prefix = marker_abs + FILE_PREFIX.len();
+
+        let close_rel = region[after_prefix..]
+            .find("===")
+            .unwrap_or_else(|| panic!("fixture {path}: unclosed ===file: marker"));
+
+        let file_name = region[after_prefix..after_prefix + close_rel].to_string();
+        let content_start = after_prefix + close_rel + "===".len();
+
+        let content_end = region[content_start..]
+            .find(FILE_PREFIX)
+            .map(|r| content_start + r)
+            .unwrap_or(region.len());
+
+        let file_content = region[content_start..content_end].trim().to_string();
+        files.push((file_name, file_content));
+        search_from = content_end;
+    }
+
+    files
+}
+
+fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
+    let parts: Vec<&str> = line.splitn(2, ": ").collect();
+    assert_eq!(
+        parts.len(),
+        2,
+        "fixture {path}: invalid expect line {line:?} — expected \"KindName: message\""
+    );
+    ExpectedIssue {
+        file: None,
+        kind_name: parts[0].trim().to_string(),
+        message: parts[1].trim().to_string(),
+    }
+}
+
+fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
+    let parts: Vec<&str> = line.splitn(3, ": ").collect();
+    assert_eq!(
+        parts.len(),
+        3,
+        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName: message\""
+    );
+    ExpectedIssue {
+        file: Some(parts[0].trim().to_string()),
+        kind_name: parts[1].trim().to_string(),
+        message: parts[2].trim().to_string(),
+    }
+}
+
+fn count_occurrences(haystack: &str, needle: &str) -> usize {
+    let mut count = 0;
+    let mut start = 0;
+    while let Some(pos) = haystack[start..].find(needle) {
+        count += 1;
+        start += pos + needle.len();
+    }
+    count
+}
+
+// ---------------------------------------------------------------------------
+// Fixture runner
+// ---------------------------------------------------------------------------
+
+/// Run a `.phpt` fixture file and assert issues match the `===expect===` section.
+///
+/// Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
+pub fn run_fixture(path: &str) {
+    let content = std::fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("failed to read fixture {path}: {e}"));
+
+    let fixture = parse_phpt(&content, path);
+    let file_refs: Vec<(&str, &str)> = fixture
+        .files
+        .iter()
+        .map(|(n, s)| (n.as_str(), s.as_str()))
+        .collect();
+    let actual = run_analyzer(&file_refs, &fixture.config);
+
+    if std::env::var("UPDATE_FIXTURES").as_deref() == Ok("1") {
+        rewrite_fixture(path, &content, &actual, fixture.is_multi);
+        return;
+    }
+
+    assert_fixture(path, &fixture, &actual);
+}
+
+// ---------------------------------------------------------------------------
+// Core analyzer runner
+// ---------------------------------------------------------------------------
+
+fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp_dir = std::env::temp_dir().join(format!("mir_multi_{}", id));
+    let tmp_dir = std::env::temp_dir().join(format!("mir_fixture_{id}"));
     std::fs::create_dir_all(&tmp_dir)
-        .unwrap_or_else(|e| panic!("failed to create temp dir {}: {}", tmp_dir.display(), e));
+        .unwrap_or_else(|e| panic!("failed to create temp dir {}: {e}", tmp_dir.display()));
 
     let paths: Vec<PathBuf> = files
         .iter()
@@ -129,10 +385,9 @@ fn check_files_with_opts(files: &[(&str, &str)], find_dead_code: bool) -> Vec<Is
             let path = tmp_dir.join(name);
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
-                    .unwrap_or_else(|e| panic!("failed to create dir for {}: {}", name, e));
+                    .unwrap_or_else(|e| panic!("failed to create dir for {name}: {e}"));
             }
-            std::fs::write(&path, src)
-                .unwrap_or_else(|e| panic!("failed to write {}: {}", name, e));
+            std::fs::write(&path, src).unwrap_or_else(|e| panic!("failed to write {name}: {e}"));
             path
         })
         .collect();
@@ -140,10 +395,11 @@ fn check_files_with_opts(files: &[(&str, &str)], find_dead_code: bool) -> Vec<Is
     let tmp_dir_str = tmp_dir.to_string_lossy().into_owned();
 
     let mut analyzer = ProjectAnalyzer::new();
-    analyzer.find_dead_code = find_dead_code;
+    analyzer.find_dead_code = config.find_dead_code;
+    if let Some(version) = config.php_version {
+        analyzer = analyzer.with_php_version(version);
+    }
 
-    // When composer.json is present, build a Psr4Map and exclude PSR-4-mapped
-    // files from the explicit analysis list so they are discovered lazily.
     let has_composer = files.iter().any(|(name, _)| *name == "composer.json");
     let explicit_paths: Vec<PathBuf> = if has_composer {
         match crate::composer::Psr4Map::from_composer(&tmp_dir) {
@@ -172,7 +428,12 @@ fn check_files_with_opts(files: &[(&str, &str)], find_dead_code: bool) -> Vec<Is
         .issues
         .into_iter()
         .filter(|i| !i.suppressed)
-        .filter(|i| !find_dead_code || i.location.file.as_ref().starts_with(tmp_dir_str.as_str()))
+        // When dead-code analysis is enabled the analyzer walks the entire
+        // codebase including stubs. Filter to issues from the temp directory
+        // only so stub-side false positives don't pollute fixture output.
+        .filter(|i| {
+            !config.find_dead_code || i.location.file.as_ref().starts_with(tmp_dir_str.as_str())
+        })
         .collect()
 }
 
@@ -185,212 +446,8 @@ fn php_files_only(paths: &[PathBuf]) -> Vec<PathBuf> {
 }
 
 // ---------------------------------------------------------------------------
-// Fixture data types
+// Fixture assertion
 // ---------------------------------------------------------------------------
-
-/// One expected issue from a `.phpt` fixture's `===expect===` section.
-///
-/// - In single-file fixtures `file` is `None`; matching ignores origin.
-/// - In multi-file fixtures `file` is `Some("Name.php")`; the issue must
-///   originate from that file (matched by basename).
-pub struct ExpectedIssue {
-    pub file: Option<String>,
-    pub kind_name: String,
-    pub message: String,
-}
-
-/// Parsed representation of a `.phpt` fixture.
-pub struct ParsedFixture {
-    /// `(filename, content)` pairs — always at least one entry.
-    pub files: Vec<(String, String)>,
-    pub expected: Vec<ExpectedIssue>,
-    pub is_multi: bool,
-}
-
-// ---------------------------------------------------------------------------
-// Fixture parsing
-// ---------------------------------------------------------------------------
-
-/// Parse a `.phpt` fixture file.
-///
-/// Auto-detects single-file (`===source===`) vs multi-file (`===file:===`) format.
-pub fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
-    if content.contains("===file:") {
-        parse_multi_file(content, path)
-    } else {
-        parse_single_file(content, path)
-    }
-}
-
-fn parse_single_file(content: &str, path: &str) -> ParsedFixture {
-    const SOURCE: &str = "===source===";
-    const EXPECT: &str = "===expect===";
-
-    let src_pos = content
-        .find(SOURCE)
-        .unwrap_or_else(|| panic!("fixture {} missing ===source=== section", path));
-    let exp_pos = content
-        .find(EXPECT)
-        .unwrap_or_else(|| panic!("fixture {} missing ===expect=== section", path));
-
-    assert!(
-        src_pos < exp_pos,
-        "fixture {}: ===source=== must come before ===expect===",
-        path
-    );
-
-    let source = content[src_pos + SOURCE.len()..exp_pos].trim().to_string();
-    let expect_section = content[exp_pos + EXPECT.len()..].trim();
-
-    let expected = expect_section
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(|l| parse_single_expect_line(l, path))
-        .collect();
-
-    ParsedFixture {
-        files: vec![("_test.php".to_string(), source)],
-        expected,
-        is_multi: false,
-    }
-}
-
-fn parse_multi_file(content: &str, path: &str) -> ParsedFixture {
-    const FILE_PREFIX: &str = "===file:";
-    const MARKER_CLOSE: &str = "===";
-    const EXPECT: &str = "===expect===";
-
-    let expect_pos = content
-        .find(EXPECT)
-        .unwrap_or_else(|| panic!("fixture {} missing ===expect=== section", path));
-
-    let files_region = &content[..expect_pos];
-    let expect_section = content[expect_pos + EXPECT.len()..].trim();
-
-    let mut files: Vec<(String, String)> = Vec::new();
-    let mut search_from = 0;
-
-    while let Some(marker_rel) = files_region[search_from..].find(FILE_PREFIX) {
-        let marker_abs = search_from + marker_rel;
-        let after_prefix = marker_abs + FILE_PREFIX.len();
-
-        // Locate the closing === of the marker: "===file:Base.php==="
-        let close_rel = files_region[after_prefix..]
-            .find(MARKER_CLOSE)
-            .unwrap_or_else(|| panic!("fixture {}: unclosed ===file: marker", path));
-
-        let file_name = files_region[after_prefix..after_prefix + close_rel].to_string();
-        let content_start = after_prefix + close_rel + MARKER_CLOSE.len();
-
-        // Content runs to the next ===file: marker (or end of files_region).
-        let content_end = files_region[content_start..]
-            .find(FILE_PREFIX)
-            .map(|r| content_start + r)
-            .unwrap_or(files_region.len());
-
-        let file_content = files_region[content_start..content_end].trim().to_string();
-        files.push((file_name, file_content));
-
-        search_from = content_end;
-    }
-
-    assert!(
-        !files.is_empty(),
-        "fixture {}: no ===file:Name=== sections found",
-        path
-    );
-
-    let expected = expect_section
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(|l| parse_multi_expect_line(l, path))
-        .collect();
-
-    ParsedFixture {
-        files,
-        expected,
-        is_multi: true,
-    }
-}
-
-fn parse_single_expect_line(line: &str, fixture_path: &str) -> ExpectedIssue {
-    let parts: Vec<&str> = line.splitn(2, ": ").collect();
-    assert_eq!(
-        parts.len(),
-        2,
-        "fixture {}: invalid expect line {:?} — expected \"KindName: message\"",
-        fixture_path,
-        line
-    );
-    ExpectedIssue {
-        file: None,
-        kind_name: parts[0].trim().to_string(),
-        message: parts[1].trim().to_string(),
-    }
-}
-
-fn parse_multi_expect_line(line: &str, fixture_path: &str) -> ExpectedIssue {
-    // Format: "FileName.php: KindName: message"
-    let parts: Vec<&str> = line.splitn(3, ": ").collect();
-    assert_eq!(
-        parts.len(),
-        3,
-        "fixture {}: invalid multi-file expect line {:?} — expected \"FileName.php: KindName: message\"",
-        fixture_path,
-        line
-    );
-    ExpectedIssue {
-        file: Some(parts[0].trim().to_string()),
-        kind_name: parts[1].trim().to_string(),
-        message: parts[2].trim().to_string(),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Fixture runners
-// ---------------------------------------------------------------------------
-
-/// Run a `.phpt` fixture file and assert issues match the `===expect===` section.
-///
-/// Supports single-file (`===source===`), multi-file (`===file:===`), and
-/// multi-file with Composer (`===file:composer.json===`).
-///
-/// Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
-pub fn run_fixture(path: &str) {
-    run_fixture_with_opts(path, false);
-}
-
-/// Like [`run_fixture`] but also enables the dead-code detector.
-pub fn run_fixture_dead_code(path: &str) {
-    run_fixture_with_opts(path, true);
-}
-
-fn run_fixture_with_opts(path: &str, find_dead_code: bool) {
-    let content = std::fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("failed to read fixture {}: {}", path, e));
-
-    if std::env::var("UPDATE_FIXTURES").as_deref() == Ok("1") {
-        update_fixture(path, &content, find_dead_code);
-        return;
-    }
-
-    let fixture = parse_phpt(&content, path);
-
-    let actual = if fixture.is_multi {
-        let file_refs: Vec<(&str, &str)> = fixture
-            .files
-            .iter()
-            .map(|(n, s)| (n.as_str(), s.as_str()))
-            .collect();
-        check_files_with_opts(&file_refs, find_dead_code)
-    } else {
-        check_with_opts(&fixture.files[0].1, find_dead_code)
-    };
-
-    assert_fixture(path, &fixture, &actual);
-}
 
 fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
     let mut failures: Vec<String> = Vec::new();
@@ -415,8 +472,7 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
 
     if !failures.is_empty() {
         panic!(
-            "fixture {} FAILED:\n{}\n\nAll actual issues:\n{}",
-            path,
+            "fixture {path} FAILED:\n{}\n\nAll actual issues:\n{}",
             failures.join("\n"),
             fmt_issues(actual, fixture.is_multi)
         );
@@ -446,99 +502,54 @@ fn issue_matches(actual: &Issue, expected: &ExpectedIssue) -> bool {
 // UPDATE_FIXTURES rewrite
 // ---------------------------------------------------------------------------
 
-fn update_fixture(path: &str, content: &str, find_dead_code: bool) {
-    if content.contains("===file:") {
-        let fixture = parse_multi_file(content, path);
-        let file_refs: Vec<(&str, &str)> = fixture
-            .files
-            .iter()
-            .map(|(n, s)| (n.as_str(), s.as_str()))
-            .collect();
-        let actual = check_files_with_opts(&file_refs, find_dead_code);
-        rewrite_fixture_multi(path, content, &actual);
-    } else {
-        let source = extract_source_section(content, path);
-        let actual = check_with_opts(&source, find_dead_code);
-        rewrite_fixture_single(path, content, &actual);
-    }
-}
-
-fn extract_source_section(content: &str, path: &str) -> String {
-    const SOURCE: &str = "===source===";
-    const EXPECT: &str = "===expect===";
-    let src_pos = content
-        .find(SOURCE)
-        .unwrap_or_else(|| panic!("fixture {} missing ===source===", path));
+fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) {
+    // Preserve everything before ===expect=== and rewrite only the expect section.
     let exp_pos = content
-        .find(EXPECT)
-        .unwrap_or_else(|| panic!("fixture {} missing ===expect===", path));
-    content[src_pos + SOURCE.len()..exp_pos].trim().to_string()
-}
-
-fn rewrite_fixture_single(path: &str, content: &str, actual: &[Issue]) {
-    const SOURCE: &str = "===source===";
-    const EXPECT: &str = "===expect===";
-
-    let src_pos = content.find(SOURCE).expect("missing ===source===");
-    let exp_pos = content.find(EXPECT).expect("missing ===expect===");
-
-    let mut out = content[src_pos..exp_pos].to_string();
-    out.push_str(EXPECT);
-    out.push('\n');
-
-    let mut sorted: Vec<&Issue> = actual.iter().collect();
-    sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
-
-    for issue in sorted {
-        out.push_str(&format!(
-            "{}: {}\n",
-            issue.kind.name(),
-            issue.kind.message()
-        ));
-    }
-
-    std::fs::write(path, &out)
-        .unwrap_or_else(|e| panic!("failed to write fixture {}: {}", path, e));
-}
-
-fn rewrite_fixture_multi(path: &str, content: &str, actual: &[Issue]) {
-    const EXPECT: &str = "===expect===";
-
-    let exp_pos = content.find(EXPECT).expect("missing ===expect===");
+        .find(EXPECT_MARKER)
+        .expect("fixture missing ===expect===");
 
     let mut out = content[..exp_pos].to_string();
-    out.push_str(EXPECT);
+    out.push_str(EXPECT_MARKER);
     out.push('\n');
 
     let mut sorted: Vec<&Issue> = actual.iter().collect();
-    sorted.sort_by_key(|i| {
-        let basename = Path::new(i.location.file.as_ref())
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        (
-            basename,
-            i.location.line,
-            i.location.col_start,
-            i.kind.name(),
-        )
-    });
-
-    for issue in sorted {
-        let basename = Path::new(issue.location.file.as_ref())
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        out.push_str(&format!(
-            "{}: {}: {}\n",
-            basename,
-            issue.kind.name(),
-            issue.kind.message()
-        ));
+    if is_multi {
+        sorted.sort_by_key(|i| {
+            let basename = Path::new(i.location.file.as_ref())
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            (
+                basename,
+                i.location.line,
+                i.location.col_start,
+                i.kind.name(),
+            )
+        });
+        for issue in sorted {
+            let basename = Path::new(issue.location.file.as_ref())
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "{}: {}: {}\n",
+                basename,
+                issue.kind.name(),
+                issue.kind.message()
+            ));
+        }
+    } else {
+        sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
+        for issue in sorted {
+            out.push_str(&format!(
+                "{}: {}\n",
+                issue.kind.name(),
+                issue.kind.message()
+            ));
+        }
     }
 
-    std::fs::write(path, &out)
-        .unwrap_or_else(|e| panic!("failed to write fixture {}: {}", path, e));
+    std::fs::write(path, &out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -553,10 +564,8 @@ pub fn assert_issue(issues: &[Issue], kind: IssueKind, line: u32, col_start: u16
         .any(|i| i.kind == kind && i.location.line == line && i.location.col_start == col_start);
     if !found {
         panic!(
-            "Expected issue {:?} at line {}, col {}.\nActual issues:\n{}",
+            "Expected issue {:?} at line {line}, col {col_start}.\nActual issues:\n{}",
             kind,
-            line,
-            col_start,
             fmt_issues(issues, false),
         );
     }
@@ -570,10 +579,7 @@ pub fn assert_issue_kind(issues: &[Issue], kind_name: &str, line: u32, col_start
     });
     if !found {
         panic!(
-            "Expected issue {} at line {}, col {}.\nActual issues:\n{}",
-            kind_name,
-            line,
-            col_start,
+            "Expected issue {kind_name} at line {line}, col {col_start}.\nActual issues:\n{}",
             fmt_issues(issues, false),
         );
     }
@@ -587,8 +593,7 @@ pub fn assert_no_issue(issues: &[Issue], kind_name: &str) {
         .collect();
     if !found.is_empty() {
         panic!(
-            "Expected no {} issues, but found:\n{}",
-            kind_name,
+            "Expected no {kind_name} issues, but found:\n{}",
             fmt_issues(&found.into_iter().cloned().collect::<Vec<_>>(), false),
         );
     }
@@ -627,4 +632,64 @@ fn fmt_issues(issues: &[Issue], is_multi: bool) -> String {
         .map(|i| format!("  {}", fmt_actual(i, is_multi)))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Fixture parser validation tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod parser_validation {
+    use super::parse_phpt;
+
+    fn p(content: &str) {
+        parse_phpt(content, "<test>");
+    }
+
+    #[test]
+    #[should_panic(expected = "===file=== must appear at most once")]
+    fn duplicate_bare_file_marker() {
+        p("===file===\n<?php\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot mix ===file=== and ===file:name===")]
+    fn mixed_bare_and_named_markers() {
+        p("===file===\n<?php\n===file:Other.php===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===config=== must appear at most once")]
+    fn duplicate_config_section() {
+        p("===config===\nfind_dead_code=false\n===config===\nfind_dead_code=true\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown config key")]
+    fn unknown_config_key() {
+        p("===config===\nfoo=bar\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid php_version")]
+    fn invalid_php_version() {
+        p("===config===\nphp_version=banana\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "find_dead_code must be `true` or `false`")]
+    fn invalid_find_dead_code_value() {
+        p("===config===\nfind_dead_code=maybe\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===config=== must appear before the first ===file===")]
+    fn config_after_file_marker() {
+        p("===file===\n<?php\n===config===\nfind_dead_code=true\n===expect===\n");
+    }
+
+    #[test]
+    fn valid_config_is_accepted() {
+        p("===config===\nphp_version=8.1\nfind_dead_code=true\n===file===\n<?php\n===expect===\n");
+    }
 }

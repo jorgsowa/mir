@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Magic {
     public function __get(string $name): mixed {

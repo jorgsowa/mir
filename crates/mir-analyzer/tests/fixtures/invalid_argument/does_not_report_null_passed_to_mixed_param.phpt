@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function f(mixed $x): void {}
 function test(): void { f(null); }

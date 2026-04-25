@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Base {
     public string $name = '';

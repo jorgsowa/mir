@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Bar {
     public function handle(?object $obj): void {

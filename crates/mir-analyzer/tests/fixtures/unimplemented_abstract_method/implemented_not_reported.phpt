@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 abstract class Base {
     abstract public function doWork(): void;

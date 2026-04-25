@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Foo {
     /** @deprecated use newMethod() instead */

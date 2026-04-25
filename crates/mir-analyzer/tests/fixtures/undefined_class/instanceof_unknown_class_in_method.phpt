@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class A {
     public function f(mixed $x): bool {

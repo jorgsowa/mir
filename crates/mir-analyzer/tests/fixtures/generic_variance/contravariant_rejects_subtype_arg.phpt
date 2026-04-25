@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 /** @template-contravariant T */
 class Sink {

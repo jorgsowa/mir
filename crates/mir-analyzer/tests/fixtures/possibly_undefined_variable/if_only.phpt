@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function foo(bool $c): string {
     if ($c) { $r = 'hello'; }

@@ -1,4 +1,6 @@
-===source===
+===config===
+find_dead_code=true
+===file===
 <?php
 class Foo {
     public function run(): void {

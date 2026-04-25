@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 interface MyInterface extends MissingParentInterface {}
 ===expect===

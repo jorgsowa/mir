@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test(bool $flag): void {
     $x = $flag ? [1, 2, 3] : null;

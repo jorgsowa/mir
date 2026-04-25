@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Svc {
     public function helper(): void {}

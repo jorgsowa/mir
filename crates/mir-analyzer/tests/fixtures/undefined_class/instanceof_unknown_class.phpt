@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test($x): bool {
     return $x instanceof NoSuchClass;

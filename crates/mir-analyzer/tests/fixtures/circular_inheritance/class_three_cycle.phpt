@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class A extends B {}
 class B extends C {}

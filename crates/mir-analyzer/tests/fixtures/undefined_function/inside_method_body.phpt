@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class A {
     public function go(): void {

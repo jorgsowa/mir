@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 enum Status {
     case Active;

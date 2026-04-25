@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class A extends A {}
 ===expect===

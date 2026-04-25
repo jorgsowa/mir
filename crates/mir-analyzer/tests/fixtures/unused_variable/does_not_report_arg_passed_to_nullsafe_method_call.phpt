@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Qux {
     public function handle(?object $obj): void {

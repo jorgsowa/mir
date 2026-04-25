@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 /** @deprecated use newGreet() instead */
 function oldGreet(string $name): void {}

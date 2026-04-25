@@ -86,7 +86,7 @@ function array_replace_recursive(
  * @return int[]|string[] an array of all the keys in input.
  */
 #[Pure]
-function array_keys(array $array, mixed $filter_value, bool $strict = false): array {}
+function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array {}
 
 /**
  * Return all the values of an array
@@ -743,12 +743,7 @@ function array_filter(array $array, ?callable $callback = null, int $mode = 0): 
  * after applying the callback function to each one.
  * @meta
  */
-function array_map(
-    ?callable $callback,
-    #[PhpStormStubsElementAvailable(from: '8.0')] array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays,
-    array ...$arrays
-): array {}
+function array_map(?callable $callback, array $array, array ...$arrays): array {}
 
 /**
  * Split an array into chunks

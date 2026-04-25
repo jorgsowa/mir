@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Bug: foreach over a keyed array (array shape) always produced TMixed for the key
 // type instead of the actual key types. A function expecting string should not

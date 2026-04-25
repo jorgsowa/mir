@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Bug: foreach over a keyed array always produced TMixed for the key type.
 // With TMixed, no InvalidArgument is reported even when the key is provably

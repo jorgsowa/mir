@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Cache {
     /** @var array<string, mixed> */

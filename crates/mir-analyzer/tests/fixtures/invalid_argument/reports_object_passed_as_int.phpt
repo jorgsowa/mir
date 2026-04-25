@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Foo {}
 function f(int $x): void { var_dump($x); }

@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function foo(array $extra): array {
     $base = [1, 2, 3];

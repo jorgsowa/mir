@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Variable assigned before the switch is always defined post-switch, even when
 // some cases fall through without a break. Before the fallthrough-context fix,

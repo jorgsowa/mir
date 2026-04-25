@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 final class MyClass {
     private \stdClass $config;

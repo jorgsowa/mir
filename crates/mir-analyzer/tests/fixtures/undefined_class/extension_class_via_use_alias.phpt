@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 use ast\Node;
 function f(Node $x): void {}

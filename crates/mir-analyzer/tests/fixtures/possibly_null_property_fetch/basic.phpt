@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Foo {
     public int $value = 0;
