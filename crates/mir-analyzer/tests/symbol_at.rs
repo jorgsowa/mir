@@ -773,3 +773,73 @@ fn symbol_at_finds_nullsafe_method_call() {
         "one nullsafe method call should produce one reference location"
     );
 }
+
+#[test]
+fn symbol_at_method_call_span_matches_reference_location_span() {
+    // Regression guard for #186: record_symbol and mark_method_referenced_at
+    // must use the same identifier-only span so an LSP client sees consistent
+    // ranges when highlighting the current symbol and listing its references.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
+    let file = write(&dir, "span_eq_method.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let offset = src.find("->run").unwrap() as u32 + 2; // points at 'r' of run
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at must find MethodCall(run)");
+
+    let key = sym.codebase_key().unwrap();
+    let locs = analyzer.codebase().get_reference_locations(&key);
+    let (ref_start, ref_end) = locs
+        .iter()
+        .find(|(f, _, _)| f.as_ref() == file_str)
+        .map(|(_, s, e)| (*s, *e))
+        .expect("reference location must exist for this file");
+
+    assert_eq!(
+        sym.span.start, ref_start,
+        "symbol_at span.start must equal reference location start"
+    );
+    assert_eq!(
+        sym.span.end, ref_end,
+        "symbol_at span.end must equal reference location end"
+    );
+}
+
+#[test]
+fn symbol_at_function_call_span_matches_reference_location_span() {
+    // Regression guard for #186: same consistency check for function calls.
+    let dir = TempDir::new().unwrap();
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
+    let file = write(&dir, "span_eq_fn.php", src);
+    let file_str = file.to_str().unwrap();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result = analyzer.analyze(std::slice::from_ref(&file));
+
+    let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at must find FunctionCall(greet)");
+
+    let key = sym.codebase_key().unwrap();
+    let locs = analyzer.codebase().get_reference_locations(&key);
+    let (ref_start, ref_end) = locs
+        .iter()
+        .find(|(f, _, _)| f.as_ref() == file_str)
+        .map(|(_, s, e)| (*s, *e))
+        .expect("reference location must exist for this file");
+
+    assert_eq!(
+        sym.span.start, ref_start,
+        "symbol_at span.start must equal reference location start"
+    );
+    assert_eq!(
+        sym.span.end, ref_end,
+        "symbol_at span.end must equal reference location end"
+    );
+}
