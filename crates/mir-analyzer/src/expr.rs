@@ -1123,6 +1123,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(e) = opt {
                     self.analyze(e, ctx);
                 }
+                ctx.diverges = true;
                 Union::single(Atomic::TNever)
             }
 
