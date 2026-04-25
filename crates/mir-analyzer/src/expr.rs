@@ -602,10 +602,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         } else if self.codebase.type_exists(&fqcn) {
                             if let Some(cls) = self.codebase.classes.get(fqcn.as_ref()) {
-                                if cls.is_deprecated {
+                                if let Some(msg) = cls.deprecated.clone() {
                                     self.emit(
                                         IssueKind::DeprecatedClass {
                                             name: fqcn.to_string(),
+                                            message: Some(msg).filter(|m| !m.is_empty()),
                                         },
                                         Severity::Info,
                                         n.class.span,

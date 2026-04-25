@@ -8,4 +8,4 @@ function test(): void {
 }
 ===expect===
 UnusedVariable: Variable $obj is never read
-DeprecatedClass: Class OldClass is deprecated
+DeprecatedClass: Class OldClass is deprecated: use NewClass instead

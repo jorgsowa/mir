@@ -10,4 +10,4 @@ class Greeter {
 }
 ===expect===
 UnusedParam: Parameter $name is never used
-DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet
+DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead

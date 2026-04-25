@@ -25,8 +25,8 @@ pub struct MemberInfo {
     pub is_static: bool,
     /// The FQCN of the class that declares this member.
     pub declaring_class: Arc<str>,
-    /// Whether this member is deprecated.
-    pub is_deprecated: bool,
+    /// Deprecation message if this member is deprecated, or None if not.
+    pub deprecated: Option<Arc<str>>,
     /// Method parameters (empty for properties/constants).
     pub params: Vec<crate::storage::FnParam>,
 }
@@ -78,7 +78,7 @@ impl Codebase {
                         visibility: method.visibility,
                         is_static: method.is_static,
                         declaring_class: method.fqcn.clone(),
-                        is_deprecated: method.is_deprecated,
+                        deprecated: method.deprecated.clone(),
                         params: method.params.clone(),
                     });
                 }
@@ -100,7 +100,7 @@ impl Codebase {
                         visibility: prop.visibility,
                         is_static: prop.is_static,
                         declaring_class: cls_fqcn.clone(),
-                        is_deprecated: false,
+                        deprecated: None,
                         params: vec![],
                     });
                 }
@@ -115,7 +115,7 @@ impl Codebase {
                         visibility: con.visibility.unwrap_or(Visibility::Public),
                         is_static: true,
                         declaring_class: cls_fqcn.clone(),
-                        is_deprecated: false,
+                        deprecated: None,
                         params: vec![],
                     });
                 }
@@ -135,7 +135,7 @@ impl Codebase {
                                 visibility: method.visibility,
                                 is_static: method.is_static,
                                 declaring_class: method.fqcn.clone(),
-                                is_deprecated: method.is_deprecated,
+                                deprecated: method.deprecated.clone(),
                                 params: method.params.clone(),
                             });
                         }
@@ -150,7 +150,7 @@ impl Codebase {
                                 visibility: prop.visibility,
                                 is_static: prop.is_static,
                                 declaring_class: tr.fqcn.clone(),
-                                is_deprecated: false,
+                                deprecated: None,
                                 params: vec![],
                             });
                         }
@@ -171,7 +171,7 @@ impl Codebase {
                                 visibility: method.visibility,
                                 is_static: method.is_static,
                                 declaring_class: method.fqcn.clone(),
-                                is_deprecated: method.is_deprecated,
+                                deprecated: method.deprecated.clone(),
                                 params: method.params.clone(),
                             });
                         }
@@ -186,7 +186,7 @@ impl Codebase {
                                 visibility: prop.visibility,
                                 is_static: prop.is_static,
                                 declaring_class: ancestor.fqcn.clone(),
-                                is_deprecated: false,
+                                deprecated: None,
                                 params: vec![],
                             });
                         }
@@ -201,7 +201,7 @@ impl Codebase {
                                 visibility: con.visibility.unwrap_or(Visibility::Public),
                                 is_static: true,
                                 declaring_class: ancestor.fqcn.clone(),
-                                is_deprecated: false,
+                                deprecated: None,
                                 params: vec![],
                             });
                         }
@@ -220,7 +220,7 @@ impl Codebase {
                                         visibility: method.visibility,
                                         is_static: method.is_static,
                                         declaring_class: method.fqcn.clone(),
-                                        is_deprecated: method.is_deprecated,
+                                        deprecated: method.deprecated.clone(),
                                         params: method.params.clone(),
                                     });
                                 }
@@ -235,7 +235,7 @@ impl Codebase {
                                         visibility: prop.visibility,
                                         is_static: prop.is_static,
                                         declaring_class: tr.fqcn.clone(),
-                                        is_deprecated: false,
+                                        deprecated: None,
                                         params: vec![],
                                     });
                                 }
@@ -253,7 +253,7 @@ impl Codebase {
                                 visibility: method.visibility,
                                 is_static: method.is_static,
                                 declaring_class: method.fqcn.clone(),
-                                is_deprecated: method.is_deprecated,
+                                deprecated: method.deprecated.clone(),
                                 params: method.params.clone(),
                             });
                         }
@@ -268,7 +268,7 @@ impl Codebase {
                                 visibility: con.visibility.unwrap_or(Visibility::Public),
                                 is_static: true,
                                 declaring_class: iface.fqcn.clone(),
-                                is_deprecated: false,
+                                deprecated: None,
                                 params: vec![],
                             });
                         }
@@ -292,7 +292,7 @@ impl Codebase {
                         visibility: method.visibility,
                         is_static: method.is_static,
                         declaring_class: method.fqcn.clone(),
-                        is_deprecated: method.is_deprecated,
+                        deprecated: method.deprecated.clone(),
                         params: method.params.clone(),
                     });
                 }
@@ -307,7 +307,7 @@ impl Codebase {
                         visibility: con.visibility.unwrap_or(Visibility::Public),
                         is_static: true,
                         declaring_class: iface.fqcn.clone(),
-                        is_deprecated: false,
+                        deprecated: None,
                         params: vec![],
                     });
                 }
@@ -334,7 +334,7 @@ impl Codebase {
                         visibility: Visibility::Public,
                         is_static: true,
                         declaring_class: en.fqcn.clone(),
-                        is_deprecated: false,
+                        deprecated: None,
                         params: vec![],
                     });
                 }
@@ -350,7 +350,7 @@ impl Codebase {
                         visibility: method.visibility,
                         is_static: method.is_static,
                         declaring_class: method.fqcn.clone(),
-                        is_deprecated: method.is_deprecated,
+                        deprecated: method.deprecated.clone(),
                         params: method.params.clone(),
                     });
                 }
@@ -366,7 +366,7 @@ impl Codebase {
                         visibility: con.visibility.unwrap_or(Visibility::Public),
                         is_static: true,
                         declaring_class: en.fqcn.clone(),
-                        is_deprecated: false,
+                        deprecated: None,
                         params: vec![],
                     });
                 }
@@ -386,7 +386,7 @@ impl Codebase {
                         visibility: method.visibility,
                         is_static: method.is_static,
                         declaring_class: method.fqcn.clone(),
-                        is_deprecated: method.is_deprecated,
+                        deprecated: method.deprecated.clone(),
                         params: method.params.clone(),
                     });
                 }
@@ -401,7 +401,7 @@ impl Codebase {
                         visibility: prop.visibility,
                         is_static: prop.is_static,
                         declaring_class: tr.fqcn.clone(),
-                        is_deprecated: false,
+                        deprecated: None,
                         params: vec![],
                     });
                 }
@@ -431,7 +431,7 @@ mod tests {
             template_params: vec![],
             assertions: vec![],
             throws: vec![],
-            is_deprecated: false,
+            deprecated: None,
             is_internal: false,
             is_pure: false,
             location: None,
@@ -465,7 +465,7 @@ mod tests {
                 is_final: false,
                 is_readonly: false,
                 all_parents: vec![],
-                is_deprecated: false,
+                deprecated: None,
                 is_internal: false,
                 location: None,
             },
@@ -494,7 +494,7 @@ mod tests {
                 is_final: false,
                 is_readonly: false,
                 all_parents: vec![],
-                is_deprecated: false,
+                deprecated: None,
                 is_internal: false,
                 location: None,
             },
@@ -538,7 +538,7 @@ mod tests {
                 is_final: false,
                 is_readonly: false,
                 all_parents: vec![],
-                is_deprecated: false,
+                deprecated: None,
                 is_internal: false,
                 location: None,
             },
@@ -563,7 +563,7 @@ mod tests {
                 is_final: false,
                 is_readonly: false,
                 all_parents: vec![],
-                is_deprecated: false,
+                deprecated: None,
                 is_internal: false,
                 location: None,
             },
