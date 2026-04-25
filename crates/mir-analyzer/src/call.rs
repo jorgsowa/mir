@@ -856,13 +856,12 @@ fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>) {
         return;
     }
 
-    for (i, (param, slot)) in params.iter().zip(param_to_arg.iter()).enumerate() {
+    for (param, slot) in params.iter().zip(param_to_arg.iter()) {
         let (arg_ty, arg_span) = match slot {
             Some(pair) => pair,
             None => continue, // optional param not supplied
         };
         let arg_span = *arg_span;
-        let _ = i;
 
         if let Some(raw_param_ty) = &param.ty {
             // For variadic params annotated as list<T>, each argument should match T, not list<T>.
