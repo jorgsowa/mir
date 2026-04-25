@@ -137,7 +137,10 @@ impl<'a> StatementsAnalyzer<'a> {
         match &stmt.kind {
             // ---- Expression statement ----------------------------------------
             StmtKind::Expression(expr) => {
-                self.expr_analyzer(ctx).analyze(expr, ctx);
+                let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+                if expr_ty.is_never() {
+                    ctx.diverges = true;
+                }
                 // For standalone assert($condition) calls, narrow from the condition.
                 if let php_ast::ast::ExprKind::FunctionCall(call) = &expr.kind {
                     if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
@@ -742,9 +745,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                         self.expr_analyzer(&case_ctx).analyze(val, &mut case_ctx);
                     }
-                    for stmt in case.body.iter() {
-                        self.analyze_stmt(stmt, &mut case_ctx);
-                    }
+                    self.analyze_stmts(&case.body, &mut case_ctx);
                     case_results.push(case_ctx);
                 }
 
@@ -818,9 +819,7 @@ impl<'a> StatementsAnalyzer<'a> {
             StmtKind::TryCatch(tc) => {
                 let pre_ctx = ctx.clone();
                 let mut try_ctx = ctx.fork();
-                for stmt in tc.body.iter() {
-                    self.analyze_stmt(stmt, &mut try_ctx);
-                }
+                self.analyze_stmts(&tc.body, &mut try_ctx);
 
                 // Build a base context for catch blocks that merges pre and try contexts.
                 // Variables that might have been set during the try body are "possibly assigned"
@@ -852,9 +851,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         };
                         catch_ctx.set_var(var.trim_start_matches('$'), exc_ty);
                     }
-                    for stmt in catch.body.iter() {
-                        self.analyze_stmt(stmt, &mut catch_ctx);
-                    }
+                    self.analyze_stmts(&catch.body, &mut catch_ctx);
                     if !catch_ctx.diverges {
                         non_diverging_catches.push(catch_ctx);
                     }
@@ -863,7 +860,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // If ALL catch branches diverge (return/throw/continue/break),
                 // code after the try/catch is only reachable from the try body.
                 // Use try_ctx directly so variables assigned in try are definitely set.
-                let result = if non_diverging_catches.is_empty() {
+                let mut result = if non_diverging_catches.is_empty() {
                     let mut r = try_ctx;
                     r.diverges = false; // the try body itself may not have diverged
                     r
@@ -881,8 +878,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(finally_stmts) = &tc.finally {
                     let mut finally_ctx = result.clone();
                     finally_ctx.inside_finally = true;
-                    for stmt in finally_stmts.iter() {
-                        self.analyze_stmt(stmt, &mut finally_ctx);
+                    self.analyze_stmts(finally_stmts, &mut finally_ctx);
+                    if finally_ctx.diverges {
+                        result.diverges = true;
                     }
                 }
 
