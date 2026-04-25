@@ -1809,4 +1809,114 @@ mod tests {
             "replaying the same location twice must not create duplicate spans"
         );
     }
+
+    // -----------------------------------------------------------------------
+    // inject_stub_slice — correctness-critical tests
+    // -----------------------------------------------------------------------
+
+    fn make_fn(fqn: &str, short_name: &str) -> crate::storage::FunctionStorage {
+        crate::storage::FunctionStorage {
+            fqn: Arc::from(fqn),
+            short_name: Arc::from(short_name),
+            params: vec![],
+            return_type: None,
+            inferred_return_type: None,
+            template_params: vec![],
+            assertions: vec![],
+            throws: vec![],
+            is_deprecated: false,
+            is_pure: false,
+            location: None,
+        }
+    }
+
+    #[test]
+    fn inject_stub_slice_later_injection_overwrites_earlier() {
+        let cb = Codebase::new();
+
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            functions: vec![make_fn("strlen", "phpstorm_version")],
+            file: Some(Arc::from("phpstorm/standard.php")),
+            ..Default::default()
+        });
+        assert_eq!(
+            cb.functions.get("strlen").unwrap().short_name.as_ref(),
+            "phpstorm_version"
+        );
+
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            functions: vec![make_fn("strlen", "custom_version")],
+            file: Some(Arc::from("stubs/standard/basic.php")),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            cb.functions.get("strlen").unwrap().short_name.as_ref(),
+            "custom_version",
+            "custom stub must overwrite phpstorm stub"
+        );
+        assert_eq!(
+            cb.symbol_to_file.get("strlen").unwrap().as_ref(),
+            "stubs/standard/basic.php",
+            "symbol_to_file must point to the overriding file"
+        );
+    }
+
+    #[test]
+    fn inject_stub_slice_constants_not_added_to_symbol_to_file() {
+        let cb = Codebase::new();
+
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            constants: vec![(Arc::from("PHP_EOL"), mir_types::Union::empty())],
+            file: Some(Arc::from("stubs/core/constants.php")),
+            ..Default::default()
+        });
+
+        assert!(
+            cb.constants.contains_key("PHP_EOL"),
+            "constant must be registered in constants map"
+        );
+        assert!(
+            !cb.symbol_to_file.contains_key("PHP_EOL"),
+            "constants must not appear in symbol_to_file — go-to-definition is not supported for them"
+        );
+    }
+
+    #[test]
+    fn remove_file_definitions_purges_injected_global_vars() {
+        let cb = Codebase::new();
+
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            global_vars: vec![(Arc::from("db_connection"), mir_types::Union::empty())],
+            file: Some(Arc::from("src/bootstrap.php")),
+            ..Default::default()
+        });
+        assert!(
+            cb.global_vars.contains_key("db_connection"),
+            "global var must be registered after injection"
+        );
+
+        cb.remove_file_definitions("src/bootstrap.php");
+
+        assert!(
+            !cb.global_vars.contains_key("db_connection"),
+            "global var must be removed when its defining file is removed"
+        );
+    }
+
+    #[test]
+    fn inject_stub_slice_without_file_discards_global_vars() {
+        let cb = Codebase::new();
+
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            global_vars: vec![(Arc::from("orphan_var"), mir_types::Union::empty())],
+            file: None,
+            ..Default::default()
+        });
+
+        assert!(
+            !cb.global_vars.contains_key("orphan_var"),
+            "global_vars must not be registered when slice.file is None"
+        );
+    }
 }
