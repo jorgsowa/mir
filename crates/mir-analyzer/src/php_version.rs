@@ -14,6 +14,8 @@ pub struct PhpVersion {
 }
 
 impl PhpVersion {
+    pub const LATEST: PhpVersion = PhpVersion::new(8, 4);
+
     pub const fn new(major: u8, minor: u8) -> Self {
         Self { major, minor }
     }
@@ -29,7 +31,7 @@ impl PhpVersion {
 
 impl Default for PhpVersion {
     fn default() -> Self {
-        Self::new(8, 2)
+        Self::LATEST
     }
 }
 

@@ -413,7 +413,7 @@ fn main() {
     if let Some(raw) = &config.php_version {
         match raw.parse::<PhpVersion>() {
             Ok(v) => analyzer = analyzer.with_php_version(v),
-            Err(e) => eprintln!("mir: {}; using default PHP {}", e, analyzer.php_version),
+            Err(e) => eprintln!("mir: {}; using default PHP {}", e, PhpVersion::LATEST),
         }
     }
 
