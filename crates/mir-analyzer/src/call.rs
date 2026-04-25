@@ -731,8 +731,17 @@ impl CallAnalyzer {
                 );
                 Union::mixed()
             }
+        } else if !ea.codebase.type_exists(&fqcn)
+            && !matches!(fqcn.as_str(), "self" | "static" | "parent")
+        {
+            ea.emit(
+                IssueKind::UndefinedClass { name: fqcn },
+                Severity::Error,
+                call.class.span,
+            );
+            Union::mixed()
         } else {
-            // Unknown/external class or class with unscanned ancestor — do not emit false positive
+            // Class exists but has unknown ancestor — method may be inherited; suppress
             Union::mixed()
         }
     }

@@ -742,8 +742,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                 prop_ty
             }
 
-            ExprKind::StaticPropertyAccess(_spa) => {
-                // Class::$prop
+            ExprKind::StaticPropertyAccess(spa) => {
+                if let ExprKind::Identifier(id) = &spa.class.kind {
+                    let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
+                    if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                        && !self.codebase.type_exists(&resolved)
+                    {
+                        self.emit(
+                            IssueKind::UndefinedClass { name: resolved },
+                            Severity::Error,
+                            spa.class.span,
+                        );
+                    }
+                }
                 Union::mixed()
             }
 
@@ -778,7 +789,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
 
                 if !self.codebase.type_exists(&fqcn) {
-                    // UndefinedClass is reported elsewhere; avoid double-reporting
+                    self.emit(
+                        IssueKind::UndefinedClass { name: fqcn },
+                        Severity::Error,
+                        cca.class.span,
+                    );
                     return Union::mixed();
                 }
 
@@ -826,6 +841,16 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Closures / arrow functions --------------------------------
             ExprKind::Closure(c) => {
+                // Check param and return type hints for undefined classes.
+                for param in c.params.iter() {
+                    if let Some(hint) = &param.type_hint {
+                        self.check_type_hint(hint);
+                    }
+                }
+                if let Some(hint) = &c.return_type {
+                    self.check_type_hint(hint);
+                }
+
                 let params = ast_params_to_fn_params_resolved(
                     &c.params,
                     ctx.self_fqcn.as_deref(),
@@ -906,6 +931,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             ExprKind::ArrowFunction(af) => {
+                // Check param and return type hints for undefined classes.
+                for param in af.params.iter() {
+                    if let Some(hint) = &param.type_hint {
+                        self.check_type_hint(hint);
+                    }
+                }
+                if let Some(hint) = &af.return_type {
+                    self.check_type_hint(hint);
+                }
+
                 let params = ast_params_to_fn_params_resolved(
                     &af.params,
                     ctx.self_fqcn.as_deref(),
@@ -1425,6 +1460,48 @@ impl<'a> ExpressionAnalyzer<'a> {
         let col = self.source[line_start_byte..byte_offset].chars().count() as u16;
 
         (line, col)
+    }
+
+    /// Walk a type hint and emit `UndefinedClass` for any named type not in the codebase.
+    fn check_type_hint(&mut self, hint: &php_ast::ast::TypeHint<'_, '_>) {
+        use php_ast::ast::TypeHintKind;
+        match &hint.kind {
+            TypeHintKind::Named(name) => {
+                let name_str = crate::parser::name_to_string(name);
+                if matches!(
+                    name_str.to_lowercase().as_str(),
+                    "self"
+                        | "static"
+                        | "parent"
+                        | "null"
+                        | "true"
+                        | "false"
+                        | "never"
+                        | "void"
+                        | "mixed"
+                        | "object"
+                        | "callable"
+                        | "iterable"
+                ) {
+                    return;
+                }
+                let resolved = self.codebase.resolve_class_name(&self.file, &name_str);
+                if !self.codebase.type_exists(&resolved) {
+                    self.emit(
+                        IssueKind::UndefinedClass { name: resolved },
+                        Severity::Error,
+                        hint.span,
+                    );
+                }
+            }
+            TypeHintKind::Nullable(inner) => self.check_type_hint(inner),
+            TypeHintKind::Union(parts) | TypeHintKind::Intersection(parts) => {
+                for part in parts.iter() {
+                    self.check_type_hint(part);
+                }
+            }
+            TypeHintKind::Keyword(_, _) => {}
+        }
     }
 
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
