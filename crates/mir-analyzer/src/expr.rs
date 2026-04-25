@@ -11,6 +11,7 @@ use mir_types::{Atomic, Union};
 
 use crate::call::CallAnalyzer;
 use crate::context::Context;
+use crate::php_version::PhpVersion;
 use crate::symbol::{ResolvedSymbol, SymbolKind};
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,7 @@ pub struct ExpressionAnalyzer<'a> {
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
+    pub php_version: PhpVersion,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -34,6 +36,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         source_map: &'a php_rs_parser::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
+        php_version: PhpVersion,
     ) -> Self {
         Self {
             codebase,
@@ -42,6 +45,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             source_map,
             issues,
             symbols,
+            php_version,
         }
     }
 
@@ -863,6 +867,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.source_map,
                         self.issues,
                         self.symbols,
+                        self.php_version,
                     );
                     sa.analyze_stmts(&c.body, &mut closure_ctx);
                     let ret = crate::project::merge_return_types(&sa.return_types);

@@ -687,6 +687,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 &mut all_symbols,
+                self.php_version,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -791,6 +792,7 @@ impl ProjectAnalyzer {
             source_map,
             &mut buf,
             all_symbols,
+            self.php_version,
         );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -891,6 +893,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 all_symbols,
+                self.php_version,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -1024,6 +1027,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 all_symbols,
+                self.php_version,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -1128,6 +1132,7 @@ impl ProjectAnalyzer {
             source_map,
             &mut buf,
             all_symbols,
+            self.php_version,
         );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -1239,6 +1244,7 @@ impl ProjectAnalyzer {
                 source_map,
                 &mut buf,
                 all_symbols,
+                self.php_version,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);

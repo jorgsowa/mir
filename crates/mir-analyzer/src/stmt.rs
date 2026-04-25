@@ -11,6 +11,7 @@ use mir_types::{ArrayKey, Atomic, Union};
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
 use crate::narrowing::narrow_from_condition;
+use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,7 @@ pub struct StatementsAnalyzer<'a> {
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
+    pub php_version: PhpVersion,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Union>,
     /// Break-context stack: one entry per active loop nesting level.
@@ -39,6 +41,7 @@ impl<'a> StatementsAnalyzer<'a> {
         source_map: &'a php_rs_parser::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
+        php_version: PhpVersion,
     ) -> Self {
         Self {
             codebase,
@@ -47,6 +50,7 @@ impl<'a> StatementsAnalyzer<'a> {
             source_map,
             issues,
             symbols,
+            php_version,
             return_types: Vec::new(),
             break_ctx_stack: Vec::new(),
         }
@@ -947,6 +951,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.source_map,
                     self.issues,
                     self.symbols,
+                    self.php_version,
                 );
                 sa.analyze_stmts(&decl.body, &mut fn_ctx);
             }
@@ -1006,6 +1011,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         self.source_map,
                         self.issues,
                         self.symbols,
+                        self.php_version,
                     );
                     sa.analyze_stmts(body, &mut method_ctx);
                 }
@@ -1044,6 +1050,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.source_map,
             self.issues,
             self.symbols,
+            self.php_version,
         )
     }
 
