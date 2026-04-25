@@ -843,6 +843,19 @@ impl ProjectAnalyzer {
         }
 
         for member in decl.members.iter() {
+            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+                if let Some(hint) = &prop.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        &self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+                continue;
+            }
             let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
@@ -1195,6 +1208,19 @@ impl ProjectAnalyzer {
         }
 
         for member in decl.members.iter() {
+            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+                if let Some(hint) = &prop.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        &self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+                continue;
+            }
             let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };

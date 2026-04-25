@@ -5,7 +5,7 @@ use std::sync::Arc;
 use php_ast::ast::StmtKind;
 
 use mir_codebase::Codebase;
-use mir_issues::{IssueBuffer, IssueKind};
+use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
 use mir_types::{ArrayKey, Atomic, Union};
 
 use crate::context::Context;
@@ -802,6 +802,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 let mut non_diverging_catches: Vec<Context> = vec![];
                 for catch in tc.catches.iter() {
                     let mut catch_ctx = catch_base.clone();
+                    // Check that all caught exception types exist.
+                    for catch_ty in catch.types.iter() {
+                        self.check_name_undefined_class(catch_ty);
+                    }
                     if let Some(var) = catch.var {
                         // Bind the caught exception variable; union all caught types
                         let exc_ty = if catch.types.is_empty() {
@@ -1073,6 +1077,30 @@ impl<'a> StatementsAnalyzer<'a> {
         let col = self.source[line_start_byte..byte_offset].chars().count() as u16;
 
         (line, col)
+    }
+
+    /// Emit `UndefinedClass` for a `Name` AST node if the resolved class does not exist.
+    fn check_name_undefined_class(&mut self, name: &php_ast::ast::Name<'_, '_>) {
+        let raw = crate::parser::name_to_string(name);
+        let resolved = self.codebase.resolve_class_name(&self.file, &raw);
+        if matches!(resolved.as_str(), "self" | "static" | "parent") {
+            return;
+        }
+        if self.codebase.type_exists(&resolved) {
+            return;
+        }
+        let span = name.span();
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let (_, col_end) = self.offset_to_line_col(span.end);
+        self.issues.add(Issue::new(
+            IssueKind::UndefinedClass { name: resolved },
+            Location {
+                file: self.file.clone(),
+                line,
+                col_start,
+                col_end: col_end.max(col_start + 1),
+            },
+        ));
     }
 
     // -----------------------------------------------------------------------
