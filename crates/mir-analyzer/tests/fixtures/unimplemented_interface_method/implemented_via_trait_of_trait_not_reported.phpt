@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 interface Runnable {
     public function run(): void;

@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function foo(int $param): int {
     return 42;

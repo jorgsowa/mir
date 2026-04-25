@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test(array $arr): mixed {
     $keys = array_keys($arr);

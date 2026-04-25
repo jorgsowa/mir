@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test(bool $flag): void {
     $x = $flag ? new stdClass() : null;

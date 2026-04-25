@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Foo {
     const BAR = 1;

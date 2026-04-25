@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 namespace MyApp {
     class MyService {}

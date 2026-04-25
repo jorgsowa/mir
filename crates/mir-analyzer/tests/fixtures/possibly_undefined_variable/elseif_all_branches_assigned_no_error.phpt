@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Bug: elseif branches were discarded from the post-if merge — variables assigned
 // in every branch (if / elseif / else) were incorrectly treated as possibly-undefined.

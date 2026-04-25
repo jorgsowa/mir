@@ -18,7 +18,7 @@ pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};
 pub use project::{AnalysisResult, ProjectAnalyzer};
-pub use stubs::is_builtin_function;
+pub use stubs::{custom_stub_files, is_builtin_function, phpstorm_stub_files, StubVfs};
 
 pub mod symbol;
 pub mod type_env;
@@ -30,5 +30,3 @@ pub mod composer;
 pub use composer::Psr4Map;
 
 pub mod test_utils;
-
-pub(crate) mod generated;

@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Before the fallthrough-context fix, the case-2 assignment was silently dropped,
 // so $y appeared to be `int` post-switch and no error was reported.

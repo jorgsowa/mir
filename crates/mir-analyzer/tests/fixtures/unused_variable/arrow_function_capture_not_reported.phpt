@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function foo(): array {
     $factor = 2;

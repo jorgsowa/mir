@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function outer(): void {
     class Inner {

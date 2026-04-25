@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class ActiveClass {}
 

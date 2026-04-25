@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Bug: foreach over a list-shaped keyed array always produced TMixed for the key.
 // A function expecting int should not receive an InvalidArgument when the array

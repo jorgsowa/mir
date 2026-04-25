@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function f(string $x): void {
     if (is_string($x)) {}

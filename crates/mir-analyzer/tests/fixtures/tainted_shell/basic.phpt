@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test(): void {
     $cmd = $_GET['cmd'];

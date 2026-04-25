@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Obj {
     public int $val = 0;

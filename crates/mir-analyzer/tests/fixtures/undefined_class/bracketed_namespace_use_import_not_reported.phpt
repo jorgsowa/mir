@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 namespace Outer {
     use Inner\Foo;

@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class Foo {
     public function bar(int $_unused): int {

@@ -23,29 +23,8 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-  stubs-up-to-date:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Install b3sum
-        run: sudo apt-get update && sudo apt-get install -y b3sum
-
-      - name: Verify stub input-hashes match generated headers
-        run: ./scripts/verify-stub-hashes.sh
-
-      - name: Regenerate stubs and verify bytes match committed output
-        run: |
-          cargo run -p mir-stubs-gen
-          git diff --exit-code -- crates/mir-analyzer/src/generated/
-
   test:
-    needs: stubs-up-to-date
+    needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true

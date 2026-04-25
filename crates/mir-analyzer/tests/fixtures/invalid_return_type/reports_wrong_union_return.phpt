@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function f(): int {
     $x = true ? 1 : 'hello';

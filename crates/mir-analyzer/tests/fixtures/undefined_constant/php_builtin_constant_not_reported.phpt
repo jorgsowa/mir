@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test(): void {
     echo PHP_EOL;

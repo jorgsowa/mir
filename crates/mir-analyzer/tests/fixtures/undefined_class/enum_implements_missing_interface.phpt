@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 enum Status: string implements MissingInterface {}
 ===expect===

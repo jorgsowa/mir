@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 /** @return array|false */
 function get(): array|false { return false; }

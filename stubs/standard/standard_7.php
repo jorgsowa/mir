@@ -199,7 +199,7 @@ function pack(
  * The packed data.
  * </p>
  * @param int $offset [optional]
- * @return array|false an associative array containing unpacked elements of binary
+ * @return array<int, mixed>|false an associative array containing unpacked elements of binary
  * string or false if the format string contains errors
  */
 #[Pure]

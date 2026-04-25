@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 interface I {
     public function doIt(): void;

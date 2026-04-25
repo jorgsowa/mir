@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // The elseif condition is NOT redundant when additional union members remain
 // after the if condition narrows the type. Here $x is string|int|null: the if

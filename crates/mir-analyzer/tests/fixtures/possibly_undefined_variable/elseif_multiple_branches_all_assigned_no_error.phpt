@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Bug: with multiple elseif branches, only the last one survived the merge loop —
 // variables assigned in earlier elseif branches were dropped.

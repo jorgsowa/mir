@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // case 1 has no break and chains into case 2 which returns. Both cases
 // effectively diverge, so $y is only reachable when no case matches (no

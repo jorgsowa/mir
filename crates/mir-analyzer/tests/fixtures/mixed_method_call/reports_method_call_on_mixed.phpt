@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function test(mixed $value): void {
     $value->someMethod();

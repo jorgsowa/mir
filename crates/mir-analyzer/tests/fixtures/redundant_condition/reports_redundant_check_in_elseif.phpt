@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 // Bug: elseif branches were not narrowed on the if condition being false — the
 // if condition's type exclusion was not applied before entering the elseif body.

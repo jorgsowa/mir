@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 function outer(string $x): callable {
     return function(): string {

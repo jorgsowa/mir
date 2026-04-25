@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 /** @deprecated use NewBase instead */
 class OldBase {}

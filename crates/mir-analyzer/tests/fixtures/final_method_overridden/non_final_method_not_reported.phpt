@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 class ParentClass {
     public function unlocked(): void {}

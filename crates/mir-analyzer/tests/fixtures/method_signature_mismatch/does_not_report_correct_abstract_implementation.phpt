@@ -1,4 +1,4 @@
-===source===
+===file===
 <?php
 abstract class Base {
     abstract public function f(string $x): void;
