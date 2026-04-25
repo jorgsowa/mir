@@ -254,11 +254,14 @@ fn collect_php_files(dir: &Path, stubs_root: &Path, code: &mut String) {
                 .replace('\\', "/");
 
             // Canonicalize gives us a stable absolute path for include_str!.
-            let abs = path
-                .canonicalize()
-                .unwrap_or_else(|_| path.clone())
-                .to_string_lossy()
-                .replace('\\', "/");
+            // On Windows, canonicalize() returns \\?\-prefixed UNC paths; strip
+            // that prefix so include_str! receives a plain absolute path.
+            let abs = {
+                let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
+                let s = canonical.to_string_lossy();
+                let s = s.strip_prefix(r"\\?\").unwrap_or(&s);
+                s.replace('\\', "/")
+            };
 
             writeln!(
                 code,
