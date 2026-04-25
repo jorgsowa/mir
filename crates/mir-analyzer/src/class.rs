@@ -104,7 +104,7 @@ impl<'a> ClassAnalyzer<'a> {
                         }
                         issues.push(issue);
                     }
-                    if parent.is_deprecated {
+                    if let Some(msg) = parent.deprecated.clone() {
                         let loc = issue_location(
                             cls.location.as_ref(),
                             fqcn,
@@ -115,6 +115,7 @@ impl<'a> ClassAnalyzer<'a> {
                         let mut issue = Issue::new(
                             IssueKind::DeprecatedClass {
                                 name: parent_fqcn.to_string(),
+                                message: Some(msg).filter(|m| !m.is_empty()),
                             },
                             loc,
                         );

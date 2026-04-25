@@ -134,7 +134,7 @@ impl CallAnalyzer {
                 name_span.start,
                 name_span.end,
             );
-            let is_deprecated = func.is_deprecated;
+            let deprecated = func.deprecated.clone();
             let params = func.params.clone();
             let template_params = func.template_params.clone();
             let return_ty_raw = func
@@ -143,10 +143,11 @@ impl CallAnalyzer {
                 .unwrap_or_else(Union::mixed);
 
             // Emit DeprecatedCall if the function is marked @deprecated
-            if is_deprecated {
+            if let Some(msg) = deprecated {
                 ea.emit(
                     IssueKind::DeprecatedCall {
                         name: resolved_fn_name.clone(),
+                        message: Some(msg).filter(|m| !m.is_empty()),
                     },
                     Severity::Info,
                     span,
@@ -322,11 +323,12 @@ impl CallAnalyzer {
                             call.method.span.end,
                         );
                         // Emit DeprecatedMethodCall if the method is marked @deprecated
-                        if method.is_deprecated {
+                        if let Some(msg) = method.deprecated.clone() {
                             ea.emit(
                                 IssueKind::DeprecatedMethodCall {
                                     class: fqcn.to_string(),
                                     method: method_name.to_string(),
+                                    message: Some(msg).filter(|m| !m.is_empty()),
                                 },
                                 Severity::Info,
                                 span,
@@ -459,11 +461,12 @@ impl CallAnalyzer {
                             call.method.span.end,
                         );
                         // Emit DeprecatedMethodCall if the method is marked @deprecated
-                        if method.is_deprecated {
+                        if let Some(msg) = method.deprecated.clone() {
                             ea.emit(
                                 IssueKind::DeprecatedMethodCall {
                                     class: fqcn.to_string(),
                                     method: method_name.to_string(),
+                                    message: Some(msg).filter(|m| !m.is_empty()),
                                 },
                                 Severity::Info,
                                 span,
@@ -669,11 +672,12 @@ impl CallAnalyzer {
                 method_end,
             );
             // Emit DeprecatedMethodCall if the method is marked @deprecated
-            if method.is_deprecated {
+            if let Some(msg) = method.deprecated.clone() {
                 ea.emit(
                     IssueKind::DeprecatedMethodCall {
                         class: fqcn.clone(),
                         method: method_name.to_string(),
+                        message: Some(msg).filter(|m| !m.is_empty()),
                     },
                     Severity::Info,
                     span,

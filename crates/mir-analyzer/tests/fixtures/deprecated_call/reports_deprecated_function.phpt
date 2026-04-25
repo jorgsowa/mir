@@ -8,4 +8,4 @@ function test(): void {
 }
 ===expect===
 UnusedParam: Parameter $name is never used
-DeprecatedCall: Call to deprecated function oldGreet
+DeprecatedCall: Call to deprecated function oldGreet: use newGreet() instead

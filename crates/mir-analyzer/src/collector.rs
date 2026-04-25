@@ -464,7 +464,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     template_params,
                     assertions: vec![],
                     throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
-                    is_deprecated: doc.is_deprecated,
+                    deprecated: doc.deprecated.as_deref().map(Arc::from),
                     is_pure: doc.is_pure,
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 };
@@ -620,7 +620,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     is_final: decl.modifiers.is_final,
                     is_readonly: decl.modifiers.is_readonly,
                     all_parents: vec![],
-                    is_deprecated: class_doc.is_deprecated,
+                    deprecated: class_doc.deprecated.as_deref().map(Arc::from),
                     is_internal: class_doc.is_internal,
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 };
@@ -989,7 +989,7 @@ impl<'a> DefinitionCollector<'a> {
             template_params,
             assertions: vec![],
             throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
-            is_deprecated: doc.is_deprecated,
+            deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
             location: span.map(|s| self.location(s.start, s.end)),

@@ -252,17 +252,21 @@ pub enum IssueKind {
     // --- Other --------------------------------------------------------------
     DeprecatedCall {
         name: String,
+        message: Option<Arc<str>>,
     },
     DeprecatedMethodCall {
         class: String,
         method: String,
+        message: Option<Arc<str>>,
     },
     DeprecatedMethod {
         class: String,
         method: String,
+        message: Option<Arc<str>>,
     },
     DeprecatedClass {
         name: String,
+        message: Option<Arc<str>>,
     },
     InternalMethod {
         class: String,
@@ -303,6 +307,13 @@ pub enum IssueKind {
     CircularInheritance {
         class: String,
     },
+}
+
+fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
+    match message.as_deref().filter(|m| !m.is_empty()) {
+        Some(msg) => format!("{}: {}", base, msg),
+        None => base,
+    }
 }
 
 impl IssueKind {
@@ -680,16 +691,30 @@ impl IssueKind {
                 "Tainted shell command — possible command injection".to_string()
             }
 
-            IssueKind::DeprecatedCall { name } => {
-                format!("Call to deprecated function {}", name)
+            IssueKind::DeprecatedCall { name, message } => {
+                let base = format!("Call to deprecated function {}", name);
+                append_deprecation_message(base, message)
             }
-            IssueKind::DeprecatedMethodCall { class, method } => {
-                format!("Call to deprecated method {}::{}", class, method)
+            IssueKind::DeprecatedMethodCall {
+                class,
+                method,
+                message,
+            } => {
+                let base = format!("Call to deprecated method {}::{}", class, method);
+                append_deprecation_message(base, message)
             }
-            IssueKind::DeprecatedMethod { class, method } => {
-                format!("Method {}::{}() is deprecated", class, method)
+            IssueKind::DeprecatedMethod {
+                class,
+                method,
+                message,
+            } => {
+                let base = format!("Method {}::{}() is deprecated", class, method);
+                append_deprecation_message(base, message)
             }
-            IssueKind::DeprecatedClass { name } => format!("Class {} is deprecated", name),
+            IssueKind::DeprecatedClass { name, message } => {
+                let base = format!("Class {} is deprecated", name);
+                append_deprecation_message(base, message)
+            }
             IssueKind::InternalMethod { class, method } => {
                 format!("Method {}::{}() is marked @internal", class, method)
             }

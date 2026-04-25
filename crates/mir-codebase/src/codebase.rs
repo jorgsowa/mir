@@ -846,7 +846,7 @@ impl Codebase {
                     is_final: false,
                     is_internal: false,
                     is_pure: false,
-                    is_deprecated: false,
+                    deprecated: None,
                     location: None,
                 }));
             }
@@ -1824,7 +1824,7 @@ mod tests {
             template_params: vec![],
             assertions: vec![],
             throws: vec![],
-            is_deprecated: false,
+            deprecated: None,
             is_pure: false,
             location: None,
         }

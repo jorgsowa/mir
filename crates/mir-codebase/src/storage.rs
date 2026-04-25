@@ -127,7 +127,7 @@ pub struct MethodStorage {
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
     pub throws: Vec<Arc<str>>,
-    pub is_deprecated: bool,
+    pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub is_pure: bool,
     pub location: Option<Location>,
@@ -191,7 +191,7 @@ pub struct ClassStorage {
     pub is_readonly: bool,
     /// Populated during finalization: all ancestor FQCNs (parents + interfaces, transitively).
     pub all_parents: Vec<Arc<str>>,
-    pub is_deprecated: bool,
+    pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub location: Option<Location>,
 }
@@ -287,7 +287,7 @@ pub struct FunctionStorage {
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
     pub throws: Vec<Arc<str>>,
-    pub is_deprecated: bool,
+    pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
     pub location: Option<Location>,
 }
