@@ -96,7 +96,13 @@ pub(crate) fn check_method_visibility(
     match method.visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
-            if caller_fqcn != method.fqcn.as_ref() {
+            let from_trait = ea.codebase.traits.contains_key(method.fqcn.as_ref());
+            let allowed = caller_fqcn == method.fqcn.as_ref()
+                || (from_trait
+                    && ea
+                        .codebase
+                        .extends_or_implements(caller_fqcn, method.fqcn.as_ref()));
+            if !allowed {
                 ea.emit(
                     IssueKind::UndefinedMethod {
                         class: method.fqcn.to_string(),
