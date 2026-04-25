@@ -296,8 +296,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self.codebase,
                             &self.file,
                         );
-                        let then_ty =
-                            self.with_ctx(&mut then_ctx, |ea, c| ea.analyze(then_expr, c));
+                        let then_ty = self.analyze(then_expr, &mut then_ctx);
 
                         let mut else_ctx = ctx.fork();
                         crate::narrowing::narrow_from_condition(
@@ -307,8 +306,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self.codebase,
                             &self.file,
                         );
-                        let else_ty =
-                            self.with_ctx(&mut else_ctx, |ea, c| ea.analyze(t.else_expr, c));
+                        let else_ty = self.analyze(t.else_expr, &mut else_ctx);
 
                         // Propagate variable reads from both branches
                         for name in then_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
@@ -1458,14 +1456,6 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         self.issues.add(issue);
-    }
-
-    // Helper to call a closure with a mutable context reference while holding &mut self.
-    fn with_ctx<F, R>(&mut self, ctx: &mut Context, f: F) -> R
-    where
-        F: FnOnce(&mut ExpressionAnalyzer<'a>, &mut Context) -> R,
-    {
-        f(self, ctx)
     }
 }
 
