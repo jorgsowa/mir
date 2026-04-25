@@ -10,6 +10,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use rayon::prelude::*;
+
 use mir_codebase::storage::{MethodStorage, Visibility};
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
@@ -38,11 +40,11 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn with_files(
         codebase: &'a Codebase,
         files: HashSet<Arc<str>>,
-        file_data: &'a [(Arc<str>, String)],
+        file_data: &'a [(Arc<str>, String, String)],
     ) -> Self {
         let sources: HashMap<Arc<str>, &'a str> = file_data
             .iter()
-            .map(|(f, s)| (f.clone(), s.as_str()))
+            .map(|(f, s, _)| (f.clone(), s.as_str()))
             .collect();
         Self {
             codebase,
@@ -53,8 +55,6 @@ impl<'a> ClassAnalyzer<'a> {
 
     /// Run all class-level checks and return every discovered issue.
     pub fn analyze_all(&self) -> Vec<Issue> {
-        let mut issues = Vec::new();
-
         let class_keys: Vec<Arc<str>> = self
             .codebase
             .classes
@@ -62,90 +62,100 @@ impl<'a> ClassAnalyzer<'a> {
             .map(|e| e.key().clone())
             .collect();
 
-        for fqcn in &class_keys {
-            let cls = match self.codebase.classes.get(fqcn.as_ref()) {
-                Some(c) => c,
-                None => continue,
-            };
+        // Per-class checks are independent — run them in parallel.
+        let mut issues: Vec<Issue> = class_keys
+            .par_iter()
+            .flat_map(|fqcn| {
+                let mut class_issues = Vec::new();
 
-            // Skip classes from vendor / stub files — only check user-analyzed files
-            if !self.analyzed_files.is_empty() {
-                let in_analyzed = cls
-                    .location
-                    .as_ref()
-                    .map(|loc| self.analyzed_files.contains(&loc.file))
-                    .unwrap_or(false);
-                if !in_analyzed {
-                    continue;
-                }
-            }
+                let cls = match self.codebase.classes.get(fqcn.as_ref()) {
+                    Some(c) => c,
+                    None => return class_issues,
+                };
 
-            // ---- 1. Final-class extension check / deprecated parent check ------
-            if let Some(parent_fqcn) = &cls.parent {
-                if let Some(parent) = self.codebase.classes.get(parent_fqcn.as_ref()) {
-                    if parent.is_final {
-                        let loc = issue_location(
-                            cls.location.as_ref(),
-                            fqcn,
-                            cls.location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
-                            IssueKind::FinalClassExtended {
-                                parent: parent_fqcn.to_string(),
-                                child: fqcn.to_string(),
-                            },
-                            loc,
-                        );
-                        if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources)
-                        {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
-                    }
-                    if let Some(msg) = parent.deprecated.clone() {
-                        let loc = issue_location(
-                            cls.location.as_ref(),
-                            fqcn,
-                            cls.location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
-                            IssueKind::DeprecatedClass {
-                                name: parent_fqcn.to_string(),
-                                message: Some(msg).filter(|m| !m.is_empty()),
-                            },
-                            loc,
-                        );
-                        if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources)
-                        {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
+                // Skip classes from vendor / stub files — only check user-analyzed files
+                if !self.analyzed_files.is_empty() {
+                    let in_analyzed = cls
+                        .location
+                        .as_ref()
+                        .map(|loc| self.analyzed_files.contains(&loc.file))
+                        .unwrap_or(false);
+                    if !in_analyzed {
+                        return class_issues;
                     }
                 }
-            }
 
-            // Skip abstract classes for "must implement" checks
-            if cls.is_abstract {
-                // Still check override compatibility for abstract classes
-                self.check_overrides(&cls, &mut issues);
-                continue;
-            }
+                // ---- 1. Final-class extension check / deprecated parent check ------
+                if let Some(parent_fqcn) = &cls.parent {
+                    if let Some(parent) = self.codebase.classes.get(parent_fqcn.as_ref()) {
+                        if parent.is_final {
+                            let loc = issue_location(
+                                cls.location.as_ref(),
+                                fqcn,
+                                cls.location
+                                    .as_ref()
+                                    .and_then(|l| self.sources.get(&l.file).copied()),
+                            );
+                            let mut issue = Issue::new(
+                                IssueKind::FinalClassExtended {
+                                    parent: parent_fqcn.to_string(),
+                                    child: fqcn.to_string(),
+                                },
+                                loc,
+                            );
+                            if let Some(snippet) =
+                                extract_snippet(cls.location.as_ref(), &self.sources)
+                            {
+                                issue = issue.with_snippet(snippet);
+                            }
+                            class_issues.push(issue);
+                        }
+                        if let Some(msg) = parent.deprecated.clone() {
+                            let loc = issue_location(
+                                cls.location.as_ref(),
+                                fqcn,
+                                cls.location
+                                    .as_ref()
+                                    .and_then(|l| self.sources.get(&l.file).copied()),
+                            );
+                            let mut issue = Issue::new(
+                                IssueKind::DeprecatedClass {
+                                    name: parent_fqcn.to_string(),
+                                    message: Some(msg).filter(|m| !m.is_empty()),
+                                },
+                                loc,
+                            );
+                            if let Some(snippet) =
+                                extract_snippet(cls.location.as_ref(), &self.sources)
+                            {
+                                issue = issue.with_snippet(snippet);
+                            }
+                            class_issues.push(issue);
+                        }
+                    }
+                }
 
-            // ---- 2. Abstract parent methods must be implemented ----------------
-            self.check_abstract_methods_implemented(&cls, &mut issues);
+                // Skip abstract classes for "must implement" checks
+                if cls.is_abstract {
+                    // Still check override compatibility for abstract classes
+                    self.check_overrides(&cls, &mut class_issues);
+                    return class_issues;
+                }
 
-            // ---- 3. Interface methods must be implemented ----------------------
-            self.check_interface_methods_implemented(&cls, &mut issues);
+                // ---- 2. Abstract parent methods must be implemented ----------------
+                self.check_abstract_methods_implemented(&cls, &mut class_issues);
 
-            // ---- 4. Method override compatibility ------------------------------
-            self.check_overrides(&cls, &mut issues);
-        }
+                // ---- 3. Interface methods must be implemented ----------------------
+                self.check_interface_methods_implemented(&cls, &mut class_issues);
 
-        // ---- 5. Circular inheritance detection --------------------------------
+                // ---- 4. Method override compatibility ------------------------------
+                self.check_overrides(&cls, &mut class_issues);
+
+                class_issues
+            })
+            .collect();
+
+        // ---- 5. Circular inheritance detection (must remain serial — uses shared memoization) ---
         self.check_circular_class_inheritance(&mut issues);
         self.check_circular_interface_inheritance(&mut issues);
 

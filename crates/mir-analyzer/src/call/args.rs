@@ -430,18 +430,16 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             }
 
             if !arg_fqcn.contains('\\') && !ea.codebase.type_exists(&resolved_arg) {
-                for entry in ea.codebase.classes.iter() {
-                    if entry.value().short_name.as_ref() == arg_fqcn.as_ref() {
-                        let actual_fqcn = entry.key().clone();
-                        if ea
+                if let Some(actual_fqcn) = ea.codebase.class_by_short_name.get(arg_fqcn.as_ref()) {
+                    let actual_fqcn = actual_fqcn.clone();
+                    if ea
+                        .codebase
+                        .extends_or_implements(actual_fqcn.as_ref(), &resolved_param)
+                        || ea
                             .codebase
-                            .extends_or_implements(actual_fqcn.as_ref(), &resolved_param)
-                            || ea
-                                .codebase
-                                .extends_or_implements(actual_fqcn.as_ref(), param_fqcn.as_ref())
-                        {
-                            return true;
-                        }
+                            .extends_or_implements(actual_fqcn.as_ref(), param_fqcn.as_ref())
+                    {
+                        return true;
                     }
                 }
             }

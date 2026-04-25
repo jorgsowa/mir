@@ -325,10 +325,10 @@ impl<'a> Pass2Driver<'a> {
             .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
             .or_else(|| {
                 self.codebase
-                    .functions
-                    .iter()
-                    .find(|e| e.short_name.as_ref() == fn_name)
-                    .map(|e| e.value().clone())
+                    .fn_by_short_name
+                    .get(fn_name)
+                    .and_then(|fqn| self.codebase.functions.get(fqn.as_ref()))
+                    .map(|r| r.clone())
             });
 
         let fqn = func_opt.as_ref().map(|f| f.fqn.clone());
@@ -535,10 +535,10 @@ impl<'a> Pass2Driver<'a> {
             .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
             .or_else(|| {
                 self.codebase
-                    .functions
-                    .iter()
-                    .find(|e| e.short_name.as_ref() == fn_name)
-                    .map(|e| e.value().clone())
+                    .fn_by_short_name
+                    .get(fn_name)
+                    .and_then(|fqn| self.codebase.functions.get(fqn.as_ref()))
+                    .map(|r| r.clone())
             });
 
         let fqn = func_opt.as_ref().map(|f| f.fqn.clone());

@@ -62,11 +62,18 @@ fn record_ref(
             entries.push(span);
         }
     }
-    {
-        let mut refs = file_refs.entry(file_id).or_default();
-        if !refs.contains(&sym_id) {
-            refs.push(sym_id);
-        }
+    // No dedup on file_refs: duplicates are harmless since remove_file_definitions
+    // uses retain() which is idempotent, and compact_reference_index clears this map.
+    file_refs.entry(file_id).or_default().push(sym_id);
+}
+
+/// Return a lowercase version of `s` without allocating when `s` is already lowercase.
+#[inline]
+fn ensure_method_name_lowercase(s: &str) -> std::borrow::Cow<'_, str> {
+    if s.bytes().any(|b| b.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(s.to_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(s)
     }
 }
 
@@ -187,6 +194,16 @@ pub struct Codebase {
     /// are available.
     pub known_symbols: DashSet<Arc<str>>,
 
+    /// Secondary index: function short name → FQN. Populated in parallel with
+    /// `functions` during Pass 1 and stub loading. Allows O(1) resolution of
+    /// unqualified function calls instead of a full `functions.iter()` scan.
+    pub fn_by_short_name: DashMap<Arc<str>, Arc<str>>,
+
+    /// Secondary index: class short name → FQCN. Populated in parallel with
+    /// `classes` during Pass 1 and stub loading. Allows O(1) resolution of
+    /// unqualified class names instead of a full `classes.iter()` scan.
+    pub class_by_short_name: DashMap<Arc<str>, Arc<str>>,
+
     /// Per-file `use` alias maps: alias → FQCN.  Populated during Pass 1.
     ///
     /// Key: absolute file path (as `Arc<str>`).
@@ -228,6 +245,8 @@ impl Codebase {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(cls.fqcn.clone(), f.clone());
             }
+            self.class_by_short_name
+                .insert(cls.short_name.clone(), cls.fqcn.clone());
             self.classes.insert(cls.fqcn.clone(), cls);
         }
         for iface in slice.interfaces {
@@ -252,6 +271,8 @@ impl Codebase {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(func.fqn.clone(), f.clone());
             }
+            self.fn_by_short_name
+                .insert(func.short_name.clone(), func.fqn.clone());
             self.functions.insert(func.fqn.clone(), func);
         }
         for (name, ty) in slice.constants {
@@ -408,11 +429,23 @@ impl Codebase {
 
         // Remove each symbol from its respective map and from symbol_to_file
         for sym in &symbols {
-            self.classes.remove(sym.as_ref());
+            if let Some((_, cls)) = self.classes.remove(sym.as_ref()) {
+                // Only evict the short-name entry when it points at this FQCN, so that
+                // a class with the same short name in another file is not affected.
+                self.class_by_short_name
+                    .remove_if(cls.short_name.as_ref(), |_, fqcn| {
+                        fqcn.as_ref() == cls.fqcn.as_ref()
+                    });
+            }
             self.interfaces.remove(sym.as_ref());
             self.traits.remove(sym.as_ref());
             self.enums.remove(sym.as_ref());
-            self.functions.remove(sym.as_ref());
+            if let Some((_, func)) = self.functions.remove(sym.as_ref()) {
+                self.fn_by_short_name
+                    .remove_if(func.short_name.as_ref(), |_, fqn| {
+                        fqn.as_ref() == func.fqn.as_ref()
+                    });
+            }
             self.constants.remove(sym.as_ref());
             self.symbol_to_file.remove(sym.as_ref());
             self.known_symbols.remove(sym.as_ref());
@@ -752,8 +785,8 @@ impl Codebase {
     /// Resolve a method, walking up the full inheritance chain (own → traits → ancestors).
     pub fn get_method(&self, fqcn: &str, method_name: &str) -> Option<Arc<MethodStorage>> {
         // PHP method names are case-insensitive — normalize to lowercase for all lookups.
-        let method_lower = method_name.to_lowercase();
-        let method_name = method_lower.as_str();
+        let method_lower = ensure_method_name_lowercase(method_name);
+        let method_name = method_lower.as_ref();
 
         // --- Class: own methods → own traits → ancestor classes/traits/interfaces ---
         if let Some(cls) = self.classes.get(fqcn) {
@@ -1074,9 +1107,8 @@ impl Codebase {
                 return resolved.clone();
             }
             // Fall back to case-insensitive alias lookup
-            let name_lower = name.to_lowercase();
             for (alias, resolved) in imports.iter() {
-                if alias.to_lowercase() == name_lower {
+                if alias.eq_ignore_ascii_case(name) {
                     return resolved.clone();
                 }
             }
@@ -1174,7 +1206,8 @@ impl Codebase {
 
     /// Mark a method as referenced from user code.
     pub fn mark_method_referenced(&self, fqcn: &str, method_name: &str) {
-        let key = format!("{}::{}", fqcn, method_name.to_lowercase());
+        let method_lower = ensure_method_name_lowercase(method_name);
+        let key = format!("{}::{}", fqcn, method_lower);
         let id = self.symbol_interner.intern_str(&key);
         self.referenced_methods.insert(id);
     }
@@ -1193,7 +1226,8 @@ impl Codebase {
     }
 
     pub fn is_method_referenced(&self, fqcn: &str, method_name: &str) -> bool {
-        let key = format!("{}::{}", fqcn, method_name.to_lowercase());
+        let method_lower = ensure_method_name_lowercase(method_name);
+        let key = format!("{}::{}", fqcn, method_lower);
         match self.symbol_interner.get_id(&key) {
             Some(id) => self.referenced_methods.contains(&id),
             None => false,
@@ -1225,7 +1259,8 @@ impl Codebase {
         start: u32,
         end: u32,
     ) {
-        let key = format!("{}::{}", fqcn, method_name.to_lowercase());
+        let method_lower = ensure_method_name_lowercase(method_name);
+        let key = format!("{}::{}", fqcn, method_lower);
         self.ensure_expanded();
         let sym_id = self.symbol_interner.intern_str(&key);
         let file_id = self.file_interner.intern(file);

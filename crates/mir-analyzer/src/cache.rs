@@ -5,8 +5,10 @@
 /// and Pass 2 analysis is skipped for that file.
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
 use mir_issues::Issue;
@@ -55,12 +57,15 @@ struct CacheFile {
 }
 
 /// Thread-safe, disk-backed cache for per-file analysis results.
+///
+/// `entries` uses a `DashMap` so concurrent Pass-2 `put` calls from rayon
+/// threads avoid serializing on a single global mutex.
 pub struct AnalysisCache {
     cache_dir: PathBuf,
-    entries: Mutex<HashMap<String, CacheEntry>>,
+    entries: DashMap<String, CacheEntry>,
     /// Reverse dependency graph loaded from disk (from the previous run).
     reverse_deps: Mutex<HashMap<String, HashSet<String>>>,
-    dirty: Mutex<bool>,
+    dirty: AtomicBool,
 }
 
 impl AnalysisCache {
@@ -72,9 +77,9 @@ impl AnalysisCache {
         let file = Self::load(cache_dir);
         Self {
             cache_dir: cache_dir.to_path_buf(),
-            entries: Mutex::new(file.entries),
+            entries: DashMap::from_iter(file.entries),
             reverse_deps: Mutex::new(file.reverse_deps),
-            dirty: Mutex::new(false),
+            dirty: AtomicBool::new(false),
         }
     }
 
@@ -89,8 +94,7 @@ impl AnalysisCache {
     /// `(symbol_key, start_byte, end_byte)` entries to replay into
     /// `Codebase::symbol_reference_locations`.
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
-        let entries = self.entries.lock().unwrap();
-        entries.get(file_path).and_then(|e| {
+        self.entries.get(file_path).and_then(|e| {
             if e.content_hash == content_hash {
                 Some((e.issues.clone(), e.reference_locations.clone()))
             } else {
@@ -109,8 +113,7 @@ impl AnalysisCache {
         issues: Vec<Issue>,
         reference_locations: Vec<(String, u32, u32)>,
     ) {
-        let mut entries = self.entries.lock().unwrap();
-        entries.insert(
+        self.entries.insert(
             file_path.to_string(),
             CacheEntry {
                 content_hash,
@@ -118,24 +121,22 @@ impl AnalysisCache {
                 reference_locations,
             },
         );
-        *self.dirty.lock().unwrap() = true;
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     /// Persist the in-memory cache to `{cache_dir}/cache.json`.
     /// This is a no-op if nothing changed since the last flush.
     pub fn flush(&self) {
-        let dirty = {
-            let mut d = self.dirty.lock().unwrap();
-            let was = *d;
-            *d = false;
-            was
-        };
-        if !dirty {
+        if !self.dirty.swap(false, Ordering::AcqRel) {
             return;
         }
         let cache_file = self.cache_dir.join("cache.json");
         let file = CacheFile {
-            entries: self.entries.lock().unwrap().clone(),
+            entries: self
+                .entries
+                .iter()
+                .map(|e| (e.key().clone(), e.value().clone()))
+                .collect(),
             reverse_deps: self.reverse_deps.lock().unwrap().clone(),
         };
         if let Ok(json) = serde_json::to_string(&file) {
@@ -146,7 +147,7 @@ impl AnalysisCache {
     /// Replace the reverse dependency graph (called after each Pass 1).
     pub fn set_reverse_deps(&self, deps: HashMap<String, HashSet<String>>) {
         *self.reverse_deps.lock().unwrap() = deps;
-        *self.dirty.lock().unwrap() = true;
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     /// BFS from each changed file through the reverse dep graph.
@@ -174,7 +175,7 @@ impl AnalysisCache {
             result
         };
 
-        // Phase 2: evict (reverse_deps lock released above, entries lock taken per file).
+        // Phase 2: evict (reverse_deps lock released above).
         let count = to_evict.len();
         for file in &to_evict {
             self.evict(file);
@@ -184,9 +185,8 @@ impl AnalysisCache {
 
     /// Remove a single file's cache entry.
     pub fn evict(&self, file_path: &str) {
-        let mut entries = self.entries.lock().unwrap();
-        entries.remove(file_path);
-        *self.dirty.lock().unwrap() = true;
+        self.entries.remove(file_path);
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     // -----------------------------------------------------------------------

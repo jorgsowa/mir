@@ -34,7 +34,7 @@ smallvec = { version = "1", features = ["union", "serde"] }
 
 # Concurrency
 rayon   = "1"
-dashmap = "6"
+dashmap = { version = "6", features = ["serde"] }
 
 # Serialization
 serde      = { version = "1", features = ["derive"] }

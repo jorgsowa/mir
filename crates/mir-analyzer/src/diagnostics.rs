@@ -114,21 +114,18 @@ pub(crate) fn check_name_class(
 }
 
 fn is_pseudo_type(name: &str) -> bool {
-    matches!(
-        name.to_lowercase().as_str(),
-        "self"
-            | "static"
-            | "parent"
-            | "null"
-            | "true"
-            | "false"
-            | "never"
-            | "void"
-            | "mixed"
-            | "object"
-            | "callable"
-            | "iterable"
-    )
+    name.eq_ignore_ascii_case("self")
+        || name.eq_ignore_ascii_case("static")
+        || name.eq_ignore_ascii_case("parent")
+        || name.eq_ignore_ascii_case("null")
+        || name.eq_ignore_ascii_case("true")
+        || name.eq_ignore_ascii_case("false")
+        || name.eq_ignore_ascii_case("never")
+        || name.eq_ignore_ascii_case("void")
+        || name.eq_ignore_ascii_case("mixed")
+        || name.eq_ignore_ascii_case("object")
+        || name.eq_ignore_ascii_case("callable")
+        || name.eq_ignore_ascii_case("iterable")
 }
 
 // ---------------------------------------------------------------------------
