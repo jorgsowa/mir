@@ -28,7 +28,7 @@ impl CallAnalyzer {
         let obj_ty = ea.analyze(call.object, ctx);
 
         let method_name = match &call.method.kind {
-            ExprKind::Identifier(name) | ExprKind::Variable(name) => name.as_str(),
+            ExprKind::Identifier(name) => name.as_str(),
             _ => return Union::mixed(),
         };
 
