@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-04-25
+
+### Added
+
+- `PhpVersion::LATEST` constant (currently `8.5`) — used as the default when no explicit version is configured.
+- `ProjectAnalyzer::with_php_version` builder method to set the target PHP version.
+- `@deprecated` tag messages are now included in `Deprecated` issue descriptions.
+- `php_version` is now propagated through `StatementsAnalyzer` and `ExpressionAnalyzer` for version-gated checks.
+
+### Fixed
+
+- `UndefinedClass` is now detected in 7 previously-silent code paths.
+- Static method call spans now use the parser span for the method name rather than manual offset arithmetic.
+- Windows build: `canonicalize()` returns `\\?\`-prefixed UNC paths on Windows; the build script now strips that prefix before embedding stub paths in `include_str!`.
+
+### Changed
+
+- `ProjectAnalyzer::php_version` field is now `Option<PhpVersion>` (`None` = use `PhpVersion::LATEST`); previously it was a bare `PhpVersion` defaulting to 8.4.
+- Bumped `php-rs-parser`, `php-ast`, and `php-lexer` to 0.9.2.
+
+### Performance
+
+- `IssueBuffer::add` deduplication changed from an O(n) scan to a `HashSet` lookup.
+
 ## [0.7.3] - 2026-04-25
 
 ### Added
