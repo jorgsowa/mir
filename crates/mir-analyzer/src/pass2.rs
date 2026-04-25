@@ -69,6 +69,16 @@ impl<'a> Pass2Driver<'a> {
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(decl, &file, source, source_map, &mut all_issues);
                 }
+                StmtKind::Trait(decl) => {
+                    self.analyze_trait_decl(
+                        decl,
+                        &file,
+                        source,
+                        source_map,
+                        &mut all_issues,
+                        &mut all_symbols,
+                    );
+                }
                 StmtKind::Namespace(ns) => {
                     if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
                         for inner in stmts.iter() {
@@ -109,6 +119,16 @@ impl<'a> Pass2Driver<'a> {
                                         source,
                                         source_map,
                                         &mut all_issues,
+                                    );
+                                }
+                                StmtKind::Trait(decl) => {
+                                    self.analyze_trait_decl(
+                                        decl,
+                                        &file,
+                                        source,
+                                        source_map,
+                                        &mut all_issues,
+                                        &mut all_symbols,
                                     );
                                 }
                                 _ => {}
@@ -202,6 +222,17 @@ impl<'a> Pass2Driver<'a> {
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(decl, &file, source, source_map, &mut all_issues);
                 }
+                StmtKind::Trait(decl) => {
+                    self.analyze_trait_decl_typed(
+                        decl,
+                        &file,
+                        source,
+                        source_map,
+                        &mut all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
+                }
                 StmtKind::Namespace(ns) => {
                     if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
                         for inner in stmts.iter() {
@@ -244,6 +275,17 @@ impl<'a> Pass2Driver<'a> {
                                         source,
                                         source_map,
                                         &mut all_issues,
+                                    );
+                                }
+                                StmtKind::Trait(decl) => {
+                                    self.analyze_trait_decl_typed(
+                                        decl,
+                                        &file,
+                                        source,
+                                        source_map,
+                                        &mut all_issues,
+                                        type_envs,
+                                        all_symbols,
                                     );
                                 }
                                 _ => {}
@@ -721,6 +763,214 @@ impl<'a> Pass2Driver<'a> {
 
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
                 if let Some(m) = cls.own_methods.get_mut(method.name) {
+                    Arc::make_mut(m).inferred_return_type = Some(inferred);
+                }
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn analyze_trait_decl<'arena, 'src>(
+        &self,
+        decl: &php_ast::ast::TraitDecl<'arena, 'src>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use crate::context::Context;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        let resolved = self.codebase.resolve_class_name(file.as_ref(), decl.name);
+        let fqcn: &str = &resolved;
+
+        for member in decl.members.iter() {
+            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+                if let Some(hint) = &prop.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+                continue;
+            }
+            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
+
+            for param in method.params.iter() {
+                if let Some(hint) = &param.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+            }
+            if let Some(hint) = &method.return_type {
+                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+            }
+
+            let Some(body) = &method.body else { continue };
+
+            let (params, return_ty) = self
+                .codebase
+                .get_method(fqcn, method.name)
+                .as_deref()
+                .map(|m| (m.params.clone(), m.return_type.clone()))
+                .unwrap_or_default();
+
+            let is_ctor = method.name == "__construct";
+            let mut ctx = Context::for_method(
+                &params,
+                return_ty,
+                Some(Arc::from(fqcn)),
+                None,
+                Some(Arc::from(fqcn)),
+                false,
+                is_ctor,
+                method.is_static,
+            );
+
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                self.codebase,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+                self.php_version,
+            );
+            sa.analyze_stmts(body, &mut ctx);
+            let inferred = merge_return_types(&sa.return_types);
+            drop(sa);
+
+            emit_unused_params(&params, &ctx, method.name, file, all_issues);
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_issues());
+
+            if let Some(mut tr) = self.codebase.traits.get_mut(fqcn) {
+                if let Some(m) = tr.own_methods.get_mut(method.name) {
+                    Arc::make_mut(m).inferred_return_type = Some(inferred);
+                }
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn analyze_trait_decl_typed<'arena, 'src>(
+        &self,
+        decl: &php_ast::ast::TraitDecl<'arena, 'src>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        type_envs: &mut std::collections::HashMap<
+            crate::type_env::ScopeId,
+            crate::type_env::TypeEnv,
+        >,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use crate::context::Context;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        let resolved = self.codebase.resolve_class_name(file.as_ref(), decl.name);
+        let fqcn: &str = &resolved;
+
+        for member in decl.members.iter() {
+            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+                if let Some(hint) = &prop.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+                continue;
+            }
+            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
+
+            for param in method.params.iter() {
+                if let Some(hint) = &param.type_hint {
+                    check_type_hint_classes(
+                        hint,
+                        self.codebase,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                    );
+                }
+            }
+            if let Some(hint) = &method.return_type {
+                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+            }
+
+            let Some(body) = &method.body else { continue };
+
+            let (params, return_ty) = self
+                .codebase
+                .get_method(fqcn, method.name)
+                .as_deref()
+                .map(|m| (m.params.clone(), m.return_type.clone()))
+                .unwrap_or_default();
+
+            let is_ctor = method.name == "__construct";
+            let mut ctx = Context::for_method(
+                &params,
+                return_ty,
+                Some(Arc::from(fqcn)),
+                None,
+                Some(Arc::from(fqcn)),
+                false,
+                is_ctor,
+                method.is_static,
+            );
+
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                self.codebase,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+                self.php_version,
+            );
+            sa.analyze_stmts(body, &mut ctx);
+            let inferred = merge_return_types(&sa.return_types);
+            drop(sa);
+
+            type_envs.insert(
+                crate::type_env::ScopeId::Method {
+                    class: Arc::from(fqcn),
+                    method: Arc::from(method.name),
+                },
+                crate::type_env::TypeEnv::new(ctx.vars.clone()),
+            );
+
+            emit_unused_params(&params, &ctx, method.name, file, all_issues);
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_issues());
+
+            if let Some(mut tr) = self.codebase.traits.get_mut(fqcn) {
+                if let Some(m) = tr.own_methods.get_mut(method.name) {
                     Arc::make_mut(m).inferred_return_type = Some(inferred);
                 }
             }
