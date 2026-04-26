@@ -1396,6 +1396,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                                             span,
                                         );
                                     }
+                                    if let Some(prop_ty) = &prop.ty {
+                                        if !prop_ty.is_mixed()
+                                            && !ty.is_mixed()
+                                            && !property_assign_compatible(
+                                                &ty,
+                                                prop_ty,
+                                                self.codebase,
+                                            )
+                                        {
+                                            self.emit(
+                                                IssueKind::InvalidPropertyAssignment {
+                                                    property: prop_name.clone(),
+                                                    expected: format!("{prop_ty}"),
+                                                    actual: format!("{ty}"),
+                                                },
+                                                Severity::Warning,
+                                                span,
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1766,6 +1786,47 @@ fn extract_string_from_expr<'arena, 'src>(
         ExprKind::String(s) => Some(s.to_string()),
         _ => None,
     }
+}
+
+/// Returns true if `value_ty` is assignable to a property typed as `prop_ty`.
+/// Handles primitive subtype checking and named-object inheritance via the codebase.
+fn property_assign_compatible(
+    value_ty: &mir_types::Union,
+    prop_ty: &mir_types::Union,
+    codebase: &mir_codebase::Codebase,
+) -> bool {
+    if value_ty.is_subtype_of_simple(prop_ty) {
+        return true;
+    }
+    // For each atomic in the value type, check if it can satisfy the property type.
+    value_ty.types.iter().all(|a| match a {
+        // Named objects: check class inheritance / interface implementation.
+        mir_types::Atomic::TNamedObject { fqcn: arg_fqcn, .. }
+        | mir_types::Atomic::TSelf { fqcn: arg_fqcn }
+        | mir_types::Atomic::TStaticObject { fqcn: arg_fqcn }
+        | mir_types::Atomic::TParent { fqcn: arg_fqcn } => {
+            prop_ty.types.iter().any(|p| match p {
+                mir_types::Atomic::TNamedObject { fqcn: prop_fqcn, .. } => {
+                    arg_fqcn == prop_fqcn
+                        || codebase.extends_or_implements(arg_fqcn.as_ref(), prop_fqcn.as_ref())
+                }
+                mir_types::Atomic::TObject | mir_types::Atomic::TMixed => true,
+                _ => false,
+            })
+        }
+        // Template params — skip check to avoid FPs.
+        mir_types::Atomic::TTemplateParam { .. } => true,
+        // Closures/callables can satisfy named Closure type.
+        mir_types::Atomic::TClosure { .. } | mir_types::Atomic::TCallable { .. } => {
+            prop_ty.types.iter().any(|p| matches!(p, mir_types::Atomic::TClosure { .. } | mir_types::Atomic::TCallable { .. })
+                || matches!(p, mir_types::Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Closure"))
+        }
+        mir_types::Atomic::TNever => true,
+        // null: only compatible if prop allows null.
+        mir_types::Atomic::TNull => prop_ty.is_nullable(),
+        // For any other atomic that didn't pass is_subtype_of_simple, not compatible.
+        _ => false,
+    })
 }
 
 #[cfg(test)]
