@@ -1,6 +1,0 @@
-[extension]
-name        = "intl"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-intl"
-description = "intl extension stubs"

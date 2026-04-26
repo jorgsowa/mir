@@ -1,5 +1,0 @@
-[extension]
-name        = "core"
-version     = "1.0.0"
-php-min     = "8.0"
-description = "PHP Core built-in constants (E_*, PHP_*, UPLOAD_ERR_*, etc.)"

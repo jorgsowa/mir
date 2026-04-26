@@ -1,6 +1,0 @@
-[extension]
-name        = "sodium"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-sodium"
-description = "sodium extension stubs"

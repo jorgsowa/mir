@@ -1,6 +1,0 @@
-[extension]
-name        = "ftp"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-ftp"
-description = "ftp extension stubs (imported from phpstorm-stubs)"
