@@ -110,14 +110,32 @@ pub fn span_snippet(src: &str, span: Span) -> String {
 
 /// Scan backwards from `offset` and return the `/** ... */` docblock comment
 /// that immediately precedes the token at that position, if any.
-/// The docblock must be separated from the declaration only by whitespace.
+///
+/// Whitespace and class-level modifier keywords (`final`, `abstract`,
+/// `readonly`) between the docblock and the declaration are skipped — the
+/// php-rs-parser places `span.start` at the `class`/`interface`/`trait`
+/// keyword, after any modifiers.
 pub fn find_preceding_docblock(source: &str, offset: u32) -> Option<String> {
     let offset = (offset as usize).min(source.len());
     if offset == 0 {
         return None;
     }
-    let before = &source[..offset];
-    let trimmed = before.trim_end();
+    let mut trimmed = source[..offset].trim_end();
+    // Strip trailing modifier keywords like `final` or `abstract readonly`.
+    loop {
+        let after_ws = trimmed.trim_end();
+        let last_word_start = after_ws
+            .rfind(|c: char| !(c.is_ascii_alphabetic()))
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let word = &after_ws[last_word_start..];
+        if matches!(word, "final" | "abstract" | "readonly") {
+            trimmed = &after_ws[..last_word_start];
+        } else {
+            trimmed = after_ws;
+            break;
+        }
+    }
     if !trimmed.ends_with("*/") {
         return None;
     }
