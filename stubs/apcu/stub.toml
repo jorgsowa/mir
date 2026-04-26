@@ -1,0 +1,6 @@
+[extension]
+name        = "apcu"
+version     = "5.1.0"
+php-min     = "7.0"
+composer    = "ext-apcu"
+description = "APC User Cache"

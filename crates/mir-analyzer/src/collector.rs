@@ -776,6 +776,21 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             }
                         }
                         ClassMemberKind::Property(p) => {
+                            let prop_doc = p
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| crate::parser::DocblockParser::parse(c.text))
+                                .or_else(|| {
+                                    crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        member.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                })
+                                .unwrap_or_default();
+                            if !self.version_allows(&prop_doc) {
+                                continue;
+                            }
                             let prop = PropertyStorage {
                                 name: p.name.into(),
                                 ty: self.resolve_union_opt(
@@ -791,6 +806,21 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             own_properties.insert(p.name.into(), prop);
                         }
                         ClassMemberKind::ClassConst(c) => {
+                            let const_doc = c
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| crate::parser::DocblockParser::parse(c.text))
+                                .or_else(|| {
+                                    crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        member.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                })
+                                .unwrap_or_default();
+                            if !self.version_allows(&const_doc) {
+                                continue;
+                            }
                             let constant = ConstantStorage {
                                 name: c.name.into(),
                                 ty: Union::mixed(),
@@ -962,6 +992,21 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             }
                         }
                         ClassMemberKind::ClassConst(c) => {
+                            let const_doc = c
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| crate::parser::DocblockParser::parse(c.text))
+                                .or_else(|| {
+                                    crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        member.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                })
+                                .unwrap_or_default();
+                            if !self.version_allows(&const_doc) {
+                                continue;
+                            }
                             own_constants.insert(
                                 Arc::from(c.name),
                                 ConstantStorage {
@@ -1068,6 +1113,21 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             }
                         }
                         ClassMemberKind::Property(p) => {
+                            let prop_doc = p
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| crate::parser::DocblockParser::parse(c.text))
+                                .or_else(|| {
+                                    crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        member.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                })
+                                .unwrap_or_default();
+                            if !self.version_allows(&prop_doc) {
+                                continue;
+                            }
                             own_properties.insert(
                                 Arc::from(p.name),
                                 PropertyStorage {
@@ -1089,6 +1149,21 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             );
                         }
                         ClassMemberKind::ClassConst(c) => {
+                            let const_doc = c
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| crate::parser::DocblockParser::parse(c.text))
+                                .or_else(|| {
+                                    crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        member.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                })
+                                .unwrap_or_default();
+                            if !self.version_allows(&const_doc) {
+                                continue;
+                            }
                             own_constants.insert(
                                 Arc::from(c.name),
                                 ConstantStorage {
@@ -1206,6 +1281,14 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             }
 
             StmtKind::Const(items) => {
+                // Check the stmt-level docblock for @since/@removed (ConstItem has no doc_comment).
+                let const_doc =
+                    crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+                        .map(|t| crate::parser::DocblockParser::parse(&t))
+                        .unwrap_or_default();
+                if !self.version_allows(&const_doc) {
+                    return ControlFlow::Continue(());
+                }
                 for item in items.iter() {
                     let fqn: Arc<str> = if let Some(ns) = &self.namespace {
                         format!("{}\\{}", ns, item.name).into()
@@ -1228,8 +1311,17 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         if fn_name.eq_ignore_ascii_case("define") {
                             if let Some(name_arg) = call.args.first() {
                                 if let php_ast::ast::ExprKind::String(name) = &name_arg.value.kind {
-                                    let fqn: Arc<str> = Arc::from(&**name);
-                                    self.slice.constants.push((fqn, Union::mixed()));
+                                    // Check for @since/@removed on the docblock preceding this define().
+                                    let define_doc = crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        stmt.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                    .unwrap_or_default();
+                                    if self.version_allows(&define_doc) {
+                                        let fqn: Arc<str> = Arc::from(&**name);
+                                        self.slice.constants.push((fqn, Union::mixed()));
+                                    }
                                 }
                             }
                         }
