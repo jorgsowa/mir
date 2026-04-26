@@ -27,6 +27,40 @@ impl PhpVersion {
     pub const fn minor(self) -> u8 {
         self.minor
     }
+
+    /// Return `true` if a stub symbol annotated with `@since`/`@removed` is
+    /// available at this target version.
+    ///
+    /// `@since X.Y` excludes targets `< X.Y`. `@removed X.Y` excludes
+    /// targets `>= X.Y` (the symbol is gone *as of* that release). Tags that
+    /// fail to parse, or whose major version is outside the plausible PHP
+    /// range, are ignored — some extension stubs (newrelic, mongodb) put
+    /// library versions there (`@since 9.12`, `@since 1.17`) which must not
+    /// drive PHP-version filtering.
+    pub fn includes_symbol(self, since: Option<&str>, removed: Option<&str>) -> bool {
+        let parse_php = |s: &str| -> Option<PhpVersion> {
+            let v = s.parse::<PhpVersion>().ok()?;
+            // PHP majors so far: 4, 5, 7, 8 (no 6). Accept LATEST.major + 1 as
+            // forward-compat headroom; reject everything else as a library
+            // version.
+            if v.major() >= 4 && v.major() <= PhpVersion::LATEST.major() {
+                Some(v)
+            } else {
+                None
+            }
+        };
+        if let Some(s) = since.and_then(parse_php) {
+            if self < s {
+                return false;
+            }
+        }
+        if let Some(r) = removed.and_then(parse_php) {
+            if self >= r {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 impl Default for PhpVersion {
@@ -97,5 +131,36 @@ mod tests {
     #[test]
     fn displays_as_major_dot_minor() {
         assert_eq!(PhpVersion::new(8, 3).to_string(), "8.3");
+    }
+
+    #[test]
+    fn includes_symbol_respects_since() {
+        assert!(!PhpVersion::new(7, 4).includes_symbol(Some("8.0"), None));
+        assert!(PhpVersion::new(8, 0).includes_symbol(Some("8.0"), None));
+        assert!(PhpVersion::new(8, 5).includes_symbol(Some("8.0"), None));
+    }
+
+    #[test]
+    fn includes_symbol_respects_removed() {
+        assert!(PhpVersion::new(7, 4).includes_symbol(None, Some("8.0")));
+        assert!(!PhpVersion::new(8, 0).includes_symbol(None, Some("8.0")));
+        assert!(!PhpVersion::new(8, 5).includes_symbol(None, Some("8.0")));
+    }
+
+    #[test]
+    fn includes_symbol_ignores_library_versions() {
+        // newrelic uses `@since 9.12` for its own version; must not exclude on
+        // PHP 8.5.
+        assert!(PhpVersion::new(8, 5).includes_symbol(Some("9.12"), None));
+        // mongodb uses `@since 1.17` for its driver version; harmless on its
+        // own, but exercise the cap explicitly.
+        assert!(PhpVersion::new(8, 5).includes_symbol(Some("1.17"), None));
+        assert!(PhpVersion::new(8, 5).includes_symbol(Some("12.0"), None));
+    }
+
+    #[test]
+    fn includes_symbol_ignores_garbage() {
+        assert!(PhpVersion::new(8, 5).includes_symbol(Some("PECL"), None));
+        assert!(PhpVersion::new(8, 5).includes_symbol(Some(""), None));
     }
 }

@@ -102,12 +102,14 @@ impl ProjectAnalyzer {
     }
 
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
+    /// Stubs are filtered against the configured target PHP version (or
+    /// `PhpVersion::LATEST` if none was set).
     pub fn load_stubs(&self) {
         if !self
             .stubs_loaded
             .swap(true, std::sync::atomic::Ordering::SeqCst)
         {
-            crate::stubs::load_stubs(&self.codebase);
+            crate::stubs::load_stubs_for_version(&self.codebase, self.resolved_php_version());
         }
     }
 

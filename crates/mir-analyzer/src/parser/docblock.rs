@@ -157,12 +157,28 @@ impl DocblockParser {
                         result.import_types.push(import);
                     }
                 }
+                PhpDocTag::Since { version } if result.since.is_none() => {
+                    // `version` is the full tag body, e.g. `"5.2.4 PHP 5.2.4 introduced…"`.
+                    // Keep only the leading version token so `PhpVersion::from_str` can parse it.
+                    let v = version.split_whitespace().next().unwrap_or("");
+                    if !v.is_empty() {
+                        result.since = Some(v.to_string());
+                    }
+                }
                 PhpDocTag::Internal => result.is_internal = true,
                 PhpDocTag::Pure => result.is_pure = true,
                 PhpDocTag::Immutable => result.is_immutable = true,
                 PhpDocTag::Readonly => result.is_readonly = true,
                 PhpDocTag::Generic { tag, body } => match *tag {
                     "api" | "psalm-api" => result.is_api = true,
+                    "removed" if result.removed.is_none() => {
+                        if let Some(b) = body {
+                            let v = b.split_whitespace().next().unwrap_or("");
+                            if !v.is_empty() {
+                                result.removed = Some(v.to_string());
+                            }
+                        }
+                    }
                     "psalm-assert" | "phpstan-assert" => {
                         if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
                             result.assertions.push((name, parse_type_string(&ty_str)));
@@ -344,6 +360,10 @@ pub struct ParsedDocblock {
     pub require_extends: Vec<String>,
     /// `@psalm-require-implements InterfaceName` / `@phpstan-require-implements InterfaceName`
     pub require_implements: Vec<String>,
+    /// `@since X.Y` — first PHP version this symbol exists in.
+    pub since: Option<String>,
+    /// `@removed X.Y` — first PHP version this symbol no longer exists in.
+    pub removed: Option<String>,
 }
 
 impl ParsedDocblock {
@@ -879,6 +899,33 @@ mod tests {
             parsed.deprecated.as_deref(),
             Some("use newMethod() instead")
         );
+    }
+
+    #[test]
+    fn parse_since_plain() {
+        let parsed = DocblockParser::parse("/** @since 8.0 */");
+        assert_eq!(parsed.since.as_deref(), Some("8.0"));
+        assert_eq!(parsed.removed, None);
+    }
+
+    #[test]
+    fn parse_since_strips_trailing_description() {
+        // phpstorm-stubs commonly writes `@since X.Y description text`.
+        // Only the leading version token must reach the version parser.
+        let parsed = DocblockParser::parse("/** @since 1.4.0 added \\$options argument */");
+        assert_eq!(parsed.since.as_deref(), Some("1.4.0"));
+    }
+
+    #[test]
+    fn parse_removed_tag() {
+        let parsed = DocblockParser::parse("/** @removed 8.0 use mb_convert_encoding */");
+        assert_eq!(parsed.removed.as_deref(), Some("8.0"));
+    }
+
+    #[test]
+    fn parse_since_empty_body_is_none() {
+        let parsed = DocblockParser::parse("/** @since */");
+        assert_eq!(parsed.since, None);
     }
 
     #[test]
