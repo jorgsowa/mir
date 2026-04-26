@@ -194,8 +194,8 @@ impl CallAnalyzer {
                     ea.emit(
                         IssueKind::InvalidTemplateParam {
                             name: name.to_string(),
-                            expected_bound: format!("{}", bound),
-                            actual: format!("{}", inferred),
+                            expected_bound: format!("{bound}"),
+                            actual: format!("{inferred}"),
                         },
                         Severity::Error,
                         span,

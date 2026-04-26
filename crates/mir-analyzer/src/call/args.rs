@@ -29,7 +29,7 @@ pub fn check_constructor_args(
     class_name: &str,
     p: CheckArgsParams<'_>,
 ) {
-    let ctor_name = format!("{}::__construct", class_name);
+    let ctor_name = format!("{class_name}::__construct");
     check_args(
         ea,
         CheckArgsParams {
@@ -329,8 +329,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                     IssueKind::InvalidArgument {
                         param: param.name.to_string(),
                         fn_name: fn_name.to_string(),
-                        expected: format!("{}", param_ty),
-                        actual: format!("{}", arg_ty),
+                        expected: format!("{param_ty}"),
+                        actual: format!("{arg_ty}"),
                     },
                     Severity::Error,
                     arg_span,
@@ -369,8 +369,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                     IssueKind::InvalidArgument {
                         param: param.name.to_string(),
                         fn_name: fn_name.to_string(),
-                        expected: format!("{}", param_ty),
-                        actual: invalid_argument_actual_type(arg_ty, param_ty, ea),
+                        expected: format!("{param_ty}"),
+                        actual: invalid_argument_actual_type(&arg_ty, param_ty, ea),
                     },
                     Severity::Error,
                     arg_span,
@@ -390,9 +390,9 @@ fn invalid_argument_actual_type(
     ea: &ExpressionAnalyzer<'_>,
 ) -> String {
     if let Some(projected) = project_generic_ancestor_type(arg_ty, param_ty, ea) {
-        return format!("{}", projected);
+        return format!("{projected}");
     }
-    format!("{}", arg_ty)
+    format!("{arg_ty}")
 }
 
 fn project_generic_ancestor_type(

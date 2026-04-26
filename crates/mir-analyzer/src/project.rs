@@ -183,7 +183,7 @@ impl ProjectAnalyzer {
                                 StmtKind::Class(decl) => {
                                     if let Some(n) = decl.name {
                                         let fqcn = match ns {
-                                            Some(ns) => format!("{}\\{}", ns, n),
+                                            Some(ns) => format!("{ns}\\{n}"),
                                             None => n.to_string(),
                                         };
                                         self.codebase

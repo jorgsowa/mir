@@ -814,7 +814,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 {
                     self.emit(
                         IssueKind::UndefinedConstant {
-                            name: format!("{}::{}", fqcn, const_name),
+                            name: format!("{fqcn}::{const_name}"),
                         },
                         Severity::Error,
                         expr.span,
@@ -1350,7 +1350,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     )
                 });
                 if has_non_array && has_array {
-                    let actual = format!("{}", ty);
+                    let actual = format!("{ty}");
                     self.emit(
                         IssueKind::PossiblyInvalidArrayOffset {
                             expected: "array".to_string(),

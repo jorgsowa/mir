@@ -37,7 +37,7 @@ fn ensure_trailing_backslash(prefix: &str) -> String {
     if prefix.ends_with('\\') {
         prefix.to_string()
     } else {
-        format!("{}\\", prefix)
+        format!("{prefix}\\")
     }
 }
 
@@ -181,7 +181,7 @@ mod tests {
     use std::fs;
 
     fn make_temp_project(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("mir_psr4_{}", name));
+        let dir = std::env::temp_dir().join(format!("mir_psr4_{name}"));
         fs::create_dir_all(&dir).unwrap();
         dir
     }

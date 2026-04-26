@@ -227,10 +227,12 @@ impl Atomic {
     /// Whether this atomic type can ever evaluate to a truthy value.
     pub fn can_be_truthy(&self) -> bool {
         match self {
-            Atomic::TNever | Atomic::TVoid => false,
-            Atomic::TNull | Atomic::TFalse => false,
-            Atomic::TLiteralInt(0) => false,
-            Atomic::TLiteralFloat(0, 0) => false,
+            Atomic::TNever
+            | Atomic::TVoid
+            | Atomic::TNull
+            | Atomic::TFalse
+            | Atomic::TLiteralInt(0)
+            | Atomic::TLiteralFloat(0, 0) => false,
             Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => false,
             _ => true,
         }

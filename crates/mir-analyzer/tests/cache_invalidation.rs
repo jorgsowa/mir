@@ -104,7 +104,6 @@ fn unrelated_file_cache_entry_survives() {
         .collect();
     assert!(
         issues_for_unrelated.is_empty(),
-        "unrelated file should produce no issues: {:?}",
-        issues_for_unrelated
+        "unrelated file should produce no issues: {issues_for_unrelated:?}"
     );
 }
