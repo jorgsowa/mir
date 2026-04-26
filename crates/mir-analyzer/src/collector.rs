@@ -13,6 +13,7 @@ use std::ops::ControlFlow;
 use php_ast::visitor::Visitor;
 
 use crate::parser::{name_to_string, type_from_hint};
+use crate::php_version::PhpVersion;
 use mir_codebase::storage::{
     Assertion, AssertionKind, ConstantStorage, EnumCaseStorage, FnParam, FunctionStorage,
     InterfaceStorage, Location, MethodStorage, PropertyStorage, StubSlice, TemplateParam,
@@ -41,6 +42,9 @@ pub struct DefinitionCollector<'a> {
     /// `use` aliases: alias → FQCN
     use_aliases: std::collections::HashMap<String, String>,
     issues: IssueBuffer,
+    /// When `Some`, stub symbols annotated with `@since`/`@removed` are filtered
+    /// against this target version. `None` disables filtering (user code).
+    php_version: Option<PhpVersion>,
 }
 
 impl<'a> DefinitionCollector<'a> {
@@ -78,6 +82,25 @@ impl<'a> DefinitionCollector<'a> {
             namespace: None,
             use_aliases: std::collections::HashMap::new(),
             issues: IssueBuffer::new(),
+            php_version: None,
+        }
+    }
+
+    /// Enable `@since`/`@removed` filtering against the given target PHP
+    /// version. Used by the stub loader so that symbols introduced after, or
+    /// removed at or before, the target version are not registered.
+    pub fn with_php_version(mut self, version: PhpVersion) -> Self {
+        self.php_version = Some(version);
+        self
+    }
+
+    /// Returns `true` if a docblock's `@since`/`@removed` tags allow this
+    /// symbol to exist at the configured target version. When no target is
+    /// configured (user code), always returns `true`.
+    fn version_allows(&self, doc: &crate::parser::ParsedDocblock) -> bool {
+        match self.php_version {
+            Some(v) => v.includes_symbol(doc.since.as_deref(), doc.removed.as_deref()),
+            None => true,
         }
     }
 
@@ -599,6 +622,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     .map(|c| crate::parser::DocblockParser::parse(c.text))
                     .unwrap_or_default();
 
+                if !self.version_allows(&doc) {
+                    return ControlFlow::Continue(());
+                }
+
                 let mut params = Vec::new();
                 for p in decl.params.iter() {
                     let ty = doc
@@ -688,11 +715,24 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 let mut own_constants = indexmap::IndexMap::new();
                 let mut trait_uses: Vec<Arc<str>> = vec![];
 
+                // The php-rs-parser sometimes attaches a class-level docblock
+                // to the first property/method instead of the class itself
+                // (same bug as traits). Fall back to scanning the source for
+                // the nearest `/** */` before the `class` keyword.
                 let class_doc = decl
                     .doc_comment
                     .as_ref()
                     .map(|c| crate::parser::DocblockParser::parse(c.text))
+                    .or_else(|| {
+                        crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+                            .map(|t| crate::parser::DocblockParser::parse(&t))
+                    })
                     .unwrap_or_default();
+
+                if !self.version_allows(&class_doc) {
+                    return ControlFlow::Continue(());
+                }
+
                 let type_aliases = self.build_type_aliases(&class_doc);
 
                 for member in decl.members.iter() {
@@ -723,16 +763,17 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     }
                                 }
                             }
-                            let method = self.build_method_storage(
+                            if let Some(method) = self.build_method_storage(
                                 m,
                                 &fqcn,
                                 Some(&member.span),
                                 Some(&type_aliases),
-                            );
-                            own_methods.insert(
-                                Arc::from(method.name.to_lowercase().as_str()),
-                                Arc::new(method),
-                            );
+                            ) {
+                                own_methods.insert(
+                                    Arc::from(method.name.to_lowercase().as_str()),
+                                    Arc::new(method),
+                                );
+                            }
                         }
                         ClassMemberKind::Property(p) => {
                             let prop = PropertyStorage {
@@ -878,7 +919,15 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     .doc_comment
                     .as_ref()
                     .map(|c| crate::parser::DocblockParser::parse(c.text))
+                    .or_else(|| {
+                        crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+                            .map(|t| crate::parser::DocblockParser::parse(&t))
+                    })
                     .unwrap_or_default();
+
+                if !self.version_allows(&iface_doc) {
+                    return ControlFlow::Continue(());
+                }
 
                 let template_params: Vec<TemplateParam> = iface_doc
                     .templates
@@ -903,12 +952,14 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                 for member in decl.members.iter() {
                     match &member.kind {
                         ClassMemberKind::Method(m) => {
-                            let method =
-                                self.build_method_storage(m, &fqcn, Some(&member.span), None);
-                            own_methods.insert(
-                                Arc::from(method.name.to_lowercase().as_str()),
-                                Arc::new(method),
-                            );
+                            if let Some(method) =
+                                self.build_method_storage(m, &fqcn, Some(&member.span), None)
+                            {
+                                own_methods.insert(
+                                    Arc::from(method.name.to_lowercase().as_str()),
+                                    Arc::new(method),
+                                );
+                            }
                         }
                         ClassMemberKind::ClassConst(c) => {
                             own_constants.insert(
@@ -959,6 +1010,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     })
                     .unwrap_or_default();
 
+                if !self.version_allows(&trait_doc) {
+                    return ControlFlow::Continue(());
+                }
+
                 let trait_template_params: Vec<TemplateParam> = trait_doc
                     .templates
                     .iter()
@@ -1003,12 +1058,14 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     }
                                 }
                             }
-                            let method =
-                                self.build_method_storage(m, &fqcn, Some(&member.span), None);
-                            own_methods.insert(
-                                Arc::from(method.name.to_lowercase().as_str()),
-                                Arc::new(method),
-                            );
+                            if let Some(method) =
+                                self.build_method_storage(m, &fqcn, Some(&member.span), None)
+                            {
+                                own_methods.insert(
+                                    Arc::from(method.name.to_lowercase().as_str()),
+                                    Arc::new(method),
+                                );
+                            }
                         }
                         ClassMemberKind::Property(p) => {
                             own_properties.insert(
@@ -1110,12 +1167,14 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             );
                         }
                         EnumMemberKind::Method(m) => {
-                            let method =
-                                self.build_method_storage(m, &fqcn, Some(&member.span), None);
-                            own_methods.insert(
-                                Arc::from(method.name.to_lowercase().as_str()),
-                                Arc::new(method),
-                            );
+                            if let Some(method) =
+                                self.build_method_storage(m, &fqcn, Some(&member.span), None)
+                            {
+                                own_methods.insert(
+                                    Arc::from(method.name.to_lowercase().as_str()),
+                                    Arc::new(method),
+                                );
+                            }
                         }
                         EnumMemberKind::ClassConst(c) => {
                             own_constants.insert(
@@ -1191,12 +1250,16 @@ impl<'a> DefinitionCollector<'a> {
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
         aliases: Option<&std::collections::HashMap<String, Union>>,
-    ) -> MethodStorage {
+    ) -> Option<MethodStorage> {
         let doc = m
             .doc_comment
             .as_ref()
             .map(|c| crate::parser::DocblockParser::parse(c.text))
             .unwrap_or_default();
+
+        if !self.version_allows(&doc) {
+            return None;
+        }
 
         let mut params = Vec::new();
         for p in m.params.iter() {
@@ -1248,7 +1311,7 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
-        MethodStorage {
+        Some(MethodStorage {
             name: m.name.into(),
             fqcn: class_fqcn.into(),
             params,
@@ -1266,7 +1329,7 @@ impl<'a> DefinitionCollector<'a> {
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
             location: span.map(|s| self.location(s.start, s.end)),
-        }
+        })
     }
 }
 
