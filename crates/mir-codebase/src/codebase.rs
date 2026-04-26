@@ -739,6 +739,7 @@ impl Codebase {
                     name: Arc::from(const_name),
                     ty: mir_types::Union::mixed(),
                     visibility: None,
+                    is_final: false,
                     location: None,
                 });
             }
