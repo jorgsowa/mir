@@ -1511,13 +1511,11 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
         let (line, col_start) = self.offset_to_line_col(span.start);
 
-        // Calculate col_end: if span.end is on the same line, use its char-count column;
-        // otherwise use col_start (single-line range for diagnostics)
-        let col_end = if span.start < span.end {
-            let (_end_line, end_col) = self.offset_to_line_col(span.end);
-            end_col
+        let (line_end, col_end) = if span.start < span.end {
+            let (end_line, end_col) = self.offset_to_line_col(span.end);
+            (end_line, end_col)
         } else {
-            col_start
+            (line, col_start)
         };
 
         let mut issue = Issue::new(
@@ -1525,6 +1523,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             Location {
                 file: self.file.clone(),
                 line,
+                line_end,
                 col_start,
                 col_end: col_end.max(col_start + 1),
             },

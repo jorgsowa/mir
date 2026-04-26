@@ -838,9 +838,21 @@ fn issue_location(
                 loc.col
             };
 
+            let line_end = if let Some(src) = source {
+                if loc.end > loc.start {
+                    let end_offset = (loc.end as usize).min(src.len());
+                    src[..end_offset].bytes().filter(|&b| b == b'\n').count() as u32 + 1
+                } else {
+                    loc.line
+                }
+            } else {
+                loc.line
+            };
+
             Location {
                 file: loc.file.clone(),
                 line: loc.line,
+                line_end,
                 col_start,
                 col_end,
             }
@@ -848,6 +860,7 @@ fn issue_location(
         None => Location {
             file: fqcn.clone(),
             line: 1,
+            line_end: 1,
             col_start: 0,
             col_end: 0,
         },
