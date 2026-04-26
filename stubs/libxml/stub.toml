@@ -1,6 +1,0 @@
-[extension]
-name        = "libxml"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-libxml"
-description = "libxml extension stubs"

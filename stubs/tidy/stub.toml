@@ -1,6 +1,0 @@
-[extension]
-name        = "tidy"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-tidy"
-description = "tidy extension stubs (imported from phpstorm-stubs)"

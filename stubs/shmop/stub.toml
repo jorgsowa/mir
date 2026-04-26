@@ -1,6 +1,0 @@
-[extension]
-name        = "shmop"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-shmop"
-description = "shmop extension stubs (imported from phpstorm-stubs)"

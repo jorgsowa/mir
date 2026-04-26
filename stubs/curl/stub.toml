@@ -1,6 +1,0 @@
-[extension]
-name        = "curl"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-curl"
-description = "cURL extension stubs with precise parameter types (by-ref, return types)"

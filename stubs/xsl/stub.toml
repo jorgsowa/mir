@@ -1,6 +1,0 @@
-[extension]
-name        = "xsl"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-xsl"
-description = "xsl extension stubs (imported from phpstorm-stubs)"
