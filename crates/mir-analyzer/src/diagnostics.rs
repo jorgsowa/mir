@@ -143,6 +143,7 @@ const MAGIC_METHODS_WITH_RUNTIME_PARAMS: &[&str] = &[
     "__callStatic",
     "__isset",
     "__unset",
+    "__unserialize",
 ];
 
 pub(crate) fn emit_unused_params(

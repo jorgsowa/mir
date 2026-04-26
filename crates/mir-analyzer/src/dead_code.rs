@@ -18,7 +18,7 @@ const MAGIC_METHODS: &[&str] = &[
     "__construct",
     "__destruct",
     "__call",
-    "__callStatic",
+    "__callstatic",
     "__get",
     "__set",
     "__isset",
@@ -27,11 +27,11 @@ const MAGIC_METHODS: &[&str] = &[
     "__wakeup",
     "__serialize",
     "__unserialize",
-    "__toString",
+    "__tostring",
     "__invoke",
     "__set_state",
     "__clone",
-    "__debugInfo",
+    "__debuginfo",
 ];
 
 pub struct DeadCodeAnalyzer<'a> {
