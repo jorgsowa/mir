@@ -69,6 +69,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         Location {
                             file,
                             line,
+                            line_end: line,
                             col_start: 0,
                             col_end: 0,
                         },
@@ -91,6 +92,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         Location {
                             file,
                             line,
+                            line_end: line,
                             col_start: 0,
                             col_end: 0,
                         },

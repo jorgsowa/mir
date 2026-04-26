@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `Location.line_end` field — all issues now carry an end line number, enabling multi-line range highlighting in editors and code scanning tools.
+- SARIF output: `region.endLine` populated from `line_end`.
+- SARIF output: results now include `rank` (Error → 90, Warning → 95, Info → 99) matching Psalm's scoring range.
+- SARIF output: rules now include `properties.tags` (`"security"` for taint issues, `"maintainability"` for all others).
+
+### Fixed
+
+- SARIF output: `startColumn`/`endColumn` are now correctly 1-based per SARIF 2.1.0 §3.30.5 (previously off by one).
+- SARIF output: rules now include `defaultConfiguration.level` so the GitHub Code Scanning rules panel shows severity.
+- SARIF output: results now include `partialFingerprints.primaryLocationLineHash` (FNV-1a of rule name + snippet) so GitHub Code Scanning can track findings across commits.
+
 ## [0.9.0] - 2026-04-26
 
 ### Added

@@ -68,11 +68,11 @@ impl<'a> StatementsAnalyzer<'a> {
 
             if ctx.diverges {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                let col_end = if stmt.span.start < stmt.span.end {
-                    let (_end_line, end_col) = self.offset_to_line_col(stmt.span.end);
-                    end_col
+                let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                    let (end_line, end_col) = self.offset_to_line_col(stmt.span.end);
+                    (end_line, end_col)
                 } else {
-                    col_start + 1
+                    (line, col_start + 1)
                 };
                 self.issues.add(
                     Issue::new(
@@ -80,6 +80,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         Location {
                             file: self.file.clone(),
                             line,
+                            line_end,
                             col_start,
                             col_end: col_end.max(col_start + 1),
                         },
@@ -165,17 +166,18 @@ impl<'a> StatementsAnalyzer<'a> {
                     // Taint check (M19): echoing tainted data → XSS
                     if crate::taint::is_expr_tainted(expr, ctx) {
                         let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                        let col_end = if stmt.span.start < stmt.span.end {
-                            let (_end_line, end_col) = self.offset_to_line_col(stmt.span.end);
-                            end_col
+                        let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                            let (end_line, end_col) = self.offset_to_line_col(stmt.span.end);
+                            (end_line, end_col)
                         } else {
-                            col_start
+                            (line, col_start)
                         };
                         let mut issue = mir_issues::Issue::new(
                             IssueKind::TaintedHtml,
                             mir_issues::Location {
                                 file: self.file.clone(),
                                 line,
+                                line_end,
                                 col_start,
                                 col_end: col_end.max(col_start + 1),
                             },
@@ -244,11 +246,11 @@ impl<'a> StatementsAnalyzer<'a> {
                                 && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file))
                         {
                             let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                            let col_end = if stmt.span.start < stmt.span.end {
-                                let (_end_line, end_col) = self.offset_to_line_col(stmt.span.end);
-                                end_col
+                            let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                                let (end_line, end_col) = self.offset_to_line_col(stmt.span.end);
+                                (end_line, end_col)
                             } else {
-                                col_start
+                                (line, col_start)
                             };
                             self.issues.add(
                                 mir_issues::Issue::new(
@@ -259,6 +261,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
+                                        line_end,
                                         col_start,
                                         col_end: col_end.max(col_start + 1),
                                     },
@@ -277,11 +280,11 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let Some(declared) = &ctx.fn_return_type.clone() {
                         if !declared.is_void() && !declared.is_mixed() {
                             let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                            let col_end = if stmt.span.start < stmt.span.end {
-                                let (_end_line, end_col) = self.offset_to_line_col(stmt.span.end);
-                                end_col
+                            let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                                let (end_line, end_col) = self.offset_to_line_col(stmt.span.end);
+                                (end_line, end_col)
                             } else {
-                                col_start
+                                (line, col_start)
                             };
                             self.issues.add(
                                 mir_issues::Issue::new(
@@ -292,6 +295,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
+                                        line_end,
                                         col_start,
                                         col_end: col_end.max(col_start + 1),
                                     },
@@ -334,12 +338,12 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || (!self.codebase.type_exists(&resolved) && !self.codebase.type_exists(fqcn));
                             if !is_throwable {
                                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                                let col_end = if stmt.span.start < stmt.span.end {
-                                    let (_end_line, end_col) =
+                                let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                                    let (end_line, end_col) =
                                         self.offset_to_line_col(stmt.span.end);
-                                    end_col
+                                    (end_line, end_col)
                                 } else {
-                                    col_start
+                                    (line, col_start)
                                 };
                                 self.issues.add(mir_issues::Issue::new(
                                     IssueKind::InvalidThrow {
@@ -348,6 +352,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
+                                        line_end,
                                         col_start,
                                         col_end: col_end.max(col_start + 1),
                                     },
@@ -372,12 +377,12 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || self.codebase.has_unknown_ancestor(fqcn);
                             if !is_throwable {
                                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                                let col_end = if stmt.span.start < stmt.span.end {
-                                    let (_end_line, end_col) =
+                                let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                                    let (end_line, end_col) =
                                         self.offset_to_line_col(stmt.span.end);
-                                    end_col
+                                    (end_line, end_col)
                                 } else {
-                                    col_start
+                                    (line, col_start)
                                 };
                                 self.issues.add(mir_issues::Issue::new(
                                     IssueKind::InvalidThrow {
@@ -386,6 +391,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                     mir_issues::Location {
                                         file: self.file.clone(),
                                         line,
+                                        line_end,
                                         col_start,
                                         col_end: col_end.max(col_start + 1),
                                     },
@@ -395,11 +401,11 @@ impl<'a> StatementsAnalyzer<'a> {
                         mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
                         _ => {
                             let (line, col_start) = self.offset_to_line_col(stmt.span.start);
-                            let col_end = if stmt.span.start < stmt.span.end {
-                                let (_end_line, end_col) = self.offset_to_line_col(stmt.span.end);
-                                end_col
+                            let (line_end, col_end) = if stmt.span.start < stmt.span.end {
+                                let (end_line, end_col) = self.offset_to_line_col(stmt.span.end);
+                                (end_line, end_col)
                             } else {
-                                col_start
+                                (line, col_start)
                             };
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::InvalidThrow {
@@ -408,6 +414,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 mir_issues::Location {
                                     file: self.file.clone(),
                                     line,
+                                    line_end,
                                     col_start,
                                     col_end: col_end.max(col_start + 1),
                                 },
@@ -484,13 +491,14 @@ impl<'a> StatementsAnalyzer<'a> {
                     {
                         let (line, col_start) =
                             self.offset_to_line_col(elseif.condition.span.start);
-                        let col_end = if elseif.condition.span.start < elseif.condition.span.end {
-                            let (_end_line, end_col) =
-                                self.offset_to_line_col(elseif.condition.span.end);
-                            end_col
-                        } else {
-                            col_start
-                        };
+                        let (line_end, col_end) =
+                            if elseif.condition.span.start < elseif.condition.span.end {
+                                let (end_line, end_col) =
+                                    self.offset_to_line_col(elseif.condition.span.end);
+                                (end_line, end_col)
+                            } else {
+                                (line, col_start)
+                            };
                         let elseif_cond_type = self
                             .expr_analyzer(ctx)
                             .analyze(&elseif.condition, &mut ctx.fork());
@@ -502,6 +510,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 mir_issues::Location {
                                     file: self.file.clone(),
                                     line,
+                                    line_end,
                                     col_start,
                                     col_end: col_end.max(col_start + 1),
                                 },
@@ -544,13 +553,14 @@ impl<'a> StatementsAnalyzer<'a> {
                     && (then_unreachable_from_narrowing || else_unreachable_from_narrowing)
                 {
                     let (line, col_start) = self.offset_to_line_col(if_stmt.condition.span.start);
-                    let col_end = if if_stmt.condition.span.start < if_stmt.condition.span.end {
-                        let (_end_line, end_col) =
-                            self.offset_to_line_col(if_stmt.condition.span.end);
-                        end_col
-                    } else {
-                        col_start
-                    };
+                    let (line_end, col_end) =
+                        if if_stmt.condition.span.start < if_stmt.condition.span.end {
+                            let (end_line, end_col) =
+                                self.offset_to_line_col(if_stmt.condition.span.end);
+                            (end_line, end_col)
+                        } else {
+                            (line, col_start)
+                        };
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::RedundantCondition {
@@ -559,6 +569,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             mir_issues::Location {
                                 file: self.file.clone(),
                                 line,
+                                line_end,
                                 col_start,
                                 col_end: col_end.max(col_start + 1),
                             },
@@ -1117,12 +1128,13 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         let span = name.span();
         let (line, col_start) = self.offset_to_line_col(span.start);
-        let (_, col_end) = self.offset_to_line_col(span.end);
+        let (line_end, col_end) = self.offset_to_line_col(span.end);
         self.issues.add(Issue::new(
             IssueKind::UndefinedClass { name: resolved },
             Location {
                 file: self.file.clone(),
                 line,
+                line_end,
                 col_start,
                 col_end: col_end.max(col_start + 1),
             },
