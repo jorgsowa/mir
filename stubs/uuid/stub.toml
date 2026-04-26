@@ -1,0 +1,6 @@
+[extension]
+name        = "uuid"
+version     = "1.2.0"
+php-min     = "7.0"
+composer    = "ext-uuid"
+description = "UUID generation and parsing"

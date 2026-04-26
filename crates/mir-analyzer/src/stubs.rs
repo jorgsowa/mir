@@ -25,6 +25,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock};
 
 use mir_codebase::Codebase;
+use rayon::prelude::*;
 
 use crate::php_version::PhpVersion;
 
@@ -90,16 +91,22 @@ pub fn load_stubs_for_version(codebase: &Codebase, php_version: PhpVersion) {
 /// Parse every embedded phpstorm-stub file through the standard PHP parser and
 /// `DefinitionCollector`, populating `codebase` with PHP built-in definitions.
 fn load_phpstorm_stubs(codebase: &Codebase, php_version: PhpVersion) {
-    for (filename, content) in PHPSTORM_STUB_FILES {
-        let arena = bumpalo::Bump::new();
-        let result = php_rs_parser::parse(&arena, content);
-        let file: Arc<str> = Arc::from(*filename);
-        let collector =
-            crate::collector::DefinitionCollector::new(codebase, file, content, &result.source_map)
-                .with_php_version(php_version);
-        // Ignore stub parse issues — they don't affect user code analysis.
-        let _ = collector.collect(&result.program);
-    }
+    PHPSTORM_STUB_FILES
+        .par_iter()
+        .for_each(|(filename, content)| {
+            let arena = bumpalo::Bump::new();
+            let result = php_rs_parser::parse(&arena, content);
+            let file: Arc<str> = Arc::from(*filename);
+            let collector = crate::collector::DefinitionCollector::new(
+                codebase,
+                file,
+                content,
+                &result.source_map,
+            )
+            .with_php_version(php_version);
+            // Ignore stub parse issues — they don't affect user code analysis.
+            let _ = collector.collect(&result.program);
+        });
 }
 
 // ---------------------------------------------------------------------------
@@ -114,15 +121,21 @@ fn load_phpstorm_stubs(codebase: &Codebase, php_version: PhpVersion) {
 /// `"stubs/standard/basic.php"`) so its symbols appear in
 /// `Codebase::symbol_to_file` and are navigable via go-to-definition.
 fn load_custom_stubs(codebase: &Codebase, php_version: PhpVersion) {
-    for (filename, content) in CUSTOM_STUB_FILES {
-        let arena = bumpalo::Bump::new();
-        let result = php_rs_parser::parse(&arena, content);
-        let file: Arc<str> = Arc::from(*filename);
-        let collector =
-            crate::collector::DefinitionCollector::new(codebase, file, content, &result.source_map)
-                .with_php_version(php_version);
-        let _ = collector.collect(&result.program);
-    }
+    CUSTOM_STUB_FILES
+        .par_iter()
+        .for_each(|(filename, content)| {
+            let arena = bumpalo::Bump::new();
+            let result = php_rs_parser::parse(&arena, content);
+            let file: Arc<str> = Arc::from(*filename);
+            let collector = crate::collector::DefinitionCollector::new(
+                codebase,
+                file,
+                content,
+                &result.source_map,
+            )
+            .with_php_version(php_version);
+            let _ = collector.collect(&result.program);
+        });
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +304,24 @@ mod tests {
     }
 
     #[test]
+    fn since_tag_excludes_constant_below_target() {
+        if PHPSTORM_STUB_FILES.is_empty() {
+            return; // submodule not initialized — skip
+        }
+        // `IMAGETYPE_AVIF` is `@since 8.1` in standard/standard_defines.php.
+        let cb_old = stubs_codebase_for(PhpVersion::new(8, 0));
+        assert!(
+            !cb_old.constants.contains_key("IMAGETYPE_AVIF"),
+            "IMAGETYPE_AVIF should not be registered on PHP 8.0"
+        );
+        let cb_new = stubs_codebase_for(PhpVersion::new(8, 1));
+        assert!(
+            cb_new.constants.contains_key("IMAGETYPE_AVIF"),
+            "IMAGETYPE_AVIF should be registered on PHP 8.1"
+        );
+    }
+
+    #[test]
     fn removed_tag_excludes_function_at_or_after_target() {
         // `each` is `@removed 8.0`.
         let cb = stubs_codebase_for(PhpVersion::new(8, 0));
@@ -403,6 +434,21 @@ mod tests {
         let cb = stubs_codebase();
         assert_fn(&cb, "cli_set_process_title");
         assert_fn(&cb, "cli_get_process_title");
+    }
+
+    #[test]
+    fn builtin_fn_names_has_sufficient_entries() {
+        // Guards against PhpStormStubsMap.php parsing regressions in build.rs.
+        // When the submodule is absent the slice is empty — skip the check in that case.
+        if BUILTIN_FN_NAMES.is_empty() {
+            return;
+        }
+        assert!(
+            BUILTIN_FN_NAMES.len() >= 500,
+            "BUILTIN_FN_NAMES has only {} entries — \
+             build.rs may have failed to parse PhpStormStubsMap.php correctly",
+            BUILTIN_FN_NAMES.len()
+        );
     }
 
     #[test]
