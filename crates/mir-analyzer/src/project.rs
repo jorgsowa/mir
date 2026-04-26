@@ -548,6 +548,7 @@ impl ProjectAnalyzer {
                 mir_issues::Location {
                     file: file.clone(),
                     line: 1,
+                    line_end: 1,
                     col_start: 0,
                     col_end: 0,
                 },
