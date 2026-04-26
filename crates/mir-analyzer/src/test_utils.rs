@@ -28,12 +28,19 @@
 //! ===config===
 //! php_version=8.1
 //! find_dead_code=true
+//! stub_file=stubs/helpers.php
+//! stub_dir=stubs
 //! ===file===
 //! <?php
 //! ...
 //! ===expect===
 //! ...
 //! ```
+//!
+//! `stub_file=path` and `stub_dir=path` refer to files/directories already declared
+//! with `===file:path===` markers. They are passed to `ProjectAnalyzer::stub_files` /
+//! `stub_dirs` and excluded from the analysis file list, so only the non-stub PHP
+//! files are analysed. Multiple `stub_file=` and `stub_dir=` lines are allowed.
 //!
 //! **With Composer/PSR-4**:
 //! ```text
@@ -61,6 +68,7 @@
 //! - `php_version` is parsed via [`PhpVersion::from_str`] (same parser as the
 //!   real CLI config); invalid values fail the test.
 //! - `find_dead_code` accepts only the literals `true` or `false`.
+//! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
 //!
 //! # Expect format
 //!
@@ -87,6 +95,10 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 struct FixtureConfig {
     php_version: Option<PhpVersion>,
     find_dead_code: bool,
+    /// Paths (relative to temp dir) to pass as `analyzer.stub_files`.
+    stub_files: Vec<String>,
+    /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
+    stub_dirs: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -268,8 +280,14 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                     ),
                 };
             }
+            "stub_file" => {
+                config.stub_files.push(value.trim().to_string());
+            }
+            "stub_dir" => {
+                config.stub_dirs.push(value.trim().to_string());
+            }
             other => panic!(
-                "fixture {path}: unknown config key {other:?} — valid keys: php_version, find_dead_code"
+                "fixture {path}: unknown config key {other:?} — valid keys: php_version, find_dead_code, stub_file, stub_dir"
             ),
         }
     }
@@ -400,6 +418,23 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
         analyzer = analyzer.with_php_version(version);
     }
 
+    // Register user stub files and directories from the fixture config.
+    for stub_file in &config.stub_files {
+        analyzer.stub_files.push(tmp_dir.join(stub_file));
+    }
+    for stub_dir in &config.stub_dirs {
+        analyzer.stub_dirs.push(tmp_dir.join(stub_dir));
+    }
+
+    // Build a set of paths that belong to user stubs so they are excluded from
+    // the list of files passed to `analyze()` (stubs are loaded separately).
+    let stub_file_set: HashSet<PathBuf> =
+        config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
+    let stub_dir_set: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
+    let is_stub = |p: &PathBuf| -> bool {
+        stub_file_set.contains(p) || stub_dir_set.iter().any(|d| p.starts_with(d))
+    };
+
     let has_composer = files.iter().any(|(name, _)| *name == "composer.json");
     let explicit_paths: Vec<PathBuf> = if has_composer {
         match crate::composer::Psr4Map::from_composer(&tmp_dir) {
@@ -409,16 +444,22 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
                 let explicit: Vec<PathBuf> = paths
                     .iter()
                     .filter(|p| p.extension().map(|e| e == "php").unwrap_or(false))
-                    .filter(|p| !psr4_files.contains(*p))
+                    .filter(|p| !psr4_files.contains(*p) && !is_stub(p))
                     .cloned()
                     .collect();
                 analyzer.psr4 = Some(psr4);
                 explicit
             }
-            Err(_) => php_files_only(&paths),
+            Err(_) => php_files_only(&paths)
+                .into_iter()
+                .filter(|p| !is_stub(p))
+                .collect(),
         }
     } else {
         php_files_only(&paths)
+            .into_iter()
+            .filter(|p| !is_stub(p))
+            .collect()
     };
 
     let result = analyzer.analyze(&explicit_paths);

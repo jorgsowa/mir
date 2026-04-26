@@ -15,6 +15,7 @@
 /// let src  = stub_vfs.get(&file).unwrap();           // → &'static str PHP source
 /// ```
 use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
 use mir_codebase::Codebase;
@@ -64,6 +65,54 @@ pub fn load_stubs_for_version(codebase: &Codebase, php_version: PhpVersion) {
                 .with_php_version(php_version);
         let _ = collector.collect(&result.program);
     });
+}
+
+/// Parse user-provided stub files and directories into `codebase`.
+///
+/// Called after built-in stubs are loaded so user definitions can override or
+/// supplement built-ins (e.g. framework-specific classes, IDE helpers).
+pub fn load_user_stubs(codebase: &Codebase, files: &[PathBuf], dirs: &[PathBuf]) {
+    for path in files {
+        parse_stub_file(codebase, path);
+    }
+    for dir in dirs {
+        walk_stub_dir(codebase, dir);
+    }
+}
+
+fn parse_stub_file(codebase: &Codebase, path: &Path) {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("mir: cannot read stub file {}: {}", path.display(), e);
+            return;
+        }
+    };
+    let arena = bumpalo::Bump::new();
+    let result = php_rs_parser::parse(&arena, &content);
+    let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+    let collector =
+        crate::collector::DefinitionCollector::new(codebase, file, &content, &result.source_map);
+    let _ = collector.collect(&result.program);
+}
+
+fn walk_stub_dir(codebase: &Codebase, dir: &Path) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("mir: cannot read stub directory {}: {}", dir.display(), e);
+            return;
+        }
+    };
+    let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+    paths.sort_unstable();
+    for path in paths {
+        if path.is_dir() {
+            walk_stub_dir(codebase, &path);
+        } else if path.extension().is_some_and(|e| e == "php") {
+            parse_stub_file(codebase, &path);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

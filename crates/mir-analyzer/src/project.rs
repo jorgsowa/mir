@@ -36,6 +36,10 @@ pub struct ProjectAnalyzer {
     /// Target PHP language version. `None` means "not configured"; resolved to
     /// `PhpVersion::LATEST` when passed down to `StatementsAnalyzer`.
     pub php_version: Option<PhpVersion>,
+    /// Additional stub files to parse before analysis (absolute paths).
+    pub stub_files: Vec<PathBuf>,
+    /// Additional stub directories to walk and parse before analysis (absolute paths).
+    pub stub_dirs: Vec<PathBuf>,
 }
 
 impl ProjectAnalyzer {
@@ -48,6 +52,8 @@ impl ProjectAnalyzer {
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
             php_version: None,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         }
     }
 
@@ -61,6 +67,8 @@ impl ProjectAnalyzer {
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
             php_version: None,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         }
     }
 
@@ -80,6 +88,8 @@ impl ProjectAnalyzer {
             stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
             php_version: None,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         };
         Ok((analyzer, map))
     }
@@ -110,6 +120,7 @@ impl ProjectAnalyzer {
             .swap(true, std::sync::atomic::Ordering::SeqCst)
         {
             crate::stubs::load_stubs_for_version(&self.codebase, self.resolved_php_version());
+            crate::stubs::load_user_stubs(&self.codebase, &self.stub_files, &self.stub_dirs);
         }
     }
 
