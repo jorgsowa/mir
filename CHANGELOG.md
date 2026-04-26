@@ -7,18 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-04-26
+
 ### Added
 
 - `Location.line_end` field — all issues now carry an end line number, enabling multi-line range highlighting in editors and code scanning tools.
 - SARIF output: `region.endLine` populated from `line_end`.
 - SARIF output: results now include `rank` (Error → 90, Warning → 95, Info → 99) matching Psalm's scoring range.
 - SARIF output: rules now include `properties.tags` (`"security"` for taint issues, `"maintainability"` for all others).
+- Psalm docblock parity: `@psalm-assert-if-false` type narrowing. (#267)
+- Psalm docblock parity: `@psalm-import-type` type alias imports. (#267)
+- Psalm docblock parity: `@psalm-param` and `@psalm-return` type narrowing annotations. (#267)
 
 ### Fixed
 
 - SARIF output: `startColumn`/`endColumn` are now correctly 1-based per SARIF 2.1.0 §3.30.5 (previously off by one).
 - SARIF output: rules now include `defaultConfiguration.level` so the GitHub Code Scanning rules panel shows severity.
 - SARIF output: results now include `partialFingerprints.primaryLocationLineHash` (FNV-1a of rule name + snippet) so GitHub Code Scanning can track findings across commits.
+- Static calls now correctly check for `__callStatic` (not `__call`) when suppressing `UndefinedMethod` on missing static methods. (#271)
+- Magic method dead-code exclusion now uses lowercase keys matching `own_methods` storage, so `__callStatic`, `__toString`, and `__debugInfo` are correctly exempted from `UnusedMethod` reports. (#271)
+- `__unserialize` added to `MAGIC_METHODS_WITH_RUNTIME_PARAMS`, preventing its `$data` parameter from being flagged as unused. (#271)
+- Trait docblock parsing now falls back to raw-source lookup when php-rs-parser absorbs the trait-level docblock, ensuring `@psalm-require-extends` and `@psalm-require-implements` are correctly detected. (#267)
+
+### Changed
+
+- Bumped blake3, php-ast, php-lexer, and php-rs-parser to latest. (#272)
 
 ## [0.9.0] - 2026-04-26
 
