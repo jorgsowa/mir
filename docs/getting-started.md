@@ -7,13 +7,13 @@ This guide walks you through installing mir, running your first analysis, and un
 ### From Composer (recommended for PHP projects)
 
 ```bash
-composer require --dev open-mir/analyzer
+composer require --dev miropen/analyzer
 ```
 
 The package is a thin wrapper: a `post-install-cmd` hook downloads the
 prebuilt `mir` binary that matches the installed version and host platform
 from [GitHub Releases](https://github.com/jorgsowa/mir/releases), verifies
-its SHA-256 checksum, and places it at `vendor/open-mir/analyzer/bin/mir`.
+its SHA-256 checksum, and places it at `vendor/miropen/analyzer/bin/mir`.
 Composer exposes it as `vendor/bin/mir`:
 
 ```bash

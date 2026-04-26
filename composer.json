@@ -1,5 +1,5 @@
 {
-    "name": "open-mir/analyzer",
+    "name": "miropen/analyzer",
     "description": "Fast static analyzer for PHP",
     "type": "library",
     "license": "MIT",
