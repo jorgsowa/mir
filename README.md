@@ -23,7 +23,7 @@ A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](htt
 ### From Composer (PHP projects)
 
 ```bash
-composer require --dev mir-analyzer/mir
+composer require --dev mir-php/analyzer
 vendor/bin/mir src/
 ```
 
