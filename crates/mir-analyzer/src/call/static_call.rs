@@ -101,7 +101,10 @@ impl CallAnalyzer {
         } else if ea.codebase.type_exists(&fqcn) && !ea.codebase.has_unknown_ancestor(&fqcn) {
             let is_interface = ea.codebase.interfaces.contains_key(fqcn.as_str());
             let is_abstract = ea.codebase.is_abstract_class(&fqcn);
-            if is_interface || is_abstract || ea.codebase.get_method(&fqcn, "__call").is_some() {
+            if is_interface
+                || is_abstract
+                || ea.codebase.get_method(&fqcn, "__callStatic").is_some()
+            {
                 Union::mixed()
             } else {
                 ea.emit(
