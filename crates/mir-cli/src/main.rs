@@ -828,24 +828,48 @@ fn xml_escape(s: &str) -> String {
 // SARIF output (GitHub Code Scanning compatible)
 // ---------------------------------------------------------------------------
 
+/// FNV-1a 64-bit hash for stable partial fingerprints without extra dependencies.
+fn fnv1a(data: &str) -> u64 {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in data.bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x00000100000001b3);
+    }
+    hash
+}
+
 fn format_sarif(issues: &[&Issue]) -> String {
-    // Build the set of unique rules (issue kinds)
-    let mut rule_ids: Vec<String> = issues
-        .iter()
-        .map(|i| i.kind.name().to_string())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
+    // Build unique rules with their default severity for rule-level metadata.
+    let mut rule_map: std::collections::HashMap<String, Severity> =
+        std::collections::HashMap::new();
+    for issue in issues {
+        rule_map
+            .entry(issue.kind.name().to_string())
+            .or_insert_with(|| issue.kind.default_severity());
+    }
+    let mut rule_ids: Vec<String> = rule_map.keys().cloned().collect();
     rule_ids.sort_unstable();
 
     let rules_json: Vec<serde_json::Value> = rule_ids
         .iter()
         .map(|id| {
+            let level = match rule_map[id] {
+                Severity::Error => "error",
+                Severity::Warning => "warning",
+                Severity::Info => "note",
+            };
+            let tag = if id.starts_with("Tainted") {
+                "security"
+            } else {
+                "maintainability"
+            };
             serde_json::json!({
                 "id": id,
                 "name": id,
                 "shortDescription": { "text": id },
-                "helpUri": "https://github.com/adamspychala/mir",
+                "helpUri": "https://github.com/jorgsowa/mir",
+                "defaultConfiguration": { "level": level },
+                "properties": { "tags": [tag] },
             })
         })
         .collect();
@@ -858,10 +882,32 @@ fn format_sarif(issues: &[&Issue]) -> String {
                 Severity::Warning => "warning",
                 Severity::Info => "note",
             };
+
+            // Fingerprint based on issue kind + snippet content (not location) so
+            // GitHub Code Scanning can track findings across renames/reformats.
+            let fingerprint_input = format!(
+                "{}:{}",
+                issue.kind.name(),
+                issue.snippet.as_deref().unwrap_or("")
+            );
+            let fingerprint = format!("{:016x}", fnv1a(&fingerprint_input));
+
+            // rank: Error → 90, Warning → 95, Info → 99 (matches Psalm's 90–99 range).
+            let rank = match issue.severity {
+                Severity::Error => 90.0_f64,
+                Severity::Warning => 95.0,
+                Severity::Info => 99.0,
+            };
+
+            // SARIF 2.1.0 §3.30.5: columns are 1-based; col_start/col_end are 0-based.
             serde_json::json!({
                 "ruleId": issue.kind.name(),
                 "level": level,
+                "rank": rank,
                 "message": { "text": issue.kind.message() },
+                "partialFingerprints": {
+                    "primaryLocationLineHash": fingerprint,
+                },
                 "locations": [{
                     "physicalLocation": {
                         "artifactLocation": {
@@ -870,8 +916,9 @@ fn format_sarif(issues: &[&Issue]) -> String {
                         },
                         "region": {
                             "startLine": issue.location.line,
-                            "startColumn": issue.location.col_start,
-                            "endColumn": issue.location.col_end,
+                            "endLine": issue.location.line_end,
+                            "startColumn": issue.location.col_start + 1,
+                            "endColumn": issue.location.col_end + 1,
                         }
                     }
                 }]
@@ -886,7 +933,7 @@ fn format_sarif(issues: &[&Issue]) -> String {
             "tool": {
                 "driver": {
                     "name": "mir",
-                    "informationUri": "https://github.com/adamspychala/mir",
+                    "informationUri": "https://github.com/jorgsowa/mir",
                     "rules": rules_json,
                 }
             },

@@ -51,12 +51,11 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
             let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
             if !codebase.type_exists(&resolved) {
                 let (line, col_start) = offset_to_line_col(source, hint.span.start, source_map);
-                let col_end = if hint.span.start < hint.span.end {
-                    let (_end_line, end_col) =
-                        offset_to_line_col(source, hint.span.end, source_map);
-                    end_col
+                let (line_end, col_end) = if hint.span.start < hint.span.end {
+                    let (end_line, end_col) = offset_to_line_col(source, hint.span.end, source_map);
+                    (end_line, end_col)
                 } else {
-                    col_start
+                    (line, col_start)
                 };
                 issues.push(
                     mir_issues::Issue::new(
@@ -64,6 +63,7 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
                         mir_issues::Location {
                             file: file.clone(),
                             line,
+                            line_end,
                             col_start,
                             col_end: col_end.max(col_start + 1),
                         },
@@ -97,13 +97,14 @@ pub(crate) fn check_name_class(
     if !codebase.type_exists(&resolved) {
         let span = name.span();
         let (line, col_start) = offset_to_line_col(source, span.start, source_map);
-        let (_, col_end) = offset_to_line_col(source, span.end, source_map);
+        let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
         issues.push(
             mir_issues::Issue::new(
                 mir_issues::IssueKind::UndefinedClass { name: resolved },
                 mir_issues::Location {
                     file: file.clone(),
                     line,
+                    line_end,
                     col_start,
                     col_end: col_end.max(col_start + 1),
                 },
@@ -165,6 +166,7 @@ pub(crate) fn emit_unused_params(
                     mir_issues::Location {
                         file: file.clone(),
                         line: 1,
+                        line_end: 1,
                         col_start: 0,
                         col_end: 0,
                     },
@@ -202,6 +204,7 @@ pub(crate) fn emit_unused_variables(
                 mir_issues::Location {
                     file: file.clone(),
                     line: 1,
+                    line_end: 1,
                     col_start: 0,
                     col_end: 0,
                 },
