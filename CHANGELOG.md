@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Composer package `miropen/analyzer`. A `post-install-cmd` / `post-update-cmd` hook downloads the prebuilt `mir` binary matching the installed version and host platform from GitHub Releases, verifies the SHA-256 sidecar, and exposes `vendor/bin/mir`. Single-entry extraction with strict path-traversal and symlink rejection. Supported targets: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`.
+- Composer package `mir-php/analyzer`. A `post-install-cmd` / `post-update-cmd` hook downloads the prebuilt `mir` binary matching the installed version and host platform from GitHub Releases, verifies the SHA-256 sidecar, and exposes `vendor/bin/mir`. Single-entry extraction with strict path-traversal and symlink rejection. Supported targets: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`.
 - `Release` GitHub Actions workflow building and uploading per-target archives + sha256 sidecars on `v*` tags.
 - `NullArgument` issue: emitted when a literal `null` is passed to a non-nullable parameter (previously subsumed by `InvalidArgument`). Severity: warning.
 - `UnusedFunction` issue: emitted for free functions that are never called when `find_dead_code` is enabled.
