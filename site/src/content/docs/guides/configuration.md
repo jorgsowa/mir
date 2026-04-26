@@ -1,4 +1,7 @@
-# Configuration
+---
+title: Configuration
+description: Configure mir through CLI flags and an optional XML config file.
+---
 
 mir can be configured through CLI flags and an optional XML config file (`mir.xml`).
 There is no required config file — mir works out of the box with sensible defaults.

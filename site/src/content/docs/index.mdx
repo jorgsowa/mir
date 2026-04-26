@@ -1,0 +1,26 @@
+---
+title: mir
+description: A fast, incremental PHP static analyzer written in Rust.
+---
+
+A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](https://psalm.dev).
+
+:::caution[Experimental]
+Not yet production-ready. APIs and output formats may change between releases.
+:::
+
+## Install
+
+```bash
+composer require --dev miropen/mir-php
+vendor/bin/mir src/
+```
+
+Types · calls · dead code · taint · generics — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) across 33 PHP extensions.
+Compatible with [Psalm](https://psalm.dev) baselines and docblock annotations.
+
+## Next steps
+
+- [Getting Started](/mir/guides/getting-started/)
+- [CLI Reference](/mir/reference/cli/)
+- [Issue Kinds](/mir/reference/issues/)

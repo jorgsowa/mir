@@ -1,4 +1,7 @@
-# Architecture
+---
+title: Architecture
+description: Crate layout and analysis pipeline internals.
+---
 
 ## Analysis pipeline
 
@@ -41,7 +44,7 @@ Source Files
 
 PHP built-in definitions (functions, classes, interfaces, constants) are loaded in two layers before any user code is analysed.
 
-**Layer 1 — phpstorm-stubs (authoritative)**
+### Layer 1 — phpstorm-stubs (authoritative)
 
 The [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) repository is included as a git submodule at `crates/mir-analyzer/phpstorm-stubs`. At compile time, `build.rs` walks 33 selected PHP extension directories and embeds every `.php` stub file as a string literal via `include_str!()`. At startup, each embedded file is parsed through the normal PHP parser + definition collector, populating the codebase with PHP built-ins.
 
@@ -53,7 +56,7 @@ This provides 500+ functions, 100+ classes, 20+ interfaces, and 200+ constants. 
 git submodule update --remote crates/mir-analyzer/phpstorm-stubs
 ```
 
-**Layer 2 — hand-written supplements**
+### Layer 2 — hand-written supplements
 
 A smaller set of Rust-coded stubs in `crates/mir-analyzer/src/stubs.rs` runs after phpstorm-stubs and overrides or extends where precise parameter shapes matter (e.g. by-reference variadic params on `sscanf`, PHPUnit assertion helpers).
 
@@ -66,7 +69,7 @@ Source positions flow through several layers, each with a different encoding res
 | Parser | `php-rs-parser` | UTF-8 byte offset | `offset_to_line_col` returns the raw byte distance from the line start. Correct for a parser; consumers must convert. |
 | Core data model | `mir-issues`, `mir-codebase` | **Unicode char count** | `IssueLocation.col_start`/`col_end` and `Location.col` are 0-based counts of Unicode code points (one slot per character as seen on screen). |
 | CLI output | `mir-cli` | Unicode char count (direct) | Column numbers in terminal, GitHub Actions annotations, and JSON output match what editors display in their status bar. |
-| LSP server | _(outside mir)_ | UTF-16 code units | The [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position) requires UTF-16. Convert at the protocol boundary: `src[line_start..byte_offset].chars().map(|c| c.len_utf16()).sum()`. LSP 3.17 also supports `positionEncoding` negotiation for UTF-8 and UTF-32. |
+| LSP server | _(outside mir)_ | UTF-16 code units | The [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position) requires UTF-16. Convert at the protocol boundary: `src[line_start..byte_offset].chars().map(\|c\| c.len_utf16()).sum()`. LSP 3.17 also supports `positionEncoding` negotiation for UTF-8 and UTF-32. |
 
 For pure-ASCII PHP files all three encodings are identical. They diverge only for multi-byte identifiers:
 
