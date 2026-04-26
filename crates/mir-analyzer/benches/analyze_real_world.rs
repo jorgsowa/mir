@@ -153,6 +153,7 @@ fn bench_full_analysis(c: &mut Criterion) {
     for &threads in &thread_counts {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
+            .stack_size(8 * 1024 * 1024)
             .build()
             .unwrap();
 

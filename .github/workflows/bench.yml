@@ -107,7 +107,12 @@ jobs:
         env:
           # 'main' on push, 'pr' on pull_request — used by --save-baseline.
           BASELINE_NAME: ${{ github.event_name == 'pull_request' && 'pr' || 'main' }}
+          # Rayon worker threads default to 2 MiB stack; deep PHP AST traversal
+          # and recursive type resolution can exceed that on large codebases.
+          # 8 MiB matches the Linux main-thread default and is sufficient.
+          RUST_MIN_STACK: "8388608"
         run: |
+          set -eo pipefail
           cargo bench -p mir-analyzer --bench analyze_real_world \
             -- --save-baseline "$BASELINE_NAME" --noplot 2>&1 | tee bench-output.txt
           # Save memory stats alongside the Criterion baseline so PRs can diff them.
