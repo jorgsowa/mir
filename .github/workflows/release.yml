@@ -49,3 +49,14 @@ jobs:
           manifest_path: crates/mir-cli/Cargo.toml
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-composer:
+    name: Publish to Packagist
+    needs: upload-assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Packagist update
+        run: |
+          curl -fsSL -XPOST -H 'content-type:application/json' \
+            'https://packagist.org/api/update-package?username=miropen&apiToken=${{ secrets.PACKAGIST_API_TOKEN }}' \
+            -d '{"repository":{"url":"https://github.com/jorgsowa/mir"}}'
