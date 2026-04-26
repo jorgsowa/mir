@@ -46,15 +46,11 @@ PHP built-in definitions (functions, classes, interfaces, constants) are loaded 
 
 ### Layer 1 — phpstorm-stubs (authoritative)
 
-The [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) repository is included as a git submodule at `crates/mir-analyzer/phpstorm-stubs`. At compile time, `build.rs` walks 33 selected PHP extension directories and embeds every `.php` stub file as a string literal via `include_str!()`. At startup, each embedded file is parsed through the normal PHP parser + definition collector, populating the codebase with PHP built-ins.
+PHP built-in definitions are sourced from [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs), vendored at `stubs/` in the repository root. At compile time, `build.rs` walks 33 selected PHP extension directories and embeds every `.php` stub file as a string literal via `include_str!()`. At startup, each embedded file is parsed through the normal PHP parser + definition collector, populating the codebase with PHP built-ins.
 
 Extensions covered: `Core`, `standard`, `SPL`, `bcmath`, `ctype`, `curl`, `date`, `dom`, `fileinfo`, `filter`, `gmp`, `hash`, `iconv`, `intl`, `json`, `libxml`, `mbstring`, `mysqli`, `openssl`, `pcntl`, `pcre`, `PDO`, `posix`, `random`, `Reflection`, `session`, `SimpleXML`, `sodium`, `sockets`, `tokenizer`, `xml`, `zip`, `zlib`.
 
-This provides 500+ functions, 100+ classes, 20+ interfaces, and 200+ constants. Updating is a single command:
-
-```bash
-git submodule update --remote crates/mir-analyzer/phpstorm-stubs
-```
+This provides 500+ functions, 100+ classes, 20+ interfaces, and 200+ constants.
 
 ### Layer 2 — hand-written supplements
 
