@@ -124,6 +124,15 @@ fn bench_full_analysis(c: &mut Criterion) {
         return;
     }
 
+    // Initialize the global Rayon pool before any analysis so the memory-stats
+    // cold runs (which use the global pool, not the explicit per-benchmark pool)
+    // get the same stack depth as the timed sections. Silently ignored if the
+    // pool was already initialized.
+    rayon::ThreadPoolBuilder::new()
+        .stack_size(16 * 1024 * 1024)
+        .build_global()
+        .ok();
+
     let (vendor_files, project_files) = split_vendor_project(&root);
     assert!(
         !project_files.is_empty(),
@@ -153,7 +162,7 @@ fn bench_full_analysis(c: &mut Criterion) {
     for &threads in &thread_counts {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
-            .stack_size(8 * 1024 * 1024)
+            .stack_size(16 * 1024 * 1024)
             .build()
             .unwrap();
 
