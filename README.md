@@ -9,7 +9,7 @@ A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](htt
 ## Features
 
 - Sound type system — scalars, objects, generics, unions, intersections, literals, `never`, `void`
-- Full type inference — return types inferred from bodies; types narrowed through `if`/`match`/`instanceof`/`is_string()` etc.
+- Full type inference — return types, narrowing via `if`/`match`/`instanceof`/`is_string()` etc.
 - Call checking — argument count and types for user-defined and built-in functions/methods
 - Class analysis — inheritance, interface compliance, abstract enforcement, visibility, `readonly`, `final`
 - Dead code detection — unused private methods, properties, functions
@@ -41,18 +41,11 @@ cargo install mir-php
 ### Build from source
 
 ```bash
-git clone --recurse-submodules https://github.com/jorgsowa/mir.git
+git clone https://github.com/jorgsowa/mir.git
 cd mir
 cargo build --release
 # binary at target/release/mir
 ```
-
-> **Note:** The `--recurse-submodules` flag is required to initialize the
-> [phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) submodule that
-> provides PHP built-in definitions. If you cloned without it, run:
-> ```bash
-> git submodule update --init
-> ```
 
 ## Usage
 
@@ -67,14 +60,7 @@ See [docs/cli.md](docs/cli.md) for the full CLI reference.
 
 ## Documentation
 
-| Document | Contents |
-|----------|----------|
-| [docs/getting-started.md](docs/getting-started.md) | Installation, first run, understanding output |
-| [docs/configuration.md](docs/configuration.md) | `mir.xml` reference, baselines, CI setup |
-| [docs/cli.md](docs/cli.md) | All flags, output formats, exit codes |
-| [docs/issue-kinds.md](docs/issue-kinds.md) | Every issue type mir can emit |
-| [docs/docblock.md](docs/docblock.md) | Supported docblock annotations |
-| [docs/architecture.md](docs/architecture.md) | Crate layout and analysis pipeline |
+Full documentation is available at **[jorgsowa.github.io/mir](https://jorgsowa.github.io/mir/)**.
 
 ## Contributing
 
@@ -85,7 +71,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 - Literal equality narrowing (`$x === 'foo'` → `TLiteralString`)
 - `UnusedVariable` / `UnusedParam` detection
 - Reduce `UndefinedMethod` / `InvalidArgument` false positives
-- `PossiblyUndefinedVariable` detection
 - Plugin system
 - PHP version–aware stub filtering (load only stubs valid for the target version)
 
