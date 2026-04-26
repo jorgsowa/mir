@@ -1,0 +1,45 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Shim that forwards execution to the prebuilt mir binary downloaded by
+ * Mir\Composer\Installer at composer install/update time.
+ *
+ * Uses proc_open with an argv array (PHP 7.4+, including Windows on PHP 8.0+)
+ * so arguments are passed without going through a shell — no quoting bugs,
+ * no command injection surface from caller-controlled argv.
+ */
+
+declare(strict_types=1);
+
+$packageRoot = dirname(__DIR__, 2);
+$binaryName = PHP_OS_FAMILY === 'Windows' ? 'mir.exe' : 'mir';
+$binary = $packageRoot . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . $binaryName;
+
+if (!is_file($binary)) {
+    fwrite(
+        STDERR,
+        "mir: prebuilt binary not found at {$binary}.\n"
+        . "Run `composer install` (or `composer update mir-analyzer/mir`) to fetch it.\n",
+    );
+    exit(1);
+}
+
+if (PHP_OS_FAMILY !== 'Windows' && !is_executable($binary)) {
+    @chmod($binary, 0755);
+}
+
+$argv = array_merge([$binary], array_slice($_SERVER['argv'], 1));
+$descriptors = [
+    0 => ['file', 'php://stdin', 'r'],
+    1 => ['file', 'php://stdout', 'w'],
+    2 => ['file', 'php://stderr', 'w'],
+];
+
+$proc = proc_open($argv, $descriptors, $pipes);
+if (!is_resource($proc)) {
+    fwrite(STDERR, "mir: failed to launch {$binary}\n");
+    exit(1);
+}
+
+$status = proc_close($proc);
+exit($status === -1 ? 1 : $status);

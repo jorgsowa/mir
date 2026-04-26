@@ -20,10 +20,22 @@ A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](htt
 
 ## Installation
 
+### From Composer (PHP projects)
+
+```bash
+composer require --dev mir-analyzer/mir
+vendor/bin/mir src/
+```
+
+A `post-install-cmd` hook downloads the prebuilt binary matching your version
+and host platform from GitHub Releases. See
+[docs/getting-started.md](docs/getting-started.md#installation) for supported
+targets.
+
 ### From crates.io
 
 ```bash
-cargo install mir-cli
+cargo install mir-php
 ```
 
 ### Build from source

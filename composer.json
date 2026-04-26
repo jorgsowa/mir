@@ -1,0 +1,33 @@
+{
+    "name": "mir-analyzer/mir",
+    "description": "Fast static analyzer for PHP",
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://github.com/jorgsowa/mir",
+    "keywords": ["static-analysis", "php", "analyzer", "psalm", "phpstan"],
+    "support": {
+        "issues": "https://github.com/jorgsowa/mir/issues",
+        "source": "https://github.com/jorgsowa/mir"
+    },
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-phar": "*",
+        "ext-zip": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Mir\\Composer\\": "composer/src/"
+        }
+    },
+    "bin": [
+        "composer/bin/mir"
+    ],
+    "scripts": {
+        "post-install-cmd": "Mir\\Composer\\Installer::install",
+        "post-update-cmd": "Mir\\Composer\\Installer::install"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
