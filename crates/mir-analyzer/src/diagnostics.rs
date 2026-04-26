@@ -172,7 +172,7 @@ pub(crate) fn emit_unused_params(
                         col_end: 0,
                     },
                 )
-                .with_snippet(format!("${}", name)),
+                .with_snippet(format!("${name}")),
             );
         }
     }

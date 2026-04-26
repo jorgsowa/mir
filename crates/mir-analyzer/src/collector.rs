@@ -116,13 +116,13 @@ impl<'a> DefinitionCollector<'a> {
         if let Some(resolved) = self.use_aliases.get(first_part) {
             if name.contains('\\') {
                 let rest = &name[first_part.len()..];
-                return format!("{}{}", resolved, rest);
+                return format!("{resolved}{rest}");
             }
             return resolved.clone();
         }
         // Qualify with namespace
         if let Some(ns) = &self.namespace {
-            return format!("{}\\{}", ns, name);
+            return format!("{ns}\\{name}");
         }
         name.to_string()
     }
@@ -135,7 +135,7 @@ impl<'a> DefinitionCollector<'a> {
         if let Some(resolved) = self.use_aliases.get(first_part) {
             if name.contains('\\') {
                 let rest = &name[first_part.len()..];
-                return format!("{}{}", resolved, rest);
+                return format!("{resolved}{rest}");
             }
             return resolved.clone();
         }
@@ -354,6 +354,37 @@ impl<'a> DefinitionCollector<'a> {
             ty.from_docblock = true;
             aliases.insert(alias.name.clone(), self.resolve_union_doc(ty));
         }
+
+        // Resolve @psalm-import-type declarations.
+        // Look first in the codebase (cross-file) then in the slice being built
+        // (same-file, for classes defined earlier in the same file).
+        for import in &doc.import_types {
+            if import.from_class.is_empty() {
+                continue;
+            }
+            let from_resolved =
+                self.resolve_type_name(&Arc::from(import.from_class.as_str()), true);
+            // Try codebase first (cross-file classes already loaded).
+            let resolved = if let Some(cb) = self.codebase {
+                cb.classes
+                    .get(from_resolved.as_ref())
+                    .and_then(|src| src.type_aliases.get(import.original.as_str()).cloned())
+            } else {
+                None
+            };
+            // Fall back to slice (same-file, collected earlier in this pass).
+            let resolved = resolved.or_else(|| {
+                self.slice
+                    .classes
+                    .iter()
+                    .find(|cls| cls.fqcn.as_ref() == from_resolved.as_ref())
+                    .and_then(|cls| cls.type_aliases.get(import.original.as_str()).cloned())
+            });
+            if let Some(ty) = resolved {
+                aliases.insert(import.local.clone(), ty);
+            }
+        }
+
         aliases
     }
 
@@ -557,7 +588,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             StmtKind::Function(decl) => {
                 let short_name = decl.name.to_string();
                 let fqn = if let Some(ns) = &self.namespace {
-                    format!("{}\\{}", ns, short_name)
+                    format!("{ns}\\{short_name}")
                 } else {
                     short_name.clone()
                 };
@@ -818,6 +849,23 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     deprecated: class_doc.deprecated.as_deref().map(Arc::from),
                     is_internal: class_doc.is_internal,
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
+                    type_aliases: type_aliases
+                        .iter()
+                        .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
+                        .collect(),
+                    pending_import_types: class_doc
+                        .import_types
+                        .iter()
+                        .map(|imp| {
+                            let from_resolved =
+                                self.resolve_type_name(&Arc::from(imp.from_class.as_str()), true);
+                            (
+                                Arc::from(imp.local.as_str()),
+                                Arc::from(imp.original.as_str()),
+                                from_resolved,
+                            )
+                        })
+                        .collect(),
                 };
 
                 self.slice.classes.push(storage);
@@ -896,10 +944,19 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             StmtKind::Trait(decl) => {
                 let fqcn = self.resolve_name(decl.name);
 
+                // The php-rs-parser calls `take_doc_comment` for the trait *after* it has
+                // already parsed the trait body.  Method declarations inside the body also
+                // call `take_doc_comment`, which can steal the trait-level docblock when the
+                // trait has a non-empty body.  Fall back to scanning the raw source for the
+                // nearest `/** */` before the `trait` keyword.
                 let trait_doc = decl
                     .doc_comment
                     .as_ref()
                     .map(|c| crate::parser::DocblockParser::parse(c.text))
+                    .or_else(|| {
+                        crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+                            .map(|t| crate::parser::DocblockParser::parse(&t))
+                    })
                     .unwrap_or_default();
 
                 let trait_template_params: Vec<TemplateParam> = trait_doc
@@ -995,6 +1052,17 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     }
                 }
 
+                let require_extends: Vec<Arc<str>> = trait_doc
+                    .require_extends
+                    .iter()
+                    .map(|s| self.resolve_type_name(&Arc::from(s.as_str()), true))
+                    .collect();
+                let require_implements: Vec<Arc<str>> = trait_doc
+                    .require_implements
+                    .iter()
+                    .map(|s| self.resolve_type_name(&Arc::from(s.as_str()), true))
+                    .collect();
+
                 self.slice.traits.push(TraitStorage {
                     fqcn: fqcn.into(),
                     short_name: decl.name.into(),
@@ -1004,6 +1072,8 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     template_params: trait_template_params,
                     traits: trait_uses,
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
+                    require_extends,
+                    require_implements,
                 });
             }
 
@@ -1333,6 +1403,50 @@ const MY_CONST = 42;
             cb_new.enums.get(enum_fqcn).unwrap().value(),
             cb_old.enums.get(enum_fqcn).unwrap().value(),
             "EnumStorage differs for {enum_fqcn}"
+        );
+    }
+
+    #[test]
+    fn trait_require_extends_is_collected() {
+        let src = r#"<?php
+class Model {}
+
+/**
+ * @psalm-require-extends Model
+ */
+trait HasTimestamps {}
+"#;
+        let cb = Codebase::new();
+        parse_and_collect_old("test.php", src, &cb);
+        let tr = cb
+            .traits
+            .get("HasTimestamps")
+            .expect("HasTimestamps should be collected");
+        assert_eq!(
+            tr.require_extends,
+            vec![std::sync::Arc::from("Model")],
+            "require_extends should contain Model"
+        );
+    }
+
+    #[test]
+    fn trait_require_extends_via_project_analyzer() {
+        let src = r#"<?php
+/** @psalm-require-extends Model */
+trait HasTimestamps {
+    public function touch(): void {}
+}
+
+class Model {}
+
+class NotAModel {
+    use HasTimestamps;
+}
+"#;
+        let result = crate::test_utils::check(src);
+        assert!(
+            result.iter().any(|i| i.kind.name() == "InvalidTraitUse"),
+            "Expected InvalidTraitUse issue"
         );
     }
 }

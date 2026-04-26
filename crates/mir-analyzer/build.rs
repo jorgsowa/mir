@@ -27,7 +27,7 @@ fn main() {
     let mut categories: Vec<_> = fs::read_dir(&fixtures_dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .collect();
     categories.sort_by_key(|e| e.file_name());
 
@@ -41,12 +41,7 @@ fn main() {
         let mut fixtures: Vec<_> = fs::read_dir(cat_entry.path())
             .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .map(|ext| ext == "phpt")
-                    .unwrap_or(false)
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "phpt"))
             .collect();
         fixtures.sort_by_key(|e| e.file_name());
 
@@ -309,7 +304,7 @@ fn generate_custom_stub_files(manifest_dir: &Path, out_dir: &Path) {
     let mut ext_dirs: Vec<PathBuf> = fs::read_dir(&stubs_dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .map(|e| e.path())
         .collect();
     ext_dirs.sort();

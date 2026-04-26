@@ -183,6 +183,8 @@ fn re_analyze_file_skips_finalize_on_body_only_change() {
             deprecated: None,
             is_internal: false,
             location: None,
+            type_aliases: std::collections::HashMap::new(),
+            pending_import_types: vec![],
         },
     );
 
@@ -202,8 +204,7 @@ fn re_analyze_file_skips_finalize_on_body_only_change() {
     assert!(
         c_all_parents.is_empty(),
         "finalize() should have been skipped for a body-only change; \
-         C::all_parents should still be [] but got {:?}",
-        c_all_parents
+         C::all_parents should still be [] but got {c_all_parents:?}"
     );
 }
 

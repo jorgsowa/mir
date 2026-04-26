@@ -536,6 +536,8 @@ impl<'a> Pass2Driver<'a> {
                 }
             }
         }
+
+        self.check_trait_constraints(fqcn, file, all_issues);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -764,6 +766,71 @@ impl<'a> Pass2Driver<'a> {
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
                 if let Some(m) = cls.own_methods.get_mut(method.name) {
                     Arc::make_mut(m).inferred_return_type = Some(inferred);
+                }
+            }
+        }
+
+        self.check_trait_constraints(fqcn, file, all_issues);
+    }
+
+    /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
+    /// `@psalm-require-implements` constraint declared on the traits it uses.
+    fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
+        // Check @psalm-require-extends / @psalm-require-implements for each used trait.
+        let (class_all_parents, trait_list) = self
+            .codebase
+            .classes
+            .get(fqcn)
+            .map(|c| (c.all_parents.clone(), c.traits.clone()))
+            .unwrap_or_default();
+
+        for trait_fqcn in &trait_list {
+            let Some(tr) = self.codebase.traits.get(trait_fqcn.as_ref()) else {
+                continue;
+            };
+            let req_ext = tr.require_extends.clone();
+            let req_impl = tr.require_implements.clone();
+            let tr_short = tr.short_name.clone();
+            drop(tr);
+
+            for req in &req_ext {
+                let satisfies = fqcn == req.as_ref()
+                    || class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
+                if !satisfies {
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::InvalidTraitUse {
+                            trait_name: tr_short.to_string(),
+                            reason: format!(
+                                "Class {fqcn} uses trait {tr_short} but does not extend {req}"
+                            ),
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line: 1,
+                            col_start: 0,
+                            col_end: 0,
+                        },
+                    ));
+                }
+            }
+
+            for req in &req_impl {
+                let satisfies = class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
+                if !satisfies {
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::InvalidTraitUse {
+                            trait_name: tr_short.to_string(),
+                            reason: format!(
+                                "Class {fqcn} uses trait {tr_short} but does not implement {req}"
+                            ),
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line: 1,
+                            col_start: 0,
+                            col_end: 0,
+                        },
+                    ));
                 }
             }
         }

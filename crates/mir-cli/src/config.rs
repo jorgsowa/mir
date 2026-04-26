@@ -128,11 +128,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 let name = bytes_to_string(e.name().as_ref());
 
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
-                if path
-                    .last()
-                    .map(|s: &String| s == "issueHandlers")
-                    .unwrap_or(false)
-                {
+                if path.last().is_some_and(|s: &String| s == "issueHandlers") {
                     for attr in e.attributes().flatten() {
                         if bytes_to_string(attr.key.as_ref()) == "errorLevel" {
                             if let Some(level) = ErrorLevel::from_str(&bytes_to_string(&attr.value))
@@ -156,11 +152,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             Ok(Event::Empty(e)) => {
                 let name = bytes_to_string(e.name().as_ref());
 
-                if path
-                    .last()
-                    .map(|s: &String| s == "issueHandlers")
-                    .unwrap_or(false)
-                {
+                if path.last().is_some_and(|s: &String| s == "issueHandlers") {
                     for attr in e.attributes().flatten() {
                         if bytes_to_string(attr.key.as_ref()) == "errorLevel" {
                             if let Some(level) = ErrorLevel::from_str(&bytes_to_string(&attr.value))
@@ -185,7 +177,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
 
             Ok(Event::End(_)) => {
                 let key = path.pop().unwrap_or_default();
-                let parent = path.last().map(|s| s.as_str()).unwrap_or("");
+                let parent = path.last().map_or("", |s| s.as_str());
                 match (key.as_str(), parent) {
                     ("phpVersion", _) if !text_buf.is_empty() => {
                         config.php_version = Some(text_buf.clone());
@@ -222,7 +214,7 @@ fn collect_directory<'a>(
     path: &[String],
     config: &mut Config,
 ) {
-    let parent = path.last().map(|s| s.as_str()).unwrap_or("");
+    let parent = path.last().map_or("", |s| s.as_str());
     for attr in e.attributes().flatten() {
         if bytes_to_string(attr.key.as_ref()) == "name" {
             let val = bytes_to_string(&attr.value);
@@ -293,8 +285,7 @@ impl Baseline {
         self.entries
             .get(file)
             .and_then(|m| m.get(issue_kind))
-            .map(|v| !v.is_empty())
-            .unwrap_or(false)
+            .is_some_and(|v| !v.is_empty())
     }
 
     /// Serialize this baseline to a Psalm-compatible XML file.
@@ -312,11 +303,11 @@ impl Baseline {
             out.push_str(&format!("  <file src=\"{}\">\n", xml_escape_attr(file)));
             for kind in kinds {
                 let snippets = &by_kind[kind];
-                out.push_str(&format!("    <{}>\n", kind));
+                out.push_str(&format!("    <{kind}>\n"));
                 for snippet in snippets {
-                    out.push_str(&format!("      <code><![CDATA[{}]]></code>\n", snippet));
+                    out.push_str(&format!("      <code><![CDATA[{snippet}]]></code>\n"));
                 }
-                out.push_str(&format!("    </{}>\n", kind));
+                out.push_str(&format!("    </{kind}>\n"));
             }
             out.push_str("  </file>\n");
         }
@@ -362,7 +353,7 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
                         current_kind = None;
                     }
                     "files" => {}
-                    _ if path.last().map(|s: &String| s == "file").unwrap_or(false) => {
+                    _ if path.last().is_some_and(|s: &String| s == "file") => {
                         // Direct child of <file> is an issue-kind element
                         current_kind = Some(name.clone());
                     }

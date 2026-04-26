@@ -319,6 +319,8 @@ mod tests {
                 deprecated: None,
                 is_internal: false,
                 location: None,
+                type_aliases: std::collections::HashMap::new(),
+                pending_import_types: vec![],
             },
         );
 
@@ -350,6 +352,8 @@ mod tests {
                 deprecated: None,
                 is_internal: false,
                 location: None,
+                type_aliases: std::collections::HashMap::new(),
+                pending_import_types: vec![],
             },
         );
 
@@ -396,6 +400,8 @@ mod tests {
                 deprecated: None,
                 is_internal: false,
                 location: None,
+                type_aliases: std::collections::HashMap::new(),
+                pending_import_types: vec![],
             },
         );
 
@@ -423,6 +429,8 @@ mod tests {
                 deprecated: None,
                 is_internal: false,
                 location: None,
+                type_aliases: std::collections::HashMap::new(),
+                pending_import_types: vec![],
             },
         );
 

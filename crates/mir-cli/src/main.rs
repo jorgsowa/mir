@@ -135,12 +135,11 @@ fn main() {
     let mut config = if let Some(path) = &cli.config {
         config_base = path
             .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| config_base.clone());
+            .map_or_else(|| config_base.clone(), |p| p.to_path_buf());
         match Config::from_file(path) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("mir: config error: {}", e);
+                eprintln!("mir: config error: {e}");
                 std::process::exit(2);
             }
         }
@@ -149,8 +148,7 @@ fn main() {
         if let Some(found) = Config::find(&cwd) {
             config_base = found
                 .parent()
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| cwd.clone());
+                .map_or_else(|| cwd.clone(), |p| p.to_path_buf());
             match Config::from_file(&found) {
                 Ok(c) => {
                     if !cli.quiet {
@@ -212,7 +210,7 @@ fn main() {
         let (mut analyzer, map) = match ProjectAnalyzer::from_composer(composer_root) {
             Ok(pair) => pair,
             Err(e) => {
-                eprintln!("mir: composer error: {}", e);
+                eprintln!("mir: composer error: {e}");
                 std::process::exit(2);
             }
         };
@@ -392,7 +390,7 @@ fn main() {
             if files.len() == 1 { "" } else { "s" },
             cli.php_version
                 .as_deref()
-                .map(|v| format!(" (PHP {})", v))
+                .map(|v| format!(" (PHP {v})"))
                 .unwrap_or_default(),
         );
     }
@@ -523,7 +521,7 @@ fn run_output(
                     eprintln!("mir: baseline written to {}", path.display());
                 }
             }
-            Err(e) => eprintln!("mir: failed to write baseline: {}", e),
+            Err(e) => eprintln!("mir: failed to write baseline: {e}"),
         }
         return;
     }
@@ -569,21 +567,21 @@ fn run_output(
 
     // --update-baseline: write back only the issues still present in the baseline.
     if cli.update_baseline {
-        let path = baseline_path
-            .as_deref()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| {
+        let path = baseline_path.as_deref().map_or_else(
+            || {
                 std::env::current_dir()
                     .unwrap_or_else(|_| PathBuf::from("."))
                     .join("psalm-baseline.xml")
-            });
+            },
+            |p| p.to_path_buf(),
+        );
         match new_baseline.write(&path) {
             Ok(()) => {
                 if !cli.quiet {
                     eprintln!("mir: baseline updated at {}", path.display());
                 }
             }
-            Err(e) => eprintln!("mir: failed to update baseline: {}", e),
+            Err(e) => eprintln!("mir: failed to update baseline: {e}"),
         }
     }
 
@@ -642,14 +640,14 @@ fn run_output(
         OutputFormat::Text => {
             if !cli.quiet {
                 for issue in &display_issues {
-                    println!("{}", issue);
+                    println!("{issue}");
                 }
             }
         }
 
         OutputFormat::Json => match serde_json::to_string_pretty(&display_issues) {
-            Ok(json) => println!("{}", json),
-            Err(e) => eprintln!("JSON serialization error: {}", e),
+            Ok(json) => println!("{json}"),
+            Err(e) => eprintln!("JSON serialization error: {e}"),
         },
 
         OutputFormat::GithubActions => {

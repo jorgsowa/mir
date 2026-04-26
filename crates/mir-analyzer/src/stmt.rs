@@ -255,8 +255,8 @@ impl<'a> StatementsAnalyzer<'a> {
                             self.issues.add(
                                 mir_issues::Issue::new(
                                     IssueKind::InvalidReturnType {
-                                        expected: format!("{}", declared),
-                                        actual: format!("{}", ret_ty),
+                                        expected: format!("{declared}"),
+                                        actual: format!("{ret_ty}"),
                                     },
                                     mir_issues::Location {
                                         file: self.file.clone(),
@@ -289,7 +289,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             self.issues.add(
                                 mir_issues::Issue::new(
                                     IssueKind::InvalidReturnType {
-                                        expected: format!("{}", declared),
+                                        expected: format!("{declared}"),
                                         actual: "void".to_string(),
                                     },
                                     mir_issues::Location {
@@ -409,7 +409,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             };
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::InvalidThrow {
-                                    ty: format!("{}", thrown_ty),
+                                    ty: format!("{thrown_ty}"),
                                 },
                                 mir_issues::Location {
                                     file: self.file.clone(),
@@ -505,7 +505,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         self.issues.add(
                             mir_issues::Issue::new(
                                 IssueKind::RedundantCondition {
-                                    ty: format!("{}", elseif_cond_type),
+                                    ty: format!("{elseif_cond_type}"),
                                 },
                                 mir_issues::Location {
                                     file: self.file.clone(),
@@ -564,7 +564,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::RedundantCondition {
-                                ty: format!("{}", cond_type),
+                                ty: format!("{cond_type}"),
                             },
                             mir_issues::Location {
                                 file: self.file.clone(),

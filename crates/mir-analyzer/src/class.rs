@@ -369,8 +369,7 @@ impl<'a> ClassAnalyzer<'a> {
                                 class: fqcn.to_string(),
                                 method: method_name.to_string(),
                                 detail: format!(
-                                    "return type '{}' is not a subtype of parent '{}'",
-                                    child_ret, parent_ret
+                                    "return type '{child_ret}' is not a subtype of parent '{parent_ret}'"
                                 ),
                             },
                             loc.clone(),
@@ -399,8 +398,7 @@ impl<'a> ClassAnalyzer<'a> {
                             class: fqcn.to_string(),
                             method: method_name.to_string(),
                             detail: format!(
-                                "overriding method requires {} argument(s) but parent requires {}",
-                                child_required, parent_required
+                                "overriding method requires {child_required} argument(s) but parent requires {parent_required}"
                             ),
                         },
                         loc.clone(),

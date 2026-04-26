@@ -56,6 +56,10 @@ pub struct Context {
     /// Used to exclude parameters from UnusedVariable detection.
     pub param_names: HashSet<String>,
 
+    /// Names of by-reference parameters in this scope (stripped of `$`).
+    /// Assigning to these is externally observable, so it counts as usage.
+    pub byref_param_names: HashSet<String>,
+
     /// Whether every execution path through this context has diverged
     /// (returned, thrown, or exited). Used to detect "all catch branches
     /// return" so that variables assigned only in the try body are
@@ -80,6 +84,7 @@ impl Context {
             tainted_vars: HashSet::new(),
             read_vars: HashSet::new(),
             param_names: HashSet::new(),
+            byref_param_names: HashSet::new(),
             diverges: false,
         };
         // PHP superglobals — always in scope in any context
@@ -162,7 +167,10 @@ impl Context {
             let name = p.name.as_ref().trim_start_matches('$').to_string();
             ctx.vars.insert(name.clone(), ty);
             ctx.assigned_vars.insert(name.clone());
-            ctx.param_names.insert(name);
+            ctx.param_names.insert(name.clone());
+            if p.is_byref {
+                ctx.byref_param_names.insert(name);
+            }
         }
 
         // Inject $this for non-static methods so that $this->method() can be

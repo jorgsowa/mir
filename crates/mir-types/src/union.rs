@@ -575,7 +575,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // List <: array
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
             // list key is always int
-            matches!(key.types.as_slice(), [Atomic::TInt] | [Atomic::TMixed])
+            matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
                 && value.is_subtype_of_simple(av)
         }
         (Atomic::TNonEmptyList { value }, Atomic::TList { value: lv }) => {
@@ -583,19 +583,19 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         }
         // array<int, X> is accepted where list<X> or non-empty-list<X> expected
         (Atomic::TArray { key, value: av }, Atomic::TList { value: lv }) => {
-            matches!(key.types.as_slice(), [Atomic::TInt] | [Atomic::TMixed])
+            matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
                 && av.is_subtype_of_simple(lv)
         }
         (Atomic::TArray { key, value: av }, Atomic::TNonEmptyList { value: lv }) => {
-            matches!(key.types.as_slice(), [Atomic::TInt] | [Atomic::TMixed])
+            matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
                 && av.is_subtype_of_simple(lv)
         }
         (Atomic::TNonEmptyArray { key, value: av }, Atomic::TList { value: lv }) => {
-            matches!(key.types.as_slice(), [Atomic::TInt] | [Atomic::TMixed])
+            matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
                 && av.is_subtype_of_simple(lv)
         }
         (Atomic::TNonEmptyArray { key, value: av }, Atomic::TNonEmptyList { value: lv }) => {
-            matches!(key.types.as_slice(), [Atomic::TInt] | [Atomic::TMixed])
+            matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
                 && av.is_subtype_of_simple(lv)
         }
         // TList <: TList value covariance
@@ -790,7 +790,7 @@ mod tests {
             }),
         ];
         let u = Union::single(Atomic::TIntersection { parts });
-        assert_eq!(format!("{}", u), "Iterator&Countable");
+        assert_eq!(format!("{u}"), "Iterator&Countable");
     }
 
     #[test]
@@ -810,7 +810,7 @@ mod tests {
             }),
         ];
         let u = Union::single(Atomic::TIntersection { parts });
-        assert_eq!(format!("{}", u), "A&B&C");
+        assert_eq!(format!("{u}"), "A&B&C");
     }
 
     #[test]

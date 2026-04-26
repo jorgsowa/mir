@@ -55,8 +55,7 @@ fn print_alloc_stats(label: &str) {
     let peak = PEAK_BYTES.load(Relaxed) as f64 / 1_048_576.0;
     let total = TOTAL_BYTES.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!(
-        "  [memory] {}: peak live {:.1} MiB, total allocated {:.1} MiB  (one cold run)",
-        label, peak, total
+        "  [memory] {label}: peak live {peak:.1} MiB, total allocated {total:.1} MiB  (one cold run)"
     );
 }
 
@@ -215,7 +214,7 @@ fn bench_reanalysis(c: &mut Criterion) {
     if let Some(original) = &model_original {
         let cache_mem: TempDir = tempfile::tempdir().unwrap();
         warm_cache(&cache_mem, &vendor_files, &project_files);
-        std::fs::write(&model_path, format!("{}\n// memory-check", original)).unwrap();
+        std::fs::write(&model_path, format!("{original}\n// memory-check")).unwrap();
         reset_alloc_counters();
         {
             let analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
@@ -229,7 +228,7 @@ fn bench_reanalysis(c: &mut Criterion) {
     if let Some(original) = &leaf_original {
         let cache_mem: TempDir = tempfile::tempdir().unwrap();
         warm_cache(&cache_mem, &vendor_files, &project_files);
-        std::fs::write(&leaf_path, format!("{}\n// memory-check", original)).unwrap();
+        std::fs::write(&leaf_path, format!("{original}\n// memory-check")).unwrap();
         reset_alloc_counters();
         {
             let analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
@@ -265,11 +264,8 @@ fn bench_reanalysis(c: &mut Criterion) {
                 || {
                     // Not timed: touch the file so its content hash changes.
                     counter_model += 1;
-                    std::fs::write(
-                        &model_path,
-                        format!("{}\n// bench {}", original, counter_model),
-                    )
-                    .unwrap();
+                    std::fs::write(&model_path, format!("{original}\n// bench {counter_model}"))
+                        .unwrap();
                 },
                 |_| {
                     let analyzer = ProjectAnalyzer::with_cache(cache_model.path());
@@ -288,11 +284,8 @@ fn bench_reanalysis(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     counter_leaf += 1;
-                    std::fs::write(
-                        &leaf_path,
-                        format!("{}\n// bench {}", original, counter_leaf),
-                    )
-                    .unwrap();
+                    std::fs::write(&leaf_path, format!("{original}\n// bench {counter_leaf}"))
+                        .unwrap();
                 },
                 |_| {
                     let analyzer = ProjectAnalyzer::with_cache(cache_leaf.path());
@@ -339,7 +332,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
     if let Some(original) = &model_original {
         let cache_mem: TempDir = tempfile::tempdir().unwrap();
         warm_cache(&cache_mem, &vendor_files, &project_files);
-        std::fs::write(&model_path, format!("{}\n// memory-check", original)).unwrap();
+        std::fs::write(&model_path, format!("{original}\n// memory-check")).unwrap();
         let mem_analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
         mem_analyzer.load_stubs();
         mem_analyzer.collect_types_only(&vendor_files);
@@ -351,7 +344,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
     if let Some(original) = &leaf_original {
         let cache_mem: TempDir = tempfile::tempdir().unwrap();
         warm_cache(&cache_mem, &vendor_files, &project_files);
-        std::fs::write(&leaf_path, format!("{}\n// memory-check", original)).unwrap();
+        std::fs::write(&leaf_path, format!("{original}\n// memory-check")).unwrap();
         let mem_analyzer = ProjectAnalyzer::with_cache(cache_mem.path());
         mem_analyzer.load_stubs();
         mem_analyzer.collect_types_only(&vendor_files);
@@ -385,11 +378,8 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     // Not timed: touch file and pre-load stubs + vendor types into
                     // a fresh analyzer so only `analyze()` is measured.
                     counter_model += 1;
-                    std::fs::write(
-                        &model_path,
-                        format!("{}\n// bench {}", original, counter_model),
-                    )
-                    .unwrap();
+                    std::fs::write(&model_path, format!("{original}\n// bench {counter_model}"))
+                        .unwrap();
                     let analyzer = ProjectAnalyzer::with_cache(cache_model.path());
                     analyzer.load_stubs();
                     analyzer.collect_types_only(&vendor_files);
@@ -407,11 +397,8 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     counter_leaf += 1;
-                    std::fs::write(
-                        &leaf_path,
-                        format!("{}\n// bench {}", original, counter_leaf),
-                    )
-                    .unwrap();
+                    std::fs::write(&leaf_path, format!("{original}\n// bench {counter_leaf}"))
+                        .unwrap();
                     let analyzer = ProjectAnalyzer::with_cache(cache_leaf.path());
                     analyzer.load_stubs();
                     analyzer.collect_types_only(&vendor_files);

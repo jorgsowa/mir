@@ -37,9 +37,7 @@ impl ResolvedSymbol {
             SymbolKind::MethodCall { class, method } | SymbolKind::StaticCall { class, method } => {
                 Some(format!("{}::{}", class, method.to_lowercase()))
             }
-            SymbolKind::PropertyAccess { class, property } => {
-                Some(format!("{}::{}", class, property))
-            }
+            SymbolKind::PropertyAccess { class, property } => Some(format!("{class}::{property}")),
             SymbolKind::FunctionCall(fqn) => Some(fqn.to_string()),
             SymbolKind::ClassReference(fqcn) => Some(fqcn.to_string()),
             SymbolKind::Variable(_) => None,

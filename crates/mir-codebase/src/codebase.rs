@@ -1062,7 +1062,7 @@ impl Codebase {
             if let Some(imports) = self.file_imports.get(file) {
                 if let Some(resolved_prefix) = imports.get(first_segment) {
                     let rest = &name[first_segment.len()..]; // includes leading '\'
-                    return format!("{}{}", resolved_prefix, rest);
+                    return format!("{resolved_prefix}{rest}");
                 }
             }
             // If already known in codebase as-is, it's FQCN — trust it
@@ -1196,7 +1196,7 @@ impl Codebase {
 
     /// Mark a property as referenced from user code.
     pub fn mark_property_referenced(&self, fqcn: &str, prop_name: &str) {
-        let key = format!("{}::{}", fqcn, prop_name);
+        let key = format!("{fqcn}::{prop_name}");
         let id = self.symbol_interner.intern_str(&key);
         self.referenced_properties.insert(id);
     }
@@ -1216,7 +1216,7 @@ impl Codebase {
     }
 
     pub fn is_property_referenced(&self, fqcn: &str, prop_name: &str) -> bool {
-        let key = format!("{}::{}", fqcn, prop_name);
+        let key = format!("{fqcn}::{prop_name}");
         match self.symbol_interner.get_id(&key) {
             Some(id) => self.referenced_properties.contains(&id),
             None => false,
@@ -1265,7 +1265,7 @@ impl Codebase {
         start: u32,
         end: u32,
     ) {
-        let key = format!("{}::{}", fqcn, prop_name);
+        let key = format!("{fqcn}::{prop_name}");
         self.ensure_expanded();
         let sym_id = self.symbol_interner.intern_str(&key);
         let file_id = self.file_interner.intern(file);
@@ -1445,6 +1445,34 @@ impl Codebase {
             let parents = self.collect_interface_ancestors(fqcn);
             if let Some(mut iface) = self.interfaces.get_mut(fqcn.as_ref()) {
                 iface.all_parents = parents;
+            }
+        }
+
+        // 3. Resolve @psalm-import-type declarations
+        // Collect imports first to avoid holding two locks simultaneously.
+        type PendingImports = Vec<(Arc<str>, Vec<(Arc<str>, Arc<str>, Arc<str>)>)>;
+        let pending: PendingImports = self
+            .classes
+            .iter()
+            .filter(|e| !e.pending_import_types.is_empty())
+            .map(|e| (e.key().clone(), e.pending_import_types.clone()))
+            .collect();
+        for (dst_fqcn, imports) in pending {
+            let mut resolved: std::collections::HashMap<Arc<str>, mir_types::Union> =
+                std::collections::HashMap::new();
+            for (local, original, from_class) in &imports {
+                if let Some(src_cls) = self.classes.get(from_class.as_ref()) {
+                    if let Some(ty) = src_cls.type_aliases.get(original.as_ref()) {
+                        resolved.insert(local.clone(), ty.clone());
+                    }
+                }
+            }
+            if !resolved.is_empty() {
+                if let Some(mut dst_cls) = self.classes.get_mut(dst_fqcn.as_ref()) {
+                    for (k, v) in resolved {
+                        dst_cls.type_aliases.insert(k, v);
+                    }
+                }
             }
         }
 

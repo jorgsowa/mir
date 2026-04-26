@@ -11,7 +11,9 @@ use crate::generic::{check_template_bounds, infer_template_bindings};
 use crate::symbol::SymbolKind;
 use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 
-use super::args::{check_args, spread_element_type, CheckArgsParams};
+use super::args::{
+    check_args, expr_can_be_passed_by_reference, spread_element_type, CheckArgsParams,
+};
 use super::CallAnalyzer;
 
 impl CallAnalyzer {
@@ -141,6 +143,11 @@ impl CallAnalyzer {
                         .iter()
                         .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
                         .collect::<Vec<_>>(),
+                    arg_can_be_byref: &call
+                        .args
+                        .iter()
+                        .map(|a| expr_can_be_passed_by_reference(&a.value))
+                        .collect::<Vec<_>>(),
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
                 },
@@ -187,8 +194,8 @@ impl CallAnalyzer {
                     ea.emit(
                         IssueKind::InvalidTemplateParam {
                             name: name.to_string(),
-                            expected_bound: format!("{}", bound),
-                            actual: format!("{}", inferred),
+                            expected_bound: format!("{bound}"),
+                            actual: format!("{inferred}"),
                         },
                         Severity::Error,
                         span,

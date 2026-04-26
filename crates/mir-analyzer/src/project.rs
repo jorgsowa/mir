@@ -183,7 +183,7 @@ impl ProjectAnalyzer {
                                 StmtKind::Class(decl) => {
                                     if let Some(n) = decl.name {
                                         let fqcn = match ns {
-                                            Some(ns) => format!("{}\\{}", ns, n),
+                                            Some(ns) => format!("{ns}\\{n}"),
                                             None => n.to_string(),
                                         };
                                         self.codebase
@@ -286,7 +286,12 @@ impl ProjectAnalyzer {
             })
             .collect();
 
+        let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
+            std::collections::HashSet::new();
         for (file_parse_errors, issues) in pass1_results {
+            for issue in &file_parse_errors {
+                files_with_parse_errors.insert(issue.location.file.clone());
+            }
             parse_errors.extend(file_parse_errors);
             all_issues.extend(issues);
         }
@@ -318,6 +323,7 @@ impl ProjectAnalyzer {
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
         let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
             .par_iter()
+            .filter(|(file, _)| !files_with_parse_errors.contains(file))
             .map(|(file, src)| {
                 let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
                 let result = if let Some(cache) = &self.cache {
@@ -500,14 +506,19 @@ impl ProjectAnalyzer {
             self.codebase.finalize();
         }
 
-        let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
-        let (body_issues, symbols) = driver.analyze_bodies(
-            &parsed.program,
-            file.clone(),
-            new_content,
-            &parsed.source_map,
-        );
-        all_issues.extend(body_issues);
+        let symbols = if parsed.errors.is_empty() {
+            let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
+            let (body_issues, symbols) = driver.analyze_bodies(
+                &parsed.program,
+                file.clone(),
+                new_content,
+                &parsed.source_map,
+            );
+            all_issues.extend(body_issues);
+            symbols
+        } else {
+            Vec::new()
+        };
 
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
@@ -529,6 +540,22 @@ impl ProjectAnalyzer {
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse(&arena, source);
         let mut all_issues = Vec::new();
+        for err in &result.errors {
+            all_issues.push(Issue::new(
+                mir_issues::IssueKind::ParseError {
+                    message: err.to_string(),
+                },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line: 1,
+                    col_start: 0,
+                    col_end: 0,
+                },
+            ));
+        }
+        if !result.errors.is_empty() {
+            return AnalysisResult::build(all_issues, std::collections::HashMap::new(), Vec::new());
+        }
         let collector =
             DefinitionCollector::new(&analyzer.codebase, file.clone(), source, &result.source_map);
         all_issues.extend(collector.collect(&result.program));
