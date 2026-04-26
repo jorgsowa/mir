@@ -193,6 +193,16 @@ pub struct Codebase {
     /// are available.
     pub known_symbols: DashSet<Arc<str>>,
 
+    /// Secondary index: function short name → FQN. Populated in parallel with
+    /// `functions` during Pass 1 and stub loading. Allows O(1) resolution of
+    /// unqualified function calls instead of a full `functions.iter()` scan.
+    pub fn_by_short_name: DashMap<Arc<str>, Arc<str>>,
+
+    /// Secondary index: class short name → FQCN. Populated in parallel with
+    /// `classes` during Pass 1 and stub loading. Allows O(1) resolution of
+    /// unqualified class names instead of a full `classes.iter()` scan.
+    pub class_by_short_name: DashMap<Arc<str>, Arc<str>>,
+
     /// Per-file `use` alias maps: alias → FQCN.  Populated during Pass 1.
     ///
     /// Key: absolute file path (as `Arc<str>`).
@@ -234,6 +244,8 @@ impl Codebase {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(cls.fqcn.clone(), f.clone());
             }
+            self.class_by_short_name
+                .insert(cls.short_name.clone(), cls.fqcn.clone());
             self.classes.insert(cls.fqcn.clone(), cls);
         }
         for iface in slice.interfaces {
@@ -258,6 +270,8 @@ impl Codebase {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(func.fqn.clone(), f.clone());
             }
+            self.fn_by_short_name
+                .insert(func.short_name.clone(), func.fqn.clone());
             self.functions.insert(func.fqn.clone(), func);
         }
         for (name, ty) in slice.constants {
@@ -414,11 +428,23 @@ impl Codebase {
 
         // Remove each symbol from its respective map and from symbol_to_file
         for sym in &symbols {
-            self.classes.remove(sym.as_ref());
+            if let Some((_, cls)) = self.classes.remove(sym.as_ref()) {
+                // Only evict the short-name entry when it points at this FQCN, so that
+                // a class with the same short name in another file is not affected.
+                self.class_by_short_name
+                    .remove_if(cls.short_name.as_ref(), |_, fqcn| {
+                        fqcn.as_ref() == cls.fqcn.as_ref()
+                    });
+            }
             self.interfaces.remove(sym.as_ref());
             self.traits.remove(sym.as_ref());
             self.enums.remove(sym.as_ref());
-            self.functions.remove(sym.as_ref());
+            if let Some((_, func)) = self.functions.remove(sym.as_ref()) {
+                self.fn_by_short_name
+                    .remove_if(func.short_name.as_ref(), |_, fqn| {
+                        fqn.as_ref() == func.fqn.as_ref()
+                    });
+            }
             self.constants.remove(sym.as_ref());
             self.symbol_to_file.remove(sym.as_ref());
             self.known_symbols.remove(sym.as_ref());
