@@ -1,4 +1,7 @@
-# CLI Reference
+---
+title: CLI Reference
+description: All flags, output formats, and exit codes for the mir command.
+---
 
 ## Synopsis
 
@@ -55,12 +58,9 @@ mir src/
 # CI with GitHub Actions annotations
 mir --format github --no-progress src/
 
-# Generate a baseline to suppress existing issues
-mir --set-baseline psalm-baseline.xml src/
+# JUnit XML output for CI systems
+mir --format junit --no-progress src/ > results.xml
 
-# Subsequent runs suppress baselined issues
-mir --baseline psalm-baseline.xml src/
-
-# After fixing issues, shrink the baseline
-mir --update-baseline --baseline psalm-baseline.xml src/
+# Target a specific PHP version
+mir --php-version 8.2 src/
 ```

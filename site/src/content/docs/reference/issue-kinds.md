@@ -1,4 +1,7 @@
-# Issue Kinds
+---
+title: Issue Kinds
+description: All issue types mir can emit, grouped by category.
+---
 
 All issue types mir can emit, grouped by category.
 

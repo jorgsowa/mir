@@ -1,4 +1,7 @@
-# Docblock Annotations
+---
+title: Docblock Annotations
+description: Supported docblock annotations for type information and suppression.
+---
 
 mir understands the following docblock annotations.
 

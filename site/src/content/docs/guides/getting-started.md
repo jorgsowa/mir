@@ -1,4 +1,7 @@
-# Getting Started
+---
+title: Getting Started
+description: Install mir and run your first analysis.
+---
 
 This guide walks you through installing mir, running your first analysis, and understanding the results.
 
@@ -40,15 +43,17 @@ cargo build --release
 # Binary is at target/release/mir
 ```
 
-> **Important:** The `--recurse-submodules` flag initializes the
-> [phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) submodule that
-> provides PHP built-in definitions. Without it the build succeeds but mir will
-> not recognise any PHP built-in functions, classes, or constants.
->
-> If you already cloned without it:
-> ```bash
-> git submodule update --init
-> ```
+:::note
+The `--recurse-submodules` flag initializes the
+[phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) submodule that
+provides PHP built-in definitions. Without it the build succeeds but mir will
+not recognise any PHP built-in functions, classes, or constants.
+
+If you already cloned without it:
+```bash
+git submodule update --init
+```
+:::
 
 You can then copy the binary to a directory on your `$PATH`:
 
@@ -120,7 +125,7 @@ The most common issue kinds you will encounter:
 | `PossiblyInvalidArrayAccess` | Array access on a value that may be `false` or `null` |
 | `NullableReturnStatement` | A nullable value returned from a non-nullable return type |
 
-See [Issue Kinds](issue-kinds.md) for the full list.
+See [Issue Kinds](/mir/reference/issues/) for the full list.
 
 ## Next steps
 
@@ -175,4 +180,4 @@ For large codebases, enable the incremental cache to speed up repeated runs:
 mir --cache-dir .mir-cache src/
 ```
 
-See the [CLI Reference](cli.md) for the full list of options and the [Docblock Annotations](docblock.md) page for how to annotate your PHP code with type information.
+See the [CLI Reference](/mir/reference/cli/) for the full list of options and the [Docblock Annotations](/mir/reference/docblock/) page for how to annotate your PHP code with type information.

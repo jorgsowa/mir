@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'docs/**'
-      - 'book.toml'
+      - 'site/**'
   workflow_dispatch:
 
 permissions:
@@ -26,18 +25,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install mdBook
-        uses: peaceiris/actions-mdbook@v2
+      - uses: actions/setup-node@v4
         with:
-          mdbook-version: '0.5.2'
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: site
 
       - name: Build
-        run: mdbook build
+        run: npm run build
+        working-directory: site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./book
+          path: ./site/dist
 
       - name: Deploy to GitHub Pages
         id: deployment
