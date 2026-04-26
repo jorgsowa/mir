@@ -21,7 +21,7 @@ use Composer\Script\Event;
  */
 final class Installer
 {
-    private const PACKAGE = 'mir-php/analyzer';
+    private const PACKAGE = 'open-mir/analyzer';
     private const REPO = 'jorgsowa/mir';
     private const VERSION_MARKER = '.mir-version';
 
