@@ -199,6 +199,12 @@ pub struct ClassStorage {
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub location: Option<Location>,
+    /// Type aliases declared on this class via `@psalm-type` / `@phpstan-type`.
+    #[serde(default)]
+    pub type_aliases: std::collections::HashMap<Arc<str>, Union>,
+    /// Raw import-type declarations (`(local_name, original_name, from_class)`) — resolved during finalization.
+    #[serde(default)]
+    pub pending_import_types: Vec<(Arc<str>, Arc<str>, Arc<str>)>,
 }
 
 impl ClassStorage {
@@ -253,6 +259,12 @@ pub struct TraitStorage {
     /// Traits used by this trait (`use OtherTrait;` inside a trait body).
     pub traits: Vec<Arc<str>>,
     pub location: Option<Location>,
+    /// `@psalm-require-extends` / `@phpstan-require-extends` — FQCNs that using classes must extend.
+    #[serde(default)]
+    pub require_extends: Vec<Arc<str>>,
+    /// `@psalm-require-implements` / `@phpstan-require-implements` — FQCNs that using classes must implement.
+    #[serde(default)]
+    pub require_implements: Vec<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------

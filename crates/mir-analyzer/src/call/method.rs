@@ -12,8 +12,8 @@ use crate::generic::{build_class_bindings, check_template_bounds, infer_template
 use crate::symbol::SymbolKind;
 
 use super::args::{
-    check_args, check_method_visibility, spread_element_type, substitute_static_in_return,
-    CheckArgsParams,
+    check_args, check_method_visibility, expr_can_be_passed_by_reference, spread_element_type,
+    substitute_static_in_return, CheckArgsParams,
 };
 use super::CallAnalyzer;
 
@@ -206,6 +206,11 @@ fn resolve_method_return<'a, 'arena, 'src>(
             .iter()
             .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
             .collect();
+        let arg_can_be_byref: Vec<bool> = call
+            .args
+            .iter()
+            .map(|a| expr_can_be_passed_by_reference(&a.value))
+            .collect();
         check_args(
             ea,
             CheckArgsParams {
@@ -214,6 +219,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
                 arg_types,
                 arg_spans,
                 arg_names: &arg_names,
+                arg_can_be_byref: &arg_can_be_byref,
                 call_span: span,
                 has_spread: call.args.iter().any(|a| a.unpack),
             },
@@ -251,8 +257,8 @@ fn resolve_method_return<'a, 'arena, 'src>(
                 ea.emit(
                     IssueKind::InvalidTemplateParam {
                         name: name.to_string(),
-                        expected_bound: format!("{}", bound),
-                        actual: format!("{}", inferred),
+                        expected_bound: format!("{bound}"),
+                        actual: format!("{inferred}"),
                     },
                     Severity::Error,
                     span,

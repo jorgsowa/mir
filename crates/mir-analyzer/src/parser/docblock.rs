@@ -152,6 +152,11 @@ impl DocblockParser {
                     name: n.to_string(),
                     type_expr: type_str.unwrap_or("").to_string(),
                 }),
+                PhpDocTag::ImportType { body } => {
+                    if let Some(import) = parse_import_type(body) {
+                        result.import_types.push(import);
+                    }
+                }
                 PhpDocTag::Internal => result.is_internal = true,
                 PhpDocTag::Pure => result.is_pure = true,
                 PhpDocTag::Immutable => result.is_immutable = true,
@@ -212,6 +217,22 @@ impl DocblockParser {
                             result.methods.push(method);
                         }
                     }
+                    "psalm-require-extends" | "phpstan-require-extends" => {
+                        if let Some(b) = body {
+                            let cls = b.split_whitespace().next().unwrap_or("").trim().to_string();
+                            if !cls.is_empty() {
+                                result.require_extends.push(cls);
+                            }
+                        }
+                    }
+                    "psalm-require-implements" | "phpstan-require-implements" => {
+                        if let Some(b) = body {
+                            let cls = b.split_whitespace().next().unwrap_or("").trim().to_string();
+                            if !cls.is_empty() {
+                                result.require_implements.push(cls);
+                            }
+                        }
+                    }
                     _ => {}
                 },
                 _ => {}
@@ -255,6 +276,16 @@ pub struct DocMethodParam {
 pub struct DocTypeAlias {
     pub name: String,
     pub type_expr: String,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct DocImportType {
+    /// The name exported by the source class (the original alias name).
+    pub original: String,
+    /// The local name to use in this class (`as LocalAlias`); defaults to `original`.
+    pub local: String,
+    /// The FQCN of the class to import the type from.
+    pub from_class: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -307,15 +338,25 @@ pub struct ParsedDocblock {
     pub methods: Vec<DocMethod>,
     /// `@psalm-type Alias = TypeExpr` / `@phpstan-type Alias = TypeExpr`
     pub type_aliases: Vec<DocTypeAlias>,
+    /// `@psalm-import-type Alias from SourceClass` / `@phpstan-import-type ...`
+    pub import_types: Vec<DocImportType>,
+    /// `@psalm-require-extends ClassName` / `@phpstan-require-extends ClassName`
+    pub require_extends: Vec<String>,
+    /// `@psalm-require-implements InterfaceName` / `@phpstan-require-implements InterfaceName`
+    pub require_implements: Vec<String>,
 }
 
 impl ParsedDocblock {
     /// Returns the type for a given parameter name (strips leading `$`).
+    ///
+    /// Uses the **last** match so that `@psalm-param` / `@phpstan-param` (which
+    /// php-rs-parser maps to the same `Param` variant as `@param`) overrides a
+    /// preceding plain `@param` annotation.
     pub fn get_param_type(&self, name: &str) -> Option<&Union> {
         let name = name.trim_start_matches('$');
         self.params
             .iter()
-            .find(|(n, _)| n.trim_start_matches('$') == name)
+            .rfind(|(n, _)| n.trim_start_matches('$') == name)
             .map(|(_, ty)| ty)
     }
 }
@@ -549,6 +590,35 @@ fn extract_description(text: &str) -> String {
         }
     }
     desc_lines.join(" ")
+}
+
+/// Parse `@psalm-import-type` body.
+///
+/// Formats:
+/// - `AliasName from SourceClass`
+/// - `AliasName as LocalAlias from SourceClass`
+fn parse_import_type(body: &str) -> Option<DocImportType> {
+    // Split on " from " (with spaces to avoid matching partial words)
+    let (before_from, from_class_raw) = body.split_once(" from ")?;
+    let from_class = from_class_raw.trim().trim_start_matches('\\').to_string();
+    if from_class.is_empty() {
+        return None;
+    }
+    // Check for " as " in before_from
+    let (original, local) = if let Some((orig, loc)) = before_from.split_once(" as ") {
+        (orig.trim().to_string(), loc.trim().to_string())
+    } else {
+        let name = before_from.trim().to_string();
+        (name.clone(), name)
+    };
+    if original.is_empty() || local.is_empty() {
+        return None;
+    }
+    Some(DocImportType {
+        original,
+        local,
+        from_class,
+    })
 }
 
 fn parse_param_line(s: &str) -> Option<(String, String)> {
@@ -884,6 +954,40 @@ mod tests {
         assert_eq!(parsed.type_aliases.len(), 1);
         assert_eq!(parsed.type_aliases[0].name, "MyAlias");
         assert_eq!(parsed.type_aliases[0].type_expr, "string|int");
+    }
+
+    #[test]
+    fn parse_import_type_no_as() {
+        let doc = "/** @psalm-import-type UserId from UserRepository */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.import_types.len(), 1);
+        assert_eq!(parsed.import_types[0].original, "UserId");
+        assert_eq!(parsed.import_types[0].local, "UserId");
+        assert_eq!(parsed.import_types[0].from_class, "UserRepository");
+    }
+
+    #[test]
+    fn parse_import_type_with_as() {
+        let doc = "/** @psalm-import-type UserId as LocalId from UserRepository */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.import_types.len(), 1);
+        assert_eq!(parsed.import_types[0].original, "UserId");
+        assert_eq!(parsed.import_types[0].local, "LocalId");
+        assert_eq!(parsed.import_types[0].from_class, "UserRepository");
+    }
+
+    #[test]
+    fn parse_require_extends() {
+        let doc = "/** @psalm-require-extends Model */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.require_extends, vec!["Model".to_string()]);
+    }
+
+    #[test]
+    fn parse_require_implements() {
+        let doc = "/** @psalm-require-implements Countable */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.require_implements, vec!["Countable".to_string()]);
     }
 
     #[test]

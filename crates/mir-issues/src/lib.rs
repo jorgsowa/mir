@@ -126,6 +126,24 @@ pub enum IssueKind {
         expected: String,
         actual: String,
     },
+    TooFewArguments {
+        fn_name: String,
+        expected: usize,
+        actual: usize,
+    },
+    TooManyArguments {
+        fn_name: String,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidNamedArgument {
+        fn_name: String,
+        name: String,
+    },
+    InvalidPassByReference {
+        fn_name: String,
+        param: String,
+    },
     InvalidPropertyAssignment {
         property: String,
         expected: String,
@@ -310,11 +328,17 @@ pub enum IssueKind {
     CircularInheritance {
         class: String,
     },
+
+    // --- Trait constraints --------------------------------------------------
+    InvalidTraitUse {
+        trait_name: String,
+        reason: String,
+    },
 }
 
 fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
     match message.as_deref().filter(|m| !m.is_empty()) {
-        Some(msg) => format!("{}: {}", base, msg),
+        Some(msg) => format!("{base}: {msg}"),
         None => base,
     }
 }
@@ -332,6 +356,10 @@ impl IssueKind {
             | IssueKind::UndefinedConstant { .. }
             | IssueKind::InvalidReturnType { .. }
             | IssueKind::InvalidArgument { .. }
+            | IssueKind::TooFewArguments { .. }
+            | IssueKind::TooManyArguments { .. }
+            | IssueKind::InvalidNamedArgument { .. }
+            | IssueKind::InvalidPassByReference { .. }
             | IssueKind::InvalidThrow { .. }
             | IssueKind::UnimplementedAbstractMethod { .. }
             | IssueKind::UnimplementedInterfaceMethod { .. }
@@ -345,7 +373,8 @@ impl IssueKind {
             | IssueKind::TaintedHtml
             | IssueKind::TaintedSql
             | IssueKind::TaintedShell
-            | IssueKind::CircularInheritance { .. } => Severity::Error,
+            | IssueKind::CircularInheritance { .. }
+            | IssueKind::InvalidTraitUse { .. } => Severity::Error,
 
             // Warnings (shown at default error level)
             IssueKind::NullArgument { .. }
@@ -423,6 +452,10 @@ impl IssueKind {
             IssueKind::NullableReturnStatement { .. } => "NullableReturnStatement",
             IssueKind::InvalidReturnType { .. } => "InvalidReturnType",
             IssueKind::InvalidArgument { .. } => "InvalidArgument",
+            IssueKind::TooFewArguments { .. } => "TooFewArguments",
+            IssueKind::TooManyArguments { .. } => "TooManyArguments",
+            IssueKind::InvalidNamedArgument { .. } => "InvalidNamedArgument",
+            IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
             IssueKind::InvalidCast { .. } => "InvalidCast",
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
@@ -470,6 +503,7 @@ impl IssueKind {
             IssueKind::MixedMethodCall { .. } => "MixedMethodCall",
             IssueKind::MixedPropertyFetch { .. } => "MixedPropertyFetch",
             IssueKind::CircularInheritance { .. } => "CircularInheritance",
+            IssueKind::InvalidTraitUse { .. } => "InvalidTraitUse",
         }
     }
 
@@ -483,57 +517,48 @@ impl IssueKind {
                     "$this cannot be used outside of a class".to_string()
                 }
             }
-            IssueKind::UndefinedVariable { name } => format!("Variable ${} is not defined", name),
-            IssueKind::UndefinedFunction { name } => format!("Function {}() is not defined", name),
+            IssueKind::UndefinedVariable { name } => format!("Variable ${name} is not defined"),
+            IssueKind::UndefinedFunction { name } => format!("Function {name}() is not defined"),
             IssueKind::UndefinedMethod { class, method } => {
-                format!("Method {}::{}() does not exist", class, method)
+                format!("Method {class}::{method}() does not exist")
             }
-            IssueKind::UndefinedClass { name } => format!("Class {} does not exist", name),
+            IssueKind::UndefinedClass { name } => format!("Class {name} does not exist"),
             IssueKind::UndefinedProperty { class, property } => {
-                format!("Property {}::${} does not exist", class, property)
+                format!("Property {class}::${property} does not exist")
             }
-            IssueKind::UndefinedConstant { name } => format!("Constant {} is not defined", name),
+            IssueKind::UndefinedConstant { name } => format!("Constant {name} is not defined"),
             IssueKind::PossiblyUndefinedVariable { name } => {
-                format!("Variable ${} might not be defined", name)
+                format!("Variable ${name} might not be defined")
             }
 
             IssueKind::NullArgument { param, fn_name } => {
-                format!("Argument ${} of {}() cannot be null", param, fn_name)
+                format!("Argument ${param} of {fn_name}() cannot be null")
             }
             IssueKind::NullPropertyFetch { property } => {
-                format!("Cannot access property ${} on null", property)
+                format!("Cannot access property ${property} on null")
             }
             IssueKind::NullMethodCall { method } => {
-                format!("Cannot call method {}() on null", method)
+                format!("Cannot call method {method}() on null")
             }
             IssueKind::NullArrayAccess => "Cannot access array on null".to_string(),
             IssueKind::PossiblyNullArgument { param, fn_name } => {
-                format!("Argument ${} of {}() might be null", param, fn_name)
+                format!("Argument ${param} of {fn_name}() might be null")
             }
             IssueKind::PossiblyNullPropertyFetch { property } => {
-                format!(
-                    "Cannot access property ${} on possibly null value",
-                    property
-                )
+                format!("Cannot access property ${property} on possibly null value")
             }
             IssueKind::PossiblyNullMethodCall { method } => {
-                format!("Cannot call method {}() on possibly null value", method)
+                format!("Cannot call method {method}() on possibly null value")
             }
             IssueKind::PossiblyNullArrayAccess => {
                 "Cannot access array on possibly null value".to_string()
             }
             IssueKind::NullableReturnStatement { expected, actual } => {
-                format!(
-                    "Return type '{}' is not compatible with declared '{}'",
-                    actual, expected
-                )
+                format!("Return type '{actual}' is not compatible with declared '{expected}'")
             }
 
             IssueKind::InvalidReturnType { expected, actual } => {
-                format!(
-                    "Return type '{}' is not compatible with declared '{}'",
-                    actual, expected
-                )
+                format!("Return type '{actual}' is not compatible with declared '{expected}'")
             }
             IssueKind::InvalidArgument {
                 param,
@@ -541,9 +566,35 @@ impl IssueKind {
                 expected,
                 actual,
             } => {
+                format!("Argument ${param} of {fn_name}() expects '{expected}', got '{actual}'")
+            }
+            IssueKind::TooFewArguments {
+                fn_name,
+                expected,
+                actual,
+            } => {
                 format!(
-                    "Argument ${} of {}() expects '{}', got '{}'",
-                    param, fn_name, expected, actual
+                    "Too few arguments for {}(): expected {}, got {}",
+                    fn_name, expected, actual
+                )
+            }
+            IssueKind::TooManyArguments {
+                fn_name,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Too many arguments for {}(): expected {}, got {}",
+                    fn_name, expected, actual
+                )
+            }
+            IssueKind::InvalidNamedArgument { fn_name, name } => {
+                format!("{}() has no parameter named ${}", fn_name, name)
+            }
+            IssueKind::InvalidPassByReference { fn_name, param } => {
+                format!(
+                    "Argument ${} of {}() must be passed by reference",
+                    param, fn_name
                 )
             }
             IssueKind::InvalidPropertyAssignment {
@@ -551,25 +602,16 @@ impl IssueKind {
                 expected,
                 actual,
             } => {
-                format!(
-                    "Property ${} expects '{}', cannot assign '{}'",
-                    property, expected, actual
-                )
+                format!("Property ${property} expects '{expected}', cannot assign '{actual}'")
             }
             IssueKind::InvalidCast { from, to } => {
-                format!("Cannot cast '{}' to '{}'", from, to)
+                format!("Cannot cast '{from}' to '{to}'")
             }
             IssueKind::InvalidOperand { op, left, right } => {
-                format!(
-                    "Operator '{}' not supported between '{}' and '{}'",
-                    op, left, right
-                )
+                format!("Operator '{op}' not supported between '{left}' and '{right}'")
             }
             IssueKind::MismatchingDocblockReturnType { declared, inferred } => {
-                format!(
-                    "Docblock return type '{}' does not match inferred '{}'",
-                    declared, inferred
-                )
+                format!("Docblock return type '{declared}' does not match inferred '{inferred}'")
             }
             IssueKind::MismatchingDocblockParamType {
                 param,
@@ -577,90 +619,73 @@ impl IssueKind {
                 inferred,
             } => {
                 format!(
-                    "Docblock type '{}' for ${} does not match inferred '{}'",
-                    declared, param, inferred
+                    "Docblock type '{declared}' for ${param} does not match inferred '{inferred}'"
                 )
             }
 
             IssueKind::InvalidArrayOffset { expected, actual } => {
-                format!("Array offset expects '{}', got '{}'", expected, actual)
+                format!("Array offset expects '{expected}', got '{actual}'")
             }
             IssueKind::NonExistentArrayOffset { key } => {
-                format!("Array offset '{}' does not exist", key)
+                format!("Array offset '{key}' does not exist")
             }
             IssueKind::PossiblyInvalidArrayOffset { expected, actual } => {
-                format!(
-                    "Array offset might be invalid: expects '{}', got '{}'",
-                    expected, actual
-                )
+                format!("Array offset might be invalid: expects '{expected}', got '{actual}'")
             }
 
             IssueKind::RedundantCondition { ty } => {
-                format!("Condition is always true/false for type '{}'", ty)
+                format!("Condition is always true/false for type '{ty}'")
             }
             IssueKind::RedundantCast { from, to } => {
-                format!("Casting '{}' to '{}' is redundant", from, to)
+                format!("Casting '{from}' to '{to}' is redundant")
             }
             IssueKind::UnnecessaryVarAnnotation { var } => {
-                format!("@var annotation for ${} is unnecessary", var)
+                format!("@var annotation for ${var} is unnecessary")
             }
             IssueKind::TypeDoesNotContainType { left, right } => {
-                format!("Type '{}' can never contain type '{}'", left, right)
+                format!("Type '{left}' can never contain type '{right}'")
             }
 
-            IssueKind::UnusedVariable { name } => format!("Variable ${} is never read", name),
-            IssueKind::UnusedParam { name } => format!("Parameter ${} is never used", name),
+            IssueKind::UnusedVariable { name } => format!("Variable ${name} is never read"),
+            IssueKind::UnusedParam { name } => format!("Parameter ${name} is never used"),
             IssueKind::UnreachableCode => "Unreachable code detected".to_string(),
             IssueKind::UnusedMethod { class, method } => {
-                format!("Private method {}::{}() is never called", class, method)
+                format!("Private method {class}::{method}() is never called")
             }
             IssueKind::UnusedProperty { class, property } => {
-                format!("Private property {}::${} is never read", class, property)
+                format!("Private property {class}::${property} is never read")
             }
             IssueKind::UnusedFunction { name } => {
-                format!("Function {}() is never called", name)
+                format!("Function {name}() is never called")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
-                format!(
-                    "Class {} must implement abstract method {}()",
-                    class, method
-                )
+                format!("Class {class} must implement abstract method {method}()")
             }
             IssueKind::UnimplementedInterfaceMethod {
                 class,
                 interface,
                 method,
             } => {
-                format!(
-                    "Class {} must implement {}::{}() from interface",
-                    class, interface, method
-                )
+                format!("Class {class} must implement {interface}::{method}() from interface")
             }
             IssueKind::MethodSignatureMismatch {
                 class,
                 method,
                 detail,
             } => {
-                format!(
-                    "Method {}::{}() signature mismatch: {}",
-                    class, method, detail
-                )
+                format!("Method {class}::{method}() signature mismatch: {detail}")
             }
             IssueKind::OverriddenMethodAccess { class, method } => {
-                format!(
-                    "Method {}::{}() overrides with less visibility",
-                    class, method
-                )
+                format!("Method {class}::{method}() overrides with less visibility")
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
                 format!(
-                    "Cannot assign to readonly property {}::${} outside of constructor",
-                    class, property
+                    "Cannot assign to readonly property {class}::${property} outside of constructor"
                 )
             }
             IssueKind::FinalClassExtended { parent, child } => {
-                format!("Class {} cannot extend final class {}", child, parent)
+                format!("Class {child} cannot extend final class {parent}")
             }
             IssueKind::InvalidTemplateParam {
                 name,
@@ -668,14 +693,12 @@ impl IssueKind {
                 actual,
             } => {
                 format!(
-                    "Template type '{}' inferred as '{}' does not satisfy bound '{}'",
-                    name, actual, expected_bound
+                    "Template type '{name}' inferred as '{actual}' does not satisfy bound '{expected_bound}'"
                 )
             }
             IssueKind::ShadowedTemplateParam { name } => {
                 format!(
-                    "Method template parameter '{}' shadows class-level template parameter with the same name",
-                    name
+                    "Method template parameter '{name}' shadows class-level template parameter with the same name"
                 )
             }
             IssueKind::FinalMethodOverridden {
@@ -683,13 +706,10 @@ impl IssueKind {
                 method,
                 parent,
             } => {
-                format!(
-                    "Method {}::{}() cannot override final method from {}",
-                    class, method, parent
-                )
+                format!("Method {class}::{method}() cannot override final method from {parent}")
             }
 
-            IssueKind::TaintedInput { sink } => format!("Tainted input reaching sink '{}'", sink),
+            IssueKind::TaintedInput { sink } => format!("Tainted input reaching sink '{sink}'"),
             IssueKind::TaintedHtml => "Tainted HTML output — possible XSS".to_string(),
             IssueKind::TaintedSql => "Tainted SQL query — possible SQL injection".to_string(),
             IssueKind::TaintedShell => {
@@ -697,7 +717,7 @@ impl IssueKind {
             }
 
             IssueKind::DeprecatedCall { name, message } => {
-                let base = format!("Call to deprecated function {}", name);
+                let base = format!("Call to deprecated function {name}");
                 append_deprecation_message(base, message)
             }
             IssueKind::DeprecatedMethodCall {
@@ -705,7 +725,7 @@ impl IssueKind {
                 method,
                 message,
             } => {
-                let base = format!("Call to deprecated method {}::{}", class, method);
+                let base = format!("Call to deprecated method {class}::{method}");
                 append_deprecation_message(base, message)
             }
             IssueKind::DeprecatedMethod {
@@ -713,47 +733,47 @@ impl IssueKind {
                 method,
                 message,
             } => {
-                let base = format!("Method {}::{}() is deprecated", class, method);
+                let base = format!("Method {class}::{method}() is deprecated");
                 append_deprecation_message(base, message)
             }
             IssueKind::DeprecatedClass { name, message } => {
-                let base = format!("Class {} is deprecated", name);
+                let base = format!("Class {name} is deprecated");
                 append_deprecation_message(base, message)
             }
             IssueKind::InternalMethod { class, method } => {
-                format!("Method {}::{}() is marked @internal", class, method)
+                format!("Method {class}::{method}() is marked @internal")
             }
             IssueKind::MissingReturnType { fn_name } => {
-                format!("Function {}() has no return type annotation", fn_name)
+                format!("Function {fn_name}() has no return type annotation")
             }
             IssueKind::MissingParamType { fn_name, param } => {
-                format!(
-                    "Parameter ${} of {}() has no type annotation",
-                    param, fn_name
-                )
+                format!("Parameter ${param} of {fn_name}() has no type annotation")
             }
             IssueKind::InvalidThrow { ty } => {
-                format!("Thrown type '{}' does not extend Throwable", ty)
+                format!("Thrown type '{ty}' does not extend Throwable")
             }
             IssueKind::MissingThrowsDocblock { class } => {
-                format!("Exception {} is thrown but not declared in @throws", class)
+                format!("Exception {class} is thrown but not declared in @throws")
             }
-            IssueKind::ParseError { message } => format!("Parse error: {}", message),
-            IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {}", message),
+            IssueKind::ParseError { message } => format!("Parse error: {message}"),
+            IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),
             IssueKind::MixedArgument { param, fn_name } => {
-                format!("Argument ${} of {}() is mixed", param, fn_name)
+                format!("Argument ${param} of {fn_name}() is mixed")
             }
             IssueKind::MixedAssignment { var } => {
-                format!("Variable ${} is assigned a mixed type", var)
+                format!("Variable ${var} is assigned a mixed type")
             }
             IssueKind::MixedMethodCall { method } => {
-                format!("Method {}() called on mixed type", method)
+                format!("Method {method}() called on mixed type")
             }
             IssueKind::MixedPropertyFetch { property } => {
-                format!("Property ${} fetched on mixed type", property)
+                format!("Property ${property} fetched on mixed type")
             }
             IssueKind::CircularInheritance { class } => {
-                format!("Class {} has a circular inheritance chain", class)
+                format!("Class {class} has a circular inheritance chain")
+            }
+            IssueKind::InvalidTraitUse { trait_name, reason } => {
+                format!("Trait {trait_name} used incorrectly: {reason}")
             }
         }
     }

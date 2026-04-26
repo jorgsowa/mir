@@ -25,10 +25,7 @@ fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
 fn make_psr4(root: &TempDir, prefix: &str, subdir: &str) -> Arc<mir_analyzer::composer::Psr4Map> {
     fs::write(
         root.path().join("composer.json"),
-        format!(
-            r#"{{"autoload":{{"psr-4":{{"{}":"{}/"}}}}}}"#,
-            prefix, subdir
-        ),
+        format!(r#"{{"autoload":{{"psr-4":{{"{prefix}":"{subdir}/"}}}}}}"#),
     )
     .unwrap();
     let map =
@@ -75,8 +72,7 @@ fn lazy_loads_parent_class_from_psr4() {
 
     assert!(
         undefined_method_issues.is_empty(),
-        "hello() should be found after lazy-loading Base.php; got: {:?}",
-        undefined_method_issues
+        "hello() should be found after lazy-loading Base.php; got: {undefined_method_issues:?}"
     );
 }
 
@@ -116,8 +112,7 @@ fn lazy_loads_interface_from_psr4() {
 
     assert!(
         undefined_class.is_empty(),
-        "Greetable interface should be found via lazy loading; got: {:?}",
-        undefined_class
+        "Greetable interface should be found via lazy loading; got: {undefined_class:?}"
     );
 }
 

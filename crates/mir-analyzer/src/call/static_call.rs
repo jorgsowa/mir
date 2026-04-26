@@ -10,7 +10,10 @@ use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
 use crate::symbol::SymbolKind;
 
-use super::args::{check_args, spread_element_type, substitute_static_in_return, CheckArgsParams};
+use super::args::{
+    check_args, expr_can_be_passed_by_reference, spread_element_type, substitute_static_in_return,
+    CheckArgsParams,
+};
 use super::CallAnalyzer;
 
 impl CallAnalyzer {
@@ -71,6 +74,11 @@ impl CallAnalyzer {
                 .iter()
                 .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
                 .collect();
+            let arg_can_be_byref: Vec<bool> = call
+                .args
+                .iter()
+                .map(|a| expr_can_be_passed_by_reference(&a.value))
+                .collect();
             check_args(
                 ea,
                 CheckArgsParams {
@@ -79,6 +87,7 @@ impl CallAnalyzer {
                     arg_types: &arg_types,
                     arg_spans: &arg_spans,
                     arg_names: &arg_names,
+                    arg_can_be_byref: &arg_can_be_byref,
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
                 },

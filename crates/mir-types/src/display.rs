@@ -8,7 +8,7 @@ impl fmt::Display for Union {
         if self.types.is_empty() {
             return write!(f, "never");
         }
-        let strs: Vec<String> = self.types.iter().map(|a| format!("{}", a)).collect();
+        let strs: Vec<String> = self.types.iter().map(|a| format!("{a}")).collect();
         write!(f, "{}", strs.join("|"))
     }
 }
@@ -17,29 +17,25 @@ impl fmt::Display for Atomic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Atomic::TString => write!(f, "string"),
-            Atomic::TLiteralString(s) => write!(f, "\"{}\"", s),
+            Atomic::TLiteralString(s) => write!(f, "\"{s}\""),
             Atomic::TClassString(None) => write!(f, "class-string"),
-            Atomic::TClassString(Some(cls)) => write!(f, "class-string<{}>", cls),
+            Atomic::TClassString(Some(cls)) => write!(f, "class-string<{cls}>"),
             Atomic::TNonEmptyString => write!(f, "non-empty-string"),
             Atomic::TNumericString => write!(f, "numeric-string"),
 
             Atomic::TInt => write!(f, "int"),
-            Atomic::TLiteralInt(n) => write!(f, "{}", n),
+            Atomic::TLiteralInt(n) => write!(f, "{n}"),
             Atomic::TIntRange { min, max } => {
-                let lo = min
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| "min".to_string());
-                let hi = max
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| "max".to_string());
-                write!(f, "int<{}, {}>", lo, hi)
+                let lo = min.map_or_else(|| "min".to_string(), |n| n.to_string());
+                let hi = max.map_or_else(|| "max".to_string(), |n| n.to_string());
+                write!(f, "int<{lo}, {hi}>")
             }
             Atomic::TPositiveInt => write!(f, "positive-int"),
             Atomic::TNegativeInt => write!(f, "negative-int"),
             Atomic::TNonNegativeInt => write!(f, "non-negative-int"),
 
             Atomic::TFloat => write!(f, "float"),
-            Atomic::TLiteralFloat(i, frac) => write!(f, "{}.{}", i, frac),
+            Atomic::TLiteralFloat(i, frac) => write!(f, "{i}.{frac}"),
 
             Atomic::TBool => write!(f, "bool"),
             Atomic::TTrue => write!(f, "true"),
@@ -55,16 +51,15 @@ impl fmt::Display for Atomic {
             Atomic::TObject => write!(f, "object"),
             Atomic::TNamedObject { fqcn, type_params } => {
                 if type_params.is_empty() {
-                    write!(f, "{}", fqcn)
+                    write!(f, "{fqcn}")
                 } else {
-                    let params: Vec<String> =
-                        type_params.iter().map(|p| format!("{}", p)).collect();
+                    let params: Vec<String> = type_params.iter().map(|p| format!("{p}")).collect();
                     write!(f, "{}<{}>", fqcn, params.join(", "))
                 }
             }
-            Atomic::TStaticObject { fqcn } => write!(f, "static({})", fqcn),
-            Atomic::TSelf { fqcn } => write!(f, "self({})", fqcn),
-            Atomic::TParent { fqcn } => write!(f, "parent({})", fqcn),
+            Atomic::TStaticObject { fqcn } => write!(f, "static({fqcn})"),
+            Atomic::TSelf { fqcn } => write!(f, "self({fqcn})"),
+            Atomic::TParent { fqcn } => write!(f, "parent({fqcn})"),
 
             Atomic::TCallable {
                 params: None,
@@ -78,7 +73,7 @@ impl fmt::Display for Atomic {
                     .iter()
                     .map(|p| {
                         if let Some(ty) = &p.ty {
-                            format!("{}", ty)
+                            format!("{ty}")
                         } else {
                             "mixed".to_string()
                         }
@@ -86,15 +81,14 @@ impl fmt::Display for Atomic {
                     .collect();
                 let ret = return_type
                     .as_ref()
-                    .map(|r| format!("{}", r))
-                    .unwrap_or_else(|| "mixed".to_string());
+                    .map_or_else(|| "mixed".to_string(), |r| format!("{r}"));
                 write!(f, "callable({}): {}", ps.join(", "), ret)
             }
             Atomic::TCallable {
                 params: None,
                 return_type: Some(ret),
             } => {
-                write!(f, "callable(): {}", ret)
+                write!(f, "callable(): {ret}")
             }
             Atomic::TClosure {
                 params,
@@ -105,7 +99,7 @@ impl fmt::Display for Atomic {
                     .iter()
                     .map(|p| {
                         if let Some(ty) = &p.ty {
-                            format!("{}", ty)
+                            format!("{ty}")
                         } else {
                             "mixed".to_string()
                         }
@@ -115,19 +109,19 @@ impl fmt::Display for Atomic {
             }
 
             Atomic::TArray { key, value } => {
-                write!(f, "array<{}, {}>", key, value)
+                write!(f, "array<{key}, {value}>")
             }
-            Atomic::TList { value } => write!(f, "list<{}>", value),
+            Atomic::TList { value } => write!(f, "list<{value}>"),
             Atomic::TNonEmptyArray { key, value } => {
-                write!(f, "non-empty-array<{}, {}>", key, value)
+                write!(f, "non-empty-array<{key}, {value}>")
             }
-            Atomic::TNonEmptyList { value } => write!(f, "non-empty-list<{}>", value),
+            Atomic::TNonEmptyList { value } => write!(f, "non-empty-list<{value}>"),
             Atomic::TKeyedArray { properties, .. } => {
                 let entries: Vec<String> = properties
                     .iter()
                     .map(|(k, v)| {
                         let key_str = match k {
-                            crate::atomic::ArrayKey::String(s) => format!("'{}'", s),
+                            crate::atomic::ArrayKey::String(s) => format!("'{s}'"),
                             crate::atomic::ArrayKey::Int(n) => n.to_string(),
                         };
                         let opt = if v.optional { "?" } else { "" };
@@ -137,13 +131,13 @@ impl fmt::Display for Atomic {
                 write!(f, "array{{{}}}", entries.join(", "))
             }
 
-            Atomic::TTemplateParam { name, .. } => write!(f, "{}", name),
+            Atomic::TTemplateParam { name, .. } => write!(f, "{name}"),
             Atomic::TConditional {
                 subject,
                 if_true,
                 if_false,
             } => {
-                write!(f, "({} is ? {} : {})", subject, if_true, if_false)
+                write!(f, "({subject} is ? {if_true} : {if_false})")
             }
 
             Atomic::TInterfaceString => write!(f, "interface-string"),
@@ -153,9 +147,9 @@ impl fmt::Display for Atomic {
             Atomic::TIntersection { parts } => {
                 let mut iter = parts.iter();
                 if let Some(first) = iter.next() {
-                    write!(f, "{}", first)?;
+                    write!(f, "{first}")?;
                     for part in iter {
-                        write!(f, "&{}", part)?;
+                        write!(f, "&{part}")?;
                     }
                 }
                 Ok(())
