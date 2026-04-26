@@ -125,8 +125,9 @@ pub fn find_preceding_docblock(source: &str, offset: u32) -> Option<String> {
     loop {
         let after_ws = trimmed.trim_end();
         let last_word_start = after_ws
-            .rfind(|c: char| !(c.is_ascii_alphabetic()))
-            .map(|i| i + 1)
+            .char_indices()
+            .rfind(|(_, c)| !c.is_ascii_alphabetic())
+            .map(|(i, c)| i + c.len_utf8())
             .unwrap_or(0);
         let word = &after_ws[last_word_start..];
         if matches!(word, "final" | "abstract" | "readonly") {

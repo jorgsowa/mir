@@ -101,6 +101,27 @@ impl<'a> DeadCodeAnalyzer<'a> {
             }
         }
 
+        // --- Non-referenced free functions ---
+        for entry in self.codebase.functions.iter() {
+            let func = entry.value();
+            let fqn = func.fqn.as_ref();
+            if !self.codebase.is_function_referenced(fqn) {
+                let (file, line) = location_from_storage(&func.location);
+                issues.push(Issue::new(
+                    IssueKind::UnusedFunction {
+                        name: func.short_name.to_string(),
+                    },
+                    Location {
+                        file,
+                        line,
+                        line_end: line,
+                        col_start: 0,
+                        col_end: 0,
+                    },
+                ));
+            }
+        }
+
         // Downgrade all dead-code issues to Info
         for issue in &mut issues {
             issue.severity = Severity::Info;

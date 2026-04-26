@@ -326,13 +326,11 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 && arg_ty.contains(|t| matches!(t, Atomic::TNull))
             {
                 ea.emit(
-                    IssueKind::InvalidArgument {
+                    IssueKind::NullArgument {
                         param: param.name.to_string(),
                         fn_name: fn_name.to_string(),
-                        expected: format!("{param_ty}"),
-                        actual: format!("{arg_ty}"),
                     },
-                    Severity::Error,
+                    Severity::Warning,
                     arg_span,
                 );
             } else if !param_ty.is_nullable() && !param_ty.is_mixed() && arg_ty.is_nullable() {

@@ -1,7 +1,6 @@
 ===file===
 <?php
-function f(int $x): void {}
+function f(int $x): void { var_dump($x); }
 function test(): void { f(null); }
 ===expect===
-UnusedParam: Parameter $x is never used
-InvalidArgument: Argument $x of f() expects 'int', got 'null'
+NullArgument: Argument $x of f() cannot be null
