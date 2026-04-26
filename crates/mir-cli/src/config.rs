@@ -38,12 +38,16 @@ pub struct Config {
     pub issue_handlers: HashMap<String, ErrorLevel>,
     /// Global error level 1–8 (lower = stricter). 1 = errors only, 2 = +warnings, 3+ = +info.
     pub error_level: u8,
-    /// Target PHP version string (e.g. `"8.2"`).
+    /// Target PHP version string (e.g. `"8.2"`). Accepts both root attribute and child element.
     pub php_version: Option<String>,
     /// Whether dead-code detection is enabled.
     pub find_unused_code: bool,
     /// Whether unused-variable checking is enabled.
     pub find_unused_variables: bool,
+    /// External stub files to load (from `<stubs><file name="..."/>`).
+    pub stub_files: Vec<String>,
+    /// External stub directories to load (from `<stubs><directory name="..."/>`).
+    pub stub_dirs: Vec<String>,
 }
 
 impl Default for Config {
@@ -56,6 +60,8 @@ impl Default for Config {
             php_version: None,
             find_unused_code: false,
             find_unused_variables: false,
+            stub_files: Vec::new(),
+            stub_dirs: Vec::new(),
         }
     }
 }
@@ -127,6 +133,20 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             Ok(Event::Start(e)) => {
                 let name = bytes_to_string(e.name().as_ref());
 
+                // phpVersion as attribute on the root element: <mir phpVersion="8.2">
+                if path.is_empty() && (name == "mir" || name == "psalm") {
+                    for attr in e.attributes().flatten() {
+                        if bytes_to_string(attr.key.as_ref()) == "phpVersion"
+                            && config.php_version.is_none()
+                        {
+                            let val = bytes_to_string(&attr.value);
+                            if !val.is_empty() {
+                                config.php_version = Some(val);
+                            }
+                        }
+                    }
+                }
+
                 // Issue handler: <SomeIssueKind errorLevel="..." />  inside <issueHandlers>
                 if path.last().is_some_and(|s: &String| s == "issueHandlers") {
                     for attr in e.attributes().flatten() {
@@ -142,6 +162,11 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 // <directory name="..."> inside <projectFiles> or <ignoreFiles>
                 if name == "directory" {
                     collect_directory(&e, &path, &mut config);
+                }
+
+                // <file name="..."> or <directory name="..."> inside <stubs>
+                if name == "file" || name == "directory" {
+                    collect_stub_entry(&e, &path, &mut config);
                 }
 
                 text_buf.clear();
@@ -165,6 +190,11 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
 
                 if name == "directory" {
                     collect_directory(&e, &path, &mut config);
+                }
+
+                // <file name="..."/> or <directory name="..."/> inside <stubs>
+                if name == "file" || name == "directory" {
+                    collect_stub_entry(&e, &path, &mut config);
                 }
             }
 
@@ -221,6 +251,28 @@ fn collect_directory<'a>(
             match parent {
                 "projectFiles" => config.project_dirs.push(val),
                 "ignoreFiles" => config.ignore_dirs.push(val),
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Handle `<file name="..."/>` and `<directory name="..."/>` inside `<stubs>`.
+fn collect_stub_entry<'a>(
+    e: &quick_xml::events::BytesStart<'a>,
+    path: &[String],
+    config: &mut Config,
+) {
+    if path.last().map_or("", |s| s.as_str()) != "stubs" {
+        return;
+    }
+    let elem = bytes_to_string(e.name().as_ref());
+    for attr in e.attributes().flatten() {
+        if bytes_to_string(attr.key.as_ref()) == "name" {
+            let val = bytes_to_string(&attr.value);
+            match elem.as_str() {
+                "file" => config.stub_files.push(val),
+                "directory" => config.stub_dirs.push(val),
                 _ => {}
             }
         }
@@ -420,4 +472,75 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
     }
 
     Ok(baseline)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_php_version_child_element() {
+        let cfg = Config::parse(r#"<mir><phpVersion>8.1</phpVersion></mir>"#).unwrap();
+        assert_eq!(cfg.php_version.as_deref(), Some("8.1"));
+    }
+
+    #[test]
+    fn parses_php_version_root_attribute() {
+        let cfg = Config::parse(r#"<mir phpVersion="8.2"></mir>"#).unwrap();
+        assert_eq!(cfg.php_version.as_deref(), Some("8.2"));
+    }
+
+    #[test]
+    fn root_attribute_does_not_override_cli_override() {
+        // Simulate: config file has attribute, CLI flag would overwrite in main.rs.
+        // The XML parser itself should accept the attribute form.
+        let cfg = Config::parse(r#"<psalm phpVersion="7.4"></psalm>"#).unwrap();
+        assert_eq!(cfg.php_version.as_deref(), Some("7.4"));
+    }
+
+    #[test]
+    fn parses_stubs_file_entries() {
+        let cfg = Config::parse(
+            r#"<mir>
+                <stubs>
+                    <file name="stubs/helpers.php"/>
+                    <file name="stubs/ide.php"/>
+                </stubs>
+            </mir>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.stub_files, vec!["stubs/helpers.php", "stubs/ide.php"]);
+        assert!(cfg.stub_dirs.is_empty());
+    }
+
+    #[test]
+    fn parses_stubs_directory_entries() {
+        let cfg = Config::parse(
+            r#"<mir>
+                <stubs>
+                    <directory name="stubs/doctrine"/>
+                </stubs>
+            </mir>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.stub_dirs, vec!["stubs/doctrine"]);
+        assert!(cfg.stub_files.is_empty());
+    }
+
+    #[test]
+    fn stubs_directory_does_not_pollute_project_dirs() {
+        let cfg = Config::parse(
+            r#"<mir>
+                <projectFiles>
+                    <directory name="src"/>
+                </projectFiles>
+                <stubs>
+                    <directory name="stubs/ext"/>
+                </stubs>
+            </mir>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.project_dirs, vec!["src"]);
+        assert_eq!(cfg.stub_dirs, vec!["stubs/ext"]);
+    }
 }

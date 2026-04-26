@@ -224,6 +224,14 @@ fn main() {
 
         analyzer.find_dead_code = cli.find_dead_code;
 
+        if let Some(raw) = &config.php_version {
+            match raw.parse::<PhpVersion>() {
+                Ok(v) => analyzer = analyzer.with_php_version(v),
+                Err(e) => eprintln!("mir: {}; using default PHP {}", e, PhpVersion::LATEST),
+            }
+        }
+        apply_stub_config(&mut analyzer, &config, &config_base);
+
         let vendor_files = map.vendor_files();
 
         // Resolve ignore dirs to absolute paths (relative to config file location)
@@ -416,6 +424,7 @@ fn main() {
     }
 
     analyzer.find_dead_code = cli.find_dead_code;
+    apply_stub_config(&mut analyzer, &config, &config_base);
 
     // Load type stubs first (needed before collect_types_only)
     analyzer.load_stubs();
@@ -467,6 +476,31 @@ fn main() {
         let elapsed = start.elapsed();
         let baseline = load_baseline(&cli, &config);
         run_output(&cli, &config, &files, result, baseline, elapsed);
+    }
+}
+
+/// Copy stub file/directory paths from `Config` into `ProjectAnalyzer`, resolving
+/// relative paths against `config_base` (the directory containing `mir.xml`).
+fn apply_stub_config(
+    analyzer: &mut ProjectAnalyzer,
+    config: &Config,
+    config_base: &std::path::Path,
+) {
+    for f in &config.stub_files {
+        let p = PathBuf::from(f);
+        analyzer.stub_files.push(if p.is_absolute() {
+            p
+        } else {
+            config_base.join(f)
+        });
+    }
+    for d in &config.stub_dirs {
+        let p = PathBuf::from(d);
+        analyzer.stub_dirs.push(if p.is_absolute() {
+            p
+        } else {
+            config_base.join(d)
+        });
     }
 }
 
