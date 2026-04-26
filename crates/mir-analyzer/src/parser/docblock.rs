@@ -26,19 +26,39 @@ impl DocblockParser {
                     name: Some(n),
                     ..
                 } => {
+                    if let Some(msg) = validate_type_str(ty_s, "param") {
+                        result.invalid_annotations.push(msg);
+                    }
                     result.params.push((
                         n.trim_start_matches('$').to_string(),
                         parse_type_string(ty_s),
                     ));
                 }
+                // @param with a type but no variable name — can happen when an unclosed generic
+                // swallows the rest of the tag body (e.g. `@param array< $x`).
+                PhpDocTag::Param {
+                    type_str: Some(ty_s),
+                    name: None,
+                    ..
+                } => {
+                    if let Some(msg) = validate_type_str(ty_s, "param") {
+                        result.invalid_annotations.push(msg);
+                    }
+                }
                 PhpDocTag::Return {
                     type_str: Some(ty_s),
                     ..
                 } => {
+                    if let Some(msg) = validate_type_str(ty_s, "return") {
+                        result.invalid_annotations.push(msg);
+                    }
                     result.return_type = Some(parse_type_string(ty_s));
                 }
                 PhpDocTag::Var { type_str, name, .. } => {
                     if let Some(ty_s) = type_str {
+                        if let Some(msg) = validate_type_str(ty_s, "var") {
+                            result.invalid_annotations.push(msg);
+                        }
                         result.var_type = Some(parse_type_string(ty_s));
                     }
                     if let Some(n) = name {
@@ -64,6 +84,11 @@ impl DocblockParser {
                     );
                 }
                 PhpDocTag::Template { name, bound } => {
+                    if let Some(b) = bound {
+                        if let Some(msg) = validate_type_str(b, "template") {
+                            result.invalid_annotations.push(msg);
+                        }
+                    }
                     result.templates.push((
                         name.to_string(),
                         bound.map(parse_type_string),
@@ -71,6 +96,11 @@ impl DocblockParser {
                     ));
                 }
                 PhpDocTag::TemplateCovariant { name, bound } => {
+                    if let Some(b) = bound {
+                        if let Some(msg) = validate_type_str(b, "template-covariant") {
+                            result.invalid_annotations.push(msg);
+                        }
+                    }
                     result.templates.push((
                         name.to_string(),
                         bound.map(parse_type_string),
@@ -78,6 +108,11 @@ impl DocblockParser {
                     ));
                 }
                 PhpDocTag::TemplateContravariant { name, bound } => {
+                    if let Some(b) = bound {
+                        if let Some(msg) = validate_type_str(b, "template-contravariant") {
+                            result.invalid_annotations.push(msg);
+                        }
+                    }
                     result.templates.push((
                         name.to_string(),
                         bound.map(parse_type_string),
@@ -364,6 +399,8 @@ pub struct ParsedDocblock {
     pub since: Option<String>,
     /// `@removed X.Y` — first PHP version this symbol no longer exists in.
     pub removed: Option<String>,
+    /// Malformed type annotations detected during parsing.
+    pub invalid_annotations: Vec<String>,
 }
 
 impl ParsedDocblock {
@@ -721,6 +758,28 @@ fn is_inside_generics(s: &str) -> bool {
 fn normalize_fqcn(s: &str) -> String {
     // Strip leading backslash if present — we normalize all FQCNs without leading `\`
     s.trim_start_matches('\\').to_string()
+}
+
+/// Returns an error message if `s` is a malformed PHPDoc type expression, otherwise `None`.
+///
+/// Detects:
+/// - unclosed generics (`array<`, `Foo<Bar`)
+/// - `$variable` in type position (only `$this` is valid)
+fn validate_type_str(s: &str, tag: &str) -> Option<String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    if is_inside_generics(s) {
+        return Some(format!("@{tag} has unclosed generic type `{s}`"));
+    }
+    for part in split_union(s) {
+        let p = part.trim();
+        if p.starts_with('$') && p != "$this" {
+            return Some(format!("@{tag} contains variable `{p}` in type position"));
+        }
+    }
+    None
 }
 
 /// Parse `[static] [ReturnType] name(...)` for @method tags.
@@ -1116,5 +1175,51 @@ mod tests {
         assert!(intersection[1].contains(
             |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Countable")
         ));
+    }
+
+    #[test]
+    fn validate_unclosed_generic_return() {
+        let parsed = DocblockParser::parse("/** @return array< */");
+        assert_eq!(parsed.invalid_annotations.len(), 1);
+        assert!(
+            parsed.invalid_annotations[0].contains("unclosed generic"),
+            "got: {}",
+            parsed.invalid_annotations[0]
+        );
+    }
+
+    #[test]
+    fn validate_variable_in_type_position_param() {
+        let parsed = DocblockParser::parse("/** @param Foo|$invalid $x */");
+        assert_eq!(parsed.invalid_annotations.len(), 1);
+        assert!(
+            parsed.invalid_annotations[0].contains("$invalid"),
+            "got: {}",
+            parsed.invalid_annotations[0]
+        );
+    }
+
+    #[test]
+    fn validate_this_is_valid_in_type_position() {
+        let parsed = DocblockParser::parse("/** @return $this */");
+        assert!(
+            parsed.invalid_annotations.is_empty(),
+            "unexpected error: {:?}",
+            parsed.invalid_annotations
+        );
+    }
+
+    #[test]
+    fn validate_unclosed_generic_var() {
+        let parsed = DocblockParser::parse("/** @var array<string */");
+        assert_eq!(parsed.invalid_annotations.len(), 1);
+        assert!(parsed.invalid_annotations[0].contains("@var"));
+    }
+
+    #[test]
+    fn validate_variable_in_template_bound() {
+        let parsed = DocblockParser::parse("/** @template T of $invalid */");
+        assert_eq!(parsed.invalid_annotations.len(), 1);
+        assert!(parsed.invalid_annotations[0].contains("$invalid"));
     }
 }

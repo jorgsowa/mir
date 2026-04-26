@@ -20,7 +20,7 @@ use mir_codebase::storage::{
     TraitStorage, Visibility,
 };
 use mir_codebase::{ClassStorage, Codebase};
-use mir_issues::{Issue, IssueBuffer};
+use mir_issues::{Issue, IssueBuffer, IssueKind};
 use mir_types::Union;
 
 // ---------------------------------------------------------------------------
@@ -353,6 +353,35 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     // -----------------------------------------------------------------------
+    // Docblock issue emission
+    // -----------------------------------------------------------------------
+
+    fn emit_docblock_issues(&mut self, doc: &crate::parser::ParsedDocblock, span_start: u32) {
+        if self.php_version.is_some() || doc.invalid_annotations.is_empty() {
+            return;
+        }
+        let lc = self.source_map.offset_to_line_col(span_start);
+        let line = lc.line + 1;
+        let suppressed = doc.suppressed_issues.iter().any(|s| s == "InvalidDocblock");
+        for msg in &doc.invalid_annotations {
+            let issue = Issue::new(
+                IssueKind::InvalidDocblock {
+                    message: msg.clone(),
+                },
+                mir_issues::Location {
+                    file: self.file.clone(),
+                    line,
+                    line_end: line,
+                    col_start: 0,
+                    col_end: 0,
+                },
+            );
+            self.issues
+                .add(if suppressed { issue.suppress() } else { issue });
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Visibility conversion
     // -----------------------------------------------------------------------
 
@@ -543,6 +572,7 @@ impl<'a> DefinitionCollector<'a> {
             return;
         };
         let parsed = crate::parser::DocblockParser::parse(&doc_text);
+        self.emit_docblock_issues(&parsed, stmt.span.start);
         let Some(var_type) = parsed.var_type else {
             return;
         };
@@ -621,6 +651,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     .as_ref()
                     .map(|c| crate::parser::DocblockParser::parse(c.text))
                     .unwrap_or_default();
+
+                if let Some(c) = decl.doc_comment.as_ref() {
+                    self.emit_docblock_issues(&doc, c.span.start);
+                }
 
                 if !self.version_allows(&doc) {
                     return ControlFlow::Continue(());
@@ -729,6 +763,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     })
                     .unwrap_or_default();
 
+                let class_doc_span = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| c.span.start)
+                    .unwrap_or(stmt.span.start);
+                self.emit_docblock_issues(&class_doc, class_doc_span);
+
                 if !self.version_allows(&class_doc) {
                     return ControlFlow::Continue(());
                 }
@@ -788,6 +829,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     .map(|t| crate::parser::DocblockParser::parse(&t))
                                 })
                                 .unwrap_or_default();
+                            let prop_doc_span = p
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| c.span.start)
+                                .unwrap_or(member.span.start);
+                            self.emit_docblock_issues(&prop_doc, prop_doc_span);
                             if !self.version_allows(&prop_doc) {
                                 continue;
                             }
@@ -818,6 +865,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     .map(|t| crate::parser::DocblockParser::parse(&t))
                                 })
                                 .unwrap_or_default();
+                            let const_doc_span = c
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| c.span.start)
+                                .unwrap_or(member.span.start);
+                            self.emit_docblock_issues(&const_doc, const_doc_span);
                             if !self.version_allows(&const_doc) {
                                 continue;
                             }
@@ -956,6 +1009,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     })
                     .unwrap_or_default();
 
+                let iface_doc_span = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| c.span.start)
+                    .unwrap_or(stmt.span.start);
+                self.emit_docblock_issues(&iface_doc, iface_doc_span);
+
                 if !self.version_allows(&iface_doc) {
                     return ControlFlow::Continue(());
                 }
@@ -1005,6 +1065,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     .map(|t| crate::parser::DocblockParser::parse(&t))
                                 })
                                 .unwrap_or_default();
+                            let const_doc_span = c
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| c.span.start)
+                                .unwrap_or(member.span.start);
+                            self.emit_docblock_issues(&const_doc, const_doc_span);
                             if !self.version_allows(&const_doc) {
                                 continue;
                             }
@@ -1056,6 +1122,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                             .map(|t| crate::parser::DocblockParser::parse(&t))
                     })
                     .unwrap_or_default();
+
+                let trait_doc_span = decl
+                    .doc_comment
+                    .as_ref()
+                    .map(|c| c.span.start)
+                    .unwrap_or(stmt.span.start);
+                self.emit_docblock_issues(&trait_doc, trait_doc_span);
 
                 if !self.version_allows(&trait_doc) {
                     return ControlFlow::Continue(());
@@ -1127,6 +1200,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     .map(|t| crate::parser::DocblockParser::parse(&t))
                                 })
                                 .unwrap_or_default();
+                            let prop_doc_span = p
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| c.span.start)
+                                .unwrap_or(member.span.start);
+                            self.emit_docblock_issues(&prop_doc, prop_doc_span);
                             if !self.version_allows(&prop_doc) {
                                 continue;
                             }
@@ -1163,6 +1242,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     .map(|t| crate::parser::DocblockParser::parse(&t))
                                 })
                                 .unwrap_or_default();
+                            let const_doc_span = c
+                                .doc_comment
+                                .as_ref()
+                                .map(|c| c.span.start)
+                                .unwrap_or(member.span.start);
+                            self.emit_docblock_issues(&const_doc, const_doc_span);
                             if !self.version_allows(&const_doc) {
                                 continue;
                             }
@@ -1295,6 +1380,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 .map(|t| crate::parser::DocblockParser::parse(&t))
                         })
                         .unwrap_or_default();
+                    let const_doc_span = item
+                        .doc_comment
+                        .as_ref()
+                        .map(|c| c.span.start)
+                        .unwrap_or(item.span.start);
+                    self.emit_docblock_issues(&const_doc, const_doc_span);
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
@@ -1326,6 +1417,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     )
                                     .map(|t| crate::parser::DocblockParser::parse(&t))
                                     .unwrap_or_default();
+                                    self.emit_docblock_issues(&define_doc, stmt.span.start);
                                     if self.version_allows(&define_doc) {
                                         let fqn: Arc<str> = Arc::from(&**name);
                                         self.slice.constants.push((fqn, Union::mixed()));
@@ -1345,7 +1437,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
 impl<'a> DefinitionCollector<'a> {
     fn build_method_storage(
-        &self,
+        &mut self,
         m: &php_ast::ast::MethodDecl<'_, '_>,
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
@@ -1356,6 +1448,10 @@ impl<'a> DefinitionCollector<'a> {
             .as_ref()
             .map(|c| crate::parser::DocblockParser::parse(c.text))
             .unwrap_or_default();
+
+        if let Some(c) = m.doc_comment.as_ref() {
+            self.emit_docblock_issues(&doc, c.span.start);
+        }
 
         if !self.version_allows(&doc) {
             return None;
