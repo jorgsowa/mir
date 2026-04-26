@@ -4,10 +4,31 @@ This guide walks you through installing mir, running your first analysis, and un
 
 ## Installation
 
-### From crates.io (recommended)
+### From Composer (recommended for PHP projects)
 
 ```bash
-cargo install mir-cli
+composer require --dev mir-analyzer/mir
+```
+
+The package is a thin wrapper: a `post-install-cmd` hook downloads the
+prebuilt `mir` binary that matches the installed version and host platform
+from [GitHub Releases](https://github.com/jorgsowa/mir/releases), verifies
+its SHA-256 checksum, and places it at `vendor/mir-analyzer/mir/bin/mir`.
+Composer exposes it as `vendor/bin/mir`:
+
+```bash
+vendor/bin/mir src/
+```
+
+Prebuilt binaries are published for `x86_64-unknown-linux-gnu`,
+`aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`,
+and `x86_64-pc-windows-msvc`. On other platforms install with `cargo` or
+build from source.
+
+### From crates.io
+
+```bash
+cargo install mir-php
 ```
 
 ### Build from source

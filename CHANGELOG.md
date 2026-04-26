@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Composer package `mir-analyzer/mir`. A `post-install-cmd` / `post-update-cmd` hook downloads the prebuilt `mir` binary matching the installed version and host platform from GitHub Releases, verifies the SHA-256 sidecar, and exposes `vendor/bin/mir`. Single-entry extraction with strict path-traversal and symlink rejection. Supported targets: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`.
+- `Release` GitHub Actions workflow building and uploading per-target archives + sha256 sidecars on `v*` tags.
+
+### Fixed
+
+- `cargo install mir-cli` references in README and docs corrected to `mir-php` (the actual crate name).
+
 ## [0.9.1] - 2026-04-26
 
 ### Added
