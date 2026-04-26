@@ -420,9 +420,16 @@ impl ProjectAnalyzer {
                 break;
             }
 
-            for (fqcn, path) in to_load {
-                loaded.insert(fqcn);
-                if let Ok(src) = std::fs::read_to_string(&path) {
+            for (fqcn, _) in &to_load {
+                loaded.insert(fqcn.clone());
+            }
+
+            let batch_issues: Vec<Vec<Issue>> = to_load
+                .par_iter()
+                .filter_map(|(_, path)| {
+                    let Ok(src) = std::fs::read_to_string(path) else {
+                        return None;
+                    };
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let arena = bumpalo::Bump::new();
                     let result = php_rs_parser::parse(&arena, &src);
@@ -432,9 +439,11 @@ impl ProjectAnalyzer {
                         &src,
                         &result.source_map,
                     );
-                    let issues = collector.collect(&result.program);
-                    all_issues.extend(issues);
-                }
+                    Some(collector.collect(&result.program))
+                })
+                .collect();
+            for issues in batch_issues {
+                all_issues.extend(issues);
             }
 
             self.codebase.invalidate_finalization();
