@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-26
+
+### Added
+
+- Trait method bodies are now analyzed in Pass 2; diagnostics (`UndefinedFunction`, `UndefinedMethod`, unused variables, etc.) are emitted for code inside traits. (#264)
+- `UnreachableCode` issue — statements following a terminator (`return`, `throw`, `exit`, `die`) in the same block are now flagged; nested closures are analyzed with a fresh context and are not affected by divergence in the outer block. (#262)
+
+### Fixed
+
+- `PossiblyUndefinedVariable` promoted to `Warning` severity, making it visible at the default error level and matching Psalm's behavior. (#261)
+- 10 false-positive `UndefinedMethod` reports eliminated: dynamic method calls via variable expressions (`$obj->{$var}()`) no longer trigger a spurious lookup, and private trait methods are now correctly accessible from classes that use the trait. (#260)
+- Improved Psalm docblock parity. (#265, #266)
+
 ## [0.8.0] - 2026-04-25
 
 ### Added
