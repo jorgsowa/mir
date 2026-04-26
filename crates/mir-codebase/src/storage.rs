@@ -166,6 +166,8 @@ pub struct ConstantStorage {
     pub name: Arc<str>,
     pub ty: Union,
     pub visibility: Option<Visibility>,
+    #[serde(default)]
+    pub is_final: bool,
     pub location: Option<Location>,
 }
 

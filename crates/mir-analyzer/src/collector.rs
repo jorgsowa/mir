@@ -825,6 +825,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                 name: c.name.into(),
                                 ty: Union::mixed(),
                                 visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
+                                is_final: c.is_final,
                                 location: Some(self.location(member.span.start, member.span.end)),
                             };
                             own_constants.insert(c.name.into(), constant);
@@ -1015,6 +1016,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     visibility: c
                                         .visibility
                                         .map(|v| Self::convert_visibility(Some(v))),
+                                    is_final: c.is_final,
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -1170,6 +1172,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     name: c.name.into(),
                                     ty: Union::mixed(),
                                     visibility: None,
+                                    is_final: c.is_final,
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -1258,6 +1261,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     name: c.name.into(),
                                     ty: Union::mixed(),
                                     visibility: None,
+                                    is_final: c.is_final,
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -1281,15 +1285,19 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             }
 
             StmtKind::Const(items) => {
-                // Check the stmt-level docblock for @since/@removed (ConstItem has no doc_comment).
-                let const_doc =
-                    crate::parser::find_preceding_docblock(self.source, stmt.span.start)
-                        .map(|t| crate::parser::DocblockParser::parse(&t))
-                        .unwrap_or_default();
-                if !self.version_allows(&const_doc) {
-                    return ControlFlow::Continue(());
-                }
                 for item in items.iter() {
+                    let const_doc = item
+                        .doc_comment
+                        .as_ref()
+                        .map(|c| crate::parser::DocblockParser::parse(c.text))
+                        .or_else(|| {
+                            crate::parser::find_preceding_docblock(self.source, item.span.start)
+                                .map(|t| crate::parser::DocblockParser::parse(&t))
+                        })
+                        .unwrap_or_default();
+                    if !self.version_allows(&const_doc) {
+                        continue;
+                    }
                     let fqn: Arc<str> = if let Some(ns) = &self.namespace {
                         format!("{}\\{}", ns, item.name).into()
                     } else {
