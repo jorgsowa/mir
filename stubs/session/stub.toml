@@ -1,6 +1,0 @@
-[extension]
-name        = "session"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-session"
-description = "session extension stubs"

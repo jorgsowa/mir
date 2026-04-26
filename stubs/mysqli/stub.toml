@@ -1,6 +1,0 @@
-[extension]
-name        = "mysqli"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-mysqli"
-description = "mysqli extension stubs"

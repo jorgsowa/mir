@@ -1,6 +1,0 @@
-[extension]
-name        = "readline"
-version     = "1.0.0"
-php-min     = "8.0"
-composer    = "ext-readline"
-description = "readline extension stubs (imported from phpstorm-stubs)"
