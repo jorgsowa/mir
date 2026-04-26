@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-04-26
+
+### Added
+
+- `InvalidDocblock` issue: emitted when a type annotation in a docblock cannot be parsed (malformed syntax). (#282)
+- Injectable user stubs: `<stubs><file name="..."/>` and `<stubs><directory name="..."/>` elements in `mir.xml` / `psalm.xml` load additional stub paths before analysis; stub files are not themselves analyzed for errors. (#285)
+- `phpVersion` can now be set as an XML attribute on the root `<mir>` or `<psalm>` element (e.g. `<mir phpVersion="8.2">`), matching Psalm's config syntax, in addition to the existing child-element form. (#285)
+
+### Changed
+
+- phpstorm-stubs is now vendored directly in `stubs/` (tracked in git) instead of a git submodule. External contributors no longer need to run `git submodule update --init`. (#283)
+- Documentation site migrated from mdBook to Astro Starlight; issue-kind reference pages are now split into individual pages grouped by category.
+
 ## [0.10.0] - 2026-04-26
 
 ### Added
