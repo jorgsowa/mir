@@ -103,6 +103,12 @@ pub enum IssueKind {
         param: String,
         fn_name: String,
     },
+    PossiblyInvalidArgument {
+        param: String,
+        fn_name: String,
+        expected: String,
+        actual: String,
+    },
     PossiblyNullPropertyFetch {
         property: String,
     },
@@ -395,8 +401,9 @@ impl IssueKind {
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
 
-            // Possibly-null (only shown in strict mode, level ≥ 7)
+            // Possibly-null / possibly-invalid (only shown in strict mode, level ≥ 7)
             IssueKind::PossiblyNullArgument { .. }
+            | IssueKind::PossiblyInvalidArgument { .. }
             | IssueKind::PossiblyNullPropertyFetch { .. }
             | IssueKind::PossiblyNullMethodCall { .. }
             | IssueKind::PossiblyNullArrayAccess => Severity::Info,
@@ -446,6 +453,7 @@ impl IssueKind {
             IssueKind::NullMethodCall { .. } => "NullMethodCall",
             IssueKind::NullArrayAccess => "NullArrayAccess",
             IssueKind::PossiblyNullArgument { .. } => "PossiblyNullArgument",
+            IssueKind::PossiblyInvalidArgument { .. } => "PossiblyInvalidArgument",
             IssueKind::PossiblyNullPropertyFetch { .. } => "PossiblyNullPropertyFetch",
             IssueKind::PossiblyNullMethodCall { .. } => "PossiblyNullMethodCall",
             IssueKind::PossiblyNullArrayAccess => "PossiblyNullArrayAccess",
@@ -543,6 +551,14 @@ impl IssueKind {
             IssueKind::NullArrayAccess => "Cannot access array on null".to_string(),
             IssueKind::PossiblyNullArgument { param, fn_name } => {
                 format!("Argument ${param} of {fn_name}() might be null")
+            }
+            IssueKind::PossiblyInvalidArgument {
+                param,
+                fn_name,
+                expected,
+                actual,
+            } => {
+                format!("Argument ${param} of {fn_name}() expects '{expected}', possibly different type '{actual}' provided")
             }
             IssueKind::PossiblyNullPropertyFetch { property } => {
                 format!("Cannot access property ${property} on possibly null value")
