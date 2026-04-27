@@ -104,6 +104,30 @@ impl CallAnalyzer {
             })
             .collect();
 
+        // When call_user_func / call_user_func_array is called with a bare string
+        // literal as the callable argument, treat that string as a direct FQN
+        // reference so the named function is not flagged as dead code.
+        // Note: 'helper' always resolves to \helper (global) — no namespace
+        // fallback applies to runtime callable strings.
+        if matches!(
+            resolved_fn_name.as_str(),
+            "call_user_func" | "call_user_func_array"
+        ) {
+            if let Some(arg) = call.args.first() {
+                if let ExprKind::String(name) = &arg.value.kind {
+                    let fqn = name.strip_prefix('\\').unwrap_or(name);
+                    if let Some(func) = ea.codebase.functions.get(fqn) {
+                        ea.codebase.mark_function_referenced_at(
+                            &func.fqn,
+                            ea.file.clone(),
+                            arg.span.start,
+                            arg.span.end,
+                        );
+                    }
+                }
+            }
+        }
+
         if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
             let name_span = call.name.span;
             ea.codebase.mark_function_referenced_at(
