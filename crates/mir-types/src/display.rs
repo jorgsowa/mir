@@ -25,11 +25,14 @@ impl fmt::Display for Atomic {
 
             Atomic::TInt => write!(f, "int"),
             Atomic::TLiteralInt(n) => write!(f, "{n}"),
-            Atomic::TIntRange { min, max } => {
-                let lo = min.map_or_else(|| "min".to_string(), |n| n.to_string());
-                let hi = max.map_or_else(|| "max".to_string(), |n| n.to_string());
-                write!(f, "int<{lo}, {hi}>")
-            }
+            Atomic::TIntRange { min, max } => match (min, max) {
+                (None, None) => write!(f, "int"),
+                (lo, hi) => {
+                    let lo = lo.map_or_else(|| "min".to_string(), |n| n.to_string());
+                    let hi = hi.map_or_else(|| "max".to_string(), |n| n.to_string());
+                    write!(f, "int<{lo}, {hi}>")
+                }
+            },
             Atomic::TPositiveInt => write!(f, "positive-int"),
             Atomic::TNegativeInt => write!(f, "negative-int"),
             Atomic::TNonNegativeInt => write!(f, "non-negative-int"),
@@ -155,5 +158,77 @@ impl fmt::Display for Atomic {
                 Ok(())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn int_range_unbounded_displays_as_int() {
+        assert_eq!(
+            format!(
+                "{}",
+                Atomic::TIntRange {
+                    min: None,
+                    max: None
+                }
+            ),
+            "int"
+        );
+    }
+
+    #[test]
+    fn int_range_bounded_min_displays_range() {
+        assert_eq!(
+            format!(
+                "{}",
+                Atomic::TIntRange {
+                    min: Some(0),
+                    max: None
+                }
+            ),
+            "int<0, max>"
+        );
+    }
+
+    #[test]
+    fn int_range_bounded_max_displays_range() {
+        assert_eq!(
+            format!(
+                "{}",
+                Atomic::TIntRange {
+                    min: None,
+                    max: Some(100)
+                }
+            ),
+            "int<min, 100>"
+        );
+    }
+
+    #[test]
+    fn int_range_fully_bounded_displays_range() {
+        assert_eq!(
+            format!(
+                "{}",
+                Atomic::TIntRange {
+                    min: Some(1),
+                    max: Some(10)
+                }
+            ),
+            "int<1, 10>"
+        );
+    }
+
+    #[test]
+    fn unbounded_int_range_in_union_displays_as_int() {
+        let mut u = Union::empty();
+        u.add_type(Atomic::TIntRange {
+            min: None,
+            max: None,
+        });
+        u.add_type(Atomic::TFalse);
+        assert_eq!(format!("{u}"), "int|false");
     }
 }

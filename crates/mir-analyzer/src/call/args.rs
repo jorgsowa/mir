@@ -344,6 +344,37 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 );
             }
 
+            let param_accepts_false =
+                param_ty.contains(|t| matches!(t, Atomic::TFalse | Atomic::TBool));
+            if !param_accepts_false
+                && !param_ty.is_mixed()
+                && !arg_ty.is_mixed()
+                && !arg_ty.is_single()
+                && arg_ty.contains(|t| matches!(t, Atomic::TFalse | Atomic::TBool))
+            {
+                let arg_without_false = arg_ty.remove_false();
+                // Strip null too: handles int|null|false → int (alongside PossiblyNullArgument)
+                let arg_core = arg_without_false.remove_null();
+                if !arg_core.types.is_empty()
+                    && (arg_without_false.is_subtype_of_simple(param_ty)
+                        || arg_core.is_subtype_of_simple(param_ty)
+                        || named_object_subtype(&arg_without_false, param_ty, ea)
+                        || named_object_subtype(&arg_core, param_ty, ea))
+                {
+                    ea.emit(
+                        IssueKind::PossiblyInvalidArgument {
+                            param: param.name.to_string(),
+                            fn_name: fn_name.to_string(),
+                            expected: format!("{param_ty}"),
+                            actual: format!("{arg_ty}"),
+                        },
+                        Severity::Info,
+                        arg_span,
+                    );
+                }
+            }
+
+            let arg_core = arg_ty.remove_null().remove_false();
             if !arg_ty.is_subtype_of_simple(param_ty)
                 && !param_ty.is_mixed()
                 && !arg_ty.is_mixed()
@@ -359,9 +390,13 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                         .iter()
                         .any(|p| Union::single(p.clone()).is_subtype_of_simple(&arg_ty)))
                 && !arg_ty.remove_null().is_subtype_of_simple(param_ty)
-                && !arg_ty.remove_false().is_subtype_of_simple(param_ty)
+                && (arg_ty.remove_false().types.is_empty()
+                    || !arg_ty.remove_false().is_subtype_of_simple(param_ty))
+                && (arg_core.types.is_empty() || !arg_core.is_subtype_of_simple(param_ty))
                 && !named_object_subtype(&arg_ty.remove_null(), param_ty, ea)
-                && !named_object_subtype(&arg_ty.remove_false(), param_ty, ea)
+                && (arg_ty.remove_false().types.is_empty()
+                    || !named_object_subtype(&arg_ty.remove_false(), param_ty, ea))
+                && (arg_core.types.is_empty() || !named_object_subtype(&arg_core, param_ty, ea))
             {
                 ea.emit(
                     IssueKind::InvalidArgument {
