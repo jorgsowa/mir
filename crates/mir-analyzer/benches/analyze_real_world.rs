@@ -119,19 +119,30 @@ fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[Pa
 ///
 /// Memory stats for one cold run are printed to stderr before the timed loop.
 fn bench_full_analysis(c: &mut Criterion) {
+    eprintln!("[diag] bench_full_analysis: entered");
     let root = fixtures_root();
     if skip_if_missing(&root) {
         return;
     }
 
+    eprintln!("[diag] bench_full_analysis: calling build_global");
     // Initialize the global Rayon pool before any analysis so the memory-stats
     // cold runs (which use the global pool, not the explicit per-benchmark pool)
     // get the same stack depth as the timed sections. Silently ignored if the
     // pool was already initialized.
     rayon::ThreadPoolBuilder::new()
-        .stack_size(16 * 1024 * 1024)
+        .stack_size(128 * 1024 * 1024)
         .build_global()
-        .ok();
+        .expect("build_global called too late — rayon global pool already initialized");
+    eprintln!("[diag] bench_full_analysis: build_global done");
+
+    eprintln!("[diag] bench_full_analysis: split_vendor_project");
+    let (vendor_files, project_files) = split_vendor_project(&root);
+    eprintln!(
+        "[diag] bench_full_analysis: {} vendor files, {} project files",
+        vendor_files.len(),
+        project_files.len()
+    );
 
     let (vendor_files, project_files) = split_vendor_project(&root);
     assert!(
@@ -141,12 +152,17 @@ fn bench_full_analysis(c: &mut Criterion) {
     );
 
     // Print memory stats once before the Criterion loop.
+    eprintln!("[diag] bench_full_analysis: starting cold run");
     reset_alloc_counters();
     {
         let analyzer = ProjectAnalyzer::new();
+        eprintln!("[diag] bench_full_analysis: load_stubs");
         analyzer.load_stubs();
+        eprintln!("[diag] bench_full_analysis: collect_types_only");
         analyzer.collect_types_only(&vendor_files);
+        eprintln!("[diag] bench_full_analysis: analyze");
         let _ = analyzer.analyze(&project_files);
+        eprintln!("[diag] bench_full_analysis: analyze done");
     }
     print_alloc_stats("full_analysis/laravel");
 

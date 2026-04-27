@@ -12,6 +12,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +36,7 @@ jobs:
     name: ${{ matrix.target }}
     needs: create-release
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +79,7 @@ jobs:
     name: Publish to crates.io
     needs: upload-assets
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,6 +116,7 @@ jobs:
     name: Publish to Packagist
     needs: upload-assets
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Trigger Packagist update
         run: |
