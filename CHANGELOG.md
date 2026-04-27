@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-04-27
+
+### Added
+
+- `PossiblyInvalidArgument` issue: emitted when a `false|T` union value is passed to a parameter that does not accept `false`, surfacing potential type mismatches that were previously silently widened to `mixed`.
+- Backed enum `->value` and `->name` access now returns a precise inferred type (`TLiteralString` / `TLiteralInt` for `->value`, `TLiteralString` for `->name`) instead of `mixed`.
+- `call_user_func` and `call_user_func_array` string callables (e.g. `'ClassName::methodName'`) are now tracked as real call references, fixing false-positive stub warnings on those forms.
+
+### Fixed
+
+- Infinite recursion on circular `@mixin` references: the mixin resolver now carries a seen-set and breaks cycles instead of stack-overflowing.
+- Benchmark harness: rayon stack size raised to 16 MiB and the global thread pool is initialised explicitly, preventing stack overflows on deeply recursive PHP files during benchmarking.
+
+### CI
+
+- `timeout-minutes` added to all workflow jobs and a concurrency group added to the CI workflow to cancel superseded runs.
+
 ## [0.11.1] - 2026-04-26
 
 ### Fixed
