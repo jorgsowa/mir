@@ -10,8 +10,7 @@ export default defineConfig({
       title: 'mir',
       description: 'A fast, incremental PHP static analyzer written in Rust.',
       logo: {
-        light: './src/assets/logo-light.svg',
-        dark: './src/assets/logo-dark.svg',
+        src: './src/assets/logo.png',
         replacesTitle: false,
       },
       social: [
