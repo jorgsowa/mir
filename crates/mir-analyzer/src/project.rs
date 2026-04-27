@@ -407,28 +407,48 @@ impl ProjectAnalyzer {
         for _ in 0..max_depth {
             let mut to_load: Vec<(String, PathBuf)> = Vec::new();
 
-            for entry in self.codebase.classes.iter() {
-                let cls = entry.value();
-
-                if let Some(parent) = &cls.parent {
-                    let fqcn = parent.as_ref();
-                    if !self.codebase.classes.contains_key(fqcn) && !loaded.contains(fqcn) {
-                        if let Some(path) = psr4.resolve(fqcn) {
-                            to_load.push((fqcn.to_string(), path));
-                        }
+            let mut try_queue = |fqcn: &str| {
+                if !self.codebase.type_exists(fqcn) && !loaded.contains(fqcn) {
+                    if let Some(path) = psr4.resolve(fqcn) {
+                        to_load.push((fqcn.to_string(), path));
                     }
                 }
+            };
 
+            for entry in self.codebase.classes.iter() {
+                let cls = entry.value();
+                if let Some(parent) = &cls.parent {
+                    try_queue(parent.as_ref());
+                }
                 for iface in &cls.interfaces {
-                    let fqcn = iface.as_ref();
-                    if !self.codebase.classes.contains_key(fqcn)
-                        && !self.codebase.interfaces.contains_key(fqcn)
-                        && !loaded.contains(fqcn)
-                    {
-                        if let Some(path) = psr4.resolve(fqcn) {
-                            to_load.push((fqcn.to_string(), path));
-                        }
-                    }
+                    try_queue(iface.as_ref());
+                }
+            }
+
+            for entry in self.codebase.interfaces.iter() {
+                for parent in &entry.value().extends {
+                    try_queue(parent.as_ref());
+                }
+            }
+
+            for entry in self.codebase.enums.iter() {
+                for iface in &entry.value().interfaces {
+                    try_queue(iface.as_ref());
+                }
+            }
+
+            for entry in self.codebase.traits.iter() {
+                for used in &entry.value().traits {
+                    try_queue(used.as_ref());
+                }
+            }
+
+            // Also lazy-load any type referenced via `use` imports that isn't yet
+            // in the codebase (covers enums and classes used only in type hints or
+            // static calls, which never appear in the inheritance scan above).
+            for entry in self.codebase.file_imports.iter() {
+                for fqcn in entry.value().values() {
+                    try_queue(fqcn.as_str());
                 }
             }
 
