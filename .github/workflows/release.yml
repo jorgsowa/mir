@@ -122,5 +122,5 @@ jobs:
       - name: Trigger Packagist update
         run: |
           curl -fsSL -XPOST -H 'content-type:application/json' \
-            'https://packagist.org/api/update-package?username=miropen&apiToken=${{ secrets.PACKAGIST_API_TOKEN }}' \
+            'https://packagist.org/api/update-package?username=Jorg%20Sowa&apiToken=${{ secrets.PACKAGIST_API_TOKEN }}' \
             -d '{"repository":{"url":"https://github.com/jorgsowa/mir"}}'
