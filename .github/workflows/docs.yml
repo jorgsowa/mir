@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'crates/**'
   workflow_dispatch:
 
 permissions:
@@ -19,12 +20,23 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - uses: actions/setup-node@v6
         with:
@@ -32,11 +44,14 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm ci
         working-directory: site
 
-      - name: Build
+      - name: Build WASM
+        run: wasm-pack build --target web crates/mir-wasm --out-dir ../../site/public/wasm
+
+      - name: Build docs
         run: npm run build
         working-directory: site
 

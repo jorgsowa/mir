@@ -1,0 +1,209 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { readFileSync } from 'fs';
+import { execSync } from 'child_process';
+import { join } from 'path';
+
+const cargoToml = readFileSync(join(process.cwd(), '../Cargo.toml'), 'utf-8');
+const version = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? 'unknown';
+const commit = (() => {
+  try { return execSync('git rev-parse --short HEAD', { cwd: process.cwd() }).toString().trim(); }
+  catch { return 'unknown'; }
+})();
+
+const PHP_VERSIONS = ['8.1', '8.2', '8.3', '8.4', '8.5'];
+const DEFAULT_PHP = '8.5';
+
+const DEFAULT_CODE = `<?php
+
+function add(int $a, int $b): int {
+    return $a + $b;
+}
+
+$result = add("not a number", 42);
+`;
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Playground',
+    description: 'Try mir in your browser — no install required.',
+    tableOfContents: false,
+  }}
+>
+  <div
+    class="playground not-content"
+    data-base={import.meta.env.BASE_URL.replace(/\/$/, '')}
+  >
+    <div class="pg-toolbar">
+      <select id="pg-version" class="pg-select">
+        {PHP_VERSIONS.map(v => (
+          <option value={v} selected={v === DEFAULT_PHP}>{`PHP ${v}`}</option>
+        ))}
+      </select>
+      <button id="pg-btn" class="pg-btn" disabled>Loading…</button>
+      <span id="pg-status" class="pg-status"></span>
+      <span class="pg-meta">mir&nbsp;v{version}&nbsp;·&nbsp;{commit}</span>
+    </div>
+
+    <div class="pg-editor">
+      <pre id="pg-gutter" class="pg-gutter" aria-hidden="true">1</pre>
+      <div class="pg-input-wrap">
+        <textarea
+          id="pg-input"
+          class="pg-input"
+          spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+        >{DEFAULT_CODE}</textarea>
+        <div id="pg-overlay" class="pg-overlay" aria-hidden="true">
+          <div id="pg-underline" class="pg-underline" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pg-diag" class="pg-diag" aria-live="polite"></div>
+  </div>
+</StarlightPage>
+
+<script is:inline>
+  const root    = document.querySelector('.playground');
+  const BASE    = root.dataset.base;
+  const WASM_JS = `${BASE}/wasm/mir_wasm.js`;
+
+  const btn     = document.getElementById('pg-btn');
+  const input   = document.getElementById('pg-input');
+  const sel     = document.getElementById('pg-version');
+  const gutter  = document.getElementById('pg-gutter');
+  const diag    = document.getElementById('pg-diag');
+  const status  = document.getElementById('pg-status');
+
+  let playground = null;
+  let debounce   = null;
+
+  // Line numbers
+  function updateGutter() {
+    const n = input.value.split('\n').length;
+    gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
+  }
+  input.addEventListener('input', updateGutter);
+  updateGutter();
+
+  // WASM
+  async function loadWasm() {
+    try {
+      const mod = await import(WASM_JS);
+      await mod.default();
+      playground = new mod.Playground();
+      btn.textContent = 'Analyze';
+      btn.disabled = false;
+      runAnalysis();
+    } catch (e) {
+      status.textContent = 'Failed to load analyzer.';
+      console.error(e);
+    }
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Overlay highlight
+  const overlay    = document.getElementById('pg-overlay');
+  const underline  = document.getElementById('pg-underline');
+
+  // Measure monospace char width once (re-measure if font changes)
+  let charW = null;
+  function getCharWidth() {
+    if (charW) return charW;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = getComputedStyle(input).font;
+    charW = ctx.measureText('x').width;
+    return charW;
+  }
+
+  function positionUnderline() {
+    if (!underline._issue) return;
+    const { line, colStart, colEnd, sev } = underline._issue;
+    const computed  = getComputedStyle(input);
+    const lineH     = parseFloat(computed.lineHeight) || 22;
+    const padTop    = parseFloat(computed.paddingTop)  || 16;
+    const padLeft   = parseFloat(computed.paddingLeft) || 16;
+    const cw        = getCharWidth();
+    const lineText  = input.value.split('\n')[line - 1] ?? '';
+    const endCol    = colEnd > 0 ? colEnd : lineText.length;
+
+    const top   = padTop + (line - 1) * lineH + lineH - 4 - input.scrollTop;
+    const left  = padLeft + colStart * cw - input.scrollLeft;
+    const width = Math.max(cw * 2, (endCol - colStart) * cw);
+
+    const colors = { error: 'var(--sl-color-red)', warning: 'var(--sl-color-orange)', info: 'var(--sl-color-blue)' };
+    underline.style.cssText = `display:block; top:${top}px; left:${left}px; width:${width}px; border-color:${colors[sev] ?? colors.error};`;
+    overlay.scrollTop  = input.scrollTop;
+    overlay.scrollLeft = input.scrollLeft;
+  }
+
+  input.addEventListener('scroll', () => {
+    gutter.scrollTop = input.scrollTop;
+    positionUnderline();
+  });
+
+  diag.addEventListener('mouseover', e => {
+    const card = e.target.closest('.pg-issue');
+    if (!card) return;
+    const sev = card.classList.contains('pg-issue--error') ? 'error'
+              : card.classList.contains('pg-issue--warning') ? 'warning' : 'info';
+    underline._issue = { line: +card.dataset.line, lineEnd: +card.dataset.lineEnd,
+                         colStart: +card.dataset.colStart, colEnd: +card.dataset.colEnd, sev };
+    // Scroll textarea to bring the line into view
+    const lineH = parseFloat(getComputedStyle(input).lineHeight) || 22;
+    input.scrollTop = Math.max(0, (+card.dataset.line - 1) * lineH - input.clientHeight / 3);
+    positionUnderline();
+  });
+
+  diag.addEventListener('mouseleave', () => {
+    underline._issue = null;
+    underline.style.display = 'none';
+  });
+
+  function renderIssues(issues) {
+    if (!issues.length) {
+      diag.innerHTML = '<p class="pg-empty">No issues found.</p>';
+      return;
+    }
+    diag.innerHTML = issues.map(i => {
+      const s = i.severity.toLowerCase();
+      return `<div class="pg-issue pg-issue--${s}"
+          data-line="${i.line}" data-line-end="${i.line_end}"
+          data-col-start="${i.col_start}" data-col-end="${i.col_end}">
+        <div class="pg-issue-head">
+          <span class="pg-dot"></span>
+          <span class="pg-issue-name">${esc(i.name)}</span>
+          <span class="pg-issue-loc">line&nbsp;${i.line}:${i.col_start}</span>
+        </div>
+        <div class="pg-issue-msg">${esc(i.message)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function runAnalysis() {
+    if (!playground) return;
+    try {
+      renderIssues(JSON.parse(playground.analyze(input.value, sel.value)));
+    } catch (e) {
+      diag.innerHTML = '<p class="pg-empty">Analysis error.</p>';
+      console.error(e);
+    }
+  }
+
+  btn.addEventListener('click', runAnalysis);
+  sel.addEventListener('change', runAnalysis);
+  input.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(runAnalysis, 400);
+  });
+
+  loadWasm();
+</script>

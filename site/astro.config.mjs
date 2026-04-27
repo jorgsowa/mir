@@ -6,6 +6,7 @@ export default defineConfig({
   base: '/mir',
   integrations: [
     starlight({
+      customCss: ['./src/styles/custom.css'],
       title: 'mir',
       description: 'A fast, incremental PHP static analyzer written in Rust.',
       logo: {
@@ -21,6 +22,7 @@ export default defineConfig({
       },
       sidebar: [
         { label: 'Introduction', link: '/' },
+        { label: 'Playground', link: '/playground/' },
         {
           label: 'Guides',
           items: [
