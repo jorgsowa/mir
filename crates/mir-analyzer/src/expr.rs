@@ -1308,6 +1308,41 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     return Union::mixed();
                 }
+                Atomic::TNamedObject { fqcn, .. }
+                    if self.codebase.enums.contains_key(fqcn.as_ref()) =>
+                {
+                    match prop_name {
+                        "name" => return Union::single(Atomic::TNonEmptyString),
+                        "value" => {
+                            if let Some(en) = self.codebase.enums.get(fqcn.as_ref()) {
+                                if let Some(scalar_ty) = en.scalar_type.clone() {
+                                    return scalar_ty;
+                                }
+                            }
+                            // Pure (unit) enum has no ->value property.
+                            self.emit(
+                                IssueKind::UndefinedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Warning,
+                                span,
+                            );
+                            return Union::mixed();
+                        }
+                        _ => {
+                            self.emit(
+                                IssueKind::UndefinedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Warning,
+                                span,
+                            );
+                            return Union::mixed();
+                        }
+                    }
+                }
                 Atomic::TMixed => return Union::mixed(),
                 _ => {}
             }
