@@ -13,6 +13,8 @@ use mir_codebase::storage::Visibility;
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location, Severity};
 
+use crate::stubs::StubVfs;
+
 // Magic PHP methods that are invoked implicitly — never flag these as unused.
 const MAGIC_METHODS: &[&str] = &[
     "__construct",
@@ -102,9 +104,17 @@ impl<'a> DeadCodeAnalyzer<'a> {
         }
 
         // --- Non-referenced free functions ---
+        let stub_vfs = StubVfs::new();
         for entry in self.codebase.functions.iter() {
             let func = entry.value();
             let fqn = func.fqn.as_ref();
+            // Skip PHP built-in and extension functions loaded from stubs —
+            // they are not user-defined dead code.
+            if let Some(loc) = &func.location {
+                if stub_vfs.is_stub_file(loc.file.as_ref()) {
+                    continue;
+                }
+            }
             if !self.codebase.is_function_referenced(fqn) {
                 let (file, line) = location_from_storage(&func.location);
                 issues.push(Issue::new(
@@ -137,5 +147,38 @@ fn location_from_storage(
     match loc {
         Some(l) => (l.file.clone(), 1), // byte offset → line mapping not available here
         None => (std::sync::Arc::from("<unknown>"), 1),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::project::ProjectAnalyzer;
+
+    #[test]
+    fn builtin_functions_not_flagged_as_unused() {
+        // The dead-code pass must not produce UnusedFunction for PHP built-ins
+        // (strlen, array_map, etc.) even when they are never called in user code.
+        // This test bypasses the fixture runner's file-path filter to verify the
+        // fix directly on the DeadCodeAnalyzer output.
+        let analyzer = ProjectAnalyzer::new();
+        analyzer.load_stubs();
+        let issues = DeadCodeAnalyzer::new(analyzer.codebase()).analyze();
+        let builtin_false_positives: Vec<_> = issues
+            .iter()
+            .filter(|i| {
+                matches!(&i.kind, IssueKind::UnusedFunction { name } if
+                    matches!(name.as_str(), "strlen" | "array_map" | "json_encode" | "preg_match")
+                )
+            })
+            .collect();
+        assert!(
+            builtin_false_positives.is_empty(),
+            "Expected no UnusedFunction for PHP builtins, got: {:?}",
+            builtin_false_positives
+                .iter()
+                .map(|i| i.kind.message())
+                .collect::<Vec<_>>()
+        );
     }
 }
