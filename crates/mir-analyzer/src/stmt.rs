@@ -135,16 +135,6 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt: &php_ast::ast::Stmt<'arena, 'src>,
         ctx: &mut Context,
     ) {
-        stacker::maybe_grow(64 * 1024, 4 * 1024 * 1024, || {
-            self.analyze_stmt_inner(stmt, ctx)
-        });
-    }
-
-    fn analyze_stmt_inner<'arena, 'src>(
-        &mut self,
-        stmt: &php_ast::ast::Stmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
         match &stmt.kind {
             // ---- Expression statement ----------------------------------------
             StmtKind::Expression(expr) => {
