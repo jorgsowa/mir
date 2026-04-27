@@ -1,3 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+/* Top bar and navigation font */
+.site-title,
+header nav a,
+nav.sidebar-pane a,
+.sidebar-content a {
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: -0.01em;
+}
+
 /* Right sidebar — same background as left sidebar */
 .right-sidebar {
   background-color: var(--sl-color-bg-sidebar);

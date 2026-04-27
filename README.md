@@ -1,3 +1,9 @@
+<div align="center">
+
+![mir](mir.png)
+
+</div>
+
 # mir
 
 [![Docs](https://img.shields.io/badge/docs-jorgsowa.github.io%2Fmir-blue)](https://jorgsowa.github.io/mir/)
