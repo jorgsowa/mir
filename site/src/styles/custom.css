@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
+/* Make the logo fill more of the top bar */
+:root {
+  --sl-nav-pad-y: 0.375rem;
+}
+
 /* Top bar and navigation font */
 .site-title,
 header nav a,
