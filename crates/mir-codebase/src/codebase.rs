@@ -614,6 +614,18 @@ impl Codebase {
         fqcn: &str,
         prop_name: &str,
     ) -> Option<crate::storage::PropertyStorage> {
+        self.get_property_inner(fqcn, prop_name, &mut std::collections::HashSet::new())
+    }
+
+    fn get_property_inner(
+        &self,
+        fqcn: &str,
+        prop_name: &str,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> Option<crate::storage::PropertyStorage> {
+        if !visited.insert(fqcn.to_string()) {
+            return None;
+        }
         // Check direct class own_properties
         if let Some(cls) = self.classes.get(fqcn) {
             if let Some(p) = cls.own_properties.get(prop_name) {
@@ -622,7 +634,7 @@ impl Codebase {
             let mixins = cls.mixins.clone();
             drop(cls);
             for mixin in &mixins {
-                if let Some(p) = self.get_property(mixin.as_ref(), prop_name) {
+                if let Some(p) = self.get_property_inner(mixin.as_ref(), prop_name, visited) {
                     return Some(p);
                 }
             }
@@ -641,6 +653,13 @@ impl Codebase {
             if let Some(ancestor_cls) = self.classes.get(ancestor_fqcn.as_ref()) {
                 if let Some(p) = ancestor_cls.own_properties.get(prop_name) {
                     return Some(p.clone());
+                }
+                let anc_mixins = ancestor_cls.mixins.clone();
+                drop(ancestor_cls);
+                for mixin_fqcn in &anc_mixins {
+                    if let Some(p) = self.get_property_inner(mixin_fqcn, prop_name, visited) {
+                        return Some(p);
+                    }
                 }
             }
         }
@@ -759,6 +778,18 @@ impl Codebase {
 
     /// Resolve a method, walking up the full inheritance chain (own → traits → ancestors).
     pub fn get_method(&self, fqcn: &str, method_name: &str) -> Option<Arc<MethodStorage>> {
+        self.get_method_inner(fqcn, method_name, &mut std::collections::HashSet::new())
+    }
+
+    fn get_method_inner(
+        &self,
+        fqcn: &str,
+        method_name: &str,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> Option<Arc<MethodStorage>> {
+        if !visited.insert(fqcn.to_string()) {
+            return None;
+        }
         // PHP method names are case-insensitive — normalize to lowercase for all lookups.
         let method_lower = method_name.to_lowercase();
         let method_name = method_lower.as_str();
@@ -777,7 +808,7 @@ impl Codebase {
 
             // 2. Docblock mixins (delegated magic lookup)
             for mixin_fqcn in &mixins {
-                if let Some(m) = self.get_method(mixin_fqcn, method_name) {
+                if let Some(m) = self.get_method_inner(mixin_fqcn, method_name, visited) {
                     return Some(m);
                 }
             }
@@ -796,9 +827,15 @@ impl Codebase {
                         return Some(Arc::clone(m));
                     }
                     let anc_traits = anc.traits.clone();
+                    let anc_mixins = anc.mixins.clone();
                     drop(anc);
                     for tr_fqcn in &anc_traits {
                         if let Some(m) = self.get_method_in_trait(tr_fqcn, method_name) {
+                            return Some(m);
+                        }
+                    }
+                    for mixin_fqcn in &anc_mixins {
+                        if let Some(m) = self.get_method_inner(mixin_fqcn, method_name, visited) {
                             return Some(m);
                         }
                     }
@@ -1962,5 +1999,217 @@ mod tests {
             !cb.global_vars.contains_key("orphan_var"),
             "global_vars must not be registered when slice.file is None"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // get_method / get_property — mixin cycle guards
+    // -----------------------------------------------------------------------
+
+    fn bare_class(fqcn: &str, mixins: Vec<Arc<str>>) -> ClassStorage {
+        use indexmap::IndexMap;
+        ClassStorage {
+            fqcn: arc(fqcn),
+            short_name: arc(fqcn),
+            parent: None,
+            interfaces: vec![],
+            traits: vec![],
+            own_methods: IndexMap::new(),
+            own_properties: IndexMap::new(),
+            own_constants: IndexMap::new(),
+            mixins,
+            template_params: vec![],
+            extends_type_args: vec![],
+            implements_type_args: vec![],
+            is_abstract: false,
+            is_final: false,
+            is_readonly: false,
+            all_parents: vec![],
+            deprecated: None,
+            is_internal: false,
+            location: None,
+            type_aliases: std::collections::HashMap::new(),
+            pending_import_types: vec![],
+        }
+    }
+
+    fn class_with_method(fqcn: &str, method_name: &str, mixins: Vec<Arc<str>>) -> ClassStorage {
+        use crate::storage::{MethodStorage, Visibility};
+        use indexmap::IndexMap;
+        let mut methods = IndexMap::new();
+        methods.insert(
+            arc(method_name),
+            Arc::new(MethodStorage {
+                name: arc(method_name),
+                fqcn: arc(fqcn),
+                params: vec![],
+                return_type: None,
+                inferred_return_type: None,
+                visibility: Visibility::Public,
+                is_static: false,
+                is_abstract: false,
+                is_final: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                deprecated: None,
+                is_internal: false,
+                is_pure: false,
+                location: None,
+            }),
+        );
+        let mut cls = bare_class(fqcn, mixins);
+        cls.own_methods = methods;
+        cls
+    }
+
+    fn class_with_property(fqcn: &str, prop_name: &str, mixins: Vec<Arc<str>>) -> ClassStorage {
+        use crate::storage::{PropertyStorage, Visibility};
+        use indexmap::IndexMap;
+        let mut props = IndexMap::new();
+        props.insert(
+            arc(prop_name),
+            PropertyStorage {
+                name: arc(prop_name),
+                ty: None,
+                inferred_ty: None,
+                visibility: Visibility::Public,
+                is_static: false,
+                is_readonly: false,
+                default: None,
+                location: None,
+            },
+        );
+        let mut cls = bare_class(fqcn, mixins);
+        cls.own_properties = props;
+        cls
+    }
+
+    #[test]
+    fn get_method_two_way_mixin_cycle_returns_none() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
+        cb.classes.insert(arc("B"), bare_class("B", vec![arc("A")]));
+        assert!(cb.get_method("A", "missing").is_none());
+    }
+
+    #[test]
+    fn get_method_self_mixin_returns_none() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![arc("A")]));
+        assert!(cb.get_method("A", "missing").is_none());
+    }
+
+    #[test]
+    fn get_method_three_way_cycle_returns_none() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
+        cb.classes.insert(arc("B"), bare_class("B", vec![arc("C")]));
+        cb.classes.insert(arc("C"), bare_class("C", vec![arc("A")]));
+        assert!(cb.get_method("A", "missing").is_none());
+    }
+
+    #[test]
+    fn get_method_resolves_through_mixin_when_no_cycle() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
+        cb.classes
+            .insert(arc("B"), class_with_method("B", "fromB", vec![]));
+        assert!(cb.get_method("A", "fromB").is_some());
+    }
+
+    #[test]
+    fn get_method_own_method_shadows_mixin() {
+        let cb = Codebase::new();
+        cb.classes
+            .insert(arc("A"), class_with_method("A", "foo", vec![arc("B")]));
+        cb.classes
+            .insert(arc("B"), class_with_method("B", "foo", vec![]));
+        let m = cb.get_method("A", "foo").unwrap();
+        assert_eq!(m.fqcn.as_ref(), "A");
+    }
+
+    #[test]
+    fn get_method_mixin_nonexistent_class_returns_none() {
+        let cb = Codebase::new();
+        cb.classes
+            .insert(arc("A"), bare_class("A", vec![arc("Ghost")]));
+        assert!(cb.get_method("A", "foo").is_none());
+    }
+
+    #[test]
+    fn get_property_two_way_mixin_cycle_returns_none() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
+        cb.classes.insert(arc("B"), bare_class("B", vec![arc("A")]));
+        assert!(cb.get_property("A", "missing").is_none());
+    }
+
+    #[test]
+    fn get_method_diamond_mixin_finds_method_via_first_path() {
+        // A @mixin [B, C]; B @mixin D; C @mixin D; D has "foo".
+        // D is visited once via B and the method is found — C's path to D is
+        // blocked by the visited set, but the result is still correct.
+        let cb = Codebase::new();
+        cb.classes
+            .insert(arc("A"), bare_class("A", vec![arc("B"), arc("C")]));
+        cb.classes.insert(arc("B"), bare_class("B", vec![arc("D")]));
+        cb.classes.insert(arc("C"), bare_class("C", vec![arc("D")]));
+        cb.classes
+            .insert(arc("D"), class_with_method("D", "foo", vec![]));
+        assert!(cb.get_method("A", "foo").is_some());
+    }
+
+    #[test]
+    fn get_method_mixin_on_ancestor_is_followed() {
+        let cb = Codebase::new();
+        cb.classes.insert(
+            arc("Child"),
+            ClassStorage {
+                all_parents: vec![arc("Parent")],
+                ..bare_class("Child", vec![])
+            },
+        );
+        cb.classes
+            .insert(arc("Parent"), bare_class("Parent", vec![arc("Mixin")]));
+        cb.classes.insert(
+            arc("Mixin"),
+            class_with_method("Mixin", "fromMixin", vec![]),
+        );
+        assert!(cb.get_method("Child", "fromMixin").is_some());
+        assert!(cb.get_method("Parent", "fromMixin").is_some());
+    }
+
+    #[test]
+    fn get_method_mixin_on_transitive_ancestor_is_followed() {
+        let cb = Codebase::new();
+        // A extends B extends C; C has @mixin D; D has "foo"
+        cb.classes.insert(
+            arc("A"),
+            ClassStorage {
+                all_parents: vec![arc("B"), arc("C")],
+                ..bare_class("A", vec![])
+            },
+        );
+        cb.classes.insert(
+            arc("B"),
+            ClassStorage {
+                all_parents: vec![arc("C")],
+                ..bare_class("B", vec![])
+            },
+        );
+        cb.classes.insert(arc("C"), bare_class("C", vec![arc("D")]));
+        cb.classes
+            .insert(arc("D"), class_with_method("D", "foo", vec![]));
+        assert!(cb.get_method("A", "foo").is_some());
+    }
+
+    #[test]
+    fn get_property_resolves_through_mixin_when_no_cycle() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
+        cb.classes
+            .insert(arc("B"), class_with_property("B", "title", vec![]));
+        assert!(cb.get_property("A", "title").is_some());
     }
 }
