@@ -671,15 +671,21 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 None
             };
             if let Some(iface_fqcn) = iface_key {
-                let compatible = ea.codebase.classes.iter().any(|entry| {
-                    let cls = entry.value();
-                    cls.all_parents.iter().any(|p| p.as_ref() == iface_fqcn)
+                let class_fqcns: Vec<std::sync::Arc<str>> = ea
+                    .codebase
+                    .classes
+                    .iter()
+                    .map(|e| e.key().clone())
+                    .collect();
+                let compatible = class_fqcns.iter().any(|cls_fqcn| {
+                    ea.codebase
+                        .extends_or_implements(cls_fqcn.as_ref(), iface_fqcn)
                         && (ea
                             .codebase
-                            .extends_or_implements(entry.key().as_ref(), param_fqcn.as_ref())
+                            .extends_or_implements(cls_fqcn.as_ref(), param_fqcn.as_ref())
                             || ea
                                 .codebase
-                                .extends_or_implements(entry.key().as_ref(), &resolved_param))
+                                .extends_or_implements(cls_fqcn.as_ref(), &resolved_param))
                 });
                 if compatible {
                     return true;

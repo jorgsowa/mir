@@ -63,6 +63,7 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for fqcn in &class_keys {
+            self.codebase.ensure_finalized(fqcn);
             let cls = match self.codebase.classes.get(fqcn.as_ref()) {
                 Some(c) => c,
                 None => continue,

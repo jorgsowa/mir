@@ -667,6 +667,7 @@ impl Codebase {
         if !visited.insert(fqcn.to_string()) {
             return None;
         }
+        self.ensure_finalized(fqcn);
         // Check direct class own_properties
         if let Some(cls) = self.classes.get(fqcn) {
             if let Some(p) = cls.own_properties.get(prop_name) {
@@ -730,6 +731,7 @@ impl Codebase {
         fqcn: &str,
         const_name: &str,
     ) -> Option<crate::storage::ConstantStorage> {
+        self.ensure_finalized(fqcn);
         // Class: own → traits → ancestors → interfaces
         if let Some(cls) = self.classes.get(fqcn) {
             if let Some(c) = cls.own_constants.get(const_name) {
@@ -831,6 +833,7 @@ impl Codebase {
         if !visited.insert(fqcn.to_string()) {
             return None;
         }
+        self.ensure_finalized(fqcn);
         // PHP method names are case-insensitive — normalize to lowercase for all lookups.
         let method_lower = method_name.to_lowercase();
         let method_name = method_lower.as_str();
@@ -951,6 +954,7 @@ impl Codebase {
 
     /// Returns true if `child` extends or implements `ancestor` (transitively).
     pub fn extends_or_implements(&self, child: &str, ancestor: &str) -> bool {
+        self.ensure_finalized(child);
         if child == ancestor {
             return true;
         }
@@ -1068,6 +1072,7 @@ impl Codebase {
     /// We use the pre-computed `all_parents` list (built during finalization) rather
     /// than recursive DashMap lookups to avoid potential deadlocks.
     pub fn has_unknown_ancestor(&self, fqcn: &str) -> bool {
+        self.ensure_finalized(fqcn);
         // For interfaces: check whether any parent interface is unknown.
         if let Some(iface) = self.interfaces.get(fqcn) {
             let parents = iface.all_parents.clone();
@@ -2431,7 +2436,7 @@ mod tests {
         cb.classes.insert(
             arc("Child"),
             ClassStorage {
-                all_parents: vec![arc("Parent")],
+                parent: Some(arc("Parent")),
                 ..bare_class("Child", vec![])
             },
         );
@@ -2452,14 +2457,14 @@ mod tests {
         cb.classes.insert(
             arc("A"),
             ClassStorage {
-                all_parents: vec![arc("B"), arc("C")],
+                parent: Some(arc("B")),
                 ..bare_class("A", vec![])
             },
         );
         cb.classes.insert(
             arc("B"),
             ClassStorage {
-                all_parents: vec![arc("C")],
+                parent: Some(arc("C")),
                 ..bare_class("B", vec![])
             },
         );
