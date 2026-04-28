@@ -1,7 +1,9 @@
-use mir_types::{Atomic, Union, Variance};
+use mir_types::{ArrayKey, Atomic, Union, Variance};
 /// Docblock parser — delegates to `php_rs_parser::phpdoc` for tag extraction,
 /// then converts `PhpDocTag`s into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
+
+use indexmap::IndexMap;
 
 use php_rs_parser::phpdoc::PhpDocTag;
 
@@ -473,6 +475,24 @@ pub fn parse_type_string(s: &str) -> Union {
         });
     }
 
+    // Callable/closure syntax: `Closure(T): R` or `callable(T): R`
+    if let Some(call_ty) = parse_callable_syntax(s) {
+        return call_ty;
+    }
+
+    // Array shape: `array{key: Type, ...}` or `list{Type, ...}`
+    if s.ends_with('}') {
+        if let Some(open) = s.find('{') {
+            let prefix = s[..open].to_lowercase();
+            let inner = &s[open + 1..s.len() - 1];
+            if prefix == "array" {
+                return parse_keyed_array(inner, false);
+            } else if prefix == "list" {
+                return parse_keyed_array(inner, true);
+            }
+        }
+    }
+
     // Generic: `name<...>`
     if let Some(open) = s.find('<') {
         if s.ends_with('>') {
@@ -631,6 +651,152 @@ fn parse_generic(name: &str, inner: &str) -> Union {
             })
         }
     }
+}
+
+fn parse_keyed_array(inner: &str, is_list: bool) -> Union {
+    use mir_types::atomic::KeyedProperty;
+    let mut properties: IndexMap<ArrayKey, KeyedProperty> = IndexMap::new();
+    let mut is_open = false;
+    let mut auto_index = 0i64;
+
+    for item in split_generics(inner) {
+        let item = item.trim();
+        if item.is_empty() {
+            continue;
+        }
+        if item == "..." {
+            is_open = true;
+            continue;
+        }
+        // Find a colon that is not inside nested generics/braces
+        let colon_pos = {
+            let mut depth = 0i32;
+            let mut found = None;
+            for (i, ch) in item.char_indices() {
+                match ch {
+                    '<' | '(' | '{' => depth += 1,
+                    '>' | ')' | '}' => depth -= 1,
+                    ':' if depth == 0 => {
+                        found = Some(i);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            found
+        };
+        if let Some(colon) = colon_pos {
+            let key_part = item[..colon].trim();
+            let ty_part = item[colon + 1..].trim();
+            let optional = key_part.ends_with('?');
+            let key_str = key_part.trim_end_matches('?').trim();
+            let key = if let Ok(n) = key_str.parse::<i64>() {
+                ArrayKey::Int(n)
+            } else {
+                ArrayKey::String(Arc::from(key_str))
+            };
+            properties.insert(
+                key,
+                KeyedProperty {
+                    ty: parse_type_string(ty_part),
+                    optional,
+                },
+            );
+        } else {
+            properties.insert(
+                ArrayKey::Int(auto_index),
+                KeyedProperty {
+                    ty: parse_type_string(item),
+                    optional: false,
+                },
+            );
+            auto_index += 1;
+        }
+    }
+
+    Union::single(Atomic::TKeyedArray {
+        properties,
+        is_open,
+        is_list,
+    })
+}
+
+fn parse_callable_syntax(s: &str) -> Option<Union> {
+    let s = s.trim_start_matches('\\');
+    let lower = s.to_lowercase();
+    let is_closure = lower.starts_with("closure");
+    let is_callable = lower.starts_with("callable");
+    if !is_closure && !is_callable {
+        return None;
+    }
+    let prefix_len = if is_closure {
+        "closure".len()
+    } else {
+        "callable".len()
+    };
+    let rest = s[prefix_len..].trim_start();
+    if !rest.starts_with('(') {
+        return None;
+    }
+    let close = find_matching_paren(rest)?;
+    let params_str = &rest[1..close];
+    let after = rest[close + 1..].trim();
+    let return_type = after
+        .strip_prefix(':')
+        .map(|ret_str| Box::new(parse_type_string(ret_str.trim())));
+    let params: Vec<mir_types::atomic::FnParam> = split_generics(params_str)
+        .into_iter()
+        .enumerate()
+        .filter(|(_, p)| !p.trim().is_empty())
+        .map(|(i, p)| {
+            let p = p.trim();
+            let (ty_str, name) = if let Some(dollar) = p.rfind('$') {
+                (p[..dollar].trim(), p[dollar + 1..].to_string())
+            } else {
+                (p, format!("arg{i}"))
+            };
+            mir_types::atomic::FnParam {
+                name: name.into(),
+                ty: Some(parse_type_string(ty_str)),
+                default: None,
+                is_variadic: false,
+                is_byref: false,
+                is_optional: false,
+            }
+        })
+        .collect();
+    if is_closure {
+        Some(Union::single(Atomic::TClosure {
+            params,
+            return_type: return_type.unwrap_or_else(|| Box::new(Union::single(Atomic::TVoid))),
+            this_type: None,
+        }))
+    } else {
+        Some(Union::single(Atomic::TCallable {
+            params: Some(params),
+            return_type,
+        }))
+    }
+}
+
+fn find_matching_paren(s: &str) -> Option<usize> {
+    if !s.starts_with('(') {
+        return None;
+    }
+    let mut depth = 0i32;
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '(' | '<' | '{' => depth += 1,
+            ')' | '>' | '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------

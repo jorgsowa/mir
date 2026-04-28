@@ -3,7 +3,7 @@ use php_ast::Span;
 
 use mir_codebase::storage::AssertionKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::Union;
+use mir_types::{Atomic, Union};
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
@@ -26,9 +26,19 @@ impl CallAnalyzer {
         let fn_name = match &call.name.kind {
             ExprKind::Identifier(name) => (*name).to_string(),
             _ => {
-                ea.analyze(call.name, ctx);
+                let callee_ty = ea.analyze(call.name, ctx);
                 for arg in call.args.iter() {
                     ea.analyze(&arg.value, ctx);
+                }
+                for atomic in &callee_ty.types {
+                    match atomic {
+                        Atomic::TClosure { return_type, .. } => return *return_type.clone(),
+                        Atomic::TCallable {
+                            return_type: Some(rt),
+                            ..
+                        } => return *rt.clone(),
+                        _ => {}
+                    }
                 }
                 return Union::mixed();
             }

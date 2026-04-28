@@ -396,6 +396,91 @@ impl Union {
                         value: Box::new(value.substitute_templates(bindings)),
                     });
                 }
+                Atomic::TNonEmptyArray { key, value } => {
+                    result.add_type(Atomic::TNonEmptyArray {
+                        key: Box::new(key.substitute_templates(bindings)),
+                        value: Box::new(value.substitute_templates(bindings)),
+                    });
+                }
+                Atomic::TNonEmptyList { value } => {
+                    result.add_type(Atomic::TNonEmptyList {
+                        value: Box::new(value.substitute_templates(bindings)),
+                    });
+                }
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                } => {
+                    use crate::atomic::KeyedProperty;
+                    let new_props = properties
+                        .iter()
+                        .map(|(k, prop)| {
+                            (
+                                k.clone(),
+                                KeyedProperty {
+                                    ty: prop.ty.substitute_templates(bindings),
+                                    optional: prop.optional,
+                                },
+                            )
+                        })
+                        .collect();
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                }
+                Atomic::TCallable {
+                    params,
+                    return_type,
+                } => {
+                    result.add_type(Atomic::TCallable {
+                        params: params.as_ref().map(|ps| {
+                            ps.iter()
+                                .map(|p| substitute_in_fn_param(p, bindings))
+                                .collect()
+                        }),
+                        return_type: return_type
+                            .as_ref()
+                            .map(|r| Box::new(r.substitute_templates(bindings))),
+                    });
+                }
+                Atomic::TClosure {
+                    params,
+                    return_type,
+                    this_type,
+                } => {
+                    result.add_type(Atomic::TClosure {
+                        params: params
+                            .iter()
+                            .map(|p| substitute_in_fn_param(p, bindings))
+                            .collect(),
+                        return_type: Box::new(return_type.substitute_templates(bindings)),
+                        this_type: this_type
+                            .as_ref()
+                            .map(|t| Box::new(t.substitute_templates(bindings))),
+                    });
+                }
+                Atomic::TConditional {
+                    subject,
+                    if_true,
+                    if_false,
+                } => {
+                    result.add_type(Atomic::TConditional {
+                        subject: Box::new(subject.substitute_templates(bindings)),
+                        if_true: Box::new(if_true.substitute_templates(bindings)),
+                        if_false: Box::new(if_false.substitute_templates(bindings)),
+                    });
+                }
+                Atomic::TIntersection { parts } => {
+                    result.add_type(Atomic::TIntersection {
+                        parts: parts
+                            .iter()
+                            .map(|p| p.substitute_templates(bindings))
+                            .collect(),
+                    });
+                }
                 Atomic::TNamedObject { fqcn, type_params } => {
                     // TODO: the docblock parser emits TNamedObject { fqcn: "T" } for bare @return T
                     // annotations instead of TTemplateParam, because it lacks template context at
@@ -469,6 +554,24 @@ impl Union {
     pub fn from_docblock(mut self) -> Self {
         self.from_docblock = true;
         self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Template substitution helpers
+// ---------------------------------------------------------------------------
+
+fn substitute_in_fn_param(
+    p: &crate::atomic::FnParam,
+    bindings: &std::collections::HashMap<Arc<str>, Union>,
+) -> crate::atomic::FnParam {
+    crate::atomic::FnParam {
+        name: p.name.clone(),
+        ty: p.ty.as_ref().map(|t| t.substitute_templates(bindings)),
+        default: p.default.as_ref().map(|d| d.substitute_templates(bindings)),
+        is_variadic: p.is_variadic,
+        is_byref: p.is_byref,
+        is_optional: p.is_optional,
     }
 }
 
@@ -831,5 +934,228 @@ mod tests {
         u.add_type(Atomic::TNull);
         assert!(u.is_nullable());
         assert!(u.contains(|t| matches!(t, Atomic::TIntersection { .. })));
+    }
+
+    // --- substitute_templates coverage for previously-missing arms ----------
+
+    fn t_param(name: &str) -> Union {
+        Union::single(Atomic::TTemplateParam {
+            name: Arc::from(name),
+            as_type: Box::new(Union::mixed()),
+            defining_entity: Arc::from("Fn"),
+        })
+    }
+
+    fn bindings_t_string() -> std::collections::HashMap<Arc<str>, Union> {
+        let mut b = std::collections::HashMap::new();
+        b.insert(Arc::from("T"), Union::single(Atomic::TString));
+        b
+    }
+
+    #[test]
+    fn substitute_non_empty_array_key_and_value() {
+        let ty = Union::single(Atomic::TNonEmptyArray {
+            key: Box::new(t_param("T")),
+            value: Box::new(t_param("T")),
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        assert_eq!(result.types.len(), 1);
+        let Atomic::TNonEmptyArray { key, value } = &result.types[0] else {
+            panic!("expected TNonEmptyArray");
+        };
+        assert!(matches!(key.types[0], Atomic::TString));
+        assert!(matches!(value.types[0], Atomic::TString));
+    }
+
+    #[test]
+    fn substitute_non_empty_list_value() {
+        let ty = Union::single(Atomic::TNonEmptyList {
+            value: Box::new(t_param("T")),
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        let Atomic::TNonEmptyList { value } = &result.types[0] else {
+            panic!("expected TNonEmptyList");
+        };
+        assert!(matches!(value.types[0], Atomic::TString));
+    }
+
+    #[test]
+    fn substitute_keyed_array_property_types() {
+        use crate::atomic::{ArrayKey, KeyedProperty};
+        use indexmap::IndexMap;
+        let mut props = IndexMap::new();
+        props.insert(
+            ArrayKey::String(Arc::from("name")),
+            KeyedProperty {
+                ty: t_param("T"),
+                optional: false,
+            },
+        );
+        props.insert(
+            ArrayKey::String(Arc::from("tag")),
+            KeyedProperty {
+                ty: t_param("T"),
+                optional: true,
+            },
+        );
+        let ty = Union::single(Atomic::TKeyedArray {
+            properties: props,
+            is_open: true,
+            is_list: false,
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } = &result.types[0]
+        else {
+            panic!("expected TKeyedArray");
+        };
+        assert!(is_open);
+        assert!(!is_list);
+        assert!(matches!(
+            properties[&ArrayKey::String(Arc::from("name"))].ty.types[0],
+            Atomic::TString
+        ));
+        assert!(properties[&ArrayKey::String(Arc::from("tag"))].optional);
+        assert!(matches!(
+            properties[&ArrayKey::String(Arc::from("tag"))].ty.types[0],
+            Atomic::TString
+        ));
+    }
+
+    #[test]
+    fn substitute_callable_params_and_return() {
+        use crate::atomic::FnParam;
+        let ty = Union::single(Atomic::TCallable {
+            params: Some(vec![FnParam {
+                name: Arc::from("x"),
+                ty: Some(t_param("T")),
+                default: None,
+                is_variadic: false,
+                is_byref: false,
+                is_optional: false,
+            }]),
+            return_type: Some(Box::new(t_param("T"))),
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        let Atomic::TCallable {
+            params,
+            return_type,
+        } = &result.types[0]
+        else {
+            panic!("expected TCallable");
+        };
+        let param_ty = params.as_ref().unwrap()[0].ty.as_ref().unwrap();
+        assert!(matches!(param_ty.types[0], Atomic::TString));
+        let ret = return_type.as_ref().unwrap();
+        assert!(matches!(ret.types[0], Atomic::TString));
+    }
+
+    #[test]
+    fn substitute_callable_bare_no_panic() {
+        // callable with no params/return — must not panic and must pass through unchanged
+        let ty = Union::single(Atomic::TCallable {
+            params: None,
+            return_type: None,
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        assert!(matches!(
+            result.types[0],
+            Atomic::TCallable {
+                params: None,
+                return_type: None
+            }
+        ));
+    }
+
+    #[test]
+    fn substitute_closure_params_return_and_this() {
+        use crate::atomic::FnParam;
+        let ty = Union::single(Atomic::TClosure {
+            params: vec![FnParam {
+                name: Arc::from("a"),
+                ty: Some(t_param("T")),
+                default: Some(t_param("T")),
+                is_variadic: true,
+                is_byref: true,
+                is_optional: true,
+            }],
+            return_type: Box::new(t_param("T")),
+            this_type: Some(Box::new(t_param("T"))),
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        let Atomic::TClosure {
+            params,
+            return_type,
+            this_type,
+        } = &result.types[0]
+        else {
+            panic!("expected TClosure");
+        };
+        let p = &params[0];
+        assert!(matches!(p.ty.as_ref().unwrap().types[0], Atomic::TString));
+        assert!(matches!(
+            p.default.as_ref().unwrap().types[0],
+            Atomic::TString
+        ));
+        // flags preserved
+        assert!(p.is_variadic);
+        assert!(p.is_byref);
+        assert!(p.is_optional);
+        assert!(matches!(return_type.types[0], Atomic::TString));
+        assert!(matches!(
+            this_type.as_ref().unwrap().types[0],
+            Atomic::TString
+        ));
+    }
+
+    #[test]
+    fn substitute_conditional_all_branches() {
+        let ty = Union::single(Atomic::TConditional {
+            subject: Box::new(t_param("T")),
+            if_true: Box::new(t_param("T")),
+            if_false: Box::new(Union::single(Atomic::TInt)),
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        let Atomic::TConditional {
+            subject,
+            if_true,
+            if_false,
+        } = &result.types[0]
+        else {
+            panic!("expected TConditional");
+        };
+        assert!(matches!(subject.types[0], Atomic::TString));
+        assert!(matches!(if_true.types[0], Atomic::TString));
+        assert!(matches!(if_false.types[0], Atomic::TInt));
+    }
+
+    #[test]
+    fn substitute_intersection_parts() {
+        let ty = Union::single(Atomic::TIntersection {
+            parts: vec![
+                Union::single(Atomic::TNamedObject {
+                    fqcn: Arc::from("Countable"),
+                    type_params: vec![],
+                }),
+                t_param("T"),
+            ],
+        });
+        let result = ty.substitute_templates(&bindings_t_string());
+        let Atomic::TIntersection { parts } = &result.types[0] else {
+            panic!("expected TIntersection");
+        };
+        assert_eq!(parts.len(), 2);
+        assert!(matches!(parts[0].types[0], Atomic::TNamedObject { .. }));
+        assert!(matches!(parts[1].types[0], Atomic::TString));
+    }
+
+    #[test]
+    fn substitute_no_template_params_identity() {
+        let ty = Union::single(Atomic::TInt);
+        let result = ty.substitute_templates(&bindings_t_string());
+        assert!(matches!(result.types[0], Atomic::TInt));
     }
 }
