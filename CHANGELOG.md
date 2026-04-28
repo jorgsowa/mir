@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-04-28
+
+### Added
+
+- Generic template substitution extended to array shapes (`TKeyedArray`, `TNonEmptyArray`, `TNonEmptyList`), callable/closure types, conditional types, and intersection types. Variable calls (`$fn()`) on `TClosure`/`TCallable` now resolve the correct return type instead of `mixed`. `TIntersection` method calls resolve against the part that owns the method. Docblock parser gains `array{key: T}` shape syntax and `callable(T): R` / `Closure(T): R` parsing.
+- `ParsedDocblock::is_inherit_doc` flag: set when `@inheritDoc`, `@inheritdoc`, or `{@inheritDoc}` is present in a docblock, enabling LSP clients to walk the inheritance chain for hover and completion without implementing resolution in mir itself.
+
+### Fixed
+
+- LSP / incremental re-analysis: `inject_stub_slice` now populates `file_namespaces` and `file_imports` in the codebase, fixing false-positive `UndefinedClass` diagnostics for `use`-aliased classes after any incremental re-analysis triggered by `re_analyze_file`.
+
+### Changed
+
+- `Location` type unified in `mir-types`; internal codebase storage switched from byte offsets to `(line, col_start, col_end)`. All `mark_*_referenced_at()` methods now accept line/column instead of byte offsets. Columns use 0-based Unicode code-point counts (LSP UTF-32 encoding); UTF-16 conversion happens at the LSP boundary for clients that do not advertise UTF-32 support. Existing on-disk caches silently rebuild on the next run.
+
+### CI
+
+- Docs deploy now invokes a reusable `workflow_call` path to `docs.yml` so the deployment runs under a branch-authorized context instead of directly from a tag, fixing GitHub Pages environment protection failures.
+
 ## [0.13.0] - 2026-04-28
 
 ### Added
