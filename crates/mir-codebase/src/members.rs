@@ -132,6 +132,7 @@ impl Codebase {
 
     /// Collect all visible members for a single FQCN.
     fn collect_members_for_fqcn(&self, fqcn: &str, out: &mut Vec<MemberInfo>, seen: &mut Seen) {
+        self.ensure_finalized(fqcn);
         // --- Class ---
         if let Some(cls) = self.classes.get(fqcn) {
             let cls_fqcn = cls.fqcn.clone();

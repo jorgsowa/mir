@@ -311,9 +311,6 @@ impl ProjectAnalyzer {
 
         all_issues.extend(parse_errors);
 
-        // ---- Finalize codebase (resolve inheritance, build dispatch tables) --
-        self.codebase.finalize();
-
         // ---- Lazy-load unknown classes via PSR-4 (issue #50) ----------------
         if let Some(psr4) = &self.psr4 {
             self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);

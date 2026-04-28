@@ -792,6 +792,7 @@ impl<'a> Pass2Driver<'a> {
     /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
     /// `@psalm-require-implements` constraint declared on the traits it uses.
     fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
+        self.codebase.ensure_finalized(fqcn);
         // Check @psalm-require-extends / @psalm-require-implements for each used trait.
         let (class_all_parents, trait_list) = self
             .codebase
