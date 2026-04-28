@@ -33,6 +33,7 @@ pub struct StatementsAnalyzer<'a> {
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
+    pub inference_only: bool,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Union>,
     /// Break-context stack: one entry per active loop nesting level.
@@ -41,6 +42,7 @@ pub struct StatementsAnalyzer<'a> {
 }
 
 impl<'a> StatementsAnalyzer<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         codebase: &'a Codebase,
         file: Arc<str>,
@@ -49,6 +51,7 @@ impl<'a> StatementsAnalyzer<'a> {
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
         php_version: PhpVersion,
+        inference_only: bool,
     ) -> Self {
         Self {
             codebase,
@@ -58,6 +61,7 @@ impl<'a> StatementsAnalyzer<'a> {
             issues,
             symbols,
             php_version,
+            inference_only,
             return_types: Vec::new(),
             break_ctx_stack: Vec::new(),
         }
@@ -1000,6 +1004,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.issues,
                     self.symbols,
                     self.php_version,
+                    self.inference_only,
                 );
                 sa.analyze_stmts(&decl.body, &mut fn_ctx);
             }
@@ -1060,6 +1065,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         self.issues,
                         self.symbols,
                         self.php_version,
+                        self.inference_only,
                     );
                     sa.analyze_stmts(body, &mut method_ctx);
                 }
@@ -1099,6 +1105,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.issues,
             self.symbols,
             self.php_version,
+            self.inference_only,
         )
     }
 

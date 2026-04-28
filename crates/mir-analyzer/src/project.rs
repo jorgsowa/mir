@@ -333,6 +333,20 @@ impl ProjectAnalyzer {
                 .analyze_all();
         all_issues.extend(class_issues);
 
+        // ---- Pass 2 priming: populate inferred_return_type for all functions  --
+        // Run a first inference-only sweep so that cross-file inferred return
+        // types are available before the issue-emitting pass below (G6).
+        file_data
+            .par_iter()
+            .filter(|(file, _)| !files_with_parse_errors.contains(file))
+            .for_each(|(file, src)| {
+                let driver =
+                    Pass2Driver::new_inference_only(&self.codebase, self.resolved_php_version());
+                let arena = bumpalo::Bump::new();
+                let parsed = php_rs_parser::parse(&arena, src);
+                driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map);
+            });
+
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
         let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
             .par_iter()
