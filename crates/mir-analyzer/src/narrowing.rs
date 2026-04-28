@@ -132,7 +132,7 @@ pub fn narrow_from_condition<'arena, 'src>(
             };
             let effective_is_true = if extra_negation { !is_true } else { is_true };
             if let Some(var_name) = extract_var_name(lhs) {
-                if let Some(raw_name) = extract_class_name(b.right) {
+                if let Some(raw_name) = extract_class_name(b.right, ctx.self_fqcn.as_deref()) {
                     // Resolve the short name to its FQCN using file imports
                     let class_name = codebase.resolve_class_name(file, &raw_name);
                     let current = ctx.get_var(&var_name);
@@ -270,6 +270,8 @@ fn narrow_or_instanceof_true<'arena, 'src>(
     codebase: &Codebase,
     file: &str,
 ) {
+    let self_fqcn = ctx.self_fqcn.as_deref();
+
     // Collect all class names from instanceof checks on the same variable.
     let mut var_name: Option<String> = None;
     let mut class_names: Vec<String> = vec![];
@@ -280,12 +282,14 @@ fn narrow_or_instanceof_true<'arena, 'src>(
         class_names: &mut Vec<String>,
         codebase: &Codebase,
         file: &str,
+        self_fqcn: Option<&str>,
     ) -> bool {
         match &expr.kind {
             ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-                if let (Some(vn), Some(cn)) =
-                    (extract_var_name(b.left), extract_class_name(b.right))
-                {
+                if let (Some(vn), Some(cn)) = (
+                    extract_var_name(b.left),
+                    extract_class_name(b.right, self_fqcn),
+                ) {
                     let resolved = codebase.resolve_class_name(file, &cn);
                     match var_name {
                         None => {
@@ -304,19 +308,33 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                 }
             }
             ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
-                collect_instanceof(b.left, var_name, class_names, codebase, file)
-                    && collect_instanceof(b.right, var_name, class_names, codebase, file)
+                collect_instanceof(b.left, var_name, class_names, codebase, file, self_fqcn)
+                    && collect_instanceof(b.right, var_name, class_names, codebase, file, self_fqcn)
             }
             ExprKind::Parenthesized(inner) => {
-                collect_instanceof(inner, var_name, class_names, codebase, file)
+                collect_instanceof(inner, var_name, class_names, codebase, file, self_fqcn)
             }
             _ => false,
         }
     }
 
     // Wrap left and right into a fake OR so we can reuse the collector
-    let left_ok = collect_instanceof(left, &mut var_name, &mut class_names, codebase, file);
-    let right_ok = collect_instanceof(right, &mut var_name, &mut class_names, codebase, file);
+    let left_ok = collect_instanceof(
+        left,
+        &mut var_name,
+        &mut class_names,
+        codebase,
+        file,
+        self_fqcn,
+    );
+    let right_ok = collect_instanceof(
+        right,
+        &mut var_name,
+        &mut class_names,
+        codebase,
+        file,
+        self_fqcn,
+    );
 
     if left_ok && right_ok {
         if let Some(vn) = var_name {
@@ -523,10 +541,16 @@ fn extract_var_name<'a, 'arena, 'src>(
     }
 }
 
-fn extract_class_name<'arena, 'src>(expr: &php_ast::ast::Expr<'arena, 'src>) -> Option<String> {
+fn extract_class_name<'arena, 'src>(
+    expr: &php_ast::ast::Expr<'arena, 'src>,
+    self_fqcn: Option<&str>,
+) -> Option<String> {
     match &expr.kind {
         ExprKind::Identifier(name) => Some(name.to_string()),
-        ExprKind::Variable(_name) => None, // dynamic class — can't narrow
+        ExprKind::Variable(name) if name.as_str().trim_start_matches('$') == "this" => {
+            self_fqcn.map(|s| s.to_string())
+        }
+        ExprKind::Variable(_) => None, // dynamic class — can't narrow
         _ => None,
     }
 }
