@@ -17,6 +17,7 @@ use crate::symbol::ResolvedSymbol;
 pub(crate) struct Pass2Driver<'a> {
     codebase: &'a Arc<Codebase>,
     php_version: PhpVersion,
+    inference_only: bool,
 }
 
 impl<'a> Pass2Driver<'a> {
@@ -24,6 +25,15 @@ impl<'a> Pass2Driver<'a> {
         Self {
             codebase,
             php_version,
+            inference_only: false,
+        }
+    }
+
+    pub(crate) fn new_inference_only(codebase: &'a Arc<Codebase>, php_version: PhpVersion) -> Self {
+        Self {
+            codebase,
+            php_version,
+            inference_only: true,
         }
     }
 
@@ -156,6 +166,7 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 &mut all_symbols,
                 self.php_version,
+                self.inference_only,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -313,6 +324,7 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
+                self.inference_only,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -411,6 +423,7 @@ impl<'a> Pass2Driver<'a> {
             &mut buf,
             all_symbols,
             self.php_version,
+            self.inference_only,
         );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -521,6 +534,7 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
+                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -623,6 +637,7 @@ impl<'a> Pass2Driver<'a> {
             &mut buf,
             all_symbols,
             self.php_version,
+            self.inference_only,
         );
         sa.analyze_stmts(body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -746,6 +761,7 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
+                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -919,6 +935,7 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
+                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -1021,6 +1038,7 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
+                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);

@@ -26,9 +26,13 @@ pub struct ExpressionAnalyzer<'a> {
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
+    /// When true, skip all reference-tracking side-effects (used by the
+    /// inference priming pass so reference locations aren't double-counted).
+    pub inference_only: bool,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         codebase: &'a Codebase,
         file: Arc<str>,
@@ -37,6 +41,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
         php_version: PhpVersion,
+        inference_only: bool,
     ) -> Self {
         Self {
             codebase,
@@ -46,6 +51,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             issues,
             symbols,
             php_version,
+            inference_only,
         }
     }
 
@@ -652,14 +658,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                         // Record class instantiation as a reference so LSP
                         // "find references" for a class includes new Foo() sites.
-                        let (line, col_start, col_end) = self.span_to_ref_loc(n.class.span);
-                        self.codebase.mark_class_referenced_at(
-                            &fqcn,
-                            self.file.clone(),
-                            line,
-                            col_start,
-                            col_end,
-                        );
+                        if !self.inference_only {
+                            let (line, col_start, col_end) = self.span_to_ref_loc(n.class.span);
+                            self.codebase.mark_class_referenced_at(
+                                &fqcn,
+                                self.file.clone(),
+                                line,
+                                col_start,
+                                col_end,
+                            );
+                        }
                         ty
                     }
                     _ => {
@@ -904,6 +912,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.issues,
                         self.symbols,
                         self.php_version,
+                        self.inference_only,
                     );
                     sa.analyze_stmts(&c.body, &mut closure_ctx);
                     let ret = crate::project::merge_return_types(&sa.return_types);
@@ -1286,15 +1295,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 {
                     if let Some(prop) = self.codebase.get_property(fqcn.as_ref(), prop_name) {
                         // Record reference for dead-code detection (M18)
-                        let (line, col_start, col_end) = self.span_to_ref_loc(span);
-                        self.codebase.mark_property_referenced_at(
-                            fqcn,
-                            prop_name,
-                            self.file.clone(),
-                            line,
-                            col_start,
-                            col_end,
-                        );
+                        if !self.inference_only {
+                            let (line, col_start, col_end) = self.span_to_ref_loc(span);
+                            self.codebase.mark_property_referenced_at(
+                                fqcn,
+                                prop_name,
+                                self.file.clone(),
+                                line,
+                                col_start,
+                                col_end,
+                            );
+                        }
                         return prop.ty.clone().unwrap_or_else(Union::mixed);
                     }
                     // Only emit UndefinedProperty if all ancestors are known and no __get magic.
