@@ -13,6 +13,7 @@ use crate::interner::Interner;
 /// Each entry is 12 bytes (`u32` + `u32` + `u16` + `u16`) with no per-entry
 /// allocator overhead beyond the `Vec` backing store.
 type ReferenceLocations = DashMap<u32, Vec<(u32, u32, u16, u16)>>;
+type FinalizationCache = DashMap<Arc<str>, std::sync::OnceLock<Arc<[Arc<str>]>>>;
 
 use crate::storage::{
     ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage, TraitStorage,
@@ -203,6 +204,14 @@ pub struct Codebase {
 
     /// Whether finalize() has been called.
     finalized: std::sync::atomic::AtomicBool,
+
+    /// Per-class memoization of ancestor lists computed by `ensure_finalized`.
+    /// Key: FQCN (class or interface). Value: `OnceLock` holding the computed
+    /// `all_parents` vec as a ref-counted slice.
+    ///
+    /// Entries are populated lazily by `ensure_finalized` and invalidated
+    /// granularly by `remove_file_definitions` / `invalidate_finalization`.
+    finalization_cache: FinalizationCache,
 }
 
 impl Codebase {
@@ -396,10 +405,12 @@ impl Codebase {
     ///
     /// Use this when new class definitions have been added after an initial
     /// `finalize()` call (e.g., lazily loaded via PSR-4) and the inheritance
-    /// graph needs to be rebuilt.
+    /// graph needs to be rebuilt. Also clears the per-class `finalization_cache`
+    /// so that `ensure_finalized` recomputes ancestors for all classes.
     pub fn invalidate_finalization(&self) {
         self.finalized
             .store(false, std::sync::atomic::Ordering::SeqCst);
+        self.finalization_cache.clear();
     }
 
     // -----------------------------------------------------------------------
@@ -421,7 +432,9 @@ impl Codebase {
             .map(|entry| entry.key().clone())
             .collect();
 
-        // Remove each symbol from its respective map and from symbol_to_file
+        // Remove each symbol from its respective map and from symbol_to_file.
+        // Also evict from finalization_cache so ensure_finalized recomputes on
+        // the next call (OnceLock cannot be reset, so we remove the entry entirely).
         for sym in &symbols {
             self.classes.remove(sym.as_ref());
             self.interfaces.remove(sym.as_ref());
@@ -431,6 +444,7 @@ impl Codebase {
             self.constants.remove(sym.as_ref());
             self.symbol_to_file.remove(sym.as_ref());
             self.known_symbols.remove(sym.as_ref());
+            self.finalization_cache.remove(sym.as_ref());
         }
 
         // Remove file-level metadata
@@ -594,10 +608,22 @@ impl Codebase {
                 if let Some(mut cls) = self.classes.get_mut(sym.as_ref()) {
                     cls.all_parents = old_cls.all_parents.clone();
                 }
+                // Re-populate finalization_cache from snapshot so ensure_finalized
+                // returns the restored value without recomputing.
+                let arc: Arc<[Arc<str>]> = Arc::from(old_cls.all_parents.as_slice());
+                self.finalization_cache
+                    .entry(sym.clone())
+                    .or_default()
+                    .get_or_init(|| arc);
             } else if let Some(old_iface) = snapshot.interfaces.get(sym.as_ref()) {
                 if let Some(mut iface) = self.interfaces.get_mut(sym.as_ref()) {
                     iface.all_parents = old_iface.all_parents.clone();
                 }
+                let arc: Arc<[Arc<str>]> = Arc::from(old_iface.all_parents.as_slice());
+                self.finalization_cache
+                    .entry(sym.clone())
+                    .or_default()
+                    .get_or_init(|| arc);
             }
         }
 
@@ -1502,29 +1528,83 @@ impl Codebase {
     // Finalization
     // -----------------------------------------------------------------------
 
+    /// Lazily compute and memoize the ancestor list (`all_parents`) for a
+    /// single class or interface.
+    ///
+    /// The result is cached in `finalization_cache` via `OnceLock`, so
+    /// repeated calls are a single atomic load. Thread-local cycle detection
+    /// guards against circular hierarchies: a re-entrant call for the same
+    /// FQCN returns an empty slice instead of looping.
+    ///
+    /// As a side-effect, `ClassStorage::all_parents` / `InterfaceStorage::all_parents`
+    /// are updated for backward-compatibility with code that reads those fields directly.
+    pub fn ensure_finalized(&self, fqcn: &str) -> Arc<[Arc<str>]> {
+        // Fast path: already cached.
+        if let Some(entry) = self.finalization_cache.get(fqcn) {
+            if let Some(v) = entry.get() {
+                return Arc::clone(v);
+            }
+        }
+
+        // Thread-local cycle detection: if this FQCN is already being computed
+        // on the current thread, we have a circular hierarchy — return empty.
+        thread_local! {
+            static IN_PROGRESS: std::cell::RefCell<std::collections::HashSet<String>> =
+                std::cell::RefCell::new(std::collections::HashSet::new());
+        }
+        let is_cycle = IN_PROGRESS.with(|s| !s.borrow_mut().insert(fqcn.to_string()));
+        if is_cycle {
+            return Arc::from([]);
+        }
+
+        let parents = if self.classes.contains_key(fqcn) {
+            self.compute_class_ancestors(fqcn)
+        } else if self.interfaces.contains_key(fqcn) {
+            self.compute_interface_ancestors(fqcn)
+        } else {
+            vec![]
+        };
+
+        // Backward-compat: keep ClassStorage/InterfaceStorage.all_parents populated.
+        if let Some(mut cls) = self.classes.get_mut(fqcn) {
+            cls.all_parents = parents.clone();
+        } else if let Some(mut iface) = self.interfaces.get_mut(fqcn) {
+            iface.all_parents = parents.clone();
+        }
+
+        let arc: Arc<[Arc<str>]> = Arc::from(parents.as_slice());
+
+        // Store in cache (another thread may have beaten us; that is fine — both
+        // computed the same value, and get_or_init returns whichever was set first).
+        let entry = self.finalization_cache.entry(Arc::from(fqcn)).or_default();
+        let stored = entry.get_or_init(|| Arc::clone(&arc));
+
+        IN_PROGRESS.with(|s| s.borrow_mut().remove(fqcn));
+
+        Arc::clone(stored)
+    }
+
     /// Must be called after all files have been parsed (pass 1 complete).
     /// Resolves inheritance chains and builds method dispatch tables.
+    ///
+    /// Internally delegates per-class ancestor computation to `ensure_finalized`,
+    /// so repeated calls are cheap (results are memoized). The global barrier
+    /// is still here for callers that need a single "everything is ready" signal.
     pub fn finalize(&self) {
         if self.finalized.load(std::sync::atomic::Ordering::SeqCst) {
             return;
         }
 
-        // 1. Resolve all_parents for classes
+        // 1. Resolve all_parents for classes via ensure_finalized (lazy + cached).
         let class_keys: Vec<Arc<str>> = self.classes.iter().map(|e| e.key().clone()).collect();
         for fqcn in &class_keys {
-            let parents = self.collect_class_ancestors(fqcn);
-            if let Some(mut cls) = self.classes.get_mut(fqcn.as_ref()) {
-                cls.all_parents = parents;
-            }
+            self.ensure_finalized(fqcn);
         }
 
-        // 2. Resolve all_parents for interfaces
+        // 2. Resolve all_parents for interfaces via ensure_finalized.
         let iface_keys: Vec<Arc<str>> = self.interfaces.iter().map(|e| e.key().clone()).collect();
         for fqcn in &iface_keys {
-            let parents = self.collect_interface_ancestors(fqcn);
-            if let Some(mut iface) = self.interfaces.get_mut(fqcn.as_ref()) {
-                iface.all_parents = parents;
-            }
+            self.ensure_finalized(fqcn);
         }
 
         // 3. Resolve @psalm-import-type declarations
@@ -1598,74 +1678,76 @@ impl Codebase {
         None
     }
 
-    fn collect_class_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        let mut result = Vec::new();
-        let mut visited = std::collections::HashSet::new();
-        self.collect_class_ancestors_inner(fqcn, &mut result, &mut visited);
-        result
-    }
-
-    fn collect_class_ancestors_inner(
-        &self,
-        fqcn: &str,
-        out: &mut Vec<Arc<str>>,
-        visited: &mut std::collections::HashSet<String>,
-    ) {
-        if !visited.insert(fqcn.to_string()) {
-            return; // cycle guard
-        }
-        let (parent, interfaces, traits) = {
-            if let Some(cls) = self.classes.get(fqcn) {
-                (
-                    cls.parent.clone(),
-                    cls.interfaces.clone(),
-                    cls.traits.clone(),
-                )
-            } else {
-                return;
-            }
+    /// Compute the ancestor list for a class by routing each parent/interface
+    /// lookup through `ensure_finalized`, so results are cached and the
+    /// thread-local cycle guard in `ensure_finalized` is the sole cycle
+    /// detection mechanism.  A local `seen` set deduplicates ancestors that
+    /// appear via multiple paths (diamond hierarchies).
+    fn compute_class_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+        let (parent, interfaces, traits) = match self.classes.get(fqcn) {
+            Some(cls) => (
+                cls.parent.clone(),
+                cls.interfaces.clone(),
+                cls.traits.clone(),
+            ),
+            None => return vec![],
         };
 
-        if let Some(p) = parent {
-            out.push(p.clone());
-            self.collect_class_ancestors_inner(&p, out, visited);
+        let mut result: Vec<Arc<str>> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        if let Some(ref p) = parent {
+            if seen.insert(p.to_string()) {
+                result.push(Arc::clone(p));
+            }
+            for a in self.ensure_finalized(p).iter() {
+                if seen.insert(a.to_string()) {
+                    result.push(Arc::clone(a));
+                }
+            }
         }
-        for iface in interfaces {
-            out.push(iface.clone());
-            self.collect_interface_ancestors_inner(&iface, out, visited);
+        for iface in &interfaces {
+            if seen.insert(iface.to_string()) {
+                result.push(Arc::clone(iface));
+            }
+            for a in self.ensure_finalized(iface).iter() {
+                if seen.insert(a.to_string()) {
+                    result.push(Arc::clone(a));
+                }
+            }
         }
         for t in traits {
-            out.push(t);
+            if seen.insert(t.to_string()) {
+                result.push(t);
+            }
         }
-    }
 
-    fn collect_interface_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        let mut result = Vec::new();
-        let mut visited = std::collections::HashSet::new();
-        self.collect_interface_ancestors_inner(fqcn, &mut result, &mut visited);
         result
     }
 
-    fn collect_interface_ancestors_inner(
-        &self,
-        fqcn: &str,
-        out: &mut Vec<Arc<str>>,
-        visited: &mut std::collections::HashSet<String>,
-    ) {
-        if !visited.insert(fqcn.to_string()) {
-            return;
-        }
-        let extends = {
-            if let Some(iface) = self.interfaces.get(fqcn) {
-                iface.extends.clone()
-            } else {
-                return;
-            }
+    /// Compute the ancestor list for an interface by routing each extended
+    /// interface lookup through `ensure_finalized`.
+    fn compute_interface_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+        let extends = match self.interfaces.get(fqcn) {
+            Some(iface) => iface.extends.clone(),
+            None => return vec![],
         };
-        for e in extends {
-            out.push(e.clone());
-            self.collect_interface_ancestors_inner(&e, out, visited);
+
+        let mut result: Vec<Arc<str>> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for e in &extends {
+            if seen.insert(e.to_string()) {
+                result.push(Arc::clone(e));
+            }
+            for a in self.ensure_finalized(e).iter() {
+                if seen.insert(a.to_string()) {
+                    result.push(Arc::clone(a));
+                }
+            }
         }
+
+        result
     }
 }
 
@@ -2394,5 +2476,113 @@ mod tests {
         cb.classes
             .insert(arc("B"), class_with_property("B", "title", vec![]));
         assert!(cb.get_property("A", "title").is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // ensure_finalized — per-class lazy ancestor memoization
+    // -----------------------------------------------------------------------
+
+    fn class_with_parent(fqcn: &str, parent: &str) -> ClassStorage {
+        ClassStorage {
+            parent: Some(arc(parent)),
+            ..bare_class(fqcn, vec![])
+        }
+    }
+
+    #[test]
+    fn ensure_finalized_returns_ancestors_for_known_class() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![]));
+        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
+
+        let parents = cb.ensure_finalized("B");
+        assert_eq!(parents.as_ref(), &[arc("A")]);
+    }
+
+    #[test]
+    fn ensure_finalized_memoizes_result() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![]));
+        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
+
+        let first = cb.ensure_finalized("B");
+        let second = cb.ensure_finalized("B");
+        // Same Arc — pointer equality confirms the memoized path was taken.
+        assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn ensure_finalized_returns_empty_for_unknown_fqcn() {
+        let cb = Codebase::new();
+        let parents = cb.ensure_finalized("NoSuchClass");
+        assert!(parents.is_empty());
+    }
+
+    #[test]
+    fn ensure_finalized_populates_all_parents_on_storage() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![]));
+        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
+
+        cb.ensure_finalized("B");
+        let stored = cb.classes.get("B").unwrap().all_parents.clone();
+        assert_eq!(stored, vec![arc("A")]);
+    }
+
+    #[test]
+    fn ensure_finalized_cycle_does_not_loop() {
+        // A extends B, B extends A — circular, PHP rejects this but we must not hang.
+        let cb = Codebase::new();
+        cb.classes.insert(
+            arc("A"),
+            ClassStorage {
+                parent: Some(arc("B")),
+                ..bare_class("A", vec![])
+            },
+        );
+        cb.classes.insert(
+            arc("B"),
+            ClassStorage {
+                parent: Some(arc("A")),
+                ..bare_class("B", vec![])
+            },
+        );
+
+        // Must return without panic or infinite loop.
+        let a_parents = cb.ensure_finalized("A");
+        let b_parents = cb.ensure_finalized("B");
+
+        // Neither result should contain the class itself as a direct descendant
+        // in an infinite chain — just verify termination and basic sanity.
+        assert!(
+            a_parents.iter().any(|p| p.as_ref() == "B"),
+            "A should have B as ancestor"
+        );
+        assert!(
+            b_parents.iter().any(|p| p.as_ref() == "A"),
+            "B should have A as ancestor"
+        );
+    }
+
+    #[test]
+    fn ensure_finalized_evicted_by_remove_file_definitions() {
+        let cb = Codebase::new();
+        cb.classes.insert(arc("A"), bare_class("A", vec![]));
+        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
+        // Register both as coming from the same file so remove_file_definitions removes them.
+        let file: Arc<str> = arc("test.php");
+        cb.symbol_to_file.insert(arc("A"), file.clone());
+        cb.symbol_to_file.insert(arc("B"), file.clone());
+
+        // Warm the cache.
+        let before = cb.ensure_finalized("B");
+        assert!(!before.is_empty());
+
+        // Evict definitions from the file.
+        cb.remove_file_definitions("test.php");
+
+        // After removal, the class is gone and ensure_finalized returns empty.
+        let after = cb.ensure_finalized("B");
+        assert!(after.is_empty());
     }
 }
