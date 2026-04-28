@@ -1322,7 +1322,7 @@ fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
 
 /// Returns true if `actual` is compatible with `declared` considering class
 /// hierarchy, self/static resolution, and short-name vs FQCN mismatches.
-fn named_object_return_compatible(
+pub(crate) fn named_object_return_compatible(
     actual: &Union,
     declared: &Union,
     codebase: &Codebase,

@@ -344,8 +344,8 @@ impl<'a> ClassAnalyzer<'a> {
             // Only check when both sides have an explicit return type.
             // Skip when:
             //   - Parent type is from a docblock (PHP doesn't enforce docblock override compat)
-            //   - Either type contains a named object (needs codebase for inheritance check)
-            //   - Either type contains TSelf/TStaticObject (always compatible with self)
+            //   - Either type is mixed
+            //   - Parent type contains a template param
             if let (Some(child_ret), Some(parent_ret)) =
                 (&own_method.return_type, &parent.return_type)
             {
@@ -356,26 +356,47 @@ impl<'a> ClassAnalyzer<'a> {
                     || self.type_has_self_or_static(parent_ret);
 
                 if !parent_from_docblock
-                    && !involves_named_objects
-                    && !involves_self_static
-                    && !child_ret.is_subtype_of_simple(parent_ret)
                     && !parent_ret.is_mixed()
                     && !child_ret.is_mixed()
                     && !self.return_type_has_template(parent_ret)
                 {
-                    issues.push(
-                        Issue::new(
-                            IssueKind::MethodSignatureMismatch {
-                                class: fqcn.to_string(),
-                                method: method_name.to_string(),
-                                detail: format!(
-                                    "return type '{child_ret}' is not a subtype of parent '{parent_ret}'"
-                                ),
-                            },
-                            loc.clone(),
+                    let child_file = own_method
+                        .location
+                        .as_ref()
+                        .map(|l| l.file.as_ref())
+                        .unwrap_or("");
+
+                    let compatible = if (involves_named_objects || involves_self_static)
+                        && self.type_has_only_object_atoms(child_ret)
+                        && self.type_has_only_object_atoms(parent_ret)
+                    {
+                        crate::stmt::named_object_return_compatible(
+                            child_ret,
+                            parent_ret,
+                            self.codebase,
+                            child_file,
                         )
-                        .with_snippet(method_name.to_string()),
-                    );
+                    } else if involves_named_objects || involves_self_static {
+                        true // mixed scalar+object union — skip (G5 gap)
+                    } else {
+                        child_ret.is_subtype_of_simple(parent_ret)
+                    };
+
+                    if !compatible {
+                        issues.push(
+                            Issue::new(
+                                IssueKind::MethodSignatureMismatch {
+                                    class: fqcn.to_string(),
+                                    method: method_name.to_string(),
+                                    detail: format!(
+                                        "return type '{child_ret}' is not a subtype of parent '{parent_ret}'"
+                                    ),
+                                },
+                                loc.clone(),
+                            )
+                            .with_snippet(method_name.to_string()),
+                        );
+                    }
                 }
             }
 
@@ -515,6 +536,27 @@ impl<'a> ClassAnalyzer<'a> {
         ty.types
             .iter()
             .any(|a| matches!(a, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }))
+    }
+
+    /// Returns true if every atom in the union is handled by `named_object_return_compatible`:
+    /// object types (named/self/static/parent), null, void, never, and class-string variants.
+    /// Unions that also contain scalar atoms (int, string, …) are not fully handled there
+    /// and must fall back to the skip path (G5 gap).
+    fn type_has_only_object_atoms(&self, ty: &mir_types::Union) -> bool {
+        use mir_types::Atomic;
+        ty.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TNamedObject { .. }
+                    | Atomic::TSelf { .. }
+                    | Atomic::TStaticObject { .. }
+                    | Atomic::TParent { .. }
+                    | Atomic::TNull
+                    | Atomic::TVoid
+                    | Atomic::TNever
+                    | Atomic::TClassString(_)
+            )
+        })
     }
 
     /// Find a method with the given name in the closest ancestor (not the class itself).
