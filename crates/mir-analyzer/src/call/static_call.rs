@@ -50,13 +50,14 @@ impl CallAnalyzer {
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
-            let method_span = call.method.span;
+            let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
             ea.codebase.mark_method_referenced_at(
                 &fqcn,
                 method_name,
                 ea.file.clone(),
-                method_span.start,
-                method_span.end,
+                line,
+                col_start,
+                col_end,
             );
             if let Some(msg) = method.deprecated.clone() {
                 ea.emit(
@@ -99,7 +100,7 @@ impl CallAnalyzer {
             let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
             let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
             ea.record_symbol(
-                method_span,
+                call.method.span,
                 SymbolKind::StaticCall {
                     class: fqcn_arc,
                     method: Arc::from(method_name),

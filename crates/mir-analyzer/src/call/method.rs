@@ -219,12 +219,14 @@ fn resolve_method_return<'a, 'arena, 'src>(
     arg_spans: &[Span],
 ) -> Union {
     if let Some(method) = ea.codebase.get_method(fqcn, method_name) {
+        let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
         ea.codebase.mark_method_referenced_at(
             fqcn,
             method_name,
             ea.file.clone(),
-            call.method.span.start,
-            call.method.span.end,
+            line,
+            col_start,
+            col_end,
         );
         if let Some(msg) = method.deprecated.clone() {
             ea.emit(

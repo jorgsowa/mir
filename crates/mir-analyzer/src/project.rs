@@ -719,11 +719,14 @@ fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
 
 // ---------------------------------------------------------------------------
 
-fn extract_reference_locations(codebase: &Codebase, file: &Arc<str>) -> Vec<(String, u32, u32)> {
+fn extract_reference_locations(
+    codebase: &Codebase,
+    file: &Arc<str>,
+) -> Vec<(String, u32, u16, u16)> {
     codebase
         .extract_file_reference_locations(file.as_ref())
         .into_iter()
-        .map(|(sym, start, end)| (sym.to_string(), start, end))
+        .map(|(sym, line, col_start, col_end)| (sym.to_string(), line, col_start, col_end))
         .collect()
 }
 

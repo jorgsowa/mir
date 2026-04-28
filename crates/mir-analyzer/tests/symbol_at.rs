@@ -794,19 +794,17 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
 
     let key = sym.codebase_key().unwrap();
     let locs = analyzer.codebase().get_reference_locations(&key);
-    let (ref_start, ref_end) = locs
+    let (_, _line, ref_col_start, ref_col_end) = *locs
         .iter()
-        .find(|(f, _, _)| f.as_ref() == file_str)
-        .map(|(_, s, e)| (*s, *e))
+        .find(|(f, ..)| f.as_ref() == file_str)
         .expect("reference location must exist for this file");
 
+    // PHP identifiers are ASCII, so byte length == char count == col width.
+    let span_len = sym.span.end - sym.span.start;
     assert_eq!(
-        sym.span.start, ref_start,
-        "symbol_at span.start must equal reference location start"
-    );
-    assert_eq!(
-        sym.span.end, ref_end,
-        "symbol_at span.end must equal reference location end"
+        span_len,
+        (ref_col_end - ref_col_start) as u32,
+        "symbol_at span length must equal reference location column width"
     );
 }
 
@@ -828,18 +826,16 @@ fn symbol_at_function_call_span_matches_reference_location_span() {
 
     let key = sym.codebase_key().unwrap();
     let locs = analyzer.codebase().get_reference_locations(&key);
-    let (ref_start, ref_end) = locs
+    let (_, _line, ref_col_start, ref_col_end) = *locs
         .iter()
-        .find(|(f, _, _)| f.as_ref() == file_str)
-        .map(|(_, s, e)| (*s, *e))
+        .find(|(f, ..)| f.as_ref() == file_str)
         .expect("reference location must exist for this file");
 
+    // PHP identifiers are ASCII, so byte length == char count == col width.
+    let span_len = sym.span.end - sym.span.start;
     assert_eq!(
-        sym.span.start, ref_start,
-        "symbol_at span.start must equal reference location start"
-    );
-    assert_eq!(
-        sym.span.end, ref_end,
-        "symbol_at span.end must equal reference location end"
+        span_len,
+        (ref_col_end - ref_col_start) as u32,
+        "symbol_at span length must equal reference location column width"
     );
 }

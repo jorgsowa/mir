@@ -127,11 +127,13 @@ impl CallAnalyzer {
                 if let ExprKind::String(name) = &arg.value.kind {
                     let fqn = name.strip_prefix('\\').unwrap_or(name);
                     if let Some(func) = ea.codebase.functions.get(fqn) {
+                        let (line, col_start, col_end) = ea.span_to_ref_loc(arg.span);
                         ea.codebase.mark_function_referenced_at(
                             &func.fqn,
                             ea.file.clone(),
-                            arg.span.start,
-                            arg.span.end,
+                            line,
+                            col_start,
+                            col_end,
                         );
                     }
                 }
@@ -139,12 +141,13 @@ impl CallAnalyzer {
         }
 
         if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
-            let name_span = call.name.span;
+            let (line, col_start, col_end) = ea.span_to_ref_loc(call.name.span);
             ea.codebase.mark_function_referenced_at(
                 &func.fqn,
                 ea.file.clone(),
-                name_span.start,
-                name_span.end,
+                line,
+                col_start,
+                col_end,
             );
             let deprecated = func.deprecated.clone();
             let params = func.params.clone();

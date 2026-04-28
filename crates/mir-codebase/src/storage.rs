@@ -51,39 +51,35 @@ pub struct FnParam {
 }
 
 // ---------------------------------------------------------------------------
-// Location — file + byte offsets
+// Location — file + pre-computed line/col span
 // ---------------------------------------------------------------------------
 
+/// Declaration location.
+///
+/// Columns are 0-based Unicode scalar value (code-point) counts, equivalent to
+/// LSP `utf-32` position encoding. Convert to UTF-16 code units at the LSP
+/// boundary for clients that do not advertise `utf-32` support.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Location {
     pub file: Arc<str>,
-    /// Byte offset of the start of the declaration in the source.
-    pub start: u32,
-    pub end: u32,
-    /// 1-based line number of the declaration.
+    /// 1-based start line.
     pub line: u32,
-    /// 0-based Unicode char-count (code-point) column offset of the declaration start.
-    pub col: u16,
+    /// 1-based end line (inclusive). Equal to `line` for single-line spans.
+    pub line_end: u32,
+    /// 0-based Unicode code-point column of the span start.
+    pub col_start: u16,
+    /// 0-based Unicode code-point column of the span end (exclusive).
+    pub col_end: u16,
 }
 
 impl Location {
-    pub fn new(file: Arc<str>, start: u32, end: u32) -> Self {
+    pub fn new(file: Arc<str>, line: u32, line_end: u32, col_start: u16, col_end: u16) -> Self {
         Self {
             file,
-            start,
-            end,
-            line: 1,
-            col: 0,
-        }
-    }
-
-    pub fn with_line_col(file: Arc<str>, start: u32, end: u32, line: u32, col: u16) -> Self {
-        Self {
-            file,
-            start,
-            end,
             line,
-            col,
+            line_end,
+            col_start,
+            col_end,
         }
     }
 }
