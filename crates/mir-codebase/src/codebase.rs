@@ -499,6 +499,7 @@ impl Codebase {
         let mut interfaces = std::collections::HashMap::new();
 
         for sym in symbols {
+            self.ensure_finalized(sym.as_ref());
             if let Some(cls) = self.classes.get(sym.as_ref()) {
                 let mut ifaces = cls.interfaces.clone();
                 ifaces.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
