@@ -130,6 +130,44 @@ impl CallAnalyzer {
                         ),
                     );
                 }
+                Atomic::TIntersection { parts } => {
+                    let mut intersection_result = Union::empty();
+                    let mut found_method = false;
+                    for part in parts {
+                        for inner_atomic in &part.types {
+                            if let Atomic::TNamedObject {
+                                fqcn,
+                                type_params: receiver_type_params,
+                            } = inner_atomic
+                            {
+                                let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
+                                let resolved_arc = Arc::from(fqcn_resolved.as_str());
+                                if ea.codebase.get_method(&resolved_arc, method_name).is_some() {
+                                    found_method = true;
+                                    intersection_result = Union::merge(
+                                        &intersection_result,
+                                        &resolve_method_return(
+                                            ea,
+                                            ctx,
+                                            call,
+                                            span,
+                                            method_name,
+                                            &resolved_arc,
+                                            receiver_type_params.as_slice(),
+                                            &arg_types,
+                                            &arg_spans,
+                                        ),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    if found_method {
+                        result = Union::merge(&result, &intersection_result);
+                    } else {
+                        result = Union::merge(&result, &Union::mixed());
+                    }
+                }
                 Atomic::TObject | Atomic::TTemplateParam { .. } => {
                     result = Union::merge(&result, &Union::mixed());
                 }
