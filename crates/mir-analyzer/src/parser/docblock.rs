@@ -205,6 +205,7 @@ impl DocblockParser {
                 PhpDocTag::Immutable => result.is_immutable = true,
                 PhpDocTag::Readonly => result.is_readonly = true,
                 PhpDocTag::Generic { tag, body } => match *tag {
+                    "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                     "api" | "psalm-api" => result.is_api = true,
                     "removed" if result.removed.is_none() => {
                         if let Some(b) = body {
@@ -288,6 +289,10 @@ impl DocblockParser {
                 },
                 _ => {}
             }
+        }
+
+        if text.to_ascii_lowercase().contains("{@inheritdoc}") {
+            result.is_inherit_doc = true;
         }
 
         result
@@ -375,6 +380,9 @@ pub struct ParsedDocblock {
     pub is_immutable: bool,
     pub is_readonly: bool,
     pub is_api: bool,
+    /// `@inheritDoc` or `{@inheritDoc}` was present — documentation should be
+    /// inherited from the nearest ancestor that has a real docblock.
+    pub is_inherit_doc: bool,
     /// Free text before first `@` tag — used for hover display
     pub description: String,
     /// `@deprecated message` — Some(message) or Some("") if no message
