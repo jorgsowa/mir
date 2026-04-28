@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-04-28
+
+### Added
+
+- Interactive WASM playground embedded in the docs site: select PHP version (8.1–8.5), type PHP code, and see live diagnostics with underline overlays and severity-colored cards. (#287)
+
+### Changed
+
+- Docs site logo added to README and top bar; branding updated.
+- php-ast and php-rs-parser bumped to 0.9.6.
+
+### CI
+
+- Node.js version in docs deploy workflows raised from 20 to 22 (Astro now requires >=22.12.0).
+
 ## [0.12.0] - 2026-04-27
 
 ### Added
