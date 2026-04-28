@@ -273,3 +273,60 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
          because ghost_fn was inserted into the codebase"
     );
 }
+
+/// After re_analyze_file, file_imports and file_namespaces must be restored so
+/// that use-alias resolution still works on the re-analyzed file.
+///
+/// Mechanism: re_analyze_file calls remove_file_definitions, which clears both
+/// maps for the re-analyzed file, then calls DefinitionCollector::collect →
+/// inject_stub_slice. inject_stub_slice is now the sole write path that
+/// repopulates file_namespaces and file_imports (via StubSlice::namespace and
+/// StubSlice::imports). If either field is missing from the slice, the maps stay
+/// empty after re-analysis and StatementsAnalyzer emits false UndefinedClass
+/// diagnostics for `use`-aliased classes (`new Entity()`, `catch (Entity $e)`,
+/// type hints, etc.).
+#[test]
+fn re_analyze_preserves_namespace_and_use_alias_resolution() {
+    let src_dir = TempDir::new().unwrap();
+
+    // Entity lives in App\Model.
+    let _entity = write(
+        &src_dir,
+        "Entity.php",
+        "<?php\nnamespace App\\Model;\nclass Entity {}\n",
+    );
+
+    // Handler is in App\Service and imports Entity via `use`.
+    let handler_src = "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\n\
+        function handle(): void { $e = new Entity(); }\n";
+    let handler = write(&src_dir, "Handler.php", handler_src);
+
+    let analyzer = ProjectAnalyzer::new();
+    let result1 = analyzer.analyze(&[src_dir.path().join("Entity.php"), handler.clone()]);
+
+    let undef1: Vec<_> = result1
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedClass")
+        .collect();
+    assert!(
+        undef1.is_empty(),
+        "initial analysis must not report UndefinedClass; got: {undef1:?}"
+    );
+
+    // Re-analyze Handler.php with a trivial body change (adds a comment).
+    let handler_src2 = "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\n\
+        function handle(): void { $e = new Entity(); /* re-analyzed */ }\n";
+    let result2 = analyzer.re_analyze_file(handler.to_string_lossy().as_ref(), handler_src2);
+
+    let undef2: Vec<_> = result2
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedClass")
+        .collect();
+    assert!(
+        undef2.is_empty(),
+        "re_analyze_file must not produce false UndefinedClass after namespace/import restoration; \
+         got: {undef2:?}"
+    );
+}
