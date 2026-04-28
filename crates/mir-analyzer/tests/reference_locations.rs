@@ -29,7 +29,7 @@ fn function_call_records_reference_location() {
 
     let locs = analyzer.codebase().get_reference_locations("greet");
     assert!(
-        locs.iter().any(|(f, _, _)| f == &file_arc),
+        locs.iter().any(|(f, ..)| f == &file_arc),
         "reference location should be recorded for the analyzed file"
     );
     assert!(!locs.is_empty(), "at least one span recorded");
@@ -54,16 +54,16 @@ fn function_call_span_covers_only_name() {
         .codebase()
         .get_reference_locations("greet")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1);
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     // The span should cover only the 5-byte identifier "greet", not the full call
     assert_eq!(
-        end - start,
+        col_end - col_start,
         5,
-        "span should cover only 'greet' (5 bytes), got start={start} end={end}"
+        "span should cover only 'greet' (5 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
 
@@ -85,16 +85,16 @@ fn method_call_span_covers_only_name() {
         .codebase()
         .get_reference_locations("Svc::run")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1);
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     // The span should cover only the 3-byte identifier "run", not the full call
     assert_eq!(
-        end - start,
+        col_end - col_start,
         3,
-        "span should cover only 'run' (3 bytes), got start={start} end={end}"
+        "span should cover only 'run' (3 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
 
@@ -116,16 +116,16 @@ fn property_access_span_covers_only_name() {
         .codebase()
         .get_reference_locations("Counter::count")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1);
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     // The span should cover only the 5-byte identifier "count", not the full "$c->count"
     assert_eq!(
-        end - start,
+        col_end - col_start,
         5,
-        "span should cover only 'count' (5 bytes), got start={start} end={end}"
+        "span should cover only 'count' (5 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
 
@@ -148,16 +148,16 @@ fn nullsafe_property_access_records_reference_location() {
         .codebase()
         .get_reference_locations("Box::val")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1);
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     // The span should cover only the 3-byte identifier "val", not "$b?->val"
     assert_eq!(
-        end - start,
+        col_end - col_start,
         3,
-        "span should cover only 'val' (3 bytes), got start={start} end={end}"
+        "span should cover only 'val' (3 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
 
@@ -199,7 +199,7 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
         .codebase()
         .get_reference_locations("ping")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .count();
 
     assert_eq!(count, 3, "three calls should produce three spans");
@@ -220,7 +220,7 @@ fn new_expression_records_class_reference() {
 
     let locs = analyzer.codebase().get_reference_locations("Widget");
     assert!(
-        locs.iter().any(|(f, _, _)| f == &file_arc),
+        locs.iter().any(|(f, ..)| f == &file_arc),
         "new Widget() should record a reference to Widget"
     );
 }
@@ -244,7 +244,7 @@ fn re_analyze_removes_stale_reference_locations() {
             .codebase()
             .get_reference_locations("helper")
             .iter()
-            .any(|(f, _, _)| f == &file_arc),
+            .any(|(f, ..)| f == &file_arc),
         "initial analysis should record location"
     );
 
@@ -258,7 +258,7 @@ fn re_analyze_removes_stale_reference_locations() {
         .codebase()
         .get_reference_locations("helper")
         .iter()
-        .any(|(f, _, _)| f == &file_arc);
+        .any(|(f, ..)| f == &file_arc);
 
     assert!(
         !stale,
@@ -284,16 +284,16 @@ fn static_method_call_span_covers_only_name() {
         .codebase()
         .get_reference_locations("Math::sq")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1);
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     // The span should cover only the 2-byte identifier "sq", not the full call
     assert_eq!(
-        end - start,
+        col_end - col_start,
         2,
-        "span should cover only 'sq' (2 bytes), got start={start} end={end}"
+        "span should cover only 'sq' (2 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
 
@@ -332,7 +332,7 @@ fn cache_hit_replays_reference_locations() {
             "cache hit should replay reference locations"
         );
         assert!(
-            locs.iter().any(|(f, _, _)| f == &file_arc),
+            locs.iter().any(|(f, ..)| f == &file_arc),
             "replayed locations should include the correct file"
         );
     }
@@ -355,7 +355,7 @@ fn compact_index_preserves_reference_locations() {
         .codebase()
         .get_reference_locations("ping")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 2, "two calls → two spans in compact index");
@@ -389,7 +389,7 @@ fn compact_index_survives_re_analyze() {
             .codebase()
             .get_reference_locations("helper")
             .iter()
-            .any(|(f, _, _)| f == &file_arc),
+            .any(|(f, ..)| f == &file_arc),
         "initial reference should be recorded"
     );
 
@@ -403,7 +403,7 @@ fn compact_index_survives_re_analyze() {
         .codebase()
         .get_reference_locations("helper")
         .iter()
-        .any(|(f, _, _)| f == &file_arc);
+        .any(|(f, ..)| f == &file_arc);
     assert!(
         !stale,
         "stale span must be removed after re-analysis through compact index"
@@ -450,16 +450,16 @@ fn this_method_call_span_covers_only_name() {
         .codebase()
         .get_reference_locations("Svc::helper")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1, "one $this->helper() call → one span");
 
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     assert_eq!(
-        end - start,
+        col_end - col_start,
         6, // "helper" = 6 bytes
-        "span must cover only the identifier 'helper' (6 bytes), got start={start} end={end}"
+        "span must cover only the identifier 'helper' (6 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
 
@@ -481,15 +481,15 @@ fn nullsafe_method_call_records_reference_location() {
         .codebase()
         .get_reference_locations("Svc::run")
         .into_iter()
-        .filter(|(f, _, _)| f == &file_arc)
+        .filter(|(f, ..)| f == &file_arc)
         .collect();
 
     assert_eq!(locs.len(), 1);
-    let (_, start, end) = locs[0];
+    let (_, _line, col_start, col_end) = locs[0];
     // The span should cover only the 3-byte identifier "run", not "$s?->run()"
     assert_eq!(
-        end - start,
+        col_end - col_start,
         3,
-        "span should cover only 'run' (3 bytes), got start={start} end={end}"
+        "span should cover only 'run' (3 bytes), got col_start={col_start} col_end={col_end}"
     );
 }

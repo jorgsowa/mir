@@ -652,11 +652,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                         // Record class instantiation as a reference so LSP
                         // "find references" for a class includes new Foo() sites.
+                        let (line, col_start, col_end) = self.span_to_ref_loc(n.class.span);
                         self.codebase.mark_class_referenced_at(
                             &fqcn,
                             self.file.clone(),
-                            n.class.span.start,
-                            n.class.span.end,
+                            line,
+                            col_start,
+                            col_end,
                         );
                         ty
                     }
@@ -1284,12 +1286,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 {
                     if let Some(prop) = self.codebase.get_property(fqcn.as_ref(), prop_name) {
                         // Record reference for dead-code detection (M18)
+                        let (line, col_start, col_end) = self.span_to_ref_loc(span);
                         self.codebase.mark_property_referenced_at(
                             fqcn,
                             prop_name,
                             self.file.clone(),
-                            span.start,
-                            span.end,
+                            line,
+                            col_start,
+                            col_end,
                         );
                         return prop.ty.clone().unwrap_or_else(Union::mixed);
                     }
@@ -1528,6 +1532,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         let col = self.source[line_start_byte..byte_offset].chars().count() as u16;
 
         (line, col)
+    }
+
+    /// Convert an AST span to `(line, col_start, col_end)` for reference recording.
+    pub(crate) fn span_to_ref_loc(&self, span: php_ast::Span) -> (u32, u16, u16) {
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let end_off = (span.end as usize).min(self.source.len());
+        let end_line_start = self.source[..end_off]
+            .rfind('\n')
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        let col_end = self.source[end_line_start..end_off].chars().count() as u16;
+        (line, col_start, col_end)
     }
 
     /// Walk a type hint and emit `UndefinedClass` for any named type not in the codebase.

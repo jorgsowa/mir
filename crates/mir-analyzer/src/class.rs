@@ -783,78 +783,22 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
     )
 }
 
-/// Build an issue location from the stored codebase Location (which carries line/col as
-/// Unicode char-count columns). Falls back to a dummy location using the FQCN as the file
-/// path when no Location is stored.
+/// Build an issue location from the stored codebase Location.
+/// Falls back to a dummy location using the FQCN as the file path when no
+/// Location is stored.
 fn issue_location(
     storage_loc: Option<&mir_codebase::storage::Location>,
     fqcn: &Arc<str>,
-    source: Option<&str>,
+    _source: Option<&str>,
 ) -> Location {
     match storage_loc {
-        Some(loc) => {
-            // Calculate col_end from the end byte offset if source is available.
-            let col_end = if let Some(src) = source {
-                if loc.end > loc.start {
-                    let end_offset = (loc.end as usize).min(src.len());
-                    // Find the line start containing the end offset.
-                    let line_start = src[..end_offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
-                    // Count Unicode chars from line start to end offset.
-                    let col_end = src[line_start..end_offset].chars().count() as u16;
-
-                    // Count Unicode chars from line start to start offset.
-                    let col_start_offset = (loc.start as usize).min(src.len());
-                    let col_start_line = src[..col_start_offset]
-                        .rfind('\n')
-                        .map(|p| p + 1)
-                        .unwrap_or(0);
-                    let col_start = src[col_start_line..col_start_offset].chars().count() as u16;
-
-                    col_end.max(col_start + 1)
-                } else {
-                    // Single-char span: end = start + 1.
-                    let col_start_offset = (loc.start as usize).min(src.len());
-                    let col_start_line = src[..col_start_offset]
-                        .rfind('\n')
-                        .map(|p| p + 1)
-                        .unwrap_or(0);
-                    src[col_start_line..col_start_offset].chars().count() as u16 + 1
-                }
-            } else {
-                loc.col + 1
-            };
-
-            // col_start: use loc.col (already a char-count) or recompute from source.
-            let col_start = if let Some(src) = source {
-                let col_start_offset = (loc.start as usize).min(src.len());
-                let col_start_line = src[..col_start_offset]
-                    .rfind('\n')
-                    .map(|p| p + 1)
-                    .unwrap_or(0);
-                src[col_start_line..col_start_offset].chars().count() as u16
-            } else {
-                loc.col
-            };
-
-            let line_end = if let Some(src) = source {
-                if loc.end > loc.start {
-                    let end_offset = (loc.end as usize).min(src.len());
-                    src[..end_offset].bytes().filter(|&b| b == b'\n').count() as u32 + 1
-                } else {
-                    loc.line
-                }
-            } else {
-                loc.line
-            };
-
-            Location {
-                file: loc.file.clone(),
-                line: loc.line,
-                line_end,
-                col_start,
-                col_end,
-            }
-        }
+        Some(loc) => Location {
+            file: loc.file.clone(),
+            line: loc.line,
+            line_end: loc.line_end,
+            col_start: loc.col_start,
+            col_end: loc.col_end,
+        },
         None => Location {
             file: fqcn.clone(),
             line: 1,
@@ -872,14 +816,8 @@ fn extract_snippet(
 ) -> Option<String> {
     let loc = storage_loc?;
     let src = *sources.get(&loc.file)?;
-    let start = loc.start as usize;
-    let end = loc.end as usize;
-    if start >= src.len() {
-        return None;
-    }
-    let end = end.min(src.len());
-    let span_text = &src[start..end];
-    // Take only the first line to keep the snippet concise.
-    let first_line = span_text.lines().next().unwrap_or(span_text);
-    Some(first_line.trim().to_string())
+    // Walk to the 1-based start line (loc.line is already 1-based).
+    let line_idx = loc.line.saturating_sub(1) as usize;
+    let line_text = src.lines().nth(line_idx)?;
+    Some(line_text.trim().to_string())
 }

@@ -337,19 +337,18 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     fn location(&self, start: u32, end: u32) -> Location {
-        let lc = self.source_map.offset_to_line_col(start);
-        let line = lc.line + 1;
-        let byte_offset = start as usize;
-        let line_start = if byte_offset == 0 {
-            0
-        } else {
-            self.source[..byte_offset]
-                .rfind('\n')
-                .map(|p| p + 1)
-                .unwrap_or(0)
-        };
-        let col = self.source[line_start..byte_offset].chars().count() as u16;
-        Location::with_line_col(self.file.clone(), start, end, line, col)
+        let src = self.source;
+        let start_off = start as usize;
+        let line_start = src[..start_off].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line = self.source_map.offset_to_line_col(start).line + 1;
+        let col_start = src[line_start..start_off].chars().count() as u16;
+
+        let end_off = (end as usize).min(src.len());
+        let end_line_start = src[..end_off].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = self.source_map.offset_to_line_col(end_off as u32).line + 1;
+        let col_end = src[end_line_start..end_off].chars().count() as u16;
+
+        Location::new(self.file.clone(), line, line_end, col_start, col_end)
     }
 
     // -----------------------------------------------------------------------

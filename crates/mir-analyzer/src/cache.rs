@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use mir_issues::Issue;
 
 /// Cached analysis result returned on a cache hit: issues and reference location
-/// triples `(symbol_key, start_byte, end_byte)`.
-pub type CacheHit = (Vec<Issue>, Vec<(String, u32, u32)>);
+/// tuples `(symbol_key, line, col_start, col_end)`.
+pub type CacheHit = (Vec<Issue>, Vec<(String, u32, u16, u16)>);
 
 // ---------------------------------------------------------------------------
 // Hash helper
@@ -32,11 +32,11 @@ pub fn hash_content(content: &str) -> String {
 struct CacheEntry {
     content_hash: String,
     issues: Vec<Issue>,
-    /// Reference locations recorded during Pass 2: (symbol_key, start_byte, end_byte).
+    /// Reference locations recorded during Pass 2: (symbol_key, line, col_start, col_end).
     /// Stored so that cache hits can replay symbol_reference_locations without re-running
     /// analyze_bodies.
     #[serde(default)]
-    reference_locations: Vec<(String, u32, u32)>,
+    reference_locations: Vec<(String, u32, u16, u16)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ impl AnalysisCache {
     /// Return cached issues and reference locations for `file_path` if its
     /// `content_hash` matches. Returns `None` if there is no entry or the file
     /// has changed. The second element of the tuple is the list of
-    /// `(symbol_key, start_byte, end_byte)` entries to replay into
+    /// `(symbol_key, line, col_start, col_end)` entries to replay into
     /// `Codebase::symbol_reference_locations`.
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
         let entries = self.entries.lock().unwrap();
@@ -101,13 +101,13 @@ impl AnalysisCache {
 
     /// Store `issues` and `reference_locations` for `file_path` with the given
     /// `content_hash`. `reference_locations` is a list of
-    /// `(symbol_key, start_byte, end_byte)` recorded during Pass 2.
+    /// `(symbol_key, line, col_start, col_end)` recorded during Pass 2.
     pub fn put(
         &self,
         file_path: &str,
         content_hash: String,
         issues: Vec<Issue>,
-        reference_locations: Vec<(String, u32, u32)>,
+        reference_locations: Vec<(String, u32, u16, u16)>,
     ) {
         let mut entries = self.entries.lock().unwrap();
         entries.insert(
