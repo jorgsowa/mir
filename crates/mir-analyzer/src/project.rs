@@ -387,6 +387,21 @@ impl ProjectAnalyzer {
             all_symbols.extend(symbols);
         }
 
+        // ---- Post-Pass-2 lazy loading: FQCNs used without `use` imports ------
+        // FQCNs in function/method bodies aren't visible until Pass 2 runs, so
+        // the pre-Pass-2 lazy load misses them.  We collect UndefinedClass names,
+        // resolve them via PSR-4, load those files, re-finalize, then re-analyze
+        // only the affected files to clear the false positives.
+        if let Some(psr4) = &self.psr4 {
+            self.lazy_load_from_body_issues(
+                psr4.clone(),
+                &file_data,
+                &files_with_parse_errors,
+                &mut all_issues,
+                &mut all_symbols,
+            );
+        }
+
         // Persist cache hits/misses to disk
         if let Some(cache) = &self.cache {
             cache.flush();
@@ -486,6 +501,101 @@ impl ProjectAnalyzer {
 
             self.codebase.invalidate_finalization();
             self.codebase.finalize();
+        }
+    }
+
+    fn lazy_load_from_body_issues(
+        &self,
+        psr4: Arc<crate::composer::Psr4Map>,
+        file_data: &[(Arc<str>, String)],
+        files_with_parse_errors: &HashSet<Arc<str>>,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
+    ) {
+        use mir_issues::IssueKind;
+
+        let max_depth = 5;
+        let mut loaded: HashSet<String> = HashSet::new();
+
+        for _ in 0..max_depth {
+            // Deduplicate by FQCN: HashMap prevents loading the same class twice
+            // when multiple files share the same UndefinedClass diagnostic.
+            let mut to_load: HashMap<String, PathBuf> = HashMap::new();
+
+            for issue in all_issues.iter() {
+                if let IssueKind::UndefinedClass { name } = &issue.kind {
+                    if !self.codebase.type_exists(name) && !loaded.contains(name) {
+                        if let Some(path) = psr4.resolve(name) {
+                            to_load.entry(name.clone()).or_insert(path);
+                        }
+                    }
+                }
+            }
+
+            if to_load.is_empty() {
+                break;
+            }
+
+            loaded.extend(to_load.keys().cloned());
+
+            for path in to_load.values() {
+                if let Ok(src) = std::fs::read_to_string(path) {
+                    let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+                    let arena = bumpalo::Bump::new();
+                    let result = php_rs_parser::parse(&arena, &src);
+                    let collector = crate::collector::DefinitionCollector::new(
+                        &self.codebase,
+                        file,
+                        &src,
+                        &result.source_map,
+                    );
+                    let _ = collector.collect(&result.program);
+                }
+            }
+
+            // Load inheritance deps of newly-added types and finalize.
+            // This covers e.g. `class Helper extends \App\Base` where Base is
+            // also not in the initial file set.
+            self.lazy_load_missing_classes(psr4.clone(), all_issues);
+
+            // Re-analyze every file that has an UndefinedClass for a type now
+            // present in the codebase — covers both direct and transitive loads.
+            let files_to_reanalyze: HashSet<Arc<str>> = all_issues
+                .iter()
+                .filter_map(|i| {
+                    if let IssueKind::UndefinedClass { name } = &i.kind {
+                        if self.codebase.type_exists(name) {
+                            return Some(i.location.file.clone());
+                        }
+                    }
+                    None
+                })
+                .collect();
+
+            if files_to_reanalyze.is_empty() {
+                break;
+            }
+
+            all_issues.retain(|i| !files_to_reanalyze.contains(&i.location.file));
+            all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
+
+            let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
+                .par_iter()
+                .filter(|(f, _)| {
+                    !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
+                })
+                .map(|(file, src)| {
+                    let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
+                    let arena = bumpalo::Bump::new();
+                    let parsed = php_rs_parser::parse(&arena, src);
+                    driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
+                })
+                .collect();
+
+            for (issues, symbols) in reanalysis {
+                all_issues.extend(issues);
+                all_symbols.extend(symbols);
+            }
         }
     }
 

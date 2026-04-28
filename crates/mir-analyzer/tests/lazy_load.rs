@@ -220,11 +220,44 @@ fn lazy_loads_interface_implemented_by_enum_from_psr4() {
     );
 }
 
-// FQCNs used directly in function bodies (no `use` import) are only discovered
-// during Pass 2 body analysis, after lazy loading has already run.  Fixing this
-// requires a post-Pass-2 lazy-load phase: collect UndefinedClass diagnostics →
-// PSR-4 resolve → load missing files → re-analyze affected files.
-#[ignore = "known gap: FQCN-without-use requires post-Pass-2 lazy loading"]
+#[test]
+fn lazy_loads_fqcn_with_inherited_parent_used_without_use_import() {
+    // Consumer.php uses \App\Child as FQCN (no `use`).
+    // Child extends \App\Base — Base must be transitively loaded.
+    let root = TempDir::new().unwrap();
+    fs::create_dir_all(root.path().join("src")).unwrap();
+    fs::write(
+        root.path().join("src").join("Base.php"),
+        "<?php\nnamespace App;\nclass Base {\n    public function hello(): string { return 'hi'; }\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("src").join("Child.php"),
+        "<?php\nnamespace App;\nclass Child extends Base {}\n",
+    )
+    .unwrap();
+    let consumer_path = write(
+        &root,
+        "Consumer.php",
+        "<?php\nfunction run(): string { return (new \\App\\Child())->hello(); }\n",
+    );
+    let psr4 = make_psr4(&root, "App\\\\", "src");
+    let mut analyzer = ProjectAnalyzer::new();
+    analyzer.psr4 = Some(psr4);
+    let result = analyzer.analyze(&[consumer_path]);
+
+    let issues: Vec<_> = result
+        .issues
+        .iter()
+        .filter(|i| matches!(i.kind.name(), "UndefinedClass" | "UndefinedMethod"))
+        .collect();
+
+    assert!(
+        issues.is_empty(),
+        "App\\Child and App\\Base should be found via lazy loading; got: {issues:?}"
+    );
+}
+
 #[test]
 fn lazy_loads_fqcn_used_directly_without_use_import_from_psr4() {
     let result = analyze_with_psr4(
