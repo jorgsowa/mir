@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-04-28
+
+### Added
+
+- Return type covariance for named-object overrides: `ClassAnalyzer` now delegates to `named_object_return_compatible` when checking overriding methods, catching cases where a child class returns an unrelated type instead of the declared parent return type. Mixed scalar+object unions still skip the check to avoid false positives.
+- Type narrowing after `instanceof $this`: when the right-hand side of `instanceof` is `$this`, it is resolved to the current class FQCN before narrowing, eliminating false-positive `MixedMethodCall` and `UndefinedProperty` diagnostics on `if (!$other instanceof $this)` guards. (#144)
+
+### Changed
+
+- `stmt.rs` split into `stmt/` sub-module (`mod.rs`, `loops.rs`, `return_type.rs`), following the same pattern as `call/`. No behavior change.
+
 ## [0.14.0] - 2026-04-28
 
 ### Added
