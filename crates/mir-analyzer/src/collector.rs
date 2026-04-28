@@ -45,6 +45,13 @@ pub struct DefinitionCollector<'a> {
     /// When `Some`, stub symbols annotated with `@since`/`@removed` are filtered
     /// against this target version. `None` disables filtering (user code).
     php_version: Option<PhpVersion>,
+    /// The first namespace declaration seen in this file. Matches the semantics
+    /// of `project.rs` which only records the first namespace per file.
+    first_namespace: Option<String>,
+    /// All `use` imports ever encountered in this file, accumulated across all
+    /// namespace blocks. Unlike `use_aliases`, this is never cleared or restored,
+    /// so braced-namespace imports are not lost.
+    accumulated_imports: std::collections::HashMap<String, String>,
 }
 
 impl<'a> DefinitionCollector<'a> {
@@ -83,6 +90,8 @@ impl<'a> DefinitionCollector<'a> {
             use_aliases: std::collections::HashMap::new(),
             issues: IssueBuffer::new(),
             php_version: None,
+            first_namespace: None,
+            accumulated_imports: std::collections::HashMap::new(),
         }
     }
 
@@ -104,11 +113,25 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
+    /// Writes accumulated namespace and import data into `self.slice` so that
+    /// `inject_stub_slice` can populate `Codebase::file_namespaces` and
+    /// `Codebase::file_imports`. Called at the end of both `collect` and
+    /// `collect_slice` to ensure both paths carry the complete data.
+    fn finalize_slice(&mut self) {
+        if let Some(ns) = self.first_namespace.take() {
+            self.slice.namespace = Some(Arc::from(ns.as_str()));
+        }
+        if !self.accumulated_imports.is_empty() {
+            self.slice.imports = std::mem::take(&mut self.accumulated_imports);
+        }
+    }
+
     /// Shim: build the slice then inject it into the target codebase (if one
     /// was supplied via [`Self::new`]). Returns the issues accumulated during
     /// Pass 1.
     pub fn collect<'arena, 'src>(mut self, program: &Program<'arena, 'src>) -> Vec<Issue> {
         let _ = self.visit_program(program);
+        self.finalize_slice();
         let issues = self.issues.into_issues();
         if let Some(codebase) = self.codebase {
             codebase.inject_stub_slice(self.slice);
@@ -122,6 +145,7 @@ impl<'a> DefinitionCollector<'a> {
         program: &Program<'arena, 'src>,
     ) -> (StubSlice, Vec<Issue>) {
         let _ = self.visit_program(program);
+        self.finalize_slice();
         (self.slice, self.issues.into_issues())
     }
 
@@ -609,7 +633,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
     fn visit_stmt(&mut self, stmt: &php_ast::ast::Stmt<'arena, 'src>) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Namespace(ns) => {
-                self.namespace = ns.name.as_ref().map(name_to_string);
+                let new_ns = ns.name.as_ref().map(name_to_string);
+                if self.first_namespace.is_none() {
+                    self.first_namespace = new_ns.clone();
+                }
+                self.namespace = new_ns;
                 match &ns.body {
                     php_ast::ast::NamespaceBody::Braced(stmts) => {
                         // Save and restore use aliases per namespace block
@@ -633,7 +661,10 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     let alias = item
                         .alias
                         .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
-                    self.use_aliases.insert(alias.to_string(), full_name);
+                    self.use_aliases
+                        .insert(alias.to_string(), full_name.clone());
+                    self.accumulated_imports
+                        .insert(alias.to_string(), full_name);
                 }
             }
 
@@ -1626,9 +1657,72 @@ const MY_CONST = 42;
         assert_eq!(sk(&cb_new), sk(&cb_old), "symbol_to_file differs");
         assert_eq!(gk(&cb_new), gk(&cb_old), "global_vars differ");
 
+        let nmk = |cb: &Codebase| {
+            sorted(
+                cb.file_namespaces
+                    .iter()
+                    .map(|e| (e.key().clone(), e.value().clone())),
+            )
+        };
+        let imk = |cb: &Codebase| {
+            sorted(cb.file_imports.iter().map(|e| {
+                let mut pairs: Vec<_> = e
+                    .value()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                pairs.sort();
+                (e.key().clone(), pairs)
+            }))
+        };
+        assert_eq!(nmk(&cb_new), nmk(&cb_old), "file_namespaces differ");
+        assert_eq!(imk(&cb_new), imk(&cb_old), "file_imports differ");
+
         // Sanity: file-based fields actually got populated.
         assert!(!cb_new.symbol_to_file.is_empty());
         assert!(cb_new.global_vars.contains_key("counter"));
+
+        // Deep-equal the concrete file_namespaces and file_imports entries.
+        // The keyset comparisons above would pass even if the stored *values* diverged.
+        assert_eq!(
+            cb_new
+                .file_namespaces
+                .get("test.php")
+                .as_deref()
+                .map(|s| s.as_str()),
+            cb_old
+                .file_namespaces
+                .get("test.php")
+                .as_deref()
+                .map(|s| s.as_str()),
+            "file_namespaces value for test.php differs"
+        );
+        assert_eq!(
+            cb_new
+                .file_namespaces
+                .get("test.php")
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("App\\Demo"),
+            "file_namespaces must contain the declared namespace"
+        );
+        let new_imports = cb_new
+            .file_imports
+            .get("test.php")
+            .expect("file_imports must be populated");
+        let old_imports = cb_old
+            .file_imports
+            .get("test.php")
+            .expect("file_imports must be populated");
+        assert_eq!(
+            *new_imports, *old_imports,
+            "file_imports value for test.php differs"
+        );
+        assert_eq!(
+            new_imports.get("Stringable").map(|s| s.as_str()),
+            Some("Stringable"),
+            "file_imports must contain the Stringable use alias"
+        );
 
         // Deep-equal one concrete entry per symbol kind to catch any drift in
         // storage contents that key-only comparison would miss.
@@ -1661,6 +1755,66 @@ const MY_CONST = 42;
             cb_new.enums.get(enum_fqcn).unwrap().value(),
             cb_old.enums.get(enum_fqcn).unwrap().value(),
             "EnumStorage differs for {enum_fqcn}"
+        );
+    }
+
+    // These three tests guard the DefinitionCollector → StubSlice contract for
+    // namespace and import data.
+    //
+    // Background: collect_slice is the pure output path used by incremental /
+    // salsa pipelines (LSP, re_analyze_file). For StubSlice-based consumers to
+    // produce correct diagnostics, the slice must carry the same namespace and
+    // import data that project.rs collects via its separate AST walk. If either
+    // field is missing from the slice, StatementsAnalyzer receives empty maps
+    // during Pass 2 and emits false UndefinedClass diagnostics for use-aliased
+    // or same-namespace classes.
+
+    #[test]
+    fn collect_slice_captures_namespace() {
+        // The first namespace declaration must end up in slice.namespace so
+        // that inject_stub_slice can populate Codebase::file_namespaces.
+        let slice = parse_and_collect_slice(
+            "src/Service.php",
+            "<?php\nnamespace App\\Service;\nclass Handler {}\n",
+        );
+        assert_eq!(
+            slice.namespace.as_deref(),
+            Some("App\\Service"),
+            "collect_slice must capture the file namespace"
+        );
+    }
+
+    #[test]
+    fn collect_slice_captures_use_imports() {
+        // All `use` imports (plain and aliased) must end up in slice.imports so
+        // that inject_stub_slice can populate Codebase::file_imports and Pass 2
+        // can resolve short names like `new Entity()` correctly.
+        let slice = parse_and_collect_slice(
+            "src/Handler.php",
+            "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\nuse App\\Repository\\EntityRepo as Repo;\nclass Handler {}\n",
+        );
+        let imports = &slice.imports;
+        assert_eq!(
+            imports.get("Entity").map(|s| s.as_str()),
+            Some("App\\Model\\Entity"),
+            "collect_slice must capture plain use import"
+        );
+        assert_eq!(
+            imports.get("Repo").map(|s| s.as_str()),
+            Some("App\\Repository\\EntityRepo"),
+            "collect_slice must capture aliased use import"
+        );
+    }
+
+    #[test]
+    fn collect_slice_captures_namespace_none_when_no_namespace() {
+        // Global-scope files have no namespace declaration; slice.namespace must
+        // be None so inject_stub_slice does not insert a spurious entry into
+        // file_namespaces.
+        let slice = parse_and_collect_slice("src/global.php", "<?php\nfunction foo(): void {}\n");
+        assert!(
+            slice.namespace.is_none(),
+            "collect_slice must not set namespace for global-scope files"
         );
     }
 

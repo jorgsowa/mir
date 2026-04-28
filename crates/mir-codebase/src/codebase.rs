@@ -219,6 +219,15 @@ impl Codebase {
     /// Called by generated stub modules (`src/generated/stubs_*.rs`) to register
     /// their pre-compiled definitions. Later insertions overwrite earlier ones,
     /// so custom stubs loaded after PHPStorm stubs act as overrides.
+    /// Merge a [`StubSlice`] into the codebase.
+    ///
+    /// When `slice.file` is `Some`, this method also writes file-keyed metadata:
+    /// `symbol_to_file`, `global_vars`, `file_namespaces`, and `file_imports`.
+    /// This includes slices produced from PHPStorm stub files — so after this
+    /// call, `file_namespaces` and `file_imports` will contain entries keyed by
+    /// stub file paths as well as user-code file paths.  That is intentional:
+    /// the lazy-load scan iterates `file_imports` but is gated by `type_exists`,
+    /// so stub-sourced entries are harmlessly short-circuited there.
     pub fn inject_stub_slice(&self, slice: crate::storage::StubSlice) {
         let file = slice.file.clone();
         for cls in slice.classes {
@@ -257,6 +266,12 @@ impl Codebase {
         if let Some(f) = &file {
             for (name, ty) in slice.global_vars {
                 self.register_global_var(f, name, ty);
+            }
+            if let Some(ns) = slice.namespace {
+                self.file_namespaces.insert(f.clone(), ns.to_string());
+            }
+            if !slice.imports.is_empty() {
+                self.file_imports.insert(f.clone(), slice.imports);
             }
         }
     }
@@ -2022,6 +2037,150 @@ mod tests {
         assert!(
             !cb.global_vars.contains_key("orphan_var"),
             "global_vars must not be registered when slice.file is None"
+        );
+    }
+
+    // These three tests guard the StubSlice → file_namespaces / file_imports contract.
+    //
+    // Background: inject_stub_slice is the only write path used by both
+    // collect() (the normal project-analysis path) and collect_slice +
+    // inject_stub_slice (the salsa/LSP incremental path and re_analyze_file).
+    // Prior to the fix, inject_stub_slice never wrote file_namespaces or
+    // file_imports, so any consumer that skipped the separate project.rs AST
+    // walk ended up with empty maps and produced false UndefinedClass
+    // diagnostics for use-aliased classes.
+
+    #[test]
+    fn inject_stub_slice_populates_file_namespace() {
+        // A slice with a namespace must cause file_namespaces to be populated
+        // for that file so that StatementsAnalyzer can resolve unqualified names
+        // against the correct namespace during Pass 2.
+        let cb = Codebase::new();
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            file: Some(Arc::from("src/Service.php")),
+            namespace: Some(Arc::from("App\\Service")),
+            ..Default::default()
+        });
+        assert_eq!(
+            cb.file_namespaces
+                .get("src/Service.php")
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("App\\Service"),
+            "file_namespaces must be populated when slice carries a namespace"
+        );
+
+        // file=Some but namespace=None must not create a spurious entry.
+        let cb2 = Codebase::new();
+        cb2.inject_stub_slice(crate::storage::StubSlice {
+            file: Some(Arc::from("src/global.php")),
+            namespace: None,
+            ..Default::default()
+        });
+        assert!(
+            cb2.file_namespaces.is_empty(),
+            "file_namespaces must not be written when slice.namespace is None"
+        );
+    }
+
+    #[test]
+    fn inject_stub_slice_populates_file_imports() {
+        // A slice with use-alias imports must cause file_imports to be
+        // populated so that StatementsAnalyzer can resolve aliased short names
+        // (e.g. `new Entity()` where `use App\Model\Entity` is in scope).
+        let cb = Codebase::new();
+        let mut imports = std::collections::HashMap::new();
+        imports.insert("Entity".to_string(), "App\\Model\\Entity".to_string());
+        imports.insert(
+            "Repo".to_string(),
+            "App\\Repository\\EntityRepo".to_string(),
+        );
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            file: Some(Arc::from("src/Handler.php")),
+            imports,
+            ..Default::default()
+        });
+        let stored = cb.file_imports.get("src/Handler.php").unwrap();
+        assert_eq!(
+            stored.get("Entity").map(|s| s.as_str()),
+            Some("App\\Model\\Entity")
+        );
+        assert_eq!(
+            stored.get("Repo").map(|s| s.as_str()),
+            Some("App\\Repository\\EntityRepo")
+        );
+
+        // file=Some but empty imports must not create a spurious entry.
+        let cb2 = Codebase::new();
+        cb2.inject_stub_slice(crate::storage::StubSlice {
+            file: Some(Arc::from("src/no_imports.php")),
+            imports: std::collections::HashMap::new(),
+            ..Default::default()
+        });
+        assert!(
+            cb2.file_imports.is_empty(),
+            "file_imports must not be written when slice.imports is empty"
+        );
+    }
+
+    #[test]
+    fn inject_stub_slice_skips_namespace_and_imports_when_no_file() {
+        // Bundled stub slices (file = None) must never pollute file_namespaces
+        // or file_imports — those maps are keyed by on-disk path and only make
+        // sense for slices that represent a specific source file.
+        let cb = Codebase::new();
+        let mut imports = std::collections::HashMap::new();
+        imports.insert("Foo".to_string(), "Bar\\Foo".to_string());
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            file: None,
+            namespace: Some(Arc::from("Bar")),
+            imports,
+            ..Default::default()
+        });
+        assert!(
+            cb.file_namespaces.is_empty(),
+            "file_namespaces must not be written when slice.file is None"
+        );
+        assert!(
+            cb.file_imports.is_empty(),
+            "file_imports must not be written when slice.file is None"
+        );
+    }
+
+    #[test]
+    fn remove_file_definitions_purges_file_namespaces_and_imports() {
+        // remove_file_definitions and inject_stub_slice form a round-trip:
+        // remove clears, inject refills. This test guards the remove half for
+        // file_namespaces and file_imports — symmetric to
+        // remove_file_definitions_purges_injected_global_vars which guards
+        // the same round-trip for global_vars.
+        let cb = Codebase::new();
+        let mut imports = std::collections::HashMap::new();
+        imports.insert("Entity".to_string(), "App\\Model\\Entity".to_string());
+        cb.inject_stub_slice(crate::storage::StubSlice {
+            file: Some(Arc::from("src/Handler.php")),
+            namespace: Some(Arc::from("App\\Service")),
+            imports,
+            ..Default::default()
+        });
+        assert!(
+            cb.file_namespaces.contains_key("src/Handler.php"),
+            "setup: namespace must be present"
+        );
+        assert!(
+            cb.file_imports.contains_key("src/Handler.php"),
+            "setup: imports must be present"
+        );
+
+        cb.remove_file_definitions("src/Handler.php");
+
+        assert!(
+            !cb.file_namespaces.contains_key("src/Handler.php"),
+            "file_namespaces entry must be removed when its defining file is removed"
+        );
+        assert!(
+            !cb.file_imports.contains_key("src/Handler.php"),
+            "file_imports entry must be removed when its defining file is removed"
         );
     }
 

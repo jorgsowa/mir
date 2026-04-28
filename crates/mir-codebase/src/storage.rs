@@ -341,4 +341,14 @@ pub struct StubSlice {
     /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
     #[serde(default)]
     pub global_vars: Vec<(Arc<str>, Union)>,
+    /// The first namespace declared in this file (e.g. `"App\\Service"`).
+    /// Populated by `DefinitionCollector`; merged into `Codebase::file_namespaces`
+    /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
+    #[serde(default)]
+    pub namespace: Option<Arc<str>>,
+    /// `use` alias map for this file: alias → FQCN.
+    /// Populated by `DefinitionCollector`; merged into `Codebase::file_imports`
+    /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
+    #[serde(default)]
+    pub imports: std::collections::HashMap<String, String>,
 }
