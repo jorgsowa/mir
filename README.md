@@ -1,6 +1,6 @@
 <div align="center">
 
-![mir](mir.png)
+<img src="mir.png" width="200" alt="mir">
 
 </div>
 
@@ -10,19 +10,23 @@
 
 > ⚠️ **Experimental.** mir is under active development and not yet production-ready. APIs, CLI flags, issue codes, and output formats may change between releases; expect false positives and rough edges.
 
+**[Try the Playground →](https://jorgsowa.github.io/mir/playground)**
+
 A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](https://psalm.dev).
 
 ## Features
 
+- **72 diagnostic rules** across type errors, undefined symbols, dead code, taint, and more
 - Sound type system — scalars, objects, generics, unions, intersections, literals, `never`, `void`
-- Full type inference — return types, narrowing via `if`/`match`/`instanceof`/`is_string()` etc.
+- Full type inference — return types, literal narrowing, `if`/`match`/`instanceof`/`is_string()` etc.
 - Call checking — argument count and types for user-defined and built-in functions/methods
 - Class analysis — inheritance, interface compliance, abstract enforcement, visibility, `readonly`, `final`
-- Dead code detection — unused private methods, properties, functions
+- Dead code detection — unused variables, parameters, private methods, properties, and functions
 - Taint analysis — tracks data from `$_GET`/`$_POST` to HTML/SQL/shell sinks
 - Incremental cache — unchanged files skipped on re-runs via SHA-256 content hashing
 - Parallel analysis — rayon-powered; scales to available CPUs
-- Comprehensive built-in coverage — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) (500+ functions, 100+ classes, 200+ constants across 33 PHP extensions)
+- PHP 8.1–8.5 support with version-aware stub filtering
+- Comprehensive built-in coverage — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) (57 extensions, 500+ functions, 100+ classes)
 
 ## Installation
 
@@ -74,11 +78,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What's next
 
-- Literal equality narrowing (`$x === 'foo'` → `TLiteralString`)
-- `UnusedVariable` / `UnusedParam` detection
 - Reduce `UndefinedMethod` / `InvalidArgument` false positives
 - Plugin system
-- PHP version–aware stub filtering (load only stubs valid for the target version)
 
 ## License
 
