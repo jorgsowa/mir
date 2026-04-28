@@ -142,6 +142,15 @@ impl CallAnalyzer {
             }
         }
 
+        // compact() reads variables by string name at runtime; mark each string-literal arg as read
+        if fn_name == "compact" {
+            for arg in call.args.iter() {
+                if let ExprKind::String(name) = &arg.value.kind {
+                    ctx.read_vars.insert((*name).to_string());
+                }
+            }
+        }
+
         if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
             if !ea.inference_only {
                 let (line, col_start, col_end) = ea.span_to_ref_loc(call.name.span);
