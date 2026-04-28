@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 license = "MIT"
 authors = ["Jorg Sowa <jorg.sowa@gmail.com>"]
@@ -19,10 +19,10 @@ homepage = "https://github.com/jorgsowa/mir"
 
 [workspace.dependencies]
 # Internal crates
-mir-types      = { path = "crates/mir-types",      version = "0.15.0" }
-mir-issues     = { path = "crates/mir-issues",     version = "0.15.0" }
-mir-codebase   = { path = "crates/mir-codebase",   version = "0.15.0" }
-mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.15.0" }
+mir-types      = { path = "crates/mir-types",      version = "0.16.0" }
+mir-issues     = { path = "crates/mir-issues",     version = "0.16.0" }
+mir-codebase   = { path = "crates/mir-codebase",   version = "0.16.0" }
+mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.16.0" }
 
 # PHP parsing
 php-rs-parser = "0.9.6"

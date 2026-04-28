@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-04-28
+
+### Added
+
+- Cross-file inferred return types (G6): a type-inference priming pass now runs all function and method bodies in parallel before the issue-emitting Pass 2, writing `inferred_return_type` for every symbol without recording reference locations. Callers no longer see `mixed` for callees whose Pass 2 had not yet completed. Covers the common depth-1 case; depth-N chains are addressed by Phase 4 (Salsa).
+- Per-class `OnceLock` finalization (Phase 3 item 6): `ensure_finalized(fqcn)` lazily computes and memoizes each class's ancestor chain on first access via `DashMap<Arc<str>, OnceLock<Arc<[Arc<str>]>>>` with thread-local cycle detection. `finalize()` is now a warm-all wrapper; `remove_file_definitions()` evicts only the affected entries granularly.
+
+### Performance
+
+- Lazy finalization removes the pass barrier (Phase 3 item 7): the eager `finalize()` barrier that blocked all of Pass 2 until every ancestor chain was warm is removed. `ensure_finalized()` is now called at each `all_parents` read site (`get_method_inner`, `get_property_inner`, `get_class_constant`, `extends_or_implements`, `has_unknown_ancestor`, `collect_members_for_fqcn`, `ClassAnalyzer::analyze_all`, `check_trait_constraints`, `argument_type_satisfies_param`). Phase 3 is now complete.
+
+### Fixed
+
+- LSP incremental re-analysis: classes defined in an analyzed file but never referenced during Pass 2 had empty `all_parents` at snapshot time, causing `restore_all_parents` to silently restore empty ancestor chains on the LSP fast path. `file_structural_snapshot` now calls `ensure_finalized` for each symbol before capturing it.
+
 ## [0.15.0] - 2026-04-28
 
 ### Added
