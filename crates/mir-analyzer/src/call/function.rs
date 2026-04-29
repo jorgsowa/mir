@@ -67,9 +67,14 @@ impl CallAnalyzer {
             .unwrap_or(fn_name);
         let resolved_fn_name: String = {
             let qualified = ea.codebase.resolve_class_name(&ea.file, &fn_name);
-            if ea.codebase.functions.contains_key(qualified.as_str()) {
+            let fn_exists = |name: &str| -> bool {
+                ea.db
+                    .and_then(|db| db.lookup_function_node(name).map(|n| n.active(db)))
+                    .unwrap_or_else(|| ea.codebase.functions.contains_key(name))
+            };
+            if fn_exists(qualified.as_str()) {
                 qualified
-            } else if ea.codebase.functions.contains_key(fn_name.as_str()) {
+            } else if fn_exists(fn_name.as_str()) {
                 fn_name.clone()
             } else {
                 qualified

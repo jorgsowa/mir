@@ -680,12 +680,13 @@ impl ProjectAnalyzer {
                 .collect()
         };
 
-        // Mark removed classes inactive so dependents re-run.
+        // Mark removed classes and functions inactive so dependents re-run.
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             let (ref mut db, _) = *guard;
             for fqcn in &old_fqcns {
                 db.deactivate_class_node(fqcn);
+                db.deactivate_function_node(fqcn);
             }
         }
 
@@ -738,6 +739,11 @@ impl ProjectAnalyzer {
                     Arc::from([]),
                     Arc::from(iface.extends.as_slice()),
                 );
+            }
+
+            // --- S5-PR2: Upsert FunctionNodes ------------------------------------
+            for func in &file_defs.slice.functions {
+                db.upsert_function_node(func);
             }
 
             let new_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
