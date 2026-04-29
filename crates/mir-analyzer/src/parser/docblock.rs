@@ -446,6 +446,14 @@ pub fn parse_type_string(s: &str) -> Union {
         return u;
     }
 
+    // Conditional type: `($param is TypeName ? TrueType : FalseType)`
+    if s.starts_with('(') && s.ends_with(')') {
+        let inner = s[1..s.len() - 1].trim();
+        if let Some(conditional) = parse_conditional_type(inner) {
+            return conditional;
+        }
+    }
+
     // Union: `A|B|C`
     if s.contains('|') && !is_inside_generics(s) {
         let parts = split_union(s);
@@ -927,6 +935,40 @@ fn is_inside_generics(s: &str) -> bool {
         }
     }
     depth != 0
+}
+
+/// Parses `$param is TypeName ? TrueType : FalseType` into a `TConditional`.
+fn parse_conditional_type(s: &str) -> Option<Union> {
+    if !s.starts_with('$') {
+        return None;
+    }
+    let is_pos = s.find(" is ")?;
+    let after_is = s[is_pos + 4..].trim();
+    let q_pos = find_char_at_depth(after_is, '?')?;
+    let subject_str = after_is[..q_pos].trim();
+    let rest = after_is[q_pos + 1..].trim();
+    let colon_pos = find_char_at_depth(rest, ':')?;
+    let true_str = rest[..colon_pos].trim();
+    let false_str = rest[colon_pos + 1..].trim();
+    Some(Union::single(Atomic::TConditional {
+        subject: Box::new(parse_type_string(subject_str)),
+        if_true: Box::new(parse_type_string(true_str)),
+        if_false: Box::new(parse_type_string(false_str)),
+    }))
+}
+
+/// Finds `target` in `s` at nesting depth 0 (not inside `<>`, `()`, `{}`).
+fn find_char_at_depth(s: &str, target: char) -> Option<usize> {
+    let mut depth = 0i32;
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => depth -= 1,
+            _ if ch == target && depth == 0 => return Some(i),
+            _ => {}
+        }
+    }
+    None
 }
 
 fn normalize_fqcn(s: &str) -> String {

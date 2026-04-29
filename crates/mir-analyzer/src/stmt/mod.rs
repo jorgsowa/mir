@@ -230,8 +230,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         // Check return type compatibility. Special case: `void` functions must not
                         // return any value (named_object_return_compatible considers TVoid compatible
                         // with TNull, so handle void separately to avoid false suppression).
-                        if (declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
-                            || (!check_ty.is_subtype_of_simple(declared)
+                        if !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
+                            && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
+                                || (!check_ty.is_subtype_of_simple(declared)
                                 && !declared.is_mixed()
                                 && !check_ty.is_mixed()
                                 && !named_object_return_compatible(&check_ty, declared, self.codebase, &self.file)
@@ -254,7 +255,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 // Suppress LessSpecificReturnStatement (level 4): actual is a
                                 // supertype of declared (not flagged at default error level).
                                 && !named_object_return_compatible(declared, &check_ty, self.codebase, &self.file)
-                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file))
+                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file)))
                         {
                             let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                             let (line_end, col_end) = if stmt.span.start < stmt.span.end {
