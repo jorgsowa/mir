@@ -831,7 +831,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .get_class_constant(&fqcn, &const_name)
                         .is_some()
                 };
-                if !const_exists && !self.codebase.has_unknown_ancestor(&fqcn) {
+                if !const_exists
+                    && !crate::db::has_unknown_ancestor_db_or_codebase(
+                        self.db,
+                        self.codebase,
+                        &fqcn,
+                    )
+                {
                     self.emit(
                         IssueKind::UndefinedConstant {
                             name: format!("{fqcn}::{const_name}"),
@@ -1330,8 +1336,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         return ty;
                     }
                     // Only emit UndefinedProperty if all ancestors are known and no __get magic.
-                    if !self.codebase.has_unknown_ancestor(fqcn.as_ref())
-                        && !self.codebase.has_magic_get(fqcn.as_ref())
+                    if !crate::db::has_unknown_ancestor_db_or_codebase(
+                        self.db,
+                        self.codebase,
+                        fqcn.as_ref(),
+                    ) && !self.codebase.has_magic_get(fqcn.as_ref())
                     {
                         self.emit(
                             IssueKind::UndefinedProperty {
