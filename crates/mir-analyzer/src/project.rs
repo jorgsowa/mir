@@ -623,14 +623,26 @@ impl ProjectAnalyzer {
             all_issues.retain(|i| !files_to_reanalyze.contains(&i.location.file));
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
+            // S5-PR11a: mirror newly-loaded definitions into the salsa db
+            // before re-analyzing, so the cloned db each rayon worker
+            // receives sees them.
+            let db_reanalysis = {
+                let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+                guard.0.ingest_codebase(&self.codebase);
+                guard.0.clone()
+            };
+
             let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
                 .par_iter()
                 .filter(|(f, _)| {
                     !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
                 })
-                .map(|(file, src)| {
-                    let driver =
-                        Pass2Driver::new(&self.codebase, None, self.resolved_php_version());
+                .map_with(db_reanalysis, |db, (file, src)| {
+                    let driver = Pass2Driver::new(
+                        &self.codebase,
+                        Some(&*db as &dyn MirDatabase),
+                        self.resolved_php_version(),
+                    );
                     let arena = bumpalo::Bump::new();
                     let parsed = php_rs_parser::parse(&arena, src);
                     driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
