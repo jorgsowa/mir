@@ -101,6 +101,16 @@ pub struct ClassNode {
     /// queries observe this change and re-run, returning empty ancestors.
     pub active: bool,
     pub is_interface: bool,
+    /// `true` for trait nodes.  Traits don't currently participate in the
+    /// `class_ancestors` query (matching `Codebase::ensure_finalized` which
+    /// returns empty for traits), but registering them as `ClassNode`s lets
+    /// callers answer `type_exists`-style questions through the db.
+    pub is_trait: bool,
+    /// `true` for enum nodes.  See note on `is_trait`.
+    pub is_enum: bool,
+    /// `true` if the class is declared `abstract`.  Always `false` for
+    /// interfaces, traits, and enums.
+    pub is_abstract: bool,
     /// Direct parent class (classes only; `None` for interfaces).
     pub parent: Option<Arc<str>>,
     /// Directly implemented interfaces (classes only).
@@ -428,10 +438,14 @@ impl MirDb {
     ///
     /// If a handle already exists, its fields are updated in-place so Salsa
     /// can track the change.  A new handle is created only on first registration.
+    #[allow(clippy::too_many_arguments)]
     pub fn upsert_class_node(
         &mut self,
         fqcn: Arc<str>,
         is_interface: bool,
+        is_trait: bool,
+        is_enum: bool,
+        is_abstract: bool,
         parent: Option<Arc<str>>,
         interfaces: Arc<[Arc<str>]>,
         traits: Arc<[Arc<str>]>,
@@ -441,6 +455,9 @@ impl MirDb {
         if let Some(&node) = self.class_nodes.get(&fqcn) {
             node.set_active(self).to(true);
             node.set_is_interface(self).to(is_interface);
+            node.set_is_trait(self).to(is_trait);
+            node.set_is_enum(self).to(is_enum);
+            node.set_is_abstract(self).to(is_abstract);
             node.set_parent(self).to(parent);
             node.set_interfaces(self).to(interfaces);
             node.set_traits(self).to(traits);
@@ -452,6 +469,9 @@ impl MirDb {
                 fqcn.clone(),
                 true,
                 is_interface,
+                is_trait,
+                is_enum,
+                is_abstract,
                 parent,
                 interfaces,
                 traits,
@@ -684,6 +704,26 @@ mod tests {
     use super::*;
     use salsa::Setter as _;
 
+    fn upsert_class(
+        db: &mut MirDb,
+        fqcn: &str,
+        parent: Option<Arc<str>>,
+        extends: Arc<[Arc<str>]>,
+        is_interface: bool,
+    ) -> ClassNode {
+        db.upsert_class_node(
+            Arc::from(fqcn),
+            is_interface,
+            false,
+            false,
+            false,
+            parent,
+            Arc::from([]),
+            Arc::from([]),
+            extends,
+        )
+    }
+
     #[test]
     fn mirdb_constructs() {
         let _db = MirDb::default();
@@ -749,14 +789,7 @@ mod tests {
     #[test]
     fn class_ancestors_empty_for_root_class() {
         let mut db = MirDb::default();
-        let node = db.upsert_class_node(
-            Arc::from("Foo"),
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
+        let node = upsert_class(&mut db, "Foo", None, Arc::from([]), false);
         let ancestors = class_ancestors(&db, node);
         assert!(ancestors.0.is_empty(), "root class has no ancestors");
     }
@@ -764,21 +797,13 @@ mod tests {
     #[test]
     fn class_ancestors_single_parent() {
         let mut db = MirDb::default();
-        db.upsert_class_node(
-            Arc::from("Base"),
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
-        let child = db.upsert_class_node(
-            Arc::from("Child"),
-            false,
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        let child = upsert_class(
+            &mut db,
+            "Child",
             Some(Arc::from("Base")),
             Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
+            false,
         );
         let ancestors = class_ancestors(&db, child);
         assert_eq!(ancestors.0.len(), 1);
@@ -788,29 +813,20 @@ mod tests {
     #[test]
     fn class_ancestors_transitive() {
         let mut db = MirDb::default();
-        db.upsert_class_node(
-            Arc::from("GrandParent"),
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
-        db.upsert_class_node(
-            Arc::from("Parent"),
-            false,
+        upsert_class(&mut db, "GrandParent", None, Arc::from([]), false);
+        upsert_class(
+            &mut db,
+            "Parent",
             Some(Arc::from("GrandParent")),
             Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
-        let child = db.upsert_class_node(
-            Arc::from("Child"),
             false,
+        );
+        let child = upsert_class(
+            &mut db,
+            "Child",
             Some(Arc::from("Parent")),
             Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
+            false,
         );
         let ancestors = class_ancestors(&db, child);
         assert_eq!(ancestors.0.len(), 2);
@@ -822,14 +838,7 @@ mod tests {
     fn class_ancestors_cycle_returns_empty() {
         let mut db = MirDb::default();
         // A extends A — not valid PHP, but we must not panic.
-        let node_a = db.upsert_class_node(
-            Arc::from("A"),
-            false,
-            Some(Arc::from("A")),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
+        let node_a = upsert_class(&mut db, "A", Some(Arc::from("A")), Arc::from([]), false);
         let ancestors = class_ancestors(&db, node_a);
         // Cycle recovery: empty list (A's ancestors exclude itself).
         assert!(ancestors.0.is_empty(), "cycle must yield empty ancestors");
@@ -838,14 +847,7 @@ mod tests {
     #[test]
     fn class_ancestors_inactive_node_returns_empty() {
         let mut db = MirDb::default();
-        let node = db.upsert_class_node(
-            Arc::from("Foo"),
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
+        let node = upsert_class(&mut db, "Foo", None, Arc::from([]), false);
         db.deactivate_class_node("Foo");
         let ancestors = class_ancestors(&db, node);
         assert!(ancestors.0.is_empty(), "inactive node must yield empty");
@@ -854,22 +856,8 @@ mod tests {
     #[test]
     fn class_ancestors_recomputes_on_parent_change() {
         let mut db = MirDb::default();
-        db.upsert_class_node(
-            Arc::from("Base"),
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
-        let child = db.upsert_class_node(
-            Arc::from("Child"),
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        let child = upsert_class(&mut db, "Child", None, Arc::from([]), false);
 
         let before = class_ancestors(&db, child);
         assert!(before.0.is_empty());
@@ -885,21 +873,13 @@ mod tests {
     #[test]
     fn interface_ancestors_via_extends() {
         let mut db = MirDb::default();
-        db.upsert_class_node(
-            Arc::from("Countable"),
-            true,
+        upsert_class(&mut db, "Countable", None, Arc::from([]), true);
+        let child_iface = upsert_class(
+            &mut db,
+            "Collection",
             None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-        );
-        let child_iface = db.upsert_class_node(
-            Arc::from("Collection"),
-            true,
-            None,
-            Arc::from([]),
-            Arc::from([]),
             Arc::from([Arc::from("Countable")]),
+            true,
         );
         let ancestors = class_ancestors(&db, child_iface);
         assert_eq!(ancestors.0.len(), 1);
