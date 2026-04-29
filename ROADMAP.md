@@ -214,15 +214,28 @@ Sub-PRs (each shippable, fixture suite green at every step):
   check is `type_exists_via_db || codebase.type_exists` so bundled
   stubs are still respected. All seven read sites in `expr.rs`,
   `stmt/mod.rs`, `call/method.rs`, and `call/static_call.rs` migrated.
+- **PR8** ✅ `MirDb::ingest_codebase(&Codebase)` mirrors the entire
+  codebase symbol table (classes, interfaces, traits, enums,
+  functions, their methods, properties, and constants) into the
+  Salsa db.  Wired into `ProjectAnalyzer::load_stubs` so bundled and
+  user stubs are db-visible the moment they land in `Codebase`.
+  This unblocks dropping the codebase fallbacks in
+  `type_exists_via_db` / `class_kind_via_db` / `class_template_params_via_db`
+  in subsequent PRs.
 
 Remaining for S5 (rough order):
-- Register bundled / user stubs with the db at load time so `type_exists`
-  can move fully off `Codebase`.
+- Drop the codebase fallback in the prefer-db wrappers
+  (`type_exists`, `is_interface`, `class_template_params`,
+  `has_unknown_ancestor_db_or_codebase`) once `ingest_codebase` is
+  also called on the batch `analyze` path (today only LSP /
+  `re_analyze_file` upserts user-code definitions).
 - Remove `finalization_cache` and the structural snapshot fallback in
-  `re_analyze_file`.
+  `re_analyze_file` once no caller reaches `ensure_finalized` (gated
+  on the per-field migrations finishing).
 - Delete the remaining fields from `Codebase` (functions, methods,
   properties, constants, classes, interfaces, traits, enums) once no
-  read site references them.
+  read site references them — one batch per field group, each a
+  shippable PR.
 
 Expected: sub-second re-analysis on save for LSP; precise invalidation across all query types.
 
