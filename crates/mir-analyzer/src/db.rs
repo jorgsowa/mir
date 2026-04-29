@@ -349,14 +349,17 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
     if !node.active(db) {
         return Ancestors(vec![]);
     }
-    // Invariant: enums always return empty here, even when `interfaces` /
-    // `is_backed_enum` are populated.  This matches `Codebase::ensure_finalized`
-    // (which returns empty for enums) and keeps `has_unknown_ancestor_via_db`
-    // from misclassifying enums.  Enum membership questions go through
-    // `extends_or_implements_via_db`, which reads `interfaces` /
-    // `is_backed_enum` directly.  Do not lift this short-circuit without also
-    // auditing every caller of `class_ancestors`.
-    if node.is_enum(db) {
+    // Invariant: enums and traits always return empty here.
+    // - Enums: matches `Codebase::ensure_finalized`.  Enum membership
+    //   questions go through `extends_or_implements_via_db`, which reads
+    //   `interfaces` / `is_backed_enum` directly.
+    // - Traits: matches `Codebase::ensure_finalized` (which only computes
+    //   ancestors for classes/interfaces).  Trait-of-trait walking is
+    //   handled by `method_is_concretely_implemented` /
+    //   `trait_provides_method` directly via the `traits` field.
+    // Do not lift either short-circuit without also auditing every caller
+    // of `class_ancestors`.
+    if node.is_enum(db) || node.is_trait(db) {
         return Ancestors(vec![]);
     }
 
@@ -419,6 +422,117 @@ pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
         .0
         .iter()
         .any(|ancestor| !type_exists_via_db(db, ancestor))
+}
+
+/// Returns `true` iff `fqcn` (or any non-interface ancestor) declares a
+/// *concrete* (non-abstract) implementation of `method_name`.  Methods
+/// declared on interface ancestors are treated as abstract — interfaces don't
+/// supply implementations even though their `MethodStorage` is collected with
+/// `is_abstract = false`.  Mirrors the implemented-method semantics that
+/// [`Codebase::get_method`] hand-rolls via its `ms.is_abstract = true`
+/// rewrite for interface ancestors.
+///
+/// Method names are PHP-case-insensitive; the lookup lower-cases internally.
+/// Cycle-safe: relies on `class_ancestors` cycle recovery.
+pub fn method_is_concretely_implemented(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    method_name: &str,
+) -> bool {
+    let lower = method_name.to_lowercase();
+    let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
+        return false;
+    };
+    // Interfaces don't supply implementations, regardless of how their methods
+    // are stored.
+    if self_node.is_interface(db) {
+        return false;
+    }
+    // 1. Direct own method.
+    if let Some(m) = db.lookup_method_node(fqcn, &lower).filter(|m| m.active(db)) {
+        if !m.is_abstract(db) {
+            return true;
+        }
+    }
+    // 2. Traits used directly by this class — walk transitively.
+    let mut visited_traits: HashSet<String> = HashSet::new();
+    for t in self_node.traits(db).iter() {
+        if trait_provides_method(db, t.as_ref(), &lower, &mut visited_traits) {
+            return true;
+        }
+    }
+    // 3. Ancestor chain (classes only — interfaces skipped, trait nodes here
+    //    are owning-class trait references already handled by their own walk).
+    for ancestor in class_ancestors(db, self_node).0.iter() {
+        let Some(anc_node) = db
+            .lookup_class_node(ancestor.as_ref())
+            .filter(|n| n.active(db))
+        else {
+            continue;
+        };
+        if anc_node.is_interface(db) {
+            continue;
+        }
+        // Ancestor's own method.
+        if !anc_node.is_trait(db) {
+            if let Some(m) = db
+                .lookup_method_node(ancestor.as_ref(), &lower)
+                .filter(|m| m.active(db))
+            {
+                if !m.is_abstract(db) {
+                    return true;
+                }
+            }
+        }
+        // Ancestor's used traits — walk transitively.  (For trait nodes in
+        // the ancestor list, this re-checks their own_methods + sub-traits.)
+        if anc_node.is_trait(db) {
+            if trait_provides_method(db, ancestor.as_ref(), &lower, &mut visited_traits) {
+                return true;
+            }
+        } else {
+            for t in anc_node.traits(db).iter() {
+                if trait_provides_method(db, t.as_ref(), &lower, &mut visited_traits) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Helper for [`method_is_concretely_implemented`]: walk a trait's own methods
+/// and recursively its used traits.  Returns true iff any provides a
+/// non-abstract method named `method_lower`.  Cycle-safe via `visited`.
+fn trait_provides_method(
+    db: &dyn MirDatabase,
+    trait_fqcn: &str,
+    method_lower: &str,
+    visited: &mut HashSet<String>,
+) -> bool {
+    if !visited.insert(trait_fqcn.to_string()) {
+        return false;
+    }
+    if let Some(m) = db
+        .lookup_method_node(trait_fqcn, method_lower)
+        .filter(|m| m.active(db))
+    {
+        if !m.is_abstract(db) {
+            return true;
+        }
+    }
+    let Some(node) = db.lookup_class_node(trait_fqcn).filter(|n| n.active(db)) else {
+        return false;
+    };
+    if !node.is_trait(db) {
+        return false;
+    }
+    for t in node.traits(db).iter() {
+        if trait_provides_method(db, t.as_ref(), method_lower, visited) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Predicate variant of [`Codebase::extends_or_implements`] backed by the
@@ -901,7 +1015,7 @@ impl MirDb {
                 false,
                 None,
                 Arc::from([]),
-                Arc::from([]),
+                Arc::from(tr.traits.as_slice()),
                 Arc::from([]),
                 Arc::from(tr.template_params.as_slice()),
                 Arc::from(tr.require_extends.as_slice()),
