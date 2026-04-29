@@ -123,6 +123,14 @@ pub struct ClassNode {
     /// Declared `@template` parameters from the class/interface/trait
     /// docblock.  Empty for classes without templates.
     pub template_params: Arc<[TemplateParam]>,
+    /// `@psalm-require-extends` / `@phpstan-require-extends` — FQCNs that
+    /// using classes must extend.  Populated for trait nodes only; empty for
+    /// classes/interfaces/enums.
+    pub require_extends: Arc<[Arc<str>]>,
+    /// `@psalm-require-implements` / `@phpstan-require-implements` — FQCNs
+    /// that using classes must implement.  Populated for trait nodes only;
+    /// empty for classes/interfaces/enums.
+    pub require_implements: Arc<[Arc<str>]>,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -526,6 +534,8 @@ impl MirDb {
         traits: Arc<[Arc<str>]>,
         extends: Arc<[Arc<str>]>,
         template_params: Arc<[TemplateParam]>,
+        require_extends: Arc<[Arc<str>]>,
+        require_implements: Arc<[Arc<str>]>,
     ) -> ClassNode {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
@@ -539,6 +549,8 @@ impl MirDb {
             node.set_traits(self).to(traits);
             node.set_extends(self).to(extends);
             node.set_template_params(self).to(template_params);
+            node.set_require_extends(self).to(require_extends);
+            node.set_require_implements(self).to(require_implements);
             node
         } else {
             let node = ClassNode::new(
@@ -554,6 +566,8 @@ impl MirDb {
                 traits,
                 extends,
                 template_params,
+                require_extends,
+                require_implements,
             );
             self.class_nodes.insert(fqcn, node);
             node
@@ -780,6 +794,8 @@ impl MirDb {
                 Arc::from(cls.traits.as_slice()),
                 Arc::from([]),
                 Arc::from(cls.template_params.as_slice()),
+                Arc::from([]),
+                Arc::from([]),
             );
             for method in cls.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -804,6 +820,8 @@ impl MirDb {
                 Arc::from([]),
                 Arc::from(iface.extends.as_slice()),
                 Arc::from(iface.template_params.as_slice()),
+                Arc::from([]),
+                Arc::from([]),
             );
             for method in iface.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -825,6 +843,8 @@ impl MirDb {
                 Arc::from([]),
                 Arc::from([]),
                 Arc::from(tr.template_params.as_slice()),
+                Arc::from(tr.require_extends.as_slice()),
+                Arc::from(tr.require_implements.as_slice()),
             );
             for method in tr.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -845,6 +865,8 @@ impl MirDb {
                 true,
                 false,
                 None,
+                Arc::from([]),
+                Arc::from([]),
                 Arc::from([]),
                 Arc::from([]),
                 Arc::from([]),
@@ -911,6 +933,8 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             extends,
+            Arc::from([]),
+            Arc::from([]),
             Arc::from([]),
         )
     }
@@ -1129,6 +1153,8 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             Arc::from([tp.clone()]),
+            Arc::from([]),
+            Arc::from([]),
         );
         let got = class_template_params_via_db(&db, "Box").expect("registered");
         assert_eq!(got.len(), 1);
