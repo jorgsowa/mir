@@ -28,7 +28,7 @@ use crate::symbol::ResolvedSymbol;
 
 pub struct StatementsAnalyzer<'a> {
     pub codebase: &'a Codebase,
-    pub db: Option<&'a dyn MirDatabase>,
+    pub db: &'a dyn MirDatabase,
     pub file: Arc<str>,
     pub source: &'a str,
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -47,7 +47,7 @@ impl<'a> StatementsAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         codebase: &'a Codebase,
-        db: Option<&'a dyn MirDatabase>,
+        db: &'a dyn MirDatabase,
         file: Arc<str>,
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,

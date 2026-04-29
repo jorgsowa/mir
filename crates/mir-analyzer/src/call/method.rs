@@ -38,7 +38,7 @@ pub(super) fn resolve_method_from_db(
     fqcn: &Arc<str>,
     method_name_lower: &str,
 ) -> Option<ResolvedMethod> {
-    let db = ea.db?;
+    let db = ea.db;
 
     // Check the class's own MethodNode first.
     let node = find_method_node_in_chain(db, fqcn, method_name_lower)?;
@@ -411,9 +411,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
     } else if ea.codebase.type_exists(fqcn)
         && !crate::db::has_unknown_ancestor_db_or_codebase(ea.db, ea.codebase, fqcn)
     {
-        let (is_interface, is_abstract) = ea
-            .db
-            .and_then(|db| crate::db::class_kind_via_db(db, fqcn))
+        let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, fqcn)
             .map(|k| (k.is_interface, k.is_abstract))
             .unwrap_or_else(|| {
                 (
