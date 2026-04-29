@@ -232,6 +232,15 @@ Sub-PRs (each shippable, fixture suite green at every step):
   the db through batch Pass 2.  Sanity test verifies a clone
   observes pre-clone upserts and resolves `class_ancestors`.
 
+- **PR11a** ✅ `lazy_load_from_body_issues` re-analysis sweep
+  also gets a cloned db via `map_with`.  A second
+  `ingest_codebase` runs immediately after PSR-4 lazy-loaded
+  definitions land in `Codebase` (and after
+  `lazy_load_missing_classes` finalizes inheritance deps), so the
+  clone each rayon worker receives reflects the freshly-loaded
+  classes.  This is the last `db: None` site in the batch path;
+  retiring `Pass2Driver::db: Option<&dyn MirDatabase>` to a plain
+  `&dyn MirDatabase` is the next sub-PR.
 - **PR10b** ✅ Thread the cloned db through batch `Pass2Driver`
   (priming sweep + main sweep) using `for_each_with` /
   `map_with` so each rayon worker gets its own clone.
