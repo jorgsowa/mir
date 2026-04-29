@@ -1,3 +1,5 @@
+===description===
+A variable that is assigned but never read in its scope reports UnusedVariable.
 ===file===
 <?php
 function foo(): int {

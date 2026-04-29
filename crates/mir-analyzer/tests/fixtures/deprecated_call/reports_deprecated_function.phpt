@@ -1,3 +1,6 @@
+===description===
+A function annotated with @deprecated reports DeprecatedCall at its call site,
+including the deprecation message from the docblock.
 ===file===
 <?php
 /** @deprecated use newGreet() instead */

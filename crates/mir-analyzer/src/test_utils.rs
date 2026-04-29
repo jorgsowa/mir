@@ -57,6 +57,32 @@
 //! Child.php: UndefinedMethod: Method Child::bar() does not exist
 //! ```
 //!
+//! **With description** (optional `===description===` section, must appear before file sections):
+//! ```text
+//! ===description===
+//! Verify that calling a method on a null variable is reported.
+//! ===file===
+//! <?php
+//! ...
+//! ===expect===
+//! ...
+//! ```
+//!
+//! **Skipped / WIP fixture** (`===ignore===`, must appear before file sections):
+//! ```text
+//! ===ignore===
+//! TODO: narrowing through loop variables not yet implemented
+//! ===file===
+//! <?php
+//! ...
+//! ===expect===
+//! ...
+//! ```
+//!
+//! The presence of `===ignore===` causes the generated test to be marked
+//! `#[ignore]` at compile time (via `build.rs`), so it shows up as `ignored`
+//! rather than `ok` or `FAILED` in test output.
+//!
 //! # Validation rules
 //!
 //! - `===file===` (bare, no name) must appear **at most once** per fixture.
@@ -69,6 +95,8 @@
 //!   real CLI config); invalid values fail the test.
 //! - `find_dead_code` accepts only the literals `true` or `false`.
 //! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
+//! - `===description===` must appear **at most once** and before any file section.
+//! - `===ignore===` must appear **at most once** and before any file section.
 //!
 //! # Expect format
 //!
@@ -139,6 +167,8 @@ pub(crate) struct ParsedFixture {
     pub files: Vec<(String, String)>,
     pub expected: Vec<ExpectedIssue>,
     pub is_multi: bool,
+    /// Optional human-readable description from `===description===`.
+    pub description: Option<String>,
     config: FixtureConfig,
 }
 
@@ -150,6 +180,8 @@ const BARE_FILE: &str = "===file===";
 const FILE_PREFIX: &str = "===file:";
 const CONFIG_MARKER: &str = "===config===";
 const EXPECT_MARKER: &str = "===expect===";
+const DESCRIPTION_MARKER: &str = "===description===";
+const IGNORE_MARKER: &str = "===ignore===";
 
 /// Parse a `.phpt` fixture file.
 pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
@@ -170,9 +202,23 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         "fixture {path}: ===config=== must appear at most once, found {config_count} times"
     );
 
+    // --- Validate description section ---
+    let description_count = count_occurrences(header_region, DESCRIPTION_MARKER);
+    assert!(
+        description_count <= 1,
+        "fixture {path}: ===description=== must appear at most once, found {description_count} times"
+    );
+
+    // --- Validate ignore marker ---
+    let ignore_count = count_occurrences(header_region, IGNORE_MARKER);
+    assert!(
+        ignore_count <= 1,
+        "fixture {path}: ===ignore=== must appear at most once, found {ignore_count} times"
+    );
+
     // --- Count and validate file markers ---
-    // Config must appear before any file marker so its text is never silently
-    // included in the PHP source of the first file.
+    // Config, description, and ignore must appear before any file marker so their
+    // text is never silently included in the PHP source of the first file.
     if config_count == 1 {
         if let (Some(cfg_pos), Some(first_file_pos)) = (
             header_region.find(CONFIG_MARKER),
@@ -181,6 +227,28 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
             assert!(
                 cfg_pos < first_file_pos,
                 "fixture {path}: ===config=== must appear before the first ===file=== / ===file:name=== marker"
+            );
+        }
+    }
+    if description_count == 1 {
+        if let (Some(desc_pos), Some(first_file_pos)) = (
+            header_region.find(DESCRIPTION_MARKER),
+            header_region.find("===file"),
+        ) {
+            assert!(
+                desc_pos < first_file_pos,
+                "fixture {path}: ===description=== must appear before the first ===file=== / ===file:name=== marker"
+            );
+        }
+    }
+    if ignore_count == 1 {
+        if let (Some(ignore_pos), Some(first_file_pos)) = (
+            header_region.find(IGNORE_MARKER),
+            header_region.find("===file"),
+        ) {
+            assert!(
+                ignore_pos < first_file_pos,
+                "fixture {path}: ===ignore=== must appear before the first ===file=== / ===file:name=== marker"
             );
         }
     }
@@ -232,6 +300,20 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         FixtureConfig::default()
     };
 
+    // --- Parse description section ---
+    let description = if description_count == 1 {
+        let desc_pos = header_region.find(DESCRIPTION_MARKER).unwrap();
+        let after_desc = desc_pos + DESCRIPTION_MARKER.len();
+        // Description body ends at the next section marker.
+        let desc_end = header_region[after_desc..]
+            .find("===")
+            .map(|r| after_desc + r)
+            .unwrap_or(header_region.len());
+        Some(header_region[after_desc..desc_end].trim().to_string())
+    } else {
+        None
+    };
+
     // --- Parse expect lines ---
     let expected = expect_content
         .lines()
@@ -250,6 +332,7 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         files,
         expected,
         is_multi,
+        description,
         config,
     }
 }
@@ -512,8 +595,13 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
     }
 
     if !failures.is_empty() {
+        let desc = fixture
+            .description
+            .as_deref()
+            .map(|d| format!("\n\nDescription: {d}"))
+            .unwrap_or_default();
         panic!(
-            "fixture {path} FAILED:\n{}\n\nAll actual issues:\n{}",
+            "fixture {path} FAILED:{desc}\n{}\n\nAll actual issues:\n{}",
             failures.join("\n"),
             fmt_issues(actual, fixture.is_multi)
         );
@@ -681,10 +769,10 @@ fn fmt_issues(issues: &[Issue], is_multi: bool) -> String {
 
 #[cfg(test)]
 mod parser_validation {
-    use super::parse_phpt;
+    use super::{parse_phpt, ParsedFixture};
 
-    fn p(content: &str) {
-        parse_phpt(content, "<test>");
+    fn p(content: &str) -> ParsedFixture {
+        parse_phpt(content, "<test>")
     }
 
     #[test]
@@ -732,5 +820,41 @@ mod parser_validation {
     #[test]
     fn valid_config_is_accepted() {
         p("===config===\nphp_version=8.1\nfind_dead_code=true\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===description=== must appear at most once")]
+    fn duplicate_description_section() {
+        p("===description===\nfoo\n===description===\nbar\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===description=== must appear before the first ===file===")]
+    fn description_after_file_marker() {
+        p("===file===\n<?php\n===description===\nfoo\n===expect===\n");
+    }
+
+    #[test]
+    fn valid_description_is_accepted() {
+        let f = p("===description===\nChecks null method call.\n===file===\n<?php\n===expect===\n");
+        assert_eq!(f.description.as_deref(), Some("Checks null method call."));
+    }
+
+    #[test]
+    #[should_panic(expected = "===ignore=== must appear at most once")]
+    fn duplicate_ignore_marker() {
+        p("===ignore===\n===ignore===\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===ignore=== must appear before the first ===file===")]
+    fn ignore_after_file_marker() {
+        p("===file===\n<?php\n===ignore===\n===expect===\n");
+    }
+
+    #[test]
+    fn valid_ignore_is_accepted() {
+        let f = p("===ignore===\nTODO: not yet implemented\n===file===\n<?php\n===expect===\n");
+        assert!(f.description.is_none());
     }
 }

@@ -1,3 +1,7 @@
+===description===
+A variable assigned only inside a case that falls through into a return
+is not defined on the path where no case matches, so it reports UndefinedVariable
+after the switch.
 ===file===
 <?php
 // case 1 has no break and chains into case 2 which returns. Both cases

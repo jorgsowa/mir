@@ -1,3 +1,5 @@
+===description===
+Functions without a @deprecated annotation are called without any diagnostic.
 ===file===
 <?php
 function greet(string $name): void {

@@ -1,3 +1,7 @@
+===description===
+A switch case that assigns a wider type without break widens the variable's
+inferred type after the switch, causing an InvalidReturnType when the
+return type declaration is narrower.
 ===file===
 <?php
 // Before the fallthrough-context fix, the case-2 assignment was silently dropped,

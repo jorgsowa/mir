@@ -1,3 +1,5 @@
+===description===
+Using a variable that was never assigned in the same scope reports UndefinedVariable.
 ===file===
 <?php
 function foo(): string {
