@@ -1298,7 +1298,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         for atomic in &obj_ty.types {
             match atomic {
                 Atomic::TNamedObject { fqcn, .. }
-                    if self.codebase.classes.contains_key(fqcn.as_ref()) =>
+                    if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
+                        .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
                     // db path: walk ancestor chain via PropertyNode inputs.
                     // prop_found: None = not found, Some(ty) = found (mixed if unannotated).
@@ -1343,7 +1344,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Union::mixed();
                 }
                 Atomic::TNamedObject { fqcn, .. }
-                    if self.codebase.enums.contains_key(fqcn.as_ref()) =>
+                    if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
+                        .is_some_and(|k| k.is_enum) =>
                 {
                     match prop_name {
                         "name" => return Union::single(Atomic::TNonEmptyString),
