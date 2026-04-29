@@ -343,6 +343,40 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `unimplemented_interface_method::trait_cycle_does_not_crash`
   fixture stays green via the `class_ancestors` cycle-recovery
   guard plus the per-helper `visited` set.
+- **PR22** ✅ `method_exists_via_db(db, fqcn, method_name)` helper
+  in `db.rs` walks the class's own methods, used traits
+  (transitively, cycle-safe), and ancestor chain via
+  `class_ancestors`.  Existence-only sibling of
+  `method_is_concretely_implemented` (abstract methods count).
+  Migrates four predicate sites — `call/method.rs:218`
+  (intersection-type member lookup), `call/method.rs:416`
+  (`__call`), `call/static_call.rs:138` (`__callStatic`),
+  `call/args.rs:565` (`__invoke`) — to read the db first
+  (registering the dependency) with a codebase fallback for
+  docblock @mixin chains.
+- **PR23** ✅ Drop the `Codebase::functions.contains_key` /
+  `Codebase::functions.get` fallbacks in `call/function.rs`'s
+  `resolve_fn` and `fn_exists`.  Verified safe: every Pass2Driver
+  entry path (initial analyze, lazy-load post-pass, re_analyze_file)
+  ingests the codebase or upserts file-local functions before the
+  driver runs.  The `call_user_func` reference-marking site is
+  preserved since it drives a Codebase-only side effect.
+- **PR24** ✅ Migrate the class/enum match guards in
+  `ExpressionAnalyzer::resolve_property_type` from
+  `Codebase::classes.contains_key` / `Codebase::enums.contains_key`
+  to `crate::db::class_kind_via_db`.  Equivalent semantics —
+  `ingest_codebase` populates `is_interface` / `is_trait` /
+  `is_enum` exactly as the underlying storage discriminator.
+- **PR25** ✅ Thread `&dyn MirDatabase` through
+  `narrow_from_condition` and `apply_docblock_assertions`.  Eleven
+  call sites in `expr.rs` and `stmt/mod.rs` updated.
+  `apply_docblock_assertions` now reads function params +
+  assertions from `FunctionNode` via `db.lookup_function_node`,
+  dropping the codebase fallback.  Removes a Salsa-tracking
+  blocker on the inferred-return-type path: docblock assertions of
+  called functions affect what types reach `return` statements, so
+  S3 needs those reads to register their dependency through the db.
+
 - **PR21** ✅ Fast-skip on identical re-ingest in
   `upsert_class_node` / `upsert_function_node` /
   `upsert_method_node` / `upsert_property_node` /
@@ -363,21 +397,79 @@ Sub-PRs (each shippable, fixture suite green at every step):
   re-upserting, defeating the guard so real schema changes still
   fire setters.
 
-Remaining for S5 (rough order):
-- Migrate the remaining `Codebase::get_method` / `get_property` /
-  `get_class_constant` reads in `expr.rs`, `stmt/mod.rs`,
-  `pass2.rs`, and `call/*.rs` to db helpers — those still drive
-  `ensure_finalized` lazily.
-- Delete `Codebase::extends_or_implements` (and eventually the
-  `ensure_finalized` driver path itself) once no read site
-  reaches into the cache.
-- Remove `finalization_cache` and the structural snapshot fallback in
-  `re_analyze_file` once no caller reaches `ensure_finalized` (gated
-  on the per-field migrations finishing).
-- Delete the remaining fields from `Codebase` (functions, methods,
-  properties, constants, classes, interfaces, traits, enums) once no
-  read site references them — one batch per field group, each a
-  shippable PR.
+Remaining for S5 (refined order, S3 prerequisites first):
+
+1. **Promote `inferred_return_type` to `MethodNode`/`FunctionNode`
+   tracked fields** (smallest unit toward S3).  Currently lives in
+   `MethodStorage::inferred_return_type` / `FunctionStorage::inferred_return_type`,
+   written by the priming sweep / main Pass 2 and read by
+   `resolve_method_from_db` / `resolve_fn` via `Codebase::get_method`
+   /`Codebase::functions.get`.  Add a tracked field on each node and
+   set it from the existing priming-sweep writeback paths
+   (`pass2.rs:454, 567, 681, 805, 986, 1099`).  Drop the codebase
+   read-back in the resolver helpers.  This *doesn't* eliminate the
+   priming sweep but makes the read path tracked, which is the
+   actual S3 prerequisite.
+2. Migrate the remaining `Codebase::get_method` / `get_property` /
+   `get_class_constant` reads in `expr.rs`, `stmt/mod.rs`,
+   `pass2.rs`, and `call/*.rs` to db helpers — those still drive
+   `ensure_finalized` lazily.
+3. Delete `Codebase::extends_or_implements` (and eventually the
+   `ensure_finalized` driver path itself) once no read site
+   reaches into the cache.
+4. Remove `finalization_cache` and the structural snapshot fallback in
+   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
+   on the per-field migrations finishing).
+5. Delete the remaining fields from `Codebase` (functions, methods,
+   properties, constants, classes, interfaces, traits, enums) once no
+   read site references them — one batch per field group, each a
+   shippable PR.  This is what unblocks S3's tracked-query body
+   actually being a tracked query.
+
+#### S3 design notes (open questions before implementation)
+
+A naïve `salsa::tracked` `inferred_return_type(db, FunctionNode) -> Union`
+hits four problems that need answers before any code lands:
+
+1. **Codebase access from a tracked query.**  `salsa::tracked` queries
+   take `(db: &dyn MirDatabase, …)` and have no caller lifetime, so a
+   `&Codebase` reference can't flow in.  Two options:
+   - **(a)** Wrap `Codebase` in `Arc` and add `fn codebase(&self) ->
+     Arc<Codebase>` to `MirDatabase`.  Footgun: `Codebase` interior-
+     mutates via `DashMap`, so Salsa's invalidation can't see those
+     changes — works only if every read the query does goes through
+     fully-immutable codebase fields by S3 entry.
+   - **(b)** Promote remaining Codebase storage to Salsa inputs (the
+     planned end-state of S5).  This is the right answer, and the
+     reason the per-field migrations above are S3 prerequisites,
+     not parallel work.
+
+2. **Body AST sourcing.**  The function body is parsed once into a
+   bumpalo arena in `Pass2Driver::analyze_*_decl` and discarded.  The
+   tracked query has no AST to walk.  Plan: re-parse via
+   `collect_file_definitions` (memoized — free on repeat calls), walk
+   the resulting AST to find the function/method by FQN.  This
+   requires adding a `file: SourceFile` field to `FunctionNode` /
+   `MethodNode` so the query knows which file to walk.
+
+3. **Inference driver shape.**  The current `Pass2Driver::new_inference_only`
+   bundles parse + walk + analyze + emit-but-discard-issues.  Inside
+   a tracked query we want analyze-only — no issue buffer, no
+   reference tracking.  Likely a new `infer_function_return` /
+   `infer_method_return` entry point that takes
+   `(db, codebase-via-db, FunctionDecl AST, …)` and returns just the
+   merged `Union`.
+
+4. **Cycle initial value.**  `Union::mixed()` is the obvious choice
+   (matches how the priming sweep handles unresolved calls).  Verify
+   against existing fixtures involving mutually-recursive return-type
+   inference before committing to it.
+
+Once those four are designed, S3 itself is roughly: define the
+tracked query, replace the priming sweep with on-demand evaluation,
+remove the `pass2.rs` writebacks (they create a second source of
+truth), and switch `resolve_fn` / `resolve_method_from_db` to read
+the query result.
 
 Expected: sub-second re-analysis on save for LSP; precise invalidation across all query types.
 
