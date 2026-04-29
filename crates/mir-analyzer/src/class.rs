@@ -14,12 +14,15 @@ use mir_codebase::storage::{MethodStorage, Visibility};
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
 
+use crate::db::{class_ancestors, MirDatabase};
+
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
 // ---------------------------------------------------------------------------
 
 pub struct ClassAnalyzer<'a> {
     codebase: &'a Codebase,
+    db: &'a dyn MirDatabase,
     /// Only report issues for classes defined in these files (empty = all files).
     analyzed_files: HashSet<Arc<str>>,
     /// Source text keyed by file path, used to extract snippets for class-level issues.
@@ -27,9 +30,10 @@ pub struct ClassAnalyzer<'a> {
 }
 
 impl<'a> ClassAnalyzer<'a> {
-    pub fn new(codebase: &'a Codebase) -> Self {
+    pub fn new(codebase: &'a Codebase, db: &'a dyn MirDatabase) -> Self {
         Self {
             codebase,
+            db,
             analyzed_files: HashSet::new(),
             sources: HashMap::new(),
         }
@@ -37,6 +41,7 @@ impl<'a> ClassAnalyzer<'a> {
 
     pub fn with_files(
         codebase: &'a Codebase,
+        db: &'a dyn MirDatabase,
         files: HashSet<Arc<str>>,
         file_data: &'a [(Arc<str>, String)],
     ) -> Self {
@@ -46,9 +51,19 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
         Self {
             codebase,
+            db,
             analyzed_files: files,
             sources,
         }
+    }
+
+    /// Ancestor chain for `fqcn` from the salsa db, or empty if the class
+    /// isn't registered.
+    fn ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+        self.db
+            .lookup_class_node(fqcn)
+            .map(|node| class_ancestors(self.db, node).0)
+            .unwrap_or_default()
     }
 
     /// Run all class-level checks and return every discovered issue.
@@ -165,7 +180,8 @@ impl<'a> ClassAnalyzer<'a> {
         let fqcn = &cls.fqcn;
 
         // Walk every ancestor class and collect abstract methods
-        for ancestor_fqcn in &cls.all_parents {
+        let ancestors = self.ancestors(fqcn);
+        for ancestor_fqcn in &ancestors {
             // Collect abstract method names first, then drop the DashMap guard before
             // calling get_method (which re-enters the same DashMap).
             let abstract_methods: Vec<Arc<str>> = {
@@ -225,11 +241,10 @@ impl<'a> ClassAnalyzer<'a> {
         let fqcn = &cls.fqcn;
 
         // Collect all interfaces (direct + from ancestors)
-        let all_ifaces: Vec<Arc<str>> = cls
-            .all_parents
-            .iter()
+        let all_ifaces: Vec<Arc<str>> = self
+            .ancestors(fqcn)
+            .into_iter()
             .filter(|p| self.codebase.interfaces.contains_key(p.as_ref()))
-            .cloned()
             .collect();
 
         for iface_fqcn in &all_ifaces {
@@ -567,7 +582,8 @@ impl<'a> ClassAnalyzer<'a> {
         method_name: &str,
     ) -> Option<Arc<MethodStorage>> {
         // Walk all_parents in order (closest ancestor first)
-        for ancestor_fqcn in &cls.all_parents {
+        let ancestors = self.ancestors(&cls.fqcn);
+        for ancestor_fqcn in &ancestors {
             if let Some(ancestor_cls) = self.codebase.classes.get(ancestor_fqcn.as_ref()) {
                 if let Some(m) = ancestor_cls.own_methods.get(method_name) {
                     return Some(Arc::clone(m));
