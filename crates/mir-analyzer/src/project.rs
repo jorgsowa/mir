@@ -680,7 +680,7 @@ impl ProjectAnalyzer {
                 .collect()
         };
 
-        // Mark removed classes, functions, and methods inactive so dependents re-run.
+        // Mark removed classes, functions, methods, properties, and constants inactive.
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             let (ref mut db, _) = *guard;
@@ -688,6 +688,8 @@ impl ProjectAnalyzer {
                 db.deactivate_class_node(fqcn);
                 db.deactivate_function_node(fqcn);
                 db.deactivate_class_methods(fqcn);
+                db.deactivate_class_properties(fqcn);
+                db.deactivate_class_constants(fqcn);
             }
         }
 
@@ -766,6 +768,34 @@ impl ProjectAnalyzer {
             for en in &file_defs.slice.enums {
                 for method in en.own_methods.values() {
                     db.upsert_method_node(method);
+                }
+            }
+
+            // --- S5-PR4: Upsert PropertyNodes and ClassConstantNodes --------------
+            for cls in &file_defs.slice.classes {
+                for prop in cls.own_properties.values() {
+                    db.upsert_property_node(&cls.fqcn, prop);
+                }
+                for constant in cls.own_constants.values() {
+                    db.upsert_class_constant_node(&cls.fqcn, constant);
+                }
+            }
+            for iface in &file_defs.slice.interfaces {
+                for constant in iface.own_constants.values() {
+                    db.upsert_class_constant_node(&iface.fqcn, constant);
+                }
+            }
+            for tr in &file_defs.slice.traits {
+                for prop in tr.own_properties.values() {
+                    db.upsert_property_node(&tr.fqcn, prop);
+                }
+                for constant in tr.own_constants.values() {
+                    db.upsert_class_constant_node(&tr.fqcn, constant);
+                }
+            }
+            for en in &file_defs.slice.enums {
+                for constant in en.own_constants.values() {
+                    db.upsert_class_constant_node(&en.fqcn, constant);
                 }
             }
 
