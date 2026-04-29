@@ -1382,7 +1382,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if ctx.byref_param_names.contains(&name_str) {
                     ctx.read_vars.insert(name_str.clone());
                 }
-                ctx.set_var(name_str, ty);
+                ctx.set_var(name_str.clone(), ty);
+                let (line, col_start) = self.offset_to_line_col(target.span.start);
+                let (line_end, col_end) = self.offset_to_line_col(target.span.end);
+                ctx.record_var_location(&name_str, line, col_start, line_end, col_end);
             }
             ExprKind::Array(elements) => {
                 // [$a, $b] = $arr  — destructuring

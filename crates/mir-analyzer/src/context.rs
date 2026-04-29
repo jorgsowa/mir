@@ -1,5 +1,5 @@
 /// Analysis context — carries type state through statement/expression analysis.
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -65,6 +65,10 @@ pub struct Context {
     /// return" so that variables assigned only in the try body are
     /// considered definitely assigned after the try/catch.
     pub diverges: bool,
+
+    /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
+    /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
+    pub var_locations: HashMap<String, (u32, u16, u32, u16)>,
 }
 
 impl Context {
@@ -86,6 +90,7 @@ impl Context {
             param_names: HashSet::new(),
             byref_param_names: HashSet::new(),
             diverges: false,
+            var_locations: HashMap::new(),
         };
         // PHP superglobals — always in scope in any context
         for sg in &[
@@ -227,6 +232,21 @@ impl Context {
         self.tainted_vars.contains(name)
     }
 
+    /// Record the location of the first assignment to a variable (first-write-wins).
+    pub fn record_var_location(
+        &mut self,
+        name: &str,
+        line: u32,
+        col_start: u16,
+        line_end: u32,
+        col_end: u16,
+    ) {
+        let name = name.trim_start_matches('$');
+        self.var_locations
+            .entry(name.to_string())
+            .or_insert((line, col_start, line_end, col_end));
+    }
+
     /// Remove a variable from the context (after `unset`).
     pub fn unset_var(&mut self, name: &str) {
         let name = name.trim_start_matches('$');
@@ -334,6 +354,15 @@ impl Context {
         // Read vars: union — if either branch reads a var, it counts as read
         for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
             result.read_vars.insert(name.clone());
+        }
+
+        // Var locations: keep the earliest known span for each variable
+        for (name, loc) in if_ctx
+            .var_locations
+            .iter()
+            .chain(else_ctx.var_locations.iter())
+        {
+            result.var_locations.entry(name.clone()).or_insert(*loc);
         }
 
         // After merging branches, the merged context does not diverge

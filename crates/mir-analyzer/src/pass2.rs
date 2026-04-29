@@ -414,6 +414,7 @@ impl<'a> Pass2Driver<'a> {
         };
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
+        seed_param_locations(&mut ctx, &decl.params, source, source_map);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.codebase,
@@ -524,6 +525,7 @@ impl<'a> Pass2Driver<'a> {
                 is_ctor,
                 method.is_static,
             );
+            seed_param_locations(&mut ctx, &method.params, source, source_map);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -628,6 +630,7 @@ impl<'a> Pass2Driver<'a> {
         };
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
+        seed_param_locations(&mut ctx, &decl.params, source, source_map);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.codebase,
@@ -751,6 +754,7 @@ impl<'a> Pass2Driver<'a> {
                 is_ctor,
                 method.is_static,
             );
+            seed_param_locations(&mut ctx, &method.params, source, source_map);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -926,6 +930,7 @@ impl<'a> Pass2Driver<'a> {
                 is_ctor,
                 method.is_static,
             );
+            seed_param_locations(&mut ctx, &method.params, source, source_map);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1029,6 +1034,7 @@ impl<'a> Pass2Driver<'a> {
                 is_ctor,
                 method.is_static,
             );
+            seed_param_locations(&mut ctx, &method.params, source, source_map);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1135,6 +1141,23 @@ impl<'a> Pass2Driver<'a> {
 }
 
 // ---------------------------------------------------------------------------
+
+/// Seed `ctx.var_locations` for function/method parameters using their AST spans.
+fn seed_param_locations(
+    ctx: &mut crate::context::Context,
+    ast_params: &php_ast::ast::ArenaVec<'_, php_ast::ast::Param<'_, '_>>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+) {
+    for p in ast_params.iter() {
+        let name = p.name.trim_start_matches('$');
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, p.span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, p.span.end, source_map);
+        ctx.record_var_location(name, line, col_start, line_end, col_end);
+    }
+}
 
 pub fn merge_return_types(return_types: &[Union]) -> Union {
     if return_types.is_empty() {

@@ -159,6 +159,8 @@ pub(crate) fn emit_unused_params(
     for p in params {
         let name = p.name.as_ref().trim_start_matches('$');
         if !ctx.read_vars.contains(name) {
+            let (line, col_start, line_end, col_end) =
+                ctx.var_locations.get(name).copied().unwrap_or((1, 0, 1, 0));
             issues.push(
                 mir_issues::Issue::new(
                     mir_issues::IssueKind::UnusedParam {
@@ -166,10 +168,10 @@ pub(crate) fn emit_unused_params(
                     },
                     mir_issues::Location {
                         file: file.clone(),
-                        line: 1,
-                        line_end: 1,
-                        col_start: 0,
-                        col_end: 0,
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
                     },
                 )
                 .with_snippet(format!("${name}")),
@@ -200,14 +202,19 @@ pub(crate) fn emit_unused_variables(
             continue;
         }
         if !ctx.read_vars.contains(name) {
+            let (line, col_start, line_end, col_end) = ctx
+                .var_locations
+                .get(name.as_str())
+                .copied()
+                .unwrap_or((1, 0, 1, 0));
             issues.push(mir_issues::Issue::new(
                 mir_issues::IssueKind::UnusedVariable { name: name.clone() },
                 mir_issues::Location {
                     file: file.clone(),
-                    line: 1,
-                    line_end: 1,
-                    col_start: 0,
-                    col_end: 0,
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: col_end.max(col_start + 1),
                 },
             ));
         }
