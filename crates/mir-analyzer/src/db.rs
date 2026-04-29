@@ -535,6 +535,93 @@ fn trait_provides_method(
     false
 }
 
+/// Returns `true` iff `fqcn` (or any ancestor / used trait, transitively)
+/// declares a method named `method_name` (abstract or concrete).  Used by
+/// magic-method existence checks (`__call`, `__callStatic`, `__invoke`,
+/// `__construct`) and intersection-type method lookups.
+///
+/// Method names are PHP-case-insensitive; the lookup lower-cases internally.
+/// Cycle-safe: relies on `class_ancestors` cycle recovery and a per-call
+/// `visited` set across trait-of-trait walks.
+pub fn method_exists_via_db(db: &dyn MirDatabase, fqcn: &str, method_name: &str) -> bool {
+    let lower = method_name.to_lowercase();
+    let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
+        return false;
+    };
+    // Direct own method.
+    if db
+        .lookup_method_node(fqcn, &lower)
+        .is_some_and(|m| m.active(db))
+    {
+        return true;
+    }
+    // Traits used directly — walk transitively.
+    let mut visited_traits: HashSet<String> = HashSet::new();
+    for t in self_node.traits(db).iter() {
+        if trait_declares_method(db, t.as_ref(), &lower, &mut visited_traits) {
+            return true;
+        }
+    }
+    // Ancestor chain (parents, interfaces, traits).
+    for ancestor in class_ancestors(db, self_node).0.iter() {
+        if db
+            .lookup_method_node(ancestor.as_ref(), &lower)
+            .is_some_and(|m| m.active(db))
+        {
+            return true;
+        }
+        if let Some(anc_node) = db
+            .lookup_class_node(ancestor.as_ref())
+            .filter(|n| n.active(db))
+        {
+            if anc_node.is_trait(db) {
+                if trait_declares_method(db, ancestor.as_ref(), &lower, &mut visited_traits) {
+                    return true;
+                }
+            } else {
+                for t in anc_node.traits(db).iter() {
+                    if trait_declares_method(db, t.as_ref(), &lower, &mut visited_traits) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Existence-only sibling of [`trait_provides_method`].  Returns true iff the
+/// trait or any sub-trait declares a method named `method_lower` (abstract
+/// counts).  Cycle-safe via `visited`.
+fn trait_declares_method(
+    db: &dyn MirDatabase,
+    trait_fqcn: &str,
+    method_lower: &str,
+    visited: &mut HashSet<String>,
+) -> bool {
+    if !visited.insert(trait_fqcn.to_string()) {
+        return false;
+    }
+    if db
+        .lookup_method_node(trait_fqcn, method_lower)
+        .is_some_and(|m| m.active(db))
+    {
+        return true;
+    }
+    let Some(node) = db.lookup_class_node(trait_fqcn).filter(|n| n.active(db)) else {
+        return false;
+    };
+    if !node.is_trait(db) {
+        return false;
+    }
+    for t in node.traits(db).iter() {
+        if trait_declares_method(db, t.as_ref(), method_lower, visited) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Predicate variant of [`Codebase::extends_or_implements`] backed by the
 /// Salsa db.
 ///

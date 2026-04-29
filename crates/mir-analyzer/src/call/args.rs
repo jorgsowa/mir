@@ -562,7 +562,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             .any(|p| matches!(p, Atomic::TCallable { .. }))
         {
             let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
-            if ea.codebase.get_method(&resolved_arg, "__invoke").is_some()
+            if crate::db::method_exists_via_db(ea.db, &resolved_arg, "__invoke")
+                || crate::db::method_exists_via_db(ea.db, arg_fqcn.as_ref(), "__invoke")
+                || ea.codebase.get_method(&resolved_arg, "__invoke").is_some()
                 || ea
                     .codebase
                     .get_method(arg_fqcn.as_ref(), "__invoke")
