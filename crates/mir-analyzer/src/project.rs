@@ -722,11 +722,16 @@ impl ProjectAnalyzer {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             let (ref mut db, _) = *guard;
 
-            // --- S2: Upsert ClassNodes and compute new ancestors via Salsa ----
+            // --- S2 + S5-PR5a: Upsert ClassNodes for all type kinds.  Traits and
+            // enums are registered with empty ancestor data — `class_ancestors`
+            // returns empty for them, matching `Codebase::ensure_finalized`.
             for cls in &file_defs.slice.classes {
                 db.upsert_class_node(
                     cls.fqcn.clone(),
                     false,
+                    false,
+                    false,
+                    cls.is_abstract,
                     cls.parent.clone(),
                     Arc::from(cls.interfaces.as_slice()),
                     Arc::from(cls.traits.as_slice()),
@@ -737,10 +742,39 @@ impl ProjectAnalyzer {
                 db.upsert_class_node(
                     iface.fqcn.clone(),
                     true,
+                    false,
+                    false,
+                    false,
                     None,
                     Arc::from([]),
                     Arc::from([]),
                     Arc::from(iface.extends.as_slice()),
+                );
+            }
+            for tr in &file_defs.slice.traits {
+                db.upsert_class_node(
+                    tr.fqcn.clone(),
+                    false,
+                    true,
+                    false,
+                    false,
+                    None,
+                    Arc::from([]),
+                    Arc::from([]),
+                    Arc::from([]),
+                );
+            }
+            for en in &file_defs.slice.enums {
+                db.upsert_class_node(
+                    en.fqcn.clone(),
+                    false,
+                    false,
+                    true,
+                    false,
+                    None,
+                    Arc::from([]),
+                    Arc::from([]),
+                    Arc::from([]),
                 );
             }
 
