@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use mir_codebase::storage::{Assertion, FnParam, FunctionStorage, TemplateParam};
 use mir_codebase::StubSlice;
 use mir_issues::Issue;
+use mir_types::Union;
 
 // ---------------------------------------------------------------------------
 // MirDatabase trait
@@ -21,6 +23,9 @@ pub trait MirDatabase: salsa::Database {
     /// interfaces, active state) are tracked through the `ClassNode` input
     /// itself, so downstream queries are still correctly invalidated.
     fn lookup_class_node(&self, fqcn: &str) -> Option<ClassNode>;
+
+    /// Look up the [`FunctionNode`] handle registered for `fqn`, if any.
+    fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode>;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +93,31 @@ pub struct ClassNode {
     pub traits: Arc<[Arc<str>]>,
     /// Directly extended interfaces (interfaces only).
     pub extends: Arc<[Arc<str>]>,
+}
+
+// ---------------------------------------------------------------------------
+// FunctionNode input (S5-PR2)
+// ---------------------------------------------------------------------------
+
+/// Salsa input representing a single global function.
+///
+/// `inferred_return_type` is intentionally absent — it lives in
+/// `FunctionStorage` until S3 promotes it to a proper tracked query.
+///
+/// Invariant: every FQN known to the Salsa DB has exactly one `FunctionNode`
+/// handle in `MirDb::function_nodes`.  Removed functions are marked
+/// `active = false` rather than dropped.
+#[salsa::input]
+pub struct FunctionNode {
+    pub fqn: Arc<str>,
+    pub active: bool,
+    pub params: Arc<[FnParam]>,
+    pub return_type: Option<Union>,
+    pub template_params: Arc<[TemplateParam]>,
+    pub assertions: Arc<[Assertion]>,
+    pub throws: Arc<[Arc<str>]>,
+    pub deprecated: Option<Arc<str>>,
+    pub is_pure: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +285,8 @@ pub struct MirDb {
     /// FQCN → ClassNode handle registry (not tracked by Salsa; see
     /// `lookup_class_node` for the rationale).
     class_nodes: HashMap<Arc<str>, ClassNode>,
+    /// FQN → FunctionNode handle registry.
+    function_nodes: HashMap<Arc<str>, FunctionNode>,
 }
 
 #[salsa::db]
@@ -268,6 +300,10 @@ impl MirDatabase for MirDb {
 
     fn lookup_class_node(&self, fqcn: &str) -> Option<ClassNode> {
         self.class_nodes.get(fqcn).copied()
+    }
+
+    fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode> {
+        self.function_nodes.get(fqn).copied()
     }
 }
 
@@ -317,6 +353,50 @@ impl MirDb {
     pub fn deactivate_class_node(&mut self, fqcn: &str) {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(fqcn) {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `FunctionNode` for the given `FunctionStorage`.
+    pub fn upsert_function_node(&mut self, storage: &FunctionStorage) -> FunctionNode {
+        use salsa::Setter as _;
+        let fqn = &storage.fqn;
+        if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
+            node.set_active(self).to(true);
+            node.set_params(self)
+                .to(Arc::from(storage.params.as_slice()));
+            node.set_return_type(self).to(storage.return_type.clone());
+            node.set_template_params(self)
+                .to(Arc::from(storage.template_params.as_slice()));
+            node.set_assertions(self)
+                .to(Arc::from(storage.assertions.as_slice()));
+            node.set_throws(self)
+                .to(Arc::from(storage.throws.as_slice()));
+            node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_is_pure(self).to(storage.is_pure);
+            node
+        } else {
+            let node = FunctionNode::new(
+                self,
+                fqn.clone(),
+                true,
+                Arc::from(storage.params.as_slice()),
+                storage.return_type.clone(),
+                Arc::from(storage.template_params.as_slice()),
+                Arc::from(storage.assertions.as_slice()),
+                Arc::from(storage.throws.as_slice()),
+                storage.deprecated.clone(),
+                storage.is_pure,
+            );
+            self.function_nodes.insert(fqn.clone(), node);
+            node
+        }
+    }
+
+    /// Mark the `FunctionNode` for `fqn` as inactive.
+    pub fn deactivate_function_node(&mut self, fqn: &str) {
+        use salsa::Setter as _;
+        if let Some(&node) = self.function_nodes.get(fqn) {
             node.set_active(self).to(false);
         }
     }
