@@ -16,6 +16,7 @@ use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
 use mir_types::{Atomic, Union};
 
 use crate::context::Context;
+use crate::db::MirDatabase;
 use crate::expr::ExpressionAnalyzer;
 use crate::narrowing::narrow_from_condition;
 use crate::php_version::PhpVersion;
@@ -27,6 +28,7 @@ use crate::symbol::ResolvedSymbol;
 
 pub struct StatementsAnalyzer<'a> {
     pub codebase: &'a Codebase,
+    pub db: Option<&'a dyn MirDatabase>,
     pub file: Arc<str>,
     pub source: &'a str,
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -45,6 +47,7 @@ impl<'a> StatementsAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         codebase: &'a Codebase,
+        db: Option<&'a dyn MirDatabase>,
         file: Arc<str>,
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -55,6 +58,7 @@ impl<'a> StatementsAnalyzer<'a> {
     ) -> Self {
         Self {
             codebase,
+            db,
             file,
             source,
             source_map,
@@ -999,6 +1003,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     Context::for_function(&params, None, None, None, None, ctx.strict_types, true);
                 let mut sa = StatementsAnalyzer::new(
                     self.codebase,
+                    self.db,
                     self.file.clone(),
                     self.source,
                     self.source_map,
@@ -1060,6 +1065,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     );
                     let mut sa = StatementsAnalyzer::new(
                         self.codebase,
+                        self.db,
                         self.file.clone(),
                         self.source,
                         self.source_map,
@@ -1100,6 +1106,7 @@ impl<'a> StatementsAnalyzer<'a> {
     {
         ExpressionAnalyzer::new(
             self.codebase,
+            self.db,
             self.file.clone(),
             self.source,
             self.source_map,

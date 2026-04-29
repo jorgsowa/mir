@@ -14,12 +14,15 @@ use mir_codebase::storage::{MethodStorage, Visibility};
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
 
+use crate::db::MirDatabase;
+
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
 // ---------------------------------------------------------------------------
 
 pub struct ClassAnalyzer<'a> {
     codebase: &'a Codebase,
+    pub db: Option<&'a dyn MirDatabase>,
     /// Only report issues for classes defined in these files (empty = all files).
     analyzed_files: HashSet<Arc<str>>,
     /// Source text keyed by file path, used to extract snippets for class-level issues.
@@ -30,6 +33,7 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn new(codebase: &'a Codebase) -> Self {
         Self {
             codebase,
+            db: None,
             analyzed_files: HashSet::new(),
             sources: HashMap::new(),
         }
@@ -46,6 +50,7 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
         Self {
             codebase,
+            db: None,
             analyzed_files: files,
             sources,
         }

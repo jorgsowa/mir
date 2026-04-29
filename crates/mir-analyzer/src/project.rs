@@ -346,8 +346,11 @@ impl ProjectAnalyzer {
             .par_iter()
             .filter(|(file, _)| !files_with_parse_errors.contains(file))
             .for_each(|(file, src)| {
-                let driver =
-                    Pass2Driver::new_inference_only(&self.codebase, self.resolved_php_version());
+                let driver = Pass2Driver::new_inference_only(
+                    &self.codebase,
+                    None,
+                    self.resolved_php_version(),
+                );
                 let arena = bumpalo::Bump::new();
                 let parsed = php_rs_parser::parse(&arena, src);
                 driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map);
@@ -358,7 +361,7 @@ impl ProjectAnalyzer {
             .par_iter()
             .filter(|(file, _)| !files_with_parse_errors.contains(file))
             .map(|(file, src)| {
-                let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
+                let driver = Pass2Driver::new(&self.codebase, None, self.resolved_php_version());
                 let result = if let Some(cache) = &self.cache {
                     let h = hash_content(src);
                     if let Some((cached_issues, ref_locs)) = cache.get(file, &h) {
@@ -594,7 +597,8 @@ impl ProjectAnalyzer {
                     !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
                 })
                 .map(|(file, src)| {
-                    let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
+                    let driver =
+                        Pass2Driver::new(&self.codebase, None, self.resolved_php_version());
                     let arena = bumpalo::Bump::new();
                     let parsed = php_rs_parser::parse(&arena, src);
                     driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
@@ -708,11 +712,13 @@ impl ProjectAnalyzer {
         let mut all_issues: Vec<Issue> = (*file_defs.issues).clone();
         self.codebase.inject_stub_slice((*file_defs.slice).clone());
 
-        // --- S2: Upsert ClassNodes and compute new ancestors via Salsa --------
-        let new_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
+        // --- S2 + Pass 2: hold the Salsa lock for ClassNode upserts and body
+        // analysis so the db reference is live during Pass 2 (S5).
+        let symbols = {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             let (ref mut db, _) = *guard;
 
+            // --- S2: Upsert ClassNodes and compute new ancestors via Salsa ----
             for cls in &file_defs.slice.classes {
                 db.upsert_class_node(
                     cls.fqcn.clone(),
@@ -734,48 +740,53 @@ impl ProjectAnalyzer {
                 );
             }
 
-            // Compute new ancestors after ClassNode fields are updated.
-            let mut map = HashMap::new();
-            for cls in &file_defs.slice.classes {
-                if let Some(node) = db.lookup_class_node(&cls.fqcn) {
-                    map.insert(cls.fqcn.clone(), class_ancestors(db, node).0);
+            let new_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
+                let mut map = HashMap::new();
+                for cls in &file_defs.slice.classes {
+                    if let Some(node) = db.lookup_class_node(&cls.fqcn) {
+                        map.insert(cls.fqcn.clone(), class_ancestors(db, node).0);
+                    }
                 }
-            }
-            for iface in &file_defs.slice.interfaces {
-                if let Some(node) = db.lookup_class_node(&iface.fqcn) {
-                    map.insert(iface.fqcn.clone(), class_ancestors(db, node).0);
+                for iface in &file_defs.slice.interfaces {
+                    if let Some(node) = db.lookup_class_node(&iface.fqcn) {
+                        map.insert(iface.fqcn.clone(), class_ancestors(db, node).0);
+                    }
                 }
+                map
+            };
+
+            // --- S2: Decide whether ancestry changed and update Codebase ------
+            let structural_unchanged = old_ancestors.len() == new_ancestors.len()
+                && new_ancestors
+                    .iter()
+                    .all(|(fqcn, new_ancs)| old_ancestors.get(fqcn) == Some(new_ancs));
+
+            if structural_unchanged {
+                // Fast path: restore ancestors from Salsa results directly.
+                for (fqcn, ancestors) in &new_ancestors {
+                    let arc: Arc<[Arc<str>]> = Arc::from(ancestors.as_slice());
+                    self.codebase.restore_ancestors(fqcn, arc);
+                }
+                self.codebase.mark_finalized();
+            } else {
+                self.codebase.invalidate_finalization();
+                self.codebase.finalize();
             }
-            map
-        };
 
-        // --- S2: Decide whether ancestry changed and update Codebase ----------
-        let structural_unchanged = old_ancestors.len() == new_ancestors.len()
-            && new_ancestors
-                .iter()
-                .all(|(fqcn, new_ancs)| old_ancestors.get(fqcn) == Some(new_ancs));
+            // Re-parse in the arena so Pass 2 can walk the AST.
+            let arena = bumpalo::Bump::new();
+            let parsed = php_rs_parser::parse(&arena, new_content);
 
-        if structural_unchanged {
-            // Fast path: restore ancestors from Salsa results directly.
-            for (fqcn, ancestors) in &new_ancestors {
-                let arc: Arc<[Arc<str>]> = Arc::from(ancestors.as_slice());
-                self.codebase.restore_ancestors(fqcn, arc);
-            }
-            self.codebase.mark_finalized();
-        } else {
-            self.codebase.invalidate_finalization();
-            self.codebase.finalize();
-        }
-
-        // Re-parse in the arena so Pass 2 can walk the AST.
-        let arena = bumpalo::Bump::new();
-        let parsed = php_rs_parser::parse(&arena, new_content);
-
-        let symbols = if parsed.errors.is_empty() {
-            // Priming sweep: populate inferred_return_type for this file's functions
-            // before the issue-emitting pass so within-file cross-function calls see
-            // the correct inferred return type rather than None.
-            Pass2Driver::new_inference_only(&self.codebase, self.resolved_php_version())
+            if parsed.errors.is_empty() {
+                // Priming sweep: populate inferred_return_type for this file's functions
+                // before the issue-emitting pass so within-file cross-function calls see
+                // the correct inferred return type rather than None.
+                let db_ref: &dyn MirDatabase = db;
+                Pass2Driver::new_inference_only(
+                    &self.codebase,
+                    Some(db_ref),
+                    self.resolved_php_version(),
+                )
                 .analyze_bodies(
                     &parsed.program,
                     file.clone(),
@@ -783,17 +794,19 @@ impl ProjectAnalyzer {
                     &parsed.source_map,
                 );
 
-            let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
-            let (body_issues, symbols) = driver.analyze_bodies(
-                &parsed.program,
-                file.clone(),
-                new_content,
-                &parsed.source_map,
-            );
-            all_issues.extend(body_issues);
-            symbols
-        } else {
-            Vec::new()
+                let driver =
+                    Pass2Driver::new(&self.codebase, Some(db_ref), self.resolved_php_version());
+                let (body_issues, symbols) = driver.analyze_bodies(
+                    &parsed.program,
+                    file.clone(),
+                    new_content,
+                    &parsed.source_map,
+                );
+                all_issues.extend(body_issues);
+                symbols
+            } else {
+                Vec::new()
+            }
         };
 
         if let Some(cache) = &self.cache {
@@ -839,7 +852,7 @@ impl ProjectAnalyzer {
         analyzer.codebase.finalize();
         let mut type_envs = std::collections::HashMap::new();
         let mut all_symbols = Vec::new();
-        let driver = Pass2Driver::new(&analyzer.codebase, analyzer.resolved_php_version());
+        let driver = Pass2Driver::new(&analyzer.codebase, None, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
             &result.program,
             file.clone(),

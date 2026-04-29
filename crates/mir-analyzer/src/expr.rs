@@ -11,6 +11,7 @@ use mir_types::{Atomic, Union};
 
 use crate::call::CallAnalyzer;
 use crate::context::Context;
+use crate::db::MirDatabase;
 use crate::php_version::PhpVersion;
 use crate::symbol::{ResolvedSymbol, SymbolKind};
 
@@ -20,6 +21,7 @@ use crate::symbol::{ResolvedSymbol, SymbolKind};
 
 pub struct ExpressionAnalyzer<'a> {
     pub codebase: &'a Codebase,
+    pub db: Option<&'a dyn MirDatabase>,
     pub file: Arc<str>,
     pub source: &'a str,
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -35,6 +37,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         codebase: &'a Codebase,
+        db: Option<&'a dyn MirDatabase>,
         file: Arc<str>,
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -45,6 +48,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Self {
         Self {
             codebase,
+            db,
             file,
             source,
             source_map,
@@ -606,8 +610,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .unwrap_or_else(|| Arc::from(resolved.as_str())),
                             _ => Arc::from(resolved.as_str()),
                         };
+                        let type_exists = self
+                            .db
+                            .and_then(|db| db.lookup_class_node(fqcn.as_ref()).map(|_| true))
+                            .unwrap_or_else(|| self.codebase.type_exists(&fqcn));
                         if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                            && !self.codebase.type_exists(&fqcn)
+                            && !type_exists
                         {
                             self.emit(
                                 IssueKind::UndefinedClass {
@@ -616,7 +624,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Severity::Error,
                                 n.class.span,
                             );
-                        } else if self.codebase.type_exists(&fqcn) {
+                        } else if type_exists {
                             if let Some(cls) = self.codebase.classes.get(fqcn.as_ref()) {
                                 if let Some(msg) = cls.deprecated.clone() {
                                     self.emit(
@@ -906,6 +914,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let inferred_return = {
                     let mut sa = crate::stmt::StatementsAnalyzer::new(
                         self.codebase,
+                        self.db,
                         self.file.clone(),
                         self.source,
                         self.source_map,

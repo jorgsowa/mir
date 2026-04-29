@@ -4,6 +4,7 @@ use mir_codebase::Codebase;
 use mir_issues::Issue;
 use mir_types::Union;
 
+use crate::db::MirDatabase;
 use crate::diagnostics::{
     check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
 };
@@ -16,22 +17,33 @@ use crate::symbol::ResolvedSymbol;
 
 pub(crate) struct Pass2Driver<'a> {
     codebase: &'a Arc<Codebase>,
+    db: Option<&'a dyn MirDatabase>,
     php_version: PhpVersion,
     inference_only: bool,
 }
 
 impl<'a> Pass2Driver<'a> {
-    pub(crate) fn new(codebase: &'a Arc<Codebase>, php_version: PhpVersion) -> Self {
+    pub(crate) fn new(
+        codebase: &'a Arc<Codebase>,
+        db: Option<&'a dyn MirDatabase>,
+        php_version: PhpVersion,
+    ) -> Self {
         Self {
             codebase,
+            db,
             php_version,
             inference_only: false,
         }
     }
 
-    pub(crate) fn new_inference_only(codebase: &'a Arc<Codebase>, php_version: PhpVersion) -> Self {
+    pub(crate) fn new_inference_only(
+        codebase: &'a Arc<Codebase>,
+        db: Option<&'a dyn MirDatabase>,
+        php_version: PhpVersion,
+    ) -> Self {
         Self {
             codebase,
+            db,
             php_version,
             inference_only: true,
         }
@@ -160,6 +172,7 @@ impl<'a> Pass2Driver<'a> {
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.codebase,
+                self.db,
                 file.clone(),
                 source,
                 source_map,
@@ -318,6 +331,7 @@ impl<'a> Pass2Driver<'a> {
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.codebase,
+                self.db,
                 file.clone(),
                 source,
                 source_map,
@@ -418,6 +432,7 @@ impl<'a> Pass2Driver<'a> {
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.codebase,
+            self.db,
             file.clone(),
             source,
             source_map,
@@ -530,6 +545,7 @@ impl<'a> Pass2Driver<'a> {
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.codebase,
+                self.db,
                 file.clone(),
                 source,
                 source_map,
@@ -634,6 +650,7 @@ impl<'a> Pass2Driver<'a> {
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.codebase,
+            self.db,
             file.clone(),
             source,
             source_map,
@@ -759,6 +776,7 @@ impl<'a> Pass2Driver<'a> {
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.codebase,
+                self.db,
                 file.clone(),
                 source,
                 source_map,
@@ -935,6 +953,7 @@ impl<'a> Pass2Driver<'a> {
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.codebase,
+                self.db,
                 file.clone(),
                 source,
                 source_map,
@@ -1039,6 +1058,7 @@ impl<'a> Pass2Driver<'a> {
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.codebase,
+                self.db,
                 file.clone(),
                 source,
                 source_map,
