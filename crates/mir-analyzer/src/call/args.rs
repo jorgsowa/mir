@@ -9,31 +9,27 @@ use mir_types::{Atomic, Union};
 
 use crate::expr::ExpressionAnalyzer;
 
-// db-prefer-with-codebase-fallback wrappers for the four read patterns
-// migrated in S5-PR6b.  Bundled / user stubs aren't promoted to the db
-// yet, so the codebase fallback remains load-bearing.
+// Pure-db lookups for the four read patterns migrated in S5-PR6b.
+// `ingest_codebase` (S5-PR8/PR9) mirrors bundled stubs, user stubs, and
+// PSR-4 lazy-loaded definitions into the Salsa db before Pass 2, so the
+// codebase fallback is no longer load-bearing.
 fn type_exists_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    if crate::db::type_exists_via_db(ea.db, fqcn) {
-        return true;
-    }
-    ea.codebase.type_exists(fqcn)
+    crate::db::type_exists_via_db(ea.db, fqcn)
 }
 
 fn is_interface_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    if let Some(kind) = crate::db::class_kind_via_db(ea.db, fqcn) {
-        return kind.is_interface;
-    }
-    ea.codebase.interfaces.contains_key(fqcn)
+    crate::db::class_kind_via_db(ea.db, fqcn)
+        .map(|k| k.is_interface)
+        .unwrap_or(false)
 }
 
 fn class_template_params_db_or_codebase(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &str,
 ) -> Vec<TemplateParam> {
-    if let Some(tps) = crate::db::class_template_params_via_db(ea.db, fqcn) {
-        return tps.to_vec();
-    }
-    ea.codebase.get_class_template_params(fqcn)
+    crate::db::class_template_params_via_db(ea.db, fqcn)
+        .map(|tps| tps.to_vec())
+        .unwrap_or_default()
 }
 
 // ---------------------------------------------------------------------------
