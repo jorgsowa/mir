@@ -814,21 +814,14 @@ impl<'a> Pass2Driver<'a> {
     /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
     /// `@psalm-require-implements` constraint declared on the traits it uses.
     fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
-        // Read used-trait list from `Codebase` (not yet on the db) and the
-        // ancestor chain from Salsa's `class_ancestors` query.
-        let trait_list = self
-            .codebase
-            .classes
-            .get(fqcn)
-            .map(|c| c.traits.clone())
-            .unwrap_or_default();
-        let class_all_parents: Vec<Arc<str>> = self
-            .db
-            .lookup_class_node(fqcn)
-            .map(|node| crate::db::class_ancestors(self.db, node).0)
-            .unwrap_or_default();
+        // Both used-trait list and ancestor chain come from the salsa db.
+        let Some(node) = self.db.lookup_class_node(fqcn) else {
+            return;
+        };
+        let trait_list = node.traits(self.db);
+        let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, node).0;
 
-        for trait_fqcn in &trait_list {
+        for trait_fqcn in trait_list.iter() {
             let Some(tr) = self.codebase.traits.get(trait_fqcn.as_ref()) else {
                 continue;
             };
