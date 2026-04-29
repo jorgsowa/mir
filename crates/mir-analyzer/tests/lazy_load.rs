@@ -278,3 +278,40 @@ fn lazy_loads_fqcn_used_directly_without_use_import_from_psr4() {
         "App\\Helper should be found via lazy loading when used as FQCN; got: {undefined_class:?}"
     );
 }
+
+#[test]
+fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
+    let root = TempDir::new().unwrap();
+    fs::create_dir_all(root.path().join("src/Model")).unwrap();
+    fs::create_dir_all(root.path().join("src/Service")).unwrap();
+
+    fs::write(
+        root.path().join("src/Model/Entity.php"),
+        "<?php\nnamespace App\\Model;\nclass Entity {}\n",
+    )
+    .unwrap();
+
+    fs::write(
+        root.path().join("src/Service/Handler.php"),
+        "<?php\nnamespace App\\Service;\nfunction handle(): void {\n    $e = new \\App\\Model\\Entity();\n}\n",
+    )
+    .unwrap();
+
+    let psr4 = make_psr4(&root, "App\\\\", "src");
+    let mut analyzer = ProjectAnalyzer::new();
+    analyzer.psr4 = Some(psr4.clone());
+
+    let files = psr4.project_files();
+    let result = analyzer.analyze(&files);
+
+    let undefined_class: Vec<_> = result
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedClass")
+        .collect();
+
+    assert!(
+        undefined_class.is_empty(),
+        "App\\Model\\Entity should be found via lazy loading when new \\FQCN() is used in namespaced file; got: {undefined_class:?}"
+    );
+}
