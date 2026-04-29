@@ -2,7 +2,7 @@
 ///
 /// Given a condition expression and a branch direction (true/false), this
 /// module updates the `Context` to narrow variable types accordingly.
-use php_ast::ast::{BinaryOp, ExprKind, UnaryPrefixOp};
+use php_ast::ast::{AssignOp, BinaryOp, ExprKind, UnaryPrefixOp};
 
 use mir_codebase::storage::AssertionKind;
 use mir_codebase::Codebase;
@@ -181,6 +181,25 @@ pub fn narrow_from_condition<'arena, 'src>(
                         ctx.set_var(&var_name, current.remove_null());
                         ctx.assigned_vars.insert(var_name);
                     }
+                }
+            }
+        }
+
+        // ($x = expr) / ($x ??= expr) used as a condition
+        // The assignment has already been evaluated (ctx holds the post-assignment type).
+        // Narrow the target variable based on the truthiness of the expression result.
+        ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign | AssignOp::Coalesce) => {
+            if let Some(var_name) = extract_var_name(a.target) {
+                let current = ctx.get_var(&var_name);
+                let narrowed = if is_true {
+                    current.narrow_to_truthy()
+                } else {
+                    current.narrow_to_falsy()
+                };
+                if !narrowed.is_empty() {
+                    ctx.set_var(&var_name, narrowed);
+                } else if !current.is_empty() && !current.is_mixed() {
+                    ctx.diverges = true;
                 }
             }
         }
