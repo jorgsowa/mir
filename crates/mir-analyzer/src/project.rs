@@ -736,6 +736,7 @@ impl ProjectAnalyzer {
                     Arc::from(cls.interfaces.as_slice()),
                     Arc::from(cls.traits.as_slice()),
                     Arc::from([]),
+                    Arc::from(cls.template_params.as_slice()),
                 );
             }
             for iface in &file_defs.slice.interfaces {
@@ -749,6 +750,7 @@ impl ProjectAnalyzer {
                     Arc::from([]),
                     Arc::from([]),
                     Arc::from(iface.extends.as_slice()),
+                    Arc::from(iface.template_params.as_slice()),
                 );
             }
             for tr in &file_defs.slice.traits {
@@ -762,6 +764,7 @@ impl ProjectAnalyzer {
                     Arc::from([]),
                     Arc::from([]),
                     Arc::from([]),
+                    Arc::from(tr.template_params.as_slice()),
                 );
             }
             for en in &file_defs.slice.enums {
@@ -772,6 +775,7 @@ impl ProjectAnalyzer {
                     true,
                     false,
                     None,
+                    Arc::from([]),
                     Arc::from([]),
                     Arc::from([]),
                     Arc::from([]),

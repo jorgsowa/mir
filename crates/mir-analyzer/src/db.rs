@@ -120,6 +120,9 @@ pub struct ClassNode {
     pub traits: Arc<[Arc<str>]>,
     /// Directly extended interfaces (interfaces only).
     pub extends: Arc<[Arc<str>]>,
+    /// Declared `@template` parameters from the class/interface/trait
+    /// docblock.  Empty for classes without templates.
+    pub template_params: Arc<[TemplateParam]>,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -148,6 +151,26 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
         is_enum: node.is_enum(db),
         is_abstract: node.is_abstract(db),
     })
+}
+
+/// Whether a class/interface/trait/enum is registered as an active
+/// `ClassNode` in the db.  Returns `false` for unregistered or inactive
+/// nodes; callers should fall back to `Codebase::type_exists` since
+/// bundled-stub types are not yet promoted to the db.
+pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
+}
+
+/// Return the declared `@template` parameters for `fqcn` from an active
+/// `ClassNode`, if one is registered.  Returns `None` for unregistered
+/// or inactive nodes; callers should fall back to
+/// `Codebase::get_class_template_params`.
+pub fn class_template_params_via_db(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+) -> Option<Arc<[TemplateParam]>> {
+    let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+    Some(node.template_params(db))
 }
 
 // ---------------------------------------------------------------------------
@@ -478,6 +501,7 @@ impl MirDb {
         interfaces: Arc<[Arc<str>]>,
         traits: Arc<[Arc<str>]>,
         extends: Arc<[Arc<str>]>,
+        template_params: Arc<[TemplateParam]>,
     ) -> ClassNode {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
@@ -490,6 +514,7 @@ impl MirDb {
             node.set_interfaces(self).to(interfaces);
             node.set_traits(self).to(traits);
             node.set_extends(self).to(extends);
+            node.set_template_params(self).to(template_params);
             node
         } else {
             let node = ClassNode::new(
@@ -504,6 +529,7 @@ impl MirDb {
                 interfaces,
                 traits,
                 extends,
+                template_params,
             );
             self.class_nodes.insert(fqcn, node);
             node
@@ -749,6 +775,7 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             extends,
+            Arc::from([]),
         )
     }
 
@@ -912,5 +939,46 @@ mod tests {
         let ancestors = class_ancestors(&db, child_iface);
         assert_eq!(ancestors.0.len(), 1);
         assert_eq!(ancestors.0[0].as_ref(), "Countable");
+    }
+
+    #[test]
+    fn type_exists_via_db_tracks_active_state() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        assert!(type_exists_via_db(&db, "Foo"));
+        assert!(!type_exists_via_db(&db, "Bar"));
+        db.deactivate_class_node("Foo");
+        assert!(!type_exists_via_db(&db, "Foo"));
+    }
+
+    #[test]
+    fn class_template_params_via_db_returns_registered_params() {
+        use mir_types::Variance;
+        let mut db = MirDb::default();
+        let tp = TemplateParam {
+            name: Arc::from("T"),
+            bound: None,
+            defining_entity: Arc::from("Box"),
+            variance: Variance::Invariant,
+        };
+        db.upsert_class_node(
+            Arc::from("Box"),
+            false,
+            false,
+            false,
+            false,
+            None,
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([tp.clone()]),
+        );
+        let got = class_template_params_via_db(&db, "Box").expect("registered");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].name.as_ref(), "T");
+
+        assert!(class_template_params_via_db(&db, "Missing").is_none());
+        db.deactivate_class_node("Box");
+        assert!(class_template_params_via_db(&db, "Box").is_none());
     }
 }
