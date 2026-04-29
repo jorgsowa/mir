@@ -280,9 +280,23 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `has_unknown_ancestor_db_or_codebase` is preserved for API-shape
   continuity until a follow-up renames the helper.
 
+- **PR13** ✅ Rename the prefer-db wrappers now that the codebase
+  fallback is gone: `args.rs` private wrappers → `type_exists`,
+  `is_interface`, `class_template_params`;
+  `has_unknown_ancestor_db_or_codebase` → `has_unknown_ancestor_via_db`
+  (drops the unused `codebase` argument; updates 8 call sites).
+- **PR14** ✅ Remove `ClassAnalyzer.db: Option<&dyn MirDatabase>` —
+  it was added in PR1 as a landing pad and never read.
+- **PR15** ✅ `Pass2Driver::check_trait_constraints` reads the
+  ancestor chain from the Salsa `class_ancestors` query instead of
+  calling `Codebase::ensure_finalized` and reading
+  `class.all_parents`.  The lone Pass-2-driven `ensure_finalized`
+  call site is gone.
+
 Remaining for S5 (rough order):
-- Rename `*_db_or_codebase` helpers to `*_via_db` (or inline) and
-  drop their now-unused `codebase` / `ea.codebase` parameters.
+- Migrate `ClassAnalyzer::analyze_all`'s `ensure_finalized` to
+  read ancestors from Salsa (needs a db reference threaded back into
+  `ClassAnalyzer`, post-PR14).
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).
