@@ -292,11 +292,21 @@ Sub-PRs (each shippable, fixture suite green at every step):
   calling `Codebase::ensure_finalized` and reading
   `class.all_parents`.  The lone Pass-2-driven `ensure_finalized`
   call site is gone.
+- **PR16** ✅ `check_trait_constraints` also reads the used-trait
+  list from `ClassNode::traits(db)` instead of `Codebase::classes`.
+  An unregistered class short-circuits early.  No more
+  `Codebase::classes.get` lookups inside Pass 2 trait validation.
 
 Remaining for S5 (rough order):
-- Migrate `ClassAnalyzer::analyze_all`'s `ensure_finalized` to
-  read ancestors from Salsa (needs a db reference threaded back into
-  `ClassAnalyzer`, post-PR14).
+- Migrate `ClassAnalyzer::analyze_all`'s `ensure_finalized` and
+  the four `cls.all_parents` reads to the salsa db (needs a `&dyn
+  MirDatabase` threaded back into `ClassAnalyzer`, post-PR14).
+  Naively dropping `ensure_finalized` breaks ~21 fixtures because
+  `cls.all_parents` is the populated side-effect the downstream
+  abstract/interface checks consume; the migration must also
+  rewrite the `cls.all_parents` reads to call `class_ancestors`.
+- Add `require_extends` / `require_implements` to ClassNode so
+  `check_trait_constraints` can drop `Codebase::traits.get`.
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).
