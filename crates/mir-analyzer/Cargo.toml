@@ -22,6 +22,7 @@ blake3        = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
 quick-xml     = "0.39"
+salsa         = { workspace = true }
 
 [dev-dependencies]
 mir-issues     = { workspace = true }

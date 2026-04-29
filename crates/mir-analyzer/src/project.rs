@@ -7,10 +7,12 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
+use crate::db::{collect_file_definitions, MirDb, SourceFile};
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use mir_codebase::Codebase;
 use mir_issues::Issue;
+use salsa::Setter as _;
 
 use crate::collector::DefinitionCollector;
 
@@ -40,6 +42,10 @@ pub struct ProjectAnalyzer {
     pub stub_files: Vec<PathBuf>,
     /// Additional stub directories to walk and parse before analysis (absolute paths).
     pub stub_dirs: Vec<PathBuf>,
+    /// Salsa database for incremental Pass-1 memoization.
+    /// `MirDb` is `Send` but `!Sync` (thread-local query state); `Mutex`
+    /// provides the `Sync` bound rayon requires without needing `T: Sync`.
+    salsa: std::sync::Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
 }
 
 impl ProjectAnalyzer {
@@ -54,6 +60,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
+            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -69,6 +76,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
+            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -90,6 +98,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
+            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
         };
         Ok((analyzer, map))
     }
@@ -622,33 +631,31 @@ impl ProjectAnalyzer {
         self.codebase.remove_file_definitions(file_path);
 
         let file: Arc<str> = Arc::from(file_path);
+
+        // --- Salsa-backed Pass 1: memoized parse + definition collection ------
+        let file_defs = {
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref mut db, ref mut files) = *guard;
+            let salsa_file = match files.get(&file) {
+                Some(&sf) => {
+                    sf.set_text(db).to(Arc::from(new_content));
+                    sf
+                }
+                None => {
+                    let sf = SourceFile::new(db, file.clone(), Arc::from(new_content));
+                    files.insert(file.clone(), sf);
+                    sf
+                }
+            };
+            collect_file_definitions(db, salsa_file)
+        };
+
+        let mut all_issues: Vec<Issue> = (*file_defs.issues).clone();
+        self.codebase.inject_stub_slice((*file_defs.slice).clone());
+
+        // Re-parse in the arena so Pass 2 can walk the AST.
         let arena = bumpalo::Bump::new();
         let parsed = php_rs_parser::parse(&arena, new_content);
-
-        let mut all_issues = Vec::new();
-
-        for err in &parsed.errors {
-            all_issues.push(Issue::new(
-                mir_issues::IssueKind::ParseError {
-                    message: err.to_string(),
-                },
-                mir_issues::Location {
-                    file: file.clone(),
-                    line: 1,
-                    line_end: 1,
-                    col_start: 0,
-                    col_end: 0,
-                },
-            ));
-        }
-
-        let collector = DefinitionCollector::new(
-            &self.codebase,
-            file.clone(),
-            new_content,
-            &parsed.source_map,
-        );
-        all_issues.extend(collector.collect(&parsed.program));
 
         if self
             .codebase

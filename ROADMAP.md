@@ -1,6 +1,6 @@
 # mir Roadmap
 
-Current version: **v0.5.2**
+Current version: **v0.16.0**
 
 ---
 
@@ -23,94 +23,148 @@ Current version: **v0.5.2**
 | M12 — Loop analysis | ✅ Complete |
 | M13 — Generic types | ✅ Complete |
 | M14 — Pass 2: body analysis | ✅ Complete |
-| M15 — Configuration | ⚠️ Partial |
-| M16 — CLI | ⚠️ Partial (`--set-baseline`, `--no-cache` missing) |
+| M15 — Configuration (`mir.xml`) | ✅ Complete |
+| M16 — CLI | ✅ Complete |
 | M17 — Cache layer (Pass 2, content-hash) | ✅ Complete |
 | M18 — Dead code detection | ✅ Complete |
 | M19 — Taint analysis | ✅ Complete |
 | M20 — Plugin system | ❌ Not started |
+| M21 — LSP API surface | ✅ Complete |
+| M22 — WASM playground | ✅ Complete |
+| M23 — Psalm docblock parity | ✅ Complete |
+
+### M15 — Configuration (`mir.xml`)
+
+Completed: `<projectFiles>`, `<ignoreFiles>`, `<issueHandlers>`, `<stubs>` (file and
+directory entries), `phpVersion` (root attribute and child element), `errorLevel`,
+`findUnusedCode`, `findUnusedVariables`. Auto-discovery walks up from the current directory
+and falls back to `psalm.xml` for drop-in Psalm compatibility.
+
+### M16 — CLI
+
+Completed: `--format` (text, JSON, GitHub Actions annotations, JUnit, SARIF),
+`--set-baseline` / `--baseline` / `--update-baseline` / `--ignore-baseline`,
+`--no-cache`, `--cache-dir`, `--clear-cache`, `--php-version`, `--find-dead-code`,
+`--quiet`, `--verbose`, `--no-progress`, `--config`.
+
+### M21 — LSP API surface
+
+`symbol_at` for go-to-definition and find-references; `re_analyze_file` for incremental
+single-file re-analysis with structural snapshot diffing; `inject_stub_slice` /
+`StubSlice` / `CodebaseBuilder` for salsa-style pure Pass 1 computation;
+`ParsedDocblock::is_inherit_doc` for hover/completion chain walking.
+Location type unified across all crates, UTF-16/UTF-32 conversion at the LSP boundary.
+
+### M22 — WASM playground
+
+Interactive playground embedded in the docs site: PHP version selector (8.1–8.5), live
+diagnostic underlay overlays, severity-colored cards. Shipped in v0.13.0.
+
+### M23 — Psalm docblock parity
+
+`@psalm-suppress`, `@psalm-assert`, `@psalm-assert-if-true`, `@psalm-assert-if-false`,
+`@psalm-param`, `@psalm-return`, `@psalm-import-type`, `@psalm-require-extends`,
+`@psalm-require-implements`, `@inheritDoc`. `InvalidDocblock` issue for unparseable
+annotations. Shipped across v0.9.1–v0.14.0.
 
 ---
 
 ## Performance & Architecture Roadmap
 
-### Phase 1 — Memory (independent, `mir-codebase` only)
+### Phase 1 — Memory  ✅ Complete (v0.5.1)
 
-The reference index uses `DashMap<Arc<str>, HashMap<Arc<str>, HashSet<(u32,u32)>>>`.
-The innermost `HashSet` carries ~72 bytes of overhead per entry; actual data is 8 bytes.
+**1. String interning** ✅
+Reference keys interned as lock-free `u32` IDs, eliminating `Arc<str>` duplication across
+`symbol_reference_locations`, `file_symbol_references`, and the dead-code sets.
 
-**1. String interning**
-Replace `Arc<str>` keys across all reference maps with `u32` IDs backed by a two-way interner.
-Eliminates key duplication across `symbol_reference_locations`, `file_symbol_references`, and
-the three dead-code `DashSet`s.
+**2. Flat `Vec<Ref>`** ✅
+Nested map structure replaced by a single `Vec<(symbol_id, file_id, start, end)>` during
+the build phase.
 
-**2. Flat `Vec<Ref>`**
-Replace the nested map structure with a single `Vec<(symbol_id, file_id, start, end)>` during
-the build phase. All three overlapping maps collapse into one.
-
-**3. `compact_reference_index()`**
-After Pass 2, sort the `Vec<Ref>` and build two CSR (Compressed Sparse Row) index arrays —
-one keyed by symbol, one by file. Drop the build-phase hash maps.
-
-Expected: ~5× reduction in reference index memory. No behavioral change.
+**3. `compact_reference_index()`** ✅
+After Pass 2, the `Vec<Ref>` is sorted and two CSR index arrays are built — one keyed by
+symbol, one by file. Delivered ~5× reduction in reference index memory.
 
 ---
 
-### Phase 2 — Non-LSP incremental (`mir-cache`)
+### Phase 2 — Non-LSP incremental  ⚠️ Partial (v0.5.2)
 
-Pass 2 results are already cached by content hash (M17). The missing increment:
-
-**4. Cache Pass 1 results**
+**4. Cache Pass 1 results** ❌ Not started
 Extend `CacheEntry` with `FileDefinitions`. On a cache hit, skip parsing and definition
 collection entirely — not just body analysis. Biggest win for large projects where few
 files change between runs.
 
-**5. Cache finalization**
-Hash each class's definition inputs (parent FQCN + interface list). Skip
-`collect_class_ancestors` if the class definition is unchanged. Store the computed
-`all_parents` and `all_methods` tables alongside the definition cache entry.
-
-Expected: near-zero cost for CLI runs where few files changed.
+**5. Cache finalization** ✅ (v0.5.2)
+`re_analyze_file` captures a structural snapshot before file removal. If inheritance fields
+are unchanged after Pass 1, `all_parents` is restored directly and ancestor recomputation
+is skipped.
 
 ---
 
-### Phase 3 — Remove the pass barrier (`mir-codebase`, `mir-analyzer`)
+### Phase 3 — Remove the pass barrier  ✅ Complete
 
-The global `finalize()` is a serial barrier: all of Pass 1 must complete before any file
-can start Pass 2. Files whose dependency chains are short are blocked unnecessarily.
+**6. Per-class `OnceLock` finalization** ✅ Complete
+`ensure_finalized(fqcn)` computes ancestors lazily per class/interface and memoizes via
+`DashMap<Arc<str>, OnceLock<Arc<[Arc<str>]>>>` with thread-local cycle detection.
+`finalize()` is now a warm-all wrapper over `ensure_finalized`. `invalidate_finalization()`
+clears the cache; `remove_file_definitions()` evicts only the affected entries granularly.
 
-**6. Per-class `OnceLock` finalization**
-Replace the global `finalize()` with `ensure_finalized(fqcn)` that computes lazily per class
-and memoizes the result. Use a `DashMap<Arc<str>, OnceLock<Arc<FinalizedClass>>>` with
-thread-local cycle detection.
-
-**7. Merge the pass loop**
-Single rayon scan: each file task does Pass 1 → `ensure_finalized()` for its dependencies →
-Pass 2, all without a global barrier. `lazy_load_missing_classes` becomes automatic — missing
-classes are loaded on demand inside `ensure_finalized()`.
-
-Expected: 20–40% wall-time reduction for large projects. Simplifies incremental re-analysis.
+**7. Merge the pass loop** ✅ Complete
+Pre-index and definition collection sub-passes merged into a single parallel `par_iter`,
+eliminating the second parse per file. The eager `finalize()` barrier between Pass 1 and
+Pass 2 is removed: `ensure_finalized()` is now called lazily at every `all_parents` read
+site (`get_method_inner`, `get_property_inner`, `get_class_constant`,
+`extends_or_implements`, `has_unknown_ancestor`, `collect_members_for_fqcn`,
+`ClassAnalyzer::analyze_all`, `check_trait_constraints`, `argument_type_satisfies_param`,
+`file_structural_snapshot`). Pass 1 result collection is the only barrier before Pass 2;
+a second barrier remains between the G6 priming sweep and the issue-emitting Pass 2.
 
 ---
 
-### Phase 4 — Symbol-level incremental + LSP (Salsa)
+### Phase 4 — Symbol-level incremental + LSP (Salsa)  ⚠️ In progress
 
-Current cache invalidation is file-level: if file A changes, all files importing anything from
-A are evicted — even if only a private method body changed. A proper query system tracks
-symbol-level dependencies and skips re-analysis when query outputs are unchanged.
+Current cache invalidation is file-level: if file A changes, all files importing anything
+from A are evicted — even if only a private method body changed. A proper query system
+tracks symbol-level dependencies and skips re-analysis when query outputs are unchanged.
 
-**8. Introduce Salsa**
-Define `parse_file`, `file_definitions`, `finalized_class`, and `analyze_file` as tracked
-queries backed by the `salsa` crate. Salsa handles memoization, cycle detection, parallel
-evaluation, and precise invalidation automatically.
+The migration is broken into five sub-phases, each a shippable PR:
 
-**9. Replace `re_analyze_file`**
-Update a `SourceFile` input; Salsa invalidates only the affected subgraph. The LSP path
-simplifies to a single call with no manual cache eviction or definition removal.
+**S0. Database skeleton** ✅ (v0.16.0)
+`salsa = "0.26"` added to the workspace. `MirDatabase` trait, `SourceFile` input, and
+`MirDb` concrete database defined in `crates/mir-analyzer/src/db.rs`. No analysis logic
+changed; this is the landing pad for subsequent sub-phases.
 
-**10. Replace file-level dep graph**
-Salsa's automatic dependency tracking replaces `file_symbol_references` and the reverse dep
-cache. Symbol-level precision: a change to a private method body invalidates zero other files.
+**S1. `collect_file_definitions` query** ✅ (v0.16.0)
+`collect_file_definitions` Salsa tracked query wraps the existing `collect_slice` pure
+variant. `StubSlice` result is memoized per `SourceFile`; consecutive in-process calls
+with unchanged text skip parse and definition collection entirely (warm-path for LSP /
+watch-mode re-analysis). Result is injected into `Codebase` via `inject_stub_slice`.
+`re_analyze_file` (LSP incremental path) now goes through `collect_file_definitions`.
+The batch `analyze()` path continues to use the direct parse route; Salsa memoization
+for the batch path is deferred to S4 alongside the accumulator rewrite.
+
+**S2. `class_ancestors` query** ❌ Not started
+Replace `file_structural_snapshot`, `structural_unchanged_after_pass1`,
+`restore_all_parents`, and the `finalization_cache: DashMap<_, OnceLock<_>>` with a single
+Salsa tracked query with cycle recovery. The structural snapshot triad in `codebase.rs` is
+deleted.
+
+**S3. `inferred_return_type` query** ❌ Not started
+Replace `Pass2Driver::new_inference_only` and the G6 priming sweep with a Salsa tracked
+query using fixpoint cycle recovery. Depth-N inferred return type chains resolve correctly.
+Priming sweep (~2× Pass 2 CPU cost) is eliminated.
+
+**S4. `analyze_file` query + accumulators** ❌ Not started
+Issues and reference locations become Salsa accumulators. `re_analyze_file` collapses to
+two lines (set input + read accumulator). `AnalysisCache`, `build_reverse_deps`,
+`evict_with_dependents`, and the compact CSR reference index are deleted. A private method
+body change invalidates zero dependent files.
+
+**S5. Collapse `Codebase`** ❌ Not started (deferred)
+Thread `&dyn MirDatabase` through `StatementsAnalyzer` / `ExpressionAnalyzer` /
+`ClassAnalyzer`. All remaining `DashMap` fields on `Codebase` become `definition_index`
+query reads. `Codebase` is deleted; per-read shard-lock overhead and the two `Interner`
+fields are eliminated.
 
 Expected: sub-second re-analysis on save for LSP; precise invalidation across all query types.
 
@@ -119,11 +173,191 @@ Expected: sub-second re-analysis on save for LSP; precise invalidation across al
 ### Phase dependencies
 
 ```
-Phase 1 ──────────────────────── ships alone, no blockers
-Phase 2 ──────────────────────── ships alone (cache is additive)
-Phase 3 ── benefits from Phase 1 (flat Vec friendlier to per-class memoization)
-Phase 4 ── subsumes Phase 2 & 3  (Salsa makes manual caching redundant)
+Phase 1 ──────────────────────── complete
+Phase 2 ──────────────────────── item 4 subsumed by Phase 4 S1 (no longer worth doing separately)
+Phase 3 ── complete; eager finalize() barrier removed, lazy ensure_finalized() at read sites
+Phase 4 ── subsumes Phase 2 & 3  (Salsa makes manual caching redundant); S0 complete
 ```
 
-Phases 1 and 2 deliver value independently. Phase 3 is the stepping stone toward Phase 4.
-Phase 4 is the right long-term foundation for both LSP and CLI incremental analysis.
+---
+
+## Analyzer Gaps
+
+Known limitations embedded as explicit skips in the analyzer.
+Each entry names the gap, the files/lines where the skip lives, and what lifting it requires.
+
+---
+
+### G1 — Full template inference for generic class instantiation
+
+**What is skipped:**
+Return type checks bail out when the declared type is a generic class instantiation
+(`Result<string, void>`), an interface, or a class not in the codebase
+(`declared_return_has_template`, `src/stmt.rs:1497–1505`). Param contravariance checks
+similarly bail when either side contains a `TTemplateParam` (`src/class.rs:419`).
+Expression-level checks skip template params to avoid false positives (`src/expr.rs:1868`).
+
+**What lifting it requires:**
+Full template inference: when a generic type is instantiated, substitute the concrete type
+arguments into method signatures before comparing. Requires propagating the instantiation
+context (`HashMap<template_name, Union>`) through `StatementsAnalyzer` and
+`ExpressionAnalyzer` for every call and return-type check.
+
+---
+
+### G2 — Post-Pass-2 FQCN lazy loading (no `use` import)
+
+**What is skipped:**
+`#[ignore = "known gap: FQCN-without-use requires post-Pass-2 lazy loading"]`
+(`tests/lazy_load.rs:227`). Fully-qualified class names referenced directly inside function
+bodies (e.g. `new \Foo\Bar\Baz()`) without a `use` statement are only discovered during
+Pass 2. The current lazy-load trigger runs before Pass 2 completes, so these classes are
+never loaded on demand.
+
+**What lifting it requires:**
+A post-Pass-2 lazy-load phase: after all files complete Pass 2, collect still-missing FQCNs
+and re-run loading + `ensure_finalized()`. Full inline resolution would require
+`ensure_finalized()` to drive PSR-4 loading on cache miss — `Codebase` does not yet have
+access to PSR-4 data, so that integration is a separate step.
+
+---
+
+### G3 — Override covariance with named objects and `self`/`static` ✅ Complete
+
+**What was skipped:**
+Return type covariance in `ClassAnalyzer` was skipped when either side involved a named
+object (`involves_named_objects`) or `TSelf`/`TStaticObject` (`involves_self_static`).
+This suppressed real violations alongside intended ones.
+
+**How it was fixed:**
+`named_object_return_compatible` (from `src/stmt.rs`) is now called inside the override
+check when both unions consist entirely of object-like atoms (named objects, self, static,
+parent, null, void, never, class-string). Mixed scalar+object unions still skip to avoid
+false positives — that is the remaining G5 gap.
+
+---
+
+### G4 — Param contravariance with named objects in override checks
+
+**What is skipped:**
+The param contravariance loop in `ClassAnalyzer` skips pairs where either side contains a
+named object (`src/class.rs:417`). A child method that illegally narrows a param from
+`Animal` to `Cat` is not flagged.
+
+**What lifting it requires:**
+Use the codebase inheritance graph (`all_parents`, `all_interfaces`) to check whether
+`child_param_type` is a subtype of `parent_param_type` for object types, mirroring how
+`named_object_return_compatible` works. Depends on G3's infrastructure.
+
+---
+
+### G5 — Non-object type handling in `named_object_return_compatible`
+
+**What is skipped:**
+Falls through to a simple subtype check for non-object atomic types with the comment
+"Non-object types: not handled here" (`src/stmt.rs:1368`). Union types mixing objects with
+scalars (e.g. `string|MyClass`) may produce false negatives.
+
+**What lifting it requires:**
+Extend `named_object_return_compatible` to split union types: object atoms go through the
+inheritance path, scalar atoms go through the existing simple subtype check.
+
+---
+
+### G6 — Cross-file inferred return types ✅ Complete (depth-1)
+
+**What was skipped:**
+`inferred_return_type` is written during the parallel Pass 2, so a file cannot see another
+file's inferred return type if that file has not yet finished. Cross-file inference was
+therefore incomplete when the calling file was analyzed before the callee.
+
+**How it was fixed:**
+A type-inference priming pass now runs before the issue-emitting Pass 2. The priming pass
+runs all function and method bodies in parallel but skips reference tracking (so dead-code
+and go-to-definition data are not double-counted); it only writes `inferred_return_type`
+back to the codebase. By the time the main Pass 2 starts, every function's inferred return
+type is already populated, eliminating the race for the common depth-1 case.
+
+**Remaining gap:**
+Depth-N chains (A→B→C where B's inferred type depends on C's) are still subject to
+ordering within the priming pass. A fixed-point iteration or Phase 4 (Salsa) would resolve
+this completely.
+
+---
+
+## False Positives
+
+Known cases where the analyzer emits a diagnostic for correct PHP code.
+
+---
+
+### FP2 — Inner variable of `$$x` reported as `UnusedVariable`
+
+**What fires incorrectly:**
+In `$$key`, `$key` is read to determine the variable name at runtime, but the
+`ExprKind::VariableVariable` handler (`src/expr.rs`) only returns `Union::mixed()` without
+marking the inner variable as read. Any variable whose only use is as the operand of `$$`
+is reported as `UnusedVariable`.
+
+**Root cause:**
+The variable-variable expression handler does not call `ctx.read_vars.insert(inner_name)`.
+
+**What fixing it requires:**
+When `ExprKind::VariableVariable(inner)` is a simple `Variable` node, extract its name and
+insert it into `ctx.read_vars` before returning `Union::mixed()`.
+
+---
+
+### FP3 — `UnusedVariable` and `UnusedParam` always report line 1
+
+**What fires incorrectly:**
+Every `UnusedVariable` and `UnusedParam` diagnostic is emitted at `line: 1, col_start: 0`
+regardless of where the variable was actually declared or assigned.
+
+**Root cause:**
+`emit_unused_variables` and `emit_unused_params` (`src/diagnostics.rs`) construct the
+`Location` with hardcoded `line: 1` because the per-variable assignment location is not
+tracked in `Context`.
+
+**What fixing it requires:**
+Add a `HashMap<String, Location>` (or similar) to `Context` that records the span of the
+first assignment for each variable. Use that span when constructing the issue location in
+`emit_unused_variables` / `emit_unused_params`.
+
+---
+
+## Refactoring
+
+### R1 — Monolithic analysis files
+
+`expr.rs` (~2 000 lines), `stmt.rs` (~1 600 lines), and `collector.rs` (~1 900 lines) are
+candidates for the same sub-module split already applied to `call/` (args, function, method,
+static_call). Splitting each into focused sub-modules would reduce compile times and make
+targeted changes easier to review.
+
+---
+
+### R2 — Hot-path locking
+
+`Codebase` uses `DashMap` throughout. After Pass 1 the symbol tables are read-only; freezing
+them into `Arc<HashMap>` post-Pass-1 would eliminate per-read locking on the hottest path in
+Pass 2.
+
+---
+
+### R3 — Type interning
+
+**Needs profiling before attempting.**
+
+The original premise — that singleton unions (`TString`, `TInt`, `TNull`, `mixed`) cause
+allocator pressure — is off: `SmallVec<[Atomic; 2]>` keeps single-element unions fully
+inline, so those copies are stack memcpys, not heap allocations.
+
+The real candidate for Arc-sharing is stored return types (`FunctionStorage::return_type`,
+`MethodStorage::return_type`): `effective_return_type().cloned()` in the call analyzer
+clones the stored `Union` on every resolved call site. For widely-called functions this
+multiplies any complex union (>2 atomics, which do heap-allocate) across all call sites.
+Changing storage to `Arc<Union>` would reduce those to cheap ref-count bumps.
+
+That change is pervasive (touches the entire value-type API surface) and the win is
+speculative without a profile showing return-type cloning as a hot spot.

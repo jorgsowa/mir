@@ -3,6 +3,7 @@ pub mod call;
 pub mod class;
 pub mod collector;
 pub mod context;
+pub mod db;
 pub mod dead_code;
 pub mod diagnostics;
 pub mod expr;
