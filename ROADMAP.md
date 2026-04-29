@@ -343,6 +343,25 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `unimplemented_interface_method::trait_cycle_does_not_crash`
   fixture stays green via the `class_ancestors` cycle-recovery
   guard plus the per-helper `visited` set.
+- **PR21** ✅ Fast-skip on identical re-ingest in
+  `upsert_class_node` / `upsert_function_node` /
+  `upsert_method_node` / `upsert_property_node` /
+  `upsert_class_constant_node`.  Each compares the would-be input
+  against the active node's current Salsa-tracked fields via the
+  cheap getters; on a full match it returns without any setter
+  call.  This eliminates the 13-setter / 13-`zalsa_mut`-acquire
+  storm that previously fired per class on every `ingest_codebase`
+  iteration.  Resolves the deadlock that surfaced in the
+  `lazy_load_*` post-Pass-2 path (the second `ingest_codebase`
+  call in `analyze` was waiting indefinitely on Salsa's
+  cancellation Condvar) and brings
+  `lazy_loads_fqcn_used_directly_without_use_import_from_psr4`
+  from "60s+ hang" down to **0.02s** end-to-end.  Safe because
+  Pass 2 only writes `inferred_return_type` to `Codebase` (never
+  to `ClassNode`/`MethodNode`/etc. tracked fields), and LSP
+  re-analyze flips `active=false` via `deactivate_*` before
+  re-upserting, defeating the guard so real schema changes still
+  fire setters.
 
 Remaining for S5 (rough order):
 - Migrate the remaining `Codebase::get_method` / `get_property` /
