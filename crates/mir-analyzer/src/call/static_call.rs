@@ -132,12 +132,7 @@ impl CallAnalyzer {
         {
             let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, &fqcn)
                 .map(|k| (k.is_interface, k.is_abstract))
-                .unwrap_or_else(|| {
-                    (
-                        ea.codebase.interfaces.contains_key(fqcn.as_str()),
-                        ea.codebase.is_abstract_class(&fqcn),
-                    )
-                });
+                .unwrap_or((false, false));
             if is_interface
                 || is_abstract
                 || ea.codebase.get_method(&fqcn, "__callStatic").is_some()
