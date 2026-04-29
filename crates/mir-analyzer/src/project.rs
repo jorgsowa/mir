@@ -349,9 +349,17 @@ impl ProjectAnalyzer {
         // ---- Class-level checks (M11) ----------------------------------------
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
-        let class_issues =
-            crate::class::ClassAnalyzer::with_files(&self.codebase, analyzed_file_set, &file_data)
-                .analyze_all();
+        let class_db = {
+            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.clone()
+        };
+        let class_issues = crate::class::ClassAnalyzer::with_files(
+            &self.codebase,
+            &class_db,
+            analyzed_file_set,
+            &file_data,
+        )
+        .analyze_all();
         all_issues.extend(class_issues);
 
         // ---- S5-PR10b: clone the salsa db once per parallel sweep so each
