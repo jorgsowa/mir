@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use mir_codebase::storage::{Assertion, FnParam, FunctionStorage, TemplateParam};
+use mir_codebase::storage::{
+    Assertion, FnParam, FunctionStorage, MethodStorage, TemplateParam, Visibility,
+};
 use mir_codebase::StubSlice;
 use mir_issues::Issue;
 use mir_types::Union;
@@ -26,6 +28,13 @@ pub trait MirDatabase: salsa::Database {
 
     /// Look up the [`FunctionNode`] handle registered for `fqn`, if any.
     fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode>;
+
+    /// Look up the [`MethodNode`] for `(fqcn, method_name_lower)`, if any.
+    ///
+    /// `method_name_lower` must already be lowercased.  This is an untracked
+    /// read — changes to a method's fields are tracked through the `MethodNode`
+    /// input itself.
+    fn lookup_method_node(&self, fqcn: &str, method_name_lower: &str) -> Option<MethodNode>;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +126,39 @@ pub struct FunctionNode {
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
     pub deprecated: Option<Arc<str>>,
+    pub is_pure: bool,
+}
+
+// ---------------------------------------------------------------------------
+// MethodNode input (S5-PR3)
+// ---------------------------------------------------------------------------
+
+/// Salsa input representing a single method or interface/trait method.
+///
+/// `inferred_return_type` is intentionally absent — it lives in
+/// `MethodStorage` until S3 promotes it to a proper tracked query.
+///
+/// The node is keyed by `(fqcn, method_name_lower)` where `fqcn` is the
+/// FQCN of the **owning** class/interface/trait and `method_name_lower` is
+/// the PHP-normalised (lowercased) method name.  Nodes for classes that are
+/// removed from the codebase are marked `active = false` via
+/// `deactivate_class_methods` rather than being dropped.
+#[salsa::input]
+pub struct MethodNode {
+    pub fqcn: Arc<str>,
+    pub name: Arc<str>,
+    pub active: bool,
+    pub params: Arc<[FnParam]>,
+    pub return_type: Option<Union>,
+    pub template_params: Arc<[TemplateParam]>,
+    pub assertions: Arc<[Assertion]>,
+    pub throws: Arc<[Arc<str>]>,
+    pub deprecated: Option<Arc<str>>,
+    pub visibility: Visibility,
+    pub is_static: bool,
+    pub is_abstract: bool,
+    pub is_final: bool,
+    pub is_constructor: bool,
     pub is_pure: bool,
 }
 
@@ -287,6 +329,8 @@ pub struct MirDb {
     class_nodes: HashMap<Arc<str>, ClassNode>,
     /// FQN → FunctionNode handle registry.
     function_nodes: HashMap<Arc<str>, FunctionNode>,
+    /// (owner FQCN) → (method_name_lower → MethodNode) handle registry.
+    method_nodes: HashMap<Arc<str>, HashMap<Arc<str>, MethodNode>>,
 }
 
 #[salsa::db]
@@ -304,6 +348,12 @@ impl MirDatabase for MirDb {
 
     fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode> {
         self.function_nodes.get(fqn).copied()
+    }
+
+    fn lookup_method_node(&self, fqcn: &str, method_name_lower: &str) -> Option<MethodNode> {
+        self.method_nodes
+            .get(fqcn)
+            .and_then(|m| m.get(method_name_lower).copied())
     }
 }
 
@@ -397,6 +447,78 @@ impl MirDb {
     pub fn deactivate_function_node(&mut self, fqn: &str) {
         use salsa::Setter as _;
         if let Some(&node) = self.function_nodes.get(fqn) {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `MethodNode` for `(storage.fqcn, storage.name.to_lowercase())`.
+    pub fn upsert_method_node(&mut self, storage: &MethodStorage) -> MethodNode {
+        use salsa::Setter as _;
+        let fqcn = &storage.fqcn;
+        let name_lower: Arc<str> = Arc::from(storage.name.to_lowercase().as_str());
+        // Copy the existing handle out to release the immutable borrow before
+        // calling node.set_*(self), which needs &mut self.
+        let existing = self
+            .method_nodes
+            .get(fqcn.as_ref())
+            .and_then(|m| m.get(&name_lower))
+            .copied();
+        if let Some(node) = existing {
+            node.set_active(self).to(true);
+            node.set_params(self)
+                .to(Arc::from(storage.params.as_slice()));
+            node.set_return_type(self).to(storage.return_type.clone());
+            node.set_template_params(self)
+                .to(Arc::from(storage.template_params.as_slice()));
+            node.set_assertions(self)
+                .to(Arc::from(storage.assertions.as_slice()));
+            node.set_throws(self)
+                .to(Arc::from(storage.throws.as_slice()));
+            node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_visibility(self).to(storage.visibility);
+            node.set_is_static(self).to(storage.is_static);
+            node.set_is_abstract(self).to(storage.is_abstract);
+            node.set_is_final(self).to(storage.is_final);
+            node.set_is_constructor(self).to(storage.is_constructor);
+            node.set_is_pure(self).to(storage.is_pure);
+            node
+        } else {
+            // MethodNode::new takes &mut self; insert after it returns.
+            let node = MethodNode::new(
+                self,
+                fqcn.clone(),
+                storage.name.clone(),
+                true,
+                Arc::from(storage.params.as_slice()),
+                storage.return_type.clone(),
+                Arc::from(storage.template_params.as_slice()),
+                Arc::from(storage.assertions.as_slice()),
+                Arc::from(storage.throws.as_slice()),
+                storage.deprecated.clone(),
+                storage.visibility,
+                storage.is_static,
+                storage.is_abstract,
+                storage.is_final,
+                storage.is_constructor,
+                storage.is_pure,
+            );
+            self.method_nodes
+                .entry(fqcn.clone())
+                .or_default()
+                .insert(name_lower, node);
+            node
+        }
+    }
+
+    /// Mark all `MethodNode`s owned by `fqcn` as inactive.
+    pub fn deactivate_class_methods(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        // Collect nodes first to release the immutable borrow before set_active.
+        let nodes: Vec<MethodNode> = match self.method_nodes.get(fqcn) {
+            Some(methods) => methods.values().copied().collect(),
+            None => return,
+        };
+        for node in nodes {
             node.set_active(self).to(false);
         }
     }

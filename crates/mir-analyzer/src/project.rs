@@ -680,13 +680,14 @@ impl ProjectAnalyzer {
                 .collect()
         };
 
-        // Mark removed classes and functions inactive so dependents re-run.
+        // Mark removed classes, functions, and methods inactive so dependents re-run.
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             let (ref mut db, _) = *guard;
             for fqcn in &old_fqcns {
                 db.deactivate_class_node(fqcn);
                 db.deactivate_function_node(fqcn);
+                db.deactivate_class_methods(fqcn);
             }
         }
 
@@ -744,6 +745,28 @@ impl ProjectAnalyzer {
             // --- S5-PR2: Upsert FunctionNodes ------------------------------------
             for func in &file_defs.slice.functions {
                 db.upsert_function_node(func);
+            }
+
+            // --- S5-PR3: Upsert MethodNodes for all type members ------------------
+            for cls in &file_defs.slice.classes {
+                for method in cls.own_methods.values() {
+                    db.upsert_method_node(method);
+                }
+            }
+            for iface in &file_defs.slice.interfaces {
+                for method in iface.own_methods.values() {
+                    db.upsert_method_node(method);
+                }
+            }
+            for tr in &file_defs.slice.traits {
+                for method in tr.own_methods.values() {
+                    db.upsert_method_node(method);
+                }
+            }
+            for en in &file_defs.slice.enums {
+                for method in en.own_methods.values() {
+                    db.upsert_method_node(method);
+                }
             }
 
             let new_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
