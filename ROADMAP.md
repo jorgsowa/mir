@@ -267,11 +267,22 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `Codebase::get_property` when the db lookup misses (db doesn't
   yet track docblock `@mixin` chains).
 
+- **PR12a / PR12b** ✅ Drop the codebase fallbacks in the prefer-db
+  wrappers now that batch and LSP Pass 2 both read the salsa db.
+  PR12a collapsed the three `args.rs` wrappers (`type_exists`,
+  `is_interface`, `class_template_params`) to pure-db lookups.
+  PR12b collapsed the four inline `class_kind_via_db(...)
+  .unwrap_or_else(|| codebase…)` patterns in `args.rs`,
+  `method.rs`, and `static_call.rs`, and reduced
+  `has_unknown_ancestor_db_or_codebase` to a pure-db ancestor walk
+  (unregistered classes return `false` — an unknown class has no
+  known ancestors to be missing).  The `codebase` parameter on
+  `has_unknown_ancestor_db_or_codebase` is preserved for API-shape
+  continuity until a follow-up renames the helper.
+
 Remaining for S5 (rough order):
-- Drop the codebase fallback in the prefer-db wrappers
-  (`type_exists`, `is_interface`, `class_template_params`,
-  `has_unknown_ancestor_db_or_codebase`) once batch Pass 2 reads
-  the db.
+- Rename `*_db_or_codebase` helpers to `*_via_db` (or inline) and
+  drop their now-unused `codebase` / `ea.codebase` parameters.
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).
