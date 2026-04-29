@@ -766,6 +766,108 @@ impl MirDb {
         }
     }
 
+    /// Walk every entry in `codebase` and upsert the corresponding db node.
+    ///
+    /// Used after bundled / user stubs are loaded into `Codebase` so that
+    /// `type_exists_via_db` / `class_kind_via_db` / `class_template_params_via_db`
+    /// see them too.  Idempotent — re-running upserts existing nodes in place
+    /// without invalidating downstream queries when fields are unchanged.
+    pub fn ingest_codebase(&mut self, codebase: &Codebase) {
+        for entry in codebase.classes.iter() {
+            let cls = entry.value();
+            self.upsert_class_node(
+                cls.fqcn.clone(),
+                false,
+                false,
+                false,
+                cls.is_abstract,
+                cls.parent.clone(),
+                Arc::from(cls.interfaces.as_slice()),
+                Arc::from(cls.traits.as_slice()),
+                Arc::from([]),
+                Arc::from(cls.template_params.as_slice()),
+            );
+            for method in cls.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            for prop in cls.own_properties.values() {
+                self.upsert_property_node(&cls.fqcn, prop);
+            }
+            for constant in cls.own_constants.values() {
+                self.upsert_class_constant_node(&cls.fqcn, constant);
+            }
+        }
+        for entry in codebase.interfaces.iter() {
+            let iface = entry.value();
+            self.upsert_class_node(
+                iface.fqcn.clone(),
+                true,
+                false,
+                false,
+                false,
+                None,
+                Arc::from([]),
+                Arc::from([]),
+                Arc::from(iface.extends.as_slice()),
+                Arc::from(iface.template_params.as_slice()),
+            );
+            for method in iface.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            for constant in iface.own_constants.values() {
+                self.upsert_class_constant_node(&iface.fqcn, constant);
+            }
+        }
+        for entry in codebase.traits.iter() {
+            let tr = entry.value();
+            self.upsert_class_node(
+                tr.fqcn.clone(),
+                false,
+                true,
+                false,
+                false,
+                None,
+                Arc::from([]),
+                Arc::from([]),
+                Arc::from([]),
+                Arc::from(tr.template_params.as_slice()),
+            );
+            for method in tr.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            for prop in tr.own_properties.values() {
+                self.upsert_property_node(&tr.fqcn, prop);
+            }
+            for constant in tr.own_constants.values() {
+                self.upsert_class_constant_node(&tr.fqcn, constant);
+            }
+        }
+        for entry in codebase.enums.iter() {
+            let en = entry.value();
+            self.upsert_class_node(
+                en.fqcn.clone(),
+                false,
+                false,
+                true,
+                false,
+                None,
+                Arc::from([]),
+                Arc::from([]),
+                Arc::from([]),
+                Arc::from([]),
+            );
+            for method in en.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            for constant in en.own_constants.values() {
+                self.upsert_class_constant_node(&en.fqcn, constant);
+            }
+        }
+        for entry in codebase.functions.iter() {
+            self.upsert_function_node(entry.value());
+        }
+    }
+
     /// Mark all `ClassConstantNode`s owned by `fqcn` as inactive.
     pub fn deactivate_class_constants(&mut self, fqcn: &str) {
         use salsa::Setter as _;

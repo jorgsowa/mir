@@ -130,6 +130,11 @@ impl ProjectAnalyzer {
         {
             crate::stubs::load_stubs_for_version(&self.codebase, self.resolved_php_version());
             crate::stubs::load_user_stubs(&self.codebase, &self.stub_files, &self.stub_dirs);
+            // S5-PR8: mirror the loaded stubs into the Salsa db so
+            // `type_exists_via_db` / `class_kind_via_db` / `class_template_params_via_db`
+            // see them.
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.ingest_codebase(&self.codebase);
         }
     }
 
