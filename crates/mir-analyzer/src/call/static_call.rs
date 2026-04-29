@@ -14,6 +14,7 @@ use super::args::{
     check_args, expr_can_be_passed_by_reference, spread_element_type, substitute_static_in_return,
     CheckArgsParams,
 };
+use super::method::{resolve_method_from_db, ResolvedMethod};
 use super::CallAnalyzer;
 
 impl CallAnalyzer {
@@ -49,7 +50,27 @@ impl CallAnalyzer {
             .collect();
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
-        if let Some(method) = ea.codebase.get_method(&fqcn, method_name) {
+        let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+        let method_name_lower = method_name.to_lowercase();
+
+        let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower).or_else(|| {
+            ea.codebase
+                .get_method(&fqcn, method_name)
+                .map(|m| ResolvedMethod {
+                    owner_fqcn: m.fqcn.clone(),
+                    name: m.name.clone(),
+                    visibility: m.visibility,
+                    deprecated: m.deprecated.clone(),
+                    params: m.params.clone(),
+                    template_params: m.template_params.clone(),
+                    return_ty_raw: m
+                        .effective_return_type()
+                        .cloned()
+                        .unwrap_or_else(Union::mixed),
+                })
+        });
+
+        if let Some(resolved) = resolved {
             if !ea.inference_only {
                 let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
                 ea.codebase.mark_method_referenced_at(
@@ -61,7 +82,7 @@ impl CallAnalyzer {
                     col_end,
                 );
             }
-            if let Some(msg) = method.deprecated.clone() {
+            if let Some(msg) = resolved.deprecated.clone() {
                 ea.emit(
                     IssueKind::DeprecatedMethodCall {
                         class: fqcn.clone(),
@@ -86,7 +107,7 @@ impl CallAnalyzer {
                 ea,
                 CheckArgsParams {
                     fn_name: method_name,
-                    params: &method.params,
+                    params: &resolved.params,
                     arg_types: &arg_types,
                     arg_spans: &arg_spans,
                     arg_names: &arg_names,
@@ -95,11 +116,7 @@ impl CallAnalyzer {
                     has_spread: call.args.iter().any(|a| a.unpack),
                 },
             );
-            let ret_raw = method
-                .effective_return_type()
-                .cloned()
-                .unwrap_or_else(Union::mixed);
-            let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+            let ret_raw = resolved.return_ty_raw;
             let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
             ea.record_symbol(
                 call.method.span,

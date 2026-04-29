@@ -3,7 +3,7 @@ use std::sync::Arc;
 use php_ast::ast::{Expr, ExprKind};
 use php_ast::Span;
 
-use mir_codebase::storage::{FnParam, MethodStorage, Visibility};
+use mir_codebase::storage::{FnParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
 
@@ -91,24 +91,26 @@ pub(crate) fn substitute_static_in_return(ret: Union, receiver_fqcn: &Arc<str>) 
 
 pub(crate) fn check_method_visibility(
     ea: &mut ExpressionAnalyzer<'_>,
-    method: &MethodStorage,
+    visibility: Visibility,
+    owner_fqcn: &Arc<str>,
+    method_name: &Arc<str>,
     ctx: &crate::context::Context,
     span: Span,
 ) {
-    match method.visibility {
+    match visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
-            let from_trait = ea.codebase.traits.contains_key(method.fqcn.as_ref());
-            let allowed = caller_fqcn == method.fqcn.as_ref()
+            let from_trait = ea.codebase.traits.contains_key(owner_fqcn.as_ref());
+            let allowed = caller_fqcn == owner_fqcn.as_ref()
                 || (from_trait
                     && ea
                         .codebase
-                        .extends_or_implements(caller_fqcn, method.fqcn.as_ref()));
+                        .extends_or_implements(caller_fqcn, owner_fqcn.as_ref()));
             if !allowed {
                 ea.emit(
                     IssueKind::UndefinedMethod {
-                        class: method.fqcn.to_string(),
-                        method: method.name.to_string(),
+                        class: owner_fqcn.to_string(),
+                        method: method_name.to_string(),
                     },
                     Severity::Error,
                     span,
@@ -120,22 +122,22 @@ pub(crate) fn check_method_visibility(
             if caller_fqcn.is_empty() {
                 ea.emit(
                     IssueKind::UndefinedMethod {
-                        class: method.fqcn.to_string(),
-                        method: method.name.to_string(),
+                        class: owner_fqcn.to_string(),
+                        method: method_name.to_string(),
                     },
                     Severity::Error,
                     span,
                 );
             } else {
-                let allowed = caller_fqcn == method.fqcn.as_ref()
+                let allowed = caller_fqcn == owner_fqcn.as_ref()
                     || ea
                         .codebase
-                        .extends_or_implements(caller_fqcn, method.fqcn.as_ref());
+                        .extends_or_implements(caller_fqcn, owner_fqcn.as_ref());
                 if !allowed {
                     ea.emit(
                         IssueKind::UndefinedMethod {
-                            class: method.fqcn.to_string(),
-                            method: method.name.to_string(),
+                            class: owner_fqcn.to_string(),
+                            method: method_name.to_string(),
                         },
                         Severity::Error,
                         span,
