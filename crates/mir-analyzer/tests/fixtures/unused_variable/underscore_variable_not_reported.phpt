@@ -1,3 +1,6 @@
+===description===
+Variables whose names start with _ are treated as intentionally unused and
+are not reported as UnusedVariable.
 ===file===
 <?php
 function foo(): int {

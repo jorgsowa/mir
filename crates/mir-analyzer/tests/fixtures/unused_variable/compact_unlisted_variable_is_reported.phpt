@@ -1,3 +1,6 @@
+===description===
+A variable not listed in a compact() call is not implicitly consumed by it
+and is still reported as UnusedVariable.
 ===file===
 <?php
 function foo(): array {

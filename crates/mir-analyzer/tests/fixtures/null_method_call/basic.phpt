@@ -1,3 +1,5 @@
+===description===
+Calling a method on a variable assigned null reports NullMethodCall.
 ===file===
 <?php
 function test(): void {

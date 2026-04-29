@@ -63,8 +63,22 @@ fn main() {
             // Rerun when this specific fixture file changes.
             println!("cargo:rerun-if-changed={manifest_dir}/{rel}");
 
+            let content = fs::read_to_string(&path).unwrap_or_default();
+            let ignore_attr = if content.contains("===ignore===") {
+                "    #[ignore]\n"
+            } else {
+                ""
+            };
+            let doc_comment = extract_description(&content)
+                .map(|d| {
+                    d.lines()
+                        .map(|l| format!("    /// {}\n", l.trim()))
+                        .collect::<String>()
+                })
+                .unwrap_or_default();
+
             code.push_str(&format!(
-                "    #[test]\n    fn {stem}() {{\n        \
+                "{doc_comment}    #[test]\n{ignore_attr}    fn {stem}() {{\n        \
                  mir_analyzer::test_utils::run_fixture(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{rel}\"));\n    \
                  }}\n"
             ));
@@ -246,6 +260,22 @@ fn generate_stub_files(manifest_dir: &Path, out_dir: &Path) {
 
     code.push_str("];\n");
     fs::write(&out_path, code).unwrap();
+}
+
+/// Extract the body of `===description===` from a `.phpt` file, if present.
+fn extract_description(content: &str) -> Option<String> {
+    const MARKER: &str = "===description===";
+    let start = content.find(MARKER)? + MARKER.len();
+    let end = content[start..]
+        .find("===")
+        .map(|r| start + r)
+        .unwrap_or(content.len());
+    let text = content[start..end].trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
+    }
 }
 
 /// Walk up from `start` until finding a directory that contains a `Cargo.toml`
