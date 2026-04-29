@@ -124,8 +124,7 @@ pub(crate) fn check_method_visibility(
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
             let from_trait = crate::db::class_kind_via_db(ea.db, owner_fqcn.as_ref())
-                .map(|k| k.is_trait)
-                .unwrap_or_else(|| ea.codebase.traits.contains_key(owner_fqcn.as_ref()));
+                .is_some_and(|k| k.is_trait);
             let allowed = caller_fqcn == owner_fqcn.as_ref()
                 || (from_trait
                     && ea
@@ -511,9 +510,8 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
         let arg_fqcn: &Arc<str> = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
-                let is_trait = crate::db::class_kind_via_db(ea.db, fqcn.as_ref())
-                    .map(|k| k.is_trait)
-                    .unwrap_or_else(|| ea.codebase.traits.contains_key(fqcn.as_ref()));
+                let is_trait =
+                    crate::db::class_kind_via_db(ea.db, fqcn.as_ref()).is_some_and(|k| k.is_trait);
                 if is_trait {
                     return true;
                 }

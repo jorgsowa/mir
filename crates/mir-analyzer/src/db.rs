@@ -380,32 +380,26 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
     Ancestors(all)
 }
 
-/// Predicate variant of [`Codebase::has_unknown_ancestor`] that prefers the
-/// Salsa db when an active `ClassNode` is registered for `fqcn`, falling
-/// back to `Codebase` when it isn't.
+/// Predicate variant of [`Codebase::has_unknown_ancestor`] backed by the
+/// Salsa db.
 ///
-/// When the class is db-registered we walk `class_ancestors` and consider an
-/// ancestor "known" if it is either active in the db OR present in
-/// `Codebase` (bundled / user stubs aren't promoted to the db yet).
-///
-/// When the class itself isn't db-registered (or `db` is `None`), we defer
-/// entirely to `Codebase::has_unknown_ancestor` — the `class_ancestors`
-/// recursion stops at db boundaries and would otherwise miss transitive
-/// unknowns reachable only via codebase data.
+/// `ingest_codebase` (S5-PR8/PR9 / PR11a) mirrors bundled stubs, user
+/// stubs, and PSR-4 lazy-loaded definitions into the db before any
+/// Pass 2 driver runs, so a class with no active `ClassNode` is one
+/// that genuinely doesn't exist — and an unknown class trivially has
+/// no known ancestors.
 pub fn has_unknown_ancestor_db_or_codebase(
     db: &dyn MirDatabase,
-    codebase: &Codebase,
+    _codebase: &Codebase,
     fqcn: &str,
 ) -> bool {
-    if let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) {
-        for ancestor in class_ancestors(db, node).0.iter() {
-            if !type_exists_via_db(db, ancestor) && !codebase.type_exists(ancestor) {
-                return true;
-            }
-        }
+    let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
-    }
-    codebase.has_unknown_ancestor(fqcn)
+    };
+    class_ancestors(db, node)
+        .0
+        .iter()
+        .any(|ancestor| !type_exists_via_db(db, ancestor))
 }
 
 // ---------------------------------------------------------------------------

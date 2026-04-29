@@ -413,12 +413,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
     {
         let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, fqcn)
             .map(|k| (k.is_interface, k.is_abstract))
-            .unwrap_or_else(|| {
-                (
-                    ea.codebase.interfaces.contains_key(fqcn.as_ref()),
-                    ea.codebase.is_abstract_class(fqcn.as_ref()),
-                )
-            });
+            .unwrap_or((false, false));
         if is_interface || is_abstract || ea.codebase.get_method(fqcn, "__call").is_some() {
             Union::mixed()
         } else {
