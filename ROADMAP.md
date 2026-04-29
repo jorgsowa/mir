@@ -296,15 +296,20 @@ Sub-PRs (each shippable, fixture suite green at every step):
   list from `ClassNode::traits(db)` instead of `Codebase::classes`.
   An unregistered class short-circuits early.  No more
   `Codebase::classes.get` lookups inside Pass 2 trait validation.
+- **PR17** ✅ Thread `&dyn MirDatabase` back into `ClassAnalyzer`
+  (the dual of PR14's removal).  All four `cls.all_parents` reads
+  in `check_abstract_methods_implemented`,
+  `check_interface_methods_implemented`, and `find_parent_method`
+  now walk `class_ancestors(db, node)`.  `ensure_finalized` stays
+  in the analyse loop because `Codebase::get_method` still finalises
+  lazily through the inheritance chain (dropping the eager call
+  hangs `unimplemented_interface_method::trait_cycle_does_not_crash`).
 
 Remaining for S5 (rough order):
-- Migrate `ClassAnalyzer::analyze_all`'s `ensure_finalized` and
-  the four `cls.all_parents` reads to the salsa db (needs a `&dyn
-  MirDatabase` threaded back into `ClassAnalyzer`, post-PR14).
-  Naively dropping `ensure_finalized` breaks ~21 fixtures because
-  `cls.all_parents` is the populated side-effect the downstream
-  abstract/interface checks consume; the migration must also
-  rewrite the `cls.all_parents` reads to call `class_ancestors`.
+- Migrate `Codebase::get_method` / `get_property` /
+  `get_class_constant` (and the `extends_or_implements` predicate)
+  off `ensure_finalized`-based ancestor reads, so the eager call in
+  `ClassAnalyzer::analyze_all` can finally go.
 - Add `require_extends` / `require_implements` to ClassNode so
   `check_trait_constraints` can drop `Codebase::traits.get`.
 - Remove `finalization_cache` and the structural snapshot fallback in
