@@ -220,10 +220,6 @@ impl ClassStorage {
     pub fn get_property(&self, name: &str) -> Option<&PropertyStorage> {
         self.own_properties.get(name)
     }
-
-    pub fn implements_or_extends(&self, fqcn: &str) -> bool {
-        self.fqcn.as_ref() == fqcn || self.all_parents.iter().any(|p| p.as_ref() == fqcn)
-    }
 }
 
 // ---------------------------------------------------------------------------

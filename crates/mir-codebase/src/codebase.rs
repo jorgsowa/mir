@@ -800,38 +800,6 @@ impl Codebase {
         None
     }
 
-    /// Returns true if `child` extends or implements `ancestor` (transitively).
-    pub fn extends_or_implements(&self, child: &str, ancestor: &str) -> bool {
-        self.ensure_finalized(child);
-        if child == ancestor {
-            return true;
-        }
-        if let Some(cls) = self.classes.get(child) {
-            return cls.implements_or_extends(ancestor);
-        }
-        if let Some(iface) = self.interfaces.get(child) {
-            return iface.all_parents.iter().any(|p| p.as_ref() == ancestor);
-        }
-        // Enum: backed enums implicitly implement BackedEnum (and UnitEnum);
-        // pure enums implicitly implement UnitEnum.
-        if let Some(en) = self.enums.get(child) {
-            // Check explicitly declared interfaces (e.g. implements SomeInterface)
-            if en.interfaces.iter().any(|i| i.as_ref() == ancestor) {
-                return true;
-            }
-            // PHP built-in: every enum implements UnitEnum
-            if ancestor == "UnitEnum" || ancestor == "\\UnitEnum" {
-                return true;
-            }
-            // Backed enums implement BackedEnum
-            if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && en.scalar_type.is_some()
-            {
-                return true;
-            }
-        }
-        false
-    }
-
     /// Whether a class/interface/trait/enum with this FQCN exists.
     pub fn type_exists(&self, fqcn: &str) -> bool {
         self.classes.contains_key(fqcn)
