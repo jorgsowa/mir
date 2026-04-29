@@ -143,11 +143,16 @@ watch-mode re-analysis). Result is injected into `Codebase` via `inject_stub_sli
 The batch `analyze()` path continues to use the direct parse route; Salsa memoization
 for the batch path is deferred to S4 alongside the accumulator rewrite.
 
-**S2. `class_ancestors` query** ❌ Not started
-Replace `file_structural_snapshot`, `structural_unchanged_after_pass1`,
-`restore_all_parents`, and the `finalization_cache: DashMap<_, OnceLock<_>>` with a single
-Salsa tracked query with cycle recovery. The structural snapshot triad in `codebase.rs` is
-deleted.
+**S2. `class_ancestors` query** ✅ (v0.16.0)
+`ClassNode` Salsa input (fqcn, active, parent, interfaces, traits, extends) and
+`class_ancestors` tracked query with cycle recovery (PHP cycles return empty).
+The structural snapshot triad (`file_structural_snapshot`, `structural_unchanged_after_pass1`,
+`restore_all_parents`) is deleted from `Codebase`; `re_analyze_file` uses Salsa ancestry
+comparison instead. Cold path (first LSP edit per file) falls back to `Codebase.all_parents`
+for the old-state baseline, then calls `invalidate_finalization() + finalize()` on change.
+Warm path (subsequent edits) skips `finalize()` when Salsa detects no ancestry change.
+`finalization_cache` is kept for the batch path and `ensure_finalized`; full deletion is
+deferred to S5 when `&dyn MirDatabase` is threaded through the analyzers.
 
 **S3. `inferred_return_type` query** ❌ Not started
 Replace `Pass2Driver::new_inference_only` and the G6 priming sweep with a Salsa tracked

@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
-use crate::db::{collect_file_definitions, MirDb, SourceFile};
+use crate::db::{class_ancestors, collect_file_definitions, MirDatabase, MirDb, SourceFile};
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use mir_codebase::Codebase;
@@ -627,10 +627,65 @@ impl ProjectAnalyzer {
             }
         }
 
-        let structural_snapshot = self.codebase.file_structural_snapshot(file_path);
-        self.codebase.remove_file_definitions(file_path);
-
         let file: Arc<str> = Arc::from(file_path);
+
+        // --- S2: Capture old ancestors and mark old ClassNodes inactive --------
+        // Collect FQCNs defined in this file before they are removed, then
+        // record their current ancestor lists so we can detect structural
+        // changes after re-running Pass 1.
+        //
+        // Priority: Salsa-memoized ancestors (warm path) > Codebase.all_parents
+        // (cold path, first LSP edit for this file).
+        let old_fqcns: Vec<Arc<str>> = self
+            .codebase
+            .symbol_to_file
+            .iter()
+            .filter(|e| e.value().as_ref() == file_path)
+            .map(|e| e.key().clone())
+            .collect();
+
+        // Only track ancestry for classes and interfaces (not functions, traits,
+        // enums, or constants — none of those participate in the inheritance graph).
+        let old_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
+            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref db, _) = *guard;
+            old_fqcns
+                .iter()
+                .filter(|fqcn| {
+                    self.codebase.classes.contains_key(fqcn.as_ref())
+                        || self.codebase.interfaces.contains_key(fqcn.as_ref())
+                })
+                .map(|fqcn| {
+                    let salsa_ancs = db.lookup_class_node(fqcn).map(|n| class_ancestors(db, n).0);
+                    let ancs = salsa_ancs.unwrap_or_else(|| {
+                        // Cold path: use Codebase data as ground truth.
+                        self.codebase
+                            .classes
+                            .get(fqcn.as_ref())
+                            .map(|c| c.all_parents.clone())
+                            .or_else(|| {
+                                self.codebase
+                                    .interfaces
+                                    .get(fqcn.as_ref())
+                                    .map(|i| i.all_parents.clone())
+                            })
+                            .unwrap_or_default()
+                    });
+                    (fqcn.clone(), ancs)
+                })
+                .collect()
+        };
+
+        // Mark removed classes inactive so dependents re-run.
+        {
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref mut db, _) = *guard;
+            for fqcn in &old_fqcns {
+                db.deactivate_class_node(fqcn);
+            }
+        }
+
+        self.codebase.remove_file_definitions(file_path);
 
         // --- Salsa-backed Pass 1: memoized parse + definition collection ------
         let file_defs = {
@@ -653,19 +708,68 @@ impl ProjectAnalyzer {
         let mut all_issues: Vec<Issue> = (*file_defs.issues).clone();
         self.codebase.inject_stub_slice((*file_defs.slice).clone());
 
+        // --- S2: Upsert ClassNodes and compute new ancestors via Salsa --------
+        let new_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref mut db, _) = *guard;
+
+            for cls in &file_defs.slice.classes {
+                db.upsert_class_node(
+                    cls.fqcn.clone(),
+                    false,
+                    cls.parent.clone(),
+                    Arc::from(cls.interfaces.as_slice()),
+                    Arc::from(cls.traits.as_slice()),
+                    Arc::from([]),
+                );
+            }
+            for iface in &file_defs.slice.interfaces {
+                db.upsert_class_node(
+                    iface.fqcn.clone(),
+                    true,
+                    None,
+                    Arc::from([]),
+                    Arc::from([]),
+                    Arc::from(iface.extends.as_slice()),
+                );
+            }
+
+            // Compute new ancestors after ClassNode fields are updated.
+            let mut map = HashMap::new();
+            for cls in &file_defs.slice.classes {
+                if let Some(node) = db.lookup_class_node(&cls.fqcn) {
+                    map.insert(cls.fqcn.clone(), class_ancestors(db, node).0);
+                }
+            }
+            for iface in &file_defs.slice.interfaces {
+                if let Some(node) = db.lookup_class_node(&iface.fqcn) {
+                    map.insert(iface.fqcn.clone(), class_ancestors(db, node).0);
+                }
+            }
+            map
+        };
+
+        // --- S2: Decide whether ancestry changed and update Codebase ----------
+        let structural_unchanged = old_ancestors.len() == new_ancestors.len()
+            && new_ancestors
+                .iter()
+                .all(|(fqcn, new_ancs)| old_ancestors.get(fqcn) == Some(new_ancs));
+
+        if structural_unchanged {
+            // Fast path: restore ancestors from Salsa results directly.
+            for (fqcn, ancestors) in &new_ancestors {
+                let arc: Arc<[Arc<str>]> = Arc::from(ancestors.as_slice());
+                self.codebase.restore_ancestors(fqcn, arc);
+            }
+            self.codebase.mark_finalized();
+        } else {
+            self.codebase.invalidate_finalization();
+            self.codebase.finalize();
+        }
+
         // Re-parse in the arena so Pass 2 can walk the AST.
         let arena = bumpalo::Bump::new();
         let parsed = php_rs_parser::parse(&arena, new_content);
-
-        if self
-            .codebase
-            .structural_unchanged_after_pass1(file_path, &structural_snapshot)
-        {
-            self.codebase
-                .restore_all_parents(file_path, &structural_snapshot);
-        } else {
-            self.codebase.finalize();
-        }
 
         let symbols = if parsed.errors.is_empty() {
             let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());

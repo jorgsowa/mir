@@ -98,34 +98,6 @@ struct CompactRefIndex {
 }
 
 // ---------------------------------------------------------------------------
-// StructuralSnapshot — inheritance data captured before file removal
-// ---------------------------------------------------------------------------
-
-struct ClassInheritance {
-    parent: Option<Arc<str>>,
-    interfaces: Vec<Arc<str>>, // sorted for order-insensitive comparison
-    traits: Vec<Arc<str>>,     // sorted
-    all_parents: Vec<Arc<str>>,
-}
-
-struct InterfaceInheritance {
-    extends: Vec<Arc<str>>, // sorted
-    all_parents: Vec<Arc<str>>,
-}
-
-/// Snapshot of the inheritance structure of all symbols defined in a file.
-///
-/// Produced by [`Codebase::file_structural_snapshot`] before
-/// [`Codebase::remove_file_definitions`], and consumed by
-/// [`Codebase::structural_unchanged_after_pass1`] /
-/// [`Codebase::restore_all_parents`] to skip an expensive `finalize()` call
-/// when only method bodies (not class hierarchies) changed.
-pub struct StructuralSnapshot {
-    classes: std::collections::HashMap<Arc<str>, ClassInheritance>,
-    interfaces: std::collections::HashMap<Arc<str>, InterfaceInheritance>,
-}
-
-// ---------------------------------------------------------------------------
 // Codebase — thread-safe global symbol registry
 // ---------------------------------------------------------------------------
 
@@ -480,154 +452,29 @@ impl Codebase {
     // Structural snapshot — skip finalize() on body-only changes
     // -----------------------------------------------------------------------
 
-    /// Capture the inheritance structure of all symbols defined in `file_path`.
+    /// Restore the pre-computed ancestor list for a single class or interface
+    /// and populate the finalization cache so that `ensure_finalized` returns
+    /// the Salsa-computed value without recomputing from scratch.
     ///
-    /// Call this *before* `remove_file_definitions` to preserve the data that
-    /// `finalize()` would otherwise have to recompute.  The snapshot records, for
-    /// each class/interface in the file, the fields that feed into
-    /// `all_parents` (parent class, implemented interfaces, used traits, extended
-    /// interfaces) as well as the already-computed `all_parents` list itself.
-    pub fn file_structural_snapshot(&self, file_path: &str) -> StructuralSnapshot {
-        let symbols: Vec<Arc<str>> = self
-            .symbol_to_file
-            .iter()
-            .filter(|e| e.value().as_ref() == file_path)
-            .map(|e| e.key().clone())
-            .collect();
-
-        let mut classes = std::collections::HashMap::new();
-        let mut interfaces = std::collections::HashMap::new();
-
-        for sym in symbols {
-            self.ensure_finalized(sym.as_ref());
-            if let Some(cls) = self.classes.get(sym.as_ref()) {
-                let mut ifaces = cls.interfaces.clone();
-                ifaces.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
-                let mut traits = cls.traits.clone();
-                traits.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
-                classes.insert(
-                    sym,
-                    ClassInheritance {
-                        parent: cls.parent.clone(),
-                        interfaces: ifaces,
-                        traits,
-                        all_parents: cls.all_parents.clone(),
-                    },
-                );
-            } else if let Some(iface) = self.interfaces.get(sym.as_ref()) {
-                let mut extends = iface.extends.clone();
-                extends.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
-                interfaces.insert(
-                    sym,
-                    InterfaceInheritance {
-                        extends,
-                        all_parents: iface.all_parents.clone(),
-                    },
-                );
-            }
+    /// Called by `re_analyze_file` when the Salsa `class_ancestors` query
+    /// confirms that the inheritance structure of a file is unchanged.
+    pub fn restore_ancestors(&self, fqcn: &str, ancestors: Arc<[Arc<str>]>) {
+        if let Some(mut cls) = self.classes.get_mut(fqcn) {
+            cls.all_parents = ancestors.to_vec();
+        } else if let Some(mut iface) = self.interfaces.get_mut(fqcn) {
+            iface.all_parents = ancestors.to_vec();
         }
-
-        StructuralSnapshot {
-            classes,
-            interfaces,
-        }
+        self.finalization_cache
+            .entry(Arc::from(fqcn))
+            .or_default()
+            .get_or_init(|| Arc::clone(&ancestors));
     }
 
-    /// After Pass 1 completes, check whether the inheritance structure in
-    /// `file_path` matches the snapshot taken before `remove_file_definitions`.
+    /// Mark the codebase as finalized without running the full `finalize()` sweep.
     ///
-    /// Returns `true` if `finalize()` can be skipped — i.e. only method bodies,
-    /// properties, or annotations changed, not any class/interface hierarchy.
-    pub fn structural_unchanged_after_pass1(
-        &self,
-        file_path: &str,
-        old: &StructuralSnapshot,
-    ) -> bool {
-        let symbols: Vec<Arc<str>> = self
-            .symbol_to_file
-            .iter()
-            .filter(|e| e.value().as_ref() == file_path)
-            .map(|e| e.key().clone())
-            .collect();
-
-        let mut seen_classes = 0usize;
-        let mut seen_interfaces = 0usize;
-
-        for sym in &symbols {
-            if let Some(cls) = self.classes.get(sym.as_ref()) {
-                seen_classes += 1;
-                let Some(old_cls) = old.classes.get(sym.as_ref()) else {
-                    return false; // new class added
-                };
-                if old_cls.parent != cls.parent {
-                    return false;
-                }
-                let mut new_ifaces = cls.interfaces.clone();
-                new_ifaces.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
-                if old_cls.interfaces != new_ifaces {
-                    return false;
-                }
-                let mut new_traits = cls.traits.clone();
-                new_traits.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
-                if old_cls.traits != new_traits {
-                    return false;
-                }
-            } else if let Some(iface) = self.interfaces.get(sym.as_ref()) {
-                seen_interfaces += 1;
-                let Some(old_iface) = old.interfaces.get(sym.as_ref()) else {
-                    return false; // new interface added
-                };
-                let mut new_extends = iface.extends.clone();
-                new_extends.sort_unstable_by(|a, b| a.as_ref().cmp(b.as_ref()));
-                if old_iface.extends != new_extends {
-                    return false;
-                }
-            }
-            // Traits, enums, functions, constants: not finalization-relevant, skip.
-        }
-
-        // Check for removed classes or interfaces.
-        seen_classes == old.classes.len() && seen_interfaces == old.interfaces.len()
-    }
-
-    /// Restore `all_parents` from a snapshot and mark the codebase as finalized.
-    ///
-    /// Call this instead of `finalize()` when `structural_unchanged_after_pass1`
-    /// returns `true`.  The newly re-registered symbols (written by Pass 1) have
-    /// `all_parents = []`; this method repopulates them from the snapshot so that
-    /// all downstream lookups that depend on `all_parents` keep working correctly.
-    pub fn restore_all_parents(&self, file_path: &str, snapshot: &StructuralSnapshot) {
-        let symbols: Vec<Arc<str>> = self
-            .symbol_to_file
-            .iter()
-            .filter(|e| e.value().as_ref() == file_path)
-            .map(|e| e.key().clone())
-            .collect();
-
-        for sym in &symbols {
-            if let Some(old_cls) = snapshot.classes.get(sym.as_ref()) {
-                if let Some(mut cls) = self.classes.get_mut(sym.as_ref()) {
-                    cls.all_parents = old_cls.all_parents.clone();
-                }
-                // Re-populate finalization_cache from snapshot so ensure_finalized
-                // returns the restored value without recomputing.
-                let arc: Arc<[Arc<str>]> = Arc::from(old_cls.all_parents.as_slice());
-                self.finalization_cache
-                    .entry(sym.clone())
-                    .or_default()
-                    .get_or_init(|| arc);
-            } else if let Some(old_iface) = snapshot.interfaces.get(sym.as_ref()) {
-                if let Some(mut iface) = self.interfaces.get_mut(sym.as_ref()) {
-                    iface.all_parents = old_iface.all_parents.clone();
-                }
-                let arc: Arc<[Arc<str>]> = Arc::from(old_iface.all_parents.as_slice());
-                self.finalization_cache
-                    .entry(sym.clone())
-                    .or_default()
-                    .get_or_init(|| arc);
-            }
-        }
-
+    /// Call this after `restore_ancestors` has been called for all symbols in
+    /// the re-analyzed file to signal that the inheritance graph is up to date.
+    pub fn mark_finalized(&self) {
         self.finalized
             .store(true, std::sync::atomic::Ordering::SeqCst);
     }
