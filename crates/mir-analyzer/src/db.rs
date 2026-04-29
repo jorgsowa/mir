@@ -388,11 +388,7 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
 /// Pass 2 driver runs, so a class with no active `ClassNode` is one
 /// that genuinely doesn't exist — and an unknown class trivially has
 /// no known ancestors.
-pub fn has_unknown_ancestor_db_or_codebase(
-    db: &dyn MirDatabase,
-    _codebase: &Codebase,
-    fqcn: &str,
-) -> bool {
+pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
     };

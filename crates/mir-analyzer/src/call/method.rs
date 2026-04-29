@@ -408,8 +408,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
         } else {
             ret_raw
         }
-    } else if ea.codebase.type_exists(fqcn)
-        && !crate::db::has_unknown_ancestor_db_or_codebase(ea.db, ea.codebase, fqcn)
+    } else if ea.codebase.type_exists(fqcn) && !crate::db::has_unknown_ancestor_via_db(ea.db, fqcn)
     {
         let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, fqcn)
             .map(|k| (k.is_interface, k.is_abstract))
