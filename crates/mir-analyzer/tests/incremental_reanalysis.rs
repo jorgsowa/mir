@@ -330,3 +330,51 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
          got: {undef2:?}"
     );
 }
+
+/// `re_analyze_file` must prime inferred return types before the issue-emitting
+/// pass so that within-file cross-function calls see the correct return type.
+///
+/// Without the priming sweep, `bar()` (no return type hint) gets
+/// `inferred_return_type = None` after `inject_stub_slice` replaces the
+/// definition. The call site then falls back to `mixed`, causing a false
+/// `InvalidReturnType` for `foo(): string { return bar(); }`.
+#[test]
+fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
+    let src_dir = TempDir::new().unwrap();
+
+    // bar() has no return type hint; its return type must be inferred.
+    // foo() has an explicit `: string` return type and delegates to bar().
+    let content =
+        "<?php\nfunction bar() { return 'hello'; }\nfunction foo(): string { return bar(); }\n";
+    let file = write(&src_dir, "A.php", content);
+    let file_path = file.to_string_lossy().to_string();
+
+    let analyzer = ProjectAnalyzer::new();
+    let result1 = analyzer.analyze(std::slice::from_ref(&file));
+
+    let issues1: Vec<_> = result1
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "InvalidReturnType")
+        .collect();
+    assert!(
+        issues1.is_empty(),
+        "initial analysis must not report InvalidReturnType; got: {issues1:?}"
+    );
+
+    // Re-analyze the same file with a trivial body change.  The priming sweep
+    // must repopulate bar.inferred_return_type before foo is analyzed.
+    let content2 = "<?php\nfunction bar() { return 'hello'; }\nfunction foo(): string { return bar(); /* re-analyzed */ }\n";
+    let result2 = analyzer.re_analyze_file(&file_path, content2);
+
+    let issues2: Vec<_> = result2
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "InvalidReturnType")
+        .collect();
+    assert!(
+        issues2.is_empty(),
+        "re_analyze_file must not report false InvalidReturnType after body-only change; \
+         got: {issues2:?}"
+    );
+}

@@ -772,6 +772,17 @@ impl ProjectAnalyzer {
         let parsed = php_rs_parser::parse(&arena, new_content);
 
         let symbols = if parsed.errors.is_empty() {
+            // Priming sweep: populate inferred_return_type for this file's functions
+            // before the issue-emitting pass so within-file cross-function calls see
+            // the correct inferred return type rather than None.
+            Pass2Driver::new_inference_only(&self.codebase, self.resolved_php_version())
+                .analyze_bodies(
+                    &parsed.program,
+                    file.clone(),
+                    new_content,
+                    &parsed.source_map,
+                );
+
             let driver = Pass2Driver::new(&self.codebase, self.resolved_php_version());
             let (body_issues, symbols) = driver.analyze_bodies(
                 &parsed.program,

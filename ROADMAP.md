@@ -154,22 +154,35 @@ Warm path (subsequent edits) skips `finalize()` when Salsa detects no ancestry c
 `finalization_cache` is kept for the batch path and `ensure_finalized`; full deletion is
 deferred to S5 when `&dyn MirDatabase` is threaded through the analyzers.
 
-**S3. `inferred_return_type` query** ❌ Not started
+**S3. `inferred_return_type` query** ❌ Blocked on S5
 Replace `Pass2Driver::new_inference_only` and the G6 priming sweep with a Salsa tracked
 query using fixpoint cycle recovery. Depth-N inferred return type chains resolve correctly.
 Priming sweep (~2× Pass 2 CPU cost) is eliminated.
 
-**S4. `analyze_file` query + accumulators** ❌ Not started
+*Prerequisite:* S5 must land first. `inferred_return_type(db, FunctionNode) -> Union`
+needs to call `StatementsAnalyzer`/`ExpressionAnalyzer`, which currently read from
+`Codebase` directly (not tracked by Salsa). Without db threading, the query cannot observe
+its own dependencies and will give stale results after the first evaluation.
+
+**S4. `analyze_file` query + accumulators** ❌ Blocked on S5
 Issues and reference locations become Salsa accumulators. `re_analyze_file` collapses to
 two lines (set input + read accumulator). `AnalysisCache`, `build_reverse_deps`,
 `evict_with_dependents`, and the compact CSR reference index are deleted. A private method
 body change invalidates zero dependent files.
 
-**S5. Collapse `Codebase`** ❌ Not started (deferred)
+*Prerequisite:* S5 must land first, for the same reason as S3 — `analyze_file` must be
+able to track all its Codebase reads through `&dyn MirDatabase`.
+
+**S5. Thread `&dyn MirDatabase` through analyzers** ❌ Next milestone
 Thread `&dyn MirDatabase` through `StatementsAnalyzer` / `ExpressionAnalyzer` /
-`ClassAnalyzer`. All remaining `DashMap` fields on `Codebase` become `definition_index`
-query reads. `Codebase` is deleted; per-read shard-lock overhead and the two `Interner`
-fields are eliminated.
+`ClassAnalyzer`. Codebase lookups that feed into tracked queries (`inferred_return_type`,
+`analyze_file`) become db-tracked reads. The `Codebase` struct shrinks incrementally as
+fields move to Salsa inputs; `finalization_cache` is deleted as the last step.
+
+*Note:* S5 does not need to be completed atomically. Individual Codebase fields can be
+migrated one at a time (functions → methods → classes → …) with the remaining fields
+still in `Codebase`. Each batch is a shippable PR. Full deletion of `Codebase` and the
+two `Interner` fields is the final PR in this sub-phase.
 
 Expected: sub-second re-analysis on save for LSP; precise invalidation across all query types.
 
@@ -181,7 +194,9 @@ Expected: sub-second re-analysis on save for LSP; precise invalidation across al
 Phase 1 ──────────────────────── complete
 Phase 2 ──────────────────────── item 4 subsumed by Phase 4 S1 (no longer worth doing separately)
 Phase 3 ── complete; eager finalize() barrier removed, lazy ensure_finalized() at read sites
-Phase 4 ── subsumes Phase 2 & 3  (Salsa makes manual caching redundant); S0 complete
+Phase 4 ── subsumes Phase 2 & 3  (Salsa makes manual caching redundant); S0–S2 complete
+           S3 and S4 unblocked only after S5 (db threading through analyzers)
+           S5 → S3 → S4 is the correct execution order
 ```
 
 ---
