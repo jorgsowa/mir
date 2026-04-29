@@ -11,7 +11,7 @@ use mir_types::{Atomic, Union};
 
 use crate::call::CallAnalyzer;
 use crate::context::Context;
-use crate::db::MirDatabase;
+use crate::db::{class_ancestors, MirDatabase, PropertyNode};
 use crate::php_version::PhpVersion;
 use crate::symbol::{ResolvedSymbol, SymbolKind};
 
@@ -824,12 +824,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Union::mixed();
                 }
 
-                if self
-                    .codebase
-                    .get_class_constant(&fqcn, &const_name)
-                    .is_none()
-                    && !self.codebase.has_unknown_ancestor(&fqcn)
-                {
+                let const_exists = if let Some(db) = self.db {
+                    class_constant_exists_in_chain(db, &fqcn, &const_name)
+                } else {
+                    self.codebase
+                        .get_class_constant(&fqcn, &const_name)
+                        .is_some()
+                };
+                if !const_exists && !self.codebase.has_unknown_ancestor(&fqcn) {
                     self.emit(
                         IssueKind::UndefinedConstant {
                             name: format!("{fqcn}::{const_name}"),
@@ -1302,7 +1304,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Atomic::TNamedObject { fqcn, .. }
                     if self.codebase.classes.contains_key(fqcn.as_ref()) =>
                 {
-                    if let Some(prop) = self.codebase.get_property(fqcn.as_ref(), prop_name) {
+                    // db path: walk ancestor chain via PropertyNode inputs.
+                    // prop_found: None = not found, Some(ty) = found (mixed if unannotated).
+                    let prop_found: Option<Union> = if let Some(db) = self.db {
+                        find_property_node_in_chain(db, fqcn, prop_name)
+                            .map(|node| node.ty(db).unwrap_or_else(Union::mixed))
+                    } else {
+                        self.codebase
+                            .get_property(fqcn.as_ref(), prop_name)
+                            .map(|p| p.ty.clone().unwrap_or_else(Union::mixed))
+                    };
+                    if let Some(ty) = prop_found {
                         // Record reference for dead-code detection (M18)
                         if !self.inference_only {
                             let (line, col_start, col_end) = self.span_to_ref_loc(span);
@@ -1315,7 +1327,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 col_end,
                             );
                         }
-                        return prop.ty.clone().unwrap_or_else(Union::mixed);
+                        return ty;
                     }
                     // Only emit UndefinedProperty if all ancestors are known and no __get magic.
                     if !self.codebase.has_unknown_ancestor(fqcn.as_ref())
@@ -1446,37 +1458,43 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(prop_name) = extract_string_from_expr(pa.property) {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
-                            if let Some(cls) = self.codebase.classes.get(fqcn.as_ref()) {
-                                if let Some(prop) = cls.get_property(&prop_name) {
-                                    if prop.is_readonly && !ctx.inside_constructor {
+                            // Resolve own property for readonly + type checks (db path first).
+                            let prop_info: Option<(bool, Option<Union>)> = if let Some(db) = self.db
+                            {
+                                db.lookup_property_node(fqcn, &prop_name)
+                                    .filter(|n| n.active(db))
+                                    .map(|n| (n.is_readonly(db), n.ty(db)))
+                            } else {
+                                self.codebase.classes.get(fqcn.as_ref()).and_then(|cls| {
+                                    cls.get_property(&prop_name)
+                                        .map(|p| (p.is_readonly, p.ty.clone()))
+                                })
+                            };
+                            if let Some((is_readonly, prop_ty)) = prop_info {
+                                if is_readonly && !ctx.inside_constructor {
+                                    self.emit(
+                                        IssueKind::ReadonlyPropertyAssignment {
+                                            class: fqcn.to_string(),
+                                            property: prop_name.clone(),
+                                        },
+                                        Severity::Error,
+                                        span,
+                                    );
+                                }
+                                if let Some(prop_ty) = &prop_ty {
+                                    if !prop_ty.is_mixed()
+                                        && !ty.is_mixed()
+                                        && !property_assign_compatible(&ty, prop_ty, self.codebase)
+                                    {
                                         self.emit(
-                                            IssueKind::ReadonlyPropertyAssignment {
-                                                class: fqcn.to_string(),
+                                            IssueKind::InvalidPropertyAssignment {
                                                 property: prop_name.clone(),
+                                                expected: format!("{prop_ty}"),
+                                                actual: format!("{ty}"),
                                             },
-                                            Severity::Error,
+                                            Severity::Warning,
                                             span,
                                         );
-                                    }
-                                    if let Some(prop_ty) = &prop.ty {
-                                        if !prop_ty.is_mixed()
-                                            && !ty.is_mixed()
-                                            && !property_assign_compatible(
-                                                &ty,
-                                                prop_ty,
-                                                self.codebase,
-                                            )
-                                        {
-                                            self.emit(
-                                                IssueKind::InvalidPropertyAssignment {
-                                                    property: prop_name.clone(),
-                                                    expected: format!("{prop_ty}"),
-                                                    actual: format!("{ty}"),
-                                                },
-                                                Severity::Warning,
-                                                span,
-                                            );
-                                        }
                                     }
                                 }
                             }
@@ -1901,6 +1919,49 @@ fn property_assign_compatible(
         // For any other atomic that didn't pass is_subtype_of_simple, not compatible.
         _ => false,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Salsa db helpers (S5-PR4)
+// ---------------------------------------------------------------------------
+
+fn find_property_node_in_chain(
+    db: &dyn MirDatabase,
+    fqcn: &Arc<str>,
+    prop_name: &str,
+) -> Option<PropertyNode> {
+    if let Some(node) = db.lookup_property_node(fqcn, prop_name) {
+        if node.active(db) {
+            return Some(node);
+        }
+    }
+    let class_node = db.lookup_class_node(fqcn)?;
+    for ancestor in class_ancestors(db, class_node).0 {
+        if let Some(node) = db.lookup_property_node(&ancestor, prop_name) {
+            if node.active(db) {
+                return Some(node);
+            }
+        }
+    }
+    None
+}
+
+fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
+    if let Some(node) = db.lookup_class_constant_node(fqcn, const_name) {
+        if node.active(db) {
+            return true;
+        }
+    }
+    if let Some(class_node) = db.lookup_class_node(fqcn) {
+        for ancestor in class_ancestors(db, class_node).0 {
+            if let Some(node) = db.lookup_class_constant_node(&ancestor, const_name) {
+                if node.active(db) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 #[cfg(test)]
