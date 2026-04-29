@@ -1471,6 +1471,291 @@ mod tests {
         assert!(ancestors.0.is_empty(), "Foo has no ancestors");
     }
 
+    // -----------------------------------------------------------------
+    // Helpers for method-related fixtures
+    // -----------------------------------------------------------------
+
+    fn upsert_class_with_traits(
+        db: &mut MirDb,
+        fqcn: &str,
+        parent: Option<Arc<str>>,
+        traits: &[&str],
+        is_interface: bool,
+        is_trait: bool,
+    ) -> ClassNode {
+        db.upsert_class_node(
+            Arc::from(fqcn),
+            is_interface,
+            is_trait,
+            false,
+            false,
+            parent,
+            Arc::from([]),
+            Arc::from(
+                traits
+                    .iter()
+                    .map(|t| Arc::<str>::from(*t))
+                    .collect::<Vec<_>>(),
+            ),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            false,
+        )
+    }
+
+    fn upsert_method(db: &mut MirDb, fqcn: &str, name: &str, is_abstract: bool) -> MethodNode {
+        let storage = MethodStorage {
+            name: Arc::from(name),
+            fqcn: Arc::from(fqcn),
+            params: vec![],
+            return_type: None,
+            inferred_return_type: None,
+            visibility: Visibility::Public,
+            is_static: false,
+            is_abstract,
+            is_final: false,
+            is_constructor: name == "__construct",
+            template_params: vec![],
+            assertions: vec![],
+            throws: vec![],
+            deprecated: None,
+            is_internal: false,
+            is_pure: false,
+            location: None,
+        };
+        db.upsert_method_node(&storage)
+    }
+
+    fn upsert_enum(db: &mut MirDb, fqcn: &str, interfaces: &[&str], is_backed: bool) -> ClassNode {
+        db.upsert_class_node(
+            Arc::from(fqcn),
+            false,
+            false,
+            true,
+            false,
+            None,
+            Arc::from(
+                interfaces
+                    .iter()
+                    .map(|i| Arc::<str>::from(*i))
+                    .collect::<Vec<_>>(),
+            ),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            is_backed,
+        )
+    }
+
+    // -----------------------------------------------------------------
+    // method_exists_via_db
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn method_exists_via_db_finds_own_method() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_method(&mut db, "Foo", "bar", false);
+        assert!(method_exists_via_db(&db, "Foo", "bar"));
+        assert!(!method_exists_via_db(&db, "Foo", "missing"));
+    }
+
+    #[test]
+    fn method_exists_via_db_walks_parent() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        upsert_method(&mut db, "Base", "inherited", false);
+        upsert_class(
+            &mut db,
+            "Child",
+            Some(Arc::from("Base")),
+            Arc::from([]),
+            false,
+        );
+        assert!(method_exists_via_db(&db, "Child", "inherited"));
+    }
+
+    #[test]
+    fn method_exists_via_db_walks_traits_transitively() {
+        let mut db = MirDb::default();
+        upsert_class_with_traits(&mut db, "InnerTrait", None, &[], false, true);
+        upsert_method(&mut db, "InnerTrait", "deep_trait_method", false);
+        upsert_class_with_traits(&mut db, "OuterTrait", None, &["InnerTrait"], false, true);
+        upsert_class_with_traits(&mut db, "Foo", None, &["OuterTrait"], false, false);
+        assert!(method_exists_via_db(&db, "Foo", "deep_trait_method"));
+    }
+
+    #[test]
+    fn method_exists_via_db_is_case_insensitive() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_method(&mut db, "Foo", "doStuff", false);
+        // Stored with original case; lookup must lowercase internally.
+        assert!(method_exists_via_db(&db, "Foo", "DoStuff"));
+        assert!(method_exists_via_db(&db, "Foo", "DOSTUFF"));
+    }
+
+    #[test]
+    fn method_exists_via_db_unknown_class_returns_false() {
+        let db = MirDb::default();
+        assert!(!method_exists_via_db(&db, "Nope", "anything"));
+    }
+
+    #[test]
+    fn method_exists_via_db_inactive_class_returns_false() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_method(&mut db, "Foo", "bar", false);
+        db.deactivate_class_node("Foo");
+        assert!(!method_exists_via_db(&db, "Foo", "bar"));
+    }
+
+    #[test]
+    fn method_exists_via_db_finds_abstract_methods() {
+        // Existence-only: abstracts count.  This is the difference vs.
+        // method_is_concretely_implemented.
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_method(&mut db, "Foo", "abstr", true);
+        assert!(method_exists_via_db(&db, "Foo", "abstr"));
+    }
+
+    // -----------------------------------------------------------------
+    // method_is_concretely_implemented
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn method_is_concretely_implemented_skips_abstract() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_method(&mut db, "Foo", "abstr", true);
+        assert!(!method_is_concretely_implemented(&db, "Foo", "abstr"));
+    }
+
+    #[test]
+    fn method_is_concretely_implemented_finds_concrete_in_trait() {
+        let mut db = MirDb::default();
+        upsert_class_with_traits(&mut db, "MyTrait", None, &[], false, true);
+        upsert_method(&mut db, "MyTrait", "provided", false);
+        upsert_class_with_traits(&mut db, "Foo", None, &["MyTrait"], false, false);
+        assert!(method_is_concretely_implemented(&db, "Foo", "provided"));
+    }
+
+    #[test]
+    fn method_is_concretely_implemented_skips_interface_definitions() {
+        // Interfaces don't supply implementations, regardless of how
+        // their methods are stored.
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "I", None, Arc::from([]), true);
+        upsert_method(&mut db, "I", "m", false);
+        upsert_class(&mut db, "C", None, Arc::from([Arc::from("I")]), false);
+        // C "implements" I but has no own implementation.
+        assert!(!method_is_concretely_implemented(&db, "C", "m"));
+    }
+
+    // -----------------------------------------------------------------
+    // extends_or_implements_via_db
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn extends_or_implements_via_db_self_match() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        assert!(extends_or_implements_via_db(&db, "Foo", "Foo"));
+    }
+
+    #[test]
+    fn extends_or_implements_via_db_transitive() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Animal", None, Arc::from([]), false);
+        upsert_class(
+            &mut db,
+            "Mammal",
+            Some(Arc::from("Animal")),
+            Arc::from([]),
+            false,
+        );
+        upsert_class(
+            &mut db,
+            "Dog",
+            Some(Arc::from("Mammal")),
+            Arc::from([]),
+            false,
+        );
+        assert!(extends_or_implements_via_db(&db, "Dog", "Animal"));
+        assert!(extends_or_implements_via_db(&db, "Dog", "Mammal"));
+        assert!(!extends_or_implements_via_db(&db, "Animal", "Dog"));
+    }
+
+    #[test]
+    fn extends_or_implements_via_db_unknown_returns_false() {
+        let db = MirDb::default();
+        assert!(!extends_or_implements_via_db(&db, "Nope", "Foo"));
+    }
+
+    #[test]
+    fn extends_or_implements_via_db_unit_enum_implicit() {
+        let mut db = MirDb::default();
+        upsert_enum(&mut db, "Status", &[], false);
+        assert!(extends_or_implements_via_db(&db, "Status", "UnitEnum"));
+        assert!(extends_or_implements_via_db(&db, "Status", "\\UnitEnum"));
+        // Pure enum is NOT a BackedEnum.
+        assert!(!extends_or_implements_via_db(&db, "Status", "BackedEnum"));
+    }
+
+    #[test]
+    fn extends_or_implements_via_db_backed_enum_implicit() {
+        let mut db = MirDb::default();
+        upsert_enum(&mut db, "Status", &[], true);
+        assert!(extends_or_implements_via_db(&db, "Status", "UnitEnum"));
+        assert!(extends_or_implements_via_db(&db, "Status", "BackedEnum"));
+        assert!(extends_or_implements_via_db(&db, "Status", "\\BackedEnum"));
+    }
+
+    #[test]
+    fn extends_or_implements_via_db_enum_declared_interface() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Stringable", None, Arc::from([]), true);
+        upsert_enum(&mut db, "Status", &["Stringable"], false);
+        assert!(extends_or_implements_via_db(&db, "Status", "Stringable"));
+    }
+
+    // -----------------------------------------------------------------
+    // has_unknown_ancestor_via_db
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn has_unknown_ancestor_via_db_clean_chain_returns_false() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        upsert_class(
+            &mut db,
+            "Child",
+            Some(Arc::from("Base")),
+            Arc::from([]),
+            false,
+        );
+        assert!(!has_unknown_ancestor_via_db(&db, "Child"));
+    }
+
+    #[test]
+    fn has_unknown_ancestor_via_db_missing_parent_returns_true() {
+        let mut db = MirDb::default();
+        // Child claims to extend Missing, but Missing isn't registered.
+        upsert_class(
+            &mut db,
+            "Child",
+            Some(Arc::from("Missing")),
+            Arc::from([]),
+            false,
+        );
+        assert!(has_unknown_ancestor_via_db(&db, "Child"));
+    }
+
     #[test]
     fn class_template_params_via_db_returns_registered_params() {
         use mir_types::Variance;
