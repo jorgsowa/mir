@@ -814,7 +814,8 @@ impl<'a> Pass2Driver<'a> {
     /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
     /// `@psalm-require-implements` constraint declared on the traits it uses.
     fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
-        // Both used-trait list and ancestor chain come from the salsa db.
+        // Used-trait list, ancestor chain, and `@psalm-require-*` constraints
+        // all come from the salsa db.
         let Some(node) = self.db.lookup_class_node(fqcn) else {
             return;
         };
@@ -822,15 +823,27 @@ impl<'a> Pass2Driver<'a> {
         let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, node).0;
 
         for trait_fqcn in trait_list.iter() {
-            let Some(tr) = self.codebase.traits.get(trait_fqcn.as_ref()) else {
+            let Some(trait_node) = self
+                .db
+                .lookup_class_node(trait_fqcn.as_ref())
+                .filter(|n| n.active(self.db))
+            else {
                 continue;
             };
-            let req_ext = tr.require_extends.clone();
-            let req_impl = tr.require_implements.clone();
-            let tr_short = tr.short_name.clone();
-            drop(tr);
+            let req_ext = trait_node.require_extends(self.db);
+            let req_impl = trait_node.require_implements(self.db);
+            if req_ext.is_empty() && req_impl.is_empty() {
+                continue;
+            }
+            // Derive short name from the FQCN's trailing segment.  Matches
+            // what the collector stores in `TraitStorage::short_name`.
+            let tr_short: Arc<str> = trait_fqcn
+                .rsplit('\\')
+                .next()
+                .map(Arc::from)
+                .unwrap_or_else(|| trait_fqcn.clone());
 
-            for req in &req_ext {
+            for req in req_ext.iter() {
                 let satisfies = fqcn == req.as_ref()
                     || class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
                 if !satisfies {
@@ -852,7 +865,7 @@ impl<'a> Pass2Driver<'a> {
                 }
             }
 
-            for req in &req_impl {
+            for req in req_impl.iter() {
                 let satisfies = class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
                 if !satisfies {
                     all_issues.push(mir_issues::Issue::new(

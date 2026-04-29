@@ -304,14 +304,20 @@ Sub-PRs (each shippable, fixture suite green at every step):
   in the analyse loop because `Codebase::get_method` still finalises
   lazily through the inheritance chain (dropping the eager call
   hangs `unimplemented_interface_method::trait_cycle_does_not_crash`).
+- **PR18** ✅ `ClassNode` extended with `require_extends` /
+  `require_implements`.  `check_trait_constraints` reads the
+  `@psalm-require-*` constraint lists from the trait's `ClassNode`
+  via `db.lookup_class_node(trait_fqcn)` instead of
+  `Codebase::traits.get`.  Trait `short_name` is derived from the
+  trailing FQCN segment, which matches how the collector builds it.
+  The lone `Codebase::traits.get` lookup inside Pass 2 trait
+  validation is gone.
 
 Remaining for S5 (rough order):
 - Migrate `Codebase::get_method` / `get_property` /
   `get_class_constant` (and the `extends_or_implements` predicate)
   off `ensure_finalized`-based ancestor reads, so the eager call in
   `ClassAnalyzer::analyze_all` can finally go.
-- Add `require_extends` / `require_implements` to ClassNode so
-  `check_trait_constraints` can drop `Codebase::traits.get`.
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).
