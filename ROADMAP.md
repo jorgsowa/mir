@@ -312,12 +312,28 @@ Sub-PRs (each shippable, fixture suite green at every step):
   trailing FQCN segment, which matches how the collector builds it.
   The lone `Codebase::traits.get` lookup inside Pass 2 trait
   validation is gone.
+- **PR19** ✅ `extends_or_implements_via_db` helper added to
+  `db.rs`; `class_ancestors` short-circuits enums (preserving
+  `ensure_finalized` semantics).  All ~30 analyzer call sites in
+  `expr.rs`, `stmt/mod.rs`, `stmt/return_type.rs`, `class.rs`, and
+  `call/args.rs` migrated off `Codebase::extends_or_implements`.
+  `ClassNode` extended with `is_backed_enum` and (for enum nodes)
+  populated `interfaces`, so the implicit `UnitEnum` / `BackedEnum`
+  membership and direct-interface checks are answered from the db.
+  `named_object_return_compatible` and `return_arrays_compatible`
+  in `stmt/return_type.rs` now take `&dyn MirDatabase`; callers in
+  `stmt/mod.rs` and `class.rs` thread `self.db` through.
+  `Codebase::extends_or_implements` itself is now unused by the
+  analyzer (kept as dead code on `Codebase` for a follow-up
+  cleanup PR).
 
 Remaining for S5 (rough order):
 - Migrate `Codebase::get_method` / `get_property` /
-  `get_class_constant` (and the `extends_or_implements` predicate)
-  off `ensure_finalized`-based ancestor reads, so the eager call in
-  `ClassAnalyzer::analyze_all` can finally go.
+  `get_class_constant` off `ensure_finalized`-based ancestor reads,
+  so the eager call in `ClassAnalyzer::analyze_all` can finally go.
+- Delete `Codebase::extends_or_implements` (and its
+  `ensure_finalized` driver path) once the member-lookup migration
+  no longer needs the cache.
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).

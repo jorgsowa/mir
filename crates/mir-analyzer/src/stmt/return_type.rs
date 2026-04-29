@@ -3,6 +3,8 @@ use std::sync::Arc;
 use mir_codebase::Codebase;
 use mir_types::{Atomic, Union};
 
+use crate::db::{extends_or_implements_via_db, MirDatabase};
+
 // ---------------------------------------------------------------------------
 // Named-object return type compatibility check
 // ---------------------------------------------------------------------------
@@ -13,6 +15,7 @@ pub(crate) fn named_object_return_compatible(
     actual: &Union,
     declared: &Union,
     codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
     actual.types.iter().all(|actual_atom| {
@@ -39,8 +42,11 @@ pub(crate) fn named_object_return_compatible(
                     Atomic::TClassString(None) => true,
                     Atomic::TClassString(Some(declared_cls)) => {
                         actual_cls == declared_cls
-                            || codebase
-                                .extends_or_implements(actual_cls.as_ref(), declared_cls.as_ref())
+                            || extends_or_implements_via_db(
+                                db,
+                                actual_cls.as_ref(),
+                                declared_cls.as_ref(),
+                            )
                     }
                     Atomic::TString => true,
                     _ => false,
@@ -77,15 +83,15 @@ pub(crate) fn named_object_return_compatible(
                     || actual_fqcn.as_ref() == declared_fqcn.as_ref()
                     || actual_fqcn.as_ref() == resolved_declared.as_str()
                     || resolved_actual.as_str() == declared_fqcn.as_ref()
-                    || codebase.extends_or_implements(actual_fqcn.as_ref(), &resolved_declared)
-                    || codebase.extends_or_implements(actual_fqcn.as_ref(), declared_fqcn.as_ref())
-                    || codebase.extends_or_implements(&resolved_actual, &resolved_declared)
-                    || codebase.extends_or_implements(&resolved_actual, declared_fqcn.as_ref())
+                    || extends_or_implements_via_db(db, actual_fqcn.as_ref(), &resolved_declared)
+                    || extends_or_implements_via_db(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
+                    || extends_or_implements_via_db(db, &resolved_actual, &resolved_declared)
+                    || extends_or_implements_via_db(db, &resolved_actual, declared_fqcn.as_ref())
                     // static(X) is compatible with declared Y if Y extends X
                     // (because when called on Y, static = Y which satisfies declared Y)
-                    || codebase.extends_or_implements(&resolved_declared, actual_fqcn.as_ref())
-                    || codebase.extends_or_implements(&resolved_declared, &resolved_actual)
-                    || codebase.extends_or_implements(declared_fqcn.as_ref(), actual_fqcn.as_ref()))
+                    || extends_or_implements_via_db(db, &resolved_declared, actual_fqcn.as_ref())
+                    || extends_or_implements_via_db(db, &resolved_declared, &resolved_actual)
+                    || extends_or_implements_via_db(db, declared_fqcn.as_ref(), actual_fqcn.as_ref()))
             {
                 return true;
             }
@@ -117,10 +123,10 @@ pub(crate) fn named_object_return_compatible(
             }
 
             // Inheritance check
-            codebase.extends_or_implements(actual_fqcn.as_ref(), &resolved_declared)
-                || codebase.extends_or_implements(actual_fqcn.as_ref(), declared_fqcn.as_ref())
-                || codebase.extends_or_implements(&resolved_actual, &resolved_declared)
-                || codebase.extends_or_implements(&resolved_actual, declared_fqcn.as_ref())
+            extends_or_implements_via_db(db, actual_fqcn.as_ref(), &resolved_declared)
+                || extends_or_implements_via_db(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
+                || extends_or_implements_via_db(db, &resolved_actual, &resolved_declared)
+                || extends_or_implements_via_db(db, &resolved_actual, declared_fqcn.as_ref())
         })
     })
 }
@@ -264,6 +270,7 @@ pub(super) fn return_arrays_compatible(
     actual: &Union,
     declared: &Union,
     codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
     actual.types.iter().all(|a_atomic| {
@@ -293,8 +300,11 @@ pub(super) fn return_arrays_compatible(
                             Atomic::TClassString(None) | Atomic::TString => true,
                             Atomic::TClassString(Some(dv_cls)) => {
                                 av_cls == dv_cls
-                                    || codebase
-                                        .extends_or_implements(av_cls.as_ref(), dv_cls.as_ref())
+                                    || extends_or_implements_via_db(
+                                        db,
+                                        av_cls.as_ref(),
+                                        dv_cls.as_ref(),
+                                    )
                             }
                             _ => false,
                         });
@@ -319,8 +329,8 @@ pub(super) fn return_arrays_compatible(
                     let res_dec = codebase.resolve_class_name(file, dv_fqcn.as_ref());
                     let res_act = codebase.resolve_class_name(file, av_fqcn.as_ref());
                     res_dec == res_act
-                        || codebase.extends_or_implements(av_fqcn.as_ref(), &res_dec)
-                        || codebase.extends_or_implements(&res_act, &res_dec)
+                        || extends_or_implements_via_db(db, av_fqcn.as_ref(), &res_dec)
+                        || extends_or_implements_via_db(db, &res_act, &res_dec)
                 })
             })
         })

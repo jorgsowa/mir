@@ -131,6 +131,11 @@ pub struct ClassNode {
     /// that using classes must implement.  Populated for trait nodes only;
     /// empty for classes/interfaces/enums.
     pub require_implements: Arc<[Arc<str>]>,
+    /// `true` if this is a *backed* enum (declared with a scalar type).
+    /// Always `false` for non-enum nodes and pure (unbacked) enums.  Used by
+    /// `extends_or_implements_via_db` to answer the implicit `BackedEnum`
+    /// interface check.
+    pub is_backed_enum: bool,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -344,6 +349,16 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
     if !node.active(db) {
         return Ancestors(vec![]);
     }
+    // Invariant: enums always return empty here, even when `interfaces` /
+    // `is_backed_enum` are populated.  This matches `Codebase::ensure_finalized`
+    // (which returns empty for enums) and keeps `has_unknown_ancestor_via_db`
+    // from misclassifying enums.  Enum membership questions go through
+    // `extends_or_implements_via_db`, which reads `interfaces` /
+    // `is_backed_enum` directly.  Do not lift this short-circuit without also
+    // auditing every caller of `class_ancestors`.
+    if node.is_enum(db) {
+        return Ancestors(vec![]);
+    }
 
     let mut all: Vec<Arc<str>> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
@@ -404,6 +419,47 @@ pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
         .0
         .iter()
         .any(|ancestor| !type_exists_via_db(db, ancestor))
+}
+
+/// Predicate variant of [`Codebase::extends_or_implements`] backed by the
+/// Salsa db.
+///
+/// Returns `true` iff `child` is `ancestor`, or `child`'s transitive
+/// ancestor list (via [`class_ancestors`]) contains `ancestor`.  For enums
+/// the ancestor list is empty by construction (matching
+/// `Codebase::ensure_finalized`); membership is answered directly from
+/// the enum's directly-declared interfaces and the implicit
+/// `UnitEnum` / `BackedEnum` interfaces.
+///
+/// Unregistered classes return `false` — `ingest_codebase` populates
+/// the db before any Pass 2 driver runs, so a class with no active
+/// `ClassNode` genuinely doesn't exist.
+pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
+    if child == ancestor {
+        return true;
+    }
+    let Some(node) = db.lookup_class_node(child).filter(|n| n.active(db)) else {
+        return false;
+    };
+    if node.is_enum(db) {
+        // Match `Codebase::extends_or_implements` enum semantics: only
+        // directly-declared interfaces participate (no transitive walk),
+        // plus the implicit UnitEnum / BackedEnum interfaces.
+        if node.interfaces(db).iter().any(|i| i.as_ref() == ancestor) {
+            return true;
+        }
+        if ancestor == "UnitEnum" || ancestor == "\\UnitEnum" {
+            return true;
+        }
+        if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && node.is_backed_enum(db) {
+            return true;
+        }
+        return false;
+    }
+    class_ancestors(db, node)
+        .0
+        .iter()
+        .any(|p| p.as_ref() == ancestor)
 }
 
 // ---------------------------------------------------------------------------
@@ -536,6 +592,7 @@ impl MirDb {
         template_params: Arc<[TemplateParam]>,
         require_extends: Arc<[Arc<str>]>,
         require_implements: Arc<[Arc<str>]>,
+        is_backed_enum: bool,
     ) -> ClassNode {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
@@ -551,6 +608,7 @@ impl MirDb {
             node.set_template_params(self).to(template_params);
             node.set_require_extends(self).to(require_extends);
             node.set_require_implements(self).to(require_implements);
+            node.set_is_backed_enum(self).to(is_backed_enum);
             node
         } else {
             let node = ClassNode::new(
@@ -568,6 +626,7 @@ impl MirDb {
                 template_params,
                 require_extends,
                 require_implements,
+                is_backed_enum,
             );
             self.class_nodes.insert(fqcn, node);
             node
@@ -796,6 +855,7 @@ impl MirDb {
                 Arc::from(cls.template_params.as_slice()),
                 Arc::from([]),
                 Arc::from([]),
+                false,
             );
             for method in cls.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -822,6 +882,7 @@ impl MirDb {
                 Arc::from(iface.template_params.as_slice()),
                 Arc::from([]),
                 Arc::from([]),
+                false,
             );
             for method in iface.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -845,6 +906,7 @@ impl MirDb {
                 Arc::from(tr.template_params.as_slice()),
                 Arc::from(tr.require_extends.as_slice()),
                 Arc::from(tr.require_implements.as_slice()),
+                false,
             );
             for method in tr.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -865,12 +927,13 @@ impl MirDb {
                 true,
                 false,
                 None,
+                Arc::from(en.interfaces.as_slice()),
                 Arc::from([]),
                 Arc::from([]),
                 Arc::from([]),
                 Arc::from([]),
                 Arc::from([]),
-                Arc::from([]),
+                en.scalar_type.is_some(),
             );
             for method in en.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -936,6 +999,7 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             Arc::from([]),
+            false,
         )
     }
 
@@ -1155,6 +1219,7 @@ mod tests {
             Arc::from([tp.clone()]),
             Arc::from([]),
             Arc::from([]),
+            false,
         );
         let got = class_template_params_via_db(&db, "Box").expect("registered");
         assert_eq!(got.len(), 1);
