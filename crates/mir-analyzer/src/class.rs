@@ -78,7 +78,6 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for fqcn in &class_keys {
-            self.codebase.ensure_finalized(fqcn);
             let cls = match self.codebase.classes.get(fqcn.as_ref()) {
                 Some(c) => c,
                 None => continue,
@@ -198,12 +197,11 @@ impl<'a> ClassAnalyzer<'a> {
 
             for method_name in abstract_methods {
                 // Check if the concrete class (or any closer ancestor) provides it
-                if self
-                    .codebase
-                    .get_method(fqcn.as_ref(), method_name.as_ref())
-                    .map(|m| !m.is_abstract)
-                    .unwrap_or(false)
-                {
+                if crate::db::method_is_concretely_implemented(
+                    self.db,
+                    fqcn.as_ref(),
+                    method_name.as_ref(),
+                ) {
                     continue; // implemented
                 }
 
@@ -262,11 +260,11 @@ impl<'a> ClassAnalyzer<'a> {
                 // lowercased key "jsonserialize" stored in own_methods.
                 let method_name_lower = method_name.to_lowercase();
                 // Check if the class provides a concrete implementation
-                let implemented = self
-                    .codebase
-                    .get_method(fqcn.as_ref(), &method_name_lower)
-                    .map(|m| !m.is_abstract)
-                    .unwrap_or(false);
+                let implemented = crate::db::method_is_concretely_implemented(
+                    self.db,
+                    fqcn.as_ref(),
+                    &method_name_lower,
+                );
 
                 if !implemented {
                     let loc = issue_location(

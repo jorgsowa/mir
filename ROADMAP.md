@@ -326,14 +326,32 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `Codebase::extends_or_implements` itself is now unused by the
   analyzer (kept as dead code on `Codebase` for a follow-up
   cleanup PR).
+- **PR20** ✅ `method_is_concretely_implemented(db, fqcn, name)`
+  helper added to `db.rs`: walks the class's own methods, its
+  used traits (transitively, with cycle-guarded
+  `trait_provides_method`), and its non-interface ancestors via
+  `class_ancestors`.  Mirrors the `ms.is_abstract = true` rewrite
+  `Codebase::get_method` performs for interface ancestors.
+  `ClassNode` trait nodes now populate their `traits` field with
+  the trait-of-trait list from `TraitStorage::traits` so the
+  recursive helper can follow trait chains.  `ClassAnalyzer`'s two
+  `Codebase::get_method` call sites (in
+  `check_abstract_methods_implemented` and
+  `check_interface_methods_implemented`) migrate to the helper, and
+  the eager `Codebase::ensure_finalized(fqcn)` call in
+  `ClassAnalyzer::analyze_all` is finally removed.  The
+  `unimplemented_interface_method::trait_cycle_does_not_crash`
+  fixture stays green via the `class_ancestors` cycle-recovery
+  guard plus the per-helper `visited` set.
 
 Remaining for S5 (rough order):
-- Migrate `Codebase::get_method` / `get_property` /
-  `get_class_constant` off `ensure_finalized`-based ancestor reads,
-  so the eager call in `ClassAnalyzer::analyze_all` can finally go.
-- Delete `Codebase::extends_or_implements` (and its
-  `ensure_finalized` driver path) once the member-lookup migration
-  no longer needs the cache.
+- Migrate the remaining `Codebase::get_method` / `get_property` /
+  `get_class_constant` reads in `expr.rs`, `stmt/mod.rs`,
+  `pass2.rs`, and `call/*.rs` to db helpers — those still drive
+  `ensure_finalized` lazily.
+- Delete `Codebase::extends_or_implements` (and eventually the
+  `ensure_finalized` driver path itself) once no read site
+  reaches into the cache.
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).

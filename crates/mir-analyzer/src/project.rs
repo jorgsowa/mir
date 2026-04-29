@@ -820,7 +820,7 @@ impl ProjectAnalyzer {
                     false,
                     None,
                     Arc::from([]),
-                    Arc::from([]),
+                    Arc::from(tr.traits.as_slice()),
                     Arc::from([]),
                     Arc::from(tr.template_params.as_slice()),
                     Arc::from(tr.require_extends.as_slice()),
