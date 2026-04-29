@@ -224,14 +224,21 @@ Sub-PRs (each shippable, fixture suite green at every step):
   the batch `Pass2Driver` still passes `db: None`, so this changes
   no behavior — it sets up dropping the per-helper codebase
   fallbacks once `Pass2Driver` is wired with a shared db reference.
+- **PR10a** ✅ `MirDb: Clone`.  Salsa 0.26's parallel pattern is
+  per-thread cloning (each clone gets a fresh `ZalsaLocal`,
+  underlying memoization is shared) — `salsa::Database: Send` but
+  not `Sync`, so `&dyn MirDatabase` cannot be shared across
+  `par_iter` workers.  Cloning is the prerequisite for threading
+  the db through batch Pass 2.  Sanity test verifies a clone
+  observes pre-clone upserts and resolves `class_ancestors`.
 
 Remaining for S5 (rough order):
-- Thread `&dyn MirDatabase` into the batch `Pass2Driver` (priming
-  sweep + main pass) so analyzers can consult the db.  Salsa 0.26
-  supports parallel `&Database` access; the existing
-  `ProjectAnalyzer.salsa: Mutex<(MirDb, …)>` is the storage.  When
-  this lands, a second `ingest_codebase` call after the post-Pass-2
-  `lazy_load_from_body_issues` will need to land alongside.
+- **PR10b** Thread the cloned db through batch `Pass2Driver`
+  (priming sweep + main sweep) using `par_iter().map_with(...)` so
+  each rayon worker gets its own clone.  Keep
+  `lazy_load_from_body_issues` on `db: None` for now (still has
+  codebase fallbacks); a second `ingest_codebase` call after that
+  lazy-load lands when the fallbacks are dropped.
 - Drop the codebase fallback in the prefer-db wrappers
   (`type_exists`, `is_interface`, `class_template_params`,
   `has_unknown_ancestor_db_or_codebase`) once batch Pass 2 reads
