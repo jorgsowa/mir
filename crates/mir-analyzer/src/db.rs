@@ -393,19 +393,17 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
 /// recursion stops at db boundaries and would otherwise miss transitive
 /// unknowns reachable only via codebase data.
 pub fn has_unknown_ancestor_db_or_codebase(
-    db: Option<&dyn MirDatabase>,
+    db: &dyn MirDatabase,
     codebase: &Codebase,
     fqcn: &str,
 ) -> bool {
-    if let Some(db) = db {
-        if let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) {
-            for ancestor in class_ancestors(db, node).0.iter() {
-                if !type_exists_via_db(db, ancestor) && !codebase.type_exists(ancestor) {
-                    return true;
-                }
+    if let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) {
+        for ancestor in class_ancestors(db, node).0.iter() {
+            if !type_exists_via_db(db, ancestor) && !codebase.type_exists(ancestor) {
+                return true;
             }
-            return false;
         }
+        return false;
     }
     codebase.has_unknown_ancestor(fqcn)
 }

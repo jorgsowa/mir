@@ -21,7 +21,7 @@ use crate::symbol::{ResolvedSymbol, SymbolKind};
 
 pub struct ExpressionAnalyzer<'a> {
     pub codebase: &'a Codebase,
-    pub db: Option<&'a dyn MirDatabase>,
+    pub db: &'a dyn MirDatabase,
     pub file: Arc<str>,
     pub source: &'a str,
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -37,7 +37,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         codebase: &'a Codebase,
-        db: Option<&'a dyn MirDatabase>,
+        db: &'a dyn MirDatabase,
         file: Arc<str>,
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,
@@ -610,10 +610,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .unwrap_or_else(|| Arc::from(resolved.as_str())),
                             _ => Arc::from(resolved.as_str()),
                         };
-                        let type_exists = self
-                            .db
-                            .and_then(|db| db.lookup_class_node(fqcn.as_ref()).map(|_| true))
-                            .unwrap_or_else(|| self.codebase.type_exists(&fqcn));
+                        let type_exists = self.db.lookup_class_node(fqcn.as_ref()).is_some()
+                            || self.codebase.type_exists(&fqcn);
                         if !matches!(resolved.as_str(), "self" | "static" | "parent")
                             && !type_exists
                         {
@@ -824,13 +822,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Union::mixed();
                 }
 
-                let const_exists = if let Some(db) = self.db {
-                    class_constant_exists_in_chain(db, &fqcn, &const_name)
-                } else {
-                    self.codebase
+                let const_exists = class_constant_exists_in_chain(self.db, &fqcn, &const_name)
+                    || self
+                        .codebase
                         .get_class_constant(&fqcn, &const_name)
-                        .is_some()
-                };
+                        .is_some();
                 if !const_exists
                     && !crate::db::has_unknown_ancestor_db_or_codebase(
                         self.db,
@@ -1312,21 +1308,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 {
                     // db path: walk ancestor chain via PropertyNode inputs.
                     // prop_found: None = not found, Some(ty) = found (mixed if unannotated).
-                    let prop_found: Option<Union> = if let Some(db) = self.db {
-                        find_property_node_in_chain(db, fqcn, prop_name)
-                            .map(|node| node.ty(db).unwrap_or_else(Union::mixed))
+                    // db tracks own/inherited properties; codebase fallback covers
+                    // docblock `@mixin` chains the db doesn't model yet.
+                    let prop_found: Option<Union> =
+                        find_property_node_in_chain(self.db, fqcn, prop_name)
+                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed))
                             .or_else(|| {
-                                // Fallback to codebase: db doesn't track docblock
-                                // `@mixin` chains yet.
                                 self.codebase
                                     .get_property(fqcn.as_ref(), prop_name)
                                     .map(|p| p.ty.clone().unwrap_or_else(Union::mixed))
-                            })
-                    } else {
-                        self.codebase
-                            .get_property(fqcn.as_ref(), prop_name)
-                            .map(|p| p.ty.clone().unwrap_or_else(Union::mixed))
-                    };
+                            });
                     if let Some(ty) = prop_found {
                         // Record reference for dead-code detection (M18)
                         if !self.inference_only {
@@ -1475,17 +1466,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             // Resolve own property for readonly + type checks (db path first).
-                            let prop_info: Option<(bool, Option<Union>)> = if let Some(db) = self.db
-                            {
-                                db.lookup_property_node(fqcn, &prop_name)
-                                    .filter(|n| n.active(db))
-                                    .map(|n| (n.is_readonly(db), n.ty(db)))
-                            } else {
-                                self.codebase.classes.get(fqcn.as_ref()).and_then(|cls| {
-                                    cls.get_property(&prop_name)
-                                        .map(|p| (p.is_readonly, p.ty.clone()))
-                                })
-                            };
+                            let db = self.db;
+                            let prop_info: Option<(bool, Option<Union>)> = db
+                                .lookup_property_node(fqcn, &prop_name)
+                                .filter(|n| n.active(db))
+                                .map(|n| (n.is_readonly(db), n.ty(db)))
+                                .or_else(|| {
+                                    self.codebase.classes.get(fqcn.as_ref()).and_then(|cls| {
+                                        cls.get_property(&prop_name)
+                                            .map(|p| (p.is_readonly, p.ty.clone()))
+                                    })
+                                });
                             if let Some((is_readonly, prop_ty)) = prop_info {
                                 if is_readonly && !ctx.inside_constructor {
                                     self.emit(

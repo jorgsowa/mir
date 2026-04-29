@@ -13,19 +13,15 @@ use crate::expr::ExpressionAnalyzer;
 // migrated in S5-PR6b.  Bundled / user stubs aren't promoted to the db
 // yet, so the codebase fallback remains load-bearing.
 fn type_exists_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    if let Some(db) = ea.db {
-        if crate::db::type_exists_via_db(db, fqcn) {
-            return true;
-        }
+    if crate::db::type_exists_via_db(ea.db, fqcn) {
+        return true;
     }
     ea.codebase.type_exists(fqcn)
 }
 
 fn is_interface_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    if let Some(db) = ea.db {
-        if let Some(kind) = crate::db::class_kind_via_db(db, fqcn) {
-            return kind.is_interface;
-        }
+    if let Some(kind) = crate::db::class_kind_via_db(ea.db, fqcn) {
+        return kind.is_interface;
     }
     ea.codebase.interfaces.contains_key(fqcn)
 }
@@ -34,10 +30,8 @@ fn class_template_params_db_or_codebase(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &str,
 ) -> Vec<TemplateParam> {
-    if let Some(db) = ea.db {
-        if let Some(tps) = crate::db::class_template_params_via_db(db, fqcn) {
-            return tps.to_vec();
-        }
+    if let Some(tps) = crate::db::class_template_params_via_db(ea.db, fqcn) {
+        return tps.to_vec();
     }
     ea.codebase.get_class_template_params(fqcn)
 }
@@ -133,9 +127,7 @@ pub(crate) fn check_method_visibility(
     match visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
-            let from_trait = ea
-                .db
-                .and_then(|db| crate::db::class_kind_via_db(db, owner_fqcn.as_ref()))
+            let from_trait = crate::db::class_kind_via_db(ea.db, owner_fqcn.as_ref())
                 .map(|k| k.is_trait)
                 .unwrap_or_else(|| ea.codebase.traits.contains_key(owner_fqcn.as_ref()));
             let allowed = caller_fqcn == owner_fqcn.as_ref()
@@ -523,9 +515,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
         let arg_fqcn: &Arc<str> = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
-                let is_trait = ea
-                    .db
-                    .and_then(|db| crate::db::class_kind_via_db(db, fqcn.as_ref()))
+                let is_trait = crate::db::class_kind_via_db(ea.db, fqcn.as_ref())
                     .map(|k| k.is_trait)
                     .unwrap_or_else(|| ea.codebase.traits.contains_key(fqcn.as_ref()));
                 if is_trait {

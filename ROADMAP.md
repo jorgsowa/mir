@@ -232,6 +232,19 @@ Sub-PRs (each shippable, fixture suite green at every step):
   the db through batch Pass 2.  Sanity test verifies a clone
   observes pre-clone upserts and resolves `class_ancestors`.
 
+- **PR11b** ✅ `Pass2Driver`, `StatementsAnalyzer`,
+  `ExpressionAnalyzer`, and `has_unknown_ancestor_db_or_codebase`
+  now hold a non-optional `&'a dyn MirDatabase`.  Every
+  `if let Some(db) = self.db { … } else { codebase fallback }`
+  branch is collapsed; where db parity is incomplete (e.g.
+  docblock `@mixin` chains, readonly assignments, class-constant
+  lookups for trait/interface inheritance not yet ingested), the
+  codebase fallback is preserved as an `.or_else(…)` after the db
+  read.  `analyze_source` (single-string entry point) builds a
+  fresh `MirDb` and `ingest_codebase`s it before invoking
+  `Pass2Driver`.  `ClassAnalyzer` still has the (always-`None`,
+  unused) `Option<&dyn MirDatabase>` pub field — left alone to
+  avoid API churn; remove in a later cleanup PR.
 - **PR11a** ✅ `lazy_load_from_body_issues` re-analysis sweep
   also gets a cloned db via `map_with`.  A second
   `ingest_codebase` runs immediately after PSR-4 lazy-loaded

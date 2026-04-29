@@ -371,7 +371,7 @@ impl ProjectAnalyzer {
             .for_each_with(db_priming, |db, (file, src)| {
                 let driver = Pass2Driver::new_inference_only(
                     &self.codebase,
-                    Some(&*db as &dyn MirDatabase),
+                    &*db as &dyn MirDatabase,
                     self.resolved_php_version(),
                 );
                 let arena = bumpalo::Bump::new();
@@ -391,7 +391,7 @@ impl ProjectAnalyzer {
             .map_with(db_main, |db, (file, src)| {
                 let driver = Pass2Driver::new(
                     &self.codebase,
-                    Some(&*db as &dyn MirDatabase),
+                    &*db as &dyn MirDatabase,
                     self.resolved_php_version(),
                 );
                 let result = if let Some(cache) = &self.cache {
@@ -640,7 +640,7 @@ impl ProjectAnalyzer {
                 .map_with(db_reanalysis, |db, (file, src)| {
                     let driver = Pass2Driver::new(
                         &self.codebase,
-                        Some(&*db as &dyn MirDatabase),
+                        &*db as &dyn MirDatabase,
                         self.resolved_php_version(),
                     );
                     let arena = bumpalo::Bump::new();
@@ -925,7 +925,7 @@ impl ProjectAnalyzer {
                 let db_ref: &dyn MirDatabase = db;
                 Pass2Driver::new_inference_only(
                     &self.codebase,
-                    Some(db_ref),
+                    db_ref,
                     self.resolved_php_version(),
                 )
                 .analyze_bodies(
@@ -935,8 +935,7 @@ impl ProjectAnalyzer {
                     &parsed.source_map,
                 );
 
-                let driver =
-                    Pass2Driver::new(&self.codebase, Some(db_ref), self.resolved_php_version());
+                let driver = Pass2Driver::new(&self.codebase, db_ref, self.resolved_php_version());
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,
                     file.clone(),
@@ -993,7 +992,11 @@ impl ProjectAnalyzer {
         analyzer.codebase.finalize();
         let mut type_envs = std::collections::HashMap::new();
         let mut all_symbols = Vec::new();
-        let driver = Pass2Driver::new(&analyzer.codebase, None, analyzer.resolved_php_version());
+        // Build a db that mirrors the just-collected definitions so the
+        // analyzers' db reads see them.
+        let mut db = MirDb::default();
+        db.ingest_codebase(&analyzer.codebase);
+        let driver = Pass2Driver::new(&analyzer.codebase, &db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
             &result.program,
             file.clone(),

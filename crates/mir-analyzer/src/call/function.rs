@@ -26,27 +26,26 @@ struct ResolvedFn {
 }
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
-    if let Some(db) = ea.db {
-        if let Some(node) = db.lookup_function_node(fqn).filter(|n| n.active(db)) {
-            // inferred_return_type lives in FunctionStorage until S3
-            let inferred = ea
-                .codebase
-                .functions
-                .get(fqn)
-                .and_then(|s| s.inferred_return_type.clone());
-            let return_ty_raw = node
-                .return_type(db)
-                .or(inferred)
-                .unwrap_or_else(Union::mixed);
-            return Some(ResolvedFn {
-                fqn: node.fqn(db),
-                deprecated: node.deprecated(db),
-                params: node.params(db).to_vec(),
-                template_params: node.template_params(db).to_vec(),
-                assertions: node.assertions(db).to_vec(),
-                return_ty_raw,
-            });
-        }
+    let db = ea.db;
+    if let Some(node) = db.lookup_function_node(fqn).filter(|n| n.active(db)) {
+        // inferred_return_type lives in FunctionStorage until S3
+        let inferred = ea
+            .codebase
+            .functions
+            .get(fqn)
+            .and_then(|s| s.inferred_return_type.clone());
+        let return_ty_raw = node
+            .return_type(db)
+            .or(inferred)
+            .unwrap_or_else(Union::mixed);
+        return Some(ResolvedFn {
+            fqn: node.fqn(db),
+            deprecated: node.deprecated(db),
+            params: node.params(db).to_vec(),
+            template_params: node.template_params(db).to_vec(),
+            assertions: node.assertions(db).to_vec(),
+            return_ty_raw,
+        });
     }
     let func = ea.codebase.functions.get(fqn)?;
     Some(ResolvedFn {
@@ -114,8 +113,9 @@ impl CallAnalyzer {
         let resolved_fn_name: String = {
             let qualified = ea.codebase.resolve_class_name(&ea.file, &fn_name);
             let fn_exists = |name: &str| -> bool {
-                ea.db
-                    .and_then(|db| db.lookup_function_node(name).map(|n| n.active(db)))
+                let db = ea.db;
+                db.lookup_function_node(name)
+                    .map(|n| n.active(db))
                     .unwrap_or_else(|| ea.codebase.functions.contains_key(name))
             };
             if fn_exists(qualified.as_str()) {

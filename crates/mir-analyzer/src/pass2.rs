@@ -17,7 +17,7 @@ use crate::symbol::ResolvedSymbol;
 
 pub(crate) struct Pass2Driver<'a> {
     codebase: &'a Arc<Codebase>,
-    db: Option<&'a dyn MirDatabase>,
+    db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     inference_only: bool,
 }
@@ -25,7 +25,7 @@ pub(crate) struct Pass2Driver<'a> {
 impl<'a> Pass2Driver<'a> {
     pub(crate) fn new(
         codebase: &'a Arc<Codebase>,
-        db: Option<&'a dyn MirDatabase>,
+        db: &'a dyn MirDatabase,
         php_version: PhpVersion,
     ) -> Self {
         Self {
@@ -38,7 +38,7 @@ impl<'a> Pass2Driver<'a> {
 
     pub(crate) fn new_inference_only(
         codebase: &'a Arc<Codebase>,
-        db: Option<&'a dyn MirDatabase>,
+        db: &'a dyn MirDatabase,
         php_version: PhpVersion,
     ) -> Self {
         Self {
