@@ -208,10 +208,14 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `interfaces.contains_key`, `traits.contains_key`,
   `get_class_template_params`) migrated to prefer db with codebase
   fallback via small private wrappers in `args.rs`.
+- **PR7** ✅ `has_unknown_ancestor_db_or_codebase` helper in `db.rs`
+  walks `class_ancestors` for db-registered classes and falls back to
+  `Codebase::has_unknown_ancestor` otherwise; per-ancestor "known"
+  check is `type_exists_via_db || codebase.type_exists` so bundled
+  stubs are still respected. All seven read sites in `expr.rs`,
+  `stmt/mod.rs`, `call/method.rs`, and `call/static_call.rs` migrated.
 
 Remaining for S5 (rough order):
-- Promote `has_unknown_ancestor` to a db-derived predicate (walks
-  `class_ancestors` and checks every name is registered).
 - Register bundled / user stubs with the db at load time so `type_exists`
   can move fully off `Codebase`.
 - Remove `finalization_cache` and the structural snapshot fallback in

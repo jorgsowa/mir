@@ -348,8 +348,16 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || self.codebase.extends_or_implements(fqcn, "Exception")
                                 || self.codebase.extends_or_implements(fqcn, "Error")
                                 // Suppress if class has unknown ancestors (might be Throwable)
-                                || self.codebase.has_unknown_ancestor(&resolved)
-                                || self.codebase.has_unknown_ancestor(fqcn)
+                                || crate::db::has_unknown_ancestor_db_or_codebase(
+                                    self.db,
+                                    self.codebase,
+                                    &resolved,
+                                )
+                                || crate::db::has_unknown_ancestor_db_or_codebase(
+                                    self.db,
+                                    self.codebase,
+                                    fqcn,
+                                )
                                 // Suppress if class is not in codebase at all (could be extension class)
                                 || (!self.codebase.type_exists(&resolved) && !self.codebase.type_exists(fqcn));
                             if !is_throwable {
@@ -389,8 +397,16 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || self.codebase.extends_or_implements(fqcn, "Throwable")
                                 || self.codebase.extends_or_implements(fqcn, "Exception")
                                 || self.codebase.extends_or_implements(fqcn, "Error")
-                                || self.codebase.has_unknown_ancestor(&resolved)
-                                || self.codebase.has_unknown_ancestor(fqcn);
+                                || crate::db::has_unknown_ancestor_db_or_codebase(
+                                    self.db,
+                                    self.codebase,
+                                    &resolved,
+                                )
+                                || crate::db::has_unknown_ancestor_db_or_codebase(
+                                    self.db,
+                                    self.codebase,
+                                    fqcn,
+                                );
                             if !is_throwable {
                                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                                 let (line_end, col_end) = if stmt.span.start < stmt.span.end {
