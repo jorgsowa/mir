@@ -1315,6 +1315,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let prop_found: Option<Union> = if let Some(db) = self.db {
                         find_property_node_in_chain(db, fqcn, prop_name)
                             .map(|node| node.ty(db).unwrap_or_else(Union::mixed))
+                            .or_else(|| {
+                                // Fallback to codebase: db doesn't track docblock
+                                // `@mixin` chains yet.
+                                self.codebase
+                                    .get_property(fqcn.as_ref(), prop_name)
+                                    .map(|p| p.ty.clone().unwrap_or_else(Union::mixed))
+                            })
                     } else {
                         self.codebase
                             .get_property(fqcn.as_ref(), prop_name)
