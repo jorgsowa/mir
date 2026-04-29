@@ -9,6 +9,7 @@ use mir_codebase::Codebase;
 use mir_types::{Atomic, Union};
 
 use crate::context::Context;
+use crate::db::MirDatabase;
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -20,32 +21,33 @@ pub fn narrow_from_condition<'arena, 'src>(
     ctx: &mut Context,
     is_true: bool,
     codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &str,
 ) {
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {
-            narrow_from_condition(inner, ctx, is_true, codebase, file);
+            narrow_from_condition(inner, ctx, is_true, codebase, db, file);
         }
 
         // !expr  →  narrow as if expr is !is_true
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
-            narrow_from_condition(u.operand, ctx, !is_true, codebase, file);
+            narrow_from_condition(u.operand, ctx, !is_true, codebase, db, file);
         }
 
         // $a && $b  →  if true: narrow both; if false: no constraint
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanAnd || b.op == BinaryOp::LogicalAnd => {
             if is_true {
-                narrow_from_condition(b.left, ctx, true, codebase, file);
-                narrow_from_condition(b.right, ctx, true, codebase, file);
+                narrow_from_condition(b.left, ctx, true, codebase, db, file);
+                narrow_from_condition(b.right, ctx, true, codebase, db, file);
             }
         }
 
         // $a || $b  →  if false: narrow both; if true: try to narrow same-var instanceof union
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
             if !is_true {
-                narrow_from_condition(b.left, ctx, false, codebase, file);
-                narrow_from_condition(b.right, ctx, false, codebase, file);
+                narrow_from_condition(b.left, ctx, false, codebase, db, file);
+                narrow_from_condition(b.right, ctx, false, codebase, db, file);
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
                 narrow_or_instanceof_true(b.left, b.right, ctx, codebase, file);
@@ -159,9 +161,10 @@ pub fn narrow_from_condition<'arena, 'src>(
                 if fn_name.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {
-                        narrow_from_condition(&arg_expr.value, ctx, is_true, codebase, file);
+                        narrow_from_condition(&arg_expr.value, ctx, is_true, codebase, db, file);
                     }
-                } else if apply_docblock_assertions(call, ctx, is_true, codebase, file, fn_name) {
+                } else if apply_docblock_assertions(call, ctx, is_true, codebase, db, file, fn_name)
+                {
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
@@ -234,6 +237,7 @@ fn apply_docblock_assertions<'arena, 'src>(
     ctx: &mut Context,
     is_true: bool,
     codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &str,
     fn_name: &str,
 ) -> bool {
@@ -241,18 +245,23 @@ fn apply_docblock_assertions<'arena, 'src>(
         .strip_prefix('\\')
         .map(|s| s.to_string())
         .unwrap_or_else(|| fn_name.to_string());
+    let fn_active =
+        |name: &str| -> bool { db.lookup_function_node(name).is_some_and(|n| n.active(db)) };
     let resolved_fn_name = {
         let qualified = codebase.resolve_class_name(file, &fn_name);
-        if codebase.functions.contains_key(qualified.as_str()) {
+        if fn_active(qualified.as_str()) {
             qualified
-        } else if codebase.functions.contains_key(fn_name.as_str()) {
+        } else if fn_active(fn_name.as_str()) {
             fn_name.clone()
         } else {
             qualified
         }
     };
 
-    let Some(func) = codebase.functions.get(resolved_fn_name.as_str()) else {
+    let Some(node) = db
+        .lookup_function_node(resolved_fn_name.as_str())
+        .filter(|n| n.active(db))
+    else {
         return false;
     };
     let expected_kind = if is_true {
@@ -261,13 +270,15 @@ fn apply_docblock_assertions<'arena, 'src>(
         AssertionKind::AssertIfFalse
     };
 
+    let assertions = node.assertions(db);
+    let params = node.params(db);
+
     let mut applied = false;
-    for assertion in func
-        .assertions
+    for assertion in assertions
         .iter()
         .filter(|a| a.kind == expected_kind || (is_true && a.kind == AssertionKind::Assert))
     {
-        if let Some(index) = func.params.iter().position(|p| p.name == assertion.param) {
+        if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
             if let Some(arg) = call.args.get(index) {
                 if let Some(var_name) = extract_var_name(&arg.value) {
                     ctx.set_var(&var_name, assertion.ty.clone());

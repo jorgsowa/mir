@@ -167,6 +167,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                     ctx,
                                     true,
                                     self.codebase,
+                                    self.db,
                                     &self.file,
                                 );
                             }
@@ -474,6 +475,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     &mut then_ctx,
                     true,
                     self.codebase,
+                    self.db,
                     &self.file,
                 );
                 // Capture narrowing-only unreachability before body analysis —
@@ -497,6 +499,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         &mut pre_elseif,
                         false,
                         self.codebase,
+                        self.db,
                         &self.file,
                     );
                     let pre_elseif_diverges = pre_elseif.diverges;
@@ -510,6 +513,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         &mut elseif_true_ctx,
                         true,
                         self.codebase,
+                        self.db,
                         &self.file,
                     );
                     let mut elseif_false_ctx = pre_elseif.clone();
@@ -518,6 +522,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         &mut elseif_false_ctx,
                         false,
                         self.codebase,
+                        self.db,
                         &self.file,
                     );
                     if !pre_elseif_diverges
@@ -573,6 +578,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     &mut else_ctx,
                     false,
                     self.codebase,
+                    self.db,
                     &self.file,
                 );
                 let else_unreachable_from_narrowing = else_ctx.diverges;
@@ -632,7 +638,14 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // Entry context: narrow on true condition
                 let mut entry = ctx.fork();
-                narrow_from_condition(&w.condition, &mut entry, true, self.codebase, &self.file);
+                narrow_from_condition(
+                    &w.condition,
+                    &mut entry,
+                    true,
+                    self.codebase,
+                    self.db,
+                    &self.file,
+                );
 
                 let post = self.analyze_loop_widened(&pre, entry, |sa, iter| {
                     sa.analyze_stmt(w.body, iter);
@@ -765,6 +778,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 &mut case_ctx,
                                 true,
                                 self.codebase,
+                                self.db,
                                 &self.file,
                             );
                         } else if let Some(ref var_name) = subject_var {

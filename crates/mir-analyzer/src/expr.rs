@@ -311,6 +311,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             &mut then_ctx,
                             true,
                             self.codebase,
+                            self.db,
                             &self.file,
                         );
                         let then_ty = self.analyze(then_expr, &mut then_ctx);
@@ -321,6 +322,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             &mut else_ctx,
                             false,
                             self.codebase,
+                            self.db,
                             &self.file,
                         );
                         let else_ty = self.analyze(t.else_expr, &mut else_ctx);
@@ -1083,6 +1085,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 &mut arm_ctx,
                                 true,
                                 self.codebase,
+                                self.db,
                                 &self.file,
                             );
                         }
@@ -1190,6 +1193,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 &mut right_ctx,
                 is_and,
                 self.codebase,
+                self.db,
                 &self.file,
             );
             // If narrowing made the right side statically unreachable, skip it
