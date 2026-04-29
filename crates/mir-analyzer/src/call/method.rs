@@ -3,10 +3,12 @@ use std::sync::Arc;
 use php_ast::ast::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
+use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::Union;
 
 use crate::context::Context;
+use crate::db::{class_ancestors, MirDatabase};
 use crate::expr::ExpressionAnalyzer;
 use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
 use crate::symbol::SymbolKind;
@@ -16,6 +18,77 @@ use super::args::{
     substitute_static_in_return, CheckArgsParams,
 };
 use super::CallAnalyzer;
+
+pub(super) struct ResolvedMethod {
+    pub(super) owner_fqcn: Arc<str>,
+    pub(super) name: Arc<str>,
+    pub(super) visibility: Visibility,
+    pub(super) deprecated: Option<Arc<str>>,
+    pub(super) params: Vec<FnParam>,
+    pub(super) template_params: Vec<TemplateParam>,
+    pub(super) return_ty_raw: Union,
+}
+
+/// Try to resolve a method via the Salsa db, walking the class ancestor chain.
+///
+/// When db is `None` or the method is not in the db, returns `None` so the
+/// caller can fall back to `codebase.get_method()`.
+pub(super) fn resolve_method_from_db(
+    ea: &ExpressionAnalyzer<'_>,
+    fqcn: &Arc<str>,
+    method_name_lower: &str,
+) -> Option<ResolvedMethod> {
+    let db = ea.db?;
+
+    // Check the class's own MethodNode first.
+    let node = find_method_node_in_chain(db, fqcn, method_name_lower)?;
+    let owner_fqcn = node.fqcn(db);
+    let name = node.name(db);
+
+    // inferred_return_type lives in MethodStorage until S3.
+    let inferred = ea
+        .codebase
+        .get_method(&owner_fqcn, &name)
+        .and_then(|s| s.inferred_return_type.clone());
+    let return_ty_raw = node
+        .return_type(db)
+        .or(inferred)
+        .unwrap_or_else(Union::mixed);
+
+    Some(ResolvedMethod {
+        owner_fqcn,
+        name,
+        visibility: node.visibility(db),
+        deprecated: node.deprecated(db),
+        params: node.params(db).to_vec(),
+        template_params: node.template_params(db).to_vec(),
+        return_ty_raw,
+    })
+}
+
+/// Walk the db class ancestor chain to find an active MethodNode.
+pub(super) fn find_method_node_in_chain(
+    db: &dyn MirDatabase,
+    fqcn: &Arc<str>,
+    method_name_lower: &str,
+) -> Option<crate::db::MethodNode> {
+    // Own node first.
+    if let Some(node) = db.lookup_method_node(fqcn, method_name_lower) {
+        if node.active(db) {
+            return Some(node);
+        }
+    }
+    // Walk ancestors.
+    let class_node = db.lookup_class_node(fqcn)?;
+    for ancestor in class_ancestors(db, class_node).0 {
+        if let Some(node) = db.lookup_method_node(&ancestor, method_name_lower) {
+            if node.active(db) {
+                return Some(node);
+            }
+        }
+    }
+    None
+}
 
 impl CallAnalyzer {
     pub fn analyze_method_call<'a, 'arena, 'src>(
@@ -50,7 +123,7 @@ impl CallAnalyzer {
 
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
-        if obj_ty.contains(|t| matches!(t, Atomic::TNull)) {
+        if obj_ty.contains(|t| matches!(t, mir_types::Atomic::TNull)) {
             if nullsafe {
                 // ?-> is fine, just returns null on null receiver
             } else if obj_ty.is_single() {
@@ -89,7 +162,7 @@ impl CallAnalyzer {
 
         for atomic in &receiver.types {
             match atomic {
-                Atomic::TNamedObject {
+                mir_types::Atomic::TNamedObject {
                     fqcn,
                     type_params: receiver_type_params,
                 } => {
@@ -110,9 +183,9 @@ impl CallAnalyzer {
                         ),
                     );
                 }
-                Atomic::TSelf { fqcn }
-                | Atomic::TStaticObject { fqcn }
-                | Atomic::TParent { fqcn } => {
+                mir_types::Atomic::TSelf { fqcn }
+                | mir_types::Atomic::TStaticObject { fqcn }
+                | mir_types::Atomic::TParent { fqcn } => {
                     let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     result = Union::merge(
@@ -130,12 +203,12 @@ impl CallAnalyzer {
                         ),
                     );
                 }
-                Atomic::TIntersection { parts } => {
+                mir_types::Atomic::TIntersection { parts } => {
                     let mut intersection_result = Union::empty();
                     let mut found_method = false;
                     for part in parts {
                         for inner_atomic in &part.types {
-                            if let Atomic::TNamedObject {
+                            if let mir_types::Atomic::TNamedObject {
                                 fqcn,
                                 type_params: receiver_type_params,
                             } = inner_atomic
@@ -168,7 +241,7 @@ impl CallAnalyzer {
                         result = Union::merge(&result, &Union::mixed());
                     }
                 }
-                Atomic::TObject | Atomic::TTemplateParam { .. } => {
+                mir_types::Atomic::TObject | mir_types::Atomic::TTemplateParam { .. } => {
                     result = Union::merge(&result, &Union::mixed());
                 }
                 _ => {
@@ -178,7 +251,7 @@ impl CallAnalyzer {
         }
 
         if nullsafe && obj_ty.is_nullable() {
-            result.add_type(Atomic::TNull);
+            result.add_type(mir_types::Atomic::TNull);
         }
 
         let final_ty = if result.is_empty() {
@@ -188,7 +261,7 @@ impl CallAnalyzer {
         };
 
         for atomic in &obj_ty.types {
-            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
                 ea.record_symbol(
                     call.method.span,
                     SymbolKind::MethodCall {
@@ -218,19 +291,37 @@ fn resolve_method_return<'a, 'arena, 'src>(
     arg_types: &[Union],
     arg_spans: &[Span],
 ) -> Union {
-    if let Some(method) = ea.codebase.get_method(fqcn, method_name) {
+    let method_name_lower = method_name.to_lowercase();
+    let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower).or_else(|| {
+        ea.codebase
+            .get_method(fqcn, method_name)
+            .map(|m| ResolvedMethod {
+                owner_fqcn: m.fqcn.clone(),
+                name: m.name.clone(),
+                visibility: m.visibility,
+                deprecated: m.deprecated.clone(),
+                params: m.params.clone(),
+                template_params: m.template_params.clone(),
+                return_ty_raw: m
+                    .effective_return_type()
+                    .cloned()
+                    .unwrap_or_else(Union::mixed),
+            })
+    });
+
+    if let Some(resolved) = resolved {
         if !ea.inference_only {
             let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
             ea.codebase.mark_method_referenced_at(
-                fqcn,
-                method_name,
+                &resolved.owner_fqcn,
+                &resolved.name,
                 ea.file.clone(),
                 line,
                 col_start,
                 col_end,
             );
         }
-        if let Some(msg) = method.deprecated.clone() {
+        if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(
                 IssueKind::DeprecatedMethodCall {
                     class: fqcn.to_string(),
@@ -241,7 +332,14 @@ fn resolve_method_return<'a, 'arena, 'src>(
                 span,
             );
         }
-        check_method_visibility(ea, &method, ctx, span);
+        check_method_visibility(
+            ea,
+            resolved.visibility,
+            &resolved.owner_fqcn,
+            &resolved.name,
+            ctx,
+            span,
+        );
 
         let arg_names: Vec<Option<String>> = call
             .args
@@ -257,7 +355,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
             ea,
             CheckArgsParams {
                 fn_name: method_name,
-                params: &method.params,
+                params: &resolved.params,
                 arg_types,
                 arg_spans,
                 arg_names: &arg_names,
@@ -267,11 +365,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
             },
         );
 
-        let ret_raw = method
-            .effective_return_type()
-            .cloned()
-            .unwrap_or_else(Union::mixed);
-        let ret_raw = substitute_static_in_return(ret_raw, fqcn);
+        let ret_raw = substitute_static_in_return(resolved.return_ty_raw, fqcn);
 
         let class_tps = ea.codebase.get_class_template_params(fqcn);
         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
@@ -279,9 +373,9 @@ fn resolve_method_return<'a, 'arena, 'src>(
             bindings.entry(k).or_insert(v);
         }
 
-        if !method.template_params.is_empty() {
+        if !resolved.template_params.is_empty() {
             let method_bindings =
-                infer_template_bindings(&method.template_params, &method.params, arg_types);
+                infer_template_bindings(&resolved.template_params, &resolved.params, arg_types);
             for key in method_bindings.keys() {
                 if bindings.contains_key(key) {
                     ea.emit(
@@ -294,7 +388,8 @@ fn resolve_method_return<'a, 'arena, 'src>(
                 }
             }
             bindings.extend(method_bindings);
-            for (name, inferred, bound) in check_template_bounds(&bindings, &method.template_params)
+            for (name, inferred, bound) in
+                check_template_bounds(&bindings, &resolved.template_params)
             {
                 ea.emit(
                     IssueKind::InvalidTemplateParam {
