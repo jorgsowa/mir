@@ -122,6 +122,34 @@ pub struct ClassNode {
     pub extends: Arc<[Arc<str>]>,
 }
 
+/// Snapshot of a class's discriminator + abstractness, read from a
+/// registered active `ClassNode`.
+///
+/// Returned by [`class_kind_via_db`] when an active node exists for the
+/// given FQCN — call sites can use this in place of the corresponding
+/// `Codebase` lookups.
+#[derive(Debug, Clone, Copy)]
+pub struct ClassKind {
+    pub is_interface: bool,
+    pub is_trait: bool,
+    pub is_enum: bool,
+    pub is_abstract: bool,
+}
+
+/// Read class kind/abstractness from an active `ClassNode`, if one is
+/// registered for `fqcn`.  Returns `None` for unregistered or inactive
+/// nodes, leaving the caller free to fall back to `Codebase` (which still
+/// holds bundled-stub types not yet promoted to the db).
+pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
+    let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+    Some(ClassKind {
+        is_interface: node.is_interface(db),
+        is_trait: node.is_trait(db),
+        is_enum: node.is_enum(db),
+        is_abstract: node.is_abstract(db),
+    })
+}
+
 // ---------------------------------------------------------------------------
 // FunctionNode input (S5-PR2)
 // ---------------------------------------------------------------------------
