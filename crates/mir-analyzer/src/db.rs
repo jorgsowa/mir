@@ -2,7 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use mir_codebase::storage::{
-    Assertion, FnParam, FunctionStorage, MethodStorage, TemplateParam, Visibility,
+    Assertion, ConstantStorage, FnParam, FunctionStorage, MethodStorage, PropertyStorage,
+    TemplateParam, Visibility,
 };
 use mir_codebase::StubSlice;
 use mir_issues::Issue;
@@ -35,6 +36,13 @@ pub trait MirDatabase: salsa::Database {
     /// read — changes to a method's fields are tracked through the `MethodNode`
     /// input itself.
     fn lookup_method_node(&self, fqcn: &str, method_name_lower: &str) -> Option<MethodNode>;
+
+    /// Look up the [`PropertyNode`] for `(fqcn, prop_name)`, if any.
+    fn lookup_property_node(&self, fqcn: &str, prop_name: &str) -> Option<PropertyNode>;
+
+    /// Look up the [`ClassConstantNode`] for `(fqcn, const_name)`, if any.
+    fn lookup_class_constant_node(&self, fqcn: &str, const_name: &str)
+        -> Option<ClassConstantNode>;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +168,44 @@ pub struct MethodNode {
     pub is_final: bool,
     pub is_constructor: bool,
     pub is_pure: bool,
+}
+
+// ---------------------------------------------------------------------------
+// PropertyNode input (S5-PR4)
+// ---------------------------------------------------------------------------
+
+/// Salsa input representing a single class/trait property.
+///
+/// `inferred_ty` is intentionally absent — it stays in `PropertyStorage` until
+/// a future S3-style tracked query promotes it.
+///
+/// Keyed by `(owner fqcn, prop_name)` — property names are case-sensitive.
+#[salsa::input]
+pub struct PropertyNode {
+    pub fqcn: Arc<str>,
+    pub name: Arc<str>,
+    pub active: bool,
+    pub ty: Option<Union>,
+    pub visibility: Visibility,
+    pub is_static: bool,
+    pub is_readonly: bool,
+}
+
+// ---------------------------------------------------------------------------
+// ClassConstantNode input (S5-PR4)
+// ---------------------------------------------------------------------------
+
+/// Salsa input representing a single class/interface/enum constant.
+///
+/// Keyed by `(owner fqcn, const_name)` — constant names are case-sensitive.
+#[salsa::input]
+pub struct ClassConstantNode {
+    pub fqcn: Arc<str>,
+    pub name: Arc<str>,
+    pub active: bool,
+    pub ty: Union,
+    pub visibility: Option<Visibility>,
+    pub is_final: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +377,10 @@ pub struct MirDb {
     function_nodes: HashMap<Arc<str>, FunctionNode>,
     /// (owner FQCN) → (method_name_lower → MethodNode) handle registry.
     method_nodes: HashMap<Arc<str>, HashMap<Arc<str>, MethodNode>>,
+    /// (owner FQCN) → (prop_name → PropertyNode) handle registry.
+    property_nodes: HashMap<Arc<str>, HashMap<Arc<str>, PropertyNode>>,
+    /// (owner FQCN) → (const_name → ClassConstantNode) handle registry.
+    class_constant_nodes: HashMap<Arc<str>, HashMap<Arc<str>, ClassConstantNode>>,
 }
 
 #[salsa::db]
@@ -354,6 +404,22 @@ impl MirDatabase for MirDb {
         self.method_nodes
             .get(fqcn)
             .and_then(|m| m.get(method_name_lower).copied())
+    }
+
+    fn lookup_property_node(&self, fqcn: &str, prop_name: &str) -> Option<PropertyNode> {
+        self.property_nodes
+            .get(fqcn)
+            .and_then(|m| m.get(prop_name).copied())
+    }
+
+    fn lookup_class_constant_node(
+        &self,
+        fqcn: &str,
+        const_name: &str,
+    ) -> Option<ClassConstantNode> {
+        self.class_constant_nodes
+            .get(fqcn)
+            .and_then(|m| m.get(const_name).copied())
     }
 }
 
@@ -513,9 +579,94 @@ impl MirDb {
     /// Mark all `MethodNode`s owned by `fqcn` as inactive.
     pub fn deactivate_class_methods(&mut self, fqcn: &str) {
         use salsa::Setter as _;
-        // Collect nodes first to release the immutable borrow before set_active.
         let nodes: Vec<MethodNode> = match self.method_nodes.get(fqcn) {
             Some(methods) => methods.values().copied().collect(),
+            None => return,
+        };
+        for node in nodes {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `PropertyNode` for `(storage.fqcn, storage.name)`.
+    pub fn upsert_property_node(&mut self, fqcn: &Arc<str>, storage: &PropertyStorage) {
+        use salsa::Setter as _;
+        let existing = self
+            .property_nodes
+            .get(fqcn.as_ref())
+            .and_then(|m| m.get(storage.name.as_ref()))
+            .copied();
+        if let Some(node) = existing {
+            node.set_active(self).to(true);
+            node.set_ty(self).to(storage.ty.clone());
+            node.set_visibility(self).to(storage.visibility);
+            node.set_is_static(self).to(storage.is_static);
+            node.set_is_readonly(self).to(storage.is_readonly);
+        } else {
+            let node = PropertyNode::new(
+                self,
+                fqcn.clone(),
+                storage.name.clone(),
+                true,
+                storage.ty.clone(),
+                storage.visibility,
+                storage.is_static,
+                storage.is_readonly,
+            );
+            self.property_nodes
+                .entry(fqcn.clone())
+                .or_default()
+                .insert(storage.name.clone(), node);
+        }
+    }
+
+    /// Mark all `PropertyNode`s owned by `fqcn` as inactive.
+    pub fn deactivate_class_properties(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        let nodes: Vec<PropertyNode> = match self.property_nodes.get(fqcn) {
+            Some(props) => props.values().copied().collect(),
+            None => return,
+        };
+        for node in nodes {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `ClassConstantNode` for `(fqcn, storage.name)`.
+    pub fn upsert_class_constant_node(&mut self, fqcn: &Arc<str>, storage: &ConstantStorage) {
+        use salsa::Setter as _;
+        let existing = self
+            .class_constant_nodes
+            .get(fqcn.as_ref())
+            .and_then(|m| m.get(storage.name.as_ref()))
+            .copied();
+        if let Some(node) = existing {
+            node.set_active(self).to(true);
+            node.set_ty(self).to(storage.ty.clone());
+            node.set_visibility(self).to(storage.visibility);
+            node.set_is_final(self).to(storage.is_final);
+        } else {
+            let node = ClassConstantNode::new(
+                self,
+                fqcn.clone(),
+                storage.name.clone(),
+                true,
+                storage.ty.clone(),
+                storage.visibility,
+                storage.is_final,
+            );
+            self.class_constant_nodes
+                .entry(fqcn.clone())
+                .or_default()
+                .insert(storage.name.clone(), node);
+        }
+    }
+
+    /// Mark all `ClassConstantNode`s owned by `fqcn` as inactive.
+    pub fn deactivate_class_constants(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        let nodes: Vec<ClassConstantNode> = match self.class_constant_nodes.get(fqcn) {
+            Some(consts) => consts.values().copied().collect(),
             None => return,
         };
         for node in nodes {
