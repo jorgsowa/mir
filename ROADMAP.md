@@ -173,7 +173,7 @@ body change invalidates zero dependent files.
 *Prerequisite:* S5 must land first, for the same reason as S3 — `analyze_file` must be
 able to track all its Codebase reads through `&dyn MirDatabase`.
 
-**S5. Thread `&dyn MirDatabase` through analyzers** ❌ Next milestone
+**S5. Thread `&dyn MirDatabase` through analyzers** ⚠️ In progress
 Thread `&dyn MirDatabase` through `StatementsAnalyzer` / `ExpressionAnalyzer` /
 `ClassAnalyzer`. Codebase lookups that feed into tracked queries (`inferred_return_type`,
 `analyze_file`) become db-tracked reads. The `Codebase` struct shrinks incrementally as
@@ -183,6 +183,43 @@ fields move to Salsa inputs; `finalization_cache` is deleted as the last step.
 migrated one at a time (functions → methods → classes → …) with the remaining fields
 still in `Codebase`. Each batch is a shippable PR. Full deletion of `Codebase` and the
 two `Interner` fields is the final PR in this sub-phase.
+
+Sub-PRs (each shippable, fixture suite green at every step):
+
+- **PR1** ✅ `&dyn MirDatabase` threaded through `StatementsAnalyzer` /
+  `ExpressionAnalyzer`; available as `ea.db: Option<&dyn MirDatabase>`.
+- **PR2a / PR2b** ✅ `FunctionNode` input + register/deactivate; `ResolvedFn`
+  helper; main metadata read in `call/function.rs` and the fn-existence
+  use site migrated to db.
+- **PR3a / PR3b** ✅ `MethodNode` input + register/deactivate; `ResolvedMethod`
+  helper; method-call read sites migrated to db.
+- **PR4a / PR4b** ✅ `PropertyNode` + `ClassConstantNode` inputs; property /
+  constant read sites in `expr.rs` migrated via
+  `find_property_node_in_chain` / `class_constant_exists_in_chain`.
+- **PR5a / PR5b** ✅ `ClassNode` extended with `is_trait`, `is_enum`,
+  `is_abstract`; traits and enums registered as `ClassNode`s.
+  `class_kind_via_db` helper; the two `is_interface` / `is_abstract_class`
+  read sites in `call/static_call.rs` and `call/method.rs` migrated to
+  prefer db with codebase fallback.
+- **PR6a** ✅ `ClassNode` extended with `template_params`; populated for
+  classes/interfaces/traits at upsert time. `type_exists_via_db` and
+  `class_template_params_via_db` helpers added in `db.rs` (None / false
+  for unregistered or inactive nodes — callers fall back to `Codebase`).
+
+Remaining for S5 (rough order):
+
+- **PR6b** Migrate `args.rs` reads (`type_exists`, `interfaces.contains_key`,
+  `traits.contains_key`, `get_class_template_params`) to prefer db with
+  codebase fallback.
+- Promote `has_unknown_ancestor` to a db-derived predicate (walks
+  `class_ancestors` and checks every name is registered).
+- Register bundled / user stubs with the db at load time so `type_exists`
+  can move fully off `Codebase`.
+- Remove `finalization_cache` and the structural snapshot fallback in
+  `re_analyze_file`.
+- Delete the remaining fields from `Codebase` (functions, methods,
+  properties, constants, classes, interfaces, traits, enums) once no
+  read site references them.
 
 Expected: sub-second re-analysis on save for LSP; precise invalidation across all query types.
 
@@ -194,7 +231,8 @@ Expected: sub-second re-analysis on save for LSP; precise invalidation across al
 Phase 1 ──────────────────────── complete
 Phase 2 ──────────────────────── item 4 subsumed by Phase 4 S1 (no longer worth doing separately)
 Phase 3 ── complete; eager finalize() barrier removed, lazy ensure_finalized() at read sites
-Phase 4 ── subsumes Phase 2 & 3  (Salsa makes manual caching redundant); S0–S2 complete
+Phase 4 ── subsumes Phase 2 & 3  (Salsa makes manual caching redundant);
+           S0–S2 complete; S5 in progress (PR1–PR5 landed)
            S3 and S4 unblocked only after S5 (db threading through analyzers)
            S5 → S3 → S4 is the correct execution order
 ```
