@@ -9,24 +9,17 @@ use mir_types::{Atomic, Union};
 
 use crate::expr::ExpressionAnalyzer;
 
-// Pure-db lookups for the four read patterns migrated in S5-PR6b.
-// `ingest_codebase` (S5-PR8/PR9) mirrors bundled stubs, user stubs, and
-// PSR-4 lazy-loaded definitions into the Salsa db before Pass 2, so the
-// codebase fallback is no longer load-bearing.
-fn type_exists_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
+// Pure-db lookups, named without the `_db_or_codebase` suffix now that
+// the codebase fallback is gone (S5-PR12).
+fn type_exists(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
     crate::db::type_exists_via_db(ea.db, fqcn)
 }
 
-fn is_interface_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    crate::db::class_kind_via_db(ea.db, fqcn)
-        .map(|k| k.is_interface)
-        .unwrap_or(false)
+fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
+    crate::db::class_kind_via_db(ea.db, fqcn).is_some_and(|k| k.is_interface)
 }
 
-fn class_template_params_db_or_codebase(
-    ea: &ExpressionAnalyzer<'_>,
-    fqcn: &str,
-) -> Vec<TemplateParam> {
+fn class_template_params(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> Vec<TemplateParam> {
     crate::db::class_template_params_via_db(ea.db, fqcn)
         .map(|tps| tps.to_vec())
         .unwrap_or_default()
@@ -600,7 +593,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     _ => &[],
                 };
                 if !arg_type_params.is_empty() || !param_type_params.is_empty() {
-                    let class_tps = class_template_params_db_or_codebase(ea, &resolved_param);
+                    let class_tps = class_template_params(ea, &resolved_param);
                     return generic_type_params_compatible(
                         arg_type_params,
                         param_type_params,
@@ -643,7 +636,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                                 generic_ancestor_type_args(&resolved_arg, param_fqcn.as_ref(), ea)
                             });
                     if let Some(arg_as_param_params) = ancestor_args {
-                        let class_tps = class_template_params_db_or_codebase(ea, &resolved_param);
+                        let class_tps = class_template_params(ea, &resolved_param);
                         return generic_type_params_compatible(
                             &arg_as_param_params,
                             param_type_params,
@@ -674,7 +667,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 }
             }
 
-            if !arg_fqcn.contains('\\') && !type_exists_db_or_codebase(ea, &resolved_arg) {
+            if !arg_fqcn.contains('\\') && !type_exists(ea, &resolved_arg) {
                 for entry in ea.codebase.classes.iter() {
                     if entry.value().short_name.as_ref() == arg_fqcn.as_ref() {
                         let actual_fqcn = entry.key().clone();
@@ -691,9 +684,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 }
             }
 
-            let iface_key = if is_interface_db_or_codebase(ea, arg_fqcn.as_ref()) {
+            let iface_key = if is_interface(ea, arg_fqcn.as_ref()) {
                 Some(arg_fqcn.as_ref())
-            } else if is_interface_db_or_codebase(ea, resolved_arg.as_str()) {
+            } else if is_interface(ea, resolved_arg.as_str()) {
                 Some(resolved_arg.as_str())
             } else {
                 None
@@ -721,15 +714,15 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             }
 
             if arg_fqcn.contains('\\')
-                && !type_exists_db_or_codebase(ea, arg_fqcn.as_ref())
-                && !type_exists_db_or_codebase(ea, &resolved_arg)
+                && !type_exists(ea, arg_fqcn.as_ref())
+                && !type_exists(ea, &resolved_arg)
             {
                 return true;
             }
 
             if param_fqcn.contains('\\')
-                && !type_exists_db_or_codebase(ea, param_fqcn.as_ref())
-                && !type_exists_db_or_codebase(ea, &resolved_param)
+                && !type_exists(ea, param_fqcn.as_ref())
+                && !type_exists(ea, &resolved_param)
             {
                 return true;
             }
@@ -865,7 +858,7 @@ fn generic_ancestor_type_args_inner(
         return Some(parent_args);
     }
 
-    let parent_template_params = class_template_params_db_or_codebase(ea, parent.as_ref());
+    let parent_template_params = class_template_params(ea, parent.as_ref());
     let bindings: std::collections::HashMap<Arc<str>, Union> = parent_template_params
         .iter()
         .zip(extends_type_args.iter())
@@ -884,10 +877,10 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
     param_ty.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
         Atomic::TNamedObject { fqcn, .. } => {
-            !fqcn.contains('\\') && !type_exists_db_or_codebase(ea, fqcn.as_ref())
+            !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
         }
         Atomic::TClassString(Some(inner)) => {
-            !inner.contains('\\') && !type_exists_db_or_codebase(ea, inner.as_ref())
+            !inner.contains('\\') && !type_exists(ea, inner.as_ref())
         }
         Atomic::TArray { key: _, value }
         | Atomic::TList { value }
@@ -895,7 +888,7 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
         | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !type_exists_db_or_codebase(ea, fqcn.as_ref())
+                !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
             }
             _ => false,
         }),
@@ -937,7 +930,7 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
                 | Atomic::TParent { fqcn } => fqcn,
                 _ => return false,
             };
-            if !pv_fqcn.contains('\\') && !type_exists_db_or_codebase(ea, pv_fqcn.as_ref()) {
+            if !pv_fqcn.contains('\\') && !type_exists(ea, pv_fqcn.as_ref()) {
                 return true;
             }
             let resolved_param = ea.codebase.resolve_class_name(&ea.file, pv_fqcn.as_ref());
