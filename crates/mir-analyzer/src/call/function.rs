@@ -1,7 +1,7 @@
 use php_ast::ast::{ExprKind, FunctionCallExpr};
 use php_ast::Span;
 
-use mir_codebase::storage::AssertionKind;
+use mir_codebase::storage::{Assertion, AssertionKind, FnParam, TemplateParam};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
 
@@ -15,6 +15,52 @@ use super::args::{
     check_args, expr_can_be_passed_by_reference, spread_element_type, CheckArgsParams,
 };
 use super::CallAnalyzer;
+
+struct ResolvedFn {
+    fqn: std::sync::Arc<str>,
+    deprecated: Option<std::sync::Arc<str>>,
+    params: Vec<FnParam>,
+    template_params: Vec<TemplateParam>,
+    assertions: Vec<Assertion>,
+    return_ty_raw: Union,
+}
+
+fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
+    if let Some(db) = ea.db {
+        if let Some(node) = db.lookup_function_node(fqn).filter(|n| n.active(db)) {
+            // inferred_return_type lives in FunctionStorage until S3
+            let inferred = ea
+                .codebase
+                .functions
+                .get(fqn)
+                .and_then(|s| s.inferred_return_type.clone());
+            let return_ty_raw = node
+                .return_type(db)
+                .or(inferred)
+                .unwrap_or_else(Union::mixed);
+            return Some(ResolvedFn {
+                fqn: node.fqn(db),
+                deprecated: node.deprecated(db),
+                params: node.params(db).to_vec(),
+                template_params: node.template_params(db).to_vec(),
+                assertions: node.assertions(db).to_vec(),
+                return_ty_raw,
+            });
+        }
+    }
+    let func = ea.codebase.functions.get(fqn)?;
+    Some(ResolvedFn {
+        fqn: func.fqn.clone(),
+        deprecated: func.deprecated.clone(),
+        params: func.params.clone(),
+        template_params: func.template_params.clone(),
+        assertions: func.assertions.clone(),
+        return_ty_raw: func
+            .effective_return_type()
+            .cloned()
+            .unwrap_or_else(Union::mixed),
+    })
+}
 
 impl CallAnalyzer {
     pub fn analyze_function_call<'a, 'arena, 'src>(
@@ -82,8 +128,8 @@ impl CallAnalyzer {
         };
 
         // Pre-mark by-reference parameter variables as defined BEFORE evaluating args
-        if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
-            for (i, param) in func.params.iter().enumerate() {
+        if let Some(resolved) = resolve_fn(ea, resolved_fn_name.as_str()) {
+            for (i, param) in resolved.params.iter().enumerate() {
                 if param.is_byref {
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
@@ -156,24 +202,21 @@ impl CallAnalyzer {
             }
         }
 
-        if let Some(func) = ea.codebase.functions.get(resolved_fn_name.as_str()) {
+        if let Some(resolved) = resolve_fn(ea, resolved_fn_name.as_str()) {
             if !ea.inference_only {
                 let (line, col_start, col_end) = ea.span_to_ref_loc(call.name.span);
                 ea.codebase.mark_function_referenced_at(
-                    &func.fqn,
+                    &resolved.fqn,
                     ea.file.clone(),
                     line,
                     col_start,
                     col_end,
                 );
             }
-            let deprecated = func.deprecated.clone();
-            let params = func.params.clone();
-            let template_params = func.template_params.clone();
-            let return_ty_raw = func
-                .effective_return_type()
-                .cloned()
-                .unwrap_or_else(Union::mixed);
+            let deprecated = resolved.deprecated;
+            let params = resolved.params;
+            let template_params = resolved.template_params;
+            let return_ty_raw = resolved.return_ty_raw;
 
             if let Some(msg) = deprecated {
                 ea.emit(
@@ -226,7 +269,7 @@ impl CallAnalyzer {
                 }
             }
 
-            for assertion in func
+            for assertion in resolved
                 .assertions
                 .iter()
                 .filter(|a| a.kind == AssertionKind::Assert)
@@ -263,7 +306,7 @@ impl CallAnalyzer {
 
             ea.record_symbol(
                 call.name.span,
-                SymbolKind::FunctionCall(func.fqn.clone()),
+                SymbolKind::FunctionCall(resolved.fqn.clone()),
                 return_ty.clone(),
             );
             return return_ty;
