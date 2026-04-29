@@ -201,16 +201,15 @@ Sub-PRs (each shippable, fixture suite green at every step):
   `class_kind_via_db` helper; the two `is_interface` / `is_abstract_class`
   read sites in `call/static_call.rs` and `call/method.rs` migrated to
   prefer db with codebase fallback.
-- **PR6a** ✅ `ClassNode` extended with `template_params`; populated for
-  classes/interfaces/traits at upsert time. `type_exists_via_db` and
-  `class_template_params_via_db` helpers added in `db.rs` (None / false
-  for unregistered or inactive nodes — callers fall back to `Codebase`).
+- **PR6a / PR6b** ✅ `ClassNode` extended with `template_params`;
+  populated for classes/interfaces/traits at upsert time.
+  `type_exists_via_db` and `class_template_params_via_db` helpers added.
+  All four read patterns in `call/args.rs` (`type_exists`,
+  `interfaces.contains_key`, `traits.contains_key`,
+  `get_class_template_params`) migrated to prefer db with codebase
+  fallback via small private wrappers in `args.rs`.
 
 Remaining for S5 (rough order):
-
-- **PR6b** Migrate `args.rs` reads (`type_exists`, `interfaces.contains_key`,
-  `traits.contains_key`, `get_class_template_params`) to prefer db with
-  codebase fallback.
 - Promote `has_unknown_ancestor` to a db-derived predicate (walks
   `class_ancestors` and checks every name is registered).
 - Register bundled / user stubs with the db at load time so `type_exists`
