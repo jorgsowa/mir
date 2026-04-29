@@ -330,6 +330,16 @@ impl ProjectAnalyzer {
             self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);
         }
 
+        // ---- S5-PR9: mirror Pass 1 + lazy-loaded definitions into the Salsa
+        // db.  Today the batch Pass 2 driver still passes `db: None`, so this
+        // is preparatory — the db is populated and ready for the per-helper
+        // fallback removal that follows once `Pass2Driver` is wired with a
+        // shared db reference.
+        {
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.ingest_codebase(&self.codebase);
+        }
+
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let rev = build_reverse_deps(&self.codebase);

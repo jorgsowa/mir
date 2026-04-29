@@ -219,16 +219,23 @@ Sub-PRs (each shippable, fixture suite green at every step):
   functions, their methods, properties, and constants) into the
   Salsa db.  Wired into `ProjectAnalyzer::load_stubs` so bundled and
   user stubs are db-visible the moment they land in `Codebase`.
-  This unblocks dropping the codebase fallbacks in
-  `type_exists_via_db` / `class_kind_via_db` / `class_template_params_via_db`
-  in subsequent PRs.
+- **PR9** ✅ `ingest_codebase` also called from the batch `analyze`
+  path after Pass 1 + PSR-4 lazy-load complete.  Preparatory: today
+  the batch `Pass2Driver` still passes `db: None`, so this changes
+  no behavior — it sets up dropping the per-helper codebase
+  fallbacks once `Pass2Driver` is wired with a shared db reference.
 
 Remaining for S5 (rough order):
+- Thread `&dyn MirDatabase` into the batch `Pass2Driver` (priming
+  sweep + main pass) so analyzers can consult the db.  Salsa 0.26
+  supports parallel `&Database` access; the existing
+  `ProjectAnalyzer.salsa: Mutex<(MirDb, …)>` is the storage.  When
+  this lands, a second `ingest_codebase` call after the post-Pass-2
+  `lazy_load_from_body_issues` will need to land alongside.
 - Drop the codebase fallback in the prefer-db wrappers
   (`type_exists`, `is_interface`, `class_template_params`,
-  `has_unknown_ancestor_db_or_codebase`) once `ingest_codebase` is
-  also called on the batch `analyze` path (today only LSP /
-  `re_analyze_file` upserts user-code definitions).
+  `has_unknown_ancestor_db_or_codebase`) once batch Pass 2 reads
+  the db.
 - Remove `finalization_cache` and the structural snapshot fallback in
   `re_analyze_file` once no caller reaches `ensure_finalized` (gated
   on the per-field migrations finishing).
