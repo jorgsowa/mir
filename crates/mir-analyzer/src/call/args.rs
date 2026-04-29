@@ -3,11 +3,44 @@ use std::sync::Arc;
 use php_ast::ast::{Expr, ExprKind};
 use php_ast::Span;
 
-use mir_codebase::storage::{FnParam, Visibility};
+use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
 
 use crate::expr::ExpressionAnalyzer;
+
+// db-prefer-with-codebase-fallback wrappers for the four read patterns
+// migrated in S5-PR6b.  Bundled / user stubs aren't promoted to the db
+// yet, so the codebase fallback remains load-bearing.
+fn type_exists_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
+    if let Some(db) = ea.db {
+        if crate::db::type_exists_via_db(db, fqcn) {
+            return true;
+        }
+    }
+    ea.codebase.type_exists(fqcn)
+}
+
+fn is_interface_db_or_codebase(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
+    if let Some(db) = ea.db {
+        if let Some(kind) = crate::db::class_kind_via_db(db, fqcn) {
+            return kind.is_interface;
+        }
+    }
+    ea.codebase.interfaces.contains_key(fqcn)
+}
+
+fn class_template_params_db_or_codebase(
+    ea: &ExpressionAnalyzer<'_>,
+    fqcn: &str,
+) -> Vec<TemplateParam> {
+    if let Some(db) = ea.db {
+        if let Some(tps) = crate::db::class_template_params_via_db(db, fqcn) {
+            return tps.to_vec();
+        }
+    }
+    ea.codebase.get_class_template_params(fqcn)
+}
 
 // ---------------------------------------------------------------------------
 // Public types and helpers
@@ -100,7 +133,11 @@ pub(crate) fn check_method_visibility(
     match visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
-            let from_trait = ea.codebase.traits.contains_key(owner_fqcn.as_ref());
+            let from_trait = ea
+                .db
+                .and_then(|db| crate::db::class_kind_via_db(db, owner_fqcn.as_ref()))
+                .map(|k| k.is_trait)
+                .unwrap_or_else(|| ea.codebase.traits.contains_key(owner_fqcn.as_ref()));
             let allowed = caller_fqcn == owner_fqcn.as_ref()
                 || (from_trait
                     && ea
@@ -486,7 +523,12 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
         let arg_fqcn: &Arc<str> = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
-                if ea.codebase.traits.contains_key(fqcn.as_ref()) {
+                let is_trait = ea
+                    .db
+                    .and_then(|db| crate::db::class_kind_via_db(db, fqcn.as_ref()))
+                    .map(|k| k.is_trait)
+                    .unwrap_or_else(|| ea.codebase.traits.contains_key(fqcn.as_ref()));
+                if is_trait {
                     return true;
                 }
                 fqcn
@@ -574,7 +616,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     _ => &[],
                 };
                 if !arg_type_params.is_empty() || !param_type_params.is_empty() {
-                    let class_tps = ea.codebase.get_class_template_params(&resolved_param);
+                    let class_tps = class_template_params_db_or_codebase(ea, &resolved_param);
                     return generic_type_params_compatible(
                         arg_type_params,
                         param_type_params,
@@ -617,7 +659,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                                 generic_ancestor_type_args(&resolved_arg, param_fqcn.as_ref(), ea)
                             });
                     if let Some(arg_as_param_params) = ancestor_args {
-                        let class_tps = ea.codebase.get_class_template_params(&resolved_param);
+                        let class_tps = class_template_params_db_or_codebase(ea, &resolved_param);
                         return generic_type_params_compatible(
                             &arg_as_param_params,
                             param_type_params,
@@ -648,7 +690,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 }
             }
 
-            if !arg_fqcn.contains('\\') && !ea.codebase.type_exists(&resolved_arg) {
+            if !arg_fqcn.contains('\\') && !type_exists_db_or_codebase(ea, &resolved_arg) {
                 for entry in ea.codebase.classes.iter() {
                     if entry.value().short_name.as_ref() == arg_fqcn.as_ref() {
                         let actual_fqcn = entry.key().clone();
@@ -665,9 +707,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 }
             }
 
-            let iface_key = if ea.codebase.interfaces.contains_key(arg_fqcn.as_ref()) {
+            let iface_key = if is_interface_db_or_codebase(ea, arg_fqcn.as_ref()) {
                 Some(arg_fqcn.as_ref())
-            } else if ea.codebase.interfaces.contains_key(resolved_arg.as_str()) {
+            } else if is_interface_db_or_codebase(ea, resolved_arg.as_str()) {
                 Some(resolved_arg.as_str())
             } else {
                 None
@@ -695,15 +737,15 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             }
 
             if arg_fqcn.contains('\\')
-                && !ea.codebase.type_exists(arg_fqcn.as_ref())
-                && !ea.codebase.type_exists(&resolved_arg)
+                && !type_exists_db_or_codebase(ea, arg_fqcn.as_ref())
+                && !type_exists_db_or_codebase(ea, &resolved_arg)
             {
                 return true;
             }
 
             if param_fqcn.contains('\\')
-                && !ea.codebase.type_exists(param_fqcn.as_ref())
-                && !ea.codebase.type_exists(&resolved_param)
+                && !type_exists_db_or_codebase(ea, param_fqcn.as_ref())
+                && !type_exists_db_or_codebase(ea, &resolved_param)
             {
                 return true;
             }
@@ -839,7 +881,7 @@ fn generic_ancestor_type_args_inner(
         return Some(parent_args);
     }
 
-    let parent_template_params = ea.codebase.get_class_template_params(parent.as_ref());
+    let parent_template_params = class_template_params_db_or_codebase(ea, parent.as_ref());
     let bindings: std::collections::HashMap<Arc<str>, Union> = parent_template_params
         .iter()
         .zip(extends_type_args.iter())
@@ -858,10 +900,10 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
     param_ty.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
         Atomic::TNamedObject { fqcn, .. } => {
-            !fqcn.contains('\\') && !ea.codebase.type_exists(fqcn.as_ref())
+            !fqcn.contains('\\') && !type_exists_db_or_codebase(ea, fqcn.as_ref())
         }
         Atomic::TClassString(Some(inner)) => {
-            !inner.contains('\\') && !ea.codebase.type_exists(inner.as_ref())
+            !inner.contains('\\') && !type_exists_db_or_codebase(ea, inner.as_ref())
         }
         Atomic::TArray { key: _, value }
         | Atomic::TList { value }
@@ -869,7 +911,7 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
         | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !ea.codebase.type_exists(fqcn.as_ref())
+                !fqcn.contains('\\') && !type_exists_db_or_codebase(ea, fqcn.as_ref())
             }
             _ => false,
         }),
@@ -911,7 +953,7 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
                 | Atomic::TParent { fqcn } => fqcn,
                 _ => return false,
             };
-            if !pv_fqcn.contains('\\') && !ea.codebase.type_exists(pv_fqcn.as_ref()) {
+            if !pv_fqcn.contains('\\') && !type_exists_db_or_codebase(ea, pv_fqcn.as_ref()) {
                 return true;
             }
             let resolved_param = ea.codebase.resolve_class_name(&ea.file, pv_fqcn.as_ref());
