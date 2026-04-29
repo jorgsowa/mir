@@ -1482,7 +1482,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 if let Some(prop_ty) = &prop_ty {
                                     if !prop_ty.is_mixed()
                                         && !ty.is_mixed()
-                                        && !property_assign_compatible(&ty, prop_ty, self.codebase)
+                                        && !property_assign_compatible(&ty, prop_ty, self.db)
                                     {
                                         self.emit(
                                             IssueKind::InvalidPropertyAssignment {
@@ -1879,11 +1879,11 @@ fn extract_string_from_expr<'arena, 'src>(
 }
 
 /// Returns true if `value_ty` is assignable to a property typed as `prop_ty`.
-/// Handles primitive subtype checking and named-object inheritance via the codebase.
+/// Handles primitive subtype checking and named-object inheritance via the db.
 fn property_assign_compatible(
     value_ty: &mir_types::Union,
     prop_ty: &mir_types::Union,
-    codebase: &mir_codebase::Codebase,
+    db: &dyn crate::db::MirDatabase,
 ) -> bool {
     if value_ty.is_subtype_of_simple(prop_ty) {
         return true;
@@ -1898,7 +1898,11 @@ fn property_assign_compatible(
             prop_ty.types.iter().any(|p| match p {
                 mir_types::Atomic::TNamedObject { fqcn: prop_fqcn, .. } => {
                     arg_fqcn == prop_fqcn
-                        || codebase.extends_or_implements(arg_fqcn.as_ref(), prop_fqcn.as_ref())
+                        || crate::db::extends_or_implements_via_db(
+                            db,
+                            arg_fqcn.as_ref(),
+                            prop_fqcn.as_ref(),
+                        )
                 }
                 mir_types::Atomic::TObject | mir_types::Atomic::TMixed => true,
                 _ => false,

@@ -239,14 +239,14 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || (!check_ty.is_subtype_of_simple(declared)
                                 && !declared.is_mixed()
                                 && !check_ty.is_mixed()
-                                && !named_object_return_compatible(&check_ty, declared, self.codebase, &self.file)
+                                && !named_object_return_compatible(&check_ty, declared, self.codebase, self.db, &self.file)
                                 // Also check without null (handles `null|T` where T implements declared).
                                 // Guard: if check_ty is purely null, remove_null() is empty and would
                                 // vacuously return true, incorrectly suppressing the error.
-                                && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, &self.file))
+                                && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, self.db, &self.file))
                                 && !declared_return_has_template(declared, self.codebase)
                                 && !declared_return_has_template(&check_ty, self.codebase)
-                                && !return_arrays_compatible(&check_ty, declared, self.codebase, &self.file)
+                                && !return_arrays_compatible(&check_ty, declared, self.codebase, self.db, &self.file)
                                 // Skip coercions: declared is more specific than actual
                                 && !declared.is_subtype_of_simple(&check_ty)
                                 && !declared.remove_null().is_subtype_of_simple(&check_ty)
@@ -258,8 +258,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                 && !check_ty.remove_false().is_subtype_of_simple(declared)
                                 // Suppress LessSpecificReturnStatement (level 4): actual is a
                                 // supertype of declared (not flagged at default error level).
-                                && !named_object_return_compatible(declared, &check_ty, self.codebase, &self.file)
-                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, &self.file)))
+                                && !named_object_return_compatible(declared, &check_ty, self.codebase, self.db, &self.file)
+                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, self.db, &self.file)))
                         {
                             let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                             let (line_end, col_end) = if stmt.span.start < stmt.span.end {
@@ -341,12 +341,12 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || fqcn.as_ref() == "Throwable"
                                 || fqcn.as_ref() == "Exception"
                                 || fqcn.as_ref() == "Error"
-                                || self.codebase.extends_or_implements(&resolved, "Throwable")
-                                || self.codebase.extends_or_implements(&resolved, "Exception")
-                                || self.codebase.extends_or_implements(&resolved, "Error")
-                                || self.codebase.extends_or_implements(fqcn, "Throwable")
-                                || self.codebase.extends_or_implements(fqcn, "Exception")
-                                || self.codebase.extends_or_implements(fqcn, "Error")
+                                || crate::db::extends_or_implements_via_db(self.db, &resolved, "Throwable")
+                                || crate::db::extends_or_implements_via_db(self.db, &resolved, "Exception")
+                                || crate::db::extends_or_implements_via_db(self.db, &resolved, "Error")
+                                || crate::db::extends_or_implements_via_db(self.db, fqcn, "Throwable")
+                                || crate::db::extends_or_implements_via_db(self.db, fqcn, "Exception")
+                                || crate::db::extends_or_implements_via_db(self.db, fqcn, "Error")
                                 // Suppress if class has unknown ancestors (might be Throwable)
                                 || crate::db::has_unknown_ancestor_via_db(self.db, &resolved)
                                 || crate::db::has_unknown_ancestor_via_db(self.db, fqcn)
@@ -383,12 +383,30 @@ impl<'a> StatementsAnalyzer<'a> {
                             let is_throwable = resolved == "Throwable"
                                 || resolved == "Exception"
                                 || resolved == "Error"
-                                || self.codebase.extends_or_implements(&resolved, "Throwable")
-                                || self.codebase.extends_or_implements(&resolved, "Exception")
-                                || self.codebase.extends_or_implements(&resolved, "Error")
-                                || self.codebase.extends_or_implements(fqcn, "Throwable")
-                                || self.codebase.extends_or_implements(fqcn, "Exception")
-                                || self.codebase.extends_or_implements(fqcn, "Error")
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db,
+                                    &resolved,
+                                    "Throwable",
+                                )
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db,
+                                    &resolved,
+                                    "Exception",
+                                )
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db, &resolved, "Error",
+                                )
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db,
+                                    fqcn,
+                                    "Throwable",
+                                )
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db,
+                                    fqcn,
+                                    "Exception",
+                                )
+                                || crate::db::extends_or_implements_via_db(self.db, fqcn, "Error")
                                 || crate::db::has_unknown_ancestor_via_db(self.db, &resolved)
                                 || crate::db::has_unknown_ancestor_via_db(self.db, fqcn);
                             if !is_throwable {

@@ -390,6 +390,7 @@ impl<'a> ClassAnalyzer<'a> {
                             child_ret,
                             parent_ret,
                             self.codebase,
+                            self.db,
                             child_file,
                         )
                     } else if involves_named_objects || involves_self_static {

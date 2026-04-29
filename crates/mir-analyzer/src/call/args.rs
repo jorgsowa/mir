@@ -120,9 +120,11 @@ pub(crate) fn check_method_visibility(
                 .is_some_and(|k| k.is_trait);
             let allowed = caller_fqcn == owner_fqcn.as_ref()
                 || (from_trait
-                    && ea
-                        .codebase
-                        .extends_or_implements(caller_fqcn, owner_fqcn.as_ref()));
+                    && crate::db::extends_or_implements_via_db(
+                        ea.db,
+                        caller_fqcn,
+                        owner_fqcn.as_ref(),
+                    ));
             if !allowed {
                 ea.emit(
                     IssueKind::UndefinedMethod {
@@ -147,9 +149,11 @@ pub(crate) fn check_method_visibility(
                 );
             } else {
                 let allowed = caller_fqcn == owner_fqcn.as_ref()
-                    || ea
-                        .codebase
-                        .extends_or_implements(caller_fqcn, owner_fqcn.as_ref());
+                    || crate::db::extends_or_implements_via_db(
+                        ea.db,
+                        caller_fqcn,
+                        owner_fqcn.as_ref(),
+                    );
                 if !allowed {
                     ea.emit(
                         IssueKind::UndefinedMethod {
@@ -531,9 +535,11 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     Atomic::TClassString(None) | Atomic::TString => true,
                     Atomic::TClassString(Some(param_cls)) => {
                         arg_cls == param_cls
-                            || ea
-                                .codebase
-                                .extends_or_implements(arg_cls.as_ref(), param_cls.as_ref())
+                            || crate::db::extends_or_implements_via_db(
+                                ea.db,
+                                arg_cls.as_ref(),
+                                param_cls.as_ref(),
+                            )
                     }
                     _ => false,
                 });
@@ -604,15 +610,18 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 return true;
             }
 
-            let arg_extends_param = ea
-                .codebase
-                .extends_or_implements(arg_fqcn.as_ref(), &resolved_param)
-                || ea
-                    .codebase
-                    .extends_or_implements(arg_fqcn.as_ref(), param_fqcn.as_ref())
-                || ea
-                    .codebase
-                    .extends_or_implements(&resolved_arg, &resolved_param);
+            let arg_extends_param =
+                crate::db::extends_or_implements_via_db(ea.db, arg_fqcn.as_ref(), &resolved_param)
+                    || crate::db::extends_or_implements_via_db(
+                        ea.db,
+                        arg_fqcn.as_ref(),
+                        param_fqcn.as_ref(),
+                    )
+                    || crate::db::extends_or_implements_via_db(
+                        ea.db,
+                        &resolved_arg,
+                        &resolved_param,
+                    );
 
             if arg_extends_param {
                 let param_type_params = match p_atomic {
@@ -648,15 +657,13 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 return true;
             }
 
-            if ea
-                .codebase
-                .extends_or_implements(param_fqcn.as_ref(), &resolved_arg)
-                || ea
-                    .codebase
-                    .extends_or_implements(param_fqcn.as_ref(), arg_fqcn.as_ref())
-                || ea
-                    .codebase
-                    .extends_or_implements(&resolved_param, &resolved_arg)
+            if crate::db::extends_or_implements_via_db(ea.db, param_fqcn.as_ref(), &resolved_arg)
+                || crate::db::extends_or_implements_via_db(
+                    ea.db,
+                    param_fqcn.as_ref(),
+                    arg_fqcn.as_ref(),
+                )
+                || crate::db::extends_or_implements_via_db(ea.db, &resolved_param, &resolved_arg)
             {
                 let param_type_params = match p_atomic {
                     Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
@@ -671,13 +678,15 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 for entry in ea.codebase.classes.iter() {
                     if entry.value().short_name.as_ref() == arg_fqcn.as_ref() {
                         let actual_fqcn = entry.key().clone();
-                        if ea
-                            .codebase
-                            .extends_or_implements(actual_fqcn.as_ref(), &resolved_param)
-                            || ea
-                                .codebase
-                                .extends_or_implements(actual_fqcn.as_ref(), param_fqcn.as_ref())
-                        {
+                        if crate::db::extends_or_implements_via_db(
+                            ea.db,
+                            actual_fqcn.as_ref(),
+                            &resolved_param,
+                        ) || crate::db::extends_or_implements_via_db(
+                            ea.db,
+                            actual_fqcn.as_ref(),
+                            param_fqcn.as_ref(),
+                        ) {
                             return true;
                         }
                     }
@@ -699,14 +708,16 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     .map(|e| e.key().clone())
                     .collect();
                 let compatible = class_fqcns.iter().any(|cls_fqcn| {
-                    ea.codebase
-                        .extends_or_implements(cls_fqcn.as_ref(), iface_fqcn)
-                        && (ea
-                            .codebase
-                            .extends_or_implements(cls_fqcn.as_ref(), param_fqcn.as_ref())
-                            || ea
-                                .codebase
-                                .extends_or_implements(cls_fqcn.as_ref(), &resolved_param))
+                    crate::db::extends_or_implements_via_db(ea.db, cls_fqcn.as_ref(), iface_fqcn)
+                        && (crate::db::extends_or_implements_via_db(
+                            ea.db,
+                            cls_fqcn.as_ref(),
+                            param_fqcn.as_ref(),
+                        ) || crate::db::extends_or_implements_via_db(
+                            ea.db,
+                            cls_fqcn.as_ref(),
+                            &resolved_param,
+                        ))
                 });
                 if compatible {
                     return true;
@@ -752,15 +763,17 @@ fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyz
             resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
                 || resolved_arg == param_fqcn.as_ref()
-                || ea
-                    .codebase
-                    .extends_or_implements(arg_fqcn.as_ref(), &resolved_param)
-                || ea
-                    .codebase
-                    .extends_or_implements(arg_fqcn.as_ref(), param_fqcn.as_ref())
-                || ea
-                    .codebase
-                    .extends_or_implements(&resolved_arg, &resolved_param)
+                || crate::db::extends_or_implements_via_db(
+                    ea.db,
+                    arg_fqcn.as_ref(),
+                    &resolved_param,
+                )
+                || crate::db::extends_or_implements_via_db(
+                    ea.db,
+                    arg_fqcn.as_ref(),
+                    param_fqcn.as_ref(),
+                )
+                || crate::db::extends_or_implements_via_db(ea.db, &resolved_arg, &resolved_param)
         })
     })
 }
@@ -936,18 +949,10 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
             let resolved_param = ea.codebase.resolve_class_name(&ea.file, pv_fqcn.as_ref());
             let resolved_arg = ea.codebase.resolve_class_name(&ea.file, av_fqcn.as_ref());
             resolved_param == resolved_arg
-                || ea
-                    .codebase
-                    .extends_or_implements(av_fqcn.as_ref(), &resolved_param)
-                || ea
-                    .codebase
-                    .extends_or_implements(&resolved_arg, &resolved_param)
-                || ea
-                    .codebase
-                    .extends_or_implements(pv_fqcn.as_ref(), &resolved_arg)
-                || ea
-                    .codebase
-                    .extends_or_implements(&resolved_param, &resolved_arg)
+                || crate::db::extends_or_implements_via_db(ea.db, av_fqcn.as_ref(), &resolved_param)
+                || crate::db::extends_or_implements_via_db(ea.db, &resolved_arg, &resolved_param)
+                || crate::db::extends_or_implements_via_db(ea.db, pv_fqcn.as_ref(), &resolved_arg)
+                || crate::db::extends_or_implements_via_db(ea.db, &resolved_param, &resolved_arg)
         })
     })
 }
