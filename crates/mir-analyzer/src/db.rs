@@ -457,8 +457,14 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 // ---------------------------------------------------------------------------
 
 /// Concrete in-process Salsa database.
+///
+/// `Clone` is required for parallel batch analysis: salsa's supported
+/// pattern for sharing a db across threads is to give each worker its
+/// own clone (each clone gets a fresh `ZalsaLocal`, sharing the
+/// underlying memoization storage).  Sharing `&MirDb` across threads is
+/// **not** supported because `salsa::Database: Send` (not `Sync`).
 #[salsa::db]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MirDb {
     storage: salsa::Storage<Self>,
     /// FQCN → ClassNode handle registry (not tracked by Salsa; see
@@ -1081,6 +1087,27 @@ mod tests {
         assert!(!type_exists_via_db(&db, "Bar"));
         db.deactivate_class_node("Foo");
         assert!(!type_exists_via_db(&db, "Foo"));
+    }
+
+    #[test]
+    fn clone_preserves_class_node_lookups() {
+        // PR10a: each parallel batch worker gets its own MirDb clone.
+        // Verify the clone observes the same registered nodes.
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        let cloned = db.clone();
+        assert!(
+            type_exists_via_db(&cloned, "Foo"),
+            "clone must observe nodes registered before clone()"
+        );
+        assert!(
+            !type_exists_via_db(&cloned, "Bar"),
+            "clone must not observe nodes that were never registered"
+        );
+        // Clones must also resolve ancestors through the same shared storage.
+        let foo_node = cloned.lookup_class_node("Foo").expect("registered");
+        let ancestors = class_ancestors(&cloned, foo_node);
+        assert!(ancestors.0.is_empty(), "Foo has no ancestors");
     }
 
     #[test]
