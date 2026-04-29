@@ -409,8 +409,16 @@ fn resolve_method_return<'a, 'arena, 'src>(
             ret_raw
         }
     } else if ea.codebase.type_exists(fqcn) && !ea.codebase.has_unknown_ancestor(fqcn) {
-        let is_interface = ea.codebase.interfaces.contains_key(fqcn.as_ref());
-        let is_abstract = ea.codebase.is_abstract_class(fqcn.as_ref());
+        let (is_interface, is_abstract) = ea
+            .db
+            .and_then(|db| crate::db::class_kind_via_db(db, fqcn))
+            .map(|k| (k.is_interface, k.is_abstract))
+            .unwrap_or_else(|| {
+                (
+                    ea.codebase.interfaces.contains_key(fqcn.as_ref()),
+                    ea.codebase.is_abstract_class(fqcn.as_ref()),
+                )
+            });
         if is_interface || is_abstract || ea.codebase.get_method(fqcn, "__call").is_some() {
             Union::mixed()
         } else {
