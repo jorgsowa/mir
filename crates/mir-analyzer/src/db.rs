@@ -710,6 +710,34 @@ impl MirDb {
     ) -> ClassNode {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
+            // Fast-skip: an already-active node whose Salsa-tracked fields
+            // match the upsert input.  Bulk re-ingest paths
+            // (`ingest_codebase` / `lazy_load_*`) call this for every class
+            // on every iteration; without the skip each call fires 13
+            // setters, each acquiring the Salsa write lock.  Schema doesn't
+            // mutate after Pass 1 (Pass 2 only writes `inferred_return_type`
+            // which lives on `Codebase`, not the db), so an active node with
+            // matching fields is by construction up to date.
+            //
+            // Mutation paths (LSP re-analyze) call `deactivate_class_node`
+            // first; that flips `active=false`, defeating this guard so the
+            // setters run as before.
+            if node.active(self)
+                && node.is_interface(self) == is_interface
+                && node.is_trait(self) == is_trait
+                && node.is_enum(self) == is_enum
+                && node.is_abstract(self) == is_abstract
+                && node.is_backed_enum(self) == is_backed_enum
+                && node.parent(self) == parent
+                && *node.interfaces(self) == *interfaces
+                && *node.traits(self) == *traits
+                && *node.extends(self) == *extends
+                && *node.template_params(self) == *template_params
+                && *node.require_extends(self) == *require_extends
+                && *node.require_implements(self) == *require_implements
+            {
+                return node;
+            }
             node.set_active(self).to(true);
             node.set_is_interface(self).to(is_interface);
             node.set_is_trait(self).to(is_trait);
@@ -763,6 +791,18 @@ impl MirDb {
         use salsa::Setter as _;
         let fqn = &storage.fqn;
         if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self)
+                && node.is_pure(self) == storage.is_pure
+                && node.deprecated(self) == storage.deprecated
+                && node.return_type(self) == storage.return_type
+                && *node.params(self) == *storage.params.as_slice()
+                && *node.template_params(self) == *storage.template_params.as_slice()
+                && *node.assertions(self) == *storage.assertions.as_slice()
+                && *node.throws(self) == *storage.throws.as_slice()
+            {
+                return node;
+            }
             node.set_active(self).to(true);
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
@@ -815,6 +855,23 @@ impl MirDb {
             .and_then(|m| m.get(&name_lower))
             .copied();
         if let Some(node) = existing {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self)
+                && node.visibility(self) == storage.visibility
+                && node.is_static(self) == storage.is_static
+                && node.is_abstract(self) == storage.is_abstract
+                && node.is_final(self) == storage.is_final
+                && node.is_constructor(self) == storage.is_constructor
+                && node.is_pure(self) == storage.is_pure
+                && node.deprecated(self) == storage.deprecated
+                && node.return_type(self) == storage.return_type
+                && *node.params(self) == *storage.params.as_slice()
+                && *node.template_params(self) == *storage.template_params.as_slice()
+                && *node.assertions(self) == *storage.assertions.as_slice()
+                && *node.throws(self) == *storage.throws.as_slice()
+            {
+                return node;
+            }
             node.set_active(self).to(true);
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
@@ -882,6 +939,15 @@ impl MirDb {
             .and_then(|m| m.get(storage.name.as_ref()))
             .copied();
         if let Some(node) = existing {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self)
+                && node.visibility(self) == storage.visibility
+                && node.is_static(self) == storage.is_static
+                && node.is_readonly(self) == storage.is_readonly
+                && node.ty(self) == storage.ty
+            {
+                return;
+            }
             node.set_active(self).to(true);
             node.set_ty(self).to(storage.ty.clone());
             node.set_visibility(self).to(storage.visibility);
@@ -926,6 +992,14 @@ impl MirDb {
             .and_then(|m| m.get(storage.name.as_ref()))
             .copied();
         if let Some(node) = existing {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self)
+                && node.visibility(self) == storage.visibility
+                && node.is_final(self) == storage.is_final
+                && node.ty(self) == storage.ty
+            {
+                return;
+            }
             node.set_active(self).to(true);
             node.set_ty(self).to(storage.ty.clone());
             node.set_visibility(self).to(storage.visibility);
