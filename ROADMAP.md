@@ -232,13 +232,20 @@ Sub-PRs (each shippable, fixture suite green at every step):
   the db through batch Pass 2.  Sanity test verifies a clone
   observes pre-clone upserts and resolves `class_ancestors`.
 
+- **PR10b** ✅ Thread the cloned db through batch `Pass2Driver`
+  (priming sweep + main sweep) using `for_each_with` /
+  `map_with` so each rayon worker gets its own clone.
+  `lazy_load_from_body_issues` stays on `db: None` for now (still
+  has codebase fallbacks); a second `ingest_codebase` call after
+  that lazy-load lands when the fallbacks are dropped.
+  Collateral fixes: `ingest_codebase` now also registers enum
+  cases (not just `own_constants`) as `ClassConstantNode`s so
+  `class_constant_exists_in_chain` finds `Status::Active` and
+  similar; `resolve_property_type` falls back to
+  `Codebase::get_property` when the db lookup misses (db doesn't
+  yet track docblock `@mixin` chains).
+
 Remaining for S5 (rough order):
-- **PR10b** Thread the cloned db through batch `Pass2Driver`
-  (priming sweep + main sweep) using `par_iter().map_with(...)` so
-  each rayon worker gets its own clone.  Keep
-  `lazy_load_from_body_issues` on `db: None` for now (still has
-  codebase fallbacks); a second `ingest_codebase` call after that
-  lazy-load lands when the fallbacks are dropped.
 - Drop the codebase fallback in the prefer-db wrappers
   (`type_exists`, `is_interface`, `class_template_params`,
   `has_unknown_ancestor_db_or_codebase`) once batch Pass 2 reads

@@ -354,16 +354,24 @@ impl ProjectAnalyzer {
                 .analyze_all();
         all_issues.extend(class_issues);
 
+        // ---- S5-PR10b: clone the salsa db once per parallel sweep so each
+        // rayon worker gets its own clone (Salsa databases are `Send` but
+        // `!Sync`; cloning shares the underlying memoization storage).
+        let db_priming = {
+            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.clone()
+        };
+
         // ---- Pass 2 priming: populate inferred_return_type for all functions  --
         // Run a first inference-only sweep so that cross-file inferred return
         // types are available before the issue-emitting pass below (G6).
         file_data
             .par_iter()
             .filter(|(file, _)| !files_with_parse_errors.contains(file))
-            .for_each(|(file, src)| {
+            .for_each_with(db_priming, |db, (file, src)| {
                 let driver = Pass2Driver::new_inference_only(
                     &self.codebase,
-                    None,
+                    Some(&*db as &dyn MirDatabase),
                     self.resolved_php_version(),
                 );
                 let arena = bumpalo::Bump::new();
@@ -371,12 +379,21 @@ impl ProjectAnalyzer {
                 driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map);
             });
 
+        let db_main = {
+            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.clone()
+        };
+
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
         let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
             .par_iter()
             .filter(|(file, _)| !files_with_parse_errors.contains(file))
-            .map(|(file, src)| {
-                let driver = Pass2Driver::new(&self.codebase, None, self.resolved_php_version());
+            .map_with(db_main, |db, (file, src)| {
+                let driver = Pass2Driver::new(
+                    &self.codebase,
+                    Some(&*db as &dyn MirDatabase),
+                    self.resolved_php_version(),
+                );
                 let result = if let Some(cache) = &self.cache {
                     let h = hash_content(src);
                     if let Some((cached_issues, ref_locs)) = cache.get(file, &h) {

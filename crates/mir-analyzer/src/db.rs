@@ -868,6 +868,16 @@ impl MirDb {
             for constant in en.own_constants.values() {
                 self.upsert_class_constant_node(&en.fqcn, constant);
             }
+            for case in en.cases.values() {
+                let case_const = ConstantStorage {
+                    name: case.name.clone(),
+                    ty: mir_types::Union::mixed(),
+                    visibility: None,
+                    is_final: false,
+                    location: case.location.clone(),
+                };
+                self.upsert_class_constant_node(&en.fqcn, &case_const);
+            }
         }
         for entry in codebase.functions.iter() {
             self.upsert_function_node(entry.value());
