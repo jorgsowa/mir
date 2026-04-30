@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use mir_codebase::storage::{
-    Assertion, ConstantStorage, FnParam, FunctionStorage, MethodStorage, PropertyStorage,
+    Assertion, ConstantStorage, FnParam, FunctionStorage, Location, MethodStorage, PropertyStorage,
     TemplateParam, Visibility,
 };
 use mir_codebase::{Codebase, StubSlice};
@@ -151,6 +151,24 @@ pub struct ClassNode {
     /// for unbacked (pure) enums.  Used by the `Enum->value` property read
     /// in `expr.rs` to return the backed scalar type instead of `mixed`.
     pub enum_scalar_type: Option<Union>,
+    /// `true` if the class is declared `final`.  Always `false` for
+    /// interfaces, traits, and enums (PHP enums are implicitly final but the
+    /// codebase doesn't currently track that on `EnumStorage`).
+    pub is_final: bool,
+    /// `true` if the class is declared `readonly`.  Always `false` for
+    /// non-class kinds.
+    pub is_readonly: bool,
+    /// Source location of the class declaration.  Mirrors
+    /// `ClassStorage::location` (and `InterfaceStorage::location`,
+    /// `TraitStorage::location`, `EnumStorage::location`).  Used by
+    /// `ClassAnalyzer` to attribute issues to the right span.
+    pub location: Option<Location>,
+    /// Type arguments from `@extends Parent<T1, T2>` — populated for
+    /// classes only.  Mirrors `ClassStorage::extends_type_args`.
+    pub extends_type_args: Arc<[Union]>,
+    /// Type arguments from `@implements Iface<T1, T2>` — populated for
+    /// classes only.  Mirrors `ClassStorage::implements_type_args`.
+    pub implements_type_args: Arc<[(Arc<str>, Arc<[Union]>)]>,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -1032,6 +1050,11 @@ pub struct ClassNodeFields {
     pub mixins: Arc<[Arc<str>]>,
     pub deprecated: Option<Arc<str>>,
     pub enum_scalar_type: Option<Union>,
+    pub is_final: bool,
+    pub is_readonly: bool,
+    pub location: Option<Location>,
+    pub extends_type_args: Arc<[Union]>,
+    pub implements_type_args: Arc<[(Arc<str>, Arc<[Union]>)]>,
 }
 
 impl ClassNodeFields {
@@ -1092,6 +1115,11 @@ impl MirDb {
             mixins,
             deprecated,
             enum_scalar_type,
+            is_final,
+            is_readonly,
+            location,
+            extends_type_args,
+            implements_type_args,
         } = fields;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
             // Fast-skip: an already-active node whose Salsa-tracked fields
@@ -1122,6 +1150,11 @@ impl MirDb {
                 && *node.mixins(self) == *mixins
                 && node.deprecated(self) == deprecated
                 && node.enum_scalar_type(self) == enum_scalar_type
+                && node.is_final(self) == is_final
+                && node.is_readonly(self) == is_readonly
+                && node.location(self) == location
+                && *node.extends_type_args(self) == *extends_type_args
+                && *node.implements_type_args(self) == *implements_type_args
             {
                 return node;
             }
@@ -1141,6 +1174,11 @@ impl MirDb {
             node.set_mixins(self).to(mixins);
             node.set_deprecated(self).to(deprecated);
             node.set_enum_scalar_type(self).to(enum_scalar_type);
+            node.set_is_final(self).to(is_final);
+            node.set_is_readonly(self).to(is_readonly);
+            node.set_location(self).to(location);
+            node.set_extends_type_args(self).to(extends_type_args);
+            node.set_implements_type_args(self).to(implements_type_args);
             node
         } else {
             let node = ClassNode::new(
@@ -1162,6 +1200,11 @@ impl MirDb {
                 mixins,
                 deprecated,
                 enum_scalar_type,
+                is_final,
+                is_readonly,
+                location,
+                extends_type_args,
+                implements_type_args,
             );
             self.class_nodes.insert(fqcn, node);
             node
@@ -1431,6 +1474,16 @@ impl MirDb {
                 template_params: Arc::from(cls.template_params.as_slice()),
                 mixins: Arc::from(cls.mixins.as_slice()),
                 deprecated: cls.deprecated.clone(),
+                is_final: cls.is_final,
+                is_readonly: cls.is_readonly,
+                location: cls.location.clone(),
+                extends_type_args: Arc::from(cls.extends_type_args.as_slice()),
+                implements_type_args: Arc::from(
+                    cls.implements_type_args
+                        .iter()
+                        .map(|(iface, args)| (iface.clone(), Arc::from(args.as_slice())))
+                        .collect::<Vec<_>>(),
+                ),
                 ..ClassNodeFields::for_class(cls.fqcn.clone())
             });
             for method in cls.own_methods.values() {
@@ -1448,6 +1501,7 @@ impl MirDb {
             self.upsert_class_node(ClassNodeFields {
                 extends: Arc::from(iface.extends.as_slice()),
                 template_params: Arc::from(iface.template_params.as_slice()),
+                location: iface.location.clone(),
                 ..ClassNodeFields::for_interface(iface.fqcn.clone())
             });
             for method in iface.own_methods.values() {
@@ -1464,6 +1518,7 @@ impl MirDb {
                 template_params: Arc::from(tr.template_params.as_slice()),
                 require_extends: Arc::from(tr.require_extends.as_slice()),
                 require_implements: Arc::from(tr.require_implements.as_slice()),
+                location: tr.location.clone(),
                 ..ClassNodeFields::for_trait(tr.fqcn.clone())
             });
             for method in tr.own_methods.values() {
@@ -1482,6 +1537,7 @@ impl MirDb {
                 interfaces: Arc::from(en.interfaces.as_slice()),
                 is_backed_enum: en.scalar_type.is_some(),
                 enum_scalar_type: en.scalar_type.clone(),
+                location: en.location.clone(),
                 ..ClassNodeFields::for_enum(en.fqcn.clone())
             });
             for method in en.own_methods.values() {

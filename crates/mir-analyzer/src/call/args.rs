@@ -846,15 +846,14 @@ fn generic_ancestor_type_args_inner(
         return None;
     }
 
-    let cls = ea.codebase.classes.get(child)?;
-    let parent = cls.parent.clone();
-    let extends_type_args = cls.extends_type_args.clone();
-    let implements_type_args = cls.implements_type_args.clone();
-    drop(cls);
+    let node = ea.db.lookup_class_node(child).filter(|n| n.active(ea.db))?;
+    let parent = node.parent(ea.db);
+    let extends_type_args: Vec<Union> = node.extends_type_args(ea.db).to_vec();
+    let implements_type_args = node.implements_type_args(ea.db);
 
-    for (iface, args) in implements_type_args {
+    for (iface, args) in implements_type_args.iter() {
         if iface.as_ref() == ancestor {
-            return Some(args);
+            return Some(args.to_vec());
         }
     }
 

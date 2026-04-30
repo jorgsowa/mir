@@ -97,8 +97,12 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- 1. Final-class extension check / deprecated parent check ------
             if let Some(parent_fqcn) = &cls.parent {
-                if let Some(parent) = self.codebase.classes.get(parent_fqcn.as_ref()) {
-                    if parent.is_final {
+                if let Some(parent) = self
+                    .db
+                    .lookup_class_node(parent_fqcn.as_ref())
+                    .filter(|n| n.active(self.db))
+                {
+                    if parent.is_final(self.db) {
                         let loc = issue_location(
                             cls.location.as_ref(),
                             fqcn,
@@ -119,7 +123,7 @@ impl<'a> ClassAnalyzer<'a> {
                         }
                         issues.push(issue);
                     }
-                    if let Some(msg) = parent.deprecated.clone() {
+                    if let Some(msg) = parent.deprecated(self.db) {
                         let loc = issue_location(
                             cls.location.as_ref(),
                             fqcn,
@@ -242,7 +246,9 @@ impl<'a> ClassAnalyzer<'a> {
         let all_ifaces: Vec<Arc<str>> = self
             .ancestors(fqcn)
             .into_iter()
-            .filter(|p| self.codebase.interfaces.contains_key(p.as_ref()))
+            .filter(|p| {
+                crate::db::class_kind_via_db(self.db, p.as_ref()).is_some_and(|k| k.is_interface)
+            })
             .collect();
 
         for iface_fqcn in &all_ifaces {
@@ -645,12 +651,16 @@ impl<'a> ClassAnalyzer<'a> {
                         .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
 
                     if let Some(offender) = offender {
-                        let cls = self.codebase.classes.get(offender.as_ref());
+                        let location = self
+                            .db
+                            .lookup_class_node(offender.as_ref())
+                            .filter(|n| n.active(self.db))
+                            .and_then(|n| n.location(self.db));
                         let loc = issue_location(
-                            cls.as_ref().and_then(|c| c.location.as_ref()),
+                            location.as_ref(),
                             offender,
-                            cls.as_ref()
-                                .and_then(|c| c.location.as_ref())
+                            location
+                                .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
                         );
                         let mut issue = Issue::new(
@@ -659,10 +669,7 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc,
                         );
-                        if let Some(snippet) = extract_snippet(
-                            cls.as_ref().and_then(|c| c.location.as_ref()),
-                            &self.sources,
-                        ) {
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
                             issue = issue.with_snippet(snippet);
                         }
                         issues.push(issue);
@@ -751,13 +758,16 @@ impl<'a> ClassAnalyzer<'a> {
                 .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
 
             if let Some(offender) = offender {
-                let iface = self.codebase.interfaces.get(offender.as_ref());
+                let location = self
+                    .db
+                    .lookup_class_node(offender.as_ref())
+                    .filter(|n| n.active(self.db))
+                    .and_then(|n| n.location(self.db));
                 let loc = issue_location(
-                    iface.as_ref().and_then(|i| i.location.as_ref()),
+                    location.as_ref(),
                     offender,
-                    iface
+                    location
                         .as_ref()
-                        .and_then(|i| i.location.as_ref())
                         .and_then(|l| self.sources.get(&l.file).copied()),
                 );
                 let mut issue = Issue::new(
@@ -766,10 +776,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc,
                 );
-                if let Some(snippet) = extract_snippet(
-                    iface.as_ref().and_then(|i| i.location.as_ref()),
-                    &self.sources,
-                ) {
+                if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);

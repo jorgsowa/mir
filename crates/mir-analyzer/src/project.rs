@@ -793,6 +793,16 @@ impl ProjectAnalyzer {
                     template_params: Arc::from(cls.template_params.as_slice()),
                     mixins: Arc::from(cls.mixins.as_slice()),
                     deprecated: cls.deprecated.clone(),
+                    is_final: cls.is_final,
+                    is_readonly: cls.is_readonly,
+                    location: cls.location.clone(),
+                    extends_type_args: Arc::from(cls.extends_type_args.as_slice()),
+                    implements_type_args: Arc::from(
+                        cls.implements_type_args
+                            .iter()
+                            .map(|(iface, args)| (iface.clone(), Arc::from(args.as_slice())))
+                            .collect::<Vec<_>>(),
+                    ),
                     ..crate::db::ClassNodeFields::for_class(cls.fqcn.clone())
                 });
             }
@@ -800,6 +810,7 @@ impl ProjectAnalyzer {
                 db.upsert_class_node(crate::db::ClassNodeFields {
                     extends: Arc::from(iface.extends.as_slice()),
                     template_params: Arc::from(iface.template_params.as_slice()),
+                    location: iface.location.clone(),
                     ..crate::db::ClassNodeFields::for_interface(iface.fqcn.clone())
                 });
             }
@@ -809,6 +820,7 @@ impl ProjectAnalyzer {
                     template_params: Arc::from(tr.template_params.as_slice()),
                     require_extends: Arc::from(tr.require_extends.as_slice()),
                     require_implements: Arc::from(tr.require_implements.as_slice()),
+                    location: tr.location.clone(),
                     ..crate::db::ClassNodeFields::for_trait(tr.fqcn.clone())
                 });
             }
@@ -817,6 +829,7 @@ impl ProjectAnalyzer {
                     interfaces: Arc::from(en.interfaces.as_slice()),
                     is_backed_enum: en.scalar_type.is_some(),
                     enum_scalar_type: en.scalar_type.clone(),
+                    location: en.location.clone(),
                     ..crate::db::ClassNodeFields::for_enum(en.fqcn.clone())
                 });
             }
