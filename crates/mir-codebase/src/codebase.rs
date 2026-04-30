@@ -13,7 +13,6 @@ use crate::interner::Interner;
 /// Each entry is 12 bytes (`u32` + `u32` + `u16` + `u16`) with no per-entry
 /// allocator overhead beyond the `Vec` backing store.
 type ReferenceLocations = DashMap<u32, Vec<(u32, u32, u16, u16)>>;
-type FinalizationCache = DashMap<Arc<str>, std::sync::OnceLock<Arc<[Arc<str>]>>>;
 
 use crate::storage::{
     ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage, TraitStorage,
@@ -176,14 +175,6 @@ pub struct Codebase {
 
     /// Whether finalize() has been called.
     finalized: std::sync::atomic::AtomicBool,
-
-    /// Per-class memoization of ancestor lists computed by `ensure_finalized`.
-    /// Key: FQCN (class or interface). Value: `OnceLock` holding the computed
-    /// `all_parents` vec as a ref-counted slice.
-    ///
-    /// Entries are populated lazily by `ensure_finalized` and invalidated
-    /// granularly by `remove_file_definitions` / `invalidate_finalization`.
-    finalization_cache: FinalizationCache,
 }
 
 impl Codebase {
@@ -377,12 +368,10 @@ impl Codebase {
     ///
     /// Use this when new class definitions have been added after an initial
     /// `finalize()` call (e.g., lazily loaded via PSR-4) and the inheritance
-    /// graph needs to be rebuilt. Also clears the per-class `finalization_cache`
-    /// so that `ensure_finalized` recomputes ancestors for all classes.
+    /// graph needs to be rebuilt.
     pub fn invalidate_finalization(&self) {
         self.finalized
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        self.finalization_cache.clear();
     }
 
     // -----------------------------------------------------------------------
@@ -405,8 +394,6 @@ impl Codebase {
             .collect();
 
         // Remove each symbol from its respective map and from symbol_to_file.
-        // Also evict from finalization_cache so ensure_finalized recomputes on
-        // the next call (OnceLock cannot be reset, so we remove the entry entirely).
         for sym in &symbols {
             self.classes.remove(sym.as_ref());
             self.interfaces.remove(sym.as_ref());
@@ -416,7 +403,6 @@ impl Codebase {
             self.constants.remove(sym.as_ref());
             self.symbol_to_file.remove(sym.as_ref());
             self.known_symbols.remove(sym.as_ref());
-            self.finalization_cache.remove(sym.as_ref());
         }
 
         // Remove file-level metadata
@@ -452,22 +438,17 @@ impl Codebase {
     // Structural snapshot — skip finalize() on body-only changes
     // -----------------------------------------------------------------------
 
-    /// Restore the pre-computed ancestor list for a single class or interface
-    /// and populate the finalization cache so that `ensure_finalized` returns
-    /// the Salsa-computed value without recomputing from scratch.
+    /// Restore the pre-computed ancestor list for a single class or interface.
     ///
     /// Called by `re_analyze_file` when the Salsa `class_ancestors` query
-    /// confirms that the inheritance structure of a file is unchanged.
+    /// confirms that the inheritance structure of a file is unchanged, so
+    /// we don't have to walk the hierarchy in `finalize()` again.
     pub fn restore_ancestors(&self, fqcn: &str, ancestors: Arc<[Arc<str>]>) {
         if let Some(mut cls) = self.classes.get_mut(fqcn) {
             cls.all_parents = ancestors.to_vec();
         } else if let Some(mut iface) = self.interfaces.get_mut(fqcn) {
             iface.all_parents = ancestors.to_vec();
         }
-        self.finalization_cache
-            .entry(Arc::from(fqcn))
-            .or_default()
-            .get_or_init(|| Arc::clone(&ancestors));
     }
 
     /// Mark the codebase as finalized without running the full `finalize()` sweep.
@@ -497,312 +478,8 @@ impl Codebase {
     // Lookups
     // -----------------------------------------------------------------------
 
-    /// Resolve a property, walking up the inheritance chain (parent classes and traits).
-    pub fn get_property(
-        &self,
-        fqcn: &str,
-        prop_name: &str,
-    ) -> Option<crate::storage::PropertyStorage> {
-        self.get_property_inner(fqcn, prop_name, &mut std::collections::HashSet::new())
-    }
-
-    fn get_property_inner(
-        &self,
-        fqcn: &str,
-        prop_name: &str,
-        visited: &mut std::collections::HashSet<String>,
-    ) -> Option<crate::storage::PropertyStorage> {
-        if !visited.insert(fqcn.to_string()) {
-            return None;
-        }
-        self.ensure_finalized(fqcn);
-        // Check direct class own_properties
-        if let Some(cls) = self.classes.get(fqcn) {
-            if let Some(p) = cls.own_properties.get(prop_name) {
-                return Some(p.clone());
-            }
-            let mixins = cls.mixins.clone();
-            drop(cls);
-            for mixin in &mixins {
-                if let Some(p) = self.get_property_inner(mixin.as_ref(), prop_name, visited) {
-                    return Some(p);
-                }
-            }
-        }
-
-        // Walk all ancestors (collected during finalize)
-        let all_parents = {
-            if let Some(cls) = self.classes.get(fqcn) {
-                cls.all_parents.clone()
-            } else {
-                return None;
-            }
-        };
-
-        for ancestor_fqcn in &all_parents {
-            if let Some(ancestor_cls) = self.classes.get(ancestor_fqcn.as_ref()) {
-                if let Some(p) = ancestor_cls.own_properties.get(prop_name) {
-                    return Some(p.clone());
-                }
-                let anc_mixins = ancestor_cls.mixins.clone();
-                drop(ancestor_cls);
-                for mixin_fqcn in &anc_mixins {
-                    if let Some(p) = self.get_property_inner(mixin_fqcn, prop_name, visited) {
-                        return Some(p);
-                    }
-                }
-            }
-        }
-
-        // Check traits
-        let trait_list = {
-            if let Some(cls) = self.classes.get(fqcn) {
-                cls.traits.clone()
-            } else {
-                vec![]
-            }
-        };
-        for trait_fqcn in &trait_list {
-            if let Some(tr) = self.traits.get(trait_fqcn.as_ref()) {
-                if let Some(p) = tr.own_properties.get(prop_name) {
-                    return Some(p.clone());
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Resolve a class constant by name, walking up the inheritance chain.
-    pub fn get_class_constant(
-        &self,
-        fqcn: &str,
-        const_name: &str,
-    ) -> Option<crate::storage::ConstantStorage> {
-        self.ensure_finalized(fqcn);
-        // Class: own → traits → ancestors → interfaces
-        if let Some(cls) = self.classes.get(fqcn) {
-            if let Some(c) = cls.own_constants.get(const_name) {
-                return Some(c.clone());
-            }
-            let all_parents = cls.all_parents.clone();
-            let interfaces = cls.interfaces.clone();
-            let traits = cls.traits.clone();
-            drop(cls);
-
-            for tr_fqcn in &traits {
-                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
-                    if let Some(c) = tr.own_constants.get(const_name) {
-                        return Some(c.clone());
-                    }
-                }
-            }
-
-            for ancestor_fqcn in &all_parents {
-                if let Some(ancestor) = self.classes.get(ancestor_fqcn.as_ref()) {
-                    if let Some(c) = ancestor.own_constants.get(const_name) {
-                        return Some(c.clone());
-                    }
-                }
-                if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
-                    if let Some(c) = iface.own_constants.get(const_name) {
-                        return Some(c.clone());
-                    }
-                }
-            }
-
-            for iface_fqcn in &interfaces {
-                if let Some(iface) = self.interfaces.get(iface_fqcn.as_ref()) {
-                    if let Some(c) = iface.own_constants.get(const_name) {
-                        return Some(c.clone());
-                    }
-                }
-            }
-
-            return None;
-        }
-
-        // Interface: own → parent interfaces
-        if let Some(iface) = self.interfaces.get(fqcn) {
-            if let Some(c) = iface.own_constants.get(const_name) {
-                return Some(c.clone());
-            }
-            let parents = iface.all_parents.clone();
-            drop(iface);
-            for p in &parents {
-                if let Some(parent_iface) = self.interfaces.get(p.as_ref()) {
-                    if let Some(c) = parent_iface.own_constants.get(const_name) {
-                        return Some(c.clone());
-                    }
-                }
-            }
-            return None;
-        }
-
-        // Enum: own constants + cases
-        if let Some(en) = self.enums.get(fqcn) {
-            if let Some(c) = en.own_constants.get(const_name) {
-                return Some(c.clone());
-            }
-            if en.cases.contains_key(const_name) {
-                return Some(crate::storage::ConstantStorage {
-                    name: Arc::from(const_name),
-                    ty: mir_types::Union::mixed(),
-                    visibility: None,
-                    is_final: false,
-                    location: None,
-                });
-            }
-            return None;
-        }
-
-        // Trait: own constants only
-        if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(c) = tr.own_constants.get(const_name) {
-                return Some(c.clone());
-            }
-            return None;
-        }
-
-        None
-    }
-
-    /// Resolve a method, walking up the full inheritance chain (own → traits → ancestors).
-    pub fn get_method(&self, fqcn: &str, method_name: &str) -> Option<Arc<MethodStorage>> {
-        self.get_method_inner(fqcn, method_name, &mut std::collections::HashSet::new())
-    }
-
-    fn get_method_inner(
-        &self,
-        fqcn: &str,
-        method_name: &str,
-        visited: &mut std::collections::HashSet<String>,
-    ) -> Option<Arc<MethodStorage>> {
-        if !visited.insert(fqcn.to_string()) {
-            return None;
-        }
-        self.ensure_finalized(fqcn);
-        // PHP method names are case-insensitive — normalize to lowercase for all lookups.
-        let method_lower = method_name.to_lowercase();
-        let method_name = method_lower.as_str();
-
-        // --- Class: own methods → own traits → ancestor classes/traits/interfaces ---
-        if let Some(cls) = self.classes.get(fqcn) {
-            // 1. Own methods (highest priority)
-            if let Some(m) = lookup_method(&cls.own_methods, method_name) {
-                return Some(Arc::clone(m));
-            }
-            // Collect chain info before dropping the DashMap guard.
-            let own_traits = cls.traits.clone();
-            let ancestors = cls.all_parents.clone();
-            let mixins = cls.mixins.clone();
-            drop(cls);
-
-            // 2. Docblock mixins (delegated magic lookup)
-            for mixin_fqcn in &mixins {
-                if let Some(m) = self.get_method_inner(mixin_fqcn, method_name, visited) {
-                    return Some(m);
-                }
-            }
-
-            // 3. Own trait methods (recursive into trait-of-trait)
-            for tr_fqcn in &own_traits {
-                if let Some(m) = self.get_method_in_trait(tr_fqcn, method_name) {
-                    return Some(m);
-                }
-            }
-
-            // 4. Ancestor chain (all_parents is closest-first: parent, grandparent, …)
-            for ancestor_fqcn in &ancestors {
-                if let Some(anc) = self.classes.get(ancestor_fqcn.as_ref()) {
-                    if let Some(m) = lookup_method(&anc.own_methods, method_name) {
-                        return Some(Arc::clone(m));
-                    }
-                    let anc_traits = anc.traits.clone();
-                    let anc_mixins = anc.mixins.clone();
-                    drop(anc);
-                    for tr_fqcn in &anc_traits {
-                        if let Some(m) = self.get_method_in_trait(tr_fqcn, method_name) {
-                            return Some(m);
-                        }
-                    }
-                    for mixin_fqcn in &anc_mixins {
-                        if let Some(m) = self.get_method_inner(mixin_fqcn, method_name, visited) {
-                            return Some(m);
-                        }
-                    }
-                } else if let Some(iface) = self.interfaces.get(ancestor_fqcn.as_ref()) {
-                    if let Some(m) = lookup_method(&iface.own_methods, method_name) {
-                        let mut ms = (**m).clone();
-                        ms.is_abstract = true;
-                        return Some(Arc::new(ms));
-                    }
-                }
-                // Traits listed in all_parents are already covered via their owning class above.
-            }
-            return None;
-        }
-
-        // --- Interface: own methods + parent interfaces ---
-        if let Some(iface) = self.interfaces.get(fqcn) {
-            if let Some(m) = lookup_method(&iface.own_methods, method_name) {
-                return Some(Arc::clone(m));
-            }
-            let parents = iface.all_parents.clone();
-            drop(iface);
-            for parent_fqcn in &parents {
-                if let Some(parent_iface) = self.interfaces.get(parent_fqcn.as_ref()) {
-                    if let Some(m) = lookup_method(&parent_iface.own_methods, method_name) {
-                        return Some(Arc::clone(m));
-                    }
-                }
-            }
-            return None;
-        }
-
-        // --- Trait (variable annotated with a trait type) ---
-        if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-                return Some(Arc::clone(m));
-            }
-            return None;
-        }
-
-        // --- Enum ---
-        if let Some(e) = self.enums.get(fqcn) {
-            if let Some(m) = lookup_method(&e.own_methods, method_name) {
-                return Some(Arc::clone(m));
-            }
-            // PHP 8.1 built-in enum methods: cases(), from(), tryFrom()
-            if matches!(method_name, "cases" | "from" | "tryfrom") {
-                return Some(Arc::new(crate::storage::MethodStorage {
-                    fqcn: Arc::from(fqcn),
-                    name: Arc::from(method_name),
-                    params: vec![],
-                    return_type: Some(mir_types::Union::mixed()),
-                    inferred_return_type: None,
-                    visibility: crate::storage::Visibility::Public,
-                    is_static: true,
-                    is_abstract: false,
-                    is_constructor: false,
-                    template_params: vec![],
-                    assertions: vec![],
-                    throws: vec![],
-                    is_final: false,
-                    is_internal: false,
-                    is_pure: false,
-                    deprecated: None,
-                    location: None,
-                }));
-            }
-        }
-
-        None
-    }
-
-    /// Direct, non-finalizing lookup of a method's `inferred_return_type` on
-    /// the owner class/trait/interface/enum.  Unlike `get_method`, this does
-    /// not run `ensure_finalized` and does not walk the inheritance chain —
+    /// Direct lookup of a method's `inferred_return_type` on the owner
+    /// class/trait/interface/enum.  Does not walk the inheritance chain —
     /// callers are expected to know the owning FQCN already (e.g. from
     /// `db::lookup_method_in_chain`).
     pub fn method_inferred_return_type(
@@ -910,7 +587,38 @@ impl Codebase {
     /// Returns true if the class (or any ancestor/trait) defines a `__get` magic method.
     /// Such classes allow arbitrary property access, suppressing UndefinedProperty.
     pub fn has_magic_get(&self, fqcn: &str) -> bool {
-        self.get_method(fqcn, "__get").is_some()
+        if let Some(cls) = self.classes.get(fqcn) {
+            if lookup_method(&cls.own_methods, "__get").is_some() {
+                return true;
+            }
+            let traits = cls.traits.clone();
+            let parents = cls.all_parents.clone();
+            drop(cls);
+            for tr_fqcn in &traits {
+                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    if lookup_method(&tr.own_methods, "__get").is_some() {
+                        return true;
+                    }
+                }
+            }
+            for anc in &parents {
+                if let Some(anc_cls) = self.classes.get(anc.as_ref()) {
+                    if lookup_method(&anc_cls.own_methods, "__get").is_some() {
+                        return true;
+                    }
+                    let anc_traits = anc_cls.traits.clone();
+                    drop(anc_cls);
+                    for tr_fqcn in &anc_traits {
+                        if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                            if lookup_method(&tr.own_methods, "__get").is_some() {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Returns true if the class (or any of its ancestors) has a parent/interface/trait
@@ -921,7 +629,6 @@ impl Codebase {
     /// We use the pre-computed `all_parents` list (built during finalization) rather
     /// than recursive DashMap lookups to avoid potential deadlocks.
     pub fn has_unknown_ancestor(&self, fqcn: &str) -> bool {
-        self.ensure_finalized(fqcn);
         // For interfaces: check whether any parent interface is unknown.
         if let Some(iface) = self.interfaces.get(fqcn) {
             let parents = iface.all_parents.clone();
@@ -1078,13 +785,14 @@ impl Codebase {
         fqcn: &str,
         member_name: &str,
     ) -> Option<crate::storage::Location> {
-        // Check methods
-        if let Some(method) = self.get_method(fqcn, member_name) {
-            return method.location.clone();
+        let method_lower = member_name.to_lowercase();
+        // Methods: own → traits → ancestors (own + traits).
+        if let Some(loc) = self.find_method_location_in_chain(fqcn, &method_lower) {
+            return loc;
         }
-        // Check properties
-        if let Some(prop) = self.get_property(fqcn, member_name) {
-            return prop.location.clone();
+        // Properties: own → ancestors.
+        if let Some(loc) = self.find_property_location_in_chain(fqcn, member_name) {
+            return loc;
         }
         // Check class constants
         if let Some(cls) = self.classes.get(fqcn) {
@@ -1382,83 +1090,30 @@ impl Codebase {
     // Finalization
     // -----------------------------------------------------------------------
 
-    /// Lazily compute and memoize the ancestor list (`all_parents`) for a
-    /// single class or interface.
-    ///
-    /// The result is cached in `finalization_cache` via `OnceLock`, so
-    /// repeated calls are a single atomic load. Thread-local cycle detection
-    /// guards against circular hierarchies: a re-entrant call for the same
-    /// FQCN returns an empty slice instead of looping.
-    ///
-    /// As a side-effect, `ClassStorage::all_parents` / `InterfaceStorage::all_parents`
-    /// are updated for backward-compatibility with code that reads those fields directly.
-    pub fn ensure_finalized(&self, fqcn: &str) -> Arc<[Arc<str>]> {
-        // Fast path: already cached.
-        if let Some(entry) = self.finalization_cache.get(fqcn) {
-            if let Some(v) = entry.get() {
-                return Arc::clone(v);
-            }
-        }
-
-        // Thread-local cycle detection: if this FQCN is already being computed
-        // on the current thread, we have a circular hierarchy — return empty.
-        thread_local! {
-            static IN_PROGRESS: std::cell::RefCell<std::collections::HashSet<String>> =
-                std::cell::RefCell::new(std::collections::HashSet::new());
-        }
-        let is_cycle = IN_PROGRESS.with(|s| !s.borrow_mut().insert(fqcn.to_string()));
-        if is_cycle {
-            return Arc::from([]);
-        }
-
-        let parents = if self.classes.contains_key(fqcn) {
-            self.compute_class_ancestors(fqcn)
-        } else if self.interfaces.contains_key(fqcn) {
-            self.compute_interface_ancestors(fqcn)
-        } else {
-            vec![]
-        };
-
-        // Backward-compat: keep ClassStorage/InterfaceStorage.all_parents populated.
-        if let Some(mut cls) = self.classes.get_mut(fqcn) {
-            cls.all_parents = parents.clone();
-        } else if let Some(mut iface) = self.interfaces.get_mut(fqcn) {
-            iface.all_parents = parents.clone();
-        }
-
-        let arc: Arc<[Arc<str>]> = Arc::from(parents.as_slice());
-
-        // Store in cache (another thread may have beaten us; that is fine — both
-        // computed the same value, and get_or_init returns whichever was set first).
-        let entry = self.finalization_cache.entry(Arc::from(fqcn)).or_default();
-        let stored = entry.get_or_init(|| Arc::clone(&arc));
-
-        IN_PROGRESS.with(|s| s.borrow_mut().remove(fqcn));
-
-        Arc::clone(stored)
-    }
-
     /// Must be called after all files have been parsed (pass 1 complete).
-    /// Resolves inheritance chains and builds method dispatch tables.
-    ///
-    /// Internally delegates per-class ancestor computation to `ensure_finalized`,
-    /// so repeated calls are cheap (results are memoized). The global barrier
-    /// is still here for callers that need a single "everything is ready" signal.
+    /// Computes `all_parents` for every class and interface and resolves
+    /// `@psalm-import-type` declarations.
     pub fn finalize(&self) {
         if self.finalized.load(std::sync::atomic::Ordering::SeqCst) {
             return;
         }
 
-        // 1. Resolve all_parents for classes via ensure_finalized (lazy + cached).
+        // 1. Compute all_parents for classes.
         let class_keys: Vec<Arc<str>> = self.classes.iter().map(|e| e.key().clone()).collect();
         for fqcn in &class_keys {
-            self.ensure_finalized(fqcn);
+            let parents = self.compute_class_ancestors(fqcn);
+            if let Some(mut cls) = self.classes.get_mut(fqcn.as_ref()) {
+                cls.all_parents = parents;
+            }
         }
 
-        // 2. Resolve all_parents for interfaces via ensure_finalized.
+        // 2. Compute all_parents for interfaces.
         let iface_keys: Vec<Arc<str>> = self.interfaces.iter().map(|e| e.key().clone()).collect();
         for fqcn in &iface_keys {
-            self.ensure_finalized(fqcn);
+            let parents = self.compute_interface_ancestors(fqcn);
+            if let Some(mut iface) = self.interfaces.get_mut(fqcn.as_ref()) {
+                iface.all_parents = parents;
+            }
         }
 
         // 3. Resolve @psalm-import-type declarations
@@ -1497,77 +1152,151 @@ impl Codebase {
     // Private helpers
     // -----------------------------------------------------------------------
 
-    /// Look up `method_name` in a trait's own methods, then recursively in any
-    /// traits that the trait itself uses (`use OtherTrait;` inside a trait body).
-    /// A visited set prevents infinite loops on pathological mutual trait use.
-    fn get_method_in_trait(
+    /// Walk own → traits → ancestors looking up a method's location.  The
+    /// outer `Option` indicates whether the method was found; the inner
+    /// `Option` is its (possibly absent) location.
+    fn find_method_location_in_chain(
         &self,
-        tr_fqcn: &Arc<str>,
-        method_name: &str,
-    ) -> Option<Arc<MethodStorage>> {
-        let mut visited = std::collections::HashSet::new();
-        self.get_method_in_trait_inner(tr_fqcn, method_name, &mut visited)
-    }
-
-    fn get_method_in_trait_inner(
-        &self,
-        tr_fqcn: &Arc<str>,
-        method_name: &str,
-        visited: &mut std::collections::HashSet<String>,
-    ) -> Option<Arc<MethodStorage>> {
-        if !visited.insert(tr_fqcn.to_string()) {
-            return None; // cycle guard
+        fqcn: &str,
+        method_lower: &str,
+    ) -> Option<Option<crate::storage::Location>> {
+        if let Some(cls) = self.classes.get(fqcn) {
+            if let Some(m) = lookup_method(&cls.own_methods, method_lower) {
+                return Some(m.location.clone());
+            }
+            let traits = cls.traits.clone();
+            let parents = cls.all_parents.clone();
+            drop(cls);
+            for tr_fqcn in &traits {
+                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    if let Some(m) = lookup_method(&tr.own_methods, method_lower) {
+                        return Some(m.location.clone());
+                    }
+                }
+            }
+            for anc in &parents {
+                if let Some(anc_cls) = self.classes.get(anc.as_ref()) {
+                    if let Some(m) = lookup_method(&anc_cls.own_methods, method_lower) {
+                        return Some(m.location.clone());
+                    }
+                    let anc_traits = anc_cls.traits.clone();
+                    drop(anc_cls);
+                    for tr_fqcn in &anc_traits {
+                        if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                            if let Some(m) = lookup_method(&tr.own_methods, method_lower) {
+                                return Some(m.location.clone());
+                            }
+                        }
+                    }
+                } else if let Some(iface) = self.interfaces.get(anc.as_ref()) {
+                    if let Some(m) = lookup_method(&iface.own_methods, method_lower) {
+                        return Some(m.location.clone());
+                    }
+                }
+            }
+            return None;
         }
-        let tr = self.traits.get(tr_fqcn.as_ref())?;
-        if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-            return Some(Arc::clone(m));
+        if let Some(iface) = self.interfaces.get(fqcn) {
+            if let Some(m) = lookup_method(&iface.own_methods, method_lower) {
+                return Some(m.location.clone());
+            }
+            let parents = iface.all_parents.clone();
+            drop(iface);
+            for p in &parents {
+                if let Some(parent_iface) = self.interfaces.get(p.as_ref()) {
+                    if let Some(m) = lookup_method(&parent_iface.own_methods, method_lower) {
+                        return Some(m.location.clone());
+                    }
+                }
+            }
+            return None;
         }
-        let used_traits = tr.traits.clone();
-        drop(tr);
-        for used_fqcn in &used_traits {
-            if let Some(m) = self.get_method_in_trait_inner(used_fqcn, method_name, visited) {
-                return Some(m);
+        if let Some(tr) = self.traits.get(fqcn) {
+            if let Some(m) = lookup_method(&tr.own_methods, method_lower) {
+                return Some(m.location.clone());
+            }
+        }
+        if let Some(en) = self.enums.get(fqcn) {
+            if let Some(m) = lookup_method(&en.own_methods, method_lower) {
+                return Some(m.location.clone());
             }
         }
         None
     }
 
-    /// Compute the ancestor list for a class by routing each parent/interface
-    /// lookup through `ensure_finalized`, so results are cached and the
-    /// thread-local cycle guard in `ensure_finalized` is the sole cycle
-    /// detection mechanism.  A local `seen` set deduplicates ancestors that
-    /// appear via multiple paths (diamond hierarchies).
+    /// Walk own → traits → ancestors looking up a property's location.
+    fn find_property_location_in_chain(
+        &self,
+        fqcn: &str,
+        prop_name: &str,
+    ) -> Option<Option<crate::storage::Location>> {
+        if let Some(cls) = self.classes.get(fqcn) {
+            if let Some(p) = cls.own_properties.get(prop_name) {
+                return Some(p.location.clone());
+            }
+            let traits = cls.traits.clone();
+            let parents = cls.all_parents.clone();
+            drop(cls);
+            for tr_fqcn in &traits {
+                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
+                    if let Some(p) = tr.own_properties.get(prop_name) {
+                        return Some(p.location.clone());
+                    }
+                }
+            }
+            for anc in &parents {
+                if let Some(anc_cls) = self.classes.get(anc.as_ref()) {
+                    if let Some(p) = anc_cls.own_properties.get(prop_name) {
+                        return Some(p.location.clone());
+                    }
+                }
+            }
+            return None;
+        }
+        if let Some(tr) = self.traits.get(fqcn) {
+            if let Some(p) = tr.own_properties.get(prop_name) {
+                return Some(p.location.clone());
+            }
+        }
+        None
+    }
+
+    /// Compute the ancestor list (`all_parents`) for a class.  Ordering matches
+    /// the historical `ensure_finalized` walk: parent + parent's ancestors,
+    /// then each implemented interface + its ancestors, then directly-used
+    /// traits.  A local `seen` set deduplicates diamond ancestors.
     fn compute_class_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+        let mut result: Vec<Arc<str>> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        self.collect_class_ancestors(fqcn, &mut result, &mut seen);
+        result
+    }
+
+    fn collect_class_ancestors(
+        &self,
+        fqcn: &str,
+        result: &mut Vec<Arc<str>>,
+        seen: &mut std::collections::HashSet<String>,
+    ) {
         let (parent, interfaces, traits) = match self.classes.get(fqcn) {
             Some(cls) => (
                 cls.parent.clone(),
                 cls.interfaces.clone(),
                 cls.traits.clone(),
             ),
-            None => return vec![],
+            None => return,
         };
 
-        let mut result: Vec<Arc<str>> = Vec::new();
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-        if let Some(ref p) = parent {
+        if let Some(p) = parent {
             if seen.insert(p.to_string()) {
-                result.push(Arc::clone(p));
-            }
-            for a in self.ensure_finalized(p).iter() {
-                if seen.insert(a.to_string()) {
-                    result.push(Arc::clone(a));
-                }
+                result.push(Arc::clone(&p));
+                self.collect_class_ancestors(&p, result, seen);
             }
         }
         for iface in &interfaces {
             if seen.insert(iface.to_string()) {
                 result.push(Arc::clone(iface));
-            }
-            for a in self.ensure_finalized(iface).iter() {
-                if seen.insert(a.to_string()) {
-                    result.push(Arc::clone(a));
-                }
+                self.collect_interface_ancestors(iface, result, seen);
             }
         }
         for t in traits {
@@ -1575,33 +1304,32 @@ impl Codebase {
                 result.push(t);
             }
         }
+    }
 
+    /// Compute the ancestor list for an interface by walking `extends` chains.
+    fn compute_interface_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+        let mut result: Vec<Arc<str>> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        self.collect_interface_ancestors(fqcn, &mut result, &mut seen);
         result
     }
 
-    /// Compute the ancestor list for an interface by routing each extended
-    /// interface lookup through `ensure_finalized`.
-    fn compute_interface_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+    fn collect_interface_ancestors(
+        &self,
+        fqcn: &str,
+        result: &mut Vec<Arc<str>>,
+        seen: &mut std::collections::HashSet<String>,
+    ) {
         let extends = match self.interfaces.get(fqcn) {
             Some(iface) => iface.extends.clone(),
-            None => return vec![],
+            None => return,
         };
-
-        let mut result: Vec<Arc<str>> = Vec::new();
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-
         for e in &extends {
             if seen.insert(e.to_string()) {
                 result.push(Arc::clone(e));
-            }
-            for a in self.ensure_finalized(e).iter() {
-                if seen.insert(a.to_string()) {
-                    result.push(Arc::clone(a));
-                }
+                self.collect_interface_ancestors(e, result, seen);
             }
         }
-
-        result
     }
 }
 
@@ -2118,325 +1846,5 @@ mod tests {
             !cb.file_imports.contains_key("src/Handler.php"),
             "file_imports entry must be removed when its defining file is removed"
         );
-    }
-
-    // -----------------------------------------------------------------------
-    // get_method / get_property — mixin cycle guards
-    // -----------------------------------------------------------------------
-
-    fn bare_class(fqcn: &str, mixins: Vec<Arc<str>>) -> ClassStorage {
-        use indexmap::IndexMap;
-        ClassStorage {
-            fqcn: arc(fqcn),
-            short_name: arc(fqcn),
-            parent: None,
-            interfaces: vec![],
-            traits: vec![],
-            own_methods: IndexMap::new(),
-            own_properties: IndexMap::new(),
-            own_constants: IndexMap::new(),
-            mixins,
-            template_params: vec![],
-            extends_type_args: vec![],
-            implements_type_args: vec![],
-            is_abstract: false,
-            is_final: false,
-            is_readonly: false,
-            all_parents: vec![],
-            deprecated: None,
-            is_internal: false,
-            location: None,
-            type_aliases: std::collections::HashMap::new(),
-            pending_import_types: vec![],
-        }
-    }
-
-    fn class_with_method(fqcn: &str, method_name: &str, mixins: Vec<Arc<str>>) -> ClassStorage {
-        use crate::storage::{MethodStorage, Visibility};
-        use indexmap::IndexMap;
-        let mut methods = IndexMap::new();
-        methods.insert(
-            arc(method_name),
-            Arc::new(MethodStorage {
-                name: arc(method_name),
-                fqcn: arc(fqcn),
-                params: vec![],
-                return_type: None,
-                inferred_return_type: None,
-                visibility: Visibility::Public,
-                is_static: false,
-                is_abstract: false,
-                is_final: false,
-                is_constructor: false,
-                template_params: vec![],
-                assertions: vec![],
-                throws: vec![],
-                deprecated: None,
-                is_internal: false,
-                is_pure: false,
-                location: None,
-            }),
-        );
-        let mut cls = bare_class(fqcn, mixins);
-        cls.own_methods = methods;
-        cls
-    }
-
-    fn class_with_property(fqcn: &str, prop_name: &str, mixins: Vec<Arc<str>>) -> ClassStorage {
-        use crate::storage::{PropertyStorage, Visibility};
-        use indexmap::IndexMap;
-        let mut props = IndexMap::new();
-        props.insert(
-            arc(prop_name),
-            PropertyStorage {
-                name: arc(prop_name),
-                ty: None,
-                inferred_ty: None,
-                visibility: Visibility::Public,
-                is_static: false,
-                is_readonly: false,
-                default: None,
-                location: None,
-            },
-        );
-        let mut cls = bare_class(fqcn, mixins);
-        cls.own_properties = props;
-        cls
-    }
-
-    #[test]
-    fn get_method_two_way_mixin_cycle_returns_none() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
-        cb.classes.insert(arc("B"), bare_class("B", vec![arc("A")]));
-        assert!(cb.get_method("A", "missing").is_none());
-    }
-
-    #[test]
-    fn get_method_self_mixin_returns_none() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![arc("A")]));
-        assert!(cb.get_method("A", "missing").is_none());
-    }
-
-    #[test]
-    fn get_method_three_way_cycle_returns_none() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
-        cb.classes.insert(arc("B"), bare_class("B", vec![arc("C")]));
-        cb.classes.insert(arc("C"), bare_class("C", vec![arc("A")]));
-        assert!(cb.get_method("A", "missing").is_none());
-    }
-
-    #[test]
-    fn get_method_resolves_through_mixin_when_no_cycle() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
-        cb.classes
-            .insert(arc("B"), class_with_method("B", "fromB", vec![]));
-        assert!(cb.get_method("A", "fromB").is_some());
-    }
-
-    #[test]
-    fn get_method_own_method_shadows_mixin() {
-        let cb = Codebase::new();
-        cb.classes
-            .insert(arc("A"), class_with_method("A", "foo", vec![arc("B")]));
-        cb.classes
-            .insert(arc("B"), class_with_method("B", "foo", vec![]));
-        let m = cb.get_method("A", "foo").unwrap();
-        assert_eq!(m.fqcn.as_ref(), "A");
-    }
-
-    #[test]
-    fn get_method_mixin_nonexistent_class_returns_none() {
-        let cb = Codebase::new();
-        cb.classes
-            .insert(arc("A"), bare_class("A", vec![arc("Ghost")]));
-        assert!(cb.get_method("A", "foo").is_none());
-    }
-
-    #[test]
-    fn get_property_two_way_mixin_cycle_returns_none() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
-        cb.classes.insert(arc("B"), bare_class("B", vec![arc("A")]));
-        assert!(cb.get_property("A", "missing").is_none());
-    }
-
-    #[test]
-    fn get_method_diamond_mixin_finds_method_via_first_path() {
-        // A @mixin [B, C]; B @mixin D; C @mixin D; D has "foo".
-        // D is visited once via B and the method is found — C's path to D is
-        // blocked by the visited set, but the result is still correct.
-        let cb = Codebase::new();
-        cb.classes
-            .insert(arc("A"), bare_class("A", vec![arc("B"), arc("C")]));
-        cb.classes.insert(arc("B"), bare_class("B", vec![arc("D")]));
-        cb.classes.insert(arc("C"), bare_class("C", vec![arc("D")]));
-        cb.classes
-            .insert(arc("D"), class_with_method("D", "foo", vec![]));
-        assert!(cb.get_method("A", "foo").is_some());
-    }
-
-    #[test]
-    fn get_method_mixin_on_ancestor_is_followed() {
-        let cb = Codebase::new();
-        cb.classes.insert(
-            arc("Child"),
-            ClassStorage {
-                parent: Some(arc("Parent")),
-                ..bare_class("Child", vec![])
-            },
-        );
-        cb.classes
-            .insert(arc("Parent"), bare_class("Parent", vec![arc("Mixin")]));
-        cb.classes.insert(
-            arc("Mixin"),
-            class_with_method("Mixin", "fromMixin", vec![]),
-        );
-        assert!(cb.get_method("Child", "fromMixin").is_some());
-        assert!(cb.get_method("Parent", "fromMixin").is_some());
-    }
-
-    #[test]
-    fn get_method_mixin_on_transitive_ancestor_is_followed() {
-        let cb = Codebase::new();
-        // A extends B extends C; C has @mixin D; D has "foo"
-        cb.classes.insert(
-            arc("A"),
-            ClassStorage {
-                parent: Some(arc("B")),
-                ..bare_class("A", vec![])
-            },
-        );
-        cb.classes.insert(
-            arc("B"),
-            ClassStorage {
-                parent: Some(arc("C")),
-                ..bare_class("B", vec![])
-            },
-        );
-        cb.classes.insert(arc("C"), bare_class("C", vec![arc("D")]));
-        cb.classes
-            .insert(arc("D"), class_with_method("D", "foo", vec![]));
-        assert!(cb.get_method("A", "foo").is_some());
-    }
-
-    #[test]
-    fn get_property_resolves_through_mixin_when_no_cycle() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![arc("B")]));
-        cb.classes
-            .insert(arc("B"), class_with_property("B", "title", vec![]));
-        assert!(cb.get_property("A", "title").is_some());
-    }
-
-    // -----------------------------------------------------------------------
-    // ensure_finalized — per-class lazy ancestor memoization
-    // -----------------------------------------------------------------------
-
-    fn class_with_parent(fqcn: &str, parent: &str) -> ClassStorage {
-        ClassStorage {
-            parent: Some(arc(parent)),
-            ..bare_class(fqcn, vec![])
-        }
-    }
-
-    #[test]
-    fn ensure_finalized_returns_ancestors_for_known_class() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![]));
-        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
-
-        let parents = cb.ensure_finalized("B");
-        assert_eq!(parents.as_ref(), &[arc("A")]);
-    }
-
-    #[test]
-    fn ensure_finalized_memoizes_result() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![]));
-        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
-
-        let first = cb.ensure_finalized("B");
-        let second = cb.ensure_finalized("B");
-        // Same Arc — pointer equality confirms the memoized path was taken.
-        assert!(Arc::ptr_eq(&first, &second));
-    }
-
-    #[test]
-    fn ensure_finalized_returns_empty_for_unknown_fqcn() {
-        let cb = Codebase::new();
-        let parents = cb.ensure_finalized("NoSuchClass");
-        assert!(parents.is_empty());
-    }
-
-    #[test]
-    fn ensure_finalized_populates_all_parents_on_storage() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![]));
-        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
-
-        cb.ensure_finalized("B");
-        let stored = cb.classes.get("B").unwrap().all_parents.clone();
-        assert_eq!(stored, vec![arc("A")]);
-    }
-
-    #[test]
-    fn ensure_finalized_cycle_does_not_loop() {
-        // A extends B, B extends A — circular, PHP rejects this but we must not hang.
-        let cb = Codebase::new();
-        cb.classes.insert(
-            arc("A"),
-            ClassStorage {
-                parent: Some(arc("B")),
-                ..bare_class("A", vec![])
-            },
-        );
-        cb.classes.insert(
-            arc("B"),
-            ClassStorage {
-                parent: Some(arc("A")),
-                ..bare_class("B", vec![])
-            },
-        );
-
-        // Must return without panic or infinite loop.
-        let a_parents = cb.ensure_finalized("A");
-        let b_parents = cb.ensure_finalized("B");
-
-        // Neither result should contain the class itself as a direct descendant
-        // in an infinite chain — just verify termination and basic sanity.
-        assert!(
-            a_parents.iter().any(|p| p.as_ref() == "B"),
-            "A should have B as ancestor"
-        );
-        assert!(
-            b_parents.iter().any(|p| p.as_ref() == "A"),
-            "B should have A as ancestor"
-        );
-    }
-
-    #[test]
-    fn ensure_finalized_evicted_by_remove_file_definitions() {
-        let cb = Codebase::new();
-        cb.classes.insert(arc("A"), bare_class("A", vec![]));
-        cb.classes.insert(arc("B"), class_with_parent("B", "A"));
-        // Register both as coming from the same file so remove_file_definitions removes them.
-        let file: Arc<str> = arc("test.php");
-        cb.symbol_to_file.insert(arc("A"), file.clone());
-        cb.symbol_to_file.insert(arc("B"), file.clone());
-
-        // Warm the cache.
-        let before = cb.ensure_finalized("B");
-        assert!(!before.is_empty());
-
-        // Evict definitions from the file.
-        cb.remove_file_definitions("test.php");
-
-        // After removal, the class is gone and ensure_finalized returns empty.
-        let after = cb.ensure_finalized("B");
-        assert!(after.is_empty());
     }
 }
