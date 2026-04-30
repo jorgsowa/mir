@@ -637,14 +637,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                             }
-                            // Check constructor arguments
-                            if let Some(ctor) = self.codebase.get_method(&fqcn, "__construct") {
+                            // Check constructor arguments — prefer the db
+                            // (so the read is tracked) and fall back to
+                            // `Codebase::get_method` for PSR-4-lazy-loaded
+                            // classes that arrive after `ingest_codebase`.
+                            let ctor_params =
+                                crate::db::lookup_method_in_chain(self.db, &fqcn, "__construct")
+                                    .map(|n| n.params(self.db).to_vec())
+                                    .or_else(|| {
+                                        self.codebase
+                                            .get_method(&fqcn, "__construct")
+                                            .map(|m| m.params.clone())
+                                    });
+                            if let Some(ctor_params) = ctor_params {
                                 crate::call::check_constructor_args(
                                     self,
                                     &fqcn,
                                     crate::call::CheckArgsParams {
                                         fn_name: "__construct",
-                                        params: &ctor.params,
+                                        params: &ctor_params,
                                         arg_types: &arg_types,
                                         arg_spans: &arg_spans,
                                         arg_names: &arg_names,
