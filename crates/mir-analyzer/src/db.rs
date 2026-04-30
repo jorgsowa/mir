@@ -292,13 +292,12 @@ pub fn inherited_template_bindings_via_db(
 
 /// Salsa input representing a single global function.
 ///
-/// `inferred_return_type` is intentionally absent — by design it lives in
-/// `FunctionStorage` (read via `Codebase::functions.get(...).inferred_return_type`).
-/// Promoting it to a Salsa tracked field deadlocks against rayon's per-worker
-/// db clones in the priming sweep (`Storage::cancel_others` waits for
-/// strong-count==1 forever); see ROADMAP "S3 deadlock" for the five
-/// resolution candidates and why none is uniformly safe.  Treat this as
-/// the chosen design, not migration debt.
+/// `inferred_return_type` is the Pass-2-derived return type, populated
+/// per-function by the priming sweep.  It is committed to Salsa serially
+/// after the parallel sweep returns (so worker db clones have dropped
+/// and `Storage::cancel_others` sees strong-count==1).  The buffer-and-
+/// commit pattern lives in [`InferredReturnTypes`] and
+/// [`MirDb::commit_inferred_return_types`].
 ///
 /// Invariant: every FQN known to the Salsa DB has exactly one `FunctionNode`
 /// handle in `MirDb::function_nodes`.  Removed functions are marked
@@ -310,6 +309,7 @@ pub struct FunctionNode {
     pub active: bool,
     pub params: Arc<[FnParam]>,
     pub return_type: Option<Union>,
+    pub inferred_return_type: Option<Union>,
     pub template_params: Arc<[TemplateParam]>,
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
@@ -326,10 +326,10 @@ pub struct FunctionNode {
 
 /// Salsa input representing a single method or interface/trait method.
 ///
-/// `inferred_return_type` is intentionally absent — by design it lives in
-/// `MethodStorage` (read via `Codebase::method_inferred_return_type`).
-/// Same rayon/Salsa deadlock rationale as `FunctionNode`; see that doc
-/// comment + ROADMAP "S3 deadlock".
+/// `inferred_return_type` is the Pass-2-derived return type, populated per
+/// method by the priming sweep.  Committed to Salsa serially after the
+/// parallel sweep returns; see [`FunctionNode`] for the buffer-and-commit
+/// pattern that resolves the historical "S3 deadlock".
 ///
 /// The node is keyed by `(fqcn, method_name_lower)` where `fqcn` is the
 /// FQCN of the **owning** class/interface/trait and `method_name_lower` is
@@ -343,6 +343,7 @@ pub struct MethodNode {
     pub active: bool,
     pub params: Arc<[FnParam]>,
     pub return_type: Option<Union>,
+    pub inferred_return_type: Option<Union>,
     pub template_params: Arc<[TemplateParam]>,
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
@@ -1166,6 +1167,50 @@ impl MirDatabase for MirDb {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Inferred-return-type buffer (S3 deadlock resolution)
+// ---------------------------------------------------------------------------
+
+/// Thread-safe buffer used by Pass 2's priming sweep to record inferred
+/// return types per (function|method).  The sweep runs in parallel across
+/// rayon workers each holding its own `MirDb` clone, so writing setters
+/// from inside the closure would deadlock against `Storage::cancel_others`
+/// (which waits for all clones to drop before allowing a write).
+///
+/// Instead, workers push into this buffer (a `Mutex<Vec<…>>` — pushes are
+/// fast, contention is negligible vs the work each worker does).  After
+/// the parallel sweep returns, all worker clones are dropped and
+/// [`MirDb::commit_inferred_return_types`] drains the buffer into Salsa
+/// setters on the canonical db (which now has strong-count==1).
+#[derive(Default)]
+#[allow(clippy::type_complexity)]
+pub struct InferredReturnTypes {
+    /// `(fqn, inferred)` pairs for free functions.
+    functions: std::sync::Mutex<Vec<(Arc<str>, Union)>>,
+    /// `(fqcn, method_name, inferred)` triples for methods.  `method_name`
+    /// is the original (non-lowercased) name; `commit` lowercases at
+    /// lookup time to match `MirDb::method_nodes`' key convention.
+    methods: std::sync::Mutex<Vec<(Arc<str>, Arc<str>, Union)>>,
+}
+
+impl InferredReturnTypes {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push_function(&self, fqn: Arc<str>, inferred: Union) {
+        if let Ok(mut g) = self.functions.lock() {
+            g.push((fqn, inferred));
+        }
+    }
+
+    pub fn push_method(&self, fqcn: Arc<str>, name: Arc<str>, inferred: Union) {
+        if let Ok(mut g) = self.methods.lock() {
+            g.push((fqcn, name, inferred));
+        }
+    }
+}
+
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
 /// to fill in the fields that don't apply to your kind (e.g. interfaces leave
 /// `parent`, `traits`, `mixins`, `is_abstract`, etc. at their defaults).
@@ -1369,6 +1414,10 @@ impl MirDb {
         let fqn = &storage.fqn;
         if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
             // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            // `inferred_return_type` is intentionally NOT compared / written:
+            // it is owned by the priming sweep's serial commit phase
+            // (`commit_inferred_return_types`) and Pass-1 re-ingest must not
+            // clobber a previously-inferred value.
             if node.active(self)
                 && node.short_name(self) == storage.short_name
                 && node.is_pure(self) == storage.is_pure
@@ -1405,6 +1454,7 @@ impl MirDb {
                 true,
                 Arc::from(storage.params.as_slice()),
                 storage.return_type.clone(),
+                storage.inferred_return_type.clone(),
                 Arc::from(storage.template_params.as_slice()),
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
@@ -1414,6 +1464,57 @@ impl MirDb {
             );
             self.function_nodes.insert(fqn.clone(), node);
             node
+        }
+    }
+
+    /// Commit a parallel-sweep-collected [`InferredReturnTypes`] buffer
+    /// into the Salsa db.  **Must be called serially**, after all rayon
+    /// workers from the priming sweep have dropped their db clones, so
+    /// that `Storage::cancel_others` sees strong-count==1 inside the
+    /// setter.  Calling this from inside a `for_each_with` / `map_with`
+    /// closure will deadlock.
+    ///
+    /// Skips writes whose value already matches the current Salsa-tracked
+    /// value (preserves PR21's fast-skip semantics).  Skips inactive
+    /// nodes — there's no point committing an inferred return for a node
+    /// that has been deactivated by a re-analyze.
+    pub fn commit_inferred_return_types(&mut self, buf: &InferredReturnTypes) {
+        use salsa::Setter as _;
+        let funcs = std::mem::take(&mut *buf.functions.lock().expect("inferred buffer poisoned"));
+        for (fqn, inferred) in funcs {
+            if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
+                if !node.active(self) {
+                    continue;
+                }
+                let new = Some(inferred);
+                if node.inferred_return_type(self) == new {
+                    continue;
+                }
+                node.set_inferred_return_type(self).to(new);
+            }
+        }
+        let methods = std::mem::take(&mut *buf.methods.lock().expect("inferred buffer poisoned"));
+        for (fqcn, name, inferred) in methods {
+            let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
+                name.clone()
+            } else {
+                Arc::from(name.to_lowercase().as_str())
+            };
+            let node = self
+                .method_nodes
+                .get(fqcn.as_ref())
+                .and_then(|m| m.get(&name_lower))
+                .copied();
+            if let Some(node) = node {
+                if !node.active(self) {
+                    continue;
+                }
+                let new = Some(inferred);
+                if node.inferred_return_type(self) == new {
+                    continue;
+                }
+                node.set_inferred_return_type(self).to(new);
+            }
         }
     }
 
@@ -1439,6 +1540,8 @@ impl MirDb {
             .copied();
         if let Some(node) = existing {
             // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            // `inferred_return_type` intentionally not compared / written here;
+            // ownership is in the priming-sweep commit phase.
             if node.active(self)
                 && node.visibility(self) == storage.visibility
                 && node.is_static(self) == storage.is_static
@@ -1484,6 +1587,7 @@ impl MirDb {
                 true,
                 Arc::from(storage.params.as_slice()),
                 storage.return_type.clone(),
+                storage.inferred_return_type.clone(),
                 Arc::from(storage.template_params.as_slice()),
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
@@ -2827,5 +2931,121 @@ mod tests {
         db.deactivate_class_node("Foo");
         db.deactivate_class_constants("Foo");
         assert!(!class_constant_exists_in_chain(&db, "Foo", "X"));
+    }
+
+    /// Validates the S3-deadlock premise.  After `for_each_with` returns,
+    /// all worker clones must drop so that a subsequent setter on the
+    /// canonical db (strong-count==1) does not block on
+    /// `Storage::cancel_others`.  Wrapped in a join-with-timeout so a
+    /// regression hangs for at most 30s instead of forever.
+    #[test]
+    fn parallel_reads_then_serial_write_does_not_deadlock() {
+        use rayon::prelude::*;
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let (tx, rx) = mpsc::channel::<()>();
+        std::thread::spawn(move || {
+            let mut db = MirDb::default();
+            let storage = mir_codebase::storage::FunctionStorage {
+                fqn: Arc::from("foo"),
+                short_name: Arc::from("foo"),
+                params: vec![],
+                return_type: None,
+                inferred_return_type: None,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                deprecated: None,
+                is_pure: false,
+                location: None,
+            };
+            let node = db.upsert_function_node(&storage);
+
+            // Parallel sweep with cloned dbs; each worker reads via &dyn MirDatabase.
+            let db_for_sweep = db.clone();
+            (0..256u32)
+                .into_par_iter()
+                .for_each_with(db_for_sweep, |db, _| {
+                    let _ = node.return_type(&*db as &dyn MirDatabase);
+                });
+
+            // Sweep is done — clones owned by `for_each_with` are dropped.
+            // If any worker-thread retains thread-local Salsa state pointing
+            // at a clone, this setter will hang in `Storage::cancel_others`.
+            node.set_return_type(&mut db).to(Some(Union::mixed()));
+            assert_eq!(node.return_type(&db), Some(Union::mixed()));
+            tx.send(()).unwrap();
+        });
+
+        match rx.recv_timeout(Duration::from_secs(30)) {
+            Ok(()) => {}
+            Err(_) => {
+                panic!("S3 deadlock repro: setter after for_each_with did not return within 30s")
+            }
+        }
+    }
+
+    /// Pins the actual root cause of the original S3 deadlock: a sibling
+    /// `MirDb` clone (e.g. the `class_db` used by `ClassAnalyzer` in
+    /// `project.rs`) being alive when a setter runs blocks
+    /// `Storage::cancel_others` indefinitely.  Dropping the sibling before
+    /// the setter unblocks it.
+    ///
+    /// This is the regression guard for `commit_inferred_return_types`: if
+    /// a future refactor hoists a clone past the commit point, this test
+    /// fails (either the "while sibling alive, setter is blocked" half
+    /// or the "after drop, setter completes" half).
+    #[test]
+    fn sibling_clone_blocks_setter_until_dropped() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let mut db = MirDb::default();
+        let storage = mir_codebase::storage::FunctionStorage {
+            fqn: Arc::from("foo"),
+            short_name: Arc::from("foo"),
+            params: vec![],
+            return_type: None,
+            inferred_return_type: None,
+            template_params: vec![],
+            assertions: vec![],
+            throws: vec![],
+            deprecated: None,
+            is_pure: false,
+            location: None,
+        };
+        let node = db.upsert_function_node(&storage);
+
+        let sibling = db.clone();
+
+        // Move the writer into a worker thread so we can probe its progress
+        // without blocking the test.  Channel signals when the setter returns.
+        let (tx, rx) = mpsc::channel::<()>();
+        let writer = std::thread::spawn(move || {
+            node.set_return_type(&mut db).to(Some(Union::mixed()));
+            tx.send(()).unwrap();
+        });
+
+        // While the sibling clone is alive the setter must NOT make progress —
+        // strong-count > 1 forces `cancel_others` to wait.
+        match rx.recv_timeout(Duration::from_millis(500)) {
+            Err(mpsc::RecvTimeoutError::Timeout) => { /* expected */ }
+            Ok(()) => panic!(
+                "setter completed while sibling clone was alive — strong-count==1 \
+                 invariant of `cancel_others` is broken; commit_inferred_return_types \
+                 cannot rely on tight-scoping clones"
+            ),
+            Err(e) => panic!("unexpected channel error: {e:?}"),
+        }
+
+        // Drop the sibling.  Strong-count drops to 1 and the setter unblocks.
+        drop(sibling);
+
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(()) => {}
+            Err(_) => panic!("setter did not complete within 5s after sibling clone dropped"),
+        }
+        writer.join().expect("writer thread panicked");
     }
 }

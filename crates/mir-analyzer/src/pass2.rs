@@ -4,7 +4,7 @@ use mir_codebase::Codebase;
 use mir_issues::Issue;
 use mir_types::Union;
 
-use crate::db::{FunctionNode, MirDatabase};
+use crate::db::{FunctionNode, InferredReturnTypes, MirDatabase};
 use crate::diagnostics::{
     check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
 };
@@ -71,6 +71,12 @@ pub(crate) struct Pass2Driver<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     inference_only: bool,
+    /// Optional buffer for inferred return types; populated by `analyze_*`
+    /// during the priming sweep.  See [`InferredReturnTypes`] and
+    /// `MirDb::commit_inferred_return_types`.  `None` means "skip the
+    /// salsa-side commit" — the main sweep doesn't need to publish
+    /// inferred types because the priming sweep already did.
+    inferred_buffer: Option<&'a InferredReturnTypes>,
 }
 
 impl<'a> Pass2Driver<'a> {
@@ -84,6 +90,7 @@ impl<'a> Pass2Driver<'a> {
             db,
             php_version,
             inference_only: false,
+            inferred_buffer: None,
         }
     }
 
@@ -97,6 +104,29 @@ impl<'a> Pass2Driver<'a> {
             db,
             php_version,
             inference_only: true,
+            inferred_buffer: None,
+        }
+    }
+
+    /// Attach an inferred-return-type buffer.  Used during the priming
+    /// sweep so workers record their inferred types for the post-sweep
+    /// commit phase.
+    pub(crate) fn with_inferred_buffer(mut self, buf: &'a InferredReturnTypes) -> Self {
+        self.inferred_buffer = Some(buf);
+        self
+    }
+
+    /// Push a function inference into the buffer (if attached).
+    fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Union) {
+        if let Some(buf) = self.inferred_buffer {
+            buf.push_function(fqn.clone(), inferred.clone());
+        }
+    }
+
+    /// Push a method inference into the buffer (if attached).
+    fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Union) {
+        if let Some(buf) = self.inferred_buffer {
+            buf.push_method(Arc::from(fqcn), Arc::from(name), inferred.clone());
         }
     }
 
@@ -477,12 +507,17 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // `inferred_return_type` is intentionally written to `Codebase`, not Salsa.
-        // See `FunctionNode` doc comment + ROADMAP "S3 deadlock" for why.
+        // Inferred return type is published two ways:
+        //   1. Codebase storage (read by inheritance walks that still go
+        //      through `Codebase` — see `mir-codebase`).
+        //   2. The Salsa `FunctionNode::inferred_return_type` field, via
+        //      the parallel-safe buffer (committed serially after the
+        //      priming sweep returns).  See `InferredReturnTypes`.
         if let Some(fqn) = fqn {
             if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
-                func.inferred_return_type = Some(inferred);
+                func.inferred_return_type = Some(inferred.clone());
             }
+            self.record_function_inference(&fqn, &inferred);
         }
     }
 
@@ -591,9 +626,10 @@ impl<'a> Pass2Driver<'a> {
 
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
                 if let Some(m) = cls.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred);
+                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
                 }
             }
+            self.record_method_inference(fqcn, method.name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -680,12 +716,13 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // `inferred_return_type` is intentionally written to `Codebase`, not Salsa.
-        // See `FunctionNode` doc comment + ROADMAP "S3 deadlock" for why.
+        // Inferred return type — see `analyze_fn_decl` for the
+        // codebase + salsa publication rationale.
         if let Some(fqn) = fqn {
             if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
-                func.inferred_return_type = Some(inferred);
+                func.inferred_return_type = Some(inferred.clone());
             }
+            self.record_function_inference(&fqn, &inferred);
         }
     }
 
@@ -806,9 +843,10 @@ impl<'a> Pass2Driver<'a> {
 
             if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
                 if let Some(m) = cls.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred);
+                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
                 }
             }
+            self.record_method_inference(fqcn, method.name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -983,9 +1021,10 @@ impl<'a> Pass2Driver<'a> {
 
             if let Some(mut tr) = self.codebase.traits.get_mut(fqcn) {
                 if let Some(m) = tr.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred);
+                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
                 }
             }
+            self.record_method_inference(fqcn, method.name, &inferred);
         }
     }
 
@@ -1093,9 +1132,10 @@ impl<'a> Pass2Driver<'a> {
 
             if let Some(mut tr) = self.codebase.traits.get_mut(fqcn) {
                 if let Some(m) = tr.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred);
+                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
                 }
             }
+            self.record_method_inference(fqcn, method.name, &inferred);
         }
     }
 
