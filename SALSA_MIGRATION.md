@@ -1,6 +1,6 @@
 # Salsa migration — current status & open questions
 
-## Shipped through PR26
+## Shipped through PR29
 
 S0 (db skeleton) and S1 (`collect_file_definitions` query) are complete.
 S2 (`class_ancestors` query) is complete and is the LSP warm-path
@@ -28,6 +28,16 @@ reads onto the db:
 - PR24 — db-track class/enum match guards in `resolve_property_type`.
 - PR25 — thread db through `narrowing.rs` (11 sites).
 - PR26 — drop dead `Codebase::extends_or_implements`.
+- PR27 — drop redundant codebase fallback in 4 magic-method existence
+  checks (`__call`, `__callStatic`, `__invoke` x2): `method_exists_via_db`
+  alone now answers them.
+- PR28 — read method-body params/return_type from db in 4 `pass2.rs`
+  sites + 1 `stmt/mod.rs` site (own-class lookups while seeding
+  `Context::for_method`).  Adds `db::lookup_method_in_chain` helper
+  (own → ancestors walk, mirroring `Codebase::get_method`).
+- PR29 — prefer db for `__construct` param lookup in `expr.rs`'s `new
+  Foo(...)` arity check.  Falls back to `Codebase::get_method` for
+  PSR-4 lazy-loaded classes.
 
 ## Architectural blocker uncovered this session
 
@@ -100,13 +110,39 @@ fields after a parallel pass will hit the same deadlock.
    tracked query gets stale results unless we manually invalidate.
    Effectively gives up on S3's perf win.
 
-## Other S5 work remaining (unblocked by the above)
+## Lazy-load → db hook (newly surfaced blocker)
+
+Discovered while attempting to drop the residual codebase fallbacks in
+`resolve_method_from_db`'s callers (`call/method.rs:299` and
+`call/static_call.rs:56`): four fixtures fail when the fallback is
+removed —
+
+- `docblock_parity::magic_properties_methods_and_mixin_are_available`
+- `undefined_class::enum_static_call_cross_file`
+- `undefined_class::psr4_trait_fqcn_lazy_loaded`
+- `undefined_class::trait_uses_trait_cross_file_exists`
+
+Common theme: PSR-4-lazy-loaded classes / traits / enums that arrive
+*after* `ingest_codebase` runs.  `ingest_codebase` mirrors the codebase
+into the db once at the start of analysis; lazy-loaded definitions
+that hydrate mid-pass never get a `MethodNode` / `PropertyNode` /
+`ClassConstantNode`, so db lookups miss and the codebase fallback is
+load-bearing.
+
+Candidate fix: hook the PSR-4 lazy-load path
+(`Codebase::lazy_load_class` and friends) to also push fresh
+storage into the db via the existing `upsert_*_node` setters.  This
+is its own architectural PR — moderate scope (touches every lazy-load
+entry point) but mechanical.
+
+## Other S5 work remaining
 
 - Migrate the residual `Codebase::get_method` / `get_property` /
-  `get_class_constant` reads in `expr.rs`, `stmt/mod.rs`, `pass2.rs`,
-  `call/*.rs`.  Each replaces an `ensure_finalized`-driven walk with a
-  `class_ancestors`-driven walk.  Mechanical but tedious; each is a
-  shippable PR.
+  `get_class_constant` reads in `expr.rs:830` (constant), `expr.rs:1317`
+  (property), `expr.rs:1473` (readonly fallback — different shape, on
+  class storage).  Each needs a `lookup_*_in_chain` helper similar to
+  the method one PR28 added; each will keep a codebase fallback until
+  the lazy-load hook lands.
 - Remove `Codebase::ensure_finalized` and the `finalization_cache`
   once no read site reaches them.  Gated on the per-field migrations
   finishing.
