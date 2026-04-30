@@ -744,6 +744,36 @@ fn trait_declares_method(
     false
 }
 
+/// Returns `true` iff `fqcn` (or any class/interface in its ancestor chain)
+/// declares a class constant named `const_name`.  Mirrors
+/// [`Codebase::get_class_constant`]'s walk for existence purposes:
+/// own → traits → ancestors (incl. interfaces).  `class_ancestors` already
+/// includes direct traits and interfaces in its returned list, so a single
+/// walk is sufficient.
+///
+/// Constant names are case-sensitive in PHP.  Cycle-safe via
+/// `class_ancestors`'s own cycle recovery.
+pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
+    if db
+        .lookup_class_constant_node(fqcn, const_name)
+        .is_some_and(|n| n.active(db))
+    {
+        return true;
+    }
+    let Some(class_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
+        return false;
+    };
+    for ancestor in class_ancestors(db, class_node).0.iter() {
+        if db
+            .lookup_class_constant_node(ancestor.as_ref(), const_name)
+            .is_some_and(|n| n.active(db))
+        {
+            return true;
+        }
+    }
+    false
+}
+
 /// Predicate variant of [`Codebase::extends_or_implements`] backed by the
 /// Salsa db.
 ///
