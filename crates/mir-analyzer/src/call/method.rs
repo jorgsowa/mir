@@ -219,8 +219,7 @@ impl CallAnalyzer {
                                     ea.db,
                                     &resolved_arc,
                                     method_name,
-                                ) || ea.codebase.get_method(&resolved_arc, method_name).is_some()
-                                {
+                                ) {
                                     found_method = true;
                                     intersection_result = Union::merge(
                                         &intersection_result,
@@ -418,11 +417,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
         let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, fqcn)
             .map(|k| (k.is_interface, k.is_abstract))
             .unwrap_or((false, false));
-        if is_interface
-            || is_abstract
-            || crate::db::method_exists_via_db(ea.db, fqcn, "__call")
-            || ea.codebase.get_method(fqcn, "__call").is_some()
-        {
+        if is_interface || is_abstract || crate::db::method_exists_via_db(ea.db, fqcn, "__call") {
             Union::mixed()
         } else {
             ea.emit(
