@@ -625,8 +625,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 n.class.span,
                             );
                         } else if type_exists {
-                            if let Some(cls) = self.codebase.classes.get(fqcn.as_ref()) {
-                                if let Some(msg) = cls.deprecated.clone() {
+                            if let Some(node) = self
+                                .db
+                                .lookup_class_node(fqcn.as_ref())
+                                .filter(|n| n.active(self.db))
+                            {
+                                if let Some(msg) = node.deprecated(self.db) {
                                     self.emit(
                                         IssueKind::DeprecatedClass {
                                             name: fqcn.to_string(),
