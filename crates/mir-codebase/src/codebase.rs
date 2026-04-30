@@ -1098,21 +1098,30 @@ impl Codebase {
             return;
         }
 
+        // Per-call memoization so a chain `A→B→C→D` walks each link once
+        // instead of once per descendant (would be O(N²) without it for
+        // deep hierarchies + interface lattices).  Lives only for this call;
+        // `invalidate_finalization` re-runs from scratch.
+        let mut class_memo: std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>> =
+            std::collections::HashMap::new();
+        let mut iface_memo: std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>> =
+            std::collections::HashMap::new();
+
         // 1. Compute all_parents for classes.
         let class_keys: Vec<Arc<str>> = self.classes.iter().map(|e| e.key().clone()).collect();
         for fqcn in &class_keys {
-            let parents = self.compute_class_ancestors(fqcn);
+            let parents = self.class_ancestors_memo(fqcn, &mut class_memo, &mut iface_memo);
             if let Some(mut cls) = self.classes.get_mut(fqcn.as_ref()) {
-                cls.all_parents = parents;
+                cls.all_parents = parents.to_vec();
             }
         }
 
         // 2. Compute all_parents for interfaces.
         let iface_keys: Vec<Arc<str>> = self.interfaces.iter().map(|e| e.key().clone()).collect();
         for fqcn in &iface_keys {
-            let parents = self.compute_interface_ancestors(fqcn);
+            let parents = self.interface_ancestors_memo(fqcn, &mut iface_memo);
             if let Some(mut iface) = self.interfaces.get_mut(fqcn.as_ref()) {
-                iface.all_parents = parents;
+                iface.all_parents = parents.to_vec();
             }
         }
 
@@ -1261,42 +1270,63 @@ impl Codebase {
         None
     }
 
-    /// Compute the ancestor list (`all_parents`) for a class.  Ordering matches
-    /// the historical `ensure_finalized` walk: parent + parent's ancestors,
+    /// Compute the ancestor list for a class, reusing previously-computed
+    /// entries from the per-`finalize` memo maps.  Ordering matches the
+    /// historical `ensure_finalized` walk: parent + parent's ancestors,
     /// then each implemented interface + its ancestors, then directly-used
-    /// traits.  A local `seen` set deduplicates diamond ancestors.
-    fn compute_class_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        let mut result: Vec<Arc<str>> = Vec::new();
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-        self.collect_class_ancestors(fqcn, &mut result, &mut seen);
-        result
-    }
-
-    fn collect_class_ancestors(
+    /// traits.  Diamond ancestors are deduplicated.
+    fn class_ancestors_memo(
         &self,
         fqcn: &str,
-        result: &mut Vec<Arc<str>>,
-        seen: &mut std::collections::HashSet<String>,
-    ) {
+        class_memo: &mut std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>>,
+        iface_memo: &mut std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>>,
+    ) -> Arc<[Arc<str>]> {
+        if let Some(cached) = class_memo.get(fqcn) {
+            return Arc::clone(cached);
+        }
+
         let (parent, interfaces, traits) = match self.classes.get(fqcn) {
             Some(cls) => (
                 cls.parent.clone(),
                 cls.interfaces.clone(),
                 cls.traits.clone(),
             ),
-            None => return,
+            None => {
+                let empty: Arc<[Arc<str>]> = Arc::from([]);
+                class_memo.insert(Arc::from(fqcn), Arc::clone(&empty));
+                return empty;
+            }
         };
+
+        // Insert an empty placeholder before recursing so a circular hierarchy
+        // (`A extends B; B extends A`) terminates: the second visit hits the
+        // empty cache and returns instead of recursing forever.
+        let placeholder: Arc<[Arc<str>]> = Arc::from([]);
+        class_memo.insert(Arc::from(fqcn), Arc::clone(&placeholder));
+
+        let mut result: Vec<Arc<str>> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         if let Some(p) = parent {
             if seen.insert(p.to_string()) {
                 result.push(Arc::clone(&p));
-                self.collect_class_ancestors(&p, result, seen);
+                let p_ancs = self.class_ancestors_memo(&p, class_memo, iface_memo);
+                for a in p_ancs.iter() {
+                    if seen.insert(a.to_string()) {
+                        result.push(Arc::clone(a));
+                    }
+                }
             }
         }
         for iface in &interfaces {
             if seen.insert(iface.to_string()) {
                 result.push(Arc::clone(iface));
-                self.collect_interface_ancestors(iface, result, seen);
+                let i_ancs = self.interface_ancestors_memo(iface, iface_memo);
+                for a in i_ancs.iter() {
+                    if seen.insert(a.to_string()) {
+                        result.push(Arc::clone(a));
+                    }
+                }
             }
         }
         for t in traits {
@@ -1304,32 +1334,52 @@ impl Codebase {
                 result.push(t);
             }
         }
+
+        let arc: Arc<[Arc<str>]> = Arc::from(result.as_slice());
+        class_memo.insert(Arc::from(fqcn), Arc::clone(&arc));
+        arc
     }
 
-    /// Compute the ancestor list for an interface by walking `extends` chains.
-    fn compute_interface_ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        let mut result: Vec<Arc<str>> = Vec::new();
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-        self.collect_interface_ancestors(fqcn, &mut result, &mut seen);
-        result
-    }
-
-    fn collect_interface_ancestors(
+    /// Compute the ancestor list for an interface by walking `extends` chains,
+    /// reusing previously-computed entries from the per-`finalize` memo map.
+    fn interface_ancestors_memo(
         &self,
         fqcn: &str,
-        result: &mut Vec<Arc<str>>,
-        seen: &mut std::collections::HashSet<String>,
-    ) {
+        iface_memo: &mut std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>>,
+    ) -> Arc<[Arc<str>]> {
+        if let Some(cached) = iface_memo.get(fqcn) {
+            return Arc::clone(cached);
+        }
+
         let extends = match self.interfaces.get(fqcn) {
             Some(iface) => iface.extends.clone(),
-            None => return,
+            None => {
+                let empty: Arc<[Arc<str>]> = Arc::from([]);
+                iface_memo.insert(Arc::from(fqcn), Arc::clone(&empty));
+                return empty;
+            }
         };
+
+        let placeholder: Arc<[Arc<str>]> = Arc::from([]);
+        iface_memo.insert(Arc::from(fqcn), Arc::clone(&placeholder));
+
+        let mut result: Vec<Arc<str>> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         for e in &extends {
             if seen.insert(e.to_string()) {
                 result.push(Arc::clone(e));
-                self.collect_interface_ancestors(e, result, seen);
+                let e_ancs = self.interface_ancestors_memo(e, iface_memo);
+                for a in e_ancs.iter() {
+                    if seen.insert(a.to_string()) {
+                        result.push(Arc::clone(a));
+                    }
+                }
             }
         }
+
+        let arc: Arc<[Arc<str>]> = Arc::from(result.as_slice());
+        iface_memo.insert(Arc::from(fqcn), Arc::clone(&arc));
+        arc
     }
 }
 
