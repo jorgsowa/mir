@@ -136,7 +136,6 @@ impl CallAnalyzer {
             if is_interface
                 || is_abstract
                 || crate::db::method_exists_via_db(ea.db, &fqcn, "__callStatic")
-                || ea.codebase.get_method(&fqcn, "__callStatic").is_some()
             {
                 Union::mixed()
             } else {
