@@ -1334,7 +1334,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     // Only emit UndefinedProperty if all ancestors are known and no __get magic.
                     if !crate::db::has_unknown_ancestor_via_db(self.db, fqcn.as_ref())
-                        && !self.codebase.has_magic_get(fqcn.as_ref())
+                        && !crate::db::method_exists_via_db(self.db, fqcn.as_ref(), "__get")
                     {
                         self.emit(
                             IssueKind::UndefinedProperty {
