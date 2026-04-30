@@ -51,6 +51,10 @@ pub trait MirDatabase: salsa::Database {
     /// registered.  Untracked iteration of a per-class HashMap.
     fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode>;
 
+    /// Return all own-property nodes for `fqcn`.  Empty if no class is
+    /// registered.  Untracked iteration of a per-class HashMap.
+    fn class_own_properties(&self, fqcn: &str) -> Vec<PropertyNode>;
+
     /// Return all class-FQCNs currently registered as active `ClassNode`s,
     /// optionally filtered by kind.  Untracked snapshot — callers should
     /// treat the returned `Vec` as a one-shot view.
@@ -349,6 +353,9 @@ pub struct MethodNode {
     pub is_final: bool,
     pub is_constructor: bool,
     pub is_pure: bool,
+    /// Source location of the declaration.  `None` for synthesized methods
+    /// (e.g. enum implicit `cases`/`from`/`tryFrom`).
+    pub location: Option<Location>,
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +377,7 @@ pub struct PropertyNode {
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_readonly: bool,
+    pub location: Option<Location>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1124,6 +1132,13 @@ impl MirDatabase for MirDb {
             .unwrap_or_default()
     }
 
+    fn class_own_properties(&self, fqcn: &str) -> Vec<PropertyNode> {
+        self.property_nodes
+            .get(fqcn)
+            .map(|m| m.values().copied().collect())
+            .unwrap_or_default()
+    }
+
     fn active_class_node_fqcns(&self) -> Vec<Arc<str>> {
         self.class_nodes
             .iter()
@@ -1433,6 +1448,7 @@ impl MirDb {
                 && node.is_pure(self) == storage.is_pure
                 && node.deprecated(self) == storage.deprecated
                 && node.return_type(self) == storage.return_type
+                && node.location(self) == storage.location
                 && *node.params(self) == *storage.params.as_slice()
                 && *node.template_params(self) == *storage.template_params.as_slice()
                 && *node.assertions(self) == *storage.assertions.as_slice()
@@ -1457,6 +1473,7 @@ impl MirDb {
             node.set_is_final(self).to(storage.is_final);
             node.set_is_constructor(self).to(storage.is_constructor);
             node.set_is_pure(self).to(storage.is_pure);
+            node.set_location(self).to(storage.location.clone());
             node
         } else {
             // MethodNode::new takes &mut self; insert after it returns.
@@ -1477,6 +1494,7 @@ impl MirDb {
                 storage.is_final,
                 storage.is_constructor,
                 storage.is_pure,
+                storage.location.clone(),
             );
             self.method_nodes
                 .entry(fqcn.clone())
@@ -1589,6 +1607,7 @@ impl MirDb {
                 && node.is_static(self) == storage.is_static
                 && node.is_readonly(self) == storage.is_readonly
                 && node.ty(self) == storage.ty
+                && node.location(self) == storage.location
             {
                 return;
             }
@@ -1597,6 +1616,7 @@ impl MirDb {
             node.set_visibility(self).to(storage.visibility);
             node.set_is_static(self).to(storage.is_static);
             node.set_is_readonly(self).to(storage.is_readonly);
+            node.set_location(self).to(storage.location.clone());
         } else {
             let node = PropertyNode::new(
                 self,
@@ -1607,6 +1627,7 @@ impl MirDb {
                 storage.visibility,
                 storage.is_static,
                 storage.is_readonly,
+                storage.location.clone(),
             );
             self.property_nodes
                 .entry(fqcn.clone())
