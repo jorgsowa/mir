@@ -245,8 +245,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                 // Guard: if check_ty is purely null, remove_null() is empty and would
                                 // vacuously return true, incorrectly suppressing the error.
                                 && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, self.db, &self.file))
-                                && !declared_return_has_template(declared, self.codebase)
-                                && !declared_return_has_template(&check_ty, self.codebase)
+                                && !declared_return_has_template(declared, self.db)
+                                && !declared_return_has_template(&check_ty, self.db)
                                 && !return_arrays_compatible(&check_ty, declared, self.codebase, self.db, &self.file)
                                 // Skip coercions: declared is more specific than actual
                                 && !declared.is_subtype_of_simple(&check_ty)

@@ -184,7 +184,7 @@ fn return_type_params_compatible(
 /// Returns true if the declared return type contains template-like types (unknown FQCNs
 /// without namespace separator that don't exist in the codebase) — we can't validate
 /// return types against generic type parameters without full template instantiation.
-pub(super) fn declared_return_has_template(declared: &Union, codebase: &Codebase) -> bool {
+pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabase) -> bool {
     declared.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
         // Generic class instantiation (e.g. Result<string, void>) — skip without full template inference.
@@ -194,8 +194,8 @@ pub(super) fn declared_return_has_template(declared: &Union, codebase: &Codebase
         // declared type in ways we don't track (not flagged at default error level).
         Atomic::TNamedObject { fqcn, type_params } => {
             !type_params.is_empty()
-                || !codebase.type_exists(fqcn.as_ref())
-                || codebase.interfaces.contains_key(fqcn.as_ref())
+                || !crate::db::type_exists_via_db(db, fqcn.as_ref())
+                || crate::db::class_kind_via_db(db, fqcn.as_ref()).is_some_and(|k| k.is_interface)
         }
         Atomic::TArray { value, .. }
         | Atomic::TList { value }
@@ -203,7 +203,7 @@ pub(super) fn declared_return_has_template(declared: &Union, codebase: &Codebase
         | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !codebase.type_exists(fqcn.as_ref())
+                !fqcn.contains('\\') && !crate::db::type_exists_via_db(db, fqcn.as_ref())
             }
             _ => false,
         }),
