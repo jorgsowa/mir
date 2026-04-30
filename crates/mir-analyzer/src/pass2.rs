@@ -507,16 +507,10 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Inferred return type is published two ways:
-        //   1. Codebase storage (read by inheritance walks that still go
-        //      through `Codebase` — see `mir-codebase`).
-        //   2. The Salsa `FunctionNode::inferred_return_type` field, via
-        //      the parallel-safe buffer (committed serially after the
-        //      priming sweep returns).  See `InferredReturnTypes`.
+        // Inferred return type → Salsa `FunctionNode::inferred_return_type`
+        // via the parallel-safe buffer (committed serially after the
+        // priming sweep returns).  See `InferredReturnTypes`.
         if let Some(fqn) = fqn {
-            if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
-                func.inferred_return_type = Some(inferred.clone());
-            }
             self.record_function_inference(&fqn, &inferred);
         }
     }
@@ -624,11 +618,6 @@ impl<'a> Pass2Driver<'a> {
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
-                if let Some(m) = cls.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
-                }
-            }
             self.record_method_inference(fqcn, method.name, &inferred);
         }
 
@@ -716,12 +705,8 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Inferred return type — see `analyze_fn_decl` for the
-        // codebase + salsa publication rationale.
+        // Inferred return type → Salsa, via the priming-sweep buffer.
         if let Some(fqn) = fqn {
-            if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
-                func.inferred_return_type = Some(inferred.clone());
-            }
             self.record_function_inference(&fqn, &inferred);
         }
     }
@@ -841,11 +826,6 @@ impl<'a> Pass2Driver<'a> {
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            if let Some(mut cls) = self.codebase.classes.get_mut(fqcn) {
-                if let Some(m) = cls.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
-                }
-            }
             self.record_method_inference(fqcn, method.name, &inferred);
         }
 
@@ -1019,11 +999,6 @@ impl<'a> Pass2Driver<'a> {
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            if let Some(mut tr) = self.codebase.traits.get_mut(fqcn) {
-                if let Some(m) = tr.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
-                }
-            }
             self.record_method_inference(fqcn, method.name, &inferred);
         }
     }
@@ -1130,11 +1105,6 @@ impl<'a> Pass2Driver<'a> {
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            if let Some(mut tr) = self.codebase.traits.get_mut(fqcn) {
-                if let Some(m) = tr.own_methods.get_mut(method.name) {
-                    Arc::make_mut(m).inferred_return_type = Some(inferred.clone());
-                }
-            }
             self.record_method_inference(fqcn, method.name, &inferred);
         }
     }

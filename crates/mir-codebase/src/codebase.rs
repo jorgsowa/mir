@@ -478,48 +478,6 @@ impl Codebase {
     // Lookups
     // -----------------------------------------------------------------------
 
-    /// Direct lookup of a free function's `inferred_return_type` by FQN.
-    /// Mirrors `method_inferred_return_type` for functions; the field
-    /// stays on `FunctionStorage` by design (see `FunctionNode` doc
-    /// comment + ROADMAP "S3 deadlock").
-    pub fn function_inferred_return_type(&self, fqn: &str) -> Option<Union> {
-        self.functions
-            .get(fqn)
-            .and_then(|s| s.inferred_return_type.clone())
-    }
-
-    /// Direct lookup of a method's `inferred_return_type` on the owner
-    /// class/trait/interface/enum.  Does not walk the inheritance chain —
-    /// callers are expected to know the owning FQCN already (e.g. from
-    /// `db::lookup_method_in_chain`).
-    pub fn method_inferred_return_type(
-        &self,
-        owner_fqcn: &str,
-        method_name: &str,
-    ) -> Option<Union> {
-        if let Some(cls) = self.classes.get(owner_fqcn) {
-            if let Some(m) = lookup_method(&cls.own_methods, method_name) {
-                return m.inferred_return_type.clone();
-            }
-        }
-        if let Some(tr) = self.traits.get(owner_fqcn) {
-            if let Some(m) = lookup_method(&tr.own_methods, method_name) {
-                return m.inferred_return_type.clone();
-            }
-        }
-        if let Some(iface) = self.interfaces.get(owner_fqcn) {
-            if let Some(m) = lookup_method(&iface.own_methods, method_name) {
-                return m.inferred_return_type.clone();
-            }
-        }
-        if let Some(en) = self.enums.get(owner_fqcn) {
-            if let Some(m) = lookup_method(&en.own_methods, method_name) {
-                return m.inferred_return_type.clone();
-            }
-        }
-        None
-    }
-
     /// Whether a class/interface/trait/enum with this FQCN exists.
     pub fn type_exists(&self, fqcn: &str) -> bool {
         self.classes.contains_key(fqcn)
