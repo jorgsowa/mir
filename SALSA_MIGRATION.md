@@ -58,6 +58,27 @@ reads onto the db:
   fixtures pass.
 - PR33 — drop the `__construct` codebase fallback in `expr.rs`
   introduced by PR29.  The chain helper covers it after PR30/PR31.
+- PR34 — drop codebase fallback for class-constant existence at
+  `expr.rs:830`.  `class_constant_exists_in_chain` (moved from `expr.rs`
+  into `db.rs` next to its peers) walks own + `class_ancestors`, which
+  already includes parents, interfaces, and direct traits — full parity
+  with `Codebase::get_class_constant` for existence purposes.
+- PR35 — `db::lookup_property_in_chain` replaces `find_property_node_in_chain`
+  in `expr.rs`, extending it to walk `@mixin` chains (own + each
+  ancestor's mixins, recursive).  Drops the
+  `.or_else(|| codebase.get_property(...))` fallback in
+  `resolve_property_type`.  Uses the same `mixins` field on `ClassNode`
+  added in PR31 and is cycle-safe via a per-call visited set.
+- PR36 — drop the redundant `cls.get_property(...)` fallback in the
+  readonly-assignment check at `expr.rs:1473`.  Both arms read
+  own_properties only (no chain walk); `ingest_codebase` mirrors every
+  class's own_properties into `PropertyNode` inputs, so the db path
+  is at parity for this site.
+- PR38 — focused unit tests for the chain helpers
+  (`lookup_method_in_chain`, `lookup_property_in_chain`,
+  `class_constant_exists_in_chain`): own-vs-ancestor precedence,
+  trait-of-traits, `@mixin` walks, mutual-mixin cycles, case sensitivity,
+  inactive-class handling.
 
 ## Architectural blocker uncovered this session
 
@@ -130,36 +151,36 @@ fields after a parallel pass will hit the same deadlock.
    tracked query gets stale results unless we manually invalidate.
    Effectively gives up on S3's perf win.
 
-## Method-resolution status: codebase-free
+## Method/property/constant resolution status: codebase-free
 
-All `Codebase::get_method`-style fallbacks in method/constructor
-resolution paths are gone (PR27/PR28/PR29/PR30/PR31/PR32/PR33).
-`db::lookup_method_in_chain` is the single canonical walker, and it
-is at full parity with `Codebase::get_method`'s order: own → mixins
-(recursive) → traits (transitive) → ancestors (with each ancestor's
-own + traits + mixins).
+All `Codebase::get_method` / `get_property` / `get_class_constant`
+fallbacks in member-resolution paths are gone
+(PR27–PR33 for methods; PR34–PR36 for properties and constants).
+The canonical walkers all live in `db.rs`:
 
-The only remaining `Codebase::get_method` reads in the analyzer are:
+- `db::lookup_method_in_chain` — own → mixins (recursive) → traits
+  (transitive) → ancestors (with each ancestor's own + traits + mixins).
+- `db::lookup_property_in_chain` — own → mixins (recursive) → ancestors
+  (with each ancestor's mixins).  `class_ancestors` itself includes
+  direct traits, so trait-property reads are covered by the ancestor loop.
+- `db::class_constant_exists_in_chain` — own + `class_ancestors`
+  (existence-only, mirroring `Codebase::get_class_constant`'s order).
+
+The only remaining `Codebase::get_method` read in the analyzer is:
+
 - `call/method.rs:51` — fetches `inferred_return_type` from
   `MethodStorage`.  Stays until S3 promotes the field to a tracked
-  query.
-
-Properties and class constants still have a few `Codebase::get_property`
-/ `get_class_constant` sites in `expr.rs` (lines 830, 1317, 1473).
-Those are the next surface to migrate; same pattern (chain helper,
-mixin walk if needed for properties).
+  query (blocked on the deadlock above).
 
 ## Other S5 work remaining
 
-- Migrate the residual `Codebase::get_method` / `get_property` /
-  `get_class_constant` reads in `expr.rs:830` (constant), `expr.rs:1317`
-  (property), `expr.rs:1473` (readonly fallback — different shape, on
-  class storage).  Each needs a `lookup_*_in_chain` helper similar to
-  the method one PR28 added; each will keep a codebase fallback until
-  the lazy-load hook lands.
-- Remove `Codebase::ensure_finalized` and the `finalization_cache`
-  once no read site reaches them.  Gated on the per-field migrations
-  finishing.
+- Remove `Codebase::ensure_finalized` and the `finalization_cache`.
+  Gated on `MethodStorage::inferred_return_type` migrating off the
+  codebase, which is gated on the deadlock resolution above.  The
+  codebase methods that depend on `ensure_finalized` (`get_method`,
+  `get_property`, `get_class_constant`, `compute_all_parents`) are
+  no longer called from outside `mir-codebase`, but `get_method` is
+  still used by `call/method.rs:51` for inferred return types.
 - Remove the structural-snapshot fallback in `re_analyze_file`'s
   cold path.  Same gating.
 - The `lazy_load_from_body_issues` post-Pass-2 sweep still uses
@@ -189,10 +210,12 @@ mixin walk if needed for properties).
 
 ## Test coverage status
 
-The 745-test fixture suite passes after every PR.  No new tests were
-added for the db helpers themselves beyond the existing `db.rs` unit
-tests for `class_ancestors`, `class_template_params_via_db`, etc.
-Adding focused unit tests for `method_exists_via_db`,
-`method_is_concretely_implemented`, and
-`extends_or_implements_via_db` would harden the migration further;
-they're tested transitively through fixtures today.
+The 745-test fixture suite passes after every PR.  Focused unit tests
+exist in `db.rs` for `class_ancestors`,
+`class_template_params_via_db`, `method_exists_via_db`,
+`method_is_concretely_implemented`, `extends_or_implements_via_db`,
+`has_unknown_ancestor_via_db`, and (added in PR38)
+`lookup_method_in_chain`, `lookup_property_in_chain`, and
+`class_constant_exists_in_chain` (own/ancestor precedence,
+mixin walks, mutual-mixin cycles, trait-of-traits, case sensitivity,
+inactive-class handling).
