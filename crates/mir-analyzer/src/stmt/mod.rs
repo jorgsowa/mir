@@ -352,7 +352,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || crate::db::has_unknown_ancestor_via_db(self.db, &resolved)
                                 || crate::db::has_unknown_ancestor_via_db(self.db, fqcn)
                                 // Suppress if class is not in codebase at all (could be extension class)
-                                || (!self.codebase.type_exists(&resolved) && !self.codebase.type_exists(fqcn));
+                                || (!crate::db::type_exists_via_db(self.db, &resolved) && !crate::db::type_exists_via_db(self.db, fqcn));
                             if !is_throwable {
                                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                                 let (line_end, col_end) = if stmt.span.start < stmt.span.end {
@@ -1178,7 +1178,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if matches!(resolved.as_str(), "self" | "static" | "parent") {
             return;
         }
-        if self.codebase.type_exists(&resolved) {
+        if crate::db::type_exists_via_db(self.db, &resolved) {
             return;
         }
         let span = name.span();
