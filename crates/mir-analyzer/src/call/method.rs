@@ -28,10 +28,7 @@ pub(super) struct ResolvedMethod {
     pub(super) return_ty_raw: Union,
 }
 
-/// Try to resolve a method via the Salsa db, walking the class ancestor chain.
-///
-/// When db is `None` or the method is not in the db, returns `None` so the
-/// caller can fall back to `codebase.get_method()`.
+/// Resolve a method via the Salsa db, walking the class ancestor chain.
 pub(super) fn resolve_method_from_db(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &Arc<str>,
@@ -44,11 +41,9 @@ pub(super) fn resolve_method_from_db(
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
-    // inferred_return_type lives in MethodStorage until S3.
-    let inferred = ea
-        .codebase
-        .get_method(&owner_fqcn, &name)
-        .and_then(|s| s.inferred_return_type.clone());
+    // inferred_return_type lives in MethodStorage until S3 — direct,
+    // non-finalizing storage read on the resolved owner.
+    let inferred = ea.codebase.method_inferred_return_type(&owner_fqcn, &name);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
