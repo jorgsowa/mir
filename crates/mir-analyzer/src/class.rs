@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use mir_codebase::storage::Visibility;
+use mir_codebase::storage::{Location as StorageLocation, Visibility};
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
 
@@ -70,23 +70,36 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn analyze_all(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
 
-        let class_keys: Vec<Arc<str>> = self
-            .codebase
-            .classes
-            .iter()
-            .map(|e| e.key().clone())
+        let mut class_keys: Vec<Arc<str>> = self
+            .db
+            .active_class_node_fqcns()
+            .into_iter()
+            .filter(|fqcn| {
+                self.db
+                    .lookup_class_node(fqcn.as_ref())
+                    .map(|n| {
+                        !n.is_interface(self.db) && !n.is_trait(self.db) && !n.is_enum(self.db)
+                    })
+                    .unwrap_or(false)
+            })
             .collect();
+        // Sort for deterministic issue order across runs.
+        class_keys.sort();
 
         for fqcn in &class_keys {
-            let cls = match self.codebase.classes.get(fqcn.as_ref()) {
-                Some(c) => c,
+            let node = match self
+                .db
+                .lookup_class_node(fqcn.as_ref())
+                .filter(|n| n.active(self.db))
+            {
+                Some(n) => n,
                 None => continue,
             };
+            let location = node.location(self.db);
 
             // Skip classes from vendor / stub files — only check user-analyzed files
             if !self.analyzed_files.is_empty() {
-                let in_analyzed = cls
-                    .location
+                let in_analyzed = location
                     .as_ref()
                     .map(|loc| self.analyzed_files.contains(&loc.file))
                     .unwrap_or(false);
@@ -96,7 +109,7 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- 1. Final-class extension check / deprecated parent check ------
-            if let Some(parent_fqcn) = &cls.parent {
+            if let Some(parent_fqcn) = node.parent(self.db) {
                 if let Some(parent) = self
                     .db
                     .lookup_class_node(parent_fqcn.as_ref())
@@ -104,9 +117,9 @@ impl<'a> ClassAnalyzer<'a> {
                 {
                     if parent.is_final(self.db) {
                         let loc = issue_location(
-                            cls.location.as_ref(),
+                            location.as_ref(),
                             fqcn,
-                            cls.location
+                            location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
                         );
@@ -117,17 +130,16 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc,
                         );
-                        if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources)
-                        {
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
                             issue = issue.with_snippet(snippet);
                         }
                         issues.push(issue);
                     }
                     if let Some(msg) = parent.deprecated(self.db) {
                         let loc = issue_location(
-                            cls.location.as_ref(),
+                            location.as_ref(),
                             fqcn,
-                            cls.location
+                            location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
                         );
@@ -138,8 +150,7 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc,
                         );
-                        if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources)
-                        {
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
                             issue = issue.with_snippet(snippet);
                         }
                         issues.push(issue);
@@ -148,20 +159,20 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // Skip abstract classes for "must implement" checks
-            if cls.is_abstract {
+            if node.is_abstract(self.db) {
                 // Still check override compatibility for abstract classes
-                self.check_overrides(&cls, &mut issues);
+                self.check_overrides(fqcn, location.as_ref(), &mut issues);
                 continue;
             }
 
             // ---- 2. Abstract parent methods must be implemented ----------------
-            self.check_abstract_methods_implemented(&cls, &mut issues);
+            self.check_abstract_methods_implemented(fqcn, location.as_ref(), &mut issues);
 
             // ---- 3. Interface methods must be implemented ----------------------
-            self.check_interface_methods_implemented(&cls, &mut issues);
+            self.check_interface_methods_implemented(fqcn, location.as_ref(), &mut issues);
 
             // ---- 4. Method override compatibility ------------------------------
-            self.check_overrides(&cls, &mut issues);
+            self.check_overrides(fqcn, location.as_ref(), &mut issues);
         }
 
         // ---- 5. Circular inheritance detection --------------------------------
@@ -177,11 +188,10 @@ impl<'a> ClassAnalyzer<'a> {
 
     fn check_abstract_methods_implemented(
         &self,
-        cls: &mir_codebase::storage::ClassStorage,
+        fqcn: &Arc<str>,
+        cls_location: Option<&StorageLocation>,
         issues: &mut Vec<Issue>,
     ) {
-        let fqcn = &cls.fqcn;
-
         // Walk every ancestor class and collect abstract methods
         let ancestors = self.ancestors(fqcn);
         for ancestor_fqcn in &ancestors {
@@ -208,11 +218,9 @@ impl<'a> ClassAnalyzer<'a> {
                 }
 
                 let loc = issue_location(
-                    cls.location.as_ref(),
+                    cls_location,
                     fqcn,
-                    cls.location
-                        .as_ref()
-                        .and_then(|l| self.sources.get(&l.file).copied()),
+                    cls_location.and_then(|l| self.sources.get(&l.file).copied()),
                 );
                 let mut issue = Issue::new(
                     IssueKind::UnimplementedAbstractMethod {
@@ -221,7 +229,7 @@ impl<'a> ClassAnalyzer<'a> {
                     },
                     loc,
                 );
-                if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources) {
+                if let Some(snippet) = extract_snippet(cls_location, &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -235,11 +243,10 @@ impl<'a> ClassAnalyzer<'a> {
 
     fn check_interface_methods_implemented(
         &self,
-        cls: &mir_codebase::storage::ClassStorage,
+        fqcn: &Arc<str>,
+        cls_location: Option<&StorageLocation>,
         issues: &mut Vec<Issue>,
     ) {
-        let fqcn = &cls.fqcn;
-
         // Collect all interfaces (direct + from ancestors)
         let all_ifaces: Vec<Arc<str>> = self
             .ancestors(fqcn)
@@ -279,11 +286,9 @@ impl<'a> ClassAnalyzer<'a> {
 
                 if !implemented {
                     let loc = issue_location(
-                        cls.location.as_ref(),
+                        cls_location,
                         fqcn,
-                        cls.location
-                            .as_ref()
-                            .and_then(|l| self.sources.get(&l.file).copied()),
+                        cls_location.and_then(|l| self.sources.get(&l.file).copied()),
                     );
                     let mut issue = Issue::new(
                         IssueKind::UnimplementedInterfaceMethod {
@@ -293,7 +298,7 @@ impl<'a> ClassAnalyzer<'a> {
                         },
                         loc,
                     );
-                    if let Some(snippet) = extract_snippet(cls.location.as_ref(), &self.sources) {
+                    if let Some(snippet) = extract_snippet(cls_location, &self.sources) {
                         issue = issue.with_snippet(snippet);
                     }
                     issues.push(issue);
@@ -306,28 +311,42 @@ impl<'a> ClassAnalyzer<'a> {
     // Check: override compatibility
     // -----------------------------------------------------------------------
 
-    fn check_overrides(&self, cls: &mir_codebase::storage::ClassStorage, issues: &mut Vec<Issue>) {
-        let fqcn = &cls.fqcn;
+    fn check_overrides(
+        &self,
+        fqcn: &Arc<str>,
+        _cls_location: Option<&StorageLocation>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let own_methods = self.db.class_own_methods(fqcn.as_ref());
+        for own in own_methods {
+            if !own.active(self.db) {
+                continue;
+            }
+            let method_name: Arc<str> = own.name(self.db);
 
-        for (method_name, own_method) in &cls.own_methods {
             // PHP does not enforce constructor signature compatibility
             if method_name.as_ref() == "__construct" {
                 continue;
             }
 
             // Find parent definition (if any) — search ancestor chain
-            let parent_method = self.find_parent_method(cls, method_name.as_ref());
+            let method_name_lower: Arc<str> = if method_name.chars().all(|c| !c.is_uppercase()) {
+                method_name.clone()
+            } else {
+                Arc::from(method_name.to_lowercase().as_str())
+            };
+            let parent_method = self.find_parent_method(fqcn, method_name_lower.as_ref());
 
             let parent = match parent_method {
                 Some(m) => m,
                 None => continue, // not an override
             };
 
+            let own_location = own.location(self.db);
             let loc = issue_location(
-                own_method.location.as_ref(),
+                own_location.as_ref(),
                 fqcn,
-                own_method
-                    .location
+                own_location
                     .as_ref()
                     .and_then(|l| self.sources.get(&l.file).copied()),
             );
@@ -337,29 +356,27 @@ impl<'a> ClassAnalyzer<'a> {
                 let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
-                        method: method_name.to_string(),
+                        method: method_name_lower.to_string(),
                         parent: parent.fqcn(self.db).to_string(),
                     },
                     loc.clone(),
                 );
-                if let Some(snippet) = extract_snippet(own_method.location.as_ref(), &self.sources)
-                {
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
             }
 
             // ---- b. Visibility must not be reduced -------------------------
-            if visibility_reduced(own_method.visibility, parent.visibility(self.db)) {
+            if visibility_reduced(own.visibility(self.db), parent.visibility(self.db)) {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
-                        method: method_name.to_string(),
+                        method: method_name_lower.to_string(),
                     },
                     loc.clone(),
                 );
-                if let Some(snippet) = extract_snippet(own_method.location.as_ref(), &self.sources)
-                {
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
@@ -372,8 +389,9 @@ impl<'a> ClassAnalyzer<'a> {
             //   - Either type is mixed
             //   - Parent type contains a template param
             let parent_return_type = parent.return_type(self.db);
+            let own_return_type = own.return_type(self.db);
             if let (Some(child_ret), Some(parent_ret)) =
-                (&own_method.return_type, parent_return_type.as_ref())
+                (own_return_type.as_ref(), parent_return_type.as_ref())
             {
                 let parent_from_docblock = parent_ret.from_docblock;
                 let involves_named_objects = self.type_has_named_objects(child_ret)
@@ -386,11 +404,7 @@ impl<'a> ClassAnalyzer<'a> {
                     && !child_ret.is_mixed()
                     && !self.return_type_has_template(parent_ret)
                 {
-                    let child_file = own_method
-                        .location
-                        .as_ref()
-                        .map(|l| l.file.as_ref())
-                        .unwrap_or("");
+                    let child_file = own_location.as_ref().map(|l| l.file.as_ref()).unwrap_or("");
 
                     let compatible = if (involves_named_objects || involves_self_static)
                         && self.type_has_only_object_atoms(child_ret)
@@ -414,14 +428,14 @@ impl<'a> ClassAnalyzer<'a> {
                             Issue::new(
                                 IssueKind::MethodSignatureMismatch {
                                     class: fqcn.to_string(),
-                                    method: method_name.to_string(),
+                                    method: method_name_lower.to_string(),
                                     detail: format!(
                                         "return type '{child_ret}' is not a subtype of parent '{parent_ret}'"
                                     ),
                                 },
                                 loc.clone(),
                             )
-                            .with_snippet(method_name.to_string()),
+                            .with_snippet(method_name_lower.to_string()),
                         );
                     }
                 }
@@ -429,12 +443,12 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- d. Required param count must not increase -----------------
             let parent_params = parent.params(self.db);
+            let own_params = own.params(self.db);
             let parent_required = parent_params
                 .iter()
                 .filter(|p| !p.is_optional && !p.is_variadic)
                 .count();
-            let child_required = own_method
-                .params
+            let child_required = own_params
                 .iter()
                 .filter(|p| !p.is_optional && !p.is_variadic)
                 .count();
@@ -444,14 +458,14 @@ impl<'a> ClassAnalyzer<'a> {
                     Issue::new(
                         IssueKind::MethodSignatureMismatch {
                             class: fqcn.to_string(),
-                            method: method_name.to_string(),
+                            method: method_name_lower.to_string(),
                             detail: format!(
                                 "overriding method requires {child_required} argument(s) but parent requires {parent_required}"
                             ),
                         },
                         loc.clone(),
                     )
-                    .with_snippet(method_name.to_string()),
+                    .with_snippet(method_name_lower.to_string()),
                 );
             }
 
@@ -465,10 +479,10 @@ impl<'a> ClassAnalyzer<'a> {
             //   - Either type contains a named object (needs codebase for inheritance check)
             //   - Either type contains TSelf/TStaticObject
             //   - Either type contains a template param
-            let shared_len = parent_params.len().min(own_method.params.len());
+            let shared_len = parent_params.len().min(own_params.len());
             for i in 0..shared_len {
                 let parent_param = &parent_params[i];
-                let child_param = &own_method.params[i];
+                let child_param = &own_params[i];
 
                 let (parent_ty, child_ty) = match (&parent_param.ty, &child_param.ty) {
                     (Some(p), Some(c)) => (p, c),
@@ -494,7 +508,7 @@ impl<'a> ClassAnalyzer<'a> {
                         Issue::new(
                             IssueKind::MethodSignatureMismatch {
                                 class: fqcn.to_string(),
-                                method: method_name.to_string(),
+                                method: method_name_lower.to_string(),
                                 detail: format!(
                                     "parameter ${} type '{}' is narrower than parent type '{}'",
                                     child_param.name, child_ty, parent_ty
@@ -502,7 +516,7 @@ impl<'a> ClassAnalyzer<'a> {
                             },
                             loc.clone(),
                         )
-                        .with_snippet(method_name.to_string()),
+                        .with_snippet(method_name_lower.to_string()),
                     );
                     break; // one issue per method is enough
                 }
@@ -592,14 +606,14 @@ impl<'a> ClassAnalyzer<'a> {
     /// Returns the parent's `MethodNode` (db-tracked).
     fn find_parent_method(
         &self,
-        cls: &mir_codebase::storage::ClassStorage,
-        method_name: &str,
+        fqcn: &Arc<str>,
+        method_name_lower: &str,
     ) -> Option<crate::db::MethodNode> {
-        let ancestors = self.ancestors(&cls.fqcn);
+        let ancestors = self.ancestors(fqcn);
         for ancestor_fqcn in &ancestors {
             if let Some(node) = self
                 .db
-                .lookup_method_node(ancestor_fqcn.as_ref(), method_name)
+                .lookup_method_node(ancestor_fqcn.as_ref(), method_name_lower)
                 .filter(|n| n.active(self.db))
             {
                 return Some(node);
@@ -616,10 +630,17 @@ impl<'a> ClassAnalyzer<'a> {
         let mut globally_done: HashSet<String> = HashSet::new();
 
         let mut class_keys: Vec<Arc<str>> = self
-            .codebase
-            .classes
-            .iter()
-            .map(|e| e.key().clone())
+            .db
+            .active_class_node_fqcns()
+            .into_iter()
+            .filter(|fqcn| {
+                self.db
+                    .lookup_class_node(fqcn.as_ref())
+                    .map(|n| {
+                        !n.is_interface(self.db) && !n.is_trait(self.db) && !n.is_enum(self.db)
+                    })
+                    .unwrap_or(false)
+            })
             .collect();
         class_keys.sort();
 
@@ -690,10 +711,10 @@ impl<'a> ClassAnalyzer<'a> {
                 chain.push(current.clone());
 
                 let parent = self
-                    .codebase
-                    .classes
-                    .get(current.as_ref())
-                    .and_then(|c| c.parent.clone());
+                    .db
+                    .lookup_class_node(current.as_ref())
+                    .filter(|n| n.active(self.db))
+                    .and_then(|n| n.parent(self.db));
 
                 match parent {
                     Some(p) => current = p,
@@ -716,10 +737,15 @@ impl<'a> ClassAnalyzer<'a> {
         let mut globally_done: HashSet<String> = HashSet::new();
 
         let mut iface_keys: Vec<Arc<str>> = self
-            .codebase
-            .interfaces
-            .iter()
-            .map(|e| e.key().clone())
+            .db
+            .active_class_node_fqcns()
+            .into_iter()
+            .filter(|fqcn| {
+                self.db
+                    .lookup_class_node(fqcn.as_ref())
+                    .map(|n| n.is_interface(self.db))
+                    .unwrap_or(false)
+            })
             .collect();
         iface_keys.sort();
 
@@ -793,11 +819,11 @@ impl<'a> ClassAnalyzer<'a> {
         stack_set.insert(fqcn.to_string());
         in_stack.push(fqcn.clone());
 
-        let extends = self
-            .codebase
-            .interfaces
-            .get(fqcn.as_ref())
-            .map(|i| i.extends.clone())
+        let extends: Vec<Arc<str>> = self
+            .db
+            .lookup_class_node(fqcn.as_ref())
+            .filter(|n| n.active(self.db))
+            .map(|n| n.extends(self.db).to_vec())
             .unwrap_or_default();
 
         for parent in extends {
@@ -813,32 +839,18 @@ impl<'a> ClassAnalyzer<'a> {
         if self.analyzed_files.is_empty() {
             return true;
         }
-        self.codebase
-            .classes
-            .get(fqcn.as_ref())
-            .map(|c| {
-                c.location
-                    .as_ref()
-                    .map(|loc| self.analyzed_files.contains(&loc.file))
-                    .unwrap_or(false)
-            })
+        self.db
+            .lookup_class_node(fqcn.as_ref())
+            .filter(|n| n.active(self.db))
+            .and_then(|n| n.location(self.db))
+            .map(|loc| self.analyzed_files.contains(&loc.file))
             .unwrap_or(false)
     }
 
     fn iface_in_analyzed_files(&self, fqcn: &Arc<str>) -> bool {
-        if self.analyzed_files.is_empty() {
-            return true;
-        }
-        self.codebase
-            .interfaces
-            .get(fqcn.as_ref())
-            .map(|i| {
-                i.location
-                    .as_ref()
-                    .map(|loc| self.analyzed_files.contains(&loc.file))
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false)
+        // Same lookup path as `class_in_analyzed_files` — interface and class
+        // nodes share `ClassNode` storage, distinguished by `is_interface`.
+        self.class_in_analyzed_files(fqcn)
     }
 }
 
