@@ -405,7 +405,7 @@ impl Codebase {
 
     /// Record an `@var`-annotated global variable type discovered in Pass 1.
     /// If the same variable is annotated in multiple files, the last write wins.
-    pub fn register_global_var(&self, file: &Arc<str>, name: Arc<str>, ty: Union) {
+    fn register_global_var(&self, file: &Arc<str>, name: Arc<str>, ty: Union) {
         self.file_global_vars
             .entry(file.clone())
             .or_default()
@@ -423,32 +423,6 @@ impl Codebase {
             || self.interfaces.contains_key(fqcn)
             || self.traits.contains_key(fqcn)
             || self.enums.contains_key(fqcn)
-    }
-
-    pub fn function_exists(&self, fqn: &str) -> bool {
-        self.functions.contains_key(fqn)
-    }
-
-    /// Returns true if the class is declared abstract.
-    /// Used to suppress `UndefinedMethod` on abstract class receivers: the concrete
-    /// subclass is expected to implement the method, matching Psalm errorLevel=3 behaviour.
-    pub fn is_abstract_class(&self, fqcn: &str) -> bool {
-        self.classes.get(fqcn).is_some_and(|c| c.is_abstract)
-    }
-
-    /// Return the declared template params for `fqcn` (class or interface), or
-    /// an empty vec if the type is not found or has no templates.
-    pub fn get_class_template_params(&self, fqcn: &str) -> Vec<crate::storage::TemplateParam> {
-        if let Some(cls) = self.classes.get(fqcn) {
-            return cls.template_params.clone();
-        }
-        if let Some(iface) = self.interfaces.get(fqcn) {
-            return iface.template_params.clone();
-        }
-        if let Some(tr) = self.traits.get(fqcn) {
-            return tr.template_params.clone();
-        }
-        vec![]
     }
 
     /// Resolve a short class/function name to its FQCN using the import table
@@ -552,26 +526,6 @@ impl Codebase {
     // -----------------------------------------------------------------------
     // Reference tracking (M18 dead-code detection)
     // -----------------------------------------------------------------------
-
-    /// Mark a method as referenced from user code.
-    pub fn mark_method_referenced(&self, fqcn: &str, method_name: &str) {
-        let key = format!("{}::{}", fqcn, method_name.to_lowercase());
-        let id = self.symbol_interner.intern_str(&key);
-        self.referenced_methods.insert(id);
-    }
-
-    /// Mark a property as referenced from user code.
-    pub fn mark_property_referenced(&self, fqcn: &str, prop_name: &str) {
-        let key = format!("{fqcn}::{prop_name}");
-        let id = self.symbol_interner.intern_str(&key);
-        self.referenced_properties.insert(id);
-    }
-
-    /// Mark a free function as referenced from user code.
-    pub fn mark_function_referenced(&self, fqn: &str) {
-        let id = self.symbol_interner.intern_str(fqn);
-        self.referenced_functions.insert(id);
-    }
 
     pub fn is_method_referenced(&self, fqcn: &str, method_name: &str) -> bool {
         let key = format!("{}::{}", fqcn, method_name.to_lowercase());
