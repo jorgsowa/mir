@@ -120,6 +120,12 @@ impl ProjectAnalyzer {
         &self.codebase
     }
 
+    /// Internal: expose the salsa Mutex for unit tests that need a `&dyn MirDatabase`.
+    #[doc(hidden)]
+    pub fn salsa_db_for_test(&self) -> &std::sync::Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)> {
+        &self.salsa
+    }
+
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
     /// Stubs are filtered against the configured target PHP version (or
     /// `PhpVersion::LATEST` if none was set).
@@ -475,8 +481,10 @@ impl ProjectAnalyzer {
 
         // ---- Dead-code detection (M18) --------------------------------------
         if self.find_dead_code {
+            let salsa = self.salsa.lock().unwrap();
             let dead_code_issues =
-                crate::dead_code::DeadCodeAnalyzer::new(&self.codebase).analyze();
+                crate::dead_code::DeadCodeAnalyzer::new(&self.codebase, &salsa.0).analyze();
+            drop(salsa);
             all_issues.extend(dead_code_issues);
         }
 
