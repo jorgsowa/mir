@@ -207,8 +207,9 @@ pub struct ClassKind {
 
 /// Read class kind/abstractness from an active `ClassNode`, if one is
 /// registered for `fqcn`.  Returns `None` for unregistered or inactive
-/// nodes, leaving the caller free to fall back to `Codebase` (which still
-/// holds bundled-stub types not yet promoted to the db).
+/// nodes.  All bundled and user types are mirrored into `ClassNode` by
+/// `MirDb::ingest_codebase`, so a `None` here means the type genuinely
+/// doesn't exist (or is inactive after a `deactivate_class_node` pass).
 pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
     let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
     Some(ClassKind {
@@ -221,16 +222,15 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
 
 /// Whether a class/interface/trait/enum is registered as an active
 /// `ClassNode` in the db.  Returns `false` for unregistered or inactive
-/// nodes; callers should fall back to `Codebase::type_exists` since
-/// bundled-stub types are not yet promoted to the db.
+/// nodes.  After `MirDb::ingest_codebase` runs (S5-PR8/PR9), this is
+/// the authoritative answer — bundled and user types are both mirrored.
 pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
 }
 
 /// Return the declared `@template` parameters for `fqcn` from an active
 /// `ClassNode`, if one is registered.  Returns `None` for unregistered
-/// or inactive nodes; callers should fall back to
-/// `Codebase::get_class_template_params`.
+/// or inactive nodes.  Authoritative after `ingest_codebase`.
 pub fn class_template_params_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
@@ -288,8 +288,13 @@ pub fn inherited_template_bindings_via_db(
 
 /// Salsa input representing a single global function.
 ///
-/// `inferred_return_type` is intentionally absent — it lives in
-/// `FunctionStorage` until S3 promotes it to a proper tracked query.
+/// `inferred_return_type` is intentionally absent — by design it lives in
+/// `FunctionStorage` (read via `Codebase::functions.get(...).inferred_return_type`).
+/// Promoting it to a Salsa tracked field deadlocks against rayon's per-worker
+/// db clones in the priming sweep (`Storage::cancel_others` waits for
+/// strong-count==1 forever); see ROADMAP "S3 deadlock" for the five
+/// resolution candidates and why none is uniformly safe.  Treat this as
+/// the chosen design, not migration debt.
 ///
 /// Invariant: every FQN known to the Salsa DB has exactly one `FunctionNode`
 /// handle in `MirDb::function_nodes`.  Removed functions are marked
@@ -313,8 +318,10 @@ pub struct FunctionNode {
 
 /// Salsa input representing a single method or interface/trait method.
 ///
-/// `inferred_return_type` is intentionally absent — it lives in
-/// `MethodStorage` until S3 promotes it to a proper tracked query.
+/// `inferred_return_type` is intentionally absent — by design it lives in
+/// `MethodStorage` (read via `Codebase::method_inferred_return_type`).
+/// Same rayon/Salsa deadlock rationale as `FunctionNode`; see that doc
+/// comment + ROADMAP "S3 deadlock".
 ///
 /// The node is keyed by `(fqcn, method_name_lower)` where `fqcn` is the
 /// FQCN of the **owning** class/interface/trait and `method_name_lower` is

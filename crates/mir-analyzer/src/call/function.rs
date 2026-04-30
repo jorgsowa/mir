@@ -28,7 +28,9 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    // inferred_return_type lives in FunctionStorage until S3.
+    // `inferred_return_type` lives on `FunctionStorage` by design; see
+    // `FunctionNode` doc comment and ROADMAP "S3 deadlock" for why it
+    // isn't a Salsa tracked field.
     let inferred = ea
         .codebase
         .functions

@@ -41,7 +41,8 @@ pub(super) fn resolve_method_from_db(
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
-    // inferred_return_type lives in MethodStorage until S3 — direct,
+    // `inferred_return_type` lives on `MethodStorage` by design; see
+    // `MethodNode` doc comment and ROADMAP "S3 deadlock".  Direct,
     // non-finalizing storage read on the resolved owner.
     let inferred = ea.codebase.method_inferred_return_type(&owner_fqcn, &name);
     let return_ty_raw = node
