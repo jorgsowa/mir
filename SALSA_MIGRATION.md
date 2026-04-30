@@ -1,6 +1,6 @@
 # Salsa migration — current status & open questions
 
-## Shipped through PR33
+## Shipped through PR38
 
 S0 (db skeleton) and S1 (`collect_file_definitions` query) are complete.
 S2 (`class_ancestors` query) is complete and is the LSP warm-path
@@ -79,8 +79,26 @@ reads onto the db:
   `class_constant_exists_in_chain`): own-vs-ancestor precedence,
   trait-of-traits, `@mixin` walks, mutual-mixin cycles, case sensitivity,
   inactive-class handling.
+- PR37 — drops the last `Codebase::get_method` fallback in the analyzer
+  (`call/method.rs:51`).  `lookup_method_in_chain` already returns the
+  *owner* of the resolved method, so reading `inferred_return_type` only
+  needed a direct (non-walking, non-finalizing) storage lookup; introduced
+  `Codebase::method_inferred_return_type` mirroring the
+  `call/function.rs:36` pattern for free functions.
+- PR39 — drops `Codebase::ensure_finalized`, the `finalization_cache`
+  field, the `compute_all_parents` private helper, and the public
+  inheritance-walking lookups (`get_method`, `get_property`,
+  `get_class_constant`).  Inlines the only two remaining external uses
+  of those walks (`has_magic_get`, `get_member_location`) as direct
+  walks of `own_methods`/`own_properties` + `all_parents`/own traits.
+  `Codebase::finalize()` now computes ancestors directly (single
+  recursive walk per class/interface) instead of memoizing per-class.
+  Also adds an explicit `self.codebase.finalize()` call in
+  `ProjectAnalyzer::analyze` between Pass 1 (with PSR-4 lazy load) and
+  Pass 2, since `all_parents` is no longer populated lazily on first
+  read.  Resolves the long-standing PR37 gating issue documented below.
 
-## Architectural blocker uncovered this session
+## Architectural blocker (still relevant for S3, no longer blocks S5)
 
 Promoting `MethodStorage::inferred_return_type` /
 `FunctionStorage::inferred_return_type` to tracked fields on
@@ -108,11 +126,14 @@ PR21 worked around this by fast-skipping setter calls when values match
 inferred-return-type sync because the values genuinely change
 (`None` → `Some(union)` is the whole point).
 
-This is **the** blocker for finishing S5.  Until it's resolved, every
-remaining S5 PR that needs to mirror Codebase state into Salsa-tracked
-fields after a parallel pass will hit the same deadlock.
+For S5, PR37 sidestepped this by keeping `inferred_return_type` outside
+Salsa: the analyzer reads it directly from `Codebase` storage on the
+already-resolved owner FQCN (no inheritance walk, no finalization).
+S3 still has to confront this — the field has to enter Salsa's
+dependency graph for cycle detection, fixpoint, and on-demand
+evaluation — but S5 no longer waits on it.
 
-## Resolution candidates (each requires a design decision)
+## Resolution candidates for S3 (each requires a design decision)
 
 1. **Avoid `for_each_with` for the priming sweep.** Use `rayon::scope`
    or manual scoped threads so worker clones are guaranteed dropped
@@ -154,47 +175,31 @@ fields after a parallel pass will hit the same deadlock.
 ## Method/property/constant resolution status: codebase-free
 
 All `Codebase::get_method` / `get_property` / `get_class_constant`
-fallbacks in member-resolution paths are gone
-(PR27–PR33 for methods; PR34–PR36 for properties and constants).
-The canonical walkers all live in `db.rs`:
+calls from analyzer code are gone (PR27–PR33 for methods; PR34–PR36
+for properties and constants; PR37 for the last
+`inferred_return_type` read).  PR39 deletes those three public methods
+from `Codebase` entirely, along with `ensure_finalized` and the
+per-class `finalization_cache`.  Inheritance walks now live in two
+places only:
 
-- `db::lookup_method_in_chain` — own → mixins (recursive) → traits
-  (transitive) → ancestors (with each ancestor's own + traits + mixins).
-- `db::lookup_property_in_chain` — own → mixins (recursive) → ancestors
-  (with each ancestor's mixins).  `class_ancestors` itself includes
-  direct traits, so trait-property reads are covered by the ancestor loop.
-- `db::class_constant_exists_in_chain` — own + `class_ancestors`
-  (existence-only, mirroring `Codebase::get_class_constant`'s order).
-
-The only remaining `Codebase::get_method` read in the analyzer is:
-
-- `call/method.rs:51` — fetches `inferred_return_type` from
-  `MethodStorage`.  Stays until S3 promotes the field to a tracked
-  query (blocked on the deadlock above).
-
-## Other S5 work remaining
-
-- Remove `Codebase::ensure_finalized` and the `finalization_cache`.
-  Gated on `MethodStorage::inferred_return_type` migrating off the
-  codebase, which is gated on the deadlock resolution above.  The
-  codebase methods that depend on `ensure_finalized` (`get_method`,
-  `get_property`, `get_class_constant`, `compute_all_parents`) are
-  no longer called from outside `mir-codebase`, but `get_method` is
-  still used by `call/method.rs:51` for inferred return types.
-- Remove the structural-snapshot fallback in `re_analyze_file`'s
-  cold path.  Same gating.
-- The `lazy_load_from_body_issues` post-Pass-2 sweep still uses
-  `Pass2Driver::new` (full pass, including issue emission and
-  reference tracking) on lazy-loaded files, then reanalyzes the
-  triggering files.  Confirm the inferred return types written here
-  reach the main pass's reads — if option 3 above is taken, this
-  is automatic.  If options 1/2/4 are taken, a sync call is needed
-  here too.
+- **`db.rs` (analyzer-facing, Salsa-memoized)**:
+  - `db::lookup_method_in_chain` — own → mixins (recursive) → traits
+    (transitive) → ancestors (with each ancestor's own + traits + mixins).
+  - `db::lookup_property_in_chain` — own → mixins (recursive) → ancestors
+    (with each ancestor's mixins).
+  - `db::class_constant_exists_in_chain` — own + `class_ancestors`.
+- **`Codebase::finalize`** populates `all_parents` once per class /
+  interface.  `has_magic_get`, `has_unknown_ancestor`,
+  `get_member_location`, and `get_inherited_template_bindings` walk
+  that pre-computed list directly — no lazy/recursive resolver
+  remains in `mir-codebase`.
 
 ## Open questions for the next session
 
-1. **Which resolution candidate above does the project want?**
-   The choice cascades into the next 5–8 PRs.
+1. **For S3 (inferred-return-type promotion), which deadlock
+   resolution candidate does the project want?**  PR37 unblocked S5
+   without picking one, but S3 still has to.  See "Resolution
+   candidates for S3" above.
 
 2. **For S3 itself, what's the body-AST sourcing strategy?**  The
    tracked query needs a way to walk a function/method body without

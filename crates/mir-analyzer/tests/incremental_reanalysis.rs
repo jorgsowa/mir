@@ -92,12 +92,13 @@ fn re_analyze_file_removes_old_definitions() {
     let _result2 = analyzer.re_analyze_file(&file_path_a, new_content_a);
 
     // Verify the old method bar() is gone and baz() exists
+    let foo = analyzer.codebase().classes.get("Foo").unwrap();
     assert!(
-        analyzer.codebase().get_method("Foo", "baz").is_some(),
+        foo.own_methods.contains_key("baz"),
         "baz() should exist after re-analysis"
     );
     assert!(
-        analyzer.codebase().get_method("Foo", "bar").is_none(),
+        !foo.own_methods.contains_key("bar"),
         "bar() should be removed after re-analysis"
     );
 }

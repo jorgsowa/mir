@@ -330,6 +330,13 @@ impl ProjectAnalyzer {
             self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);
         }
 
+        // ---- Compute Codebase.all_parents for all classes/interfaces.
+        // Pass 2 reads `cls.all_parents` via `has_magic_get`, `has_unknown_ancestor`,
+        // `get_member_location`, and `get_inherited_template_bindings` — none of
+        // those walk inheritance lazily anymore (`ensure_finalized` was removed
+        // in S5-PR38), so the global walk has to run before Pass 2 starts.
+        self.codebase.finalize();
+
         // ---- S5-PR9: mirror Pass 1 + lazy-loaded definitions into the Salsa
         // db.  Today the batch Pass 2 driver still passes `db: None`, so this
         // is preparatory — the db is populated and ready for the per-helper
