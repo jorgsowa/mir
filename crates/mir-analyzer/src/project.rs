@@ -349,7 +349,11 @@ impl ProjectAnalyzer {
 
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
-            let rev = build_reverse_deps(&self.codebase);
+            let db_snapshot = {
+                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                guard.0.clone()
+            };
+            let rev = build_reverse_deps(&self.codebase, &db_snapshot);
             cache.set_reverse_deps(rev);
         }
 
@@ -500,6 +504,13 @@ impl ProjectAnalyzer {
                 }
             };
 
+            // Iterate `Codebase` directly (not the salsa db).  Newly lazy-loaded
+            // classes are added to `Codebase` by `DefinitionCollector::collect`
+            // below but aren't upserted to the salsa db until after the lazy-load
+            // loop finishes (`ingest_codebase` runs after this method returns).
+            // Iterating the db here would miss classes loaded in earlier
+            // iterations of this max-depth loop, breaking transitive ancestor
+            // discovery (see `psr4_trait_fqcn_lazy_loaded` fixture).
             for entry in self.codebase.classes.iter() {
                 let cls = entry.value();
                 if let Some(parent) = &cls.parent {
@@ -509,19 +520,16 @@ impl ProjectAnalyzer {
                     try_queue(iface.as_ref());
                 }
             }
-
             for entry in self.codebase.interfaces.iter() {
                 for parent in &entry.value().extends {
                     try_queue(parent.as_ref());
                 }
             }
-
             for entry in self.codebase.enums.iter() {
                 for iface in &entry.value().interfaces {
                     try_queue(iface.as_ref());
                 }
             }
-
             for entry in self.codebase.traits.iter() {
                 for used in &entry.value().traits {
                     try_queue(used.as_ref());
@@ -715,8 +723,8 @@ impl ProjectAnalyzer {
             old_fqcns
                 .iter()
                 .filter(|fqcn| {
-                    self.codebase.classes.contains_key(fqcn.as_ref())
-                        || self.codebase.interfaces.contains_key(fqcn.as_ref())
+                    crate::db::class_kind_via_db(db, fqcn.as_ref())
+                        .is_some_and(|k| !k.is_trait && !k.is_enum)
                 })
                 .map(|fqcn| {
                     let salsa_ancs = db.lookup_class_node(fqcn).map(|n| class_ancestors(db, n).0);
@@ -1083,7 +1091,10 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 // build_reverse_deps
 // ---------------------------------------------------------------------------
 
-fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
+fn build_reverse_deps(
+    codebase: &Codebase,
+    db: &dyn crate::db::MirDatabase,
+) -> HashMap<String, HashSet<String>> {
     let mut reverse: HashMap<String, HashSet<String>> = HashMap::new();
 
     let mut add_edge = |symbol: &str, dependent_file: &str| {
@@ -1105,24 +1116,34 @@ fn build_reverse_deps(codebase: &Codebase) -> HashMap<String, HashSet<String>> {
         }
     }
 
-    for entry in codebase.classes.iter() {
-        let defining = {
-            let fqcn = entry.key().as_ref();
-            codebase
-                .symbol_to_file
-                .get(fqcn)
-                .map(|f| f.as_ref().to_string())
+    for fqcn in db.active_class_node_fqcns() {
+        // Match `Codebase::classes` semantics: only true classes contribute
+        // class-direction edges in this loop.  Interface / trait / enum edges
+        // are handled by their own dedicated codebase iterators elsewhere if
+        // needed (none currently — this function only ever read classes).
+        let kind = match crate::db::class_kind_via_db(db, fqcn.as_ref()) {
+            Some(k) if !k.is_interface && !k.is_trait && !k.is_enum => k,
+            _ => continue,
         };
-        let Some(file) = defining else { continue };
+        let _ = kind;
+        let Some(file) = codebase
+            .symbol_to_file
+            .get(fqcn.as_ref())
+            .map(|f| f.as_ref().to_string())
+        else {
+            continue;
+        };
 
-        let cls = entry.value();
-        if let Some(ref parent) = cls.parent {
+        let Some(node) = db.lookup_class_node(fqcn.as_ref()) else {
+            continue;
+        };
+        if let Some(parent) = node.parent(db) {
             add_edge(parent.as_ref(), &file);
         }
-        for iface in &cls.interfaces {
+        for iface in node.interfaces(db).iter() {
             add_edge(iface.as_ref(), &file);
         }
-        for tr in &cls.traits {
+        for tr in node.traits(db).iter() {
             add_edge(tr.as_ref(), &file);
         }
     }
