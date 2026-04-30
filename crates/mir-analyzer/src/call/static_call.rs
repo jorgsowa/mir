@@ -14,7 +14,7 @@ use super::args::{
     check_args, expr_can_be_passed_by_reference, spread_element_type, substitute_static_in_return,
     CheckArgsParams,
 };
-use super::method::{resolve_method_from_db, ResolvedMethod};
+use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
 
 impl CallAnalyzer {
@@ -53,22 +53,7 @@ impl CallAnalyzer {
         let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
         let method_name_lower = method_name.to_lowercase();
 
-        let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower).or_else(|| {
-            ea.codebase
-                .get_method(&fqcn, method_name)
-                .map(|m| ResolvedMethod {
-                    owner_fqcn: m.fqcn.clone(),
-                    name: m.name.clone(),
-                    visibility: m.visibility,
-                    deprecated: m.deprecated.clone(),
-                    params: m.params.clone(),
-                    template_params: m.template_params.clone(),
-                    return_ty_raw: m
-                        .effective_return_type()
-                        .cloned()
-                        .unwrap_or_else(Union::mixed),
-                })
-        });
+        let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower);
 
         if let Some(resolved) = resolved {
             if !ea.inference_only {
