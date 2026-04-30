@@ -829,11 +829,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Union::mixed();
                 }
 
-                let const_exists = class_constant_exists_in_chain(self.db, &fqcn, &const_name)
-                    || self
-                        .codebase
-                        .get_class_constant(&fqcn, &const_name)
-                        .is_some();
+                let const_exists =
+                    crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
                 if !const_exists && !crate::db::has_unknown_ancestor_via_db(self.db, &fqcn) {
                     self.emit(
                         IssueKind::UndefinedConstant {
@@ -1957,24 +1954,6 @@ fn find_property_node_in_chain(
         }
     }
     None
-}
-
-fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
-    if let Some(node) = db.lookup_class_constant_node(fqcn, const_name) {
-        if node.active(db) {
-            return true;
-        }
-    }
-    if let Some(class_node) = db.lookup_class_node(fqcn) {
-        for ancestor in class_ancestors(db, class_node).0 {
-            if let Some(node) = db.lookup_class_constant_node(&ancestor, const_name) {
-                if node.active(db) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 #[cfg(test)]
