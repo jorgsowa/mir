@@ -11,7 +11,7 @@ use mir_types::{Atomic, Union};
 
 use crate::call::CallAnalyzer;
 use crate::context::Context;
-use crate::db::{class_ancestors, MirDatabase, PropertyNode};
+use crate::db::MirDatabase;
 use crate::php_version::PhpVersion;
 use crate::symbol::{ResolvedSymbol, SymbolKind};
 
@@ -1307,18 +1307,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
-                    // db path: walk ancestor chain via PropertyNode inputs.
-                    // prop_found: None = not found, Some(ty) = found (mixed if unannotated).
-                    // db tracks own/inherited properties; codebase fallback covers
-                    // docblock `@mixin` chains the db doesn't model yet.
+                    // db path: walk own → mixins → traits → ancestors via
+                    // PropertyNode inputs.  prop_found: None = not found,
+                    // Some(ty) = found (mixed if unannotated).
                     let prop_found: Option<Union> =
-                        find_property_node_in_chain(self.db, fqcn, prop_name)
-                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed))
-                            .or_else(|| {
-                                self.codebase
-                                    .get_property(fqcn.as_ref(), prop_name)
-                                    .map(|p| p.ty.clone().unwrap_or_else(Union::mixed))
-                            });
+                        crate::db::lookup_property_in_chain(self.db, fqcn.as_ref(), prop_name)
+                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed));
                     if let Some(ty) = prop_found {
                         // Record reference for dead-code detection (M18)
                         if !self.inference_only {
@@ -1934,27 +1928,6 @@ fn property_assign_compatible(
 // ---------------------------------------------------------------------------
 // Salsa db helpers (S5-PR4)
 // ---------------------------------------------------------------------------
-
-fn find_property_node_in_chain(
-    db: &dyn MirDatabase,
-    fqcn: &Arc<str>,
-    prop_name: &str,
-) -> Option<PropertyNode> {
-    if let Some(node) = db.lookup_property_node(fqcn, prop_name) {
-        if node.active(db) {
-            return Some(node);
-        }
-    }
-    let class_node = db.lookup_class_node(fqcn)?;
-    for ancestor in class_ancestors(db, class_node).0 {
-        if let Some(node) = db.lookup_property_node(&ancestor, prop_name) {
-            if node.active(db) {
-                return Some(node);
-            }
-        }
-    }
-    None
-}
 
 #[cfg(test)]
 mod tests {

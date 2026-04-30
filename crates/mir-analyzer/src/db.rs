@@ -744,6 +744,78 @@ fn trait_declares_method(
     false
 }
 
+/// Walk `fqcn`'s own [`PropertyNode`] then mixins, traits, and ancestors,
+/// returning the first active node whose name matches `prop_name`.
+/// Mirrors [`Codebase::get_property`]'s walk: own → mixins (recursive) →
+/// each ancestor's own + mixins → direct traits' own.  `class_ancestors`
+/// already includes parents, interfaces, and direct traits in its returned
+/// list, so the ancestor loop covers traits' `own_properties`.
+///
+/// Property names are case-sensitive in PHP.  Cycle-safe via a per-call
+/// `visited_mixins` set; `class_ancestors` itself is cycle-safe.
+pub fn lookup_property_in_chain(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    prop_name: &str,
+) -> Option<PropertyNode> {
+    let mut visited_mixins: HashSet<String> = HashSet::new();
+    lookup_property_in_chain_inner(db, fqcn, prop_name, &mut visited_mixins)
+}
+
+fn lookup_property_in_chain_inner(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    prop_name: &str,
+    visited_mixins: &mut HashSet<String>,
+) -> Option<PropertyNode> {
+    let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+
+    // 1. Own property.
+    if let Some(node) = db
+        .lookup_property_node(fqcn, prop_name)
+        .filter(|n| n.active(db))
+    {
+        return Some(node);
+    }
+    // 2. Docblock @mixin chains — recurse so each mixin's own walk includes
+    //    its own mixins, traits, ancestors.  Cycle-safe via `visited_mixins`.
+    for m in self_node.mixins(db).iter() {
+        if visited_mixins.insert(m.to_string()) {
+            if let Some(node) =
+                lookup_property_in_chain_inner(db, m.as_ref(), prop_name, visited_mixins)
+            {
+                return Some(node);
+            }
+        }
+    }
+    // 3. Ancestor chain (parents + interfaces + direct traits).  Each
+    //    ancestor may itself have `@mixin` declarations that forward
+    //    property access — recurse into those too.
+    for ancestor in class_ancestors(db, self_node).0.iter() {
+        if let Some(node) = db
+            .lookup_property_node(ancestor.as_ref(), prop_name)
+            .filter(|n| n.active(db))
+        {
+            return Some(node);
+        }
+        if let Some(anc_node) = db
+            .lookup_class_node(ancestor.as_ref())
+            .filter(|n| n.active(db))
+        {
+            for m in anc_node.mixins(db).iter() {
+                if visited_mixins.insert(m.to_string()) {
+                    if let Some(node) =
+                        lookup_property_in_chain_inner(db, m.as_ref(), prop_name, visited_mixins)
+                    {
+                        return Some(node);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Returns `true` iff `fqcn` (or any class/interface in its ancestor chain)
 /// declares a class constant named `const_name`.  Mirrors
 /// [`Codebase::get_class_constant`]'s walk for existence purposes:
