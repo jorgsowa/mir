@@ -136,6 +136,11 @@ pub struct ClassNode {
     /// `extends_or_implements_via_db` to answer the implicit `BackedEnum`
     /// interface check.
     pub is_backed_enum: bool,
+    /// `@mixin` / `@psalm-mixin` FQCNs declared on the class docblock.
+    /// Used by `lookup_method_in_chain` for delegated magic-method lookup,
+    /// matching `Codebase::get_method`'s mixin walk.  Empty for interfaces,
+    /// traits, and enums (mixin is a class-only docblock concept).
+    pub mixins: Arc<[Arc<str>]>,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -554,26 +559,45 @@ pub fn lookup_method_in_chain(
     fqcn: &str,
     method_name: &str,
 ) -> Option<MethodNode> {
-    let lower = method_name.to_lowercase();
+    let mut visited_mixins: HashSet<String> = HashSet::new();
+    lookup_method_in_chain_inner(db, fqcn, &method_name.to_lowercase(), &mut visited_mixins)
+}
+
+fn lookup_method_in_chain_inner(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    lower: &str,
+    visited_mixins: &mut HashSet<String>,
+) -> Option<MethodNode> {
     let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
 
-    // Direct own method.
-    if let Some(node) = db.lookup_method_node(fqcn, &lower).filter(|n| n.active(db)) {
+    // 1. Direct own method.
+    if let Some(node) = db.lookup_method_node(fqcn, lower).filter(|n| n.active(db)) {
         return Some(node);
     }
-    // Traits used directly — walk transitively (trait-of-traits is *not*
-    // included in `class_ancestors`, by design — see comments on that fn).
+    // 2. Docblock @mixin chains (delegated magic-method lookup) — recurse so
+    //    each mixin's own walk includes its own mixins, traits, ancestors.
+    //    Cycle-safe via `visited_mixins`.
+    for m in self_node.mixins(db).iter() {
+        if visited_mixins.insert(m.to_string()) {
+            if let Some(node) = lookup_method_in_chain_inner(db, m.as_ref(), lower, visited_mixins)
+            {
+                return Some(node);
+            }
+        }
+    }
+    // 3. Traits used directly — walk transitively (trait-of-traits is *not*
+    //    included in `class_ancestors`, by design — see that fn's comments).
     let mut visited_traits: HashSet<String> = HashSet::new();
     for t in self_node.traits(db).iter() {
-        if let Some(node) = trait_provides_method_node(db, t.as_ref(), &lower, &mut visited_traits)
-        {
+        if let Some(node) = trait_provides_method_node(db, t.as_ref(), lower, &mut visited_traits) {
             return Some(node);
         }
     }
-    // Ancestor chain (parents, interfaces, traits).
+    // 4. Ancestor chain (parents, interfaces, traits — empty for enums).
     for ancestor in class_ancestors(db, self_node).0.iter() {
         if let Some(node) = db
-            .lookup_method_node(ancestor.as_ref(), &lower)
+            .lookup_method_node(ancestor.as_ref(), lower)
             .filter(|n| n.active(db))
         {
             return Some(node);
@@ -584,16 +608,25 @@ pub fn lookup_method_in_chain(
         {
             if anc_node.is_trait(db) {
                 if let Some(node) =
-                    trait_provides_method_node(db, ancestor.as_ref(), &lower, &mut visited_traits)
+                    trait_provides_method_node(db, ancestor.as_ref(), lower, &mut visited_traits)
                 {
                     return Some(node);
                 }
             } else {
                 for t in anc_node.traits(db).iter() {
                     if let Some(node) =
-                        trait_provides_method_node(db, t.as_ref(), &lower, &mut visited_traits)
+                        trait_provides_method_node(db, t.as_ref(), lower, &mut visited_traits)
                     {
                         return Some(node);
+                    }
+                }
+                for m in anc_node.mixins(db).iter() {
+                    if visited_mixins.insert(m.to_string()) {
+                        if let Some(node) =
+                            lookup_method_in_chain_inner(db, m.as_ref(), lower, visited_mixins)
+                        {
+                            return Some(node);
+                        }
                     }
                 }
             }
@@ -883,6 +916,7 @@ impl MirDb {
         require_extends: Arc<[Arc<str>]>,
         require_implements: Arc<[Arc<str>]>,
         is_backed_enum: bool,
+        mixins: Arc<[Arc<str>]>,
     ) -> ClassNode {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
@@ -911,6 +945,7 @@ impl MirDb {
                 && *node.template_params(self) == *template_params
                 && *node.require_extends(self) == *require_extends
                 && *node.require_implements(self) == *require_implements
+                && *node.mixins(self) == *mixins
             {
                 return node;
             }
@@ -927,6 +962,7 @@ impl MirDb {
             node.set_require_extends(self).to(require_extends);
             node.set_require_implements(self).to(require_implements);
             node.set_is_backed_enum(self).to(is_backed_enum);
+            node.set_mixins(self).to(mixins);
             node
         } else {
             let node = ClassNode::new(
@@ -945,6 +981,7 @@ impl MirDb {
                 require_extends,
                 require_implements,
                 is_backed_enum,
+                mixins,
             );
             self.class_nodes.insert(fqcn, node);
             node
@@ -1220,6 +1257,7 @@ impl MirDb {
                 Arc::from([]),
                 Arc::from([]),
                 false,
+                Arc::from(cls.mixins.as_slice()),
             );
             for method in cls.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -1247,6 +1285,7 @@ impl MirDb {
                 Arc::from([]),
                 Arc::from([]),
                 false,
+                Arc::from([]),
             );
             for method in iface.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -1271,6 +1310,7 @@ impl MirDb {
                 Arc::from(tr.require_extends.as_slice()),
                 Arc::from(tr.require_implements.as_slice()),
                 false,
+                Arc::from([]),
             );
             for method in tr.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -1298,9 +1338,50 @@ impl MirDb {
                 Arc::from([]),
                 Arc::from([]),
                 en.scalar_type.is_some(),
+                Arc::from([]),
             );
             for method in en.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
+            }
+            // Synthesize PHP 8.1 implicit enum methods (`cases`, plus `from` /
+            // `tryFrom` for backed enums) so `lookup_method_node` finds them
+            // — mirrors the on-the-fly synthesis in `Codebase::get_method`.
+            // Only register when the user hasn't shadowed the name (PHP forbids
+            // it but be defensive).
+            let synth_method = |name: &str| mir_codebase::storage::MethodStorage {
+                fqcn: en.fqcn.clone(),
+                name: Arc::from(name),
+                params: vec![],
+                return_type: Some(Union::mixed()),
+                inferred_return_type: None,
+                visibility: Visibility::Public,
+                is_static: true,
+                is_abstract: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                is_final: false,
+                is_internal: false,
+                is_pure: false,
+                deprecated: None,
+                location: None,
+            };
+            let already = |name: &str| {
+                en.own_methods
+                    .keys()
+                    .any(|k| k.as_ref().eq_ignore_ascii_case(name))
+            };
+            if !already("cases") {
+                self.upsert_method_node(&synth_method("cases"));
+            }
+            if en.scalar_type.is_some() {
+                if !already("from") {
+                    self.upsert_method_node(&synth_method("from"));
+                }
+                if !already("tryFrom") {
+                    self.upsert_method_node(&synth_method("tryFrom"));
+                }
             }
             for constant in en.own_constants.values() {
                 self.upsert_class_constant_node(&en.fqcn, constant);
@@ -1364,6 +1445,7 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             false,
+            Arc::from([]),
         )
     }
 
@@ -1591,6 +1673,7 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             false,
+            Arc::from([]),
         )
     }
 
@@ -1637,6 +1720,7 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             is_backed,
+            Arc::from([]),
         )
     }
 
@@ -1869,6 +1953,7 @@ mod tests {
             Arc::from([]),
             Arc::from([]),
             false,
+            Arc::from([]),
         );
         let got = class_template_params_via_db(&db, "Box").expect("registered");
         assert_eq!(got.len(), 1);
