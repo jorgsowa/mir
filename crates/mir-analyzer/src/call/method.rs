@@ -43,11 +43,9 @@ pub(super) fn resolve_method_from_db(
 
     // `inferred_return_type` is published on `MethodNode` by the priming
     // sweep's serial commit phase; see `MirDb::commit_inferred_return_types`.
-    // Fall back to `Codebase` for entry paths without a Salsa-side commit
-    // (e.g. the `analyze_source` single-string helper).
-    let inferred = node
-        .inferred_return_type(db)
-        .or_else(|| ea.codebase.method_inferred_return_type(&owner_fqcn, &name));
+    // Every analyzer entry path runs a priming sweep + commit before the
+    // issue-emitting pass, so the read-side codebase fallback is gone.
+    let inferred = node.inferred_return_type(db);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)

@@ -1066,6 +1066,18 @@ impl ProjectAnalyzer {
         // analyzers' db reads see them.
         let mut db = MirDb::default();
         db.ingest_codebase(&analyzer.codebase);
+
+        // Priming sweep: populate inferred_return_type on FunctionNode /
+        // MethodNode before the issue-emitting pass so call sites see the
+        // inferred values.  Single-threaded — no buffer / commit dance
+        // needed in principle, but we use the same pattern for symmetry
+        // and so the read-side fallback to `Codebase` can be dropped.
+        let inferred_buffer = crate::db::InferredReturnTypes::new();
+        Pass2Driver::new_inference_only(&analyzer.codebase, &db, analyzer.resolved_php_version())
+            .with_inferred_buffer(&inferred_buffer)
+            .analyze_bodies(&result.program, file.clone(), source, &result.source_map);
+        db.commit_inferred_return_types(&inferred_buffer);
+
         let driver = Pass2Driver::new(&analyzer.codebase, &db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
             &result.program,
