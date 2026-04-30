@@ -772,6 +772,9 @@ impl ProjectAnalyzer {
 
         // Only track ancestry for classes and interfaces (not functions, traits,
         // enums, or constants — none of those participate in the inheritance graph).
+        // Every symbol reaches `re_analyze_file` after the batch `analyze` path
+        // has run `ingest_codebase`, so the salsa db always has a `ClassNode`
+        // for any class/interface in `old_fqcns`; missing nodes return empty.
         let old_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
             let guard = self.salsa.lock().expect("salsa lock poisoned");
             let (ref db, _) = *guard;
@@ -782,21 +785,10 @@ impl ProjectAnalyzer {
                         .is_some_and(|k| !k.is_trait && !k.is_enum)
                 })
                 .map(|fqcn| {
-                    let salsa_ancs = db.lookup_class_node(fqcn).map(|n| class_ancestors(db, n).0);
-                    let ancs = salsa_ancs.unwrap_or_else(|| {
-                        // Cold path: use Codebase data as ground truth.
-                        self.codebase
-                            .classes
-                            .get(fqcn.as_ref())
-                            .map(|c| c.all_parents.clone())
-                            .or_else(|| {
-                                self.codebase
-                                    .interfaces
-                                    .get(fqcn.as_ref())
-                                    .map(|i| i.all_parents.clone())
-                            })
-                            .unwrap_or_default()
-                    });
+                    let ancs = db
+                        .lookup_class_node(fqcn)
+                        .map(|n| class_ancestors(db, n).0)
+                        .unwrap_or_default();
                     (fqcn.clone(), ancs)
                 })
                 .collect()
