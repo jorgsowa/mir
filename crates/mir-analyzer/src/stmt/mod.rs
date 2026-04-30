@@ -1064,26 +1064,27 @@ impl<'a> StatementsAnalyzer<'a> {
                         continue;
                     };
                     let Some(body) = &method.body else { continue };
-                    let (params, return_ty) = self
-                        .codebase
-                        .get_method(fqcn.as_ref(), method.name)
-                        .as_deref()
-                        .map(|m| (m.params.clone(), m.return_type.clone()))
-                        .unwrap_or_else(|| {
-                            let ast_params = method
-                                .params
-                                .iter()
-                                .map(|p| mir_codebase::FnParam {
-                                    name: p.name.trim_start_matches('$').into(),
-                                    ty: None,
-                                    default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
-                                    is_variadic: p.variadic,
-                                    is_byref: p.by_ref,
-                                    is_optional: p.default.is_some() || p.variadic,
-                                })
-                                .collect();
-                            (ast_params, None)
-                        });
+                    let (params, return_ty) =
+                        crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), method.name)
+                            .map(|n| (n.params(self.db).to_vec(), n.return_type(self.db)))
+                            .unwrap_or_else(|| {
+                                let ast_params = method
+                                    .params
+                                    .iter()
+                                    .map(|p| mir_codebase::FnParam {
+                                        name: p.name.trim_start_matches('$').into(),
+                                        ty: None,
+                                        default: p
+                                            .default
+                                            .as_ref()
+                                            .map(|_| mir_types::Union::mixed()),
+                                        is_variadic: p.variadic,
+                                        is_byref: p.by_ref,
+                                        is_optional: p.default.is_some() || p.variadic,
+                                    })
+                                    .collect();
+                                (ast_params, None)
+                            });
                     let is_ctor = method.name == "__construct";
                     let mut method_ctx = Context::for_method(
                         &params,

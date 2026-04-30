@@ -522,11 +522,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty) = self
-                .codebase
-                .get_method(fqcn, method.name)
-                .as_deref()
-                .map(|m| (m.params.clone(), m.return_type.clone()))
+            let (params, return_ty) = crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                .map(|n| (n.params(self.db).to_vec(), n.return_type(self.db)))
                 .unwrap_or_default();
 
             let is_ctor = method.name == "__construct";
@@ -753,11 +750,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty) = self
-                .codebase
-                .get_method(fqcn, method.name)
-                .as_deref()
-                .map(|m| (m.params.clone(), m.return_type.clone()))
+            let (params, return_ty) = crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                .map(|n| (n.params(self.db).to_vec(), n.return_type(self.db)))
                 .unwrap_or_default();
 
             let is_ctor = method.name == "__construct";
@@ -941,11 +935,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty) = self
-                .codebase
-                .get_method(fqcn, method.name)
-                .as_deref()
-                .map(|m| (m.params.clone(), m.return_type.clone()))
+            let (params, return_ty) = crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                .map(|n| (n.params(self.db).to_vec(), n.return_type(self.db)))
                 .unwrap_or_default();
 
             let is_ctor = method.name == "__construct";
@@ -1046,11 +1037,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty) = self
-                .codebase
-                .get_method(fqcn, method.name)
-                .as_deref()
-                .map(|m| (m.params.clone(), m.return_type.clone()))
+            let (params, return_ty) = crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                .map(|n| (n.params(self.db).to_vec(), n.return_type(self.db)))
                 .unwrap_or_default();
 
             let is_ctor = method.name == "__construct";

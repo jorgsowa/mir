@@ -543,6 +543,33 @@ fn trait_provides_method(
 /// Method names are PHP-case-insensitive; the lookup lower-cases internally.
 /// Cycle-safe: relies on `class_ancestors` cycle recovery and a per-call
 /// `visited` set across trait-of-trait walks.
+/// Walk `fqcn`'s own MethodNode then the class-ancestor chain, returning the
+/// first active [`MethodNode`] whose name matches `method_name` (case-
+/// insensitive).  Mirrors [`Codebase::get_method`]'s ancestor walk.
+///
+/// Used when a caller needs the full method node (params, return type,
+/// visibility, etc.), not just an existence check.
+pub fn lookup_method_in_chain(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    method_name: &str,
+) -> Option<MethodNode> {
+    let lower = method_name.to_lowercase();
+    if let Some(node) = db.lookup_method_node(fqcn, &lower).filter(|n| n.active(db)) {
+        return Some(node);
+    }
+    let class_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+    for ancestor in class_ancestors(db, class_node).0.iter() {
+        if let Some(node) = db
+            .lookup_method_node(ancestor.as_ref(), &lower)
+            .filter(|n| n.active(db))
+        {
+            return Some(node);
+        }
+    }
+    None
+}
+
 pub fn method_exists_via_db(db: &dyn MirDatabase, fqcn: &str, method_name: &str) -> bool {
     let lower = method_name.to_lowercase();
     let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
