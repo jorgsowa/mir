@@ -185,21 +185,17 @@ impl<'a> ClassAnalyzer<'a> {
         // Walk every ancestor class and collect abstract methods
         let ancestors = self.ancestors(fqcn);
         for ancestor_fqcn in &ancestors {
-            // Read abstract method names from `Codebase::classes` rather than
-            // the salsa db — salsa `method_nodes` may still hold stale methods
-            // from bundled-stub class versions that user files later shadowed
-            // (see analogous note in `check_interface_methods_implemented`).
-            let abstract_methods: Vec<Arc<str>> = {
-                let Some(ancestor) = self.codebase.classes.get(ancestor_fqcn.as_ref()) else {
-                    continue;
-                };
-                ancestor
-                    .own_methods
-                    .iter()
-                    .filter(|(_, m)| m.is_abstract)
-                    .map(|(_, m)| m.name.clone())
-                    .collect()
-            };
+            // Read abstract method names from the salsa db.  PR52 wired
+            // pruning into `ingest_codebase`, so `method_nodes` no longer
+            // accumulates stale stub entries when a user file shadows a
+            // bundled-stub class with a different method set.
+            let abstract_methods: Vec<Arc<str>> = self
+                .db
+                .class_own_methods(ancestor_fqcn.as_ref())
+                .into_iter()
+                .filter(|m| m.active(self.db) && m.is_abstract(self.db))
+                .map(|m| m.name(self.db))
+                .collect();
 
             for method_name in abstract_methods {
                 // Check if the concrete class (or any closer ancestor) provides it
@@ -254,18 +250,20 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for iface_fqcn in &all_ifaces {
-            // Read method names from `Codebase::interfaces` (not the salsa db):
-            // salsa `method_nodes` accumulates across ingestions and may still
-            // hold stale methods from a bundled-stub interface that the user
-            // file later shadowed (the deactivate cycle isn't hooked up for
-            // bundled-stub overrides).  `Codebase::interfaces` is the single
-            // source of truth for "which methods does this interface declare
-            // *right now*".
-            let method_names: Vec<Arc<str>> =
-                match self.codebase.interfaces.get(iface_fqcn.as_ref()) {
-                    Some(iface) => iface.own_methods.values().map(|m| m.name.clone()).collect(),
-                    None => continue,
-                };
+            // Read method names from the salsa db.  PR52 wired pruning into
+            // `ingest_codebase`, so `method_nodes` no longer accumulates stale
+            // stub entries when a user file shadows a bundled-stub interface.
+            let method_nodes = self.db.class_own_methods(iface_fqcn.as_ref());
+            if method_nodes.is_empty() {
+                // Skip interfaces with no registered methods (unregistered or
+                // empty marker interfaces).
+                continue;
+            }
+            let method_names: Vec<Arc<str>> = method_nodes
+                .into_iter()
+                .filter(|m| m.active(self.db))
+                .map(|m| m.name(self.db))
+                .collect();
 
             for method_name in method_names {
                 // PHP method names are case-insensitive; normalize before lookup so that
