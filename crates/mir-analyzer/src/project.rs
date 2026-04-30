@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
-use crate::db::{class_ancestors, collect_file_definitions, MirDatabase, MirDb, SourceFile};
+use crate::db::{collect_file_definitions, MirDatabase, MirDb, SourceFile};
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use mir_codebase::Codebase;
@@ -349,12 +349,9 @@ impl ProjectAnalyzer {
             self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);
         }
 
-        // ---- Compute Codebase.all_parents for all classes/interfaces.
-        // Pass 2 reads `cls.all_parents` via `has_magic_get`, `has_unknown_ancestor`,
-        // `get_member_location`, and `get_inherited_template_bindings` — none of
-        // those walk inheritance lazily anymore (`ensure_finalized` was removed
-        // in S5-PR38), so the global walk has to run before Pass 2 starts.
-        self.codebase.finalize();
+        // ---- Resolve @psalm-import-type declarations now that all Pass 1
+        // classes (including their `type_aliases`) are populated.
+        self.codebase.resolve_pending_import_types();
 
         // ---- S5-PR9: mirror Pass 1 + lazy-loaded definitions into the Salsa
         // db.  Today the batch Pass 2 driver still passes `db: None`, so this
@@ -610,8 +607,7 @@ impl ProjectAnalyzer {
                 }
             }
 
-            self.codebase.invalidate_finalization();
-            self.codebase.finalize();
+            self.codebase.resolve_pending_import_types();
         }
     }
 
@@ -739,7 +735,7 @@ impl ProjectAnalyzer {
     /// This is the incremental analysis API for LSP:
     /// 1. Removes old definitions from this file
     /// 2. Re-runs Pass 1 (definition collection) on the new content
-    /// 3. Re-finalizes the codebase (rebuilds inheritance)
+    /// 3. Resolves any newly-collected `@psalm-import-type` declarations
     /// 4. Re-runs Pass 2 (body analysis) on this file
     /// 5. Returns the analysis result for this file only
     pub fn re_analyze_file(&self, file_path: &str, new_content: &str) -> AnalysisResult {
@@ -755,13 +751,8 @@ impl ProjectAnalyzer {
 
         let file: Arc<str> = Arc::from(file_path);
 
-        // --- S2: Capture old ancestors and mark old ClassNodes inactive --------
-        // Collect FQCNs defined in this file before they are removed, then
-        // record their current ancestor lists so we can detect structural
-        // changes after re-running Pass 1.
-        //
-        // Priority: Salsa-memoized ancestors (warm path) > Codebase.all_parents
-        // (cold path, first LSP edit for this file).
+        // Collect FQCNs defined in this file before removal so the
+        // corresponding salsa nodes can be deactivated below.
         let old_fqcns: Vec<Arc<str>> = self
             .codebase
             .symbol_to_file
@@ -769,30 +760,6 @@ impl ProjectAnalyzer {
             .filter(|e| e.value().as_ref() == file_path)
             .map(|e| e.key().clone())
             .collect();
-
-        // Only track ancestry for classes and interfaces (not functions, traits,
-        // enums, or constants — none of those participate in the inheritance graph).
-        // Every symbol reaches `re_analyze_file` after the batch `analyze` path
-        // has run `ingest_codebase`, so the salsa db always has a `ClassNode`
-        // for any class/interface in `old_fqcns`; missing nodes return empty.
-        let old_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
-            let (ref db, _) = *guard;
-            old_fqcns
-                .iter()
-                .filter(|fqcn| {
-                    crate::db::class_kind_via_db(db, fqcn.as_ref())
-                        .is_some_and(|k| !k.is_trait && !k.is_enum)
-                })
-                .map(|fqcn| {
-                    let ancs = db
-                        .lookup_class_node(fqcn)
-                        .map(|n| class_ancestors(db, n).0)
-                        .unwrap_or_default();
-                    (fqcn.clone(), ancs)
-                })
-                .collect()
-        };
 
         // Mark removed classes, functions, methods, properties, and constants inactive.
         {
@@ -949,38 +916,9 @@ impl ProjectAnalyzer {
                 }
             }
 
-            let new_ancestors: HashMap<Arc<str>, Vec<Arc<str>>> = {
-                let mut map = HashMap::new();
-                for cls in &file_defs.slice.classes {
-                    if let Some(node) = db.lookup_class_node(&cls.fqcn) {
-                        map.insert(cls.fqcn.clone(), class_ancestors(db, node).0);
-                    }
-                }
-                for iface in &file_defs.slice.interfaces {
-                    if let Some(node) = db.lookup_class_node(&iface.fqcn) {
-                        map.insert(iface.fqcn.clone(), class_ancestors(db, node).0);
-                    }
-                }
-                map
-            };
-
-            // --- S2: Decide whether ancestry changed and update Codebase ------
-            let structural_unchanged = old_ancestors.len() == new_ancestors.len()
-                && new_ancestors
-                    .iter()
-                    .all(|(fqcn, new_ancs)| old_ancestors.get(fqcn) == Some(new_ancs));
-
-            if structural_unchanged {
-                // Fast path: restore ancestors from Salsa results directly.
-                for (fqcn, ancestors) in &new_ancestors {
-                    let arc: Arc<[Arc<str>]> = Arc::from(ancestors.as_slice());
-                    self.codebase.restore_ancestors(fqcn, arc);
-                }
-                self.codebase.mark_finalized();
-            } else {
-                self.codebase.invalidate_finalization();
-                self.codebase.finalize();
-            }
+            // Resolve any newly-collected @psalm-import-type declarations so
+            // Pass 2 reads the imported aliases out of `type_aliases`.
+            self.codebase.resolve_pending_import_types();
 
             // Re-parse in the arena so Pass 2 can walk the AST.
             let arena = bumpalo::Bump::new();
@@ -1066,7 +1004,7 @@ impl ProjectAnalyzer {
         let collector =
             DefinitionCollector::new(&analyzer.codebase, file.clone(), source, &result.source_map);
         all_issues.extend(collector.collect(&result.program));
-        analyzer.codebase.finalize();
+        analyzer.codebase.resolve_pending_import_types();
         let mut type_envs = std::collections::HashMap::new();
         let mut all_symbols = Vec::new();
         // Build a db that mirrors the just-collected definitions so the

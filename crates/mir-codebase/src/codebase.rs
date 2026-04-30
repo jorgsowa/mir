@@ -154,9 +154,6 @@ pub struct Codebase {
     /// Exposed as `pub` so that external consumers (e.g. `php-lsp`) can read
     /// namespace data that mir already collects, instead of reimplementing it.
     pub file_namespaces: DashMap<Arc<str>, String>,
-
-    /// Whether finalize() has been called.
-    finalized: std::sync::atomic::AtomicBool,
 }
 
 impl Codebase {
@@ -346,16 +343,6 @@ impl Codebase {
         // If another thread already decompressed (guard is now None), we're done.
     }
 
-    /// Reset the finalization flag so that `finalize()` will run again.
-    ///
-    /// Use this when new class definitions have been added after an initial
-    /// `finalize()` call (e.g., lazily loaded via PSR-4) and the inheritance
-    /// graph needs to be rebuilt.
-    pub fn invalidate_finalization(&self) {
-        self.finalized
-            .store(false, std::sync::atomic::Ordering::SeqCst);
-    }
-
     // -----------------------------------------------------------------------
     // Incremental: remove all definitions from a single file
     // -----------------------------------------------------------------------
@@ -364,8 +351,6 @@ impl Codebase {
     /// This clears classes, interfaces, traits, enums, functions, and constants
     /// whose defining file matches `file_path`, the file's import and namespace entries,
     /// and all entries in symbol_reference_locations that originated from this file.
-    /// After calling this, `invalidate_finalization()` is called so the next `finalize()`
-    /// rebuilds inheritance.
     pub fn remove_file_definitions(&self, file_path: &str) {
         // Collect all symbols defined in this file
         let symbols: Vec<Arc<str>> = self
@@ -412,34 +397,6 @@ impl Codebase {
                 }
             }
         }
-
-        self.invalidate_finalization();
-    }
-
-    // -----------------------------------------------------------------------
-    // Structural snapshot — skip finalize() on body-only changes
-    // -----------------------------------------------------------------------
-
-    /// Restore the pre-computed ancestor list for a single class or interface.
-    ///
-    /// Called by `re_analyze_file` when the Salsa `class_ancestors` query
-    /// confirms that the inheritance structure of a file is unchanged, so
-    /// we don't have to walk the hierarchy in `finalize()` again.
-    pub fn restore_ancestors(&self, fqcn: &str, ancestors: Arc<[Arc<str>]>) {
-        if let Some(mut cls) = self.classes.get_mut(fqcn) {
-            cls.all_parents = ancestors.to_vec();
-        } else if let Some(mut iface) = self.interfaces.get_mut(fqcn) {
-            iface.all_parents = ancestors.to_vec();
-        }
-    }
-
-    /// Mark the codebase as finalized without running the full `finalize()` sweep.
-    ///
-    /// Call this after `restore_ancestors` has been called for all symbols in
-    /// the re-analyzed file to signal that the inheritance graph is up to date.
-    pub fn mark_finalized(&self) {
-        self.finalized
-            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     // -----------------------------------------------------------------------
@@ -855,45 +812,18 @@ impl Codebase {
     }
 
     // -----------------------------------------------------------------------
-    // Finalization
+    // @psalm-import-type resolution
     // -----------------------------------------------------------------------
 
-    /// Must be called after all files have been parsed (pass 1 complete).
-    /// Computes `all_parents` for every class and interface and resolves
-    /// `@psalm-import-type` declarations.
-    pub fn finalize(&self) {
-        if self.finalized.load(std::sync::atomic::Ordering::SeqCst) {
-            return;
-        }
-
-        // Per-call memoization so a chain `A→B→C→D` walks each link once
-        // instead of once per descendant (would be O(N²) without it for
-        // deep hierarchies + interface lattices).  Lives only for this call;
-        // `invalidate_finalization` re-runs from scratch.
-        let mut class_memo: std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>> =
-            std::collections::HashMap::new();
-        let mut iface_memo: std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>> =
-            std::collections::HashMap::new();
-
-        // 1. Compute all_parents for classes.
-        let class_keys: Vec<Arc<str>> = self.classes.iter().map(|e| e.key().clone()).collect();
-        for fqcn in &class_keys {
-            let parents = self.class_ancestors_memo(fqcn, &mut class_memo, &mut iface_memo);
-            if let Some(mut cls) = self.classes.get_mut(fqcn.as_ref()) {
-                cls.all_parents = parents.to_vec();
-            }
-        }
-
-        // 2. Compute all_parents for interfaces.
-        let iface_keys: Vec<Arc<str>> = self.interfaces.iter().map(|e| e.key().clone()).collect();
-        for fqcn in &iface_keys {
-            let parents = self.interface_ancestors_memo(fqcn, &mut iface_memo);
-            if let Some(mut iface) = self.interfaces.get_mut(fqcn.as_ref()) {
-                iface.all_parents = parents.to_vec();
-            }
-        }
-
-        // 3. Resolve @psalm-import-type declarations
+    /// Resolve `@psalm-import-type` declarations collected in Pass 1 by copying
+    /// each referenced source class's matching `type_aliases` entry into the
+    /// importing class.  Idempotent — running it after every Pass 1 batch (or
+    /// after a lazy load) just re-imports the same aliases.
+    ///
+    /// Must be called after all classes referenced by import-type declarations
+    /// have been collected; otherwise the source `type_aliases` map is empty
+    /// and the import resolves to nothing.
+    pub fn resolve_pending_import_types(&self) {
         // Collect imports first to avoid holding two locks simultaneously.
         type PendingImports = Vec<(Arc<str>, Vec<(Arc<str>, Arc<str>, Arc<str>)>)>;
         let pending: PendingImports = self
@@ -920,134 +850,15 @@ impl Codebase {
                 }
             }
         }
-
-        self.finalized
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    // -----------------------------------------------------------------------
-    // Private helpers
-    // -----------------------------------------------------------------------
-
-    /// Compute the ancestor list for a class, reusing previously-computed
-    /// entries from the per-`finalize` memo maps.  Ordering matches the
-    /// historical `ensure_finalized` walk: parent + parent's ancestors,
-    /// then each implemented interface + its ancestors, then directly-used
-    /// traits.  Diamond ancestors are deduplicated.
-    fn class_ancestors_memo(
-        &self,
-        fqcn: &str,
-        class_memo: &mut std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>>,
-        iface_memo: &mut std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>>,
-    ) -> Arc<[Arc<str>]> {
-        if let Some(cached) = class_memo.get(fqcn) {
-            return Arc::clone(cached);
-        }
-
-        let (parent, interfaces, traits) = match self.classes.get(fqcn) {
-            Some(cls) => (
-                cls.parent.clone(),
-                cls.interfaces.clone(),
-                cls.traits.clone(),
-            ),
-            None => {
-                let empty: Arc<[Arc<str>]> = Arc::from([]);
-                class_memo.insert(Arc::from(fqcn), Arc::clone(&empty));
-                return empty;
-            }
-        };
-
-        // Insert an empty placeholder before recursing so a circular hierarchy
-        // (`A extends B; B extends A`) terminates: the second visit hits the
-        // empty cache and returns instead of recursing forever.
-        let placeholder: Arc<[Arc<str>]> = Arc::from([]);
-        class_memo.insert(Arc::from(fqcn), Arc::clone(&placeholder));
-
-        let mut result: Vec<Arc<str>> = Vec::new();
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-        if let Some(p) = parent {
-            if seen.insert(p.to_string()) {
-                result.push(Arc::clone(&p));
-                let p_ancs = self.class_ancestors_memo(&p, class_memo, iface_memo);
-                for a in p_ancs.iter() {
-                    if seen.insert(a.to_string()) {
-                        result.push(Arc::clone(a));
-                    }
-                }
-            }
-        }
-        for iface in &interfaces {
-            if seen.insert(iface.to_string()) {
-                result.push(Arc::clone(iface));
-                let i_ancs = self.interface_ancestors_memo(iface, iface_memo);
-                for a in i_ancs.iter() {
-                    if seen.insert(a.to_string()) {
-                        result.push(Arc::clone(a));
-                    }
-                }
-            }
-        }
-        for t in traits {
-            if seen.insert(t.to_string()) {
-                result.push(t);
-            }
-        }
-
-        let arc: Arc<[Arc<str>]> = Arc::from(result.as_slice());
-        class_memo.insert(Arc::from(fqcn), Arc::clone(&arc));
-        arc
-    }
-
-    /// Compute the ancestor list for an interface by walking `extends` chains,
-    /// reusing previously-computed entries from the per-`finalize` memo map.
-    fn interface_ancestors_memo(
-        &self,
-        fqcn: &str,
-        iface_memo: &mut std::collections::HashMap<Arc<str>, Arc<[Arc<str>]>>,
-    ) -> Arc<[Arc<str>]> {
-        if let Some(cached) = iface_memo.get(fqcn) {
-            return Arc::clone(cached);
-        }
-
-        let extends = match self.interfaces.get(fqcn) {
-            Some(iface) => iface.extends.clone(),
-            None => {
-                let empty: Arc<[Arc<str>]> = Arc::from([]);
-                iface_memo.insert(Arc::from(fqcn), Arc::clone(&empty));
-                return empty;
-            }
-        };
-
-        let placeholder: Arc<[Arc<str>]> = Arc::from([]);
-        iface_memo.insert(Arc::from(fqcn), Arc::clone(&placeholder));
-
-        let mut result: Vec<Arc<str>> = Vec::new();
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-        for e in &extends {
-            if seen.insert(e.to_string()) {
-                result.push(Arc::clone(e));
-                let e_ancs = self.interface_ancestors_memo(e, iface_memo);
-                for a in e_ancs.iter() {
-                    if seen.insert(a.to_string()) {
-                        result.push(Arc::clone(a));
-                    }
-                }
-            }
-        }
-
-        let arc: Arc<[Arc<str>]> = Arc::from(result.as_slice());
-        iface_memo.insert(Arc::from(fqcn), Arc::clone(&arc));
-        arc
     }
 }
 
 // ---------------------------------------------------------------------------
-// CodebaseBuilder — compose a finalized Codebase from per-file StubSlices
+// CodebaseBuilder — compose a Codebase from per-file StubSlices
 // ---------------------------------------------------------------------------
 
 /// Incremental builder that accumulates [`crate::storage::StubSlice`] values
-/// into a fresh [`Codebase`] and finalizes it on demand.
+/// into a fresh [`Codebase`].
 ///
 /// Designed for callers (e.g. salsa queries in downstream consumers) that want
 /// to treat Pass-1 definition collection as a pure function from source to
@@ -1070,9 +881,9 @@ impl CodebaseBuilder {
         self.cb.inject_stub_slice(slice);
     }
 
-    /// Finalize inheritance graphs and return the built `Codebase`.
+    /// Resolve `@psalm-import-type` declarations and return the built `Codebase`.
     pub fn finalize(self) -> Codebase {
-        self.cb.finalize();
+        self.cb.resolve_pending_import_types();
         self.cb
     }
 
