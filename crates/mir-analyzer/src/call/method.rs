@@ -8,7 +8,6 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::Union;
 
 use crate::context::Context;
-use crate::db::{class_ancestors, MirDatabase};
 use crate::expr::ExpressionAnalyzer;
 use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
 use crate::symbol::SymbolKind;
@@ -40,8 +39,8 @@ pub(super) fn resolve_method_from_db(
 ) -> Option<ResolvedMethod> {
     let db = ea.db;
 
-    // Check the class's own MethodNode first.
-    let node = find_method_node_in_chain(db, fqcn, method_name_lower)?;
+    // Walk own → mixins → traits → ancestors via the canonical chain helper.
+    let node = crate::db::lookup_method_in_chain(db, fqcn, method_name_lower)?;
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
@@ -64,30 +63,6 @@ pub(super) fn resolve_method_from_db(
         template_params: node.template_params(db).to_vec(),
         return_ty_raw,
     })
-}
-
-/// Walk the db class ancestor chain to find an active MethodNode.
-pub(super) fn find_method_node_in_chain(
-    db: &dyn MirDatabase,
-    fqcn: &Arc<str>,
-    method_name_lower: &str,
-) -> Option<crate::db::MethodNode> {
-    // Own node first.
-    if let Some(node) = db.lookup_method_node(fqcn, method_name_lower) {
-        if node.active(db) {
-            return Some(node);
-        }
-    }
-    // Walk ancestors.
-    let class_node = db.lookup_class_node(fqcn)?;
-    for ancestor in class_ancestors(db, class_node).0 {
-        if let Some(node) = db.lookup_method_node(&ancestor, method_name_lower) {
-            if node.active(db) {
-                return Some(node);
-            }
-        }
-    }
-    None
 }
 
 impl CallAnalyzer {
@@ -296,22 +271,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
     arg_spans: &[Span],
 ) -> Union {
     let method_name_lower = method_name.to_lowercase();
-    let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower).or_else(|| {
-        ea.codebase
-            .get_method(fqcn, method_name)
-            .map(|m| ResolvedMethod {
-                owner_fqcn: m.fqcn.clone(),
-                name: m.name.clone(),
-                visibility: m.visibility,
-                deprecated: m.deprecated.clone(),
-                params: m.params.clone(),
-                template_params: m.template_params.clone(),
-                return_ty_raw: m
-                    .effective_return_type()
-                    .cloned()
-                    .unwrap_or_else(Union::mixed),
-            })
-    });
+    let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower);
 
     if let Some(resolved) = resolved {
         if !ea.inference_only {
