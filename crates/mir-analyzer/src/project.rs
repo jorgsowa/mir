@@ -785,84 +785,40 @@ impl ProjectAnalyzer {
             // enums are registered with empty ancestor data — `class_ancestors`
             // returns empty for them, matching `Codebase::ensure_finalized`.
             for cls in &file_defs.slice.classes {
-                db.upsert_class_node(
-                    cls.fqcn.clone(),
-                    false,
-                    false,
-                    false,
-                    cls.is_abstract,
-                    cls.parent.clone(),
-                    Arc::from(cls.interfaces.as_slice()),
-                    Arc::from(cls.traits.as_slice()),
-                    Arc::from([]),
-                    Arc::from(cls.template_params.as_slice()),
-                    Arc::from([]),
-                    Arc::from([]),
-                    false,
-                    Arc::from(cls.mixins.as_slice()),
-                    cls.deprecated.clone(),
-                    None,
-                );
+                db.upsert_class_node(crate::db::ClassNodeFields {
+                    is_abstract: cls.is_abstract,
+                    parent: cls.parent.clone(),
+                    interfaces: Arc::from(cls.interfaces.as_slice()),
+                    traits: Arc::from(cls.traits.as_slice()),
+                    template_params: Arc::from(cls.template_params.as_slice()),
+                    mixins: Arc::from(cls.mixins.as_slice()),
+                    deprecated: cls.deprecated.clone(),
+                    ..crate::db::ClassNodeFields::for_class(cls.fqcn.clone())
+                });
             }
             for iface in &file_defs.slice.interfaces {
-                db.upsert_class_node(
-                    iface.fqcn.clone(),
-                    true,
-                    false,
-                    false,
-                    false,
-                    None,
-                    Arc::from([]),
-                    Arc::from([]),
-                    Arc::from(iface.extends.as_slice()),
-                    Arc::from(iface.template_params.as_slice()),
-                    Arc::from([]),
-                    Arc::from([]),
-                    false,
-                    Arc::from([]),
-                    None,
-                    None,
-                );
+                db.upsert_class_node(crate::db::ClassNodeFields {
+                    extends: Arc::from(iface.extends.as_slice()),
+                    template_params: Arc::from(iface.template_params.as_slice()),
+                    ..crate::db::ClassNodeFields::for_interface(iface.fqcn.clone())
+                });
             }
             for tr in &file_defs.slice.traits {
-                db.upsert_class_node(
-                    tr.fqcn.clone(),
-                    false,
-                    true,
-                    false,
-                    false,
-                    None,
-                    Arc::from([]),
-                    Arc::from(tr.traits.as_slice()),
-                    Arc::from([]),
-                    Arc::from(tr.template_params.as_slice()),
-                    Arc::from(tr.require_extends.as_slice()),
-                    Arc::from(tr.require_implements.as_slice()),
-                    false,
-                    Arc::from([]),
-                    None,
-                    None,
-                );
+                db.upsert_class_node(crate::db::ClassNodeFields {
+                    traits: Arc::from(tr.traits.as_slice()),
+                    template_params: Arc::from(tr.template_params.as_slice()),
+                    require_extends: Arc::from(tr.require_extends.as_slice()),
+                    require_implements: Arc::from(tr.require_implements.as_slice()),
+                    ..crate::db::ClassNodeFields::for_trait(tr.fqcn.clone())
+                });
             }
             for en in &file_defs.slice.enums {
-                db.upsert_class_node(
-                    en.fqcn.clone(),
-                    false,
-                    false,
-                    true,
-                    false,
-                    None,
-                    Arc::from(en.interfaces.as_slice()),
-                    Arc::from([]),
-                    Arc::from([]),
-                    Arc::from([]),
-                    Arc::from([]),
-                    Arc::from([]),
-                    en.scalar_type.is_some(),
-                    Arc::from([]),
-                    None,
-                    en.scalar_type.clone(),
-                );
+                db.upsert_class_node(crate::db::ClassNodeFields {
+                    interfaces: Arc::from(en.interfaces.as_slice()),
+                    is_backed_enum: en.scalar_type.is_some(),
+                    enum_scalar_type: en.scalar_type.clone(),
+                    ..crate::db::ClassNodeFields::for_enum(en.fqcn.clone())
+                });
             }
 
             // --- S5-PR2: Upsert FunctionNodes ------------------------------------

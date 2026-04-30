@@ -1007,32 +1007,92 @@ impl MirDatabase for MirDb {
     }
 }
 
+/// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
+/// to fill in the fields that don't apply to your kind (e.g. interfaces leave
+/// `parent`, `traits`, `mixins`, `is_abstract`, etc. at their defaults).
+///
+/// Per-kind constructors (`for_class` / `for_interface` / `for_trait` /
+/// `for_enum`) seed the kind discriminators so the caller only has to populate
+/// kind-specific fields.
+#[derive(Debug, Clone, Default)]
+pub struct ClassNodeFields {
+    pub fqcn: Arc<str>,
+    pub is_interface: bool,
+    pub is_trait: bool,
+    pub is_enum: bool,
+    pub is_abstract: bool,
+    pub parent: Option<Arc<str>>,
+    pub interfaces: Arc<[Arc<str>]>,
+    pub traits: Arc<[Arc<str>]>,
+    pub extends: Arc<[Arc<str>]>,
+    pub template_params: Arc<[TemplateParam]>,
+    pub require_extends: Arc<[Arc<str>]>,
+    pub require_implements: Arc<[Arc<str>]>,
+    pub is_backed_enum: bool,
+    pub mixins: Arc<[Arc<str>]>,
+    pub deprecated: Option<Arc<str>>,
+    pub enum_scalar_type: Option<Union>,
+}
+
+impl ClassNodeFields {
+    pub fn for_class(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            ..Self::default()
+        }
+    }
+
+    pub fn for_interface(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            is_interface: true,
+            ..Self::default()
+        }
+    }
+
+    pub fn for_trait(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            is_trait: true,
+            ..Self::default()
+        }
+    }
+
+    pub fn for_enum(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            is_enum: true,
+            ..Self::default()
+        }
+    }
+}
+
 impl MirDb {
     /// Create or update the `ClassNode` for `fqcn`.
     ///
     /// If a handle already exists, its fields are updated in-place so Salsa
     /// can track the change.  A new handle is created only on first registration.
     #[allow(clippy::too_many_arguments)]
-    pub fn upsert_class_node(
-        &mut self,
-        fqcn: Arc<str>,
-        is_interface: bool,
-        is_trait: bool,
-        is_enum: bool,
-        is_abstract: bool,
-        parent: Option<Arc<str>>,
-        interfaces: Arc<[Arc<str>]>,
-        traits: Arc<[Arc<str>]>,
-        extends: Arc<[Arc<str>]>,
-        template_params: Arc<[TemplateParam]>,
-        require_extends: Arc<[Arc<str>]>,
-        require_implements: Arc<[Arc<str>]>,
-        is_backed_enum: bool,
-        mixins: Arc<[Arc<str>]>,
-        deprecated: Option<Arc<str>>,
-        enum_scalar_type: Option<Union>,
-    ) -> ClassNode {
+    pub fn upsert_class_node(&mut self, fields: ClassNodeFields) -> ClassNode {
         use salsa::Setter as _;
+        let ClassNodeFields {
+            fqcn,
+            is_interface,
+            is_trait,
+            is_enum,
+            is_abstract,
+            parent,
+            interfaces,
+            traits,
+            extends,
+            template_params,
+            require_extends,
+            require_implements,
+            is_backed_enum,
+            mixins,
+            deprecated,
+            enum_scalar_type,
+        } = fields;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
             // Fast-skip: an already-active node whose Salsa-tracked fields
             // match the upsert input.  Bulk re-ingest paths
@@ -1363,24 +1423,16 @@ impl MirDb {
     pub fn ingest_codebase(&mut self, codebase: &Codebase) {
         for entry in codebase.classes.iter() {
             let cls = entry.value();
-            self.upsert_class_node(
-                cls.fqcn.clone(),
-                false,
-                false,
-                false,
-                cls.is_abstract,
-                cls.parent.clone(),
-                Arc::from(cls.interfaces.as_slice()),
-                Arc::from(cls.traits.as_slice()),
-                Arc::from([]),
-                Arc::from(cls.template_params.as_slice()),
-                Arc::from([]),
-                Arc::from([]),
-                false,
-                Arc::from(cls.mixins.as_slice()),
-                cls.deprecated.clone(),
-                None,
-            );
+            self.upsert_class_node(ClassNodeFields {
+                is_abstract: cls.is_abstract,
+                parent: cls.parent.clone(),
+                interfaces: Arc::from(cls.interfaces.as_slice()),
+                traits: Arc::from(cls.traits.as_slice()),
+                template_params: Arc::from(cls.template_params.as_slice()),
+                mixins: Arc::from(cls.mixins.as_slice()),
+                deprecated: cls.deprecated.clone(),
+                ..ClassNodeFields::for_class(cls.fqcn.clone())
+            });
             for method in cls.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
@@ -1393,24 +1445,11 @@ impl MirDb {
         }
         for entry in codebase.interfaces.iter() {
             let iface = entry.value();
-            self.upsert_class_node(
-                iface.fqcn.clone(),
-                true,
-                false,
-                false,
-                false,
-                None,
-                Arc::from([]),
-                Arc::from([]),
-                Arc::from(iface.extends.as_slice()),
-                Arc::from(iface.template_params.as_slice()),
-                Arc::from([]),
-                Arc::from([]),
-                false,
-                Arc::from([]),
-                None,
-                None,
-            );
+            self.upsert_class_node(ClassNodeFields {
+                extends: Arc::from(iface.extends.as_slice()),
+                template_params: Arc::from(iface.template_params.as_slice()),
+                ..ClassNodeFields::for_interface(iface.fqcn.clone())
+            });
             for method in iface.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
@@ -1420,24 +1459,13 @@ impl MirDb {
         }
         for entry in codebase.traits.iter() {
             let tr = entry.value();
-            self.upsert_class_node(
-                tr.fqcn.clone(),
-                false,
-                true,
-                false,
-                false,
-                None,
-                Arc::from([]),
-                Arc::from(tr.traits.as_slice()),
-                Arc::from([]),
-                Arc::from(tr.template_params.as_slice()),
-                Arc::from(tr.require_extends.as_slice()),
-                Arc::from(tr.require_implements.as_slice()),
-                false,
-                Arc::from([]),
-                None,
-                None,
-            );
+            self.upsert_class_node(ClassNodeFields {
+                traits: Arc::from(tr.traits.as_slice()),
+                template_params: Arc::from(tr.template_params.as_slice()),
+                require_extends: Arc::from(tr.require_extends.as_slice()),
+                require_implements: Arc::from(tr.require_implements.as_slice()),
+                ..ClassNodeFields::for_trait(tr.fqcn.clone())
+            });
             for method in tr.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
@@ -1450,24 +1478,12 @@ impl MirDb {
         }
         for entry in codebase.enums.iter() {
             let en = entry.value();
-            self.upsert_class_node(
-                en.fqcn.clone(),
-                false,
-                false,
-                true,
-                false,
-                None,
-                Arc::from(en.interfaces.as_slice()),
-                Arc::from([]),
-                Arc::from([]),
-                Arc::from([]),
-                Arc::from([]),
-                Arc::from([]),
-                en.scalar_type.is_some(),
-                Arc::from([]),
-                None,
-                en.scalar_type.clone(),
-            );
+            self.upsert_class_node(ClassNodeFields {
+                interfaces: Arc::from(en.interfaces.as_slice()),
+                is_backed_enum: en.scalar_type.is_some(),
+                enum_scalar_type: en.scalar_type.clone(),
+                ..ClassNodeFields::for_enum(en.fqcn.clone())
+            });
             for method in en.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
@@ -1559,24 +1575,12 @@ mod tests {
         extends: Arc<[Arc<str>]>,
         is_interface: bool,
     ) -> ClassNode {
-        db.upsert_class_node(
-            Arc::from(fqcn),
+        db.upsert_class_node(ClassNodeFields {
             is_interface,
-            false,
-            false,
-            false,
             parent,
-            Arc::from([]),
-            Arc::from([]),
             extends,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            false,
-            Arc::from([]),
-            None,
-            None,
-        )
+            ..ClassNodeFields::for_class(Arc::from(fqcn))
+        })
     }
 
     #[test]
@@ -1784,29 +1788,18 @@ mod tests {
         is_interface: bool,
         is_trait: bool,
     ) -> ClassNode {
-        db.upsert_class_node(
-            Arc::from(fqcn),
+        db.upsert_class_node(ClassNodeFields {
             is_interface,
             is_trait,
-            false,
-            false,
             parent,
-            Arc::from([]),
-            Arc::from(
+            traits: Arc::from(
                 traits
                     .iter()
                     .map(|t| Arc::<str>::from(*t))
                     .collect::<Vec<_>>(),
             ),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            false,
-            Arc::from([]),
-            None,
-            None,
-        )
+            ..ClassNodeFields::for_class(Arc::from(fqcn))
+        })
     }
 
     fn upsert_method(db: &mut MirDb, fqcn: &str, name: &str, is_abstract: bool) -> MethodNode {
@@ -1833,29 +1826,16 @@ mod tests {
     }
 
     fn upsert_enum(db: &mut MirDb, fqcn: &str, interfaces: &[&str], is_backed: bool) -> ClassNode {
-        db.upsert_class_node(
-            Arc::from(fqcn),
-            false,
-            false,
-            true,
-            false,
-            None,
-            Arc::from(
+        db.upsert_class_node(ClassNodeFields {
+            interfaces: Arc::from(
                 interfaces
                     .iter()
                     .map(|i| Arc::<str>::from(*i))
                     .collect::<Vec<_>>(),
             ),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            is_backed,
-            Arc::from([]),
-            None,
-            None,
-        )
+            is_backed_enum: is_backed,
+            ..ClassNodeFields::for_enum(Arc::from(fqcn))
+        })
     }
 
     // -----------------------------------------------------------------
@@ -2073,24 +2053,10 @@ mod tests {
             defining_entity: Arc::from("Box"),
             variance: Variance::Invariant,
         };
-        db.upsert_class_node(
-            Arc::from("Box"),
-            false,
-            false,
-            false,
-            false,
-            None,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([tp.clone()]),
-            Arc::from([]),
-            Arc::from([]),
-            false,
-            Arc::from([]),
-            None,
-            None,
-        );
+        db.upsert_class_node(ClassNodeFields {
+            template_params: Arc::from([tp.clone()]),
+            ..ClassNodeFields::for_class(Arc::from("Box"))
+        });
         let got = class_template_params_via_db(&db, "Box").expect("registered");
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].name.as_ref(), "T");
@@ -2110,29 +2076,16 @@ mod tests {
         parent: Option<Arc<str>>,
         mixins: &[&str],
     ) -> ClassNode {
-        db.upsert_class_node(
-            Arc::from(fqcn),
-            false,
-            false,
-            false,
-            false,
+        db.upsert_class_node(ClassNodeFields {
             parent,
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            false,
-            Arc::from(
+            mixins: Arc::from(
                 mixins
                     .iter()
                     .map(|m| Arc::<str>::from(*m))
                     .collect::<Vec<_>>(),
             ),
-            None,
-            None,
-        )
+            ..ClassNodeFields::for_class(Arc::from(fqcn))
+        })
     }
 
     #[test]
@@ -2328,24 +2281,10 @@ mod tests {
         upsert_constant(&mut db, "I", "TYPE");
         // A class that implements I — interfaces go in the `interfaces`
         // slot, not the `extends` slot which is interface-only.
-        db.upsert_class_node(
-            Arc::from("Impl"),
-            false,
-            false,
-            false,
-            false,
-            None,
-            Arc::from([Arc::from("I")]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            Arc::from([]),
-            false,
-            Arc::from([]),
-            None,
-            None,
-        );
+        db.upsert_class_node(ClassNodeFields {
+            interfaces: Arc::from([Arc::from("I")]),
+            ..ClassNodeFields::for_class(Arc::from("Impl"))
+        });
         assert!(class_constant_exists_in_chain(&db, "Impl", "TYPE"));
     }
 
