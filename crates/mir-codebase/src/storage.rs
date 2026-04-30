@@ -192,8 +192,6 @@ pub struct ClassStorage {
     pub is_abstract: bool,
     pub is_final: bool,
     pub is_readonly: bool,
-    /// Populated during finalization: all ancestor FQCNs (parents + interfaces, transitively).
-    pub all_parents: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub location: Option<Location>,
@@ -234,7 +232,6 @@ pub struct InterfaceStorage {
     pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
     pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
     pub template_params: Vec<TemplateParam>,
-    pub all_parents: Vec<Arc<str>>,
     pub location: Option<Location>,
 }
 

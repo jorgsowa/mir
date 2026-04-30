@@ -1000,7 +1000,6 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     is_abstract: decl.modifiers.is_abstract,
                     is_final: decl.modifiers.is_final,
                     is_readonly: decl.modifiers.is_readonly,
-                    all_parents: vec![],
                     deprecated: class_doc.deprecated.as_deref().map(Arc::from),
                     is_internal: class_doc.is_internal,
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
@@ -1130,7 +1129,6 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     own_methods,
                     own_constants,
                     template_params,
-                    all_parents: vec![],
                     location: Some(self.location(stmt.span.start, stmt.span.end)),
                 });
             }
@@ -1605,7 +1603,7 @@ const MY_CONST = 42;
         let collector =
             DefinitionCollector::new(codebase, Arc::from(file), src, &result.source_map);
         let _ = collector.collect(&result.program);
-        codebase.finalize();
+        codebase.resolve_pending_import_types();
     }
 
     fn parse_and_collect_slice(file: &str, src: &str) -> StubSlice {
