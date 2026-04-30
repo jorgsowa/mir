@@ -326,9 +326,11 @@ fn resolve_method_return<'a, 'arena, 'src>(
 
         let ret_raw = substitute_static_in_return(resolved.return_ty_raw, fqcn);
 
-        let class_tps = ea.codebase.get_class_template_params(fqcn);
+        let class_tps = crate::db::class_template_params_via_db(ea.db, fqcn)
+            .map(|tps| tps.to_vec())
+            .unwrap_or_default();
         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
-        for (k, v) in ea.codebase.get_inherited_template_bindings(fqcn) {
+        for (k, v) in crate::db::inherited_template_bindings_via_db(ea.db, fqcn) {
             bindings.entry(k).or_insert(v);
         }
 

@@ -239,6 +239,49 @@ pub fn class_template_params_via_db(
     Some(node.template_params(db))
 }
 
+/// Walk the parent chain collecting template bindings from `@extends` type
+/// args.  Mirrors `Codebase::get_inherited_template_bindings`.
+///
+/// For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`, this
+/// returns `{ T → User }` where `T` is `BaseRepo`'s declared template
+/// parameter.  Cycle-safe via a visited set.
+pub fn inherited_template_bindings_via_db(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+) -> std::collections::HashMap<Arc<str>, Union> {
+    let mut bindings: std::collections::HashMap<Arc<str>, Union> = std::collections::HashMap::new();
+    let mut visited: std::collections::HashSet<Arc<str>> = std::collections::HashSet::new();
+    let mut current: Arc<str> = Arc::from(fqcn);
+    loop {
+        if !visited.insert(current.clone()) {
+            break;
+        }
+        let node = match db
+            .lookup_class_node(current.as_ref())
+            .filter(|n| n.active(db))
+        {
+            Some(n) => n,
+            None => break,
+        };
+        let parent = match node.parent(db) {
+            Some(p) => p,
+            None => break,
+        };
+        let extends_type_args = node.extends_type_args(db);
+        if !extends_type_args.is_empty() {
+            if let Some(parent_tps) = class_template_params_via_db(db, parent.as_ref()) {
+                for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
+                    bindings
+                        .entry(tp.name.clone())
+                        .or_insert_with(|| ty.clone());
+                }
+            }
+        }
+        current = parent;
+    }
+    bindings
+}
+
 // ---------------------------------------------------------------------------
 // FunctionNode input (S5-PR2)
 // ---------------------------------------------------------------------------
