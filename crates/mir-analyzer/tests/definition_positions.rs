@@ -75,7 +75,7 @@ fn get_member_location_finds_method() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.codebase.get_member_location("Bar", "baz");
+    let loc = analyzer.member_location("Bar", "baz");
     assert!(loc.is_some(), "should find location for method Bar::baz");
 }
 
@@ -91,7 +91,7 @@ fn get_member_location_finds_property() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.codebase.get_member_location("Qux", "name");
+    let loc = analyzer.member_location("Qux", "name");
     assert!(
         loc.is_some(),
         "should find location for property Qux::$name"
@@ -105,8 +105,5 @@ fn get_symbol_location_returns_none_for_unknown() {
         .codebase
         .get_symbol_location("NonExistent")
         .is_none());
-    assert!(analyzer
-        .codebase
-        .get_member_location("NonExistent", "foo")
-        .is_none());
+    assert!(analyzer.member_location("NonExistent", "foo").is_none());
 }
