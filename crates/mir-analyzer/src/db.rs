@@ -1900,6 +1900,113 @@ impl MirDb {
 }
 
 // ---------------------------------------------------------------------------
+// S4 Step 1: analyze_file accumulators + tracked-query skeleton
+// ---------------------------------------------------------------------------
+//
+// First step toward S4 (issues + reference locations as Salsa accumulators,
+// `analyze_file` as a tracked query).  This step is purely additive:
+//
+//   1. Defines `IssueAccumulator` and `RefLocAccumulator` salsa accumulator
+//      types — push targets for analyzer-emitted issues and reference-index
+//      entries during tracked-query evaluation.
+//   2. Defines `analyze_file` as a tracked-query stub keyed on a
+//      `(SourceFile, AnalyzeFileInput)` pair.  The stub does NOT perform
+//      analysis — it accumulates only the parse errors (a strict subset of
+//      what `collect_file_definitions` already produces, so semantics are
+//      unchanged).  The full analyzer wiring follows in subsequent S4 PRs.
+//
+// Nothing in this module is wired into the batch (`analyze`) or LSP
+// (`re_analyze_file`) paths yet.  Behavior change: zero.
+
+/// Salsa accumulator carrying analyzer-emitted issues.  In the eventual
+/// S4 design, every site that today calls `IssueBuffer::add` / `Vec::push`
+/// from inside a tracked query will instead call
+/// `IssueAccumulator(issue).accumulate(db)`, and `re_analyze_file` will read
+/// the accumulated issues for the file with
+/// `analyze_file::accumulated::<IssueAccumulator>(db, file, ...)`.
+#[salsa::accumulator]
+#[derive(Clone, Debug)]
+pub struct IssueAccumulator(pub Issue);
+
+/// Reference-index entry as produced during analysis.  Mirrors the tuple
+/// shape that `Codebase::record_ref` accepts:
+///
+/// - `symbol_key`: interner-bound string (`"fn:foo"`, `"cls:Foo"`,
+///   `"prop:Foo::$bar"`, `"cnst:Foo::BAR"`, `"meth:Foo::bar"` — same keys
+///   `Codebase::mark_*_referenced_at` use).
+/// - `file`: the file in which the reference appears.
+/// - `(line, col_start, col_end)`: span within the file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RefLoc {
+    pub symbol_key: Arc<str>,
+    pub file: Arc<str>,
+    pub line: u32,
+    pub col_start: u16,
+    pub col_end: u16,
+}
+
+/// Salsa accumulator carrying reference-index entries.  In the eventual
+/// S4 design this replaces the `Codebase::mark_*_referenced_at` side
+/// effects: instead of mutating the codebase's reference index inside a
+/// tracked query (which Salsa cannot observe), the analyzer pushes
+/// `RefLocAccumulator(loc)` and the consumer (LSP / dead-code) reads via
+/// `analyze_file::accumulated::<RefLocAccumulator>(db, …)`.
+#[salsa::accumulator]
+#[derive(Clone, Debug)]
+pub struct RefLocAccumulator(pub RefLoc);
+
+/// Salsa tracked-query input for `analyze_file`.  Carries the analysis
+/// parameters that aren't already captured by `SourceFile` itself.  Kept
+/// minimal in this PR; subsequent PRs in the S4 chain will extend it as
+/// the query body grows to call the full analyzer pipeline.
+#[salsa::input]
+pub struct AnalyzeFileInput {
+    /// Resolved PHP version (`"8.1"`, `"8.2"`, …) used by the analyzer.
+    /// Mirrors `ProjectAnalyzer::resolved_php_version`.
+    pub php_version: Arc<str>,
+}
+
+/// Tracked-query skeleton for `analyze_file`.
+///
+/// **Current behavior (S4 step 1):** parses the file and emits parse-error
+/// issues via `IssueAccumulator`.  Does NOT call into Pass 2 / the
+/// statement / expression analyzer; full body analysis stays in
+/// `Pass2Driver` until later S4 PRs migrate it.
+///
+/// The query exists at this stage to:
+/// - validate that accumulators compile and accumulate against the
+///   concrete `MirDb`,
+/// - give subsequent PRs a stable signature to extend without churning
+///   the public surface of `db.rs` again,
+/// - provide a readable test of the accumulator round-trip
+///   (`accumulate` → `accumulated::<…>(db, …)`).
+#[salsa::tracked]
+pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, _input: AnalyzeFileInput) {
+    use salsa::Accumulator as _;
+    let path = file.path(db);
+    let text = file.text(db);
+
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, &text);
+
+    for err in &parsed.errors {
+        let issue = Issue::new(
+            mir_issues::IssueKind::ParseError {
+                message: err.to_string(),
+            },
+            mir_issues::Location {
+                file: path.clone(),
+                line: 1,
+                line_end: 1,
+                col_start: 0,
+                col_end: 0,
+            },
+        );
+        IssueAccumulator(issue).accumulate(db);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1962,6 +2069,44 @@ mod tests {
             Arc::ptr_eq(&defs1.slice, &defs2.slice),
             "unchanged file must return the memoized result"
         );
+    }
+
+    #[test]
+    fn analyze_file_accumulates_parse_errors() {
+        let db = MirDb::default();
+        // Unterminated string literal — guaranteed parser diagnostic.
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/parse_err.php"),
+            Arc::from("<?php $x = \"unterminated"),
+        );
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        analyze_file(&db, file, input);
+        let issues: Vec<&IssueAccumulator> = analyze_file::accumulated(&db, file, input);
+        assert!(
+            !issues.is_empty(),
+            "expected parse error to surface as accumulated IssueAccumulator"
+        );
+        assert!(matches!(
+            issues[0].0.kind,
+            mir_issues::IssueKind::ParseError { .. }
+        ));
+    }
+
+    #[test]
+    fn analyze_file_clean_input_accumulates_nothing() {
+        let db = MirDb::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/clean.php"),
+            Arc::from("<?php class Foo {}"),
+        );
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        analyze_file(&db, file, input);
+        let issues: Vec<&IssueAccumulator> = analyze_file::accumulated(&db, file, input);
+        let refs: Vec<&RefLocAccumulator> = analyze_file::accumulated(&db, file, input);
+        assert!(issues.is_empty());
+        assert!(refs.is_empty());
     }
 
     #[test]
