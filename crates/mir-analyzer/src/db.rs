@@ -44,6 +44,9 @@ pub trait MirDatabase: salsa::Database {
     fn lookup_class_constant_node(&self, fqcn: &str, const_name: &str)
         -> Option<ClassConstantNode>;
 
+    /// Look up the [`GlobalConstantNode`] for `fqn`, if any.
+    fn lookup_global_constant_node(&self, fqn: &str) -> Option<GlobalConstantNode>;
+
     /// Return all own-method nodes for `fqcn`.  Empty if no class is
     /// registered.  Untracked iteration of a per-class HashMap.
     fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode>;
@@ -330,6 +333,19 @@ pub struct ClassConstantNode {
     pub ty: Union,
     pub visibility: Option<Visibility>,
     pub is_final: bool,
+}
+
+// ---------------------------------------------------------------------------
+// GlobalConstantNode input (S5-PR47)
+// ---------------------------------------------------------------------------
+
+/// Salsa input representing a global PHP constant (e.g. `PHP_EOL`).
+/// Mirrors `Codebase::constants`.
+#[salsa::input]
+pub struct GlobalConstantNode {
+    pub fqn: Arc<str>,
+    pub active: bool,
+    pub ty: Union,
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,6 +1016,8 @@ pub struct MirDb {
     property_nodes: HashMap<Arc<str>, HashMap<Arc<str>, PropertyNode>>,
     /// (owner FQCN) → (const_name → ClassConstantNode) handle registry.
     class_constant_nodes: HashMap<Arc<str>, HashMap<Arc<str>, ClassConstantNode>>,
+    /// FQN → GlobalConstantNode handle registry.
+    global_constant_nodes: HashMap<Arc<str>, GlobalConstantNode>,
 }
 
 #[salsa::db]
@@ -1039,6 +1057,10 @@ impl MirDatabase for MirDb {
         self.class_constant_nodes
             .get(fqcn)
             .and_then(|m| m.get(const_name).copied())
+    }
+
+    fn lookup_global_constant_node(&self, fqn: &str) -> Option<GlobalConstantNode> {
+        self.global_constant_nodes.get(fqn).copied()
     }
 
     fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode> {
@@ -1649,6 +1671,35 @@ impl MirDb {
         }
         for entry in codebase.functions.iter() {
             self.upsert_function_node(entry.value());
+        }
+        for entry in codebase.constants.iter() {
+            self.upsert_global_constant_node(entry.key().clone(), entry.value().clone());
+        }
+    }
+
+    /// Create or update the `GlobalConstantNode` for `fqn`.
+    pub fn upsert_global_constant_node(&mut self, fqn: Arc<str>, ty: Union) -> GlobalConstantNode {
+        use salsa::Setter as _;
+        if let Some(&node) = self.global_constant_nodes.get(&fqn) {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self) && node.ty(self) == ty {
+                return node;
+            }
+            node.set_active(self).to(true);
+            node.set_ty(self).to(ty);
+            node
+        } else {
+            let node = GlobalConstantNode::new(self, fqn.clone(), true, ty);
+            self.global_constant_nodes.insert(fqn, node);
+            node
+        }
+    }
+
+    /// Mark the `GlobalConstantNode` for `fqn` as inactive.
+    pub fn deactivate_global_constant_node(&mut self, fqn: &str) {
+        use salsa::Setter as _;
+        if let Some(&node) = self.global_constant_nodes.get(fqn) {
+            node.set_active(self).to(false);
         }
     }
 
