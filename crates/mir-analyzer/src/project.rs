@@ -364,20 +364,26 @@ impl ProjectAnalyzer {
         }
 
         // ---- Class-level checks (M11) ----------------------------------------
+        // `class_db` is scoped tightly: it must be dropped before the priming
+        // sweep's `commit_inferred_return_types` call below, otherwise the
+        // setter's `Storage::cancel_others` blocks waiting for this clone's
+        // Arc to drop (strong-count==1 invariant).
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
-        let class_db = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.0.clone()
-        };
-        let class_issues = crate::class::ClassAnalyzer::with_files(
-            &self.codebase,
-            &class_db,
-            analyzed_file_set,
-            &file_data,
-        )
-        .analyze_all();
-        all_issues.extend(class_issues);
+        {
+            let class_db = {
+                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                guard.0.clone()
+            };
+            let class_issues = crate::class::ClassAnalyzer::with_files(
+                &self.codebase,
+                &class_db,
+                analyzed_file_set,
+                &file_data,
+            )
+            .analyze_all();
+            all_issues.extend(class_issues);
+        }
 
         // ---- S5-PR10b: clone the salsa db once per parallel sweep so each
         // rayon worker gets its own clone (Salsa databases are `Send` but
@@ -390,6 +396,14 @@ impl ProjectAnalyzer {
         // ---- Pass 2 priming: populate inferred_return_type for all functions  --
         // Run a first inference-only sweep so that cross-file inferred return
         // types are available before the issue-emitting pass below (G6).
+        //
+        // Inferred types are also collected into a thread-safe buffer here and
+        // committed to the Salsa db serially after the sweep returns.  Writing
+        // setters from inside `for_each_with` would deadlock against
+        // `Storage::cancel_others` (which waits for sibling worker clones to
+        // drop); the post-sweep commit runs against the canonical db with
+        // strong-count==1.  See `crate::db::InferredReturnTypes`.
+        let inferred_buffer = crate::db::InferredReturnTypes::new();
         file_data
             .par_iter()
             .filter(|(file, _)| !files_with_parse_errors.contains(file))
@@ -398,11 +412,18 @@ impl ProjectAnalyzer {
                     &self.codebase,
                     &*db as &dyn MirDatabase,
                     self.resolved_php_version(),
-                );
+                )
+                .with_inferred_buffer(&inferred_buffer);
                 let arena = bumpalo::Bump::new();
                 let parsed = php_rs_parser::parse(&arena, src);
                 driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map);
             });
+
+        // Sweep clones are dropped — commit inferred types into the Salsa db.
+        {
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.commit_inferred_return_types(&inferred_buffer);
+        }
 
         let db_main = {
             let guard = self.salsa.lock().expect("salsa lock poisoned");
@@ -663,6 +684,11 @@ impl ProjectAnalyzer {
                 guard.0.clone()
             };
 
+            // Lazy-loaded files re-run Pass 2 to pick up the just-loaded
+            // definitions; collect inferred return types for a serial commit
+            // after the parallel sweep returns (same buffer-and-commit
+            // pattern as the main batch priming sweep).
+            let inferred_buffer = crate::db::InferredReturnTypes::new();
             let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
                 .par_iter()
                 .filter(|(f, _)| {
@@ -673,12 +699,18 @@ impl ProjectAnalyzer {
                         &self.codebase,
                         &*db as &dyn MirDatabase,
                         self.resolved_php_version(),
-                    );
+                    )
+                    .with_inferred_buffer(&inferred_buffer);
                     let arena = bumpalo::Bump::new();
                     let parsed = php_rs_parser::parse(&arena, src);
                     driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
                 })
                 .collect();
+
+            {
+                let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+                guard.0.commit_inferred_return_types(&inferred_buffer);
+            }
 
             for (issues, symbols) in reanalysis {
                 all_issues.extend(issues);
@@ -950,20 +982,29 @@ impl ProjectAnalyzer {
             if parsed.errors.is_empty() {
                 // Priming sweep: populate inferred_return_type for this file's functions
                 // before the issue-emitting pass so within-file cross-function calls see
-                // the correct inferred return type rather than None.
-                let db_ref: &dyn MirDatabase = db;
-                Pass2Driver::new_inference_only(
-                    &self.codebase,
-                    db_ref,
-                    self.resolved_php_version(),
-                )
-                .analyze_bodies(
-                    &parsed.program,
-                    file.clone(),
-                    new_content,
-                    &parsed.source_map,
-                );
+                // the correct inferred return type rather than None.  The buffer +
+                // commit pattern is overkill for the single-threaded LSP path but kept
+                // for symmetry with the parallel batch path (and so the analyzer's
+                // Salsa node reads see the inferred values).
+                let inferred_buffer = crate::db::InferredReturnTypes::new();
+                {
+                    let db_ref: &dyn MirDatabase = db;
+                    Pass2Driver::new_inference_only(
+                        &self.codebase,
+                        db_ref,
+                        self.resolved_php_version(),
+                    )
+                    .with_inferred_buffer(&inferred_buffer)
+                    .analyze_bodies(
+                        &parsed.program,
+                        file.clone(),
+                        new_content,
+                        &parsed.source_map,
+                    );
+                }
+                db.commit_inferred_return_types(&inferred_buffer);
 
+                let db_ref: &dyn MirDatabase = db;
                 let driver = Pass2Driver::new(&self.codebase, db_ref, self.resolved_php_version());
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,

@@ -41,10 +41,13 @@ pub(super) fn resolve_method_from_db(
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
-    // `inferred_return_type` lives on `MethodStorage` by design; see
-    // `MethodNode` doc comment and ROADMAP "S3 deadlock".  Direct,
-    // non-finalizing storage read on the resolved owner.
-    let inferred = ea.codebase.method_inferred_return_type(&owner_fqcn, &name);
+    // `inferred_return_type` is published on `MethodNode` by the priming
+    // sweep's serial commit phase; see `MirDb::commit_inferred_return_types`.
+    // Fall back to `Codebase` for entry paths without a Salsa-side commit
+    // (e.g. the `analyze_source` single-string helper).
+    let inferred = node
+        .inferred_return_type(db)
+        .or_else(|| ea.codebase.method_inferred_return_type(&owner_fqcn, &name));
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
