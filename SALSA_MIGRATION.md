@@ -1,6 +1,6 @@
 # Salsa migration — current status & open questions
 
-## Shipped through PR29
+## Shipped through PR30
 
 S0 (db skeleton) and S1 (`collect_file_definitions` query) are complete.
 S2 (`class_ancestors` query) is complete and is the LSP warm-path
@@ -36,8 +36,12 @@ reads onto the db:
   `Context::for_method`).  Adds `db::lookup_method_in_chain` helper
   (own → ancestors walk, mirroring `Codebase::get_method`).
 - PR29 — prefer db for `__construct` param lookup in `expr.rs`'s `new
-  Foo(...)` arity check.  Falls back to `Codebase::get_method` for
-  PSR-4 lazy-loaded classes.
+  Foo(...)` arity check.
+- PR30 — `lookup_method_in_chain` now walks trait-of-traits
+  (transitively) and ancestor traits, mirroring `method_exists_via_db`'s
+  semantics.  Closes the trait-walk gap behind three of the four
+  fixtures that failed when the codebase fallback was first dropped
+  in `resolve_method_from_db`'s callers.
 
 ## Architectural blocker uncovered this session
 
@@ -110,30 +114,33 @@ fields after a parallel pass will hit the same deadlock.
    tracked query gets stale results unless we manually invalidate.
    Effectively gives up on S3's perf win.
 
-## Lazy-load → db hook (newly surfaced blocker)
+## Two design gaps still blocking the codebase-method fallback drop
 
-Discovered while attempting to drop the residual codebase fallbacks in
-`resolve_method_from_db`'s callers (`call/method.rs:299` and
-`call/static_call.rs:56`): four fixtures fail when the fallback is
-removed —
+Attempting to drop the `or_else(|| codebase.get_method(...))` fallbacks
+in `resolve_method_from_db`'s callers (`call/method.rs:299`,
+`call/static_call.rs:56`) initially produced four fixture failures.
+PR30 closed three of them by adding trait-of-trait walking to
+`lookup_method_in_chain`.  The remaining gaps are *not* lazy-load
+timing (an earlier diagnosis mis-blamed PSR-4 lazy-load — `ingest_codebase`
+runs after both pre- and post-Pass-2 lazy-load sweeps, so lazy-loaded
+definitions *are* in the db).  They are:
 
-- `docblock_parity::magic_properties_methods_and_mixin_are_available`
-- `undefined_class::enum_static_call_cross_file`
-- `undefined_class::psr4_trait_fqcn_lazy_loaded`
-- `undefined_class::trait_uses_trait_cross_file_exists`
+1. **Enum implicit interfaces.**  `class_ancestors(enum)` returns
+   empty by construction.  `Status::cases()` therefore can't be
+   resolved by walking ancestors; `BackedEnum` / `UnitEnum` (built-in
+   stubs) are never visited.  Fix: have the chain walker, for enum
+   nodes, also walk `node.interfaces(db)` directly (the field is
+   populated; the short-circuit is just in `class_ancestors`).
+   Fixture: `undefined_class::enum_static_call_cross_file`.
 
-Common theme: PSR-4-lazy-loaded classes / traits / enums that arrive
-*after* `ingest_codebase` runs.  `ingest_codebase` mirrors the codebase
-into the db once at the start of analysis; lazy-loaded definitions
-that hydrate mid-pass never get a `MethodNode` / `PropertyNode` /
-`ClassConstantNode`, so db lookups miss and the codebase fallback is
-load-bearing.
+2. **`@mixin` docblock chains.**  `Codebase` is the only place that
+   tracks `@mixin` (per project_overview).  No db field today.
+   Adding it would mean a new `mixins: Arc<[Arc<str>]>` field on
+   `ClassNode` plus walker support.  Fixture:
+   `docblock_parity::magic_properties_methods_and_mixin_are_available`.
 
-Candidate fix: hook the PSR-4 lazy-load path
-(`Codebase::lazy_load_class` and friends) to also push fresh
-storage into the db via the existing `upsert_*_node` setters.  This
-is its own architectural PR — moderate scope (touches every lazy-load
-entry point) but mechanical.
+Each is a contained follow-up; both are required before the
+`or_else(codebase.get_method)` fallbacks can go.
 
 ## Other S5 work remaining
 
