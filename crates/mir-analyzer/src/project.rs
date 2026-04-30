@@ -533,35 +533,37 @@ impl ProjectAnalyzer {
                 }
             };
 
-            // Iterate `Codebase` directly (not the salsa db).  Newly lazy-loaded
-            // classes are added to `Codebase` by `DefinitionCollector::collect`
-            // below but aren't upserted to the salsa db until after the lazy-load
-            // loop finishes (`ingest_codebase` runs after this method returns).
-            // Iterating the db here would miss classes loaded in earlier
-            // iterations of this max-depth loop, breaking transitive ancestor
-            // discovery (see `psr4_trait_fqcn_lazy_loaded` fixture).
-            for entry in self.codebase.classes.iter() {
-                let cls = entry.value();
-                if let Some(parent) = &cls.parent {
-                    try_queue(parent.as_ref());
-                }
-                for iface in &cls.interfaces {
-                    try_queue(iface.as_ref());
-                }
-            }
-            for entry in self.codebase.interfaces.iter() {
-                for parent in &entry.value().extends {
-                    try_queue(parent.as_ref());
-                }
-            }
-            for entry in self.codebase.enums.iter() {
-                for iface in &entry.value().interfaces {
-                    try_queue(iface.as_ref());
-                }
-            }
-            for entry in self.codebase.traits.iter() {
-                for used in &entry.value().traits {
-                    try_queue(used.as_ref());
+            // Mirror everything collected so far (initial Pass 1 plus any
+            // classes loaded by previous iterations of this loop) into the
+            // salsa db, then drive the inheritance scan from `ClassNode`s.
+            {
+                let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+                guard.0.ingest_codebase(&self.codebase);
+                let db = &guard.0;
+                for fqcn in db.active_class_node_fqcns() {
+                    let Some(node) = db.lookup_class_node(&fqcn) else {
+                        continue;
+                    };
+                    if node.is_interface(db) {
+                        for parent in node.extends(db).iter() {
+                            try_queue(parent.as_ref());
+                        }
+                    } else if node.is_enum(db) {
+                        for iface in node.interfaces(db).iter() {
+                            try_queue(iface.as_ref());
+                        }
+                    } else if node.is_trait(db) {
+                        for used in node.traits(db).iter() {
+                            try_queue(used.as_ref());
+                        }
+                    } else {
+                        if let Some(parent) = node.parent(db) {
+                            try_queue(parent.as_ref());
+                        }
+                        for iface in node.interfaces(db).iter() {
+                            try_queue(iface.as_ref());
+                        }
+                    }
                 }
             }
 
