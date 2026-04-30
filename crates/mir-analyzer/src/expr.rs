@@ -1458,18 +1458,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(prop_name) = extract_string_from_expr(pa.property) {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
-                            // Resolve own property for readonly + type checks (db path first).
+                            // Resolve own property for readonly + type checks via db.
+                            // Own-only — readonly enforcement applies to the
+                            // declaring class; chain walks would mis-attribute.
                             let db = self.db;
                             let prop_info: Option<(bool, Option<Union>)> = db
                                 .lookup_property_node(fqcn, &prop_name)
                                 .filter(|n| n.active(db))
-                                .map(|n| (n.is_readonly(db), n.ty(db)))
-                                .or_else(|| {
-                                    self.codebase.classes.get(fqcn.as_ref()).and_then(|cls| {
-                                        cls.get_property(&prop_name)
-                                            .map(|p| (p.is_readonly, p.ty.clone()))
-                                    })
-                                });
+                                .map(|n| (n.is_readonly(db), n.ty(db)));
                             if let Some((is_readonly, prop_ty)) = prop_info {
                                 if is_readonly && !ctx.inside_constructor {
                                     self.emit(
