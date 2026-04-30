@@ -28,15 +28,12 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    // `inferred_return_type` is the priming-sweep-derived type, populated
+    // `inferred_return_type` is the priming-sweep-derived type, published
     // on `FunctionNode` via `MirDb::commit_inferred_return_types` after
-    // each priming sweep returns (sweep clones must drop first to avoid
-    // `Storage::cancel_others` deadlock).  Fall back to `Codebase` for
-    // entry paths that haven't run a Salsa-side commit yet
-    // (e.g. `analyze_source` single-string entry point).
-    let inferred = node
-        .inferred_return_type(db)
-        .or_else(|| ea.codebase.function_inferred_return_type(fqn));
+    // each priming sweep returns.  Every entry path (batch `analyze`,
+    // `re_analyze_file`, lazy-load reanalysis sweep, `analyze_source`)
+    // runs a priming-sweep + commit before the issue-emitting pass.
+    let inferred = node.inferred_return_type(db);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
