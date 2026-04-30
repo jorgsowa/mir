@@ -1481,6 +1481,82 @@ impl MirDb {
         }
     }
 
+    /// Deactivate `MethodNode`s for `fqcn` whose lowercased name is not in
+    /// `keep_lower`.  Used by `ingest_codebase` to prune stale stub methods
+    /// when a user file shadows a bundled-stub class with a different method
+    /// set.  Active-only check preserves PR21's fast-skip — already-inactive
+    /// nodes don't fire a setter.
+    pub fn prune_class_methods(
+        &mut self,
+        fqcn: &str,
+        keep_lower: &std::collections::HashSet<Arc<str>>,
+    ) {
+        use salsa::Setter as _;
+        let candidates: Vec<MethodNode> = self
+            .method_nodes
+            .get(fqcn)
+            .map(|m| {
+                m.iter()
+                    .filter(|(k, _)| !keep_lower.contains(k.as_ref()))
+                    .map(|(_, n)| *n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for node in candidates {
+            if node.active(self) {
+                node.set_active(self).to(false);
+            }
+        }
+    }
+
+    /// Deactivate `PropertyNode`s for `fqcn` whose name is not in `keep`.
+    pub fn prune_class_properties(
+        &mut self,
+        fqcn: &str,
+        keep: &std::collections::HashSet<Arc<str>>,
+    ) {
+        use salsa::Setter as _;
+        let candidates: Vec<PropertyNode> = self
+            .property_nodes
+            .get(fqcn)
+            .map(|m| {
+                m.iter()
+                    .filter(|(k, _)| !keep.contains(k.as_ref()))
+                    .map(|(_, n)| *n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for node in candidates {
+            if node.active(self) {
+                node.set_active(self).to(false);
+            }
+        }
+    }
+
+    /// Deactivate `ClassConstantNode`s for `fqcn` whose name is not in `keep`.
+    pub fn prune_class_constants(
+        &mut self,
+        fqcn: &str,
+        keep: &std::collections::HashSet<Arc<str>>,
+    ) {
+        use salsa::Setter as _;
+        let candidates: Vec<ClassConstantNode> = self
+            .class_constant_nodes
+            .get(fqcn)
+            .map(|m| {
+                m.iter()
+                    .filter(|(k, _)| !keep.contains(k.as_ref()))
+                    .map(|(_, n)| *n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for node in candidates {
+            if node.active(self) {
+                node.set_active(self).to(false);
+            }
+        }
+    }
+
     /// Create or update the `PropertyNode` for `(storage.fqcn, storage.name)`.
     pub fn upsert_property_node(&mut self, fqcn: &Arc<str>, storage: &PropertyStorage) {
         use salsa::Setter as _;
@@ -1579,6 +1655,7 @@ impl MirDb {
     /// see them too.  Idempotent — re-running upserts existing nodes in place
     /// without invalidating downstream queries when fields are unchanged.
     pub fn ingest_codebase(&mut self, codebase: &Codebase) {
+        use std::collections::HashSet;
         for entry in codebase.classes.iter() {
             let cls = entry.value();
             self.upsert_class_node(ClassNodeFields {
@@ -1601,12 +1678,27 @@ impl MirDb {
                 ),
                 ..ClassNodeFields::for_class(cls.fqcn.clone())
             });
+            let method_keep: HashSet<Arc<str>> = cls
+                .own_methods
+                .values()
+                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
+                .collect();
+            self.prune_class_methods(&cls.fqcn, &method_keep);
             for method in cls.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
+            let prop_keep: HashSet<Arc<str>> = cls
+                .own_properties
+                .values()
+                .map(|p| p.name.clone())
+                .collect();
+            self.prune_class_properties(&cls.fqcn, &prop_keep);
             for prop in cls.own_properties.values() {
                 self.upsert_property_node(&cls.fqcn, prop);
             }
+            let const_keep: HashSet<Arc<str>> =
+                cls.own_constants.values().map(|c| c.name.clone()).collect();
+            self.prune_class_constants(&cls.fqcn, &const_keep);
             for constant in cls.own_constants.values() {
                 self.upsert_class_constant_node(&cls.fqcn, constant);
             }
@@ -1619,9 +1711,21 @@ impl MirDb {
                 location: iface.location.clone(),
                 ..ClassNodeFields::for_interface(iface.fqcn.clone())
             });
+            let method_keep: HashSet<Arc<str>> = iface
+                .own_methods
+                .values()
+                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
+                .collect();
+            self.prune_class_methods(&iface.fqcn, &method_keep);
             for method in iface.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
+            let const_keep: HashSet<Arc<str>> = iface
+                .own_constants
+                .values()
+                .map(|c| c.name.clone())
+                .collect();
+            self.prune_class_constants(&iface.fqcn, &const_keep);
             for constant in iface.own_constants.values() {
                 self.upsert_class_constant_node(&iface.fqcn, constant);
             }
@@ -1636,12 +1740,24 @@ impl MirDb {
                 location: tr.location.clone(),
                 ..ClassNodeFields::for_trait(tr.fqcn.clone())
             });
+            let method_keep: HashSet<Arc<str>> = tr
+                .own_methods
+                .values()
+                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
+                .collect();
+            self.prune_class_methods(&tr.fqcn, &method_keep);
             for method in tr.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
+            let prop_keep: HashSet<Arc<str>> =
+                tr.own_properties.values().map(|p| p.name.clone()).collect();
+            self.prune_class_properties(&tr.fqcn, &prop_keep);
             for prop in tr.own_properties.values() {
                 self.upsert_property_node(&tr.fqcn, prop);
             }
+            let const_keep: HashSet<Arc<str>> =
+                tr.own_constants.values().map(|c| c.name.clone()).collect();
+            self.prune_class_constants(&tr.fqcn, &const_keep);
             for constant in tr.own_constants.values() {
                 self.upsert_class_constant_node(&tr.fqcn, constant);
             }
@@ -1655,6 +1771,17 @@ impl MirDb {
                 location: en.location.clone(),
                 ..ClassNodeFields::for_enum(en.fqcn.clone())
             });
+            let mut method_keep: HashSet<Arc<str>> = en
+                .own_methods
+                .values()
+                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
+                .collect();
+            method_keep.insert(Arc::from("cases"));
+            if en.scalar_type.is_some() {
+                method_keep.insert(Arc::from("from"));
+                method_keep.insert(Arc::from("tryfrom"));
+            }
+            self.prune_class_methods(&en.fqcn, &method_keep);
             for method in en.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
             }
@@ -1698,6 +1825,12 @@ impl MirDb {
                     self.upsert_method_node(&synth_method("tryFrom"));
                 }
             }
+            let mut const_keep: HashSet<Arc<str>> =
+                en.own_constants.values().map(|c| c.name.clone()).collect();
+            for case in en.cases.values() {
+                const_keep.insert(case.name.clone());
+            }
+            self.prune_class_constants(&en.fqcn, &const_keep);
             for constant in en.own_constants.values() {
                 self.upsert_class_constant_node(&en.fqcn, constant);
             }
