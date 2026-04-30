@@ -14,30 +14,12 @@ use crate::interner::Interner;
 /// allocator overhead beyond the `Vec` backing store.
 type ReferenceLocations = DashMap<u32, Vec<(u32, u32, u16, u16)>>;
 
-use crate::storage::{
-    ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage, TraitStorage,
-};
+use crate::storage::{ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, TraitStorage};
 use mir_types::Union;
 
 // ---------------------------------------------------------------------------
 // Private helper — shared insert logic for reference tracking
 // ---------------------------------------------------------------------------
-
-/// Case-insensitive method lookup within a single `own_methods` map.
-///
-/// Tries an exact key match first (O(1)), then falls back to a linear
-/// case-insensitive scan for stubs that store keys in original case.
-#[inline]
-fn lookup_method<'a>(
-    map: &'a indexmap::IndexMap<Arc<str>, Arc<MethodStorage>>,
-    name: &str,
-) -> Option<&'a Arc<MethodStorage>> {
-    map.get(name).or_else(|| {
-        map.iter()
-            .find(|(k, _)| k.as_ref().eq_ignore_ascii_case(name))
-            .map(|(_, v)| v)
-    })
-}
 
 /// Append `(sym_id, file_id, line, col_start, col_end)` to the reference index,
 /// skipping exact duplicates so union receivers like `Foo|Foo->method()` don't
@@ -610,51 +592,6 @@ impl Codebase {
         None
     }
 
-    /// Look up the definition location of a class member (method, property, constant).
-    pub fn get_member_location(
-        &self,
-        fqcn: &str,
-        member_name: &str,
-    ) -> Option<crate::storage::Location> {
-        let method_lower = member_name.to_lowercase();
-        // Methods: own → traits → ancestors (own + traits).
-        if let Some(loc) = self.find_method_location_in_chain(fqcn, &method_lower) {
-            return loc;
-        }
-        // Properties: own → ancestors.
-        if let Some(loc) = self.find_property_location_in_chain(fqcn, member_name) {
-            return loc;
-        }
-        // Check class constants
-        if let Some(cls) = self.classes.get(fqcn) {
-            if let Some(c) = cls.own_constants.get(member_name) {
-                return c.location.clone();
-            }
-        }
-        // Check interface constants
-        if let Some(iface) = self.interfaces.get(fqcn) {
-            if let Some(c) = iface.own_constants.get(member_name) {
-                return c.location.clone();
-            }
-        }
-        // Check trait constants
-        if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(c) = tr.own_constants.get(member_name) {
-                return c.location.clone();
-            }
-        }
-        // Check enum constants and cases
-        if let Some(en) = self.enums.get(fqcn) {
-            if let Some(c) = en.own_constants.get(member_name) {
-                return c.location.clone();
-            }
-            if let Some(case) = en.cases.get(member_name) {
-                return case.location.clone();
-            }
-        }
-        None
-    }
-
     // -----------------------------------------------------------------------
     // Reference tracking (M18 dead-code detection)
     // -----------------------------------------------------------------------
@@ -991,115 +928,6 @@ impl Codebase {
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
-
-    /// Walk own → traits → ancestors looking up a method's location.  The
-    /// outer `Option` indicates whether the method was found; the inner
-    /// `Option` is its (possibly absent) location.
-    fn find_method_location_in_chain(
-        &self,
-        fqcn: &str,
-        method_lower: &str,
-    ) -> Option<Option<crate::storage::Location>> {
-        if let Some(cls) = self.classes.get(fqcn) {
-            if let Some(m) = lookup_method(&cls.own_methods, method_lower) {
-                return Some(m.location.clone());
-            }
-            let traits = cls.traits.clone();
-            let parents = cls.all_parents.clone();
-            drop(cls);
-            for tr_fqcn in &traits {
-                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
-                    if let Some(m) = lookup_method(&tr.own_methods, method_lower) {
-                        return Some(m.location.clone());
-                    }
-                }
-            }
-            for anc in &parents {
-                if let Some(anc_cls) = self.classes.get(anc.as_ref()) {
-                    if let Some(m) = lookup_method(&anc_cls.own_methods, method_lower) {
-                        return Some(m.location.clone());
-                    }
-                    let anc_traits = anc_cls.traits.clone();
-                    drop(anc_cls);
-                    for tr_fqcn in &anc_traits {
-                        if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
-                            if let Some(m) = lookup_method(&tr.own_methods, method_lower) {
-                                return Some(m.location.clone());
-                            }
-                        }
-                    }
-                } else if let Some(iface) = self.interfaces.get(anc.as_ref()) {
-                    if let Some(m) = lookup_method(&iface.own_methods, method_lower) {
-                        return Some(m.location.clone());
-                    }
-                }
-            }
-            return None;
-        }
-        if let Some(iface) = self.interfaces.get(fqcn) {
-            if let Some(m) = lookup_method(&iface.own_methods, method_lower) {
-                return Some(m.location.clone());
-            }
-            let parents = iface.all_parents.clone();
-            drop(iface);
-            for p in &parents {
-                if let Some(parent_iface) = self.interfaces.get(p.as_ref()) {
-                    if let Some(m) = lookup_method(&parent_iface.own_methods, method_lower) {
-                        return Some(m.location.clone());
-                    }
-                }
-            }
-            return None;
-        }
-        if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(m) = lookup_method(&tr.own_methods, method_lower) {
-                return Some(m.location.clone());
-            }
-        }
-        if let Some(en) = self.enums.get(fqcn) {
-            if let Some(m) = lookup_method(&en.own_methods, method_lower) {
-                return Some(m.location.clone());
-            }
-        }
-        None
-    }
-
-    /// Walk own → traits → ancestors looking up a property's location.
-    fn find_property_location_in_chain(
-        &self,
-        fqcn: &str,
-        prop_name: &str,
-    ) -> Option<Option<crate::storage::Location>> {
-        if let Some(cls) = self.classes.get(fqcn) {
-            if let Some(p) = cls.own_properties.get(prop_name) {
-                return Some(p.location.clone());
-            }
-            let traits = cls.traits.clone();
-            let parents = cls.all_parents.clone();
-            drop(cls);
-            for tr_fqcn in &traits {
-                if let Some(tr) = self.traits.get(tr_fqcn.as_ref()) {
-                    if let Some(p) = tr.own_properties.get(prop_name) {
-                        return Some(p.location.clone());
-                    }
-                }
-            }
-            for anc in &parents {
-                if let Some(anc_cls) = self.classes.get(anc.as_ref()) {
-                    if let Some(p) = anc_cls.own_properties.get(prop_name) {
-                        return Some(p.location.clone());
-                    }
-                }
-            }
-            return None;
-        }
-        if let Some(tr) = self.traits.get(fqcn) {
-            if let Some(p) = tr.own_properties.get(prop_name) {
-                return Some(p.location.clone());
-            }
-        }
-        None
-    }
 
     /// Compute the ancestor list for a class, reusing previously-computed
     /// entries from the per-`finalize` memo maps.  Ordering matches the

@@ -126,6 +126,19 @@ impl ProjectAnalyzer {
         &self.salsa
     }
 
+    /// Look up the source location of a class member (method, property, or
+    /// class constant / enum case) by walking the inheritance chain through
+    /// the salsa db.  Returns `None` if no member with that name exists, or
+    /// if the member has no recorded location.
+    pub fn member_location(
+        &self,
+        fqcn: &str,
+        member_name: &str,
+    ) -> Option<mir_codebase::storage::Location> {
+        let guard = self.salsa.lock().expect("salsa lock poisoned");
+        crate::db::member_location_via_db(&guard.0, fqcn, member_name)
+    }
+
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
     /// Stubs are filtered against the configured target PHP version (or
     /// `PhpVersion::LATEST` if none was set).

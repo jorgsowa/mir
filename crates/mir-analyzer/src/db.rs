@@ -396,6 +396,10 @@ pub struct ClassConstantNode {
     pub ty: Union,
     pub visibility: Option<Visibility>,
     pub is_final: bool,
+    /// Source location of the declaration.  Mirrors `ConstantStorage::location`
+    /// for class/interface/trait constants, and `EnumCaseStorage::location` for
+    /// enum cases.  `None` for nodes registered without a source span.
+    pub location: Option<Location>,
 }
 
 // ---------------------------------------------------------------------------
@@ -968,6 +972,52 @@ pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_na
         }
     }
     false
+}
+
+/// Look up the source location of a class member (method, property, or
+/// class/interface/trait/enum constant including enum cases).  Walks the
+/// inheritance chain via the same helpers used by analyzer call sites
+/// (`lookup_method_in_chain`, `lookup_property_in_chain`,
+/// `class_ancestors` for constants), so members defined on an ancestor
+/// are still found.  Returns `None` if no member with that name exists,
+/// or if the member exists but has no recorded location (e.g. a
+/// synthesized enum implicit method).
+pub fn member_location_via_db(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    member_name: &str,
+) -> Option<Location> {
+    if let Some(node) = lookup_method_in_chain(db, fqcn, member_name) {
+        if let Some(loc) = node.location(db) {
+            return Some(loc);
+        }
+    }
+    if let Some(node) = lookup_property_in_chain(db, fqcn, member_name) {
+        if let Some(loc) = node.location(db) {
+            return Some(loc);
+        }
+    }
+    // Class/interface/trait/enum constants and enum cases.
+    if let Some(node) = db
+        .lookup_class_constant_node(fqcn, member_name)
+        .filter(|n| n.active(db))
+    {
+        if let Some(loc) = node.location(db) {
+            return Some(loc);
+        }
+    }
+    let class_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+    for ancestor in class_ancestors(db, class_node).0.iter() {
+        if let Some(node) = db
+            .lookup_class_constant_node(ancestor.as_ref(), member_name)
+            .filter(|n| n.active(db))
+        {
+            if let Some(loc) = node.location(db) {
+                return Some(loc);
+            }
+        }
+    }
+    None
 }
 
 /// Predicate variant of [`Codebase::extends_or_implements`] backed by the
@@ -1766,6 +1816,7 @@ impl MirDb {
                 && node.visibility(self) == storage.visibility
                 && node.is_final(self) == storage.is_final
                 && node.ty(self) == storage.ty
+                && node.location(self) == storage.location
             {
                 return;
             }
@@ -1773,6 +1824,7 @@ impl MirDb {
             node.set_ty(self).to(storage.ty.clone());
             node.set_visibility(self).to(storage.visibility);
             node.set_is_final(self).to(storage.is_final);
+            node.set_location(self).to(storage.location.clone());
         } else {
             let node = ClassConstantNode::new(
                 self,
@@ -1782,6 +1834,7 @@ impl MirDb {
                 storage.ty.clone(),
                 storage.visibility,
                 storage.is_final,
+                storage.location.clone(),
             );
             self.class_constant_nodes
                 .entry(fqcn.clone())
