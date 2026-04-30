@@ -43,6 +43,19 @@ pub trait MirDatabase: salsa::Database {
     /// Look up the [`ClassConstantNode`] for `(fqcn, const_name)`, if any.
     fn lookup_class_constant_node(&self, fqcn: &str, const_name: &str)
         -> Option<ClassConstantNode>;
+
+    /// Return all own-method nodes for `fqcn`.  Empty if no class is
+    /// registered.  Untracked iteration of a per-class HashMap.
+    fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode>;
+
+    /// Return all class-FQCNs currently registered as active `ClassNode`s,
+    /// optionally filtered by kind.  Untracked snapshot — callers should
+    /// treat the returned `Vec` as a one-shot view.
+    fn active_class_node_fqcns(&self) -> Vec<Arc<str>>;
+
+    /// Return all function-FQNs currently registered as active
+    /// `FunctionNode`s.  Untracked snapshot.
+    fn active_function_node_fqns(&self) -> Vec<Arc<str>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +98,10 @@ unsafe impl salsa::Update for FileDefinitions {
 // ---------------------------------------------------------------------------
 // ClassNode input (S2)
 // ---------------------------------------------------------------------------
+
+/// `(interface_fqcn, type_args)` pairs from `@implements Iface<T1, T2>`
+/// docblocks.  Stored on `ClassNode` for classes only.
+pub type ImplementsTypeArgs = Arc<[(Arc<str>, Arc<[Union]>)]>;
 
 /// Salsa input representing a single class or interface in the inheritance
 /// graph.  Fields are kept minimal — only what `class_ancestors` needs.
@@ -168,7 +185,7 @@ pub struct ClassNode {
     pub extends_type_args: Arc<[Union]>,
     /// Type arguments from `@implements Iface<T1, T2>` — populated for
     /// classes only.  Mirrors `ClassStorage::implements_type_args`.
-    pub implements_type_args: Arc<[(Arc<str>, Arc<[Union]>)]>,
+    pub implements_type_args: ImplementsTypeArgs,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -1023,6 +1040,39 @@ impl MirDatabase for MirDb {
             .get(fqcn)
             .and_then(|m| m.get(const_name).copied())
     }
+
+    fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode> {
+        self.method_nodes
+            .get(fqcn)
+            .map(|m| m.values().copied().collect())
+            .unwrap_or_default()
+    }
+
+    fn active_class_node_fqcns(&self) -> Vec<Arc<str>> {
+        self.class_nodes
+            .iter()
+            .filter_map(|(fqcn, node)| {
+                if node.active(self) {
+                    Some(fqcn.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn active_function_node_fqns(&self) -> Vec<Arc<str>> {
+        self.function_nodes
+            .iter()
+            .filter_map(|(fqn, node)| {
+                if node.active(self) {
+                    Some(fqn.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
@@ -1054,7 +1104,7 @@ pub struct ClassNodeFields {
     pub is_readonly: bool,
     pub location: Option<Location>,
     pub extends_type_args: Arc<[Union]>,
-    pub implements_type_args: Arc<[(Arc<str>, Arc<[Union]>)]>,
+    pub implements_type_args: ImplementsTypeArgs,
 }
 
 impl ClassNodeFields {

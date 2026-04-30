@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use mir_codebase::storage::{MethodStorage, Visibility};
+use mir_codebase::storage::Visibility;
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
 
@@ -185,8 +185,10 @@ impl<'a> ClassAnalyzer<'a> {
         // Walk every ancestor class and collect abstract methods
         let ancestors = self.ancestors(fqcn);
         for ancestor_fqcn in &ancestors {
-            // Collect abstract method names first, then drop the DashMap guard before
-            // calling get_method (which re-enters the same DashMap).
+            // Read abstract method names from `Codebase::classes` rather than
+            // the salsa db — salsa `method_nodes` may still hold stale methods
+            // from bundled-stub class versions that user files later shadowed
+            // (see analogous note in `check_interface_methods_implemented`).
             let abstract_methods: Vec<Arc<str>> = {
                 let Some(ancestor) = self.codebase.classes.get(ancestor_fqcn.as_ref()) else {
                     continue;
@@ -252,8 +254,13 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for iface_fqcn in &all_ifaces {
-            // Collect method names first, then drop the interface guard before calling
-            // get_method (which re-enters self.codebase.interfaces when walking ancestors).
+            // Read method names from `Codebase::interfaces` (not the salsa db):
+            // salsa `method_nodes` accumulates across ingestions and may still
+            // hold stale methods from a bundled-stub interface that the user
+            // file later shadowed (the deactivate cycle isn't hooked up for
+            // bundled-stub overrides).  `Codebase::interfaces` is the single
+            // source of truth for "which methods does this interface declare
+            // *right now*".
             let method_names: Vec<Arc<str>> =
                 match self.codebase.interfaces.get(iface_fqcn.as_ref()) {
                     Some(iface) => iface.own_methods.values().map(|m| m.name.clone()).collect(),
@@ -328,12 +335,12 @@ impl<'a> ClassAnalyzer<'a> {
             );
 
             // ---- a. Cannot override a final method -------------------------
-            if parent.is_final {
+            if parent.is_final(self.db) {
                 let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
                         method: method_name.to_string(),
-                        parent: parent.fqcn.to_string(),
+                        parent: parent.fqcn(self.db).to_string(),
                     },
                     loc.clone(),
                 );
@@ -345,7 +352,7 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- b. Visibility must not be reduced -------------------------
-            if visibility_reduced(own_method.visibility, parent.visibility) {
+            if visibility_reduced(own_method.visibility, parent.visibility(self.db)) {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
@@ -366,8 +373,9 @@ impl<'a> ClassAnalyzer<'a> {
             //   - Parent type is from a docblock (PHP doesn't enforce docblock override compat)
             //   - Either type is mixed
             //   - Parent type contains a template param
+            let parent_return_type = parent.return_type(self.db);
             if let (Some(child_ret), Some(parent_ret)) =
-                (&own_method.return_type, &parent.return_type)
+                (&own_method.return_type, parent_return_type.as_ref())
             {
                 let parent_from_docblock = parent_ret.from_docblock;
                 let involves_named_objects = self.type_has_named_objects(child_ret)
@@ -422,8 +430,8 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- d. Required param count must not increase -----------------
-            let parent_required = parent
-                .params
+            let parent_params = parent.params(self.db);
+            let parent_required = parent_params
                 .iter()
                 .filter(|p| !p.is_optional && !p.is_variadic)
                 .count();
@@ -459,9 +467,9 @@ impl<'a> ClassAnalyzer<'a> {
             //   - Either type contains a named object (needs codebase for inheritance check)
             //   - Either type contains TSelf/TStaticObject
             //   - Either type contains a template param
-            let shared_len = parent.params.len().min(own_method.params.len());
+            let shared_len = parent_params.len().min(own_method.params.len());
             for i in 0..shared_len {
-                let parent_param = &parent.params[i];
+                let parent_param = &parent_params[i];
                 let child_param = &own_method.params[i];
 
                 let (parent_ty, child_ty) = match (&parent_param.ty, &child_param.ty) {
@@ -581,22 +589,20 @@ impl<'a> ClassAnalyzer<'a> {
     }
 
     /// Find a method with the given name in the closest ancestor (not the class itself).
+    /// Returns the parent's `MethodNode` (db-tracked).
     fn find_parent_method(
         &self,
         cls: &mir_codebase::storage::ClassStorage,
         method_name: &str,
-    ) -> Option<Arc<MethodStorage>> {
-        // Walk all_parents in order (closest ancestor first)
+    ) -> Option<crate::db::MethodNode> {
         let ancestors = self.ancestors(&cls.fqcn);
         for ancestor_fqcn in &ancestors {
-            if let Some(ancestor_cls) = self.codebase.classes.get(ancestor_fqcn.as_ref()) {
-                if let Some(m) = ancestor_cls.own_methods.get(method_name) {
-                    return Some(Arc::clone(m));
-                }
-            } else if let Some(iface) = self.codebase.interfaces.get(ancestor_fqcn.as_ref()) {
-                if let Some(m) = iface.own_methods.get(method_name) {
-                    return Some(Arc::clone(m));
-                }
+            if let Some(node) = self
+                .db
+                .lookup_method_node(ancestor_fqcn.as_ref(), method_name)
+                .filter(|n| n.active(self.db))
+            {
+                return Some(node);
             }
         }
         None
