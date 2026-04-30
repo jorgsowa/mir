@@ -1354,8 +1354,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     match prop_name {
                         "name" => return Union::single(Atomic::TNonEmptyString),
                         "value" => {
-                            if let Some(en) = self.codebase.enums.get(fqcn.as_ref()) {
-                                if let Some(scalar_ty) = en.scalar_type.clone() {
+                            if let Some(node) = self
+                                .db
+                                .lookup_class_node(fqcn.as_ref())
+                                .filter(|n| n.active(self.db))
+                            {
+                                if let Some(scalar_ty) = node.enum_scalar_type(self.db) {
                                     return scalar_ty;
                                 }
                             }
