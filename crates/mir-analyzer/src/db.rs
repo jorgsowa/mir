@@ -2065,4 +2065,274 @@ mod tests {
         db.deactivate_class_node("Box");
         assert!(class_template_params_via_db(&db, "Box").is_none());
     }
+
+    // -----------------------------------------------------------------
+    // lookup_method_in_chain
+    // -----------------------------------------------------------------
+
+    fn upsert_class_with_mixins(
+        db: &mut MirDb,
+        fqcn: &str,
+        parent: Option<Arc<str>>,
+        mixins: &[&str],
+    ) -> ClassNode {
+        db.upsert_class_node(
+            Arc::from(fqcn),
+            false,
+            false,
+            false,
+            false,
+            parent,
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            false,
+            Arc::from(
+                mixins
+                    .iter()
+                    .map(|m| Arc::<str>::from(*m))
+                    .collect::<Vec<_>>(),
+            ),
+        )
+    }
+
+    #[test]
+    fn lookup_method_in_chain_finds_own_then_ancestor() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        upsert_method(&mut db, "Base", "shared", false);
+        upsert_class(
+            &mut db,
+            "Child",
+            Some(Arc::from("Base")),
+            Arc::from([]),
+            false,
+        );
+        upsert_method(&mut db, "Child", "shared", false);
+        // Own wins over ancestor.
+        let found = lookup_method_in_chain(&db, "Child", "shared").expect("own");
+        assert_eq!(found.fqcn(&db).as_ref(), "Child");
+        // Inherited-only resolves to ancestor.
+        upsert_method(&mut db, "Base", "only_in_base", false);
+        let found = lookup_method_in_chain(&db, "Child", "only_in_base").expect("ancestor");
+        assert_eq!(found.fqcn(&db).as_ref(), "Base");
+    }
+
+    #[test]
+    fn lookup_method_in_chain_walks_trait_of_traits() {
+        let mut db = MirDb::default();
+        upsert_class_with_traits(&mut db, "InnerTrait", None, &[], false, true);
+        upsert_method(&mut db, "InnerTrait", "deep", false);
+        upsert_class_with_traits(&mut db, "OuterTrait", None, &["InnerTrait"], false, true);
+        upsert_class_with_traits(&mut db, "Foo", None, &["OuterTrait"], false, false);
+        let found = lookup_method_in_chain(&db, "Foo", "deep").expect("transitive trait");
+        assert_eq!(found.fqcn(&db).as_ref(), "InnerTrait");
+    }
+
+    #[test]
+    fn lookup_method_in_chain_walks_mixins() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "MixinTarget", None, Arc::from([]), false);
+        upsert_method(&mut db, "MixinTarget", "magic", false);
+        upsert_class_with_mixins(&mut db, "Host", None, &["MixinTarget"]);
+        let found = lookup_method_in_chain(&db, "Host", "magic").expect("via @mixin");
+        assert_eq!(found.fqcn(&db).as_ref(), "MixinTarget");
+    }
+
+    #[test]
+    fn lookup_method_in_chain_mixin_cycle_does_not_hang() {
+        let mut db = MirDb::default();
+        // A → B → A (mutual @mixin); neither defines the method.
+        upsert_class_with_mixins(&mut db, "A", None, &["B"]);
+        upsert_class_with_mixins(&mut db, "B", None, &["A"]);
+        assert!(lookup_method_in_chain(&db, "A", "missing").is_none());
+    }
+
+    #[test]
+    fn lookup_method_in_chain_is_case_insensitive() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_method(&mut db, "Foo", "doStuff", false);
+        assert!(lookup_method_in_chain(&db, "Foo", "DOSTUFF").is_some());
+        assert!(lookup_method_in_chain(&db, "Foo", "dostuff").is_some());
+    }
+
+    #[test]
+    fn lookup_method_in_chain_unknown_returns_none() {
+        let db = MirDb::default();
+        assert!(lookup_method_in_chain(&db, "Nope", "anything").is_none());
+    }
+
+    // -----------------------------------------------------------------
+    // lookup_property_in_chain
+    // -----------------------------------------------------------------
+
+    fn upsert_property(db: &mut MirDb, fqcn: &str, name: &str, is_readonly: bool) -> PropertyNode {
+        let storage = PropertyStorage {
+            name: Arc::from(name),
+            ty: None,
+            inferred_ty: None,
+            visibility: Visibility::Public,
+            is_static: false,
+            is_readonly,
+            default: None,
+            location: None,
+        };
+        let owner = Arc::<str>::from(fqcn);
+        db.upsert_property_node(&owner, &storage);
+        db.lookup_property_node(fqcn, name).expect("registered")
+    }
+
+    #[test]
+    fn lookup_property_in_chain_own_then_ancestor() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        upsert_property(&mut db, "Base", "x", false);
+        upsert_class(
+            &mut db,
+            "Child",
+            Some(Arc::from("Base")),
+            Arc::from([]),
+            false,
+        );
+        // Inherited resolves to Base.
+        let found = lookup_property_in_chain(&db, "Child", "x").expect("ancestor");
+        assert_eq!(found.fqcn(&db).as_ref(), "Base");
+        // Own override wins.
+        upsert_property(&mut db, "Child", "x", true);
+        let found = lookup_property_in_chain(&db, "Child", "x").expect("own");
+        assert_eq!(found.fqcn(&db).as_ref(), "Child");
+        assert!(found.is_readonly(&db));
+    }
+
+    #[test]
+    fn lookup_property_in_chain_walks_mixins() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "MixinTarget", None, Arc::from([]), false);
+        upsert_property(&mut db, "MixinTarget", "exposed", false);
+        upsert_class_with_mixins(&mut db, "Host", None, &["MixinTarget"]);
+        let found = lookup_property_in_chain(&db, "Host", "exposed").expect("via @mixin");
+        assert_eq!(found.fqcn(&db).as_ref(), "MixinTarget");
+    }
+
+    #[test]
+    fn lookup_property_in_chain_mixin_cycle_does_not_hang() {
+        let mut db = MirDb::default();
+        upsert_class_with_mixins(&mut db, "A", None, &["B"]);
+        upsert_class_with_mixins(&mut db, "B", None, &["A"]);
+        assert!(lookup_property_in_chain(&db, "A", "missing").is_none());
+    }
+
+    #[test]
+    fn lookup_property_in_chain_is_case_sensitive() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_property(&mut db, "Foo", "myProp", false);
+        assert!(lookup_property_in_chain(&db, "Foo", "myProp").is_some());
+        // Property names are case-sensitive in PHP.
+        assert!(lookup_property_in_chain(&db, "Foo", "MyProp").is_none());
+    }
+
+    #[test]
+    fn lookup_property_in_chain_inactive_returns_none() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_property(&mut db, "Foo", "x", false);
+        db.deactivate_class_node("Foo");
+        assert!(lookup_property_in_chain(&db, "Foo", "x").is_none());
+    }
+
+    // -----------------------------------------------------------------
+    // class_constant_exists_in_chain
+    // -----------------------------------------------------------------
+
+    fn upsert_constant(db: &mut MirDb, fqcn: &str, name: &str) {
+        let storage = ConstantStorage {
+            name: Arc::from(name),
+            ty: mir_types::Union::mixed(),
+            visibility: None,
+            is_final: false,
+            location: None,
+        };
+        let owner = Arc::<str>::from(fqcn);
+        db.upsert_class_constant_node(&owner, &storage);
+    }
+
+    #[test]
+    fn class_constant_exists_in_chain_finds_own() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_constant(&mut db, "Foo", "MAX");
+        assert!(class_constant_exists_in_chain(&db, "Foo", "MAX"));
+        assert!(!class_constant_exists_in_chain(&db, "Foo", "MIN"));
+    }
+
+    #[test]
+    fn class_constant_exists_in_chain_walks_parent() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Base", None, Arc::from([]), false);
+        upsert_constant(&mut db, "Base", "VERSION");
+        upsert_class(
+            &mut db,
+            "Child",
+            Some(Arc::from("Base")),
+            Arc::from([]),
+            false,
+        );
+        assert!(class_constant_exists_in_chain(&db, "Child", "VERSION"));
+    }
+
+    #[test]
+    fn class_constant_exists_in_chain_walks_interface() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "I", None, Arc::from([]), true);
+        upsert_constant(&mut db, "I", "TYPE");
+        // A class that implements I — interfaces go in the `interfaces`
+        // slot, not the `extends` slot which is interface-only.
+        db.upsert_class_node(
+            Arc::from("Impl"),
+            false,
+            false,
+            false,
+            false,
+            None,
+            Arc::from([Arc::from("I")]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            Arc::from([]),
+            false,
+            Arc::from([]),
+        );
+        assert!(class_constant_exists_in_chain(&db, "Impl", "TYPE"));
+    }
+
+    #[test]
+    fn class_constant_exists_in_chain_walks_direct_trait() {
+        let mut db = MirDb::default();
+        upsert_class_with_traits(&mut db, "T", None, &[], false, true);
+        upsert_constant(&mut db, "T", "FROM_TRAIT");
+        upsert_class_with_traits(&mut db, "Foo", None, &["T"], false, false);
+        assert!(class_constant_exists_in_chain(&db, "Foo", "FROM_TRAIT"));
+    }
+
+    #[test]
+    fn class_constant_exists_in_chain_unknown_class_returns_false() {
+        let db = MirDb::default();
+        assert!(!class_constant_exists_in_chain(&db, "Nope", "ANY"));
+    }
+
+    #[test]
+    fn class_constant_exists_in_chain_inactive_returns_false() {
+        let mut db = MirDb::default();
+        upsert_class(&mut db, "Foo", None, Arc::from([]), false);
+        upsert_constant(&mut db, "Foo", "X");
+        db.deactivate_class_node("Foo");
+        db.deactivate_class_constants("Foo");
+        assert!(!class_constant_exists_in_chain(&db, "Foo", "X"));
+    }
 }
