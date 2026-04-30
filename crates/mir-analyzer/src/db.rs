@@ -302,6 +302,7 @@ pub fn inherited_template_bindings_via_db(
 #[salsa::input]
 pub struct FunctionNode {
     pub fqn: Arc<str>,
+    pub short_name: Arc<str>,
     pub active: bool,
     pub params: Arc<[FnParam]>,
     pub return_type: Option<Union>,
@@ -310,6 +311,9 @@ pub struct FunctionNode {
     pub throws: Arc<[Arc<str>]>,
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
+    /// Source location of the declaration.  `None` for functions registered
+    /// without a known origin (e.g. some legacy test fixtures).
+    pub location: Option<Location>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1351,9 +1355,11 @@ impl MirDb {
         if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
             // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
             if node.active(self)
+                && node.short_name(self) == storage.short_name
                 && node.is_pure(self) == storage.is_pure
                 && node.deprecated(self) == storage.deprecated
                 && node.return_type(self) == storage.return_type
+                && node.location(self) == storage.location
                 && *node.params(self) == *storage.params.as_slice()
                 && *node.template_params(self) == *storage.template_params.as_slice()
                 && *node.assertions(self) == *storage.assertions.as_slice()
@@ -1362,6 +1368,7 @@ impl MirDb {
                 return node;
             }
             node.set_active(self).to(true);
+            node.set_short_name(self).to(storage.short_name.clone());
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
             node.set_return_type(self).to(storage.return_type.clone());
@@ -1373,11 +1380,13 @@ impl MirDb {
                 .to(Arc::from(storage.throws.as_slice()));
             node.set_deprecated(self).to(storage.deprecated.clone());
             node.set_is_pure(self).to(storage.is_pure);
+            node.set_location(self).to(storage.location.clone());
             node
         } else {
             let node = FunctionNode::new(
                 self,
                 fqn.clone(),
+                storage.short_name.clone(),
                 true,
                 Arc::from(storage.params.as_slice()),
                 storage.return_type.clone(),
@@ -1386,6 +1395,7 @@ impl MirDb {
                 Arc::from(storage.throws.as_slice()),
                 storage.deprecated.clone(),
                 storage.is_pure,
+                storage.location.clone(),
             );
             self.function_nodes.insert(fqn.clone(), node);
             node

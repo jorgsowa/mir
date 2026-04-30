@@ -13,6 +13,7 @@ use mir_codebase::storage::Visibility;
 use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location, Severity};
 
+use crate::db::MirDatabase;
 use crate::stubs::StubVfs;
 
 // Magic PHP methods that are invoked implicitly — never flag these as unused.
@@ -38,11 +39,12 @@ const MAGIC_METHODS: &[&str] = &[
 
 pub struct DeadCodeAnalyzer<'a> {
     codebase: &'a Codebase,
+    db: &'a dyn MirDatabase,
 }
 
 impl<'a> DeadCodeAnalyzer<'a> {
-    pub fn new(codebase: &'a Codebase) -> Self {
-        Self { codebase }
+    pub fn new(codebase: &'a Codebase, db: &'a dyn MirDatabase) -> Self {
+        Self { codebase, db }
     }
 
     pub fn analyze(&self) -> Vec<Issue> {
@@ -105,21 +107,26 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
         // --- Non-referenced free functions ---
         let stub_vfs = StubVfs::new();
-        for entry in self.codebase.functions.iter() {
-            let func = entry.value();
-            let fqn = func.fqn.as_ref();
+        for fqn in self.db.active_function_node_fqns() {
+            let Some(node) = self.db.lookup_function_node(fqn.as_ref()) else {
+                continue;
+            };
+            if !node.active(self.db) {
+                continue;
+            }
+            let location = node.location(self.db);
             // Skip PHP built-in and extension functions loaded from stubs —
             // they are not user-defined dead code.
-            if let Some(loc) = &func.location {
+            if let Some(loc) = &location {
                 if stub_vfs.is_stub_file(loc.file.as_ref()) {
                     continue;
                 }
             }
-            if !self.codebase.is_function_referenced(fqn) {
-                let (file, line) = location_from_storage(&func.location);
+            if !self.codebase.is_function_referenced(fqn.as_ref()) {
+                let (file, line) = location_from_storage(&location);
                 issues.push(Issue::new(
                     IssueKind::UnusedFunction {
-                        name: func.short_name.to_string(),
+                        name: node.short_name(self.db).to_string(),
                     },
                     Location {
                         file,
@@ -163,7 +170,9 @@ mod tests {
         // fix directly on the DeadCodeAnalyzer output.
         let analyzer = ProjectAnalyzer::new();
         analyzer.load_stubs();
-        let issues = DeadCodeAnalyzer::new(analyzer.codebase()).analyze();
+        let salsa = analyzer.salsa_db_for_test();
+        let salsa = salsa.lock().unwrap();
+        let issues = DeadCodeAnalyzer::new(analyzer.codebase(), &salsa.0).analyze();
         let builtin_false_positives: Vec<_> = issues
             .iter()
             .filter(|i| {
