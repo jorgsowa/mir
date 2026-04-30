@@ -168,11 +168,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .get(self.file.as_ref())
                         .map(|ns| format!("{}\\{}", *ns, name_str));
 
-                    ns_qualified
-                        .as_deref()
-                        .map(|q| self.codebase.constants.contains_key(q))
-                        .unwrap_or(false)
-                        || self.codebase.constants.contains_key(name_str)
+                    let exists = |fqn: &str| -> bool {
+                        self.db
+                            .lookup_global_constant_node(fqn)
+                            .is_some_and(|n| n.active(self.db))
+                    };
+                    ns_qualified.as_deref().is_some_and(exists) || exists(name_str)
                 };
 
                 if !found {

@@ -839,6 +839,11 @@ impl ProjectAnalyzer {
                 db.upsert_function_node(func);
             }
 
+            // --- S5-PR47: Upsert GlobalConstantNodes ------------------------------
+            for (fqn, ty) in &file_defs.slice.constants {
+                db.upsert_global_constant_node(fqn.clone(), ty.clone());
+            }
+
             // --- S5-PR3: Upsert MethodNodes for all type members ------------------
             for cls in &file_defs.slice.classes {
                 for method in cls.own_methods.values() {
