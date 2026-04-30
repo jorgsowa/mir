@@ -478,6 +478,16 @@ impl Codebase {
     // Lookups
     // -----------------------------------------------------------------------
 
+    /// Direct lookup of a free function's `inferred_return_type` by FQN.
+    /// Mirrors `method_inferred_return_type` for functions; the field
+    /// stays on `FunctionStorage` by design (see `FunctionNode` doc
+    /// comment + ROADMAP "S3 deadlock").
+    pub fn function_inferred_return_type(&self, fqn: &str) -> Option<Union> {
+        self.functions
+            .get(fqn)
+            .and_then(|s| s.inferred_return_type.clone())
+    }
+
     /// Direct lookup of a method's `inferred_return_type` on the owner
     /// class/trait/interface/enum.  Does not walk the inheritance chain —
     /// callers are expected to know the owning FQCN already (e.g. from

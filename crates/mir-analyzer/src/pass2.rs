@@ -4,12 +4,63 @@ use mir_codebase::Codebase;
 use mir_issues::Issue;
 use mir_types::Union;
 
-use crate::db::MirDatabase;
+use crate::db::{FunctionNode, MirDatabase};
 use crate::diagnostics::{
     check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
 };
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
+
+/// Resolve a function declaration's `FunctionNode` via the salsa db,
+/// matching the pre-S5 fallback chain (qualified FQN → raw name →
+/// short-name scan).  `None` if no active node matches.
+fn lookup_function_node_for_decl(
+    db: &dyn MirDatabase,
+    codebase: &Codebase,
+    file: &str,
+    fn_name: &str,
+) -> Option<FunctionNode> {
+    let qualified = codebase.resolve_class_name(file, fn_name);
+    if let Some(n) = db
+        .lookup_function_node(qualified.as_str())
+        .filter(|n| n.active(db))
+    {
+        return Some(n);
+    }
+    if let Some(n) = db.lookup_function_node(fn_name).filter(|n| n.active(db)) {
+        return Some(n);
+    }
+    for fqn in db.active_function_node_fqns() {
+        let short = fqn.as_ref().rsplit('\\').next().unwrap_or(fqn.as_ref());
+        if short == fn_name {
+            if let Some(n) = db
+                .lookup_function_node(fqn.as_ref())
+                .filter(|n| n.active(db))
+            {
+                return Some(n);
+            }
+        }
+    }
+    None
+}
+
+/// Build `FnParam`s directly from the declaration AST when no storage match is
+/// available.  Defaults are typed as `mixed` since their value type isn't tracked.
+fn ast_derived_fn_params<'arena, 'src>(
+    params: &[php_ast::ast::Param<'arena, 'src>],
+) -> Vec<mir_codebase::FnParam> {
+    params
+        .iter()
+        .map(|p| mir_codebase::FnParam {
+            name: Arc::from(p.name),
+            ty: None,
+            default: p.default.as_ref().map(|_| Union::mixed()),
+            is_variadic: p.variadic,
+            is_byref: p.by_ref,
+            is_optional: p.default.is_some() || p.variadic,
+        })
+        .collect()
+}
 
 // ---------------------------------------------------------------------------
 // Pass2Driver
@@ -384,47 +435,24 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved_fn = self.codebase.resolve_class_name(file.as_ref(), fn_name);
-        let func_opt: Option<mir_codebase::storage::FunctionStorage> = self
-            .codebase
-            .functions
-            .get(resolved_fn.as_str())
-            .map(|r| r.clone())
-            .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
-            .or_else(|| {
-                self.codebase
-                    .functions
-                    .iter()
-                    .find(|e| e.short_name.as_ref() == fn_name)
-                    .map(|e| e.value().clone())
-            });
-
-        let fqn = func_opt.as_ref().map(|f| f.fqn.clone());
-        let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match &func_opt {
-            Some(f)
-                if f.params.len() == decl.params.len()
-                    && f.params
+        let node_opt =
+            lookup_function_node_for_decl(self.db, self.codebase, file.as_ref(), fn_name);
+        let fqn = node_opt.map(|n| n.fqn(self.db));
+        let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match node_opt {
+            Some(n) => {
+                let stored = n.params(self.db);
+                if stored.len() == decl.params.len()
+                    && stored
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
-            {
-                (f.params.clone(), f.return_type.clone())
+                        .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+                {
+                    (stored.to_vec(), n.return_type(self.db))
+                } else {
+                    (ast_derived_fn_params(&decl.params), None)
+                }
             }
-            _ => {
-                let ast_params = decl
-                    .params
-                    .iter()
-                    .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name),
-                        ty: None,
-                        default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
-                        is_variadic: p.variadic,
-                        is_byref: p.by_ref,
-                        is_optional: p.default.is_some() || p.variadic,
-                    })
-                    .collect();
-                (ast_params, None)
-            }
+            None => (ast_derived_fn_params(&decl.params), None),
         };
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
@@ -449,6 +477,8 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
+        // `inferred_return_type` is intentionally written to `Codebase`, not Salsa.
+        // See `FunctionNode` doc comment + ROADMAP "S3 deadlock" for why.
         if let Some(fqn) = fqn {
             if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
                 func.inferred_return_type = Some(inferred);
@@ -599,47 +629,24 @@ impl<'a> Pass2Driver<'a> {
             check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
         }
 
-        let resolved_fn = self.codebase.resolve_class_name(file.as_ref(), fn_name);
-        let func_opt: Option<mir_codebase::storage::FunctionStorage> = self
-            .codebase
-            .functions
-            .get(resolved_fn.as_str())
-            .map(|r| r.clone())
-            .or_else(|| self.codebase.functions.get(fn_name).map(|r| r.clone()))
-            .or_else(|| {
-                self.codebase
-                    .functions
-                    .iter()
-                    .find(|e| e.short_name.as_ref() == fn_name)
-                    .map(|e| e.value().clone())
-            });
-
-        let fqn = func_opt.as_ref().map(|f| f.fqn.clone());
-        let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match &func_opt {
-            Some(f)
-                if f.params.len() == decl.params.len()
-                    && f.params
+        let node_opt =
+            lookup_function_node_for_decl(self.db, self.codebase, file.as_ref(), fn_name);
+        let fqn = node_opt.map(|n| n.fqn(self.db));
+        let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match node_opt {
+            Some(n) => {
+                let stored = n.params(self.db);
+                if stored.len() == decl.params.len()
+                    && stored
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| cp.name.as_ref() == ap.name) =>
-            {
-                (f.params.clone(), f.return_type.clone())
+                        .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+                {
+                    (stored.to_vec(), n.return_type(self.db))
+                } else {
+                    (ast_derived_fn_params(&decl.params), None)
+                }
             }
-            _ => {
-                let ast_params = decl
-                    .params
-                    .iter()
-                    .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name),
-                        ty: None,
-                        default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
-                        is_variadic: p.variadic,
-                        is_byref: p.by_ref,
-                        is_optional: p.default.is_some() || p.variadic,
-                    })
-                    .collect();
-                (ast_params, None)
-            }
+            None => (ast_derived_fn_params(&decl.params), None),
         };
 
         let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
@@ -673,6 +680,8 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
+        // `inferred_return_type` is intentionally written to `Codebase`, not Salsa.
+        // See `FunctionNode` doc comment + ROADMAP "S3 deadlock" for why.
         if let Some(fqn) = fqn {
             if let Some(mut func) = self.codebase.functions.get_mut(fqn.as_ref()) {
                 func.inferred_return_type = Some(inferred);

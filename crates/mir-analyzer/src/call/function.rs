@@ -31,11 +31,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     // `inferred_return_type` lives on `FunctionStorage` by design; see
     // `FunctionNode` doc comment and ROADMAP "S3 deadlock" for why it
     // isn't a Salsa tracked field.
-    let inferred = ea
-        .codebase
-        .functions
-        .get(fqn)
-        .and_then(|s| s.inferred_return_type.clone());
+    let inferred = ea.codebase.function_inferred_return_type(fqn);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
