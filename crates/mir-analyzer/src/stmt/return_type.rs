@@ -323,7 +323,9 @@ pub(super) fn return_arrays_compatible(
                         Atomic::TClosure { .. } => return true,
                         _ => return false,
                     };
-                    if !dv_fqcn.contains('\\') && !codebase.type_exists(dv_fqcn.as_ref()) {
+                    if !dv_fqcn.contains('\\')
+                        && !crate::db::type_exists_via_db(db, dv_fqcn.as_ref())
+                    {
                         return true; // template param wildcard
                     }
                     let res_dec = codebase.resolve_class_name(file, dv_fqcn.as_ref());

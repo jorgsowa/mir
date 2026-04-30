@@ -112,7 +112,7 @@ impl CallAnalyzer {
                 ret.clone(),
             );
             ret
-        } else if ea.codebase.type_exists(&fqcn)
+        } else if crate::db::type_exists_via_db(ea.db, &fqcn)
             && !crate::db::has_unknown_ancestor_via_db(ea.db, &fqcn)
         {
             let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, &fqcn)
@@ -134,7 +134,7 @@ impl CallAnalyzer {
                 );
                 Union::mixed()
             }
-        } else if !ea.codebase.type_exists(&fqcn)
+        } else if !crate::db::type_exists_via_db(ea.db, &fqcn)
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
         {
             ea.emit(

@@ -613,8 +613,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .unwrap_or_else(|| Arc::from(resolved.as_str())),
                             _ => Arc::from(resolved.as_str()),
                         };
-                        let type_exists = self.db.lookup_class_node(fqcn.as_ref()).is_some()
-                            || self.codebase.type_exists(&fqcn);
+                        let type_exists = crate::db::type_exists_via_db(self.db, fqcn.as_ref());
                         if !matches!(resolved.as_str(), "self" | "static" | "parent")
                             && !type_exists
                         {
@@ -783,7 +782,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let ExprKind::Identifier(id) = &spa.class.kind {
                     let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
                     if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                        && !self.codebase.type_exists(&resolved)
+                        && !crate::db::type_exists_via_db(self.db, &resolved)
                     {
                         self.emit(
                             IssueKind::UndefinedClass { name: resolved },
@@ -825,7 +824,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     _ => return Union::mixed(),
                 };
 
-                if !self.codebase.type_exists(&fqcn) {
+                if !crate::db::type_exists_via_db(self.db, &fqcn) {
                     self.emit(
                         IssueKind::UndefinedClass { name: fqcn },
                         Severity::Error,
@@ -1231,7 +1230,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
                 let fqcn: std::sync::Arc<str> = std::sync::Arc::from(resolved.as_str());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                    && !self.codebase.type_exists(&fqcn)
+                    && !crate::db::type_exists_via_db(self.db, &fqcn)
                 {
                     self.emit(
                         IssueKind::UndefinedClass { name: resolved },
@@ -1616,7 +1615,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return;
                 }
                 let resolved = self.codebase.resolve_class_name(&self.file, &name_str);
-                if !self.codebase.type_exists(&resolved) {
+                if !crate::db::type_exists_via_db(self.db, &resolved) {
                     self.emit(
                         IssueKind::UndefinedClass { name: resolved },
                         Severity::Error,
