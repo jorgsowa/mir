@@ -672,20 +672,30 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             }
 
             if !arg_fqcn.contains('\\') && !type_exists(ea, &resolved_arg) {
-                for entry in ea.codebase.classes.iter() {
-                    if entry.value().short_name.as_ref() == arg_fqcn.as_ref() {
-                        let actual_fqcn = entry.key().clone();
-                        if crate::db::extends_or_implements_via_db(
+                let target = arg_fqcn.as_ref();
+                for fqcn in ea.db.active_class_node_fqcns() {
+                    // Match `Codebase::classes` semantics: only true classes,
+                    // not interfaces / traits / enums (all of which are stored
+                    // as `ClassNode` post-PR5 but live in separate Codebase
+                    // DashMaps).
+                    let is_class = crate::db::class_kind_via_db(ea.db, fqcn.as_ref())
+                        .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum);
+                    if !is_class {
+                        continue;
+                    }
+                    let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn.as_ref());
+                    if short_name == target
+                        && (crate::db::extends_or_implements_via_db(
                             ea.db,
-                            actual_fqcn.as_ref(),
+                            fqcn.as_ref(),
                             &resolved_param,
                         ) || crate::db::extends_or_implements_via_db(
                             ea.db,
-                            actual_fqcn.as_ref(),
+                            fqcn.as_ref(),
                             param_fqcn.as_ref(),
-                        ) {
-                            return true;
-                        }
+                        ))
+                    {
+                        return true;
                     }
                 }
             }
