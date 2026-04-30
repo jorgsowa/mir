@@ -51,23 +51,37 @@ impl<'a> DeadCodeAnalyzer<'a> {
         let mut issues = Vec::new();
 
         // --- Private methods / properties on classes ---
-        for entry in self.codebase.classes.iter() {
-            let cls = entry.value();
-            let fqcn = cls.fqcn.as_ref();
+        // Walk only class-kind nodes (not interfaces/traits/enums) to match
+        // the previous `Codebase::classes` iteration semantics.
+        for fqcn in self.db.active_class_node_fqcns() {
+            let Some(class_node) = self.db.lookup_class_node(fqcn.as_ref()) else {
+                continue;
+            };
+            if class_node.is_interface(self.db)
+                || class_node.is_trait(self.db)
+                || class_node.is_enum(self.db)
+            {
+                continue;
+            }
+            let fqcn_str = fqcn.as_ref();
 
-            for (method_name, method) in &cls.own_methods {
-                if method.visibility != Visibility::Private {
+            for method in self.db.class_own_methods(fqcn_str) {
+                if !method.active(self.db) {
                     continue;
                 }
-                let name = method_name.as_ref();
-                if MAGIC_METHODS.contains(&name) {
+                if method.visibility(self.db) != Visibility::Private {
                     continue;
                 }
-                if !self.codebase.is_method_referenced(fqcn, name) {
-                    let (file, line) = location_from_storage(&method.location);
+                let name = method.name(self.db);
+                let name_lower = name.to_lowercase();
+                if MAGIC_METHODS.contains(&name_lower.as_str()) {
+                    continue;
+                }
+                if !self.codebase.is_method_referenced(fqcn_str, name.as_ref()) {
+                    let (file, line) = location_from_storage(&method.location(self.db));
                     issues.push(Issue::new(
                         IssueKind::UnusedMethod {
-                            class: fqcn.to_string(),
+                            class: fqcn_str.to_string(),
                             method: name.to_string(),
                         },
                         Location {
@@ -81,16 +95,22 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
             }
 
-            for (prop_name, prop) in &cls.own_properties {
-                if prop.visibility != Visibility::Private {
+            for prop in self.db.class_own_properties(fqcn_str) {
+                if !prop.active(self.db) {
                     continue;
                 }
-                let name = prop_name.as_ref();
-                if !self.codebase.is_property_referenced(fqcn, name) {
-                    let (file, line) = location_from_storage(&prop.location);
+                if prop.visibility(self.db) != Visibility::Private {
+                    continue;
+                }
+                let name = prop.name(self.db);
+                if !self
+                    .codebase
+                    .is_property_referenced(fqcn_str, name.as_ref())
+                {
+                    let (file, line) = location_from_storage(&prop.location(self.db));
                     issues.push(Issue::new(
                         IssueKind::UnusedProperty {
-                            class: fqcn.to_string(),
+                            class: fqcn_str.to_string(),
                             property: name.to_string(),
                         },
                         Location {
