@@ -162,11 +162,12 @@ impl CallAnalyzer {
             if let Some(arg) = call.args.first() {
                 if let ExprKind::String(name) = &arg.value.kind {
                     let fqn = name.strip_prefix('\\').unwrap_or(name);
-                    if let Some(func) = ea.codebase.functions.get(fqn) {
+                    if let Some(node) = ea.db.lookup_function_node(fqn).filter(|n| n.active(ea.db))
+                    {
                         if !ea.inference_only {
                             let (line, col_start, col_end) = ea.span_to_ref_loc(arg.span);
                             ea.codebase.mark_function_referenced_at(
-                                &func.fqn,
+                                node.fqn(ea.db).as_ref(),
                                 ea.file.clone(),
                                 line,
                                 col_start,
