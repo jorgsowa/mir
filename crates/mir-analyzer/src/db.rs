@@ -555,16 +555,78 @@ pub fn lookup_method_in_chain(
     method_name: &str,
 ) -> Option<MethodNode> {
     let lower = method_name.to_lowercase();
+    let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+
+    // Direct own method.
     if let Some(node) = db.lookup_method_node(fqcn, &lower).filter(|n| n.active(db)) {
         return Some(node);
     }
-    let class_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
-    for ancestor in class_ancestors(db, class_node).0.iter() {
+    // Traits used directly — walk transitively (trait-of-traits is *not*
+    // included in `class_ancestors`, by design — see comments on that fn).
+    let mut visited_traits: HashSet<String> = HashSet::new();
+    for t in self_node.traits(db).iter() {
+        if let Some(node) = trait_provides_method_node(db, t.as_ref(), &lower, &mut visited_traits)
+        {
+            return Some(node);
+        }
+    }
+    // Ancestor chain (parents, interfaces, traits).
+    for ancestor in class_ancestors(db, self_node).0.iter() {
         if let Some(node) = db
             .lookup_method_node(ancestor.as_ref(), &lower)
             .filter(|n| n.active(db))
         {
             return Some(node);
+        }
+        if let Some(anc_node) = db
+            .lookup_class_node(ancestor.as_ref())
+            .filter(|n| n.active(db))
+        {
+            if anc_node.is_trait(db) {
+                if let Some(node) =
+                    trait_provides_method_node(db, ancestor.as_ref(), &lower, &mut visited_traits)
+                {
+                    return Some(node);
+                }
+            } else {
+                for t in anc_node.traits(db).iter() {
+                    if let Some(node) =
+                        trait_provides_method_node(db, t.as_ref(), &lower, &mut visited_traits)
+                    {
+                        return Some(node);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Node-returning sibling of [`trait_declares_method`] used by
+/// [`lookup_method_in_chain`].  Walks `trait_fqcn`'s own MethodNode then its
+/// used traits transitively.  Cycle-safe via `visited`.
+fn trait_provides_method_node(
+    db: &dyn MirDatabase,
+    trait_fqcn: &str,
+    method_lower: &str,
+    visited: &mut HashSet<String>,
+) -> Option<MethodNode> {
+    if !visited.insert(trait_fqcn.to_string()) {
+        return None;
+    }
+    if let Some(node) = db
+        .lookup_method_node(trait_fqcn, method_lower)
+        .filter(|n| n.active(db))
+    {
+        return Some(node);
+    }
+    let node = db.lookup_class_node(trait_fqcn).filter(|n| n.active(db))?;
+    if !node.is_trait(db) {
+        return None;
+    }
+    for t in node.traits(db).iter() {
+        if let Some(found) = trait_provides_method_node(db, t.as_ref(), method_lower, visited) {
+            return Some(found);
         }
     }
     None
