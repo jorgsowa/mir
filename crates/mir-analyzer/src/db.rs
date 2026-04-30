@@ -146,6 +146,11 @@ pub struct ClassNode {
     /// and enums (S5-PR42 only mirrors the class-level field — those storages
     /// don't carry a deprecated message).
     pub deprecated: Option<Arc<str>>,
+    /// For backed-enum nodes: the declared scalar type (`int`/`string`).
+    /// Mirrors `EnumStorage::scalar_type`.  `None` for non-enum nodes and
+    /// for unbacked (pure) enums.  Used by the `Enum->value` property read
+    /// in `expr.rs` to return the backed scalar type instead of `mixed`.
+    pub enum_scalar_type: Option<Union>,
 }
 
 /// Snapshot of a class's discriminator + abstractness, read from a
@@ -1025,6 +1030,7 @@ impl MirDb {
         is_backed_enum: bool,
         mixins: Arc<[Arc<str>]>,
         deprecated: Option<Arc<str>>,
+        enum_scalar_type: Option<Union>,
     ) -> ClassNode {
         use salsa::Setter as _;
         if let Some(&node) = self.class_nodes.get(&fqcn) {
@@ -1055,6 +1061,7 @@ impl MirDb {
                 && *node.require_implements(self) == *require_implements
                 && *node.mixins(self) == *mixins
                 && node.deprecated(self) == deprecated
+                && node.enum_scalar_type(self) == enum_scalar_type
             {
                 return node;
             }
@@ -1073,6 +1080,7 @@ impl MirDb {
             node.set_is_backed_enum(self).to(is_backed_enum);
             node.set_mixins(self).to(mixins);
             node.set_deprecated(self).to(deprecated);
+            node.set_enum_scalar_type(self).to(enum_scalar_type);
             node
         } else {
             let node = ClassNode::new(
@@ -1093,6 +1101,7 @@ impl MirDb {
                 is_backed_enum,
                 mixins,
                 deprecated,
+                enum_scalar_type,
             );
             self.class_nodes.insert(fqcn, node);
             node
@@ -1370,6 +1379,7 @@ impl MirDb {
                 false,
                 Arc::from(cls.mixins.as_slice()),
                 cls.deprecated.clone(),
+                None,
             );
             for method in cls.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -1399,6 +1409,7 @@ impl MirDb {
                 false,
                 Arc::from([]),
                 None,
+                None,
             );
             for method in iface.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -1424,6 +1435,7 @@ impl MirDb {
                 Arc::from(tr.require_implements.as_slice()),
                 false,
                 Arc::from([]),
+                None,
                 None,
             );
             for method in tr.own_methods.values() {
@@ -1454,6 +1466,7 @@ impl MirDb {
                 en.scalar_type.is_some(),
                 Arc::from([]),
                 None,
+                en.scalar_type.clone(),
             );
             for method in en.own_methods.values() {
                 self.upsert_method_node(method.as_ref());
@@ -1561,6 +1574,7 @@ mod tests {
             Arc::from([]),
             false,
             Arc::from([]),
+            None,
             None,
         )
     }
@@ -1791,6 +1805,7 @@ mod tests {
             false,
             Arc::from([]),
             None,
+            None,
         )
     }
 
@@ -1838,6 +1853,7 @@ mod tests {
             Arc::from([]),
             is_backed,
             Arc::from([]),
+            None,
             None,
         )
     }
@@ -2073,6 +2089,7 @@ mod tests {
             false,
             Arc::from([]),
             None,
+            None,
         );
         let got = class_template_params_via_db(&db, "Box").expect("registered");
         assert_eq!(got.len(), 1);
@@ -2113,6 +2130,7 @@ mod tests {
                     .map(|m| Arc::<str>::from(*m))
                     .collect::<Vec<_>>(),
             ),
+            None,
             None,
         )
     }
@@ -2325,6 +2343,7 @@ mod tests {
             Arc::from([]),
             false,
             Arc::from([]),
+            None,
             None,
         );
         assert!(class_constant_exists_in_chain(&db, "Impl", "TYPE"));

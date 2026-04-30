@@ -801,6 +801,7 @@ impl ProjectAnalyzer {
                     false,
                     Arc::from(cls.mixins.as_slice()),
                     cls.deprecated.clone(),
+                    None,
                 );
             }
             for iface in &file_defs.slice.interfaces {
@@ -819,6 +820,7 @@ impl ProjectAnalyzer {
                     Arc::from([]),
                     false,
                     Arc::from([]),
+                    None,
                     None,
                 );
             }
@@ -839,6 +841,7 @@ impl ProjectAnalyzer {
                     false,
                     Arc::from([]),
                     None,
+                    None,
                 );
             }
             for en in &file_defs.slice.enums {
@@ -858,6 +861,7 @@ impl ProjectAnalyzer {
                     en.scalar_type.is_some(),
                     Arc::from([]),
                     None,
+                    en.scalar_type.clone(),
                 );
             }
 
