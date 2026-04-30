@@ -1,6 +1,6 @@
 # Salsa migration — current status & open questions
 
-## Shipped through PR30
+## Shipped through PR33
 
 S0 (db skeleton) and S1 (`collect_file_definitions` query) are complete.
 S2 (`class_ancestors` query) is complete and is the LSP warm-path
@@ -42,6 +42,22 @@ reads onto the db:
   semantics.  Closes the trait-walk gap behind three of the four
   fixtures that failed when the codebase fallback was first dropped
   in `resolve_method_from_db`'s callers.
+- PR31 — closes the last two semantic gaps in
+  `lookup_method_in_chain`: enum implicit methods (`cases` always,
+  `from`/`tryFrom` for backed enums) are now synthesized as
+  `MethodNode`s at ingest time; docblock `@mixin` chains have a new
+  `mixins: Arc<[Arc<str>]>` field on `ClassNode` plus a recursive walk
+  in the chain helper.  Brings the helper to full parity with
+  `Codebase::get_method`'s walk.
+- PR32 — `resolve_method_from_db` now calls
+  `db::lookup_method_in_chain` directly; the private
+  `find_method_node_in_chain` helper (own + ancestors only) is
+  removed, and the `or_else(|| codebase.get_method(...))` fallbacks
+  in its two callers (`call/method.rs:299`,
+  `call/static_call.rs:56`) are deleted.  All four originally-failing
+  fixtures pass.
+- PR33 — drop the `__construct` codebase fallback in `expr.rs`
+  introduced by PR29.  The chain helper covers it after PR30/PR31.
 
 ## Architectural blocker uncovered this session
 
@@ -114,33 +130,24 @@ fields after a parallel pass will hit the same deadlock.
    tracked query gets stale results unless we manually invalidate.
    Effectively gives up on S3's perf win.
 
-## Two design gaps still blocking the codebase-method fallback drop
+## Method-resolution status: codebase-free
 
-Attempting to drop the `or_else(|| codebase.get_method(...))` fallbacks
-in `resolve_method_from_db`'s callers (`call/method.rs:299`,
-`call/static_call.rs:56`) initially produced four fixture failures.
-PR30 closed three of them by adding trait-of-trait walking to
-`lookup_method_in_chain`.  The remaining gaps are *not* lazy-load
-timing (an earlier diagnosis mis-blamed PSR-4 lazy-load — `ingest_codebase`
-runs after both pre- and post-Pass-2 lazy-load sweeps, so lazy-loaded
-definitions *are* in the db).  They are:
+All `Codebase::get_method`-style fallbacks in method/constructor
+resolution paths are gone (PR27/PR28/PR29/PR30/PR31/PR32/PR33).
+`db::lookup_method_in_chain` is the single canonical walker, and it
+is at full parity with `Codebase::get_method`'s order: own → mixins
+(recursive) → traits (transitive) → ancestors (with each ancestor's
+own + traits + mixins).
 
-1. **Enum implicit interfaces.**  `class_ancestors(enum)` returns
-   empty by construction.  `Status::cases()` therefore can't be
-   resolved by walking ancestors; `BackedEnum` / `UnitEnum` (built-in
-   stubs) are never visited.  Fix: have the chain walker, for enum
-   nodes, also walk `node.interfaces(db)` directly (the field is
-   populated; the short-circuit is just in `class_ancestors`).
-   Fixture: `undefined_class::enum_static_call_cross_file`.
+The only remaining `Codebase::get_method` reads in the analyzer are:
+- `call/method.rs:51` — fetches `inferred_return_type` from
+  `MethodStorage`.  Stays until S3 promotes the field to a tracked
+  query.
 
-2. **`@mixin` docblock chains.**  `Codebase` is the only place that
-   tracks `@mixin` (per project_overview).  No db field today.
-   Adding it would mean a new `mixins: Arc<[Arc<str>]>` field on
-   `ClassNode` plus walker support.  Fixture:
-   `docblock_parity::magic_properties_methods_and_mixin_are_available`.
-
-Each is a contained follow-up; both are required before the
-`or_else(codebase.get_method)` fallbacks can go.
+Properties and class constants still have a few `Codebase::get_property`
+/ `get_class_constant` sites in `expr.rs` (lines 830, 1317, 1473).
+Those are the next surface to migrate; same pattern (chain helper,
+mixin walk if needed for properties).
 
 ## Other S5 work remaining
 
