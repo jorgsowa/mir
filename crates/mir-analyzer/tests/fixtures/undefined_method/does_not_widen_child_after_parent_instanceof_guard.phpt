@@ -1,0 +1,15 @@
+===file===
+<?php
+class Base {}
+class Child extends Base {
+    public function childOnly(): void {}
+}
+class Other {}
+/** @param Child|Other $value */
+function test(object $value): void {
+    if (!$value instanceof Base) {
+        return;
+    }
+    $value->childOnly();
+}
+===expect===

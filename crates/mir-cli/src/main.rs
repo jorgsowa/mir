@@ -557,49 +557,6 @@ fn load_baseline(cli: &Cli, _config: &Config) -> Option<(PathBuf, Baseline)> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::find_composer_root_for_path;
-    use std::fs;
-
-    fn temp_project(name: &str) -> std::path::PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "mir_cli_{name}_{}_{}",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("test")
-        ));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root).unwrap();
-        root
-    }
-
-    #[test]
-    fn composer_root_is_found_for_explicit_root_config_file() {
-        let root = temp_project("root_config");
-        fs::write(root.join("composer.json"), "{}").unwrap();
-        fs::write(root.join(".php-cs-fixer.php"), "<?php\n").unwrap();
-
-        let found = find_composer_root_for_path(&root.join(".php-cs-fixer.php"));
-
-        assert_eq!(found, Some(root.canonicalize().unwrap()));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn composer_root_is_found_for_nested_file() {
-        let root = temp_project("nested_file");
-        let nested = root.join("src/App");
-        fs::create_dir_all(&nested).unwrap();
-        fs::write(root.join("composer.json"), "{}").unwrap();
-        fs::write(nested.join("Service.php"), "<?php\n").unwrap();
-
-        let found = find_composer_root_for_path(&nested.join("Service.php"));
-
-        assert_eq!(found, Some(root.canonicalize().unwrap()));
-        let _ = fs::remove_dir_all(root);
-    }
-}
-
 fn run_output(
     cli: &Cli,
     config: &Config,
@@ -1036,4 +993,47 @@ fn format_sarif(issues: &[&Issue]) -> String {
     });
 
     serde_json::to_string_pretty(&sarif).unwrap_or_else(|_| "{}".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_composer_root_for_path;
+    use std::fs;
+
+    fn temp_project(name: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "mir_cli_{name}_{}_{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn composer_root_is_found_for_explicit_root_config_file() {
+        let root = temp_project("root_config");
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(root.join(".php-cs-fixer.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&root.join(".php-cs-fixer.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn composer_root_is_found_for_nested_file() {
+        let root = temp_project("nested_file");
+        let nested = root.join("src/App");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(nested.join("Service.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&nested.join("Service.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
 }
