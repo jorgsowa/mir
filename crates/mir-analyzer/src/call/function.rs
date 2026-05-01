@@ -255,24 +255,7 @@ impl CallAnalyzer {
                 }
             }
 
-            for assertion in resolved
-                .assertions
-                .iter()
-                .filter(|a| a.kind == AssertionKind::Assert)
-            {
-                if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
-                    if let Some(arg) = call.args.get(index) {
-                        if let ExprKind::Variable(name) = &arg.value.kind {
-                            ctx.set_var(
-                                name.as_str().trim_start_matches('$'),
-                                assertion.ty.clone(),
-                            );
-                        }
-                    }
-                }
-            }
-
-            let return_ty = if !template_params.is_empty() {
+            let template_bindings = if !template_params.is_empty() {
                 let bindings = infer_template_bindings(&template_params, &params, &arg_types);
                 for (name, inferred, bound) in check_template_bounds(&bindings, &template_params) {
                     ea.emit(
@@ -285,9 +268,32 @@ impl CallAnalyzer {
                         span,
                     );
                 }
-                return_ty_raw.substitute_templates(&bindings)
+                Some(bindings)
             } else {
-                return_ty_raw
+                None
+            };
+
+            for assertion in resolved
+                .assertions
+                .iter()
+                .filter(|a| a.kind == AssertionKind::Assert)
+            {
+                if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
+                    if let Some(arg) = call.args.get(index) {
+                        if let ExprKind::Variable(name) = &arg.value.kind {
+                            let asserted_ty = match &template_bindings {
+                                Some(b) => assertion.ty.substitute_templates(b),
+                                None => assertion.ty.clone(),
+                            };
+                            ctx.set_var(name.as_str().trim_start_matches('$'), asserted_ty);
+                        }
+                    }
+                }
+            }
+
+            let return_ty = match &template_bindings {
+                Some(bindings) => return_ty_raw.substitute_templates(bindings),
+                None => return_ty_raw,
             };
 
             ea.record_symbol(
