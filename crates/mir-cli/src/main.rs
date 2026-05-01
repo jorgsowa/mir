@@ -186,7 +186,7 @@ fn main() {
 
     // --- Composer auto-detection -------------------------------------------
     // Trigger when: no paths given and cwd has composer.json, OR a single
-    // directory argument is given that contains a composer.json.
+    // explicit path lives inside a Composer project.
     let composer_root: Option<PathBuf> = if cli.paths.is_empty() {
         if cwd.join("composer.json").exists() {
             Some(cwd.clone())
@@ -194,14 +194,7 @@ fn main() {
             None
         }
     } else if cli.paths.len() == 1 {
-        let p = cli.paths[0]
-            .canonicalize()
-            .unwrap_or_else(|_| cli.paths[0].clone());
-        if p.is_dir() && p.join("composer.json").exists() {
-            Some(p)
-        } else {
-            None
-        }
+        find_composer_root_for_path(&cli.paths[0])
     } else {
         None
     };
@@ -248,10 +241,22 @@ fn main() {
             })
             .collect();
 
-        // Filter out ignored directories from project files
+        let analyze_whole_composer_project = cli.paths.is_empty()
+            || cli
+                .paths
+                .first()
+                .and_then(|p| p.canonicalize().ok())
+                .is_some_and(|p| p == *composer_root);
+
+        let discovered_files: Vec<PathBuf> = if analyze_whole_composer_project {
+            map.project_files()
+        } else {
+            ProjectAnalyzer::discover_files(&cli.paths[0])
+        };
+
+        // Filter out ignored directories from project files.
         let cwd_abs = composer_root.clone();
-        let files: Vec<PathBuf> = map
-            .project_files()
+        let files: Vec<PathBuf> = discovered_files
             .into_iter()
             .filter(|p| {
                 if ignore_dirs.is_empty() {
@@ -504,6 +509,20 @@ fn apply_stub_config(
     }
 }
 
+fn find_composer_root_for_path(path: &std::path::Path) -> Option<PathBuf> {
+    let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let start = if resolved.is_dir() {
+        resolved.as_path()
+    } else {
+        resolved.parent()?
+    };
+
+    start
+        .ancestors()
+        .find(|dir| dir.join("composer.json").exists())
+        .map(PathBuf::from)
+}
+
 /// Load baseline from `--baseline` flag or config (auto-discover `psalm-baseline.xml`).
 /// Returns `None` when `--ignore-baseline` or `--set-baseline` is active (both bypass the baseline).
 /// Otherwise returns `Some((path, baseline))`.
@@ -535,6 +554,49 @@ fn load_baseline(cli: &Cli, _config: &Config) -> Option<(PathBuf, Baseline)> {
             eprintln!("mir: baseline error in {}: {}", path.display(), e);
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_composer_root_for_path;
+    use std::fs;
+
+    fn temp_project(name: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "mir_cli_{name}_{}_{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn composer_root_is_found_for_explicit_root_config_file() {
+        let root = temp_project("root_config");
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(root.join(".php-cs-fixer.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&root.join(".php-cs-fixer.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn composer_root_is_found_for_nested_file() {
+        let root = temp_project("nested_file");
+        let nested = root.join("src/App");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(nested.join("Service.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&nested.join("Service.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
     }
 }
 
