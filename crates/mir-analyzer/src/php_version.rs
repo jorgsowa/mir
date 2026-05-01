@@ -88,7 +88,12 @@ impl FromStr for PhpVersion {
             .next()
             .and_then(|p| p.parse::<u8>().ok())
             .ok_or_else(|| ParsePhpVersionError(s.to_string()))?;
-        let minor = parts.next().and_then(|p| p.parse::<u8>().ok()).unwrap_or(0);
+        let minor = match parts.next() {
+            Some(p) => p
+                .parse::<u8>()
+                .map_err(|_| ParsePhpVersionError(s.to_string()))?,
+            None => 0,
+        };
         // Ignore any patch component — language features track the minor release.
         Ok(Self::new(major, minor))
     }
@@ -119,6 +124,7 @@ mod tests {
     #[test]
     fn rejects_garbage() {
         assert!("x.y".parse::<PhpVersion>().is_err());
+        assert!("8.x".parse::<PhpVersion>().is_err());
         assert!("".parse::<PhpVersion>().is_err());
     }
 
