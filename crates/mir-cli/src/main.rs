@@ -1001,10 +1001,14 @@ mod tests {
     use std::fs;
 
     fn temp_project(name: &str) -> std::path::PathBuf {
+        let thread_name = std::thread::current()
+            .name()
+            .unwrap_or("test")
+            .replace(|c: char| !c.is_ascii_alphanumeric(), "_");
         let root = std::env::temp_dir().join(format!(
             "mir_cli_{name}_{}_{}",
             std::process::id(),
-            std::thread::current().name().unwrap_or("test")
+            thread_name
         ));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
