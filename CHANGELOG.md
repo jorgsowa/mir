@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-05-01
+
+### Fixed
+
+- CLI Composer detection now walks up from a single explicit file path to find the nearest `composer.json`, so root config files such as `.php-cs-fixer.php` can resolve project PSR-4 namespaces instead of reporting false-positive `UndefinedClass` diagnostics.
+
 ## [0.16.0] - 2026-04-28
 
 ### Added
