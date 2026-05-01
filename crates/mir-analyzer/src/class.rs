@@ -394,8 +394,8 @@ impl<'a> ClassAnalyzer<'a> {
                 (own_return_type.as_ref(), parent_return_type.as_ref())
             {
                 let parent_from_docblock = parent_ret.from_docblock;
-                let involves_named_objects = self.type_has_named_objects(child_ret)
-                    || self.type_has_named_objects(parent_ret);
+                let involves_named_objects = Self::type_has_named_objects(child_ret)
+                    || Self::type_has_named_objects(parent_ret);
                 let involves_self_static = self.type_has_self_or_static(child_ret)
                     || self.type_has_self_or_static(parent_ret);
 
@@ -491,8 +491,8 @@ impl<'a> ClassAnalyzer<'a> {
 
                 if parent_ty.is_mixed()
                     || child_ty.is_mixed()
-                    || self.type_has_named_objects(parent_ty)
-                    || self.type_has_named_objects(child_ty)
+                    || Self::type_has_named_objects(parent_ty)
+                    || Self::type_has_named_objects(child_ty)
                     || self.type_has_self_or_static(parent_ty)
                     || self.type_has_self_or_static(child_ty)
                     || self.return_type_has_template(parent_ty)
@@ -558,15 +558,15 @@ impl<'a> ClassAnalyzer<'a> {
     /// at any level (including inside array key/value types).
     /// Named-object subtyping requires codebase inheritance lookup, so we skip
     /// the simple structural check for these.
-    fn type_has_named_objects(&self, ty: &mir_types::Union) -> bool {
+    fn type_has_named_objects(ty: &mir_types::Union) -> bool {
         use mir_types::Atomic;
         ty.types.iter().any(|a| match a {
             Atomic::TNamedObject { .. } => true,
             Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
-                self.type_has_named_objects(key) || self.type_has_named_objects(value)
+                Self::type_has_named_objects(key) || Self::type_has_named_objects(value)
             }
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                self.type_has_named_objects(value)
+                Self::type_has_named_objects(value)
             }
             _ => false,
         })

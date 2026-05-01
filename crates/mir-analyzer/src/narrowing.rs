@@ -50,7 +50,7 @@ pub fn narrow_from_condition<'arena, 'src>(
                 narrow_from_condition(b.right, ctx, false, codebase, db, file);
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
-                narrow_or_instanceof_true(b.left, b.right, ctx, codebase, file);
+                narrow_or_instanceof_true(b.left, b.right, ctx, codebase, db, file);
             }
         }
 
@@ -139,12 +139,11 @@ pub fn narrow_from_condition<'arena, 'src>(
                     let class_name = codebase.resolve_class_name(file, &raw_name);
                     let current = ctx.get_var(&var_name);
                     let narrowed = if effective_is_true {
-                        current.narrow_instanceof(&class_name)
+                        narrow_instanceof_preserving_subtypes(&current, &class_name, db)
                     } else {
-                        // remove that specific named object type
-                        current.filter_out_named_object(&class_name)
+                        filter_out_instanceof_match(&current, &class_name, db)
                     };
-                    ctx.set_var(&var_name, narrowed);
+                    set_narrowed(ctx, &var_name, &current, narrowed, true);
                 }
             }
         }
@@ -298,6 +297,7 @@ fn narrow_or_instanceof_true<'arena, 'src>(
     right: &php_ast::ast::Expr<'arena, 'src>,
     ctx: &mut Context,
     codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &str,
 ) {
     let self_fqcn = ctx.self_fqcn.as_deref();
@@ -373,7 +373,7 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                 // Narrow to the union of all instanceof types: take union of narrow_instanceof results
                 let mut narrowed = Union::empty();
                 for cn in &class_names {
-                    let n = current.narrow_instanceof(cn);
+                    let n = narrow_instanceof_preserving_subtypes(&current, cn, db);
                     narrowed = Union::merge(&narrowed, &n);
                 }
                 // Fall back to current if narrowed is empty (e.g. mixed)
@@ -388,6 +388,60 @@ fn narrow_or_instanceof_true<'arena, 'src>(
             }
         }
     }
+}
+
+fn narrow_instanceof_preserving_subtypes(
+    current: &Union,
+    class_name: &str,
+    db: &dyn MirDatabase,
+) -> Union {
+    let narrowed_ty = Atomic::TNamedObject {
+        fqcn: class_name.into(),
+        type_params: vec![],
+    };
+
+    if current.is_empty() || current.is_mixed() {
+        return Union::single(narrowed_ty);
+    }
+
+    let mut result = Union::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+
+    for atomic in &current.types {
+        match atomic {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if named_object_matches_instanceof(fqcn, class_name, db) =>
+            {
+                result.add_type(atomic.clone());
+            }
+            Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
+            _ => {}
+        }
+    }
+
+    if result.is_empty() {
+        Union::single(narrowed_ty)
+    } else {
+        result
+    }
+}
+
+fn filter_out_instanceof_match(current: &Union, class_name: &str, db: &dyn MirDatabase) -> Union {
+    current.filter(|t| match t {
+        Atomic::TNamedObject { fqcn, .. }
+        | Atomic::TSelf { fqcn }
+        | Atomic::TStaticObject { fqcn }
+        | Atomic::TParent { fqcn } => !named_object_matches_instanceof(fqcn, class_name, db),
+        _ => true,
+    })
+}
+
+fn named_object_matches_instanceof(fqcn: &str, class_name: &str, db: &dyn MirDatabase) -> bool {
+    fqcn == class_name || crate::db::extends_or_implements_via_db(db, fqcn, class_name)
 }
 
 /// Apply a pre-computed narrowed type to a variable.
@@ -591,7 +645,6 @@ fn extract_class_name<'arena, 'src>(
 
 trait UnionNarrowExt {
     fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Union;
-    fn filter_out_named_object(&self, fqcn: &str) -> Union;
 }
 
 impl UnionNarrowExt for Union {
@@ -605,12 +658,5 @@ impl UnionNarrowExt for Union {
             }
         }
         result
-    }
-
-    fn filter_out_named_object(&self, fqcn: &str) -> Union {
-        self.filter(|t| match t {
-            Atomic::TNamedObject { fqcn: f, .. } => f.as_ref() != fqcn,
-            _ => true,
-        })
     }
 }
