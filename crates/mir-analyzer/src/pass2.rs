@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use mir_codebase::Codebase;
 use mir_issues::Issue;
 use mir_types::Union;
 
-use crate::db::{FunctionNode, InferredReturnTypes, MirDatabase};
+use crate::db::{resolve_name_via_db, FunctionNode, InferredReturnTypes, MirDatabase};
 use crate::diagnostics::{
     check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
 };
@@ -16,11 +15,10 @@ use crate::symbol::ResolvedSymbol;
 /// short-name scan).  `None` if no active node matches.
 fn lookup_function_node_for_decl(
     db: &dyn MirDatabase,
-    codebase: &Codebase,
     file: &str,
     fn_name: &str,
 ) -> Option<FunctionNode> {
-    let qualified = codebase.resolve_class_name(file, fn_name);
+    let qualified = resolve_name_via_db(db, file, fn_name);
     if let Some(n) = db
         .lookup_function_node(qualified.as_str())
         .filter(|n| n.active(db))
@@ -67,7 +65,6 @@ fn ast_derived_fn_params<'arena, 'src>(
 // ---------------------------------------------------------------------------
 
 pub(crate) struct Pass2Driver<'a> {
-    codebase: &'a Arc<Codebase>,
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     inference_only: bool,
@@ -80,13 +77,8 @@ pub(crate) struct Pass2Driver<'a> {
 }
 
 impl<'a> Pass2Driver<'a> {
-    pub(crate) fn new(
-        codebase: &'a Arc<Codebase>,
-        db: &'a dyn MirDatabase,
-        php_version: PhpVersion,
-    ) -> Self {
+    pub(crate) fn new(db: &'a dyn MirDatabase, php_version: PhpVersion) -> Self {
         Self {
-            codebase,
             db,
             php_version,
             inference_only: false,
@@ -94,13 +86,8 @@ impl<'a> Pass2Driver<'a> {
         }
     }
 
-    pub(crate) fn new_inference_only(
-        codebase: &'a Arc<Codebase>,
-        db: &'a dyn MirDatabase,
-        php_version: PhpVersion,
-    ) -> Self {
+    pub(crate) fn new_inference_only(db: &'a dyn MirDatabase, php_version: PhpVersion) -> Self {
         Self {
-            codebase,
             db,
             php_version,
             inference_only: true,
@@ -243,8 +230,10 @@ impl<'a> Pass2Driver<'a> {
             }
         }
 
-        // Analyze top-level executable statements in global scope.
-        {
+        // Analyze top-level executable statements in global scope. The
+        // inference-only sweep only primes function/method return types; top-
+        // level diagnostics and references are produced by the main sweep.
+        if !self.inference_only {
             use crate::context::Context;
             use crate::stmt::StatementsAnalyzer;
             use mir_issues::IssueBuffer;
@@ -252,7 +241,6 @@ impl<'a> Pass2Driver<'a> {
             let mut ctx = Context::new();
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
-                self.codebase,
                 self.db,
                 file.clone(),
                 source,
@@ -411,7 +399,6 @@ impl<'a> Pass2Driver<'a> {
             let mut ctx = Context::new();
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
-                self.codebase,
                 self.db,
                 file.clone(),
                 source,
@@ -455,18 +442,17 @@ impl<'a> Pass2Driver<'a> {
         let body = &decl.body;
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+            check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
         }
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let node_opt =
-            lookup_function_node_for_decl(self.db, self.codebase, file.as_ref(), fn_name);
+        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), fn_name);
         let fqn = node_opt.map(|n| n.fqn(self.db));
         let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match node_opt {
             Some(n) => {
@@ -489,7 +475,6 @@ impl<'a> Pass2Driver<'a> {
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
-            self.codebase,
             self.db,
             file.clone(),
             source,
@@ -530,32 +515,24 @@ impl<'a> Pass2Driver<'a> {
         use mir_issues::IssueBuffer;
 
         let class_name = decl.name.unwrap_or("<anonymous>");
-        let resolved = self.codebase.resolve_class_name(file.as_ref(), class_name);
+        let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
         let parent_fqcn = self
-            .codebase
-            .classes
-            .get(fqcn)
-            .and_then(|c| c.parent.clone());
+            .db
+            .lookup_class_node(fqcn)
+            .and_then(|node| node.parent(self.db));
 
         if let Some(parent) = &decl.extends {
-            check_name_class(parent, self.codebase, file, source, source_map, all_issues);
+            check_name_class(parent, self.db, file, source, source_map, all_issues);
         }
         for iface in decl.implements.iter() {
-            check_name_class(iface, self.codebase, file, source, source_map, all_issues);
+            check_name_class(iface, self.db, file, source, source_map, all_issues);
         }
 
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
                 continue;
             }
@@ -565,18 +542,11 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -600,7 +570,6 @@ impl<'a> Pass2Driver<'a> {
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
-                self.codebase,
                 self.db,
                 file.clone(),
                 source,
@@ -647,15 +616,14 @@ impl<'a> Pass2Driver<'a> {
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+            check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
         }
 
-        let node_opt =
-            lookup_function_node_for_decl(self.db, self.codebase, file.as_ref(), fn_name);
+        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), fn_name);
         let fqn = node_opt.map(|n| n.fqn(self.db));
         let (params, return_ty): (Vec<mir_codebase::FnParam>, _) = match node_opt {
             Some(n) => {
@@ -678,7 +646,6 @@ impl<'a> Pass2Driver<'a> {
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
-            self.codebase,
             self.db,
             file.clone(),
             source,
@@ -730,32 +697,24 @@ impl<'a> Pass2Driver<'a> {
         use mir_issues::IssueBuffer;
 
         let class_name = decl.name.unwrap_or("<anonymous>");
-        let resolved = self.codebase.resolve_class_name(file.as_ref(), class_name);
+        let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
         let parent_fqcn = self
-            .codebase
-            .classes
-            .get(fqcn)
-            .and_then(|c| c.parent.clone());
+            .db
+            .lookup_class_node(fqcn)
+            .and_then(|node| node.parent(self.db));
 
         if let Some(parent) = &decl.extends {
-            check_name_class(parent, self.codebase, file, source, source_map, all_issues);
+            check_name_class(parent, self.db, file, source, source_map, all_issues);
         }
         for iface in decl.implements.iter() {
-            check_name_class(iface, self.codebase, file, source, source_map, all_issues);
+            check_name_class(iface, self.db, file, source, source_map, all_issues);
         }
 
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
                 continue;
             }
@@ -765,18 +724,11 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -800,7 +752,6 @@ impl<'a> Pass2Driver<'a> {
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
-                self.codebase,
                 self.db,
                 file.clone(),
                 source,
@@ -923,20 +874,13 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved = self.codebase.resolve_class_name(file.as_ref(), decl.name);
+        let resolved = resolve_name_via_db(self.db, file.as_ref(), decl.name);
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
                 continue;
             }
@@ -946,18 +890,11 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -981,7 +918,6 @@ impl<'a> Pass2Driver<'a> {
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
-                self.codebase,
                 self.db,
                 file.clone(),
                 source,
@@ -1021,20 +957,13 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved = self.codebase.resolve_class_name(file.as_ref(), decl.name);
+        let resolved = resolve_name_via_db(self.db, file.as_ref(), decl.name);
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
                 continue;
             }
@@ -1044,18 +973,11 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -1079,7 +1001,6 @@ impl<'a> Pass2Driver<'a> {
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
-                self.codebase,
                 self.db,
                 file.clone(),
                 source,
@@ -1119,7 +1040,7 @@ impl<'a> Pass2Driver<'a> {
     ) {
         use php_ast::ast::EnumMemberKind;
         for iface in decl.implements.iter() {
-            check_name_class(iface, self.codebase, file, source, source_map, all_issues);
+            check_name_class(iface, self.db, file, source, source_map, all_issues);
         }
         for member in decl.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
@@ -1127,18 +1048,11 @@ impl<'a> Pass2Driver<'a> {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
         }
     }
@@ -1153,7 +1067,7 @@ impl<'a> Pass2Driver<'a> {
     ) {
         use php_ast::ast::ClassMemberKind;
         for parent in decl.extends.iter() {
-            check_name_class(parent, self.codebase, file, source, source_map, all_issues);
+            check_name_class(parent, self.db, file, source, source_map, all_issues);
         }
         for member in decl.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
@@ -1161,18 +1075,11 @@ impl<'a> Pass2Driver<'a> {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.codebase,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                    );
+                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.codebase, file, source, source_map, all_issues);
+                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
             }
         }
     }

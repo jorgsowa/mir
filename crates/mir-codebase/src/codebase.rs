@@ -185,30 +185,35 @@ impl Codebase {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(cls.fqcn.clone(), f.clone());
             }
+            self.known_symbols.insert(cls.fqcn.clone());
             self.classes.insert(cls.fqcn.clone(), cls);
         }
         for iface in slice.interfaces {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(iface.fqcn.clone(), f.clone());
             }
+            self.known_symbols.insert(iface.fqcn.clone());
             self.interfaces.insert(iface.fqcn.clone(), iface);
         }
         for tr in slice.traits {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(tr.fqcn.clone(), f.clone());
             }
+            self.known_symbols.insert(tr.fqcn.clone());
             self.traits.insert(tr.fqcn.clone(), tr);
         }
         for en in slice.enums {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(en.fqcn.clone(), f.clone());
             }
+            self.known_symbols.insert(en.fqcn.clone());
             self.enums.insert(en.fqcn.clone(), en);
         }
         for func in slice.functions {
             if let Some(f) = &file {
                 self.symbol_to_file.insert(func.fqn.clone(), f.clone());
             }
+            self.known_symbols.insert(func.fqn.clone());
             self.functions.insert(func.fqn.clone(), func);
         }
         for (name, ty) in slice.constants {

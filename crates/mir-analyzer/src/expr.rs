@@ -5,7 +5,6 @@ use php_ast::ast::{
     AssignOp, BinaryOp, CastKind, ExprKind, MagicConstKind, UnaryPostfixOp, UnaryPrefixOp,
 };
 
-use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location, Severity};
 use mir_types::{Atomic, Union};
 
@@ -20,7 +19,6 @@ use crate::symbol::{ResolvedSymbol, SymbolKind};
 // ---------------------------------------------------------------------------
 
 pub struct ExpressionAnalyzer<'a> {
-    pub codebase: &'a Codebase,
     pub db: &'a dyn MirDatabase,
     pub file: Arc<str>,
     pub source: &'a str,
@@ -36,7 +34,6 @@ pub struct ExpressionAnalyzer<'a> {
 impl<'a> ExpressionAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        codebase: &'a Codebase,
         db: &'a dyn MirDatabase,
         file: Arc<str>,
         source: &'a str,
@@ -47,7 +44,6 @@ impl<'a> ExpressionAnalyzer<'a> {
         inference_only: bool,
     ) -> Self {
         Self {
-            codebase,
             db,
             file,
             source,
@@ -163,10 +159,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Try namespace-qualified name first, then fall back to global
                 let found = {
                     let ns_qualified = self
-                        .codebase
-                        .file_namespaces
-                        .get(self.file.as_ref())
-                        .map(|ns| format!("{}\\{}", *ns, name_str));
+                        .db
+                        .file_namespace(self.file.as_ref())
+                        .map(|ns| format!("{}\\{}", ns, name_str));
 
                     let exists = |fqn: &str| -> bool {
                         self.db
@@ -311,7 +306,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                             t.condition,
                             &mut then_ctx,
                             true,
-                            self.codebase,
                             self.db,
                             &self.file,
                         );
@@ -322,7 +316,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                             t.condition,
                             &mut else_ctx,
                             false,
-                            self.codebase,
                             self.db,
                             &self.file,
                         );
@@ -599,7 +592,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 let class_ty = match &n.class.kind {
                     ExprKind::Identifier(name) => {
-                        let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
+                        let resolved =
+                            crate::db::resolve_name_via_db(self.db, &self.file, name.as_ref());
                         // `self`, `static`, `parent` resolve to the current class — use ctx
                         let fqcn: Arc<str> = match resolved.as_str() {
                             "self" | "static" => ctx
@@ -677,13 +671,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // "find references" for a class includes new Foo() sites.
                         if !self.inference_only {
                             let (line, col_start, col_end) = self.span_to_ref_loc(n.class.span);
-                            self.codebase.mark_class_referenced_at(
-                                &fqcn,
-                                self.file.clone(),
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: fqcn.clone(),
+                                file: self.file.clone(),
                                 line,
                                 col_start,
                                 col_end,
-                            );
+                            });
                         }
                         ty
                     }
@@ -780,7 +774,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::StaticPropertyAccess(spa) => {
                 if let ExprKind::Identifier(id) = &spa.class.kind {
-                    let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
+                    let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
                     if !matches!(resolved.as_str(), "self" | "static" | "parent")
                         && !crate::db::type_exists_via_db(self.db, &resolved)
                     {
@@ -799,7 +793,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if cca.member.name_str() == Some("class") {
                     // Resolve the class name so Foo::class gives the correct FQCN string
                     let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
-                        let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
+                        let resolved =
+                            crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
                         Some(Arc::from(resolved.as_str()))
                     } else {
                         None
@@ -814,7 +809,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 let fqcn = match &cca.class.kind {
                     ExprKind::Identifier(id) => {
-                        let resolved = self.codebase.resolve_class_name(&self.file, id.as_ref());
+                        let resolved =
+                            crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
                         // self/static/parent: can't validate without full type narrowing
                         if matches!(resolved.as_str(), "self" | "static" | "parent") {
                             return Union::mixed();
@@ -887,14 +883,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let params = ast_params_to_fn_params_resolved(
                     &c.params,
                     ctx.self_fqcn.as_deref(),
-                    self.codebase,
+                    self.db,
                     &self.file,
                 );
                 let return_ty_hint = c
                     .return_type
                     .as_ref()
                     .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
-                    .map(|u| resolve_named_objects_in_union(u, self.codebase, &self.file));
+                    .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
 
                 // Build closure context — capture declared use-vars from outer scope.
                 // Static closures (`static function() {}`) do not bind $this even when
@@ -919,7 +915,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Analyze closure body, collecting issues into the same buffer
                 let inferred_return = {
                     let mut sa = crate::stmt::StatementsAnalyzer::new(
-                        self.codebase,
                         self.db,
                         self.file.clone(),
                         self.source,
@@ -979,14 +974,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let params = ast_params_to_fn_params_resolved(
                     &af.params,
                     ctx.self_fqcn.as_deref(),
-                    self.codebase,
+                    self.db,
                     &self.file,
                 );
                 let return_ty_hint = af
                     .return_type
                     .as_ref()
                     .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
-                    .map(|u| resolve_named_objects_in_union(u, self.codebase, &self.file));
+                    .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
 
                 // Arrow functions implicitly capture the outer scope by value.
                 // Static arrow functions (`static fn() =>`) do not bind $this.
@@ -1090,7 +1085,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 cond,
                                 &mut arm_ctx,
                                 true,
-                                self.codebase,
                                 self.db,
                                 &self.file,
                             );
@@ -1198,7 +1192,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                 b.left,
                 &mut right_ctx,
                 is_and,
-                self.codebase,
                 self.db,
                 &self.file,
             );
@@ -1227,7 +1220,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         if b.op == B::Instanceof {
             let _left_ty = self.analyze(b.left, ctx);
             if let ExprKind::Identifier(name) = &b.right.kind {
-                let resolved = self.codebase.resolve_class_name(&self.file, name.as_ref());
+                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, name.as_ref());
                 let fqcn: std::sync::Arc<str> = std::sync::Arc::from(resolved.as_str());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent")
                     && !crate::db::type_exists_via_db(self.db, &fqcn)
@@ -1321,14 +1314,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // Record reference for dead-code detection (M18)
                         if !self.inference_only {
                             let (line, col_start, col_end) = self.span_to_ref_loc(span);
-                            self.codebase.mark_property_referenced_at(
-                                fqcn,
-                                prop_name,
-                                self.file.clone(),
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(format!("{}::{}", fqcn, prop_name)),
+                                file: self.file.clone(),
                                 line,
                                 col_start,
                                 col_end,
-                            );
+                            });
                         }
                         return ty;
                     }
@@ -1614,7 +1606,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ) {
                     return;
                 }
-                let resolved = self.codebase.resolve_class_name(&self.file, &name_str);
+                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, &name_str);
                 if !crate::db::type_exists_via_db(self.db, &resolved) {
                     self.emit(
                         IssueKind::UndefinedClass { name: resolved },
@@ -1820,7 +1812,7 @@ pub fn extract_destructure_vars<'arena, 'src>(
 fn ast_params_to_fn_params_resolved<'arena, 'src>(
     params: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Param<'arena, 'src>>,
     self_fqcn: Option<&str>,
-    codebase: &mir_codebase::Codebase,
+    db: &dyn MirDatabase,
     file: &str,
 ) -> Vec<mir_codebase::FnParam> {
     params
@@ -1830,7 +1822,7 @@ fn ast_params_to_fn_params_resolved<'arena, 'src>(
                 .type_hint
                 .as_ref()
                 .map(|h| crate::parser::type_from_hint(h, self_fqcn))
-                .map(|u| resolve_named_objects_in_union(u, codebase, file));
+                .map(|u| resolve_named_objects_in_union(u, db, file));
             mir_codebase::FnParam {
                 name: p.name.trim_start_matches('$').into(),
                 ty,
@@ -1844,11 +1836,7 @@ fn ast_params_to_fn_params_resolved<'arena, 'src>(
 }
 
 /// Resolve TNamedObject fqcns in a union through the file's import table.
-fn resolve_named_objects_in_union(
-    union: Union,
-    codebase: &mir_codebase::Codebase,
-    file: &str,
-) -> Union {
+fn resolve_named_objects_in_union(union: Union, db: &dyn MirDatabase, file: &str) -> Union {
     use mir_types::Atomic;
     let from_docblock = union.from_docblock;
     let possibly_undefined = union.possibly_undefined;
@@ -1857,7 +1845,7 @@ fn resolve_named_objects_in_union(
         .into_iter()
         .map(|a| match a {
             Atomic::TNamedObject { fqcn, type_params } => {
-                let resolved = codebase.resolve_class_name(file, fqcn.as_ref());
+                let resolved = crate::db::resolve_name_via_db(db, file, fqcn.as_ref());
                 Atomic::TNamedObject {
                     fqcn: resolved.into(),
                     type_params,

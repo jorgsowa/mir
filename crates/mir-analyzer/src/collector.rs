@@ -1,8 +1,8 @@
 /// Pass 1 — Definition collector.
 ///
-/// Visits every top-level declaration in the AST and populates the `Codebase`
-/// with `ClassStorage`, `FunctionStorage`, etc. No type inference happens here;
-/// we only record the *signatures* of all symbols.
+/// Visits every top-level declaration in the AST and produces a `StubSlice`
+/// containing class, function, and constant signatures. No type inference
+/// happens here.
 use std::sync::Arc;
 
 use php_ast::ast::{
@@ -19,7 +19,7 @@ use mir_codebase::storage::{
     InterfaceStorage, Location, MethodStorage, PropertyStorage, StubSlice, TemplateParam,
     TraitStorage, Visibility,
 };
-use mir_codebase::{ClassStorage, Codebase};
+use mir_codebase::ClassStorage;
 use mir_issues::{Issue, IssueBuffer, IssueKind};
 use mir_types::Union;
 
@@ -27,13 +27,7 @@ use mir_types::Union;
 // DefinitionCollector
 // ---------------------------------------------------------------------------
 
-#[allow(dead_code)]
 pub struct DefinitionCollector<'a> {
-    /// Optional codebase target. When `Some`, [`Self::collect`] will inject the
-    /// accumulated slice into it (backward-compat shim for existing callers).
-    /// When `None`, only [`Self::collect_slice`] is valid and the collector is
-    /// a pure function from AST to [`StubSlice`].
-    codebase: Option<&'a Codebase>,
     slice: StubSlice,
     file: Arc<str>,
     source: &'a str,
@@ -55,22 +49,6 @@ pub struct DefinitionCollector<'a> {
 }
 
 impl<'a> DefinitionCollector<'a> {
-    /// Backward-compat constructor: the collector will inject its accumulated
-    /// slice into `codebase` when [`Self::collect`] is called.
-    pub fn new(
-        codebase: &'a Codebase,
-        file: Arc<str>,
-        source: &'a str,
-        source_map: &'a php_rs_parser::source_map::SourceMap,
-    ) -> Self {
-        let mut s = Self::new_for_slice(file, source, source_map);
-        s.codebase = Some(codebase);
-        s
-    }
-
-    /// Pure-function constructor: the collector accumulates a [`StubSlice`]
-    /// without touching any shared state. Use [`Self::collect_slice`] to
-    /// retrieve it.
     pub fn new_for_slice(
         file: Arc<str>,
         source: &'a str,
@@ -82,7 +60,6 @@ impl<'a> DefinitionCollector<'a> {
         };
         Self {
             source_map,
-            codebase: None,
             slice,
             file,
             source,
@@ -126,20 +103,6 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    /// Shim: build the slice then inject it into the target codebase (if one
-    /// was supplied via [`Self::new`]). Returns the issues accumulated during
-    /// Pass 1.
-    pub fn collect<'arena, 'src>(mut self, program: &Program<'arena, 'src>) -> Vec<Issue> {
-        let _ = self.visit_program(program);
-        self.finalize_slice();
-        let issues = self.issues.into_issues();
-        if let Some(codebase) = self.codebase {
-            codebase.inject_stub_slice(self.slice);
-        }
-        issues
-    }
-
-    /// Pure variant: returns the collected slice and any issues.
     pub fn collect_slice<'arena, 'src>(
         mut self,
         program: &Program<'arena, 'src>,
@@ -430,31 +393,21 @@ impl<'a> DefinitionCollector<'a> {
             aliases.insert(alias.name.clone(), self.resolve_union_doc(ty));
         }
 
-        // Resolve @psalm-import-type declarations.
-        // Look first in the codebase (cross-file) then in the slice being built
-        // (same-file, for classes defined earlier in the same file).
+        // Resolve same-file @psalm-import-type declarations. Cross-file imports
+        // stay in `pending_import_types` and are resolved after all slices are
+        // injected.
         for import in &doc.import_types {
             if import.from_class.is_empty() {
                 continue;
             }
             let from_resolved =
                 self.resolve_type_name(&Arc::from(import.from_class.as_str()), true);
-            // Try codebase first (cross-file classes already loaded).
-            let resolved = if let Some(cb) = self.codebase {
-                cb.classes
-                    .get(from_resolved.as_ref())
-                    .and_then(|src| src.type_aliases.get(import.original.as_str()).cloned())
-            } else {
-                None
-            };
-            // Fall back to slice (same-file, collected earlier in this pass).
-            let resolved = resolved.or_else(|| {
-                self.slice
-                    .classes
-                    .iter()
-                    .find(|cls| cls.fqcn.as_ref() == from_resolved.as_ref())
-                    .and_then(|cls| cls.type_aliases.get(import.original.as_str()).cloned())
-            });
+            let resolved = self
+                .slice
+                .classes
+                .iter()
+                .find(|cls| cls.fqcn.as_ref() == from_resolved.as_ref())
+                .and_then(|cls| cls.type_aliases.get(import.original.as_str()).cloned());
             if let Some(ty) = resolved {
                 aliases.insert(import.local.clone(), ty);
             }
@@ -1560,51 +1513,6 @@ impl<'a> DefinitionCollector<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mir_codebase::codebase_from_parts;
-
-    const SAMPLE: &str = r#"<?php
-namespace App\Demo;
-
-use Stringable;
-
-/**
- * @template T
- */
-class Widget implements Stringable {
-    public function __construct(public string $name) {}
-    public function render(): string { return $this->name; }
-}
-
-interface Renderable {
-    public function render(): string;
-}
-
-trait Colored {
-    public string $color;
-}
-
-enum Size {
-    case Small;
-    case Large;
-}
-
-function make_widget(string $n): Widget {
-    /** @var int $counter */
-    global $counter;
-    return new Widget($n);
-}
-
-const MY_CONST = 42;
-"#;
-
-    fn parse_and_collect_old(file: &str, src: &str, codebase: &Codebase) {
-        let arena = bumpalo::Bump::new();
-        let result = php_rs_parser::parse(&arena, src);
-        let collector =
-            DefinitionCollector::new(codebase, Arc::from(file), src, &result.source_map);
-        let _ = collector.collect(&result.program);
-        codebase.resolve_pending_import_types();
-    }
 
     fn parse_and_collect_slice(file: &str, src: &str) -> StubSlice {
         let arena = bumpalo::Bump::new();
@@ -1613,147 +1521,6 @@ const MY_CONST = 42;
             DefinitionCollector::new_for_slice(Arc::from(file), src, &result.source_map);
         let (slice, _) = collector.collect_slice(&result.program);
         slice
-    }
-
-    #[test]
-    fn codebase_from_parts_produces_same_result_as_mutation() {
-        let file = "test.php";
-
-        let slice = parse_and_collect_slice(file, SAMPLE);
-        let cb_new = codebase_from_parts(vec![slice]);
-
-        let cb_old = Codebase::new();
-        parse_and_collect_old(file, SAMPLE, &cb_old);
-
-        fn sorted<T: Ord + Clone, I: IntoIterator<Item = T>>(xs: I) -> Vec<T> {
-            let mut v: Vec<T> = xs.into_iter().collect();
-            v.sort();
-            v
-        }
-
-        let ck = |cb: &Codebase| sorted(cb.classes.iter().map(|e| e.key().clone()));
-        let ik = |cb: &Codebase| sorted(cb.interfaces.iter().map(|e| e.key().clone()));
-        let tk = |cb: &Codebase| sorted(cb.traits.iter().map(|e| e.key().clone()));
-        let ek = |cb: &Codebase| sorted(cb.enums.iter().map(|e| e.key().clone()));
-        let fk = |cb: &Codebase| sorted(cb.functions.iter().map(|e| e.key().clone()));
-        let nk = |cb: &Codebase| sorted(cb.constants.iter().map(|e| e.key().clone()));
-        let sk = |cb: &Codebase| {
-            sorted(
-                cb.symbol_to_file
-                    .iter()
-                    .map(|e| (e.key().clone(), e.value().clone())),
-            )
-        };
-        let gk = |cb: &Codebase| sorted(cb.global_vars.iter().map(|e| e.key().clone()));
-
-        assert_eq!(ck(&cb_new), ck(&cb_old), "classes differ");
-        assert_eq!(ik(&cb_new), ik(&cb_old), "interfaces differ");
-        assert_eq!(tk(&cb_new), tk(&cb_old), "traits differ");
-        assert_eq!(ek(&cb_new), ek(&cb_old), "enums differ");
-        assert_eq!(fk(&cb_new), fk(&cb_old), "functions differ");
-        assert_eq!(nk(&cb_new), nk(&cb_old), "constants differ");
-        assert_eq!(sk(&cb_new), sk(&cb_old), "symbol_to_file differs");
-        assert_eq!(gk(&cb_new), gk(&cb_old), "global_vars differ");
-
-        let nmk = |cb: &Codebase| {
-            sorted(
-                cb.file_namespaces
-                    .iter()
-                    .map(|e| (e.key().clone(), e.value().clone())),
-            )
-        };
-        let imk = |cb: &Codebase| {
-            sorted(cb.file_imports.iter().map(|e| {
-                let mut pairs: Vec<_> = e
-                    .value()
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
-                pairs.sort();
-                (e.key().clone(), pairs)
-            }))
-        };
-        assert_eq!(nmk(&cb_new), nmk(&cb_old), "file_namespaces differ");
-        assert_eq!(imk(&cb_new), imk(&cb_old), "file_imports differ");
-
-        // Sanity: file-based fields actually got populated.
-        assert!(!cb_new.symbol_to_file.is_empty());
-        assert!(cb_new.global_vars.contains_key("counter"));
-
-        // Deep-equal the concrete file_namespaces and file_imports entries.
-        // The keyset comparisons above would pass even if the stored *values* diverged.
-        assert_eq!(
-            cb_new
-                .file_namespaces
-                .get("test.php")
-                .as_deref()
-                .map(|s| s.as_str()),
-            cb_old
-                .file_namespaces
-                .get("test.php")
-                .as_deref()
-                .map(|s| s.as_str()),
-            "file_namespaces value for test.php differs"
-        );
-        assert_eq!(
-            cb_new
-                .file_namespaces
-                .get("test.php")
-                .as_deref()
-                .map(|s| s.as_str()),
-            Some("App\\Demo"),
-            "file_namespaces must contain the declared namespace"
-        );
-        let new_imports = cb_new
-            .file_imports
-            .get("test.php")
-            .expect("file_imports must be populated");
-        let old_imports = cb_old
-            .file_imports
-            .get("test.php")
-            .expect("file_imports must be populated");
-        assert_eq!(
-            *new_imports, *old_imports,
-            "file_imports value for test.php differs"
-        );
-        assert_eq!(
-            new_imports.get("Stringable").map(|s| s.as_str()),
-            Some("Stringable"),
-            "file_imports must contain the Stringable use alias"
-        );
-
-        // Deep-equal one concrete entry per symbol kind to catch any drift in
-        // storage contents that key-only comparison would miss.
-        let fqcn = "App\\Demo\\Widget";
-        assert_eq!(
-            cb_new.classes.get(fqcn).unwrap().value(),
-            cb_old.classes.get(fqcn).unwrap().value(),
-            "ClassStorage differs for {fqcn}"
-        );
-        let fn_fqn = "App\\Demo\\make_widget";
-        assert_eq!(
-            cb_new.functions.get(fn_fqn).unwrap().value(),
-            cb_old.functions.get(fn_fqn).unwrap().value(),
-            "FunctionStorage differs for {fn_fqn}"
-        );
-        let iface = "App\\Demo\\Renderable";
-        assert_eq!(
-            cb_new.interfaces.get(iface).unwrap().value(),
-            cb_old.interfaces.get(iface).unwrap().value(),
-            "InterfaceStorage differs for {iface}"
-        );
-        let tr = "App\\Demo\\Colored";
-        assert_eq!(
-            cb_new.traits.get(tr).unwrap().value(),
-            cb_old.traits.get(tr).unwrap().value(),
-            "TraitStorage differs for {tr}"
-        );
-        let enum_fqcn = "App\\Demo\\Size";
-        assert_eq!(
-            cb_new.enums.get(enum_fqcn).unwrap().value(),
-            cb_old.enums.get(enum_fqcn).unwrap().value(),
-            "EnumStorage differs for {enum_fqcn}"
-        );
     }
 
     // These three tests guard the DefinitionCollector → StubSlice contract for
@@ -1826,11 +1593,11 @@ class Model {}
  */
 trait HasTimestamps {}
 "#;
-        let cb = Codebase::new();
-        parse_and_collect_old("test.php", src, &cb);
-        let tr = cb
+        let slice = parse_and_collect_slice("test.php", src);
+        let tr = slice
             .traits
-            .get("HasTimestamps")
+            .iter()
+            .find(|tr| tr.fqcn.as_ref() == "HasTimestamps")
             .expect("HasTimestamps should be collected");
         assert_eq!(
             tr.require_extends,

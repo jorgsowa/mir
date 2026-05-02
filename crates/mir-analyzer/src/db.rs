@@ -5,7 +5,7 @@ use mir_codebase::storage::{
     Assertion, ConstantStorage, FnParam, FunctionStorage, Location, MethodStorage, PropertyStorage,
     TemplateParam, Visibility,
 };
-use mir_codebase::{Codebase, StubSlice};
+use mir_codebase::StubSlice;
 use mir_issues::Issue;
 use mir_types::Union;
 
@@ -63,6 +63,42 @@ pub trait MirDatabase: salsa::Database {
     /// Return all function-FQNs currently registered as active
     /// `FunctionNode`s.  Untracked snapshot.
     fn active_function_node_fqns(&self) -> Vec<Arc<str>>;
+
+    /// Return this file's first declared namespace, if any.
+    fn file_namespace(&self, file: &str) -> Option<Arc<str>>;
+
+    /// Return this file's `use` alias map.
+    fn file_imports(&self, file: &str) -> HashMap<String, String>;
+
+    /// Return the known type for a PHP global variable.
+    fn global_var_type(&self, name: &str) -> Option<Union>;
+
+    /// Return `(file, imports)` snapshots for every known file.
+    fn file_import_snapshots(&self) -> Vec<(Arc<str>, HashMap<String, String>)>;
+
+    /// Return the defining file for a symbol, if known.
+    fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>>;
+
+    /// Return all symbols whose defining file is `file`.
+    fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>>;
+
+    /// Record a reference-location entry.
+    fn record_reference_location(&self, loc: RefLoc);
+
+    /// Replay reference locations for one file from cache.
+    fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]);
+
+    /// Extract reference locations for one file in cache-storage shape.
+    fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)>;
+
+    /// Return all reference locations for one public symbol key.
+    fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)>;
+
+    /// Whether the public symbol key has at least one recorded reference.
+    fn has_reference(&self, symbol: &str) -> bool;
+
+    /// Clear reference locations for a file before re-analysis.
+    fn clear_file_references(&self, file: &str);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +266,64 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
 /// the authoritative answer — bundled and user types are both mirrored.
 pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
+}
+
+pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
+    db.lookup_function_node(fqn).is_some_and(|n| n.active(db))
+}
+
+pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
+    db.lookup_global_constant_node(fqn)
+        .is_some_and(|n| n.active(db))
+}
+
+pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> String {
+    if name.starts_with('\\') {
+        return name.trim_start_matches('\\').to_string();
+    }
+
+    let lower = name.to_ascii_lowercase();
+    if matches!(lower.as_str(), "self" | "static" | "parent") {
+        return name.to_string();
+    }
+
+    if name.contains('\\') {
+        if let Some(imports) = (!name.starts_with('\\')).then(|| db.file_imports(file)) {
+            if let Some((first, rest)) = name.split_once('\\') {
+                if let Some(base) = imports.get(first) {
+                    return format!("{base}\\{rest}");
+                }
+            }
+        }
+        if type_exists_via_db(db, name) {
+            return name.to_string();
+        }
+        if let Some(ns) = db.file_namespace(file) {
+            let qualified = format!("{}\\{}", ns, name);
+            if type_exists_via_db(db, &qualified) {
+                return qualified;
+            }
+        }
+        return name.to_string();
+    }
+
+    let imports = db.file_imports(file);
+    if let Some(fqcn) = imports.get(name) {
+        return fqcn.clone();
+    }
+    if let Some((_, fqcn)) = imports
+        .iter()
+        .find(|(alias, _)| alias.eq_ignore_ascii_case(name))
+    {
+        return fqcn.clone();
+    }
+    if let Some(ns) = db.file_namespace(file) {
+        let qualified = format!("{}\\{}", ns, name);
+        if type_exists_via_db(db, &qualified) {
+            return qualified;
+        }
+    }
+    name.to_string()
 }
 
 /// Return the declared `@template` parameters for `fqcn` from an active
@@ -1118,19 +1212,33 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 #[derive(Default, Clone)]
 pub struct MirDb {
     storage: salsa::Storage<Self>,
+    // Keep registries behind `Arc`s so `MirDb::clone()` stays cheap for
+    // parallel analysis workers. The salsa storage is already shared by clone;
+    // these maps only hold stable input handles, so copy-on-write insertion is
+    // enough for the canonical mutable db paths.
     /// FQCN → ClassNode handle registry (not tracked by Salsa; see
     /// `lookup_class_node` for the rationale).
-    class_nodes: HashMap<Arc<str>, ClassNode>,
+    class_nodes: Arc<HashMap<Arc<str>, ClassNode>>,
     /// FQN → FunctionNode handle registry.
-    function_nodes: HashMap<Arc<str>, FunctionNode>,
+    function_nodes: Arc<HashMap<Arc<str>, FunctionNode>>,
     /// (owner FQCN) → (method_name_lower → MethodNode) handle registry.
-    method_nodes: HashMap<Arc<str>, HashMap<Arc<str>, MethodNode>>,
+    method_nodes: Arc<HashMap<Arc<str>, HashMap<Arc<str>, MethodNode>>>,
     /// (owner FQCN) → (prop_name → PropertyNode) handle registry.
-    property_nodes: HashMap<Arc<str>, HashMap<Arc<str>, PropertyNode>>,
+    property_nodes: Arc<HashMap<Arc<str>, HashMap<Arc<str>, PropertyNode>>>,
     /// (owner FQCN) → (const_name → ClassConstantNode) handle registry.
-    class_constant_nodes: HashMap<Arc<str>, HashMap<Arc<str>, ClassConstantNode>>,
+    class_constant_nodes: Arc<HashMap<Arc<str>, HashMap<Arc<str>, ClassConstantNode>>>,
     /// FQN → GlobalConstantNode handle registry.
-    global_constant_nodes: HashMap<Arc<str>, GlobalConstantNode>,
+    global_constant_nodes: Arc<HashMap<Arc<str>, GlobalConstantNode>>,
+    /// File path → first declared namespace.
+    file_namespaces: Arc<HashMap<Arc<str>, Arc<str>>>,
+    /// File path → use-alias imports.
+    file_imports: Arc<HashMap<Arc<str>, HashMap<String, String>>>,
+    /// Global variable name (without `$`) → collected type.
+    global_vars: Arc<HashMap<Arc<str>, Union>>,
+    /// Symbol FQN → defining file.
+    symbol_to_file: Arc<HashMap<Arc<str>, Arc<str>>>,
+    /// Public symbol key → reference locations.
+    reference_locations: Arc<std::sync::Mutex<HashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>,
 }
 
 #[salsa::db]
@@ -1214,6 +1322,108 @@ impl MirDatabase for MirDb {
                 }
             })
             .collect()
+    }
+
+    fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
+        self.file_namespaces.get(file).cloned()
+    }
+
+    fn file_imports(&self, file: &str) -> HashMap<String, String> {
+        self.file_imports.get(file).cloned().unwrap_or_default()
+    }
+
+    fn global_var_type(&self, name: &str) -> Option<Union> {
+        self.global_vars.get(name).cloned()
+    }
+
+    fn file_import_snapshots(&self) -> Vec<(Arc<str>, HashMap<String, String>)> {
+        self.file_imports
+            .iter()
+            .map(|(file, imports)| (file.clone(), imports.clone()))
+            .collect()
+    }
+
+    fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
+        self.symbol_to_file.get(symbol).cloned()
+    }
+
+    fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>> {
+        self.symbol_to_file
+            .iter()
+            .filter_map(|(sym, defining_file)| {
+                if defining_file.as_ref() == file {
+                    Some(sym.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn record_reference_location(&self, loc: RefLoc) {
+        let mut refs = self
+            .reference_locations
+            .lock()
+            .expect("reference lock poisoned");
+        let entry = refs.entry(loc.symbol_key).or_default();
+        let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
+        if !entry.iter().any(|existing| existing == &tuple) {
+            entry.push(tuple);
+        }
+    }
+
+    fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]) {
+        for (symbol, line, col_start, col_end) in locs {
+            self.record_reference_location(RefLoc {
+                symbol_key: Arc::from(symbol.as_str()),
+                file: file.clone(),
+                line: *line,
+                col_start: *col_start,
+                col_end: *col_end,
+            });
+        }
+    }
+
+    fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
+        let refs = self
+            .reference_locations
+            .lock()
+            .expect("reference lock poisoned");
+        let mut out = Vec::new();
+        for (symbol, locs) in refs.iter() {
+            for (loc_file, line, col_start, col_end) in locs {
+                if loc_file.as_ref() == file {
+                    out.push((symbol.clone(), *line, *col_start, *col_end));
+                }
+            }
+        }
+        out
+    }
+
+    fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
+        let refs = self
+            .reference_locations
+            .lock()
+            .expect("reference lock poisoned");
+        refs.get(symbol).cloned().unwrap_or_default()
+    }
+
+    fn has_reference(&self, symbol: &str) -> bool {
+        let refs = self
+            .reference_locations
+            .lock()
+            .expect("reference lock poisoned");
+        refs.get(symbol).is_some_and(|locs| !locs.is_empty())
+    }
+
+    fn clear_file_references(&self, file: &str) {
+        let mut refs = self
+            .reference_locations
+            .lock()
+            .expect("reference lock poisoned");
+        for locs in refs.values_mut() {
+            locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
+        }
     }
 }
 
@@ -1327,6 +1537,283 @@ impl ClassNodeFields {
 }
 
 impl MirDb {
+    pub fn remove_file_definitions(&mut self, file: &str) {
+        let symbols = self.symbols_defined_in_file(file);
+        for symbol in &symbols {
+            self.deactivate_class_node(symbol);
+            self.deactivate_function_node(symbol);
+            self.deactivate_class_methods(symbol);
+            self.deactivate_class_properties(symbol);
+            self.deactivate_class_constants(symbol);
+            self.deactivate_global_constant_node(symbol);
+        }
+        let symbol_set: HashSet<Arc<str>> = symbols.into_iter().collect();
+        Arc::make_mut(&mut self.symbol_to_file).retain(|sym, defining_file| {
+            defining_file.as_ref() != file && !symbol_set.contains(sym)
+        });
+        Arc::make_mut(&mut self.file_namespaces).retain(|path, _| path.as_ref() != file);
+        Arc::make_mut(&mut self.file_imports).retain(|path, _| path.as_ref() != file);
+        Arc::make_mut(&mut self.global_vars).retain(|name, _| !symbol_set.contains(name));
+        self.clear_file_references(file);
+    }
+
+    pub fn type_count(&self) -> usize {
+        self.class_nodes
+            .values()
+            .filter(|node| node.active(self))
+            .count()
+    }
+
+    pub fn function_count(&self) -> usize {
+        self.function_nodes
+            .values()
+            .filter(|node| node.active(self))
+            .count()
+    }
+
+    pub fn constant_count(&self) -> usize {
+        self.global_constant_nodes
+            .values()
+            .filter(|node| node.active(self))
+            .count()
+    }
+
+    /// Walk one collected [`StubSlice`] and upsert the corresponding db nodes.
+    ///
+    /// This is the slice-first sibling of [`Self::ingest_codebase`]. Use it
+    /// when Pass 1 already produced a complete per-file slice so batch analysis
+    /// does not need to first mutate `Codebase` and then re-scan the whole
+    /// accumulated codebase to mirror the same definitions into salsa.
+    pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
+        use std::collections::HashSet;
+
+        if let Some(file) = &slice.file {
+            if let Some(namespace) = &slice.namespace {
+                Arc::make_mut(&mut self.file_namespaces).insert(file.clone(), namespace.clone());
+            }
+            if !slice.imports.is_empty() {
+                Arc::make_mut(&mut self.file_imports).insert(file.clone(), slice.imports.clone());
+            }
+            for (name, _) in &slice.global_vars {
+                let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
+                Arc::make_mut(&mut self.symbol_to_file)
+                    .insert(Arc::from(global_name), file.clone());
+            }
+        }
+        for (name, ty) in &slice.global_vars {
+            let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
+            Arc::make_mut(&mut self.global_vars).insert(Arc::from(global_name), ty.clone());
+        }
+
+        for cls in &slice.classes {
+            if let Some(file) = &slice.file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(cls.fqcn.clone(), file.clone());
+            }
+            self.upsert_class_node(ClassNodeFields {
+                is_abstract: cls.is_abstract,
+                parent: cls.parent.clone(),
+                interfaces: Arc::from(cls.interfaces.as_slice()),
+                traits: Arc::from(cls.traits.as_slice()),
+                template_params: Arc::from(cls.template_params.as_slice()),
+                mixins: Arc::from(cls.mixins.as_slice()),
+                deprecated: cls.deprecated.clone(),
+                is_final: cls.is_final,
+                is_readonly: cls.is_readonly,
+                location: cls.location.clone(),
+                extends_type_args: Arc::from(cls.extends_type_args.as_slice()),
+                implements_type_args: Arc::from(
+                    cls.implements_type_args
+                        .iter()
+                        .map(|(iface, args)| (iface.clone(), Arc::from(args.as_slice())))
+                        .collect::<Vec<_>>(),
+                ),
+                ..ClassNodeFields::for_class(cls.fqcn.clone())
+            });
+            if self.method_nodes.contains_key(cls.fqcn.as_ref()) {
+                let method_keep: HashSet<&str> =
+                    cls.own_methods.keys().map(|m| m.as_ref()).collect();
+                self.prune_class_methods(&cls.fqcn, &method_keep);
+            }
+            for method in cls.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            if self.property_nodes.contains_key(cls.fqcn.as_ref()) {
+                let prop_keep: HashSet<&str> =
+                    cls.own_properties.keys().map(|p| p.as_ref()).collect();
+                self.prune_class_properties(&cls.fqcn, &prop_keep);
+            }
+            for prop in cls.own_properties.values() {
+                self.upsert_property_node(&cls.fqcn, prop);
+            }
+            if self.class_constant_nodes.contains_key(cls.fqcn.as_ref()) {
+                let const_keep: HashSet<&str> =
+                    cls.own_constants.keys().map(|c| c.as_ref()).collect();
+                self.prune_class_constants(&cls.fqcn, &const_keep);
+            }
+            for constant in cls.own_constants.values() {
+                self.upsert_class_constant_node(&cls.fqcn, constant);
+            }
+        }
+
+        for iface in &slice.interfaces {
+            if let Some(file) = &slice.file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(iface.fqcn.clone(), file.clone());
+            }
+            self.upsert_class_node(ClassNodeFields {
+                extends: Arc::from(iface.extends.as_slice()),
+                template_params: Arc::from(iface.template_params.as_slice()),
+                location: iface.location.clone(),
+                ..ClassNodeFields::for_interface(iface.fqcn.clone())
+            });
+            if self.method_nodes.contains_key(iface.fqcn.as_ref()) {
+                let method_keep: HashSet<&str> =
+                    iface.own_methods.keys().map(|m| m.as_ref()).collect();
+                self.prune_class_methods(&iface.fqcn, &method_keep);
+            }
+            for method in iface.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            if self.class_constant_nodes.contains_key(iface.fqcn.as_ref()) {
+                let const_keep: HashSet<&str> =
+                    iface.own_constants.keys().map(|c| c.as_ref()).collect();
+                self.prune_class_constants(&iface.fqcn, &const_keep);
+            }
+            for constant in iface.own_constants.values() {
+                self.upsert_class_constant_node(&iface.fqcn, constant);
+            }
+        }
+
+        for tr in &slice.traits {
+            if let Some(file) = &slice.file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(tr.fqcn.clone(), file.clone());
+            }
+            self.upsert_class_node(ClassNodeFields {
+                traits: Arc::from(tr.traits.as_slice()),
+                template_params: Arc::from(tr.template_params.as_slice()),
+                require_extends: Arc::from(tr.require_extends.as_slice()),
+                require_implements: Arc::from(tr.require_implements.as_slice()),
+                location: tr.location.clone(),
+                ..ClassNodeFields::for_trait(tr.fqcn.clone())
+            });
+            if self.method_nodes.contains_key(tr.fqcn.as_ref()) {
+                let method_keep: HashSet<&str> =
+                    tr.own_methods.keys().map(|m| m.as_ref()).collect();
+                self.prune_class_methods(&tr.fqcn, &method_keep);
+            }
+            for method in tr.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            if self.property_nodes.contains_key(tr.fqcn.as_ref()) {
+                let prop_keep: HashSet<&str> =
+                    tr.own_properties.keys().map(|p| p.as_ref()).collect();
+                self.prune_class_properties(&tr.fqcn, &prop_keep);
+            }
+            for prop in tr.own_properties.values() {
+                self.upsert_property_node(&tr.fqcn, prop);
+            }
+            if self.class_constant_nodes.contains_key(tr.fqcn.as_ref()) {
+                let const_keep: HashSet<&str> =
+                    tr.own_constants.keys().map(|c| c.as_ref()).collect();
+                self.prune_class_constants(&tr.fqcn, &const_keep);
+            }
+            for constant in tr.own_constants.values() {
+                self.upsert_class_constant_node(&tr.fqcn, constant);
+            }
+        }
+
+        for en in &slice.enums {
+            if let Some(file) = &slice.file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(en.fqcn.clone(), file.clone());
+            }
+            self.upsert_class_node(ClassNodeFields {
+                interfaces: Arc::from(en.interfaces.as_slice()),
+                is_backed_enum: en.scalar_type.is_some(),
+                enum_scalar_type: en.scalar_type.clone(),
+                location: en.location.clone(),
+                ..ClassNodeFields::for_enum(en.fqcn.clone())
+            });
+            if self.method_nodes.contains_key(en.fqcn.as_ref()) {
+                let mut method_keep: HashSet<&str> =
+                    en.own_methods.keys().map(|m| m.as_ref()).collect();
+                method_keep.insert("cases");
+                if en.scalar_type.is_some() {
+                    method_keep.insert("from");
+                    method_keep.insert("tryfrom");
+                }
+                self.prune_class_methods(&en.fqcn, &method_keep);
+            }
+            for method in en.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            let synth_method = |name: &str| mir_codebase::storage::MethodStorage {
+                fqcn: en.fqcn.clone(),
+                name: Arc::from(name),
+                params: vec![],
+                return_type: Some(Union::mixed()),
+                inferred_return_type: None,
+                visibility: Visibility::Public,
+                is_static: true,
+                is_abstract: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                is_final: false,
+                is_internal: false,
+                is_pure: false,
+                deprecated: None,
+                location: None,
+            };
+            let already = |name: &str| {
+                en.own_methods
+                    .keys()
+                    .any(|k| k.as_ref().eq_ignore_ascii_case(name))
+            };
+            if !already("cases") {
+                self.upsert_method_node(&synth_method("cases"));
+            }
+            if en.scalar_type.is_some() {
+                if !already("from") {
+                    self.upsert_method_node(&synth_method("from"));
+                }
+                if !already("tryFrom") {
+                    self.upsert_method_node(&synth_method("tryFrom"));
+                }
+            }
+            if self.class_constant_nodes.contains_key(en.fqcn.as_ref()) {
+                let mut const_keep: HashSet<&str> =
+                    en.own_constants.keys().map(|c| c.as_ref()).collect();
+                for case in en.cases.values() {
+                    const_keep.insert(case.name.as_ref());
+                }
+                self.prune_class_constants(&en.fqcn, &const_keep);
+            }
+            for constant in en.own_constants.values() {
+                self.upsert_class_constant_node(&en.fqcn, constant);
+            }
+            for case in en.cases.values() {
+                let case_const = ConstantStorage {
+                    name: case.name.clone(),
+                    ty: mir_types::Union::mixed(),
+                    visibility: None,
+                    is_final: false,
+                    location: case.location.clone(),
+                };
+                self.upsert_class_constant_node(&en.fqcn, &case_const);
+            }
+        }
+
+        for func in &slice.functions {
+            if let Some(file) = &slice.file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(func.fqn.clone(), file.clone());
+            }
+            self.upsert_function_node(func);
+        }
+        for (fqn, ty) in &slice.constants {
+            self.upsert_global_constant_node(fqn.clone(), ty.clone());
+        }
+    }
+
     /// Create or update the `ClassNode` for `fqcn`.
     ///
     /// If a handle already exists, its fields are updated in-place so Salsa
@@ -1442,7 +1929,7 @@ impl MirDb {
                 extends_type_args,
                 implements_type_args,
             );
-            self.class_nodes.insert(fqcn, node);
+            Arc::make_mut(&mut self.class_nodes).insert(fqcn, node);
             node
         }
     }
@@ -1512,7 +1999,7 @@ impl MirDb {
                 storage.is_pure,
                 storage.location.clone(),
             );
-            self.function_nodes.insert(fqn.clone(), node);
+            Arc::make_mut(&mut self.function_nodes).insert(fqn.clone(), node);
             node
         }
     }
@@ -1650,7 +2137,7 @@ impl MirDb {
                 storage.is_pure,
                 storage.location.clone(),
             );
-            self.method_nodes
+            Arc::make_mut(&mut self.method_nodes)
                 .entry(fqcn.clone())
                 .or_default()
                 .insert(name_lower, node);
@@ -1675,11 +2162,10 @@ impl MirDb {
     /// when a user file shadows a bundled-stub class with a different method
     /// set.  Active-only check preserves PR21's fast-skip — already-inactive
     /// nodes don't fire a setter.
-    pub fn prune_class_methods(
-        &mut self,
-        fqcn: &str,
-        keep_lower: &std::collections::HashSet<Arc<str>>,
-    ) {
+    pub fn prune_class_methods<T>(&mut self, fqcn: &str, keep_lower: &std::collections::HashSet<T>)
+    where
+        T: Eq + std::hash::Hash + std::borrow::Borrow<str>,
+    {
         use salsa::Setter as _;
         let candidates: Vec<MethodNode> = self
             .method_nodes
@@ -1699,11 +2185,10 @@ impl MirDb {
     }
 
     /// Deactivate `PropertyNode`s for `fqcn` whose name is not in `keep`.
-    pub fn prune_class_properties(
-        &mut self,
-        fqcn: &str,
-        keep: &std::collections::HashSet<Arc<str>>,
-    ) {
+    pub fn prune_class_properties<T>(&mut self, fqcn: &str, keep: &std::collections::HashSet<T>)
+    where
+        T: Eq + std::hash::Hash + std::borrow::Borrow<str>,
+    {
         use salsa::Setter as _;
         let candidates: Vec<PropertyNode> = self
             .property_nodes
@@ -1723,11 +2208,10 @@ impl MirDb {
     }
 
     /// Deactivate `ClassConstantNode`s for `fqcn` whose name is not in `keep`.
-    pub fn prune_class_constants(
-        &mut self,
-        fqcn: &str,
-        keep: &std::collections::HashSet<Arc<str>>,
-    ) {
+    pub fn prune_class_constants<T>(&mut self, fqcn: &str, keep: &std::collections::HashSet<T>)
+    where
+        T: Eq + std::hash::Hash + std::borrow::Borrow<str>,
+    {
         use salsa::Setter as _;
         let candidates: Vec<ClassConstantNode> = self
             .class_constant_nodes
@@ -1783,7 +2267,7 @@ impl MirDb {
                 storage.is_readonly,
                 storage.location.clone(),
             );
-            self.property_nodes
+            Arc::make_mut(&mut self.property_nodes)
                 .entry(fqcn.clone())
                 .or_default()
                 .insert(storage.name.clone(), node);
@@ -1836,215 +2320,10 @@ impl MirDb {
                 storage.is_final,
                 storage.location.clone(),
             );
-            self.class_constant_nodes
+            Arc::make_mut(&mut self.class_constant_nodes)
                 .entry(fqcn.clone())
                 .or_default()
                 .insert(storage.name.clone(), node);
-        }
-    }
-
-    /// Walk every entry in `codebase` and upsert the corresponding db node.
-    ///
-    /// Used after bundled / user stubs are loaded into `Codebase` so that
-    /// `type_exists_via_db` / `class_kind_via_db` / `class_template_params_via_db`
-    /// see them too.  Idempotent — re-running upserts existing nodes in place
-    /// without invalidating downstream queries when fields are unchanged.
-    pub fn ingest_codebase(&mut self, codebase: &Codebase) {
-        use std::collections::HashSet;
-        for entry in codebase.classes.iter() {
-            let cls = entry.value();
-            self.upsert_class_node(ClassNodeFields {
-                is_abstract: cls.is_abstract,
-                parent: cls.parent.clone(),
-                interfaces: Arc::from(cls.interfaces.as_slice()),
-                traits: Arc::from(cls.traits.as_slice()),
-                template_params: Arc::from(cls.template_params.as_slice()),
-                mixins: Arc::from(cls.mixins.as_slice()),
-                deprecated: cls.deprecated.clone(),
-                is_final: cls.is_final,
-                is_readonly: cls.is_readonly,
-                location: cls.location.clone(),
-                extends_type_args: Arc::from(cls.extends_type_args.as_slice()),
-                implements_type_args: Arc::from(
-                    cls.implements_type_args
-                        .iter()
-                        .map(|(iface, args)| (iface.clone(), Arc::from(args.as_slice())))
-                        .collect::<Vec<_>>(),
-                ),
-                ..ClassNodeFields::for_class(cls.fqcn.clone())
-            });
-            let method_keep: HashSet<Arc<str>> = cls
-                .own_methods
-                .values()
-                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
-                .collect();
-            self.prune_class_methods(&cls.fqcn, &method_keep);
-            for method in cls.own_methods.values() {
-                self.upsert_method_node(method.as_ref());
-            }
-            let prop_keep: HashSet<Arc<str>> = cls
-                .own_properties
-                .values()
-                .map(|p| p.name.clone())
-                .collect();
-            self.prune_class_properties(&cls.fqcn, &prop_keep);
-            for prop in cls.own_properties.values() {
-                self.upsert_property_node(&cls.fqcn, prop);
-            }
-            let const_keep: HashSet<Arc<str>> =
-                cls.own_constants.values().map(|c| c.name.clone()).collect();
-            self.prune_class_constants(&cls.fqcn, &const_keep);
-            for constant in cls.own_constants.values() {
-                self.upsert_class_constant_node(&cls.fqcn, constant);
-            }
-        }
-        for entry in codebase.interfaces.iter() {
-            let iface = entry.value();
-            self.upsert_class_node(ClassNodeFields {
-                extends: Arc::from(iface.extends.as_slice()),
-                template_params: Arc::from(iface.template_params.as_slice()),
-                location: iface.location.clone(),
-                ..ClassNodeFields::for_interface(iface.fqcn.clone())
-            });
-            let method_keep: HashSet<Arc<str>> = iface
-                .own_methods
-                .values()
-                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
-                .collect();
-            self.prune_class_methods(&iface.fqcn, &method_keep);
-            for method in iface.own_methods.values() {
-                self.upsert_method_node(method.as_ref());
-            }
-            let const_keep: HashSet<Arc<str>> = iface
-                .own_constants
-                .values()
-                .map(|c| c.name.clone())
-                .collect();
-            self.prune_class_constants(&iface.fqcn, &const_keep);
-            for constant in iface.own_constants.values() {
-                self.upsert_class_constant_node(&iface.fqcn, constant);
-            }
-        }
-        for entry in codebase.traits.iter() {
-            let tr = entry.value();
-            self.upsert_class_node(ClassNodeFields {
-                traits: Arc::from(tr.traits.as_slice()),
-                template_params: Arc::from(tr.template_params.as_slice()),
-                require_extends: Arc::from(tr.require_extends.as_slice()),
-                require_implements: Arc::from(tr.require_implements.as_slice()),
-                location: tr.location.clone(),
-                ..ClassNodeFields::for_trait(tr.fqcn.clone())
-            });
-            let method_keep: HashSet<Arc<str>> = tr
-                .own_methods
-                .values()
-                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
-                .collect();
-            self.prune_class_methods(&tr.fqcn, &method_keep);
-            for method in tr.own_methods.values() {
-                self.upsert_method_node(method.as_ref());
-            }
-            let prop_keep: HashSet<Arc<str>> =
-                tr.own_properties.values().map(|p| p.name.clone()).collect();
-            self.prune_class_properties(&tr.fqcn, &prop_keep);
-            for prop in tr.own_properties.values() {
-                self.upsert_property_node(&tr.fqcn, prop);
-            }
-            let const_keep: HashSet<Arc<str>> =
-                tr.own_constants.values().map(|c| c.name.clone()).collect();
-            self.prune_class_constants(&tr.fqcn, &const_keep);
-            for constant in tr.own_constants.values() {
-                self.upsert_class_constant_node(&tr.fqcn, constant);
-            }
-        }
-        for entry in codebase.enums.iter() {
-            let en = entry.value();
-            self.upsert_class_node(ClassNodeFields {
-                interfaces: Arc::from(en.interfaces.as_slice()),
-                is_backed_enum: en.scalar_type.is_some(),
-                enum_scalar_type: en.scalar_type.clone(),
-                location: en.location.clone(),
-                ..ClassNodeFields::for_enum(en.fqcn.clone())
-            });
-            let mut method_keep: HashSet<Arc<str>> = en
-                .own_methods
-                .values()
-                .map(|m| Arc::<str>::from(m.name.to_lowercase().as_str()))
-                .collect();
-            method_keep.insert(Arc::from("cases"));
-            if en.scalar_type.is_some() {
-                method_keep.insert(Arc::from("from"));
-                method_keep.insert(Arc::from("tryfrom"));
-            }
-            self.prune_class_methods(&en.fqcn, &method_keep);
-            for method in en.own_methods.values() {
-                self.upsert_method_node(method.as_ref());
-            }
-            // Synthesize PHP 8.1 implicit enum methods (`cases`, plus `from` /
-            // `tryFrom` for backed enums) so `lookup_method_node` finds them
-            // — mirrors the on-the-fly synthesis in `Codebase::get_method`.
-            // Only register when the user hasn't shadowed the name (PHP forbids
-            // it but be defensive).
-            let synth_method = |name: &str| mir_codebase::storage::MethodStorage {
-                fqcn: en.fqcn.clone(),
-                name: Arc::from(name),
-                params: vec![],
-                return_type: Some(Union::mixed()),
-                inferred_return_type: None,
-                visibility: Visibility::Public,
-                is_static: true,
-                is_abstract: false,
-                is_constructor: false,
-                template_params: vec![],
-                assertions: vec![],
-                throws: vec![],
-                is_final: false,
-                is_internal: false,
-                is_pure: false,
-                deprecated: None,
-                location: None,
-            };
-            let already = |name: &str| {
-                en.own_methods
-                    .keys()
-                    .any(|k| k.as_ref().eq_ignore_ascii_case(name))
-            };
-            if !already("cases") {
-                self.upsert_method_node(&synth_method("cases"));
-            }
-            if en.scalar_type.is_some() {
-                if !already("from") {
-                    self.upsert_method_node(&synth_method("from"));
-                }
-                if !already("tryFrom") {
-                    self.upsert_method_node(&synth_method("tryFrom"));
-                }
-            }
-            let mut const_keep: HashSet<Arc<str>> =
-                en.own_constants.values().map(|c| c.name.clone()).collect();
-            for case in en.cases.values() {
-                const_keep.insert(case.name.clone());
-            }
-            self.prune_class_constants(&en.fqcn, &const_keep);
-            for constant in en.own_constants.values() {
-                self.upsert_class_constant_node(&en.fqcn, constant);
-            }
-            for case in en.cases.values() {
-                let case_const = ConstantStorage {
-                    name: case.name.clone(),
-                    ty: mir_types::Union::mixed(),
-                    visibility: None,
-                    is_final: false,
-                    location: case.location.clone(),
-                };
-                self.upsert_class_constant_node(&en.fqcn, &case_const);
-            }
-        }
-        for entry in codebase.functions.iter() {
-            self.upsert_function_node(entry.value());
-        }
-        for entry in codebase.constants.iter() {
-            self.upsert_global_constant_node(entry.key().clone(), entry.value().clone());
         }
     }
 
@@ -2061,7 +2340,7 @@ impl MirDb {
             node
         } else {
             let node = GlobalConstantNode::new(self, fqn.clone(), true, ty);
-            self.global_constant_nodes.insert(fqn, node);
+            Arc::make_mut(&mut self.global_constant_nodes).insert(fqn, node);
             node
         }
     }

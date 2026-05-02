@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use mir_codebase::Codebase;
 use mir_types::{Atomic, Union};
 
 use crate::db::{extends_or_implements_via_db, MirDatabase};
@@ -14,7 +13,6 @@ use crate::db::{extends_or_implements_via_db, MirDatabase};
 pub(crate) fn named_object_return_compatible(
     actual: &Union,
     declared: &Union,
-    codebase: &Codebase,
     db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
@@ -72,8 +70,8 @@ pub(crate) fn named_object_return_compatible(
                 _ => return false,
             };
 
-            let resolved_declared = codebase.resolve_class_name(file, declared_fqcn.as_ref());
-            let resolved_actual = codebase.resolve_class_name(file, actual_fqcn.as_ref());
+            let resolved_declared = crate::db::resolve_name_via_db(db, file, declared_fqcn.as_ref());
+            let resolved_actual = crate::db::resolve_name_via_db(db, file, actual_fqcn.as_ref());
 
             // Self/static always compatible with the class itself
             if matches!(
@@ -215,12 +213,12 @@ pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabas
 
 /// Resolve all TNamedObject FQCNs in a Union using the codebase's file-level imports/namespace.
 /// Used to fix up `@var` annotation types that were parsed without namespace context.
-pub(super) fn resolve_union_for_file(union: Union, codebase: &Codebase, file: &str) -> Union {
+pub(super) fn resolve_union_for_file(union: Union, db: &dyn MirDatabase, file: &str) -> Union {
     let mut result = Union::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = union.from_docblock;
     for atomic in union.types {
-        let resolved = resolve_atomic_for_file(atomic, codebase, file);
+        let resolved = resolve_atomic_for_file(atomic, db, file);
         result.types.push(resolved);
     }
     result
@@ -232,31 +230,31 @@ fn is_resolvable_class_name(s: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c == '_' || c == '\\')
 }
 
-fn resolve_atomic_for_file(atomic: Atomic, codebase: &Codebase, file: &str) -> Atomic {
+fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
             if !is_resolvable_class_name(fqcn.as_ref()) {
                 return Atomic::TNamedObject { fqcn, type_params };
             }
-            let resolved = codebase.resolve_class_name(file, fqcn.as_ref());
+            let resolved = crate::db::resolve_name_via_db(db, file, fqcn.as_ref());
             Atomic::TNamedObject {
                 fqcn: resolved.into(),
                 type_params,
             }
         }
         Atomic::TClassString(Some(cls)) => {
-            let resolved = codebase.resolve_class_name(file, cls.as_ref());
+            let resolved = crate::db::resolve_name_via_db(db, file, cls.as_ref());
             Atomic::TClassString(Some(resolved.into()))
         }
         Atomic::TList { value } => Atomic::TList {
-            value: Box::new(resolve_union_for_file(*value, codebase, file)),
+            value: Box::new(resolve_union_for_file(*value, db, file)),
         },
         Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
-            value: Box::new(resolve_union_for_file(*value, codebase, file)),
+            value: Box::new(resolve_union_for_file(*value, db, file)),
         },
         Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(resolve_union_for_file(*key, codebase, file)),
-            value: Box::new(resolve_union_for_file(*value, codebase, file)),
+            key: Box::new(resolve_union_for_file(*key, db, file)),
+            value: Box::new(resolve_union_for_file(*value, db, file)),
         },
         Atomic::TSelf { fqcn } if fqcn.is_empty() => {
             // Sentinel from docblock parser — leave as-is; caller handles it
@@ -271,7 +269,6 @@ fn resolve_atomic_for_file(atomic: Atomic, codebase: &Codebase, file: &str) -> A
 pub(super) fn return_arrays_compatible(
     actual: &Union,
     declared: &Union,
-    codebase: &Codebase,
     db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
@@ -330,8 +327,8 @@ pub(super) fn return_arrays_compatible(
                     {
                         return true; // template param wildcard
                     }
-                    let res_dec = codebase.resolve_class_name(file, dv_fqcn.as_ref());
-                    let res_act = codebase.resolve_class_name(file, av_fqcn.as_ref());
+                    let res_dec = crate::db::resolve_name_via_db(db, file, dv_fqcn.as_ref());
+                    let res_act = crate::db::resolve_name_via_db(db, file, av_fqcn.as_ref());
                     res_dec == res_act
                         || extends_or_implements_via_db(db, av_fqcn.as_ref(), &res_dec)
                         || extends_or_implements_via_db(db, &res_act, &res_dec)
