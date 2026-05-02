@@ -469,7 +469,7 @@ fn project_generic_ancestor_type(
         Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => fqcn,
         _ => return None,
     };
-    let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
+    let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
 
     for param_atomic in &param_ty.types {
         let (param_fqcn, param_type_params) = match param_atomic {
@@ -480,9 +480,7 @@ fn project_generic_ancestor_type(
             continue;
         }
 
-        let resolved_param = ea
-            .codebase
-            .resolve_class_name(&ea.file, param_fqcn.as_ref());
+        let resolved_param = crate::db::resolve_name_via_db(ea.db, &ea.file, param_fqcn.as_ref());
         let ancestor_args = generic_ancestor_type_args(arg_fqcn.as_ref(), &resolved_param, ea)
             .or_else(|| generic_ancestor_type_args(&resolved_arg, &resolved_param, ea))
             .or_else(|| generic_ancestor_type_args(arg_fqcn.as_ref(), param_fqcn.as_ref(), ea))
@@ -561,7 +559,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             .iter()
             .any(|p| matches!(p, Atomic::TCallable { .. }))
         {
-            let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
             if crate::db::method_exists_via_db(ea.db, &resolved_arg, "__invoke")
                 || crate::db::method_exists_via_db(ea.db, arg_fqcn.as_ref(), "__invoke")
             {
@@ -577,10 +575,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 Atomic::TParent { fqcn } => fqcn,
                 _ => return false,
             };
-            let resolved_param = ea
-                .codebase
-                .resolve_class_name(&ea.file, param_fqcn.as_ref());
-            let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
+            let resolved_param =
+                crate::db::resolve_name_via_db(ea.db, &ea.file, param_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
 
             let is_same_class = resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
@@ -709,10 +706,13 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             };
             if let Some(iface_fqcn) = iface_key {
                 let class_fqcns: Vec<std::sync::Arc<str>> = ea
-                    .codebase
-                    .classes
-                    .iter()
-                    .map(|e| e.key().clone())
+                    .db
+                    .active_class_node_fqcns()
+                    .into_iter()
+                    .filter(|fqcn| {
+                        crate::db::class_kind_via_db(ea.db, fqcn.as_ref())
+                            .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum)
+                    })
                     .collect();
                 let compatible = class_fqcns.iter().any(|cls_fqcn| {
                     crate::db::extends_or_implements_via_db(ea.db, cls_fqcn.as_ref(), iface_fqcn)
@@ -763,10 +763,9 @@ fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyz
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 _ => return false,
             };
-            let resolved_param = ea
-                .codebase
-                .resolve_class_name(&ea.file, param_fqcn.as_ref());
-            let resolved_arg = ea.codebase.resolve_class_name(&ea.file, arg_fqcn.as_ref());
+            let resolved_param =
+                crate::db::resolve_name_via_db(ea.db, &ea.file, param_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
             resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
                 || resolved_arg == param_fqcn.as_ref()
@@ -952,8 +951,8 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
             if !pv_fqcn.contains('\\') && !type_exists(ea, pv_fqcn.as_ref()) {
                 return true;
             }
-            let resolved_param = ea.codebase.resolve_class_name(&ea.file, pv_fqcn.as_ref());
-            let resolved_arg = ea.codebase.resolve_class_name(&ea.file, av_fqcn.as_ref());
+            let resolved_param = crate::db::resolve_name_via_db(ea.db, &ea.file, pv_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, av_fqcn.as_ref());
             resolved_param == resolved_arg
                 || crate::db::extends_or_implements_via_db(ea.db, av_fqcn.as_ref(), &resolved_param)
                 || crate::db::extends_or_implements_via_db(ea.db, &resolved_arg, &resolved_param)

@@ -5,7 +5,6 @@
 use php_ast::ast::{AssignOp, BinaryOp, ExprKind, UnaryPrefixOp};
 
 use mir_codebase::storage::AssertionKind;
-use mir_codebase::Codebase;
 use mir_types::{Atomic, Union};
 
 use crate::context::Context;
@@ -20,37 +19,36 @@ pub fn narrow_from_condition<'arena, 'src>(
     expr: &php_ast::ast::Expr<'arena, 'src>,
     ctx: &mut Context,
     is_true: bool,
-    codebase: &Codebase,
     db: &dyn MirDatabase,
     file: &str,
 ) {
     match &expr.kind {
         // Parenthesized — unwrap and narrow the inner expression
         ExprKind::Parenthesized(inner) => {
-            narrow_from_condition(inner, ctx, is_true, codebase, db, file);
+            narrow_from_condition(inner, ctx, is_true, db, file);
         }
 
         // !expr  →  narrow as if expr is !is_true
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
-            narrow_from_condition(u.operand, ctx, !is_true, codebase, db, file);
+            narrow_from_condition(u.operand, ctx, !is_true, db, file);
         }
 
         // $a && $b  →  if true: narrow both; if false: no constraint
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanAnd || b.op == BinaryOp::LogicalAnd => {
             if is_true {
-                narrow_from_condition(b.left, ctx, true, codebase, db, file);
-                narrow_from_condition(b.right, ctx, true, codebase, db, file);
+                narrow_from_condition(b.left, ctx, true, db, file);
+                narrow_from_condition(b.right, ctx, true, db, file);
             }
         }
 
         // $a || $b  →  if false: narrow both; if true: try to narrow same-var instanceof union
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
             if !is_true {
-                narrow_from_condition(b.left, ctx, false, codebase, db, file);
-                narrow_from_condition(b.right, ctx, false, codebase, db, file);
+                narrow_from_condition(b.left, ctx, false, db, file);
+                narrow_from_condition(b.right, ctx, false, db, file);
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
-                narrow_or_instanceof_true(b.left, b.right, ctx, codebase, db, file);
+                narrow_or_instanceof_true(b.left, b.right, ctx, db, file);
             }
         }
 
@@ -136,7 +134,7 @@ pub fn narrow_from_condition<'arena, 'src>(
             if let Some(var_name) = extract_var_name(lhs) {
                 if let Some(raw_name) = extract_class_name(b.right, ctx.self_fqcn.as_deref()) {
                     // Resolve the short name to its FQCN using file imports
-                    let class_name = codebase.resolve_class_name(file, &raw_name);
+                    let class_name = crate::db::resolve_name_via_db(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
                     let narrowed = if effective_is_true {
                         narrow_instanceof_preserving_subtypes(&current, &class_name, db)
@@ -160,10 +158,9 @@ pub fn narrow_from_condition<'arena, 'src>(
                 if fn_name.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {
-                        narrow_from_condition(&arg_expr.value, ctx, is_true, codebase, db, file);
+                        narrow_from_condition(&arg_expr.value, ctx, is_true, db, file);
                     }
-                } else if apply_docblock_assertions(call, ctx, is_true, codebase, db, file, fn_name)
-                {
+                } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
@@ -235,7 +232,6 @@ fn apply_docblock_assertions<'arena, 'src>(
     call: &php_ast::ast::FunctionCallExpr<'arena, 'src>,
     ctx: &mut Context,
     is_true: bool,
-    codebase: &Codebase,
     db: &dyn MirDatabase,
     file: &str,
     fn_name: &str,
@@ -247,7 +243,7 @@ fn apply_docblock_assertions<'arena, 'src>(
     let fn_active =
         |name: &str| -> bool { db.lookup_function_node(name).is_some_and(|n| n.active(db)) };
     let resolved_fn_name = {
-        let qualified = codebase.resolve_class_name(file, &fn_name);
+        let qualified = crate::db::resolve_name_via_db(db, file, &fn_name);
         if fn_active(qualified.as_str()) {
             qualified
         } else if fn_active(fn_name.as_str()) {
@@ -296,7 +292,6 @@ fn narrow_or_instanceof_true<'arena, 'src>(
     left: &php_ast::ast::Expr<'arena, 'src>,
     right: &php_ast::ast::Expr<'arena, 'src>,
     ctx: &mut Context,
-    codebase: &Codebase,
     db: &dyn MirDatabase,
     file: &str,
 ) {
@@ -310,7 +305,7 @@ fn narrow_or_instanceof_true<'arena, 'src>(
         expr: &php_ast::ast::Expr<'a, 's>,
         var_name: &mut Option<String>,
         class_names: &mut Vec<String>,
-        codebase: &Codebase,
+        db: &dyn MirDatabase,
         file: &str,
         self_fqcn: Option<&str>,
     ) -> bool {
@@ -320,7 +315,7 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                     extract_var_name(b.left),
                     extract_class_name(b.right, self_fqcn),
                 ) {
-                    let resolved = codebase.resolve_class_name(file, &cn);
+                    let resolved = crate::db::resolve_name_via_db(db, file, &cn);
                     match var_name {
                         None => {
                             *var_name = Some(vn);
@@ -338,33 +333,19 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                 }
             }
             ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
-                collect_instanceof(b.left, var_name, class_names, codebase, file, self_fqcn)
-                    && collect_instanceof(b.right, var_name, class_names, codebase, file, self_fqcn)
+                collect_instanceof(b.left, var_name, class_names, db, file, self_fqcn)
+                    && collect_instanceof(b.right, var_name, class_names, db, file, self_fqcn)
             }
             ExprKind::Parenthesized(inner) => {
-                collect_instanceof(inner, var_name, class_names, codebase, file, self_fqcn)
+                collect_instanceof(inner, var_name, class_names, db, file, self_fqcn)
             }
             _ => false,
         }
     }
 
     // Wrap left and right into a fake OR so we can reuse the collector
-    let left_ok = collect_instanceof(
-        left,
-        &mut var_name,
-        &mut class_names,
-        codebase,
-        file,
-        self_fqcn,
-    );
-    let right_ok = collect_instanceof(
-        right,
-        &mut var_name,
-        &mut class_names,
-        codebase,
-        file,
-        self_fqcn,
-    );
+    let left_ok = collect_instanceof(left, &mut var_name, &mut class_names, db, file, self_fqcn);
+    let right_ok = collect_instanceof(right, &mut var_name, &mut class_names, db, file, self_fqcn);
 
     if left_ok && right_ok {
         if let Some(vn) = var_name {

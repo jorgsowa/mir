@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mir_codebase::Codebase;
+use crate::db::{resolve_name_via_db, type_exists_via_db, MirDatabase};
 
 // ---------------------------------------------------------------------------
 // Offset to char-count column conversion
@@ -35,7 +35,7 @@ pub(crate) fn offset_to_line_col(
 
 pub(crate) fn check_type_hint_classes<'arena, 'src>(
     hint: &php_ast::ast::TypeHint<'arena, 'src>,
-    codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
@@ -48,8 +48,8 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
             if is_pseudo_type(&name_str) {
                 return;
             }
-            let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
-            if !codebase.type_exists(&resolved) {
+            let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
+            if !type_exists_via_db(db, &resolved) {
                 let (line, col_start) = offset_to_line_col(source, hint.span.start, source_map);
                 let (line_end, col_end) = if hint.span.start < hint.span.end {
                     let (end_line, end_col) = offset_to_line_col(source, hint.span.end, source_map);
@@ -73,11 +73,11 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
             }
         }
         TypeHintKind::Nullable(inner) => {
-            check_type_hint_classes(inner, codebase, file, source, source_map, issues);
+            check_type_hint_classes(inner, db, file, source, source_map, issues);
         }
         TypeHintKind::Union(parts) | TypeHintKind::Intersection(parts) => {
             for part in parts.iter() {
-                check_type_hint_classes(part, codebase, file, source, source_map, issues);
+                check_type_hint_classes(part, db, file, source, source_map, issues);
             }
         }
         TypeHintKind::Keyword(_, _) => {}
@@ -86,15 +86,15 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
 
 pub(crate) fn check_name_class(
     name: &php_ast::ast::Name<'_, '_>,
-    codebase: &Codebase,
+    db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<mir_issues::Issue>,
 ) {
     let name_str = crate::parser::name_to_string(name);
-    let resolved = codebase.resolve_class_name(file.as_ref(), &name_str);
-    if !codebase.type_exists(&resolved) {
+    let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
+    if !type_exists_via_db(db, &resolved) {
         let span = name.span();
         let (line, col_start) = offset_to_line_col(source, span.start, source_map);
         let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);

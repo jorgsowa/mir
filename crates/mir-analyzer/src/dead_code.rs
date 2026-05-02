@@ -10,7 +10,6 @@
 /// Magic methods (`__construct`, `__destruct`, `__toString`, etc.) and
 /// constructors are excluded because they are called implicitly.
 use mir_codebase::storage::Visibility;
-use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location, Severity};
 
 use crate::db::MirDatabase;
@@ -38,13 +37,12 @@ const MAGIC_METHODS: &[&str] = &[
 ];
 
 pub struct DeadCodeAnalyzer<'a> {
-    codebase: &'a Codebase,
     db: &'a dyn MirDatabase,
 }
 
 impl<'a> DeadCodeAnalyzer<'a> {
-    pub fn new(codebase: &'a Codebase, db: &'a dyn MirDatabase) -> Self {
-        Self { codebase, db }
+    pub fn new(db: &'a dyn MirDatabase) -> Self {
+        Self { db }
     }
 
     pub fn analyze(&self) -> Vec<Issue> {
@@ -77,7 +75,10 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 if MAGIC_METHODS.contains(&name_lower.as_str()) {
                     continue;
                 }
-                if !self.codebase.is_method_referenced(fqcn_str, name.as_ref()) {
+                if !self
+                    .db
+                    .has_reference(&format!("{}::{}", fqcn_str, name.to_lowercase()))
+                {
                     let (file, line) = location_from_storage(&method.location(self.db));
                     issues.push(Issue::new(
                         IssueKind::UnusedMethod {
@@ -104,8 +105,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
                 let name = prop.name(self.db);
                 if !self
-                    .codebase
-                    .is_property_referenced(fqcn_str, name.as_ref())
+                    .db
+                    .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
                 {
                     let (file, line) = location_from_storage(&prop.location(self.db));
                     issues.push(Issue::new(
@@ -142,7 +143,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     continue;
                 }
             }
-            if !self.codebase.is_function_referenced(fqn.as_ref()) {
+            if !self.db.has_reference(fqn.as_ref()) {
                 let (file, line) = location_from_storage(&location);
                 issues.push(Issue::new(
                     IssueKind::UnusedFunction {
@@ -192,7 +193,7 @@ mod tests {
         analyzer.load_stubs();
         let salsa = analyzer.salsa_db_for_test();
         let salsa = salsa.lock().unwrap();
-        let issues = DeadCodeAnalyzer::new(analyzer.codebase(), &salsa.0).analyze();
+        let issues = DeadCodeAnalyzer::new(&salsa.0).analyze();
         let builtin_false_positives: Vec<_> = issues
             .iter()
             .filter(|i| {

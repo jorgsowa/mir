@@ -138,7 +138,7 @@ impl CallAnalyzer {
                     fqcn,
                     type_params: receiver_type_params,
                 } => {
-                    let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
+                    let fqcn_resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     result = Union::merge(
                         &result,
@@ -158,7 +158,7 @@ impl CallAnalyzer {
                 mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
                 | mir_types::Atomic::TParent { fqcn } => {
-                    let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
+                    let fqcn_resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     result = Union::merge(
                         &result,
@@ -185,7 +185,8 @@ impl CallAnalyzer {
                                 type_params: receiver_type_params,
                             } = inner_atomic
                             {
-                                let fqcn_resolved = ea.codebase.resolve_class_name(&ea.file, fqcn);
+                                let fqcn_resolved =
+                                    crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
                                 let resolved_arc = Arc::from(fqcn_resolved.as_str());
                                 if crate::db::method_exists_via_db(
                                     ea.db,
@@ -273,14 +274,17 @@ fn resolve_method_return<'a, 'arena, 'src>(
     if let Some(resolved) = resolved {
         if !ea.inference_only {
             let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
-            ea.codebase.mark_method_referenced_at(
-                &resolved.owner_fqcn,
-                &resolved.name,
-                ea.file.clone(),
+            ea.db.record_reference_location(crate::db::RefLoc {
+                symbol_key: Arc::from(format!(
+                    "{}::{}",
+                    &resolved.owner_fqcn,
+                    resolved.name.to_lowercase()
+                )),
+                file: ea.file.clone(),
                 line,
                 col_start,
                 col_end,
-            );
+            });
         }
         if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(

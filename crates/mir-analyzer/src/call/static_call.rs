@@ -30,7 +30,9 @@ impl CallAnalyzer {
         };
 
         let fqcn = match &call.class.kind {
-            ExprKind::Identifier(name) => ea.codebase.resolve_class_name(&ea.file, name.as_ref()),
+            ExprKind::Identifier(name) => {
+                crate::db::resolve_name_via_db(ea.db, &ea.file, name.as_ref())
+            }
             _ => return Union::mixed(),
         };
 
@@ -58,14 +60,13 @@ impl CallAnalyzer {
         if let Some(resolved) = resolved {
             if !ea.inference_only {
                 let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
-                ea.codebase.mark_method_referenced_at(
-                    &fqcn,
-                    method_name,
-                    ea.file.clone(),
+                ea.db.record_reference_location(crate::db::RefLoc {
+                    symbol_key: Arc::from(format!("{}::{}", &fqcn, method_name.to_lowercase())),
+                    file: ea.file.clone(),
                     line,
                     col_start,
                     col_end,
-                );
+                });
             }
             if let Some(msg) = resolved.deprecated.clone() {
                 ea.emit(

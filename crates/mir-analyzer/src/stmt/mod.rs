@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use php_ast::ast::StmtKind;
 
-use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
 use mir_types::{Atomic, Union};
 
@@ -27,7 +26,6 @@ use crate::symbol::ResolvedSymbol;
 // ---------------------------------------------------------------------------
 
 pub struct StatementsAnalyzer<'a> {
-    pub codebase: &'a Codebase,
     pub db: &'a dyn MirDatabase,
     pub file: Arc<str>,
     pub source: &'a str,
@@ -46,7 +44,6 @@ pub struct StatementsAnalyzer<'a> {
 impl<'a> StatementsAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        codebase: &'a Codebase,
         db: &'a dyn MirDatabase,
         file: Arc<str>,
         source: &'a str,
@@ -57,7 +54,6 @@ impl<'a> StatementsAnalyzer<'a> {
         inference_only: bool,
     ) -> Self {
         Self {
-            codebase,
             db,
             file,
             source,
@@ -162,14 +158,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
                         if fn_name.eq_ignore_ascii_case("assert") {
                             if let Some(arg) = call.args.first() {
-                                narrow_from_condition(
-                                    &arg.value,
-                                    ctx,
-                                    true,
-                                    self.codebase,
-                                    self.db,
-                                    &self.file,
-                                );
+                                narrow_from_condition(&arg.value, ctx, true, self.db, &self.file);
                             }
                         }
                     }
@@ -240,14 +229,14 @@ impl<'a> StatementsAnalyzer<'a> {
                                 || (!check_ty.is_subtype_of_simple(declared)
                                 && !declared.is_mixed()
                                 && !check_ty.is_mixed()
-                                && !named_object_return_compatible(&check_ty, declared, self.codebase, self.db, &self.file)
+                                && !named_object_return_compatible(&check_ty, declared, self.db, &self.file)
                                 // Also check without null (handles `null|T` where T implements declared).
                                 // Guard: if check_ty is purely null, remove_null() is empty and would
                                 // vacuously return true, incorrectly suppressing the error.
-                                && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.codebase, self.db, &self.file))
+                                && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.db, &self.file))
                                 && !declared_return_has_template(declared, self.db)
                                 && !declared_return_has_template(&check_ty, self.db)
-                                && !return_arrays_compatible(&check_ty, declared, self.codebase, self.db, &self.file)
+                                && !return_arrays_compatible(&check_ty, declared, self.db, &self.file)
                                 // Skip coercions: declared is more specific than actual
                                 && !declared.is_subtype_of_simple(&check_ty)
                                 && !declared.remove_null().is_subtype_of_simple(&check_ty)
@@ -259,8 +248,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                 && !check_ty.remove_false().is_subtype_of_simple(declared)
                                 // Suppress LessSpecificReturnStatement (level 4): actual is a
                                 // supertype of declared (not flagged at default error level).
-                                && !named_object_return_compatible(declared, &check_ty, self.codebase, self.db, &self.file)
-                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.codebase, self.db, &self.file)))
+                                && !named_object_return_compatible(declared, &check_ty, self.db, &self.file)
+                                && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.db, &self.file)))
                         {
                             let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                             let (line_end, col_end) = if stmt.span.start < stmt.span.end {
@@ -335,7 +324,8 @@ impl<'a> StatementsAnalyzer<'a> {
                 for atomic in &thrown_ty.types {
                     match atomic {
                         mir_types::Atomic::TNamedObject { fqcn, .. } => {
-                            let resolved = self.codebase.resolve_class_name(&self.file, fqcn);
+                            let resolved =
+                                crate::db::resolve_name_via_db(self.db, &self.file, fqcn);
                             let is_throwable = resolved == "Throwable"
                                 || resolved == "Exception"
                                 || resolved == "Error"
@@ -380,7 +370,8 @@ impl<'a> StatementsAnalyzer<'a> {
                         mir_types::Atomic::TSelf { fqcn }
                         | mir_types::Atomic::TStaticObject { fqcn }
                         | mir_types::Atomic::TParent { fqcn } => {
-                            let resolved = self.codebase.resolve_class_name(&self.file, fqcn);
+                            let resolved =
+                                crate::db::resolve_name_via_db(self.db, &self.file, fqcn);
                             let is_throwable = resolved == "Throwable"
                                 || resolved == "Exception"
                                 || resolved == "Error"
@@ -470,14 +461,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // True branch
                 let mut then_ctx = ctx.fork();
-                narrow_from_condition(
-                    &if_stmt.condition,
-                    &mut then_ctx,
-                    true,
-                    self.codebase,
-                    self.db,
-                    &self.file,
-                );
+                narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
                 // Capture narrowing-only unreachability before body analysis —
                 // body divergence (continue/return/throw) must not trigger
                 // RedundantCondition for valid conditions.
@@ -498,7 +482,6 @@ impl<'a> StatementsAnalyzer<'a> {
                         &if_stmt.condition,
                         &mut pre_elseif,
                         false,
-                        self.codebase,
                         self.db,
                         &self.file,
                     );
@@ -512,7 +495,6 @@ impl<'a> StatementsAnalyzer<'a> {
                         &elseif.condition,
                         &mut elseif_true_ctx,
                         true,
-                        self.codebase,
                         self.db,
                         &self.file,
                     );
@@ -521,7 +503,6 @@ impl<'a> StatementsAnalyzer<'a> {
                         &elseif.condition,
                         &mut elseif_false_ctx,
                         false,
-                        self.codebase,
                         self.db,
                         &self.file,
                     );
@@ -577,7 +558,6 @@ impl<'a> StatementsAnalyzer<'a> {
                     &if_stmt.condition,
                     &mut else_ctx,
                     false,
-                    self.codebase,
                     self.db,
                     &self.file,
                 );
@@ -638,14 +618,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
                 // Entry context: narrow on true condition
                 let mut entry = ctx.fork();
-                narrow_from_condition(
-                    &w.condition,
-                    &mut entry,
-                    true,
-                    self.codebase,
-                    self.db,
-                    &self.file,
-                );
+                narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
 
                 let post = self.analyze_loop_widened(&pre, entry, |sa, iter| {
                     sa.analyze_stmt(w.body, iter);
@@ -773,14 +746,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let Some(val) = &case.value {
                         if switch_on_true {
                             // `switch(true) { case $x instanceof Y: }` — narrow from condition
-                            narrow_from_condition(
-                                val,
-                                &mut case_ctx,
-                                true,
-                                self.codebase,
-                                self.db,
-                                &self.file,
-                            );
+                            narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
                         } else if let Some(ref var_name) = subject_var {
                             // Narrow subject var to the literal type of the case value
                             let narrow_ty = match &val.kind {
@@ -900,7 +866,8 @@ impl<'a> StatementsAnalyzer<'a> {
                             let mut u = Union::empty();
                             for catch_ty in catch.types.iter() {
                                 let raw = crate::parser::name_to_string(catch_ty);
-                                let resolved = self.codebase.resolve_class_name(&self.file, &raw);
+                                let resolved =
+                                    crate::db::resolve_name_via_db(self.db, &self.file, &raw);
                                 u.add_type(Atomic::TNamedObject {
                                     fqcn: resolved.into(),
                                     type_params: vec![],
@@ -993,10 +960,8 @@ impl<'a> StatementsAnalyzer<'a> {
                     if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
                         let var_name = name.as_str().trim_start_matches('$');
                         let ty = self
-                            .codebase
-                            .global_vars
-                            .get(var_name)
-                            .map(|r| r.clone())
+                            .db
+                            .global_var_type(var_name)
                             .unwrap_or_else(Union::mixed);
                         ctx.set_var(var_name, ty);
                     }
@@ -1034,7 +999,6 @@ impl<'a> StatementsAnalyzer<'a> {
                 let mut fn_ctx =
                     Context::for_function(&params, None, None, None, None, ctx.strict_types, true);
                 let mut sa = StatementsAnalyzer::new(
-                    self.codebase,
                     self.db,
                     self.file.clone(),
                     self.source,
@@ -1051,13 +1015,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 // Nested class declaration — analyze each method body in the same
                 // issue buffer so that undefined-function/class calls are reported.
                 let class_name = decl.name.unwrap_or("<anonymous>");
-                let resolved = self.codebase.resolve_class_name(&self.file, class_name);
+                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, class_name);
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
                 let parent_fqcn = self
-                    .codebase
-                    .classes
-                    .get(fqcn.as_ref())
-                    .and_then(|c| c.parent.clone());
+                    .db
+                    .lookup_class_node(fqcn.as_ref())
+                    .and_then(|node| node.parent(self.db));
 
                 for member in decl.members.iter() {
                     let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
@@ -1097,7 +1060,6 @@ impl<'a> StatementsAnalyzer<'a> {
                         method.is_static,
                     );
                     let mut sa = StatementsAnalyzer::new(
-                        self.codebase,
                         self.db,
                         self.file.clone(),
                         self.source,
@@ -1138,7 +1100,6 @@ impl<'a> StatementsAnalyzer<'a> {
         'a: 'b,
     {
         ExpressionAnalyzer::new(
-            self.codebase,
             self.db,
             self.file.clone(),
             self.source,
@@ -1174,7 +1135,7 @@ impl<'a> StatementsAnalyzer<'a> {
     /// Emit `UndefinedClass` for a `Name` AST node if the resolved class does not exist.
     fn check_name_undefined_class(&mut self, name: &php_ast::ast::Name<'_, '_>) {
         let raw = crate::parser::name_to_string(name);
-        let resolved = self.codebase.resolve_class_name(&self.file, &raw);
+        let resolved = crate::db::resolve_name_via_db(self.db, &self.file, &raw);
         if matches!(resolved.as_str(), "self" | "static" | "parent") {
             return;
         }
@@ -1233,7 +1194,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let doc = crate::parser::find_preceding_docblock(self.source, span.start)?;
         let parsed = crate::parser::DocblockParser::parse(&doc);
         let ty = parsed.var_type?;
-        let resolved = resolve_union_for_file(ty, self.codebase, &self.file);
+        let resolved = resolve_union_for_file(ty, self.db, &self.file);
         Some((parsed.var_name, resolved))
     }
 

@@ -1,6 +1,8 @@
 use php_ast::ast::{ExprKind, FunctionCallExpr};
 use php_ast::Span;
 
+use std::sync::Arc;
+
 use mir_codebase::storage::{Assertion, AssertionKind, FnParam, TemplateParam};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
@@ -98,7 +100,16 @@ impl CallAnalyzer {
             .map(|s: &str| s.to_string())
             .unwrap_or(fn_name);
         let resolved_fn_name: String = {
-            let qualified = ea.codebase.resolve_class_name(&ea.file, &fn_name);
+            let imports = ea.db.file_imports(&ea.file);
+            let qualified = if let Some(imported) = imports.get(fn_name.as_str()) {
+                imported.clone()
+            } else if fn_name.contains('\\') {
+                crate::db::resolve_name_via_db(ea.db, &ea.file, &fn_name)
+            } else if let Some(ns) = ea.db.file_namespace(&ea.file) {
+                format!("{}\\{}", ns, fn_name)
+            } else {
+                fn_name.clone()
+            };
             let fn_exists = |name: &str| -> bool {
                 let db = ea.db;
                 db.lookup_function_node(name).is_some_and(|n| n.active(db))
@@ -166,13 +177,13 @@ impl CallAnalyzer {
                     {
                         if !ea.inference_only {
                             let (line, col_start, col_end) = ea.span_to_ref_loc(arg.span);
-                            ea.codebase.mark_function_referenced_at(
-                                node.fqn(ea.db).as_ref(),
-                                ea.file.clone(),
+                            ea.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(node.fqn(ea.db).as_ref()),
+                                file: ea.file.clone(),
                                 line,
                                 col_start,
                                 col_end,
-                            );
+                            });
                         }
                     }
                 }
@@ -191,13 +202,13 @@ impl CallAnalyzer {
         if let Some(resolved) = resolve_fn(ea, resolved_fn_name.as_str()) {
             if !ea.inference_only {
                 let (line, col_start, col_end) = ea.span_to_ref_loc(call.name.span);
-                ea.codebase.mark_function_referenced_at(
-                    &resolved.fqn,
-                    ea.file.clone(),
+                ea.db.record_reference_location(crate::db::RefLoc {
+                    symbol_key: resolved.fqn.clone(),
+                    file: ea.file.clone(),
                     line,
                     col_start,
                     col_end,
-                );
+                });
             }
             let deprecated = resolved.deprecated;
             let params = resolved.params;

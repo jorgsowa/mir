@@ -11,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use mir_codebase::storage::{Location as StorageLocation, Visibility};
-use mir_codebase::Codebase;
 use mir_issues::{Issue, IssueKind, Location};
 
 use crate::db::{class_ancestors, MirDatabase};
@@ -21,7 +20,6 @@ use crate::db::{class_ancestors, MirDatabase};
 // ---------------------------------------------------------------------------
 
 pub struct ClassAnalyzer<'a> {
-    codebase: &'a Codebase,
     db: &'a dyn MirDatabase,
     /// Only report issues for classes defined in these files (empty = all files).
     analyzed_files: HashSet<Arc<str>>,
@@ -30,9 +28,8 @@ pub struct ClassAnalyzer<'a> {
 }
 
 impl<'a> ClassAnalyzer<'a> {
-    pub fn new(codebase: &'a Codebase, db: &'a dyn MirDatabase) -> Self {
+    pub fn new(db: &'a dyn MirDatabase) -> Self {
         Self {
-            codebase,
             db,
             analyzed_files: HashSet::new(),
             sources: HashMap::new(),
@@ -40,17 +37,15 @@ impl<'a> ClassAnalyzer<'a> {
     }
 
     pub fn with_files(
-        codebase: &'a Codebase,
         db: &'a dyn MirDatabase,
         files: HashSet<Arc<str>>,
-        file_data: &'a [(Arc<str>, String)],
+        file_data: &'a [(Arc<str>, Arc<str>)],
     ) -> Self {
         let sources: HashMap<Arc<str>, &'a str> = file_data
             .iter()
-            .map(|(f, s)| (f.clone(), s.as_str()))
+            .map(|(f, s)| (f.clone(), s.as_ref()))
             .collect();
         Self {
-            codebase,
             db,
             analyzed_files: files,
             sources,
@@ -411,11 +406,7 @@ impl<'a> ClassAnalyzer<'a> {
                         && self.type_has_only_object_atoms(parent_ret)
                     {
                         crate::stmt::named_object_return_compatible(
-                            child_ret,
-                            parent_ret,
-                            self.codebase,
-                            self.db,
-                            child_file,
+                            child_ret, parent_ret, self.db, child_file,
                         )
                     } else if involves_named_objects || involves_self_static {
                         true // mixed scalar+object union — skip (G5 gap)
