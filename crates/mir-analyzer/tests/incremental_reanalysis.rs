@@ -4,6 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use mir_analyzer::db::MirDatabase;
 use mir_analyzer::ProjectAnalyzer;
 use tempfile::TempDir;
 
@@ -92,13 +93,16 @@ fn re_analyze_file_removes_old_definitions() {
     let _result2 = analyzer.re_analyze_file(&file_path_a, new_content_a);
 
     // Verify the old method bar() is gone and baz() exists
-    let foo = analyzer.codebase().classes.get("Foo").unwrap();
+    let guard = analyzer.salsa_db_for_test().lock().unwrap();
+    let db = &guard.0;
     assert!(
-        foo.own_methods.contains_key("baz"),
+        db.lookup_method_node("Foo", "baz")
+            .is_some_and(|n| n.active(db)),
         "baz() should exist after re-analysis"
     );
     assert!(
-        !foo.own_methods.contains_key("bar"),
+        !db.lookup_method_node("Foo", "bar")
+            .is_some_and(|n| n.active(db)),
         "bar() should be removed after re-analysis"
     );
 }
@@ -170,11 +174,12 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
         "initial analysis should report UndefinedFunction"
     );
 
-    // Insert ghost_fn() into the codebase so a slow-path re-analysis would
+    // Insert ghost_fn() into the salsa db so a slow-path re-analysis would
     // find it and produce no issues.
-    analyzer.codebase().functions.insert(
-        Arc::from("ghost_fn"),
-        mir_codebase::FunctionStorage {
+    {
+        let mut guard = analyzer.salsa_db_for_test().lock().unwrap();
+        let db = &mut guard.0;
+        db.upsert_function_node(&mir_codebase::FunctionStorage {
             fqn: Arc::from("ghost_fn"),
             short_name: Arc::from("ghost_fn"),
             params: vec![],
@@ -186,8 +191,8 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
             deprecated: None,
             is_pure: false,
             location: None,
-        },
-    );
+        });
+    }
 
     // Re-analyze with identical content — must hit the cache.
     let result2 = analyzer.re_analyze_file(&file_path, content);

@@ -636,8 +636,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                             }
                             // Check constructor arguments via the db chain
-                            // helper — PR30/PR31 brought it to full parity
-                            // with `Codebase::get_method`.
+                            // helper.
                             let ctor_params =
                                 crate::db::lookup_method_in_chain(self.db, &fqcn, "__construct")
                                     .map(|n| n.params(self.db).to_vec());

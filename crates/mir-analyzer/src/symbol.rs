@@ -24,10 +24,10 @@ pub struct ResolvedSymbol {
 }
 
 impl ResolvedSymbol {
-    /// Return the key used in `Codebase::symbol_reference_locations` for this
+    /// Return the key used in the salsa db's reference-location table for this
     /// symbol, or `None` for kinds that are not tracked there (e.g. variables).
     ///
-    /// Key format mirrors `mark_*_referenced_at`:
+    /// Key format mirrors `MirDatabase::record_reference_location`:
     /// - method / static call : `"ClassName::methodname"` (method lowercased)
     /// - property access      : `"ClassName::propName"`
     /// - function call        : fully-qualified function name

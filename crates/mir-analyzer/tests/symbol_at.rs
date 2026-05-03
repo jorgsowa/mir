@@ -299,7 +299,7 @@ fn symbol_at_this_method_call_full_lsp_flow() {
         "codebase_key must end with '::helper', got: {key}"
     );
 
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
         2,
@@ -384,10 +384,7 @@ fn codebase_key_for_function_call_matches_reference_index() {
     assert_eq!(key, "greet");
 
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations(key.as_str())
-            .is_empty(),
+        !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -413,10 +410,7 @@ fn codebase_key_for_method_call_is_lowercased() {
         "method part of key must be lowercased, got: {key}"
     );
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations(key.as_str())
-            .is_empty(),
+        !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -441,10 +435,7 @@ fn codebase_key_for_static_call_matches_reference_index() {
     let key = sym.codebase_key().unwrap();
     assert_eq!(key, "Math::square");
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations(key.as_str())
-            .is_empty(),
+        !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -469,10 +460,7 @@ fn codebase_key_for_property_access_matches_reference_index() {
     let key = sym.codebase_key().unwrap();
     assert_eq!(key, "Counter::count");
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations(key.as_str())
-            .is_empty(),
+        !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key for PropertyAccess should match an entry in symbol_reference_locations"
     );
 }
@@ -495,10 +483,7 @@ fn codebase_key_for_class_reference_matches_reference_index() {
     let key = sym.codebase_key().unwrap();
     assert_eq!(key, "Widget");
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations(key.as_str())
-            .is_empty(),
+        !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
@@ -544,7 +529,7 @@ fn full_flow_cursor_to_reference_locations() {
     let key = sym.codebase_key().expect("FunctionCall must have a key");
     assert_eq!(key, "ping");
 
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
         2,
@@ -699,7 +684,7 @@ fn symbol_at_finds_property_access() {
     // Verify the full LSP flow: cursor → key → reference locations
     let key = sym.codebase_key().expect("PropertyAccess must have a key");
     assert_eq!(key, "Counter::count");
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
         1,
@@ -733,7 +718,7 @@ fn symbol_at_finds_nullsafe_property_access() {
     // Verify the full LSP flow: cursor → key → reference locations
     let key = sym.codebase_key().expect("PropertyAccess must have a key");
     assert_eq!(key, "Box::val");
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
         1,
@@ -766,7 +751,7 @@ fn symbol_at_finds_nullsafe_method_call() {
     // Verify the full LSP flow: cursor → key → reference locations
     let key = sym.codebase_key().expect("MethodCall must have a key");
     assert_eq!(key, "Svc::run");
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
         1,
@@ -793,7 +778,7 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
         .expect("symbol_at must find MethodCall(run)");
 
     let key = sym.codebase_key().unwrap();
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     let (_, _line, ref_col_start, ref_col_end) = *locs
         .iter()
         .find(|(f, ..)| f.as_ref() == file_str)
@@ -825,7 +810,7 @@ fn symbol_at_function_call_span_matches_reference_location_span() {
         .expect("symbol_at must find FunctionCall(greet)");
 
     let key = sym.codebase_key().unwrap();
-    let locs = analyzer.codebase().get_reference_locations(&key);
+    let locs = analyzer.reference_locations(&key);
     let (_, _line, ref_col_start, ref_col_end) = *locs
         .iter()
         .find(|(f, ..)| f.as_ref() == file_str)

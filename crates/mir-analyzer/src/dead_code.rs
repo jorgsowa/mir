@@ -49,8 +49,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
         let mut issues = Vec::new();
 
         // --- Private methods / properties on classes ---
-        // Walk only class-kind nodes (not interfaces/traits/enums) to match
-        // the previous `Codebase::classes` iteration semantics.
+        // Walk only class-kind nodes (not interfaces/traits/enums); private
+        // members on the other kinds aren't subject to dead-code reporting.
         for fqcn in self.db.active_class_node_fqcns() {
             let Some(class_node) = self.db.lookup_class_node(fqcn.as_ref()) else {
                 continue;

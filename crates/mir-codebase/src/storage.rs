@@ -206,7 +206,8 @@ pub struct ClassStorage {
 impl ClassStorage {
     pub fn get_method(&self, name: &str) -> Option<&MethodStorage> {
         // PHP method names are case-insensitive; caller should pass lowercase name.
-        // Only searches own_methods — inherited method resolution is done by Codebase::get_method.
+        // Only searches own_methods — inherited method resolution is done by
+        // `db::lookup_method_in_chain`.
         self.own_methods.get(name).map(Arc::as_ref).or_else(|| {
             self.own_methods
                 .iter()
@@ -315,7 +316,8 @@ impl FunctionStorage {
 /// A snapshot of all PHP definitions contributed by a single stub file set.
 ///
 /// Produced by `mir-stubs-gen` at code-generation time and deserialized at
-/// runtime to inject definitions into the `Codebase`.
+/// runtime to ingest definitions into the salsa db via
+/// `MirDatabase::ingest_stub_slice`.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct StubSlice {
     pub classes: Vec<ClassStorage>,
@@ -330,18 +332,18 @@ pub struct StubSlice {
     #[serde(default)]
     pub file: Option<Arc<str>>,
     /// Types of `@var`-annotated global variables collected from this file.
-    /// Populated by `DefinitionCollector`; merged into `Codebase::global_vars`
-    /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
+    /// Populated by `DefinitionCollector`; ingested into the salsa db's
+    /// `global_vars` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
     pub global_vars: Vec<(Arc<str>, Union)>,
     /// The first namespace declared in this file (e.g. `"App\\Service"`).
-    /// Populated by `DefinitionCollector`; merged into `Codebase::file_namespaces`
-    /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
+    /// Populated by `DefinitionCollector`; ingested into the salsa db's
+    /// `file_namespaces` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
     pub namespace: Option<Arc<str>>,
     /// `use` alias map for this file: alias → FQCN.
-    /// Populated by `DefinitionCollector`; merged into `Codebase::file_imports`
-    /// by [`crate::Codebase::inject_stub_slice`] when `file` is `Some`.
+    /// Populated by `DefinitionCollector`; ingested into the salsa db's
+    /// `file_imports` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
     pub imports: std::collections::HashMap<String, String>,
 }
