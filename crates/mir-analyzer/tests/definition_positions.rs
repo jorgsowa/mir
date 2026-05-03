@@ -25,7 +25,7 @@ fn get_symbol_location_finds_class() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.codebase.get_symbol_location("Foo");
+    let loc = analyzer.symbol_location("Foo");
     assert!(loc.is_some(), "should find location for class Foo");
     let loc = loc.unwrap();
     assert_eq!(loc.file.as_ref(), file_str.as_str());
@@ -43,7 +43,7 @@ fn get_symbol_location_finds_function() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.codebase.get_symbol_location("my_func");
+    let loc = analyzer.symbol_location("my_func");
     assert!(loc.is_some(), "should find location for function my_func");
 }
 
@@ -59,7 +59,7 @@ fn get_symbol_location_finds_interface() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.codebase.get_symbol_location("Renderable");
+    let loc = analyzer.symbol_location("Renderable");
     assert!(loc.is_some(), "should find location for interface");
 }
 
@@ -101,9 +101,6 @@ fn get_member_location_finds_property() {
 #[test]
 fn get_symbol_location_returns_none_for_unknown() {
     let analyzer = ProjectAnalyzer::new();
-    assert!(analyzer
-        .codebase
-        .get_symbol_location("NonExistent")
-        .is_none());
+    assert!(analyzer.symbol_location("NonExistent").is_none());
     assert!(analyzer.member_location("NonExistent", "foo").is_none());
 }

@@ -11,6 +11,4 @@ homepage.workspace   = true
 [dependencies]
 mir-types = { workspace = true }
 indexmap  = { workspace = true }
-dashmap   = { workspace = true }
 serde     = { workspace = true }
-thiserror = { workspace = true }

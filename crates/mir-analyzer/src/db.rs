@@ -1,4 +1,6 @@
 use std::collections::{HashMap, HashSet};
+
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_codebase::storage::{
@@ -162,9 +164,9 @@ pub struct ClassNode {
     pub active: bool,
     pub is_interface: bool,
     /// `true` for trait nodes.  Traits don't currently participate in the
-    /// `class_ancestors` query (matching `Codebase::ensure_finalized` which
-    /// returns empty for traits), but registering them as `ClassNode`s lets
-    /// callers answer `type_exists`-style questions through the db.
+    /// `class_ancestors` query (it returns empty for traits), but registering
+    /// them as `ClassNode`s lets callers answer `type_exists`-style questions
+    /// through the db.
     pub is_trait: bool,
     /// `true` for enum nodes.  See note on `is_trait`.
     pub is_enum: bool,
@@ -197,9 +199,9 @@ pub struct ClassNode {
     /// interface check.
     pub is_backed_enum: bool,
     /// `@mixin` / `@psalm-mixin` FQCNs declared on the class docblock.
-    /// Used by `lookup_method_in_chain` for delegated magic-method lookup,
-    /// matching `Codebase::get_method`'s mixin walk.  Empty for interfaces,
-    /// traits, and enums (mixin is a class-only docblock concept).
+    /// Used by `lookup_method_in_chain` for delegated magic-method lookup.
+    /// Empty for interfaces, traits, and enums (mixin is a class-only
+    /// docblock concept).
     pub mixins: Arc<[Arc<str>]>,
     /// `@deprecated` message from the class docblock, if any.  Mirrors
     /// `ClassStorage::deprecated`.  Empty / `None` for interfaces, traits,
@@ -248,7 +250,7 @@ pub struct ClassKind {
 /// Read class kind/abstractness from an active `ClassNode`, if one is
 /// registered for `fqcn`.  Returns `None` for unregistered or inactive
 /// nodes.  All bundled and user types are mirrored into `ClassNode` by
-/// `MirDb::ingest_codebase`, so a `None` here means the type genuinely
+/// `MirDb::ingest_stub_slice`, so a `None` here means the type genuinely
 /// doesn't exist (or is inactive after a `deactivate_class_node` pass).
 pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
     let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
@@ -262,8 +264,9 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
 
 /// Whether a class/interface/trait/enum is registered as an active
 /// `ClassNode` in the db.  Returns `false` for unregistered or inactive
-/// nodes.  After `MirDb::ingest_codebase` runs (S5-PR8/PR9), this is
-/// the authoritative answer — bundled and user types are both mirrored.
+/// nodes.  After `MirDb::ingest_stub_slice` has been called for all
+/// collected slices, this is the authoritative answer — bundled and user
+/// types are both mirrored.
 pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
 }
@@ -328,7 +331,8 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
 
 /// Return the declared `@template` parameters for `fqcn` from an active
 /// `ClassNode`, if one is registered.  Returns `None` for unregistered
-/// or inactive nodes.  Authoritative after `ingest_codebase`.
+/// or inactive nodes.  Authoritative after all collected slices have been
+/// fed through `ingest_stub_slice`.
 pub fn class_template_params_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
@@ -348,7 +352,7 @@ pub fn inherited_template_bindings_via_db(
     fqcn: &str,
 ) -> std::collections::HashMap<Arc<str>, Union> {
     let mut bindings: std::collections::HashMap<Arc<str>, Union> = std::collections::HashMap::new();
-    let mut visited: std::collections::HashSet<Arc<str>> = std::collections::HashSet::new();
+    let mut visited: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
     let mut current: Arc<str> = Arc::from(fqcn);
     loop {
         if !visited.insert(current.clone()) {
@@ -577,13 +581,12 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
         return Ancestors(vec![]);
     }
     // Invariant: enums and traits always return empty here.
-    // - Enums: matches `Codebase::ensure_finalized`.  Enum membership
-    //   questions go through `extends_or_implements_via_db`, which reads
-    //   `interfaces` / `is_backed_enum` directly.
-    // - Traits: matches `Codebase::ensure_finalized` (which only computes
-    //   ancestors for classes/interfaces).  Trait-of-trait walking is
-    //   handled by `method_is_concretely_implemented` /
-    //   `trait_provides_method` directly via the `traits` field.
+    // - Enums: enum membership questions go through
+    //   `extends_or_implements_via_db`, which reads `interfaces` /
+    //   `is_backed_enum` directly.
+    // - Traits: trait-of-trait walking is handled by
+    //   `method_is_concretely_implemented` / `trait_provides_method`
+    //   directly via the `traits` field.
     // Do not lift either short-circuit without also auditing every caller
     // of `class_ancestors`.
     if node.is_enum(db) || node.is_trait(db) {
@@ -591,13 +594,14 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
     }
 
     let mut all: Vec<Arc<str>> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
+    let mut seen: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
 
-    let add = |fqcn: &Arc<str>, all: &mut Vec<Arc<str>>, seen: &mut HashSet<String>| {
-        if seen.insert(fqcn.to_string()) {
-            all.push(fqcn.clone());
-        }
-    };
+    let add =
+        |fqcn: &Arc<str>, all: &mut Vec<Arc<str>>, seen: &mut rustc_hash::FxHashSet<Arc<str>>| {
+            if seen.insert(fqcn.clone()) {
+                all.push(fqcn.clone());
+            }
+        };
 
     if node.is_interface(db) {
         for e in node.extends(db).iter() {
@@ -633,14 +637,13 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
     Ancestors(all)
 }
 
-/// Predicate variant of [`Codebase::has_unknown_ancestor`] backed by the
-/// Salsa db.
+/// Predicate: does `fqcn` have any registered ancestor that lacks a
+/// `ClassNode` in the db?
 ///
-/// `ingest_codebase` (S5-PR8/PR9 / PR11a) mirrors bundled stubs, user
-/// stubs, and PSR-4 lazy-loaded definitions into the db before any
-/// Pass 2 driver runs, so a class with no active `ClassNode` is one
-/// that genuinely doesn't exist — and an unknown class trivially has
-/// no known ancestors.
+/// `ingest_stub_slice` mirrors bundled stubs, user stubs, and PSR-4
+/// lazy-loaded definitions into the db before any Pass 2 driver runs, so
+/// a class with no active `ClassNode` is one that genuinely doesn't
+/// exist — and an unknown class trivially has no known ancestors.
 pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
@@ -682,7 +685,7 @@ pub fn method_is_concretely_implemented(
         }
     }
     // 2. Traits used directly by this class — walk transitively.
-    let mut visited_traits: HashSet<String> = HashSet::new();
+    let mut visited_traits: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
     for t in self_node.traits(db).iter() {
         if trait_provides_method(db, t.as_ref(), &lower, &mut visited_traits) {
             return true;
@@ -735,7 +738,7 @@ fn trait_provides_method(
     db: &dyn MirDatabase,
     trait_fqcn: &str,
     method_lower: &str,
-    visited: &mut HashSet<String>,
+    visited: &mut rustc_hash::FxHashSet<String>,
 ) -> bool {
     if !visited.insert(trait_fqcn.to_string()) {
         return false;
@@ -781,7 +784,7 @@ pub fn lookup_method_in_chain(
     fqcn: &str,
     method_name: &str,
 ) -> Option<MethodNode> {
-    let mut visited_mixins: HashSet<String> = HashSet::new();
+    let mut visited_mixins: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
     lookup_method_in_chain_inner(db, fqcn, &method_name.to_lowercase(), &mut visited_mixins)
 }
 
@@ -789,7 +792,7 @@ fn lookup_method_in_chain_inner(
     db: &dyn MirDatabase,
     fqcn: &str,
     lower: &str,
-    visited_mixins: &mut HashSet<String>,
+    visited_mixins: &mut rustc_hash::FxHashSet<String>,
 ) -> Option<MethodNode> {
     let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
 
@@ -810,7 +813,7 @@ fn lookup_method_in_chain_inner(
     }
     // 3. Traits used directly — walk transitively (trait-of-traits is *not*
     //    included in `class_ancestors`, by design — see that fn's comments).
-    let mut visited_traits: HashSet<String> = HashSet::new();
+    let mut visited_traits: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
     for t in self_node.traits(db).iter() {
         if let Some(node) = trait_provides_method_node(db, t.as_ref(), lower, &mut visited_traits) {
             return Some(node);
@@ -864,7 +867,7 @@ fn trait_provides_method_node(
     db: &dyn MirDatabase,
     trait_fqcn: &str,
     method_lower: &str,
-    visited: &mut HashSet<String>,
+    visited: &mut rustc_hash::FxHashSet<String>,
 ) -> Option<MethodNode> {
     if !visited.insert(trait_fqcn.to_string()) {
         return None;
@@ -900,7 +903,7 @@ pub fn method_exists_via_db(db: &dyn MirDatabase, fqcn: &str, method_name: &str)
         return true;
     }
     // Traits used directly — walk transitively.
-    let mut visited_traits: HashSet<String> = HashSet::new();
+    let mut visited_traits: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
     for t in self_node.traits(db).iter() {
         if trait_declares_method(db, t.as_ref(), &lower, &mut visited_traits) {
             return true;
@@ -941,7 +944,7 @@ fn trait_declares_method(
     db: &dyn MirDatabase,
     trait_fqcn: &str,
     method_lower: &str,
-    visited: &mut HashSet<String>,
+    visited: &mut rustc_hash::FxHashSet<String>,
 ) -> bool {
     if !visited.insert(trait_fqcn.to_string()) {
         return false;
@@ -980,7 +983,7 @@ pub fn lookup_property_in_chain(
     fqcn: &str,
     prop_name: &str,
 ) -> Option<PropertyNode> {
-    let mut visited_mixins: HashSet<String> = HashSet::new();
+    let mut visited_mixins: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
     lookup_property_in_chain_inner(db, fqcn, prop_name, &mut visited_mixins)
 }
 
@@ -988,7 +991,7 @@ fn lookup_property_in_chain_inner(
     db: &dyn MirDatabase,
     fqcn: &str,
     prop_name: &str,
-    visited_mixins: &mut HashSet<String>,
+    visited_mixins: &mut rustc_hash::FxHashSet<String>,
 ) -> Option<PropertyNode> {
     let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
 
@@ -1119,12 +1122,11 @@ pub fn member_location_via_db(
 ///
 /// Returns `true` iff `child` is `ancestor`, or `child`'s transitive
 /// ancestor list (via [`class_ancestors`]) contains `ancestor`.  For enums
-/// the ancestor list is empty by construction (matching
-/// `Codebase::ensure_finalized`); membership is answered directly from
-/// the enum's directly-declared interfaces and the implicit
+/// the ancestor list is empty by construction; membership is answered
+/// directly from the enum's directly-declared interfaces and the implicit
 /// `UnitEnum` / `BackedEnum` interfaces.
 ///
-/// Unregistered classes return `false` — `ingest_codebase` populates
+/// Unregistered classes return `false` — `ingest_stub_slice` populates
 /// the db before any Pass 2 driver runs, so a class with no active
 /// `ClassNode` genuinely doesn't exist.
 pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
@@ -1135,9 +1137,9 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
         return false;
     };
     if node.is_enum(db) {
-        // Match `Codebase::extends_or_implements` enum semantics: only
-        // directly-declared interfaces participate (no transitive walk),
-        // plus the implicit UnitEnum / BackedEnum interfaces.
+        // Enum semantics: only directly-declared interfaces participate
+        // (no transitive walk), plus the implicit UnitEnum / BackedEnum
+        // interfaces.
         if node.interfaces(db).iter().any(|i| i.as_ref() == ancestor) {
             return true;
         }
@@ -1208,6 +1210,10 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 /// own clone (each clone gets a fresh `ZalsaLocal`, sharing the
 /// underlying memoization storage).  Sharing `&MirDb` across threads is
 /// **not** supported because `salsa::Database: Send` (not `Sync`).
+type MemberRegistry<V> = Arc<FxHashMap<Arc<str>, FxHashMap<Arc<str>, V>>>;
+type ReferenceLocations =
+    Arc<std::sync::Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
+
 #[salsa::db]
 #[derive(Default, Clone)]
 pub struct MirDb {
@@ -1218,27 +1224,27 @@ pub struct MirDb {
     // enough for the canonical mutable db paths.
     /// FQCN → ClassNode handle registry (not tracked by Salsa; see
     /// `lookup_class_node` for the rationale).
-    class_nodes: Arc<HashMap<Arc<str>, ClassNode>>,
+    class_nodes: Arc<FxHashMap<Arc<str>, ClassNode>>,
     /// FQN → FunctionNode handle registry.
-    function_nodes: Arc<HashMap<Arc<str>, FunctionNode>>,
+    function_nodes: Arc<FxHashMap<Arc<str>, FunctionNode>>,
     /// (owner FQCN) → (method_name_lower → MethodNode) handle registry.
-    method_nodes: Arc<HashMap<Arc<str>, HashMap<Arc<str>, MethodNode>>>,
+    method_nodes: MemberRegistry<MethodNode>,
     /// (owner FQCN) → (prop_name → PropertyNode) handle registry.
-    property_nodes: Arc<HashMap<Arc<str>, HashMap<Arc<str>, PropertyNode>>>,
+    property_nodes: MemberRegistry<PropertyNode>,
     /// (owner FQCN) → (const_name → ClassConstantNode) handle registry.
-    class_constant_nodes: Arc<HashMap<Arc<str>, HashMap<Arc<str>, ClassConstantNode>>>,
+    class_constant_nodes: MemberRegistry<ClassConstantNode>,
     /// FQN → GlobalConstantNode handle registry.
-    global_constant_nodes: Arc<HashMap<Arc<str>, GlobalConstantNode>>,
+    global_constant_nodes: Arc<FxHashMap<Arc<str>, GlobalConstantNode>>,
     /// File path → first declared namespace.
-    file_namespaces: Arc<HashMap<Arc<str>, Arc<str>>>,
+    file_namespaces: Arc<FxHashMap<Arc<str>, Arc<str>>>,
     /// File path → use-alias imports.
-    file_imports: Arc<HashMap<Arc<str>, HashMap<String, String>>>,
+    file_imports: Arc<FxHashMap<Arc<str>, HashMap<String, String>>>,
     /// Global variable name (without `$`) → collected type.
-    global_vars: Arc<HashMap<Arc<str>, Union>>,
+    global_vars: Arc<FxHashMap<Arc<str>, Union>>,
     /// Symbol FQN → defining file.
-    symbol_to_file: Arc<HashMap<Arc<str>, Arc<str>>>,
+    symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
     /// Public symbol key → reference locations.
-    reference_locations: Arc<std::sync::Mutex<HashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>,
+    reference_locations: ReferenceLocations,
 }
 
 #[salsa::db]
@@ -1580,10 +1586,9 @@ impl MirDb {
 
     /// Walk one collected [`StubSlice`] and upsert the corresponding db nodes.
     ///
-    /// This is the slice-first sibling of [`Self::ingest_codebase`]. Use it
-    /// when Pass 1 already produced a complete per-file slice so batch analysis
-    /// does not need to first mutate `Codebase` and then re-scan the whole
-    /// accumulated codebase to mirror the same definitions into salsa.
+    /// This is the canonical post-Pass-1 ingestion path: each file's slice is
+    /// fed in directly, so batch analysis does not need any intermediate
+    /// mutable codebase store between Pass 1 and Pass 2.
     pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
         use std::collections::HashSet;
 
@@ -1847,12 +1852,12 @@ impl MirDb {
         if let Some(&node) = self.class_nodes.get(&fqcn) {
             // Fast-skip: an already-active node whose Salsa-tracked fields
             // match the upsert input.  Bulk re-ingest paths
-            // (`ingest_codebase` / `lazy_load_*`) call this for every class
+            // (`ingest_stub_slice` / `lazy_load_*`) call this for every class
             // on every iteration; without the skip each call fires 13
             // setters, each acquiring the Salsa write lock.  Schema doesn't
-            // mutate after Pass 1 (Pass 2 only writes `inferred_return_type`
-            // which lives on `Codebase`, not the db), so an active node with
-            // matching fields is by construction up to date.
+            // mutate after Pass 1 (Pass 2 only writes `inferred_return_type`),
+            // so an active node with matching fields is by construction up
+            // to date.
             //
             // Mutation paths (LSP re-analyze) call `deactivate_class_node`
             // first; that flips `active=false`, defeating this guard so the
@@ -2158,7 +2163,7 @@ impl MirDb {
     }
 
     /// Deactivate `MethodNode`s for `fqcn` whose lowercased name is not in
-    /// `keep_lower`.  Used by `ingest_codebase` to prune stale stub methods
+    /// `keep_lower`.  Used by `ingest_stub_slice` to prune stale stub methods
     /// when a user file shadows a bundled-stub class with a different method
     /// set.  Active-only check preserves PR21's fast-skip — already-inactive
     /// nodes don't fire a setter.

@@ -671,10 +671,8 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             if !arg_fqcn.contains('\\') && !type_exists(ea, &resolved_arg) {
                 let target = arg_fqcn.as_ref();
                 for fqcn in ea.db.active_class_node_fqcns() {
-                    // Match `Codebase::classes` semantics: only true classes,
-                    // not interfaces / traits / enums (all of which are stored
-                    // as `ClassNode` post-PR5 but live in separate Codebase
-                    // DashMaps).
+                    // Only true classes, not interfaces / traits / enums —
+                    // they all live in `ClassNode` but are filtered here.
                     let is_class = crate::db::class_kind_via_db(ea.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum);
                     if !is_class {

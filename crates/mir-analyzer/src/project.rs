@@ -848,7 +848,7 @@ impl ProjectAnalyzer {
         {
             db.ingest_stub_slice(&slice);
         }
-        let salsa_file = SourceFile::new(&mut db, file.clone(), Arc::from(source));
+        let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
         let file_defs = collect_file_definitions(&db, salsa_file);
         db.ingest_stub_slice(&file_defs.slice);
         let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
@@ -867,7 +867,7 @@ impl ProjectAnalyzer {
         // MethodNode before the issue-emitting pass so call sites see the
         // inferred values.  Single-threaded — no buffer / commit dance
         // needed in principle, but we use the same pattern for symmetry
-        // and so the read-side fallback to `Codebase` can be dropped.
+        // with the parallel batch path.
         let inferred_buffer = crate::db::InferredReturnTypes::new();
         Pass2Driver::new_inference_only(&db, analyzer.resolved_php_version())
             .with_inferred_buffer(&inferred_buffer)
@@ -1033,10 +1033,9 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
     }
 
     for fqcn in db.active_class_node_fqcns() {
-        // Match `Codebase::classes` semantics: only true classes contribute
-        // class-direction edges in this loop.  Interface / trait / enum edges
-        // are handled by their own dedicated codebase iterators elsewhere if
-        // needed (none currently — this function only ever read classes).
+        // Only true classes contribute class-direction edges in this loop.
+        // Interface / trait / enum edges are not currently emitted here —
+        // this function only ever read classes.
         let kind = match crate::db::class_kind_via_db(db, fqcn.as_ref()) {
             Some(k) if !k.is_interface && !k.is_trait && !k.is_enum => k,
             _ => continue,

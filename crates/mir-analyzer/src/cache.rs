@@ -87,7 +87,7 @@ impl AnalysisCache {
     /// `content_hash` matches. Returns `None` if there is no entry or the file
     /// has changed. The second element of the tuple is the list of
     /// `(symbol_key, line, col_start, col_end)` entries to replay into
-    /// `Codebase::symbol_reference_locations`.
+    /// the salsa db via `MirDatabase::replay_reference_locations`.
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
         let entries = self.entries.lock().unwrap();
         entries.get(file_path).and_then(|e| {

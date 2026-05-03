@@ -27,7 +27,7 @@ fn function_call_records_reference_location() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer.codebase().get_reference_locations("greet");
+    let locs = analyzer.reference_locations("greet");
     assert!(
         locs.iter().any(|(f, ..)| f == &file_arc),
         "reference location should be recorded for the analyzed file"
@@ -51,8 +51,7 @@ fn function_call_span_covers_only_name() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("greet")
+        .reference_locations("greet")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -82,8 +81,7 @@ fn method_call_span_covers_only_name() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("Svc::run")
+        .reference_locations("Svc::run")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -113,8 +111,7 @@ fn property_access_span_covers_only_name() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("Counter::count")
+        .reference_locations("Counter::count")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -145,8 +142,7 @@ fn nullsafe_property_access_records_reference_location() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("Box::val")
+        .reference_locations("Box::val")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -174,10 +170,7 @@ fn method_call_records_reference_location() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations("Svc::run")
-            .is_empty(),
+        !analyzer.reference_locations("Svc::run").is_empty(),
         "Svc::run should be in symbol_reference_locations"
     );
 }
@@ -196,8 +189,7 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let count = analyzer
-        .codebase()
-        .get_reference_locations("ping")
+        .reference_locations("ping")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .count();
@@ -218,7 +210,7 @@ fn new_expression_records_class_reference() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    let locs = analyzer.codebase().get_reference_locations("Widget");
+    let locs = analyzer.reference_locations("Widget");
     assert!(
         locs.iter().any(|(f, ..)| f == &file_arc),
         "new Widget() should record a reference to Widget"
@@ -241,8 +233,7 @@ fn re_analyze_removes_stale_reference_locations() {
 
     assert!(
         analyzer
-            .codebase()
-            .get_reference_locations("helper")
+            .reference_locations("helper")
             .iter()
             .any(|(f, ..)| f == &file_arc),
         "initial analysis should record location"
@@ -255,8 +246,7 @@ fn re_analyze_removes_stale_reference_locations() {
     );
 
     let stale = analyzer
-        .codebase()
-        .get_reference_locations("helper")
+        .reference_locations("helper")
         .iter()
         .any(|(f, ..)| f == &file_arc);
 
@@ -281,8 +271,7 @@ fn static_method_call_span_covers_only_name() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("Math::sq")
+        .reference_locations("Math::sq")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -313,10 +302,7 @@ fn cache_hit_replays_reference_locations() {
         let analyzer = ProjectAnalyzer::with_cache(&cache_dir);
         analyzer.analyze(std::slice::from_ref(&file));
         assert!(
-            !analyzer
-                .codebase()
-                .get_reference_locations("cached_fn")
-                .is_empty(),
+            !analyzer.reference_locations("cached_fn").is_empty(),
             "first run should record reference"
         );
     }
@@ -326,7 +312,7 @@ fn cache_hit_replays_reference_locations() {
         let analyzer = ProjectAnalyzer::with_cache(&cache_dir);
         analyzer.analyze(std::slice::from_ref(&file));
 
-        let locs = analyzer.codebase().get_reference_locations("cached_fn");
+        let locs = analyzer.reference_locations("cached_fn");
         assert!(
             !locs.is_empty(),
             "cache hit should replay reference locations"
@@ -350,20 +336,17 @@ fn compact_index_preserves_reference_locations() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
 
-    // analyze() calls compact_reference_index() internally; verify results are intact.
+    // After analyze(), the reference index must hold both call sites.
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("ping")
+        .reference_locations("ping")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
 
-    assert_eq!(locs.len(), 2, "two calls → two spans in compact index");
-    assert!(
-        analyzer
-            .codebase()
-            .file_has_symbol_references(file.to_str().unwrap()),
-        "file_has_symbol_references must return true after compaction"
+    assert_eq!(
+        locs.len(),
+        2,
+        "two calls → two spans in the reference index"
     );
 }
 
@@ -386,8 +369,7 @@ fn compact_index_survives_re_analyze() {
     // Index is now compact; verify initial state.
     assert!(
         analyzer
-            .codebase()
-            .get_reference_locations("helper")
+            .reference_locations("helper")
             .iter()
             .any(|(f, ..)| f == &file_arc),
         "initial reference should be recorded"
@@ -400,8 +382,7 @@ fn compact_index_survives_re_analyze() {
     );
 
     let stale = analyzer
-        .codebase()
-        .get_reference_locations("helper")
+        .reference_locations("helper")
         .iter()
         .any(|(f, ..)| f == &file_arc);
     assert!(
@@ -426,10 +407,7 @@ fn this_method_call_records_reference_location() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     assert!(
-        !analyzer
-            .codebase()
-            .get_reference_locations("Svc::helper")
-            .is_empty(),
+        !analyzer.reference_locations("Svc::helper").is_empty(),
         "$this->helper() should record a reference to Svc::helper"
     );
 }
@@ -447,8 +425,7 @@ fn this_method_call_span_covers_only_name() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("Svc::helper")
+        .reference_locations("Svc::helper")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -478,8 +455,7 @@ fn nullsafe_method_call_records_reference_location() {
     analyzer.analyze(std::slice::from_ref(&file));
 
     let locs: Vec<_> = analyzer
-        .codebase()
-        .get_reference_locations("Svc::run")
+        .reference_locations("Svc::run")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();

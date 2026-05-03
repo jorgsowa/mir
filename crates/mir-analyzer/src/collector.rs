@@ -91,9 +91,9 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     /// Writes accumulated namespace and import data into `self.slice` so that
-    /// `inject_stub_slice` can populate `Codebase::file_namespaces` and
-    /// `Codebase::file_imports`. Called at the end of both `collect` and
-    /// `collect_slice` to ensure both paths carry the complete data.
+    /// `MirDatabase::ingest_stub_slice` can populate the db's `file_namespaces`
+    /// and `file_imports` tables. Called at the end of `collect_slice` to
+    /// ensure the slice carries the complete data.
     fn finalize_slice(&mut self) {
         if let Some(ns) = self.first_namespace.take() {
             self.slice.namespace = Some(Arc::from(ns.as_str()));
@@ -1537,7 +1537,7 @@ mod tests {
     #[test]
     fn collect_slice_captures_namespace() {
         // The first namespace declaration must end up in slice.namespace so
-        // that inject_stub_slice can populate Codebase::file_namespaces.
+        // that ingest_stub_slice can populate the db's file_namespaces table.
         let slice = parse_and_collect_slice(
             "src/Service.php",
             "<?php\nnamespace App\\Service;\nclass Handler {}\n",
@@ -1552,8 +1552,8 @@ mod tests {
     #[test]
     fn collect_slice_captures_use_imports() {
         // All `use` imports (plain and aliased) must end up in slice.imports so
-        // that inject_stub_slice can populate Codebase::file_imports and Pass 2
-        // can resolve short names like `new Entity()` correctly.
+        // that ingest_stub_slice can populate the db's file_imports table and
+        // Pass 2 can resolve short names like `new Entity()` correctly.
         let slice = parse_and_collect_slice(
             "src/Handler.php",
             "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\nuse App\\Repository\\EntityRepo as Repo;\nclass Handler {}\n",
