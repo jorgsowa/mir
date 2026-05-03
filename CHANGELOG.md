@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-05-03
+
+### Removed
+
+- `mir_codebase::Codebase` struct, `CodebaseBuilder`, `codebase_from_parts`, and the internal `Interner` module. The salsa db (`MirDb`) is the single source of truth for class/method/property/constant metadata, per-file imports/namespaces, global vars, and reference tracking. The `mir-codebase` crate now exports only the serializable storage types (`StubSlice`, `*Storage`, `FnParam`, `TemplateParam`, `Visibility`, `Location`). **Breaking** for library consumers that imported `mir_codebase::Codebase`.
+- `ProjectAnalyzer::codebase()` accessor (already removed in 0.16.x perf work; the Codebase deletion completes the cleanup).
+- `mir-codebase` no longer pulls in `dashmap` or `thiserror`.
+
+### Performance
+
+- Hot-path Salsa db lookup tables (`class_nodes`, `function_nodes`, `method_nodes`, `property_nodes`, `class_constant_nodes`, `global_constant_nodes`, `file_namespaces`, `file_imports`, `global_vars`, `symbol_to_file`, `reference_locations`) and the ancestor-walk visited sets in `class_ancestors` / `lookup_method_in_chain` / `method_is_concretely_implemented` now use `FxHashMap` / `FxHashSet` instead of std `HashMap` / `HashSet`. Eliminates the per-ancestor `String` allocation in `class_ancestors` (now reuses the existing `Arc<str>`). ~7% reduction in user CPU time on the Laravel `src/` benchmark.
+
 ## [0.16.1] - 2026-05-01
 
 ### Fixed
