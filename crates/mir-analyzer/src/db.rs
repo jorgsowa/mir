@@ -321,10 +321,7 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
         return fqcn.clone();
     }
     if let Some(ns) = db.file_namespace(file) {
-        let qualified = format!("{}\\{}", ns, name);
-        if type_exists_via_db(db, &qualified) {
-            return qualified;
-        }
+        return format!("{}\\{}", ns, name);
     }
     name.to_string()
 }
