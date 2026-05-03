@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] - 2026-05-03
+
+### Fixed
+
+- Unqualified class names in namespaced files no longer silently fall back to the global namespace when the namespaced class is missing. PHP only does that fallback for functions and constants; mir's `resolve_name_via_db` was incorrectly extending it to classes, masking real `UndefinedClass` bugs.
+- Composer autoload parsing now covers `psr-0`, `classmap`, and `files` in addition to `psr-4`, for both project `composer.json` and each package in `vendor/composer/installed.json`. Vendor packages that expose global helpers via `autoload.files` (Symfony polyfills, Laravel helpers, ramsey/uuid bootstrap, etc.) and classmap-only packages no longer produce false-positive `UndefinedFunction` / `UndefinedClass` diagnostics.
+
 ## [0.17.0] - 2026-05-03
 
 ### Removed
