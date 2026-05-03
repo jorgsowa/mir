@@ -100,10 +100,13 @@
 //!
 //! # Expect format
 //!
-//! Single-file fixtures use `KindName: message`.
-//! Multi-file fixtures use `FileName.php: KindName: message`.
+//! Single-file fixtures use `KindName: message` or `KindName@line:col: message`.
+//! Multi-file fixtures use `FileName.php: KindName: message` or `FileName.php: KindName@line:col: message`.
 //!
-//! Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
+//! Location assertions (`@line:col`) are optional. When specified, both line and column
+//! must match for the issue to be considered a match.
+//!
+//! Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output (including locations).
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -159,6 +162,8 @@ pub(crate) struct ExpectedIssue {
     pub file: Option<String>,
     pub kind_name: String,
     pub message: String,
+    pub line: Option<u32>,
+    pub col_start: Option<u16>,
 }
 
 /// Parsed representation of a `.phpt` fixture.
@@ -410,12 +415,42 @@ fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
     assert_eq!(
         parts.len(),
         2,
-        "fixture {path}: invalid expect line {line:?} — expected \"KindName: message\""
+        "fixture {path}: invalid expect line {line:?} — expected \"KindName: message\" or \"KindName@line:col: message\""
     );
+
+    let kind_part = parts[0];
+    let (kind_name, line_col) = if let Some(at_pos) = kind_part.find('@') {
+        (
+            kind_part[..at_pos].trim().to_string(),
+            Some(&kind_part[at_pos + 1..]),
+        )
+    } else {
+        (kind_part.trim().to_string(), None)
+    };
+
+    let (line_num, col_start) = if let Some(loc) = line_col {
+        let loc_parts: Vec<&str> = loc.split(':').collect();
+        if loc_parts.len() == 2 {
+            let l = loc_parts[0]
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("fixture {path}: invalid line number in {line:?}"));
+            let c = loc_parts[1]
+                .parse::<u16>()
+                .unwrap_or_else(|_| panic!("fixture {path}: invalid column number in {line:?}"));
+            (Some(l), Some(c))
+        } else {
+            panic!("fixture {path}: invalid location format in {line:?} — expected \"@line:col\"");
+        }
+    } else {
+        (None, None)
+    };
+
     ExpectedIssue {
         file: None,
-        kind_name: parts[0].trim().to_string(),
+        kind_name,
         message: parts[1].trim().to_string(),
+        line: line_num,
+        col_start,
     }
 }
 
@@ -424,12 +459,42 @@ fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
     assert_eq!(
         parts.len(),
         3,
-        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName: message\""
+        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName: message\" or \"FileName.php: KindName@line:col: message\""
     );
+
+    let kind_part = parts[1];
+    let (kind_name, line_col) = if let Some(at_pos) = kind_part.find('@') {
+        (
+            kind_part[..at_pos].trim().to_string(),
+            Some(&kind_part[at_pos + 1..]),
+        )
+    } else {
+        (kind_part.trim().to_string(), None)
+    };
+
+    let (line_num, col_start) = if let Some(loc) = line_col {
+        let loc_parts: Vec<&str> = loc.split(':').collect();
+        if loc_parts.len() == 2 {
+            let l = loc_parts[0]
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("fixture {path}: invalid line number in {line:?}"));
+            let c = loc_parts[1]
+                .parse::<u16>()
+                .unwrap_or_else(|_| panic!("fixture {path}: invalid column number in {line:?}"));
+            (Some(l), Some(c))
+        } else {
+            panic!("fixture {path}: invalid location format in {line:?} — expected \"@line:col\"");
+        }
+    } else {
+        (None, None)
+    };
+
     ExpectedIssue {
         file: Some(parts[0].trim().to_string()),
-        kind_name: parts[1].trim().to_string(),
+        kind_name,
         message: parts[2].trim().to_string(),
+        line: line_num,
+        col_start,
     }
 }
 
@@ -624,6 +689,16 @@ fn issue_matches(actual: &Issue, expected: &ExpectedIssue) -> bool {
             return false;
         }
     }
+    if let Some(line) = expected.line {
+        if actual.location.line != line {
+            return false;
+        }
+    }
+    if let Some(col) = expected.col_start {
+        if actual.location.col_start != col {
+            return false;
+        }
+    }
     true
 }
 
@@ -661,9 +736,11 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) 
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
             out.push_str(&format!(
-                "{}: {}: {}\n",
+                "{}: {}@{}:{}: {}\n",
                 basename,
                 issue.kind.name(),
+                issue.location.line,
+                issue.location.col_start,
                 issue.kind.message()
             ));
         }
@@ -671,8 +748,10 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) 
         sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
         for issue in sorted {
             out.push_str(&format!(
-                "{}: {}\n",
+                "{}@{}:{}: {}\n",
                 issue.kind.name(),
+                issue.location.line,
+                issue.location.col_start,
                 issue.kind.message()
             ));
         }
@@ -733,12 +812,18 @@ pub fn assert_no_issue(issues: &[Issue], kind_name: &str) {
 // ---------------------------------------------------------------------------
 
 fn fmt_expected(exp: &ExpectedIssue, is_multi: bool) -> String {
+    let kind_with_loc = if let (Some(line), Some(col)) = (exp.line, exp.col_start) {
+        format!("{}@{}:{}", exp.kind_name, line, col)
+    } else {
+        exp.kind_name.clone()
+    };
+
     if is_multi {
         if let Some(f) = &exp.file {
-            return format!("{}: {}: {}", f, exp.kind_name, exp.message);
+            return format!("{}: {}: {}", f, kind_with_loc, exp.message);
         }
     }
-    format!("{}: {}", exp.kind_name, exp.message)
+    format!("{}: {}", kind_with_loc, exp.message)
 }
 
 fn fmt_actual(act: &Issue, is_multi: bool) -> String {
@@ -747,9 +832,22 @@ fn fmt_actual(act: &Issue, is_multi: bool) -> String {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
-        return format!("{}: {}: {}", basename, act.kind.name(), act.kind.message());
+        return format!(
+            "{}: {}@{}:{}: {}",
+            basename,
+            act.kind.name(),
+            act.location.line,
+            act.location.col_start,
+            act.kind.message()
+        );
     }
-    format!("{}: {}", act.kind.name(), act.kind.message())
+    format!(
+        "{}@{}:{}: {}",
+        act.kind.name(),
+        act.location.line,
+        act.location.col_start,
+        act.kind.message()
+    )
 }
 
 fn fmt_issues(issues: &[Issue], is_multi: bool) -> String {
