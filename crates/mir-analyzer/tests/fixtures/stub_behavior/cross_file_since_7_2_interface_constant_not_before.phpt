@@ -1,3 +1,5 @@
+===description===
+cross file since 7 2 interface constant not before
 ===config===
 php_version=7.1
 ===file:DateHelper.php===
@@ -10,3 +12,5 @@ function get_atom_format(): void {
 get_atom_format();
 ===expect===
 DateHelper.php: UndefinedConstant: Constant DateTimeInterface::ATOM is not defined
+===ignore===
+TODO

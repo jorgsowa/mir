@@ -1,3 +1,5 @@
+===description===
+cross file subclass accepted
 ===file:Base.php===
 <?php
 class Base {}
@@ -11,3 +13,5 @@ function test(): void {
     accept(new Child());
 }
 ===expect===
+===ignore===
+TODO

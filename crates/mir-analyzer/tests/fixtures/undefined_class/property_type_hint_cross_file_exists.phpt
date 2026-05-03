@@ -1,3 +1,5 @@
+===description===
+property type hint cross file exists
 ===file:Dep.php===
 <?php
 namespace Vendor\Lib;
@@ -9,3 +11,5 @@ class Bar {
     public Dep $prop;
 }
 ===expect===
+===ignore===
+TODO

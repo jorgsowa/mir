@@ -1,3 +1,5 @@
+===description===
+invariant allows exact type arg
 ===file===
 <?php
 /** @template T */
@@ -14,3 +16,5 @@ function test(): void {
     f($c);
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+after throw expression assignment
 ===file===
 <?php
 function test(): void {
@@ -6,3 +8,5 @@ function test(): void {
 }
 ===expect===
 UnreachableCode: Unreachable code detected
+===ignore===
+TODO

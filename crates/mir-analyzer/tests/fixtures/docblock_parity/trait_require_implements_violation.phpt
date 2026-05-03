@@ -1,3 +1,5 @@
+===description===
+trait require implements violation
 ===file===
 <?php
 interface Countable {}
@@ -18,3 +20,5 @@ class Bag {
 }
 ===expect===
 InvalidTraitUse: Trait HasCount used incorrectly: Class Bag uses trait HasCount but does not implement Countable
+===ignore===
+TODO

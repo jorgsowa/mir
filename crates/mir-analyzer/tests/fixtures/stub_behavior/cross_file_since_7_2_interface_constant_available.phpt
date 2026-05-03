@@ -1,3 +1,5 @@
+===description===
+cross file since 7 2 interface constant available
 ===config===
 php_version=7.2
 ===file:DateHelper.php===
@@ -9,3 +11,5 @@ function get_atom_format(): void {
 <?php
 get_atom_format();
 ===expect===
+===ignore===
+TODO

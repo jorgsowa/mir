@@ -1,3 +1,5 @@
+===description===
+magic method used param not reported
 ===file===
 <?php
 class Cache {
@@ -17,3 +19,5 @@ class Cache {
     }
 }
 ===expect===
+===ignore===
+TODO

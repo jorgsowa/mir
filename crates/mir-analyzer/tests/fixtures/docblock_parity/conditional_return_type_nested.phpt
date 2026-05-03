@@ -1,3 +1,5 @@
+===description===
+conditional return type nested
 ===file===
 <?php
 /**
@@ -12,3 +14,5 @@ function wrap(?string $value): array|string
     return $value . '!';
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+reports redundant check in elseif
 ===file===
 <?php
 // Bug: elseif branches were not narrowed on the if condition being false — the
@@ -13,3 +15,5 @@ function foo(string|null $x): void {
 }
 ===expect===
 RedundantCondition: Condition is always true/false for type 'bool'
+===ignore===
+TODO

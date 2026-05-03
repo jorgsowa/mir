@@ -1,3 +1,5 @@
+===description===
+require once global class unqualified from namespaced
 ===file:Foo.php===
 <?php
 class Foo {}
@@ -10,3 +12,5 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedClass: Class App\Service\Foo does not exist
+===ignore===
+TODO

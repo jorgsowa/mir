@@ -1,3 +1,5 @@
+===description===
+intersection as return type no error
 ===file===
 <?php
 interface Iterator {}
@@ -9,3 +11,5 @@ function f(): Iterator&Countable {
     return $x;
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+covariant allows subclass with template extends
 ===file===
 <?php
 /** @template-covariant T */
@@ -12,3 +14,5 @@ function test(): void {
     acceptsAnimalBox(new CatBox());
 }
 ===expect===
+===ignore===
+TODO

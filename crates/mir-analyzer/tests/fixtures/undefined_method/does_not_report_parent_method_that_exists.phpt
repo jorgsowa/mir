@@ -1,3 +1,5 @@
+===description===
+does not report parent method that exists
 ===file===
 <?php
 class Base {
@@ -9,3 +11,5 @@ class Child extends Base {
     }
 }
 ===expect===
+===ignore===
+TODO

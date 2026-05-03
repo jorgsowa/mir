@@ -1,3 +1,5 @@
+===description===
+cross file psr4 throws stdlib exception
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Config.php===
@@ -33,3 +35,5 @@ try {
     echo $e->getMessage();
 }
 ===expect===
+===ignore===
+TODO

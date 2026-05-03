@@ -1,3 +1,5 @@
+===description===
+psalm return narrows type
 ===file===
 <?php
 class Product {}
@@ -15,3 +17,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method Product::missing() does not exist
+===ignore===
+TODO

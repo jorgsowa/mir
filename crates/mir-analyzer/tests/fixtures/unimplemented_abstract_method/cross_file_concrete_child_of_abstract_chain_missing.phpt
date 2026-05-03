@@ -1,3 +1,5 @@
+===description===
+cross file concrete child of abstract chain missing
 ===file:Shape.php===
 <?php
 abstract class Shape {
@@ -13,3 +15,5 @@ class Triangle extends Polygon {
 }
 ===expect===
 Triangle.php: UnimplementedAbstractMethod: Class Triangle must implement abstract method area()
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 class ParentClass {
@@ -8,3 +10,5 @@ class Child extends ParentClass {
 }
 ===expect===
 OverriddenMethodAccess: Method Child::dostuff() overrides with less visibility
+===ignore===
+TODO

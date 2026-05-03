@@ -1,3 +1,5 @@
+===description===
+reports deprecated method
 ===file===
 <?php
 class Foo {
@@ -10,3 +12,5 @@ function test(Foo $foo): void {
 }
 ===expect===
 DeprecatedMethodCall: Call to deprecated method Foo::oldMethod: use newMethod() instead
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+cross file chained return type
 ===file:Entity.php===
 <?php
 class Entity {
@@ -17,3 +19,5 @@ function use_repo(Repository $r): void {
 }
 ===expect===
 Service.php: UndefinedMethod: Method Entity::missing() does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+reports unpack result when stub present
 ===file===
 <?php
 function test(): void {
@@ -7,3 +9,5 @@ function test(): void {
 ===expect===
 PossiblyInvalidArgument: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
 PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'
+===ignore===
+TODO

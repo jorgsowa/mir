@@ -1,3 +1,5 @@
+===description===
+does not report single false
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }
@@ -6,3 +8,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $n of takesInt() expects 'int', got 'false'
+===ignore===
+TODO

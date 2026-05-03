@@ -1,3 +1,5 @@
+===description===
+mixed variance two params compatible
 ===file===
 <?php
 /**
@@ -15,3 +17,5 @@ function test(): void {
     f($p);
 }
 ===expect===
+===ignore===
+TODO

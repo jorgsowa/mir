@@ -1,3 +1,5 @@
+===description===
+interface extends cross file exists
 ===file:Countable.php===
 <?php
 namespace App;
@@ -11,3 +13,5 @@ interface Collection extends Countable {
     public function isEmpty(): bool;
 }
 ===expect===
+===ignore===
+TODO

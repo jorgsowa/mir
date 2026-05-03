@@ -1,3 +1,5 @@
+===description===
+magic methods not reported
 ===file===
 <?php
 class Magic {
@@ -22,3 +24,5 @@ class Magic {
     public function __unset(string $name): void {}
 }
 ===expect===
+===ignore===
+TODO

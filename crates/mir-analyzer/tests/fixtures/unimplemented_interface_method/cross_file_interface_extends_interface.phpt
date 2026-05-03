@@ -1,3 +1,5 @@
+===description===
+cross file interface extends interface
 ===file:Readable.php===
 <?php
 interface Readable {
@@ -16,3 +18,5 @@ class Stream implements ReadWritable {
 }
 ===expect===
 Stream.php: UnimplementedInterfaceMethod: Class Stream must implement Readable::read() from interface
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+require once global no namespace undefined
 ===file:Helpers.php===
 <?php
 function helper(): string {
@@ -11,3 +13,5 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedFunction: Function missing_helper() is not defined
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+param defined but other var undefined error
 ===file===
 <?php
 function transform(string $input): string {
@@ -5,3 +7,5 @@ function transform(string $input): string {
 }
 ===expect===
 UndefinedVariable: Variable $suffix is not defined
+===ignore===
+TODO

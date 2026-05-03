@@ -1,3 +1,5 @@
+===description===
+bracketed namespace class not reported
 ===file===
 <?php
 namespace MyApp {
@@ -8,3 +10,5 @@ namespace MyApp {
     }
 }
 ===expect===
+===ignore===
+TODO

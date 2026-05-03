@@ -1,3 +1,5 @@
+===description===
+class level template allows valid user methods
 ===file===
 <?php
 /** @template T */
@@ -15,3 +17,5 @@ function test(): void {
     $first->getName();
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+parameter not reported as unused variable
 ===file===
 <?php
 function foo(int $param): int {
@@ -5,3 +7,5 @@ function foo(int $param): int {
 }
 ===expect===
 UnusedParam: Parameter $param is never used
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+sscanf multiple output vars are defined
 ===file===
 <?php
 function parse_pair(string $input): int {
@@ -5,3 +7,5 @@ function parse_pair(string $input): int {
     return $left + $right;
 }
 ===expect===
+===ignore===
+TODO

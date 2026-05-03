@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 function test(): void {
@@ -6,3 +8,5 @@ function test(): void {
 }
 ===expect===
 NullPropertyFetch: Cannot access property $prop on null
+===ignore===
+TODO

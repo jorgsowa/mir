@@ -1,3 +1,5 @@
+===description===
+new via use alias cross file no error
 ===file:Entity.php===
 <?php
 namespace App\Model;
@@ -10,3 +12,5 @@ function wrap(): void {
 }
 ===expect===
 Service.php: UnusedVariable: Variable $x is never read
+===ignore===
+TODO

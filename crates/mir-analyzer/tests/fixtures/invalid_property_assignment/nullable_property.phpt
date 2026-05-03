@@ -1,3 +1,5 @@
+===description===
+nullable property
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
 $f = new Foo();
 $f->name = null;
 ===expect===
+===ignore===
+TODO

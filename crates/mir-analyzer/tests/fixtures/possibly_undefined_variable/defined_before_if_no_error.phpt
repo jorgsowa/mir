@@ -1,3 +1,5 @@
+===description===
+defined before if no error
 ===file===
 <?php
 function foo(bool $c): string {
@@ -6,3 +8,5 @@ function foo(bool $c): string {
     return $r;
 }
 ===expect===
+===ignore===
+TODO

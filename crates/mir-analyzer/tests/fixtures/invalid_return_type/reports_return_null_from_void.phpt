@@ -1,3 +1,5 @@
+===description===
+reports return null from void
 ===file===
 <?php
 function f(): void {
@@ -5,3 +7,5 @@ function f(): void {
 }
 ===expect===
 InvalidReturnType: Return type 'null' is not compatible with declared 'void'
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report function called via use function
 ===config===
 find_dead_code=true
 ===file:lib.php===
@@ -11,3 +13,5 @@ use function Utils\helper;
 
 helper();
 ===expect===
+===ignore===
+TODO

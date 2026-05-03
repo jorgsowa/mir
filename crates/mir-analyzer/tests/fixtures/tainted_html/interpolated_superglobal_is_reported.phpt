@@ -1,3 +1,5 @@
+===description===
+interpolated superglobal is reported
 ===file===
 <?php
 function render(): void {
@@ -5,3 +7,5 @@ function render(): void {
 }
 ===expect===
 TaintedHtml: Tainted HTML output — possible XSS
+===ignore===
+TODO

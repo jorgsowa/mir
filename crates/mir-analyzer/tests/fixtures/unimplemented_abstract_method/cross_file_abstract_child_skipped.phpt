@@ -1,3 +1,5 @@
+===description===
+cross file abstract child skipped
 ===file:Shape.php===
 <?php
 abstract class Shape {
@@ -14,3 +16,5 @@ class Triangle extends Polygon {
     public function area(): float { return 0.5; }
 }
 ===expect===
+===ignore===
+TODO

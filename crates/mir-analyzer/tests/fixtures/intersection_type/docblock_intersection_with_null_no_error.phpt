@@ -1,3 +1,5 @@
+===description===
+docblock intersection with null no error
 ===file===
 <?php
 interface Iterator {}
@@ -10,3 +12,5 @@ function test(): void {
     f(null);
 }
 ===expect===
+===ignore===
+TODO

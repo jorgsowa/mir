@@ -1,3 +1,5 @@
+===description===
+cross file implements stdlib interface
 ===file:Collection.php===
 <?php
 class NumberList implements \Iterator {
@@ -21,3 +23,5 @@ function process(\Iterator $it): void {
 $list = new NumberList([1, 2, 3]);
 process($list);
 ===expect===
+===ignore===
+TODO

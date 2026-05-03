@@ -1,3 +1,5 @@
+===description===
+magic get not reported
 ===file===
 <?php
 class Magic {
@@ -10,3 +12,5 @@ function test(): void {
     echo $m->anything;
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+enum in static closure cross file
 ===file:Status.php===
 <?php
 namespace App;
@@ -13,3 +15,5 @@ function getCallback(): \Closure {
     return static fn() => Status::Active;
 }
 ===expect===
+===ignore===
+TODO

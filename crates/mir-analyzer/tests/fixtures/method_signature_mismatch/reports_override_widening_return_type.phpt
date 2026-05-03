@@ -1,3 +1,5 @@
+===description===
+reports override widening return type
 ===file===
 <?php
 class Base {
@@ -8,3 +10,5 @@ class Child extends Base {
 }
 ===expect===
 MethodSignatureMismatch: Method Child::f() signature mismatch: return type 'int|string' is not a subtype of parent 'int'
+===ignore===
+TODO

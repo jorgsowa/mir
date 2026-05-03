@@ -1,3 +1,5 @@
+===description===
+covariant rejects subclass with template extends mismatch
 ===file===
 <?php
 /** @template-covariant T */
@@ -14,3 +16,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $box of acceptsDogBox() expects 'Box<Dog>', got 'Box<Cat>'
+===ignore===
+TODO

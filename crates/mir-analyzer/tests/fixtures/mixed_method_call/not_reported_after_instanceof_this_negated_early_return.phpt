@@ -1,3 +1,5 @@
+===description===
+not reported after instanceof this negated early return
 ===file===
 <?php
 abstract class A
@@ -14,3 +16,5 @@ abstract class A
     }
 }
 ===expect===
+===ignore===
+TODO

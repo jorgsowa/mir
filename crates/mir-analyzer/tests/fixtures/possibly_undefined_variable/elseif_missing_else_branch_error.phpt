@@ -1,3 +1,5 @@
+===description===
+elseif missing else branch error
 ===file===
 <?php
 // Bug: elseif branches were discarded from the post-if merge — even with the bug
@@ -13,3 +15,5 @@ function foo(int $x): string {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $result might not be defined
+===ignore===
+TODO

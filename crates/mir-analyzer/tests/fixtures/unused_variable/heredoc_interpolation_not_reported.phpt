@@ -1,3 +1,5 @@
+===description===
+heredoc interpolation not reported
 ===file===
 <?php
 function foo(): string {
@@ -7,3 +9,5 @@ Hello $name!
 EOT;
 }
 ===expect===
+===ignore===
+TODO

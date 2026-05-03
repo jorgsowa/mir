@@ -1,3 +1,5 @@
+===description===
+no false positive without type arg
 ===file===
 <?php
 /** @template T */
@@ -10,3 +12,5 @@ class UserRepo extends BaseRepo {}
 $repo = new UserRepo();
 $result = $repo->find();
 ===expect===
+===ignore===
+TODO

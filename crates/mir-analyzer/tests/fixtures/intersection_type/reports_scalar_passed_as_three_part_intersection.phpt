@@ -1,3 +1,5 @@
+===description===
+reports scalar passed as three part intersection
 ===file===
 <?php
 interface Iterator {}
@@ -11,3 +13,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $x of f() expects 'Iterator&Countable&Stringable', got '"hello"'
+===ignore===
+TODO

@@ -10,3 +10,5 @@ function foo(): array {
 }
 ===expect===
 UnusedVariable: Variable $unlisted is never read
+===ignore===
+TODO

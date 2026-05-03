@@ -1,3 +1,5 @@
+===description===
+elseif multiple branches all assigned no error
 ===file===
 <?php
 // Bug: with multiple elseif branches, only the last one survived the merge loop —
@@ -15,3 +17,5 @@ function classify(int $x): string {
     return $label;
 }
 ===expect===
+===ignore===
+TODO

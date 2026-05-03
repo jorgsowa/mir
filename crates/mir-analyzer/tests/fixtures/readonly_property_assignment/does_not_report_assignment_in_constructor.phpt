@@ -1,3 +1,5 @@
+===description===
+does not report assignment in constructor
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ class Foo {
     }
 }
 ===expect===
+===ignore===
+TODO

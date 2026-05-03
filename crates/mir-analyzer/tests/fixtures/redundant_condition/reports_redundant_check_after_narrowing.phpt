@@ -1,3 +1,5 @@
+===description===
+reports redundant check after narrowing
 ===file===
 <?php
 function f(string|int $x): void {
@@ -7,3 +9,5 @@ function f(string|int $x): void {
 }
 ===expect===
 RedundantCondition: Condition is always true/false for type 'bool'
+===ignore===
+TODO

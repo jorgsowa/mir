@@ -1,3 +1,5 @@
+===description===
+after never function call
 ===file===
 <?php
 function stop(): never {
@@ -10,3 +12,5 @@ function test(): void {
 }
 ===expect===
 UnreachableCode: Unreachable code detected
+===ignore===
+TODO

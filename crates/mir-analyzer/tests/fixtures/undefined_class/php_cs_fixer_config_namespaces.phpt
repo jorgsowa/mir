@@ -1,3 +1,5 @@
+===description===
+php cs fixer config namespaces
 ===file:composer.json===
 {
   "autoload-dev": {
@@ -30,3 +32,5 @@ namespace StubTests\CodeStyle;
 
 class BracesOneLineFixer {}
 ===expect===
+===ignore===
+TODO

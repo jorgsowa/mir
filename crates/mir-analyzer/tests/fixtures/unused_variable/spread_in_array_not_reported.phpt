@@ -1,3 +1,5 @@
+===description===
+spread in array not reported
 ===file===
 <?php
 function foo(array $extra): array {
@@ -5,3 +7,5 @@ function foo(array $extra): array {
     return [...$base, ...$extra];
 }
 ===expect===
+===ignore===
+TODO

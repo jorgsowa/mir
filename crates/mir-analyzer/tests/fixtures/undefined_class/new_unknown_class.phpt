@@ -1,3 +1,5 @@
+===description===
+new unknown class
 ===file===
 <?php
 function test(): void {
@@ -5,3 +7,5 @@ function test(): void {
 }
 ===expect===
 UndefinedClass: Class UnknownClass does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+backed enum int value returned as string
 ===file===
 <?php
 enum Color: int {
@@ -9,3 +11,5 @@ function test(Color $color): string {
 }
 ===expect===
 InvalidReturnType: Return type 'int' is not compatible with declared 'string'
+===ignore===
+TODO

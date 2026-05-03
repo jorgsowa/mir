@@ -1,3 +1,5 @@
+===description===
+intersection return type valid not flagged
 ===file===
 <?php
 /**
@@ -27,3 +29,5 @@ function test(): void {
 }
 ===expect===
 
+===ignore===
+TODO

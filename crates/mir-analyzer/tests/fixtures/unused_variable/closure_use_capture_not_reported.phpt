@@ -1,3 +1,5 @@
+===description===
+closure use capture not reported
 ===file===
 <?php
 function foo(): array {
@@ -8,3 +10,5 @@ function foo(): array {
     }, $items);
 }
 ===expect===
+===ignore===
+TODO

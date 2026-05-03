@@ -1,3 +1,5 @@
+===description===
+auditable trait method body
 ===file===
 <?php
 trait Auditable {
@@ -7,3 +9,5 @@ trait Auditable {
 }
 ===expect===
 UndefinedFunction: Function nonexistent_function() is not defined
+===ignore===
+TODO

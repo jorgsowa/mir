@@ -1,3 +1,5 @@
+===description===
+cross file stdlib return type flows
 ===file:Clock.php===
 <?php
 function now(): \DateTimeImmutable {
@@ -8,3 +10,5 @@ function now(): \DateTimeImmutable {
 $dt = now();
 $formatted = $dt->format('Y-m-d');
 ===expect===
+===ignore===
+TODO

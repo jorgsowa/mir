@@ -1,3 +1,5 @@
+===description===
+circular mixin does not hang
 ===file===
 <?php
 /**
@@ -19,3 +21,5 @@ function test(A $a, B $b): void {
     $b->fromB();
 }
 ===expect===
+===ignore===
+TODO

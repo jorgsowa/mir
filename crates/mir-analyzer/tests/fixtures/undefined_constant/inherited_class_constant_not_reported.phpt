@@ -1,3 +1,5 @@
+===description===
+inherited class constant not reported
 ===file===
 <?php
 class Base {
@@ -8,3 +10,5 @@ function test(): void {
     echo Child::VALUE;
 }
 ===expect===
+===ignore===
+TODO

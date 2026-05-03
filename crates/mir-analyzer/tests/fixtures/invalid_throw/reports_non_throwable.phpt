@@ -1,3 +1,5 @@
+===description===
+reports non throwable
 ===file===
 <?php
 class NotAnException {}
@@ -7,3 +9,5 @@ function test(): void {
 }
 ===expect===
 InvalidThrow: Thrown type 'NotAnException' does not extend Throwable
+===ignore===
+TODO

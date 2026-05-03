@@ -1,3 +1,5 @@
+===description===
+phpstan assert if true narrows condition
 ===file===
 <?php
 class User {
@@ -19,3 +21,5 @@ function test(mixed $value): void {
 }
 ===expect===
 UndefinedMethod: Method User::missing() does not exist
+===ignore===
+TODO

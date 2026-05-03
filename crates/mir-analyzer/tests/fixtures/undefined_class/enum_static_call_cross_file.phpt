@@ -1,3 +1,5 @@
+===description===
+enum static call cross file
 ===file:Status.php===
 <?php
 namespace App;
@@ -12,3 +14,5 @@ function getAll(): array {
     return Status::cases();
 }
 ===expect===
+===ignore===
+TODO

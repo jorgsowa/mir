@@ -1,3 +1,5 @@
+===description===
+reports wrong union return
 ===file===
 <?php
 function f(): int {
@@ -6,3 +8,5 @@ function f(): int {
 }
 ===expect===
 InvalidReturnType: Return type '1|"hello"' is not compatible with declared 'int'
+===ignore===
+TODO

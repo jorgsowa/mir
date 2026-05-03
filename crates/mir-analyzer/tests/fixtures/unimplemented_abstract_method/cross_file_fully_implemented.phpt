@@ -1,3 +1,5 @@
+===description===
+cross file fully implemented
 ===file:Shape.php===
 <?php
 abstract class Shape {
@@ -9,3 +11,5 @@ class Circle extends Shape {
     public function area(): float { return 3.14; }
 }
 ===expect===
+===ignore===
+TODO

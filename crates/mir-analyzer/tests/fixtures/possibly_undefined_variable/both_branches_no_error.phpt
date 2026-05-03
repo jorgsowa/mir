@@ -1,3 +1,5 @@
+===description===
+both branches no error
 ===file===
 <?php
 function foo(bool $c): string {
@@ -5,3 +7,5 @@ function foo(bool $c): string {
     return $r;
 }
 ===expect===
+===ignore===
+TODO

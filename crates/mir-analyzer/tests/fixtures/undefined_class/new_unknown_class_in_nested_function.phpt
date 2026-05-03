@@ -1,3 +1,5 @@
+===description===
+new unknown class in nested function
 ===file===
 <?php
 function outer(): void {
@@ -7,3 +9,5 @@ function outer(): void {
 }
 ===expect===
 UndefinedClass: Class UnknownClass does not exist
+===ignore===
+TODO

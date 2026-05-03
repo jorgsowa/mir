@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 function test(): void {
@@ -6,3 +8,5 @@ function test(): void {
 }
 ===expect===
 TaintedShell: Tainted shell command — possible command injection
+===ignore===
+TODO

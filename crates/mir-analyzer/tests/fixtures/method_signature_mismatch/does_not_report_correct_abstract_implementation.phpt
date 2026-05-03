@@ -1,3 +1,5 @@
+===description===
+does not report correct abstract implementation
 ===file===
 <?php
 abstract class Base {
@@ -7,3 +9,5 @@ class Child extends Base {
     public function f(string $x): void { var_dump($x); }
 }
 ===expect===
+===ignore===
+TODO

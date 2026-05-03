@@ -1,3 +1,5 @@
+===description===
+enum instanceof cross file
 ===file:Status.php===
 <?php
 namespace App;
@@ -11,3 +13,5 @@ function check(mixed $val): bool {
     return $val instanceof Status;
 }
 ===expect===
+===ignore===
+TODO

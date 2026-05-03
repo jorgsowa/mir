@@ -1,3 +1,5 @@
+===description===
+stub file function type checked
 ===config===
 stub_file=stubs/helpers.php
 ===file:stubs/helpers.php===
@@ -8,3 +10,5 @@ function my_helper(string $s): string { return $s; }
 function test(): void { my_helper(42); }
 ===expect===
 App.php: InvalidArgument: Argument $s of my_helper() expects 'string', got '42'
+===ignore===
+TODO

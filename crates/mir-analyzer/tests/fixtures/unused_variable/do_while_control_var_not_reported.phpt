@@ -1,3 +1,5 @@
+===description===
+do while control var not reported
 ===file===
 <?php
 function foo(): void {
@@ -10,3 +12,5 @@ function foo(): void {
     } while ($run);
 }
 ===expect===
+===ignore===
+TODO

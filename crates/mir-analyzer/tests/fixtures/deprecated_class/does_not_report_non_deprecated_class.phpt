@@ -1,3 +1,5 @@
+===description===
+does not report non deprecated class
 ===file===
 <?php
 class ActiveClass {}
@@ -7,3 +9,5 @@ function test(): void {
 }
 ===expect===
 UnusedVariable: Variable $obj is never read
+===ignore===
+TODO

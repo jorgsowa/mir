@@ -1,3 +1,5 @@
+===description===
+covariant allows subtype arg
 ===file===
 <?php
 /** @template-covariant T */
@@ -15,3 +17,5 @@ function test(): void {
     f($c);
 }
 ===expect===
+===ignore===
+TODO

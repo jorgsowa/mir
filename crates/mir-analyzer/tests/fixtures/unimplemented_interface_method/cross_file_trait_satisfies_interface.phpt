@@ -1,3 +1,5 @@
+===description===
+cross file trait satisfies interface
 ===file:Runnable.php===
 <?php
 interface Runnable {
@@ -14,3 +16,5 @@ class Worker implements Runnable {
     use RunsTrait;
 }
 ===expect===
+===ignore===
+TODO

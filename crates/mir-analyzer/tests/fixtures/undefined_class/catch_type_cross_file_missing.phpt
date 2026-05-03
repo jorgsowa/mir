@@ -1,3 +1,5 @@
+===description===
+catch type cross file missing
 ===file:Exceptions.php===
 <?php
 namespace App;
@@ -17,3 +19,5 @@ function handle(): void {
 Handler.php: UndefinedClass: Class App\MissingException does not exist
 Handler.php: UnusedVariable: Variable $e is never read
 Handler.php: UnusedVariable: Variable $e is never read
+===ignore===
+TODO

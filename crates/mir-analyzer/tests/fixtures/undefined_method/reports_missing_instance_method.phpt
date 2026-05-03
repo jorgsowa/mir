@@ -1,3 +1,5 @@
+===description===
+reports missing instance method
 ===file===
 <?php
 class Foo {}
@@ -7,3 +9,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method Foo::missing() does not exist
+===ignore===
+TODO

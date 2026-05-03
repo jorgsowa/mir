@@ -1,3 +1,5 @@
+===description===
+invariant rejects subtype arg
 ===file===
 <?php
 /** @template T */
@@ -16,3 +18,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $b of f() expects 'Box<Animal>', got 'Box<Cat>'
+===ignore===
+TODO

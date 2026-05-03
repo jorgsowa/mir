@@ -1,3 +1,5 @@
+===description===
+trait method body
 ===file===
 <?php
 trait MyTrait {
@@ -7,3 +9,5 @@ trait MyTrait {
 }
 ===expect===
 UndefinedFunction: Function missing_function() is not defined
+===ignore===
+TODO

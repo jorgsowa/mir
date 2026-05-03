@@ -1,3 +1,5 @@
+===description===
+suppressed via psalm suppress
 ===file===
 <?php
 function test(): void {
@@ -7,3 +9,5 @@ function test(): void {
     new NoSuchClass();
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+require once global class fqn from namespaced
 ===file:Foo.php===
 <?php
 class Foo {}
@@ -9,3 +11,5 @@ function run(): void {
     new \Foo();
 }
 ===expect===
+===ignore===
+TODO

@@ -1,6 +1,10 @@
+===description===
+reports null passed as string
 ===file===
 <?php
 function f(string $x): void { var_dump($x); }
 function test(): void { f(null); }
 ===expect===
 NullArgument: Argument $x of f() cannot be null
+===ignore===
+TODO

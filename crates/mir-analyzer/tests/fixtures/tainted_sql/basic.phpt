@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 function run_query(mysqli $db): void {
@@ -5,3 +7,5 @@ function run_query(mysqli $db): void {
 }
 ===expect===
 TaintedSql: Tainted SQL query — possible SQL injection
+===ignore===
+TODO

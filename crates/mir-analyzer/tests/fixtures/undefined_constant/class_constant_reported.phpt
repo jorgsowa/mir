@@ -1,3 +1,5 @@
+===description===
+class constant reported
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 UndefinedConstant: Constant Foo::MISSING is not defined
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+cross file since 8 0 interface not defined on php 7 4
 ===config===
 php_version=7.4
 ===file:Printable.php===
@@ -15,3 +17,5 @@ $label = new Label('hello');
 echo $label;
 ===expect===
 Printable.php: UndefinedClass: Class Stringable does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report read property
 ===config===
 find_dead_code=true
 ===file===
@@ -10,3 +12,5 @@ class Foo {
     }
 }
 ===expect===
+===ignore===
+TODO

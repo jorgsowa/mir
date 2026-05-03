@@ -1,3 +1,5 @@
+===description===
+cross file missing method
 ===file:Shape.php===
 <?php
 abstract class Shape {
@@ -11,3 +13,5 @@ class Circle extends Shape {
 }
 ===expect===
 Circle.php: UnimplementedAbstractMethod: Class Circle must implement abstract method perimeter()
+===ignore===
+TODO

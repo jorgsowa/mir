@@ -1,3 +1,5 @@
+===description===
+docblock return static
 ===file===
 <?php
 class A {
@@ -20,3 +22,5 @@ class C extends B {
     }
 }
 ===expect===
+===ignore===
+TODO

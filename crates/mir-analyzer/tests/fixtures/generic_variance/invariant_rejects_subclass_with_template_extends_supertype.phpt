@@ -1,3 +1,5 @@
+===description===
+invariant rejects subclass with template extends supertype
 ===file===
 <?php
 /** @template T */
@@ -13,3 +15,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $box of acceptsAnimalBox() expects 'Box<Animal>', got 'Box<Cat>'
+===ignore===
+TODO

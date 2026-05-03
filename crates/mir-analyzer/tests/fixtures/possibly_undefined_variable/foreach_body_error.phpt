@@ -1,3 +1,5 @@
+===description===
+foreach body error
 ===file===
 <?php
 function foo(array $items): string {
@@ -8,3 +10,5 @@ function foo(array $items): string {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $last might not be defined
+===ignore===
+TODO

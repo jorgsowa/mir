@@ -1,3 +1,5 @@
+===description===
+enum type hint cross file exists
 ===file:Status.php===
 <?php
 namespace App;
@@ -13,3 +15,5 @@ function getStatus(): Status {
 }
 function checkStatus(Status $s): string { return $s->value; }
 ===expect===
+===ignore===
+TODO

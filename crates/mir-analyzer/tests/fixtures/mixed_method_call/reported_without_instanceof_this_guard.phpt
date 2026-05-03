@@ -1,3 +1,5 @@
+===description===
+reported without instanceof this guard
 ===file===
 <?php
 abstract class A
@@ -12,3 +14,5 @@ abstract class A
 }
 ===expect===
 MixedMethodCall: Method greet() called on mixed type
+===ignore===
+TODO

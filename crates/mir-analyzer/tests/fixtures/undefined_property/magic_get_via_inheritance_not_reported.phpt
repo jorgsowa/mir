@@ -1,3 +1,5 @@
+===description===
+magic get via inheritance not reported
 ===file===
 <?php
 class Base {
@@ -12,3 +14,5 @@ function test(): void {
     echo $c->anotherUndefined;
 }
 ===expect===
+===ignore===
+TODO

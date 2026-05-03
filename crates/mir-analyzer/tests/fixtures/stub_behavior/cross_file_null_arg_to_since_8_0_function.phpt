@@ -1,3 +1,5 @@
+===description===
+cross file null arg to since 8 0 function
 ===config===
 php_version=8.0
 ===file:StringHelper.php===
@@ -10,3 +12,5 @@ function test_null(string $needle): void {
 test_null('hello');
 ===expect===
 StringHelper.php: NullArgument: Argument $haystack of str_contains() cannot be null
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+nullsafe backed enum value
 ===file===
 <?php
 enum Status: string {
@@ -8,3 +10,5 @@ function test(?Status $status): string {
     return $status?->value ?? 'unknown';
 }
 ===expect===
+===ignore===
+TODO

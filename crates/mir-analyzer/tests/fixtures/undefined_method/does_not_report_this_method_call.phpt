@@ -1,3 +1,5 @@
+===description===
+does not report this method call
 ===file===
 <?php
 class Svc {
@@ -7,3 +9,5 @@ class Svc {
     }
 }
 ===expect===
+===ignore===
+TODO

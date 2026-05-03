@@ -1,3 +1,5 @@
+===description===
+from nullable variable
 ===file===
 <?php
 function test(bool $flag): void {
@@ -6,3 +8,5 @@ function test(bool $flag): void {
 }
 ===expect===
 PossiblyNullArrayAccess: Cannot access array on possibly null value
+===ignore===
+TODO

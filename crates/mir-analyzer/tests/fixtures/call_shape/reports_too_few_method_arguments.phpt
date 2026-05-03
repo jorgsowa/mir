@@ -1,3 +1,5 @@
+===description===
+reports too few method arguments
 ===file===
 <?php
 class Greeter {
@@ -8,3 +10,5 @@ class Greeter {
 UnusedParam: Parameter $name is never used
 UnusedParam: Parameter $suffix is never used
 TooFewArguments: Too few arguments for say(): expected 2, got 1
+===ignore===
+TODO

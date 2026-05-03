@@ -1,3 +1,5 @@
+===description===
+stub dir function no error
 ===config===
 stub_dir=stubs
 ===file:stubs/auth.php===
@@ -14,3 +16,5 @@ function handle(string $token, string $key): void {
     }
 }
 ===expect===
+===ignore===
+TODO

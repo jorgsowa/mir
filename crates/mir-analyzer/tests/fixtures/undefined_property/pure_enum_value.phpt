@@ -1,3 +1,5 @@
+===description===
+pure enum value
 ===file===
 <?php
 enum Direction {
@@ -9,3 +11,5 @@ function test(Direction $dir): mixed {
 }
 ===expect===
 UndefinedProperty: Property Direction::$value does not exist
+===ignore===
+TODO

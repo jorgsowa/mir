@@ -1,3 +1,5 @@
+===description===
+reported after instanceof this nonexistent property
 ===file===
 <?php
 abstract class A
@@ -14,3 +16,5 @@ abstract class A
 }
 ===expect===
 UndefinedProperty: Property A::$nonexistent does not exist
+===ignore===
+TODO

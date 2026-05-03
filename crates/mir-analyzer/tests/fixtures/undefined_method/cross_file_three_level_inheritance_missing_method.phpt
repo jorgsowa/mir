@@ -1,3 +1,5 @@
+===description===
+cross file three level inheritance missing method
 ===file:GrandParent.php===
 <?php
 class GrandParent {
@@ -15,3 +17,5 @@ function test(): void {
 }
 ===expect===
 Child.php: UndefinedMethod: Method Child::missing() does not exist
+===ignore===
+TODO

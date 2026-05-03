@@ -1,3 +1,5 @@
+===description===
+underscore param reported
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
 }
 ===expect===
 UnusedParam: Parameter $_unused is never used
+===ignore===
+TODO

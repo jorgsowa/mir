@@ -1,3 +1,5 @@
+===description===
+three part intersection no error
 ===file===
 <?php
 interface A {}
@@ -8,3 +10,5 @@ function f(A&B&C $x): void {
     $_ = $x;
 }
 ===expect===
+===ignore===
+TODO

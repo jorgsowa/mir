@@ -1,3 +1,5 @@
+===description===
+psalm assert template param narrows
 ===file===
 <?php
 /**
@@ -18,3 +20,5 @@ function test(?Bar $x): void {
 }
 ===expect===
 UndefinedMethod: Method Bar::missing() does not exist
+===ignore===
+TODO

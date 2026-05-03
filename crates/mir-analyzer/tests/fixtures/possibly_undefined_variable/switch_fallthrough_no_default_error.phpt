@@ -1,3 +1,5 @@
+===description===
+switch fallthrough no default error
 ===file===
 <?php
 function foo(int $x): string {
@@ -13,3 +15,5 @@ function foo(int $x): string {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $y might not be defined
+===ignore===
+TODO

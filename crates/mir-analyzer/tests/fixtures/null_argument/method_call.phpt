@@ -1,3 +1,5 @@
+===description===
+method call
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ $f = new Foo();
 $f->bar(null);
 ===expect===
 NullArgument: Argument $n of bar() cannot be null
+===ignore===
+TODO

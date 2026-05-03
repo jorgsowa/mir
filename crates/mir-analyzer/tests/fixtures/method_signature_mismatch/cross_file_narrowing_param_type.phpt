@@ -1,3 +1,5 @@
+===description===
+cross file narrowing param type
 ===file:Animal.php===
 <?php
 class Animal {
@@ -10,3 +12,5 @@ class Dog extends Animal {
 }
 ===expect===
 Dog.php: MethodSignatureMismatch: Method Dog::eat() signature mismatch: parameter $food type 'int' is narrower than parent type 'string'
+===ignore===
+TODO

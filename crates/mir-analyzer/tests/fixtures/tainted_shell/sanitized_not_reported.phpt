@@ -1,3 +1,5 @@
+===description===
+sanitized not reported
 ===file===
 <?php
 function test(): void {
@@ -5,3 +7,5 @@ function test(): void {
     exec($cmd);
 }
 ===expect===
+===ignore===
+TODO

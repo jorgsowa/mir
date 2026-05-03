@@ -1,3 +1,5 @@
+===description===
+cross file missing method
 ===file:Runnable.php===
 <?php
 interface Runnable {
@@ -11,3 +13,5 @@ class Task implements Runnable {
 }
 ===expect===
 Task.php: UnimplementedInterfaceMethod: Class Task must implement Runnable::stop() from interface
+===ignore===
+TODO

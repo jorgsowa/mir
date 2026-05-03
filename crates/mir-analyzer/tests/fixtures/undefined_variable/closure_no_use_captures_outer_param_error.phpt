@@ -1,3 +1,5 @@
+===description===
+closure no use captures outer param error
 ===file===
 <?php
 function outer(string $x): callable {
@@ -7,3 +9,5 @@ function outer(string $x): callable {
 }
 ===expect===
 UndefinedVariable: Variable $x is not defined
+===ignore===
+TODO

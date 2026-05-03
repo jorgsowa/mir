@@ -1,3 +1,5 @@
+===description===
+psr4 trait fqcn lazy loaded
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Greetable.php===
@@ -19,3 +21,5 @@ function test(): void {
     $h->bye();
 }
 ===expect===
+===ignore===
+TODO

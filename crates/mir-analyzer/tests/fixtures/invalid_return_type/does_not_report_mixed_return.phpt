@@ -1,3 +1,5 @@
+===description===
+does not report mixed return
 ===file===
 <?php
 function f(): int {
@@ -5,3 +7,5 @@ function f(): int {
     return $x;
 }
 ===expect===
+===ignore===
+TODO

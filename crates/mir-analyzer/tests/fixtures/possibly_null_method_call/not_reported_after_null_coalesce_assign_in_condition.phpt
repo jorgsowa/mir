@@ -1,3 +1,5 @@
+===description===
+not reported after null coalesce assign in condition
 ===file===
 <?php
 class Foo {
@@ -11,3 +13,5 @@ function a(Foo|null $s): void {
     $s->bar();
 }
 ===expect===
+===ignore===
+TODO

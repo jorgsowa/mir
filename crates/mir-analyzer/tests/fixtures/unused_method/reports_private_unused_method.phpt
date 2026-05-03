@@ -1,3 +1,5 @@
+===description===
+reports private unused method
 ===config===
 find_dead_code=true
 ===file===
@@ -7,3 +9,5 @@ class Foo {
 }
 ===expect===
 UnusedMethod: Private method Foo::helper() is never called
+===ignore===
+TODO

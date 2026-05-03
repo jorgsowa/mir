@@ -1,3 +1,5 @@
+===description===
+magic properties methods and mixin are available
 ===file===
 <?php
 class User {
@@ -27,3 +29,5 @@ function test(DynamicModel $model): void {
     strlen($model->title);
 }
 ===expect===
+===ignore===
+TODO

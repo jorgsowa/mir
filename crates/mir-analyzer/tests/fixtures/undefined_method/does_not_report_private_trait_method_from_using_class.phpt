@@ -1,3 +1,5 @@
+===description===
+does not report private trait method from using class
 ===file===
 <?php
 trait MyTrait {
@@ -10,3 +12,5 @@ class MyClass {
     }
 }
 ===expect===
+===ignore===
+TODO

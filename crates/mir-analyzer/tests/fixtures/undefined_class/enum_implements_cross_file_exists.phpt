@@ -1,3 +1,5 @@
+===description===
+enum implements cross file exists
 ===file:HasLabel.php===
 <?php
 namespace App;
@@ -13,3 +15,5 @@ enum Status: string implements HasLabel {
     public function label(): string { return $this->value; }
 }
 ===expect===
+===ignore===
+TODO

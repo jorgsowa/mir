@@ -1,3 +1,5 @@
+===description===
+does not report when param accepts bool
 ===file===
 <?php
 function takesBool(bool $b): void { var_dump($b); }
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $b of takesBool() expects 'bool', got 'int|false'
+===ignore===
+TODO

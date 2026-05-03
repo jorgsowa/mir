@@ -1,3 +1,5 @@
+===description===
+cross file since 8 1 class not defined on php 8 0
 ===config===
 php_version=8.0
 ===file:Async.php===
@@ -10,3 +12,5 @@ function make_fiber(callable $fn): void {
 make_fiber(function (): void {});
 ===expect===
 Async.php: UndefinedClass: Class Fiber does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+three way mixin cycle does not hang
 ===file===
 <?php
 /**
@@ -25,3 +27,5 @@ function test(A $a): void {
     $a->fromA();
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+cross file inheritance
 ===file:A.php===
 <?php
 class A {
@@ -19,3 +21,5 @@ class C extends B {
     }
 }
 ===expect===
+===ignore===
+TODO

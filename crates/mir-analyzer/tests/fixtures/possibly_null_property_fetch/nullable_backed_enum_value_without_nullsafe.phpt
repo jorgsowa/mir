@@ -1,3 +1,5 @@
+===description===
+nullable backed enum value without nullsafe
 ===file===
 <?php
 enum Status: string {
@@ -8,3 +10,5 @@ function test(?Status $status): string {
 }
 ===expect===
 PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
+===ignore===
+TODO

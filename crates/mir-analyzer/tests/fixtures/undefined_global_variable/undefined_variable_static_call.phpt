@@ -1,0 +1,9 @@
+===description===
+undefinedVariableStaticCall
+===file===
+<?php
+                    $foo::bar();
+===expect===
+UndefinedGlobalVariable
+===ignore===
+TODO

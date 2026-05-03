@@ -1,3 +1,5 @@
+===description===
+psalm param narrows type
 ===file===
 <?php
 class User {
@@ -14,3 +16,5 @@ function process($value): void {
 }
 ===expect===
 UndefinedMethod: Method User::missing() does not exist
+===ignore===
+TODO

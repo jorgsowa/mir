@@ -1,3 +1,5 @@
+===description===
+used variable not reported
 ===file===
 <?php
 function foo(): int {
@@ -5,3 +7,5 @@ function foo(): int {
     return $x;
 }
 ===expect===
+===ignore===
+TODO

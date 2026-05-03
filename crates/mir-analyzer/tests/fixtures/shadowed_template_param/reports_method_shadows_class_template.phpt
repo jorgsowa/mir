@@ -1,3 +1,5 @@
+===description===
+reports method shadows class template
 ===file===
 <?php
 /** @template T */
@@ -17,3 +19,5 @@ function test(): void {
 }
 ===expect===
 ShadowedTemplateParam: Method template parameter 'T' shadows class-level template parameter with the same name
+===ignore===
+TODO

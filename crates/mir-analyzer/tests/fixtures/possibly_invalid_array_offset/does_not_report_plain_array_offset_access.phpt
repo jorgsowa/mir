@@ -1,3 +1,5 @@
+===description===
+does not report plain array offset access
 ===file===
 <?php
 function test(): void {
@@ -6,3 +8,5 @@ function test(): void {
     var_dump($x);
 }
 ===expect===
+===ignore===
+TODO

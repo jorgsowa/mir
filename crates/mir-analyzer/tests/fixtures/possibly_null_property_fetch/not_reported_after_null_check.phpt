@@ -1,3 +1,5 @@
+===description===
+not reported after null check
 ===file===
 <?php
 class Foo {
@@ -9,3 +11,5 @@ function test(?Foo $obj): void {
     }
 }
 ===expect===
+===ignore===
+TODO

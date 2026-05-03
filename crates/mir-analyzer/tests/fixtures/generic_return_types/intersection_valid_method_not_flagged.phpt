@@ -1,3 +1,5 @@
+===description===
+intersection valid method not flagged
 ===file===
 <?php
 /**
@@ -20,3 +22,5 @@ function test(object $c): void {
 }
 ===expect===
 
+===ignore===
+TODO

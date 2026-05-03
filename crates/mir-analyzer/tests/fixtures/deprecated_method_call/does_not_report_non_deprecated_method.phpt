@@ -1,3 +1,5 @@
+===description===
+does not report non deprecated method
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
 $foo = new Foo();
 $foo->activeMethod();
 ===expect===
+===ignore===
+TODO

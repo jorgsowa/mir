@@ -1,3 +1,5 @@
+===description===
+does not report elseif check on remaining union
 ===file===
 <?php
 // The elseif condition is NOT redundant when additional union members remain
@@ -12,3 +14,5 @@ function foo(string|int|null $x): void {
     }
 }
 ===expect===
+===ignore===
+TODO

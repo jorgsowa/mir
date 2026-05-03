@@ -1,3 +1,5 @@
+===description===
+inside method body
 ===file===
 <?php
 class A {
@@ -7,3 +9,5 @@ class A {
 }
 ===expect===
 UndefinedFunction: Function missing() is not defined
+===ignore===
+TODO

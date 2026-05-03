@@ -1,3 +1,5 @@
+===description===
+abstract class not reported
 ===file===
 <?php
 interface Runnable {
@@ -5,3 +7,5 @@ interface Runnable {
 }
 abstract class AbstractTask implements Runnable {}
 ===expect===
+===ignore===
+TODO

@@ -1,0 +1,9 @@
+===description===
+varDumpCased
+===file===
+<?php
+                    vAr_dUMp("hello");
+===expect===
+ForbiddenCode
+===ignore===
+TODO

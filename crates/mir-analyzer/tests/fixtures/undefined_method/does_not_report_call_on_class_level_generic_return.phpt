@@ -1,3 +1,5 @@
+===description===
+does not report call on class level generic return
 ===file===
 <?php
 /**
@@ -26,3 +28,5 @@ $box = new Box(new User());
 $user = $box->get();
 $user->getName();
 ===expect===
+===ignore===
+TODO

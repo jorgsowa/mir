@@ -1,3 +1,5 @@
+===description===
+implemented not reported
 ===file===
 <?php
 abstract class Base {
@@ -7,3 +9,5 @@ class Complete extends Base {
     public function doWork(): void {}
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+reports too many function arguments cross file
 ===file:Helper.php===
 <?php
 function greet(string $name): void {}
@@ -7,3 +9,5 @@ greet('Ada', 'Grace');
 ===expect===
 Helper.php: UnusedParam: Parameter $name is never used
 App.php: TooManyArguments: Too many arguments for greet(): expected 1, got 2
+===ignore===
+TODO

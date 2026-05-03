@@ -1,3 +1,5 @@
+===description===
+reports both null and false independently
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }
@@ -9,3 +11,5 @@ function test(): void {
 ===expect===
 PossiblyNullArgument: Argument $n of takesInt() might be null
 PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|null|false' provided
+===ignore===
+TODO

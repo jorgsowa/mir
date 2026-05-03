@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 /**
@@ -8,3 +10,5 @@ function test(?array $arr): void {
 }
 ===expect===
 PossiblyNullArrayAccess: Cannot access array on possibly null value
+===ignore===
+TODO

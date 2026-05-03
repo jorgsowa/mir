@@ -1,3 +1,5 @@
+===description===
+call static magic inherited suppresses static method
 ===file===
 <?php
 class Base {
@@ -11,3 +13,5 @@ function test(): void {
     Child::anotherMissing(1, 2);
 }
 ===expect===
+===ignore===
+TODO

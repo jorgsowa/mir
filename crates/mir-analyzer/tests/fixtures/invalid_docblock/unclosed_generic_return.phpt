@@ -1,3 +1,5 @@
+===description===
+unclosed generic return
 ===file===
 <?php
 /**
@@ -6,3 +8,5 @@
 function foo(): mixed { return []; }
 ===expect===
 InvalidDocblock: Invalid docblock: @return has unclosed generic type `array<`
+===ignore===
+TODO

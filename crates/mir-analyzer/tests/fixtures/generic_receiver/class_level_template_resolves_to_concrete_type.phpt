@@ -1,3 +1,5 @@
+===description===
+class level template resolves to concrete type
 ===file===
 <?php
 /** @template T */
@@ -16,3 +18,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method User::nonExistentMethod() does not exist
+===ignore===
+TODO

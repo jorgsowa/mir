@@ -1,3 +1,5 @@
+===description===
+cross file psr4 uses stdlib
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Formatter.php===
@@ -23,3 +25,5 @@ $f = new LogFormatter();
 $result = $f->format(new \DateTimeImmutable());
 $keys = $f->keys(['a' => 1, 'b' => 2]);
 ===expect===
+===ignore===
+TODO

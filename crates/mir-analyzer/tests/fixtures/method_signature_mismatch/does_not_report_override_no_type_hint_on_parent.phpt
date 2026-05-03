@@ -1,3 +1,5 @@
+===description===
+does not report override no type hint on parent
 ===file===
 <?php
 class Base {
@@ -7,3 +9,5 @@ class Child extends Base {
     public function f(int $x): void { var_dump($x); }
 }
 ===expect===
+===ignore===
+TODO

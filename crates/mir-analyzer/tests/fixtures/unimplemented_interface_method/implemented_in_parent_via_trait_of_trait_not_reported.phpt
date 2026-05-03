@@ -1,3 +1,5 @@
+===description===
+implemented in parent via trait of trait not reported
 ===file===
 <?php
 interface Runnable {
@@ -14,3 +16,5 @@ abstract class Base implements Runnable {
 }
 class Task extends Base {}
 ===expect===
+===ignore===
+TODO

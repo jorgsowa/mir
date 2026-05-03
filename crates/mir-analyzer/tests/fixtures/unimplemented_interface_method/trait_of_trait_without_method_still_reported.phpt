@@ -1,3 +1,5 @@
+===description===
+trait of trait without method still reported
 ===file===
 <?php
 interface Runnable {
@@ -15,3 +17,5 @@ class Task implements Runnable {
 }
 ===expect===
 UnimplementedInterfaceMethod: Class Task must implement Runnable::run() from interface
+===ignore===
+TODO

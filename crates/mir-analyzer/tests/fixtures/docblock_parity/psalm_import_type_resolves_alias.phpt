@@ -1,3 +1,5 @@
+===description===
+psalm import type resolves alias
 ===file===
 <?php
 class User {
@@ -21,3 +23,5 @@ function test(Service $s): void {
 }
 ===expect===
 UndefinedMethod: Method User::missing() does not exist
+===ignore===
+TODO

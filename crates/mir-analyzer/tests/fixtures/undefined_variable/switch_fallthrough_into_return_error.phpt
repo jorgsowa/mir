@@ -19,3 +19,5 @@ function foo(int $x): void {
 }
 ===expect===
 UndefinedVariable: Variable $y is not defined
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+keyed array foreach int key no error
 ===file===
 <?php
 // Bug: foreach over a list-shaped keyed array always produced TMixed for the key.
@@ -12,3 +14,5 @@ function foo(): void {
     }
 }
 ===expect===
+===ignore===
+TODO

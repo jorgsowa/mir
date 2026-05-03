@@ -1,3 +1,5 @@
+===description===
+psr4 enum interface fqcn lazy loaded
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/HasLabel.php===
@@ -13,3 +15,5 @@ enum Status: string implements \App\HasLabel {
     public function label(): string { return $this->value; }
 }
 ===expect===
+===ignore===
+TODO

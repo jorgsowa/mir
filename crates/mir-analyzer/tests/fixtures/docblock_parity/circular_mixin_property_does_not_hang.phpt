@@ -1,3 +1,5 @@
+===description===
+circular mixin property does not hang
 ===file===
 <?php
 /**
@@ -18,3 +20,5 @@ function test(A $a): void {
     strlen($a->fromA);
 }
 ===expect===
+===ignore===
+TODO

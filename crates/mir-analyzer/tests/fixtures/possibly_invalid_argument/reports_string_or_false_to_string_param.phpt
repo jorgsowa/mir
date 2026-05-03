@@ -1,3 +1,5 @@
+===description===
+reports string or false to string param
 ===file===
 <?php
 function takesString(string $s): void { var_dump($s); }
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $s of takesString() expects 'string', possibly different type 'string|false' provided
+===ignore===
+TODO

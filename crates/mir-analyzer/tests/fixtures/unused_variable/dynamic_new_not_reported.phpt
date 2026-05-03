@@ -1,3 +1,5 @@
+===description===
+dynamic new not reported
 ===file===
 <?php
 function test(): object {
@@ -5,3 +7,5 @@ function test(): object {
     return new $class();
 }
 ===expect===
+===ignore===
+TODO

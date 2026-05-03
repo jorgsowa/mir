@@ -1,3 +1,5 @@
+===description===
+require once global no namespace no error
 ===file:Helpers.php===
 <?php
 function helper(): string {
@@ -10,3 +12,5 @@ function run(): string {
     return helper();
 }
 ===expect===
+===ignore===
+TODO

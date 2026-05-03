@@ -1,3 +1,5 @@
+===description===
+trait require extends violation
 ===file===
 <?php
 class Model {}
@@ -18,3 +20,5 @@ class NotAModel {
 }
 ===expect===
 InvalidTraitUse: Trait HasTimestamps used incorrectly: Class NotAModel uses trait HasTimestamps but does not extend Model
+===ignore===
+TODO

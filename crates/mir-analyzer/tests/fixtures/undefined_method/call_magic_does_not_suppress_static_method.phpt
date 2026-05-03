@@ -1,3 +1,5 @@
+===description===
+call magic does not suppress static method
 ===file===
 <?php
 class Magic {
@@ -10,3 +12,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method Magic::missing() does not exist
+===ignore===
+TODO

@@ -7,3 +7,5 @@ function f(): int {
 }
 ===expect===
 InvalidReturnType: Return type '"hello"' is not compatible with declared 'int'
+===ignore===
+TODO

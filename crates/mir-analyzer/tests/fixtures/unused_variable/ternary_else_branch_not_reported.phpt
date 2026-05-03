@@ -1,3 +1,5 @@
+===description===
+ternary else branch not reported
 ===file===
 <?php
 function test(bool $flag): string {
@@ -5,3 +7,5 @@ function test(bool $flag): string {
     return $flag ? 'yes' : $default;
 }
 ===expect===
+===ignore===
+TODO

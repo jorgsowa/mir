@@ -1,3 +1,5 @@
+===description===
+enum type hint cross file missing
 ===file:Service.php===
 <?php
 use App\MissingEnum;
@@ -7,3 +9,5 @@ function getStatus(): MissingEnum {
 ===expect===
 Service.php: UndefinedClass: Class App\MissingEnum does not exist
 Service.php: UndefinedClass: Class App\MissingEnum does not exist
+===ignore===
+TODO

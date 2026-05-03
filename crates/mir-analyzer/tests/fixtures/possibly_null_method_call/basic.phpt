@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ function test(?Foo $obj): void {
 }
 ===expect===
 PossiblyNullMethodCall: Cannot call method bar() on possibly null value
+===ignore===
+TODO

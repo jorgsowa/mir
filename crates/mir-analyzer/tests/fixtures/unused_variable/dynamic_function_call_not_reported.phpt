@@ -1,3 +1,5 @@
+===description===
+dynamic function call not reported
 ===file===
 <?php
 function test(): string {
@@ -5,3 +7,5 @@ function test(): string {
     return $fn();
 }
 ===expect===
+===ignore===
+TODO

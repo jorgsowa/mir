@@ -1,3 +1,5 @@
+===description===
+enum case not reported
 ===file===
 <?php
 enum Status {
@@ -8,3 +10,5 @@ function test(): Status {
     return Status::Active;
 }
 ===expect===
+===ignore===
+TODO

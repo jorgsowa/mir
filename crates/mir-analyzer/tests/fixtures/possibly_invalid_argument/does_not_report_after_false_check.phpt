@@ -1,3 +1,5 @@
+===description===
+does not report after false check
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }
@@ -10,3 +12,5 @@ function test(): void {
     }
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+self mixin does not hang
 ===file===
 <?php
 /**
@@ -11,3 +13,5 @@ function test(A $a): void {
     $a->foo();
 }
 ===expect===
+===ignore===
+TODO

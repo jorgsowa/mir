@@ -1,3 +1,5 @@
+===description===
+contravariant allows supertype arg
 ===file===
 <?php
 /** @template-contravariant T */
@@ -15,3 +17,5 @@ function test(): void {
     f($a);
 }
 ===expect===
+===ignore===
+TODO

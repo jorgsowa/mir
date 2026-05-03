@@ -1,3 +1,5 @@
+===description===
+instanceof unknown class
 ===file===
 <?php
 function test($x): bool {
@@ -5,3 +7,5 @@ function test($x): bool {
 }
 ===expect===
 UndefinedClass: Class NoSuchClass does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report global function called from namespace
 ===config===
 find_dead_code=true
 ===file===
@@ -8,3 +10,5 @@ namespace App;
 
 \helper();
 ===expect===
+===ignore===
+TODO

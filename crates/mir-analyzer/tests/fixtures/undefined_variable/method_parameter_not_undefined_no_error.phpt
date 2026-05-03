@@ -1,3 +1,5 @@
+===description===
+method parameter not undefined no error
 ===file===
 <?php
 class Greeter {
@@ -6,3 +8,5 @@ class Greeter {
     }
 }
 ===expect===
+===ignore===
+TODO

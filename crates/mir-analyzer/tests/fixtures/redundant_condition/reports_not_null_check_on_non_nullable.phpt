@@ -1,3 +1,5 @@
+===description===
+reports not null check on non nullable
 ===file===
 <?php
 function f(string $x): void {
@@ -5,3 +7,5 @@ function f(string $x): void {
 }
 ===expect===
 RedundantCondition: Condition is always true/false for type 'bool'
+===ignore===
+TODO

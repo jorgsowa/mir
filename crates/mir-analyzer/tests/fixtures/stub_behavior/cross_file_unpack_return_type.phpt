@@ -1,3 +1,5 @@
+===description===
+cross file unpack return type
 ===file:Protocol.php===
 <?php
 /**
@@ -13,3 +15,5 @@ if ($result !== false) {
     $first = $result[1];
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report self return in override
 ===file===
 <?php
 class Base {
@@ -7,3 +9,5 @@ class Child extends Base {
     public function getInstance(): static { return $this; }
 }
 ===expect===
+===ignore===
+TODO

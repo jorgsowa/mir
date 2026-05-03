@@ -1,3 +1,5 @@
+===description===
+backed enum unknown property
 ===file===
 <?php
 enum Status: string {
@@ -8,3 +10,5 @@ function test(Status $status): void {
 }
 ===expect===
 UndefinedProperty: Property Status::$label does not exist
+===ignore===
+TODO

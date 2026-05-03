@@ -1,0 +1,15 @@
+===description===
+noInterfacePropertyFetch
+===file===
+<?php
+                    interface A { }
+
+                    function fooFoo(A $a): void {
+                        if ($a->bar) {
+
+                        }
+                    }
+===expect===
+NoInterfaceProperties
+===ignore===
+TODO

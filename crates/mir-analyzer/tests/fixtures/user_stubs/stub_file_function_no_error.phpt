@@ -1,3 +1,5 @@
+===description===
+stub file function no error
 ===config===
 stub_file=stubs/helpers.php
 ===file:stubs/helpers.php===
@@ -7,3 +9,5 @@ function my_helper(string $s): string { return $s; }
 <?php
 $result = my_helper('hello');
 ===expect===
+===ignore===
+TODO

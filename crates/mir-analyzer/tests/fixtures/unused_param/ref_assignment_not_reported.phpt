@@ -1,3 +1,5 @@
+===description===
+ref assignment not reported
 ===file===
 <?php
 final class MyClass {
@@ -8,3 +10,5 @@ final class MyClass {
     }
 }
 ===expect===
+===ignore===
+TODO

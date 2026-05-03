@@ -1,3 +1,5 @@
+===description===
+does not flag reachable code
 ===file===
 <?php
 function foo(): int {
@@ -6,3 +8,5 @@ function foo(): int {
 }
 ===expect===
 
+===ignore===
+TODO

@@ -1,0 +1,9 @@
+===description===
+insideIssetDisabledForDim
+===file===
+<?php
+                    isset($a[$b]);
+===expect===
+UndefinedGlobalVariable
+===ignore===
+TODO

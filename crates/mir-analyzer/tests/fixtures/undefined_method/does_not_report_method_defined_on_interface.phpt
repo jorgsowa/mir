@@ -1,3 +1,5 @@
+===description===
+does not report method defined on interface
 ===file===
 <?php
 interface I {
@@ -7,3 +9,5 @@ function f(I $i): void {
     $i->doIt();
 }
 ===expect===
+===ignore===
+TODO

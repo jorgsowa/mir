@@ -1,3 +1,5 @@
+===description===
+non runtime magic methods reported
 ===file===
 <?php
 class Foo {
@@ -13,3 +15,5 @@ class Foo {
 }
 ===expect===
 UnusedParam: Parameter $x is never used
+===ignore===
+TODO

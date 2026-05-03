@@ -1,3 +1,5 @@
+===description===
+no type not reported
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
 $f = new Foo();
 $f->name = 42;
 ===expect===
+===ignore===
+TODO

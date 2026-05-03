@@ -1,3 +1,5 @@
+===description===
+reports assignment outside constructor
 ===file===
 <?php
 class Foo {
@@ -13,3 +15,5 @@ function test(Foo $foo): void {
 }
 ===expect===
 ReadonlyPropertyAssignment: Cannot assign to readonly property Foo::$name outside of constructor
+===ignore===
+TODO

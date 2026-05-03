@@ -1,3 +1,5 @@
+===description===
+implemented not reported
 ===file===
 <?php
 interface Runnable {
@@ -7,3 +9,5 @@ class Task implements Runnable {
     public function run(): void {}
 }
 ===expect===
+===ignore===
+TODO

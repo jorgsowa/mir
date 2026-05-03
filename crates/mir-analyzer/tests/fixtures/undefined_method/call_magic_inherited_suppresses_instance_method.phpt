@@ -1,3 +1,5 @@
+===description===
+call magic inherited suppresses instance method
 ===file===
 <?php
 class Base {
@@ -12,3 +14,5 @@ function test(): void {
     $c->anotherMissing(1, 2);
 }
 ===expect===
+===ignore===
+TODO

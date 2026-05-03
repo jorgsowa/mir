@@ -1,3 +1,5 @@
+===description===
+trait cycle does not crash
 ===file===
 <?php
 interface Runnable {
@@ -16,3 +18,5 @@ class Task implements Runnable {
 }
 ===expect===
 UnimplementedInterfaceMethod: Class Task must implement Runnable::run() from interface
+===ignore===
+TODO

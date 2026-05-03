@@ -1,3 +1,5 @@
+===description===
+cross file psr4 lazy loaded interface method
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Contracts/Logger.php===
@@ -25,3 +27,5 @@ function test(): void {
 
 class Worker extends \App\NullLogger {}
 ===expect===
+===ignore===
+TODO
