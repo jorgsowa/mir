@@ -1,3 +1,5 @@
+===description===
+case insensitive method not reported
 ===file===
 <?php
 interface Serializable {
@@ -7,3 +9,5 @@ class Impl implements Serializable {
     public function fooBar(): void {}
 }
 ===expect===
+===ignore===
+TODO

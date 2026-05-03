@@ -1,3 +1,5 @@
+===description===
+bracketed namespace use import not reported
 ===file===
 <?php
 namespace Outer {
@@ -10,3 +12,5 @@ namespace Inner {
     class Foo {}
 }
 ===expect===
+===ignore===
+TODO

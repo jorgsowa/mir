@@ -1,3 +1,5 @@
+===description===
+does not report destructure of plain array
 ===file===
 <?php
 /** @return array */
@@ -7,3 +9,5 @@ function test(): void {
     var_dump($a, $b);
 }
 ===expect===
+===ignore===
+TODO

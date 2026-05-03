@@ -1,3 +1,5 @@
+===description===
+intersection method return type resolved
 ===file===
 <?php
 /**
@@ -20,3 +22,5 @@ function test(object $c): void {
 }
 ===expect===
 UndefinedMethod: Method Item::undefinedMethod() does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not count read after throw expression
 ===config===
 find_dead_code=true
 ===file===
@@ -13,3 +15,5 @@ class Foo {
 ===expect===
 UnreachableCode: Unreachable code detected
 UnusedProperty: Private property Foo::$name is never read
+===ignore===
+TODO

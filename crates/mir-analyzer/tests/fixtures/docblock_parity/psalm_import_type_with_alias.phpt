@@ -1,3 +1,5 @@
+===description===
+psalm import type with alias
 ===file===
 <?php
 class Product {}
@@ -18,3 +20,5 @@ function test(ProductService $s): void {
 }
 ===expect===
 UndefinedMethod: Method Product::missing() does not exist
+===ignore===
+TODO

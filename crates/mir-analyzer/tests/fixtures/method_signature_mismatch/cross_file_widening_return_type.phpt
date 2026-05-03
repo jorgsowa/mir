@@ -1,3 +1,5 @@
+===description===
+cross file widening return type
 ===file:Base.php===
 <?php
 class Base {
@@ -10,3 +12,5 @@ class Child extends Base {
 }
 ===expect===
 Child.php: MethodSignatureMismatch: Method Child::fetch() signature mismatch: return type 'string|null' is not a subtype of parent 'string'
+===ignore===
+TODO

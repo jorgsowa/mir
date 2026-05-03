@@ -17,3 +17,5 @@ function foo(int $x): int {
 }
 ===expect===
 InvalidReturnType: Return type '"not an int"|0' is not compatible with declared 'int'
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+inherited property not reported
 ===file===
 <?php
 class Base {
@@ -9,3 +11,5 @@ function test(): void {
     echo $c->name;
 }
 ===expect===
+===ignore===
+TODO

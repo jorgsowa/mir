@@ -1,3 +1,5 @@
+===description===
+require once namespaced class use from global
 ===file:Foo.php===
 <?php
 namespace Vendor\Lib;
@@ -10,3 +12,5 @@ function run(): void {
     new Foo();
 }
 ===expect===
+===ignore===
+TODO

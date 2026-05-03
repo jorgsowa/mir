@@ -1,3 +1,5 @@
+===description===
+psr4 new via use as alias no error
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Model/Entity.php===
@@ -12,3 +14,5 @@ function wrap(): void {
 }
 ===expect===
 Service.php: UnusedVariable: Variable $x is never read
+===ignore===
+TODO

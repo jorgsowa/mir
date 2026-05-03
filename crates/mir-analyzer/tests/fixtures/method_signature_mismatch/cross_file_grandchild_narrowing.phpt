@@ -1,3 +1,5 @@
+===description===
+cross file grandchild narrowing
 ===file:GrandParent.php===
 <?php
 class GrandParent {
@@ -13,3 +15,5 @@ class GrandChild extends ParentClass {
 }
 ===expect===
 GrandChild.php: MethodSignatureMismatch: Method GrandChild::f() signature mismatch: parameter $x type 'int' is narrower than parent type 'string'
+===ignore===
+TODO

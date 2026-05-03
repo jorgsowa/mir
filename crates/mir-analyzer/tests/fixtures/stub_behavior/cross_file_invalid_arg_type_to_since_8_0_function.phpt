@@ -1,3 +1,5 @@
+===description===
+cross file invalid arg type to since 8 0 function
 ===config===
 php_version=8.0
 ===file:StringHelper.php===
@@ -10,3 +12,5 @@ function test_wrong_type(int $n): void {
 test_wrong_type(42);
 ===expect===
 StringHelper.php: InvalidArgument: Argument $haystack of str_contains() expects 'string', got 'int'
+===ignore===
+TODO

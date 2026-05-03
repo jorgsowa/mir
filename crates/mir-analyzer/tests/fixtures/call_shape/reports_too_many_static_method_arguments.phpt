@@ -1,3 +1,5 @@
+===description===
+reports too many static method arguments
 ===file===
 <?php
 class Greeter {
@@ -7,3 +9,5 @@ Greeter::say('Ada', 'Grace');
 ===expect===
 UnusedParam: Parameter $name is never used
 TooManyArguments: Too many arguments for say(): expected 1, got 2
+===ignore===
+TODO

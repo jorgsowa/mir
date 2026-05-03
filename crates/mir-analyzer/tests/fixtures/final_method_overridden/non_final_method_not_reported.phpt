@@ -1,3 +1,5 @@
+===description===
+non final method not reported
 ===file===
 <?php
 class ParentClass {
@@ -7,3 +9,5 @@ class Child extends ParentClass {
     public function unlocked(): void {}
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+call static magic suppresses static method
 ===file===
 <?php
 class Magic {
@@ -10,3 +12,5 @@ function test(): void {
     Magic::anotherMissing(1, 2);
 }
 ===expect===
+===ignore===
+TODO

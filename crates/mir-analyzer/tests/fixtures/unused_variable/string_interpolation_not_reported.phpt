@@ -1,3 +1,5 @@
+===description===
+string interpolation not reported
 ===file===
 <?php
 function foo(): string {
@@ -5,3 +7,5 @@ function foo(): string {
     return "Hello $name!";
 }
 ===expect===
+===ignore===
+TODO

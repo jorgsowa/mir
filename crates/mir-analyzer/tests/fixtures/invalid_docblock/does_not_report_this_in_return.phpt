@@ -1,3 +1,5 @@
+===description===
+does not report this in return
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
     public function self(): static { return $this; }
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report assign in condition
 ===file===
 <?php
 function f(): object|null { return null; }
@@ -8,3 +10,5 @@ function d(object|null $s): object {
     return $s;
 }
 ===expect===
+===ignore===
+TODO

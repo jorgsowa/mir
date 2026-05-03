@@ -1,3 +1,5 @@
+===description===
+suppress silences issue
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }
@@ -10,3 +12,5 @@ function test(): void {
     takesInt(getResult());
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+cross file fully implemented
 ===file:Logger.php===
 <?php
 interface Logger {
@@ -11,3 +13,5 @@ class ConsoleLogger implements Logger {
     public function error(string $msg): void { echo $msg; }
 }
 ===expect===
+===ignore===
+TODO

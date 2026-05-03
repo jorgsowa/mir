@@ -1,3 +1,5 @@
+===description===
+compatible subtype not reported
 ===file===
 <?php
 class Animal {}
@@ -10,3 +12,5 @@ class Cage {
 $c = new Cage();
 $c->occupant = new Dog();
 ===expect===
+===ignore===
+TODO

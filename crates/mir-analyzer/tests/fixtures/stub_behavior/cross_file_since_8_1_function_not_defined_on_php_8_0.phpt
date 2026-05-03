@@ -1,3 +1,5 @@
+===description===
+cross file since 8 1 function not defined on php 8 0
 ===config===
 php_version=8.0
 ===file:ArrayHelper.php===
@@ -10,3 +12,5 @@ function check_is_list(array $items): void {
 check_is_list([1, 2, 3]);
 ===expect===
 ArrayHelper.php: UndefinedFunction: Function array_is_list() is not defined
+===ignore===
+TODO

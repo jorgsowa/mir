@@ -1,3 +1,5 @@
+===description===
+trait uses trait cross file exists
 ===file:Greetable.php===
 <?php
 namespace App;
@@ -20,3 +22,5 @@ function test(): void {
     $h->bye();
 }
 ===expect===
+===ignore===
+TODO

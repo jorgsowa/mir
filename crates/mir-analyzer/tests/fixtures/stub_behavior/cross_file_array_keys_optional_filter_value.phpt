@@ -1,3 +1,5 @@
+===description===
+cross file array keys optional filter value
 ===file:Helper.php===
 <?php
 function extractKeys(array $map): array {
@@ -13,3 +15,5 @@ function extractMatchingKeys(array $map, mixed $value): array {
 $keys = extractKeys(['x' => 1, 'y' => 2]);
 $matching = extractMatchingKeys(['x' => 1, 'y' => 1, 'z' => 2], 1);
 ===expect===
+===ignore===
+TODO

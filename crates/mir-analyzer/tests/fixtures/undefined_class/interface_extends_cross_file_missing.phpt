@@ -1,3 +1,5 @@
+===description===
+interface extends cross file missing
 ===file:Collection.php===
 <?php
 use App\Countable;
@@ -6,3 +8,5 @@ interface Collection extends Countable {
 }
 ===expect===
 Collection.php: UndefinedClass: Class App\Countable does not exist
+===ignore===
+TODO

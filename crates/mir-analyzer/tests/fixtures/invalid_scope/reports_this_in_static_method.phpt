@@ -1,3 +1,5 @@
+===description===
+reports this in static method
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
 }
 ===expect===
 InvalidScope: $this cannot be used in a static method
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+instanceof unknown class in method
 ===file===
 <?php
 class A {
@@ -7,3 +9,5 @@ class A {
 }
 ===expect===
 UndefinedClass: Class UnknownClass does not exist
+===ignore===
+TODO

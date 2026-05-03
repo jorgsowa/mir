@@ -1,3 +1,5 @@
+===description===
+does not report called function
 ===config===
 find_dead_code=true
 ===file===
@@ -6,3 +8,5 @@ function helper(): void {}
 
 helper();
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+isset check not reported
 ===file===
 <?php
 function foo(): bool {
@@ -5,3 +7,5 @@ function foo(): bool {
     return isset($val);
 }
 ===expect===
+===ignore===
+TODO

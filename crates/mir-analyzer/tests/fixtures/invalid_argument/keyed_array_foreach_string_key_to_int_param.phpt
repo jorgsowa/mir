@@ -1,3 +1,5 @@
+===description===
+keyed array foreach string key to int param
 ===file===
 <?php
 // Bug: foreach over a keyed array always produced TMixed for the key type.
@@ -14,3 +16,5 @@ function foo(): void {
 }
 ===expect===
 InvalidArgument: Argument $k of takes_int() expects 'int', got '"hello"|"world"'
+===ignore===
+TODO

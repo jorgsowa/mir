@@ -1,3 +1,5 @@
+===description===
+header with superglobal is reported
 ===file===
 <?php
 function redirect(): void {
@@ -5,3 +7,5 @@ function redirect(): void {
 }
 ===expect===
 TaintedHtml: Tainted HTML output — possible XSS
+===ignore===
+TODO

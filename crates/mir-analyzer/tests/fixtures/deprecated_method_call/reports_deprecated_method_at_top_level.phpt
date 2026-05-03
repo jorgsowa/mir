@@ -1,3 +1,5 @@
+===description===
+reports deprecated method at top level
 ===file===
 <?php
 class Greeter {
@@ -10,3 +12,5 @@ $g->oldGreet('Alice');
 ===expect===
 UnusedParam: Parameter $name is never used
 DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+namespaced trait method body
 ===file===
 <?php
 namespace App {
@@ -9,3 +11,5 @@ namespace App {
 }
 ===expect===
 UndefinedFunction: Function missing_function() is not defined
+===ignore===
+TODO

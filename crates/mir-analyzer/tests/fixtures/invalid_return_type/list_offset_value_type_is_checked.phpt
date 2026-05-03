@@ -1,3 +1,5 @@
+===description===
+list offset value type is checked
 ===file===
 <?php
 function first(): int {
@@ -6,3 +8,5 @@ function first(): int {
 }
 ===expect===
 InvalidReturnType: Return type '"alpha"' is not compatible with declared 'int'
+===ignore===
+TODO

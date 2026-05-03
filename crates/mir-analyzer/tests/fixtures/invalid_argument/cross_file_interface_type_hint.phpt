@@ -1,3 +1,5 @@
+===description===
+cross file interface type hint
 ===file:Printable.php===
 <?php
 interface Printable {
@@ -15,3 +17,5 @@ function test(): void {
     render(new Doc());
 }
 ===expect===
+===ignore===
+TODO

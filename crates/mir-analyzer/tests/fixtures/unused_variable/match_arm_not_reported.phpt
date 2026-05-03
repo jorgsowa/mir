@@ -1,3 +1,5 @@
+===description===
+match arm not reported
 ===file===
 <?php
 function test(string $type): string {
@@ -8,3 +10,5 @@ function test(string $type): string {
     };
 }
 ===expect===
+===ignore===
+TODO

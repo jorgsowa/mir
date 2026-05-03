@@ -1,3 +1,5 @@
+===description===
+reports unreferenced namespaced function
 ===config===
 find_dead_code=true
 ===file===
@@ -7,3 +9,5 @@ namespace App;
 function helper(): void {}
 ===expect===
 UnusedFunction: Function helper() is never called
+===ignore===
+TODO

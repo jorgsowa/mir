@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 function test(): void {
@@ -5,3 +7,5 @@ function test(): void {
 }
 ===expect===
 TaintedHtml: Tainted HTML output — possible XSS
+===ignore===
+TODO

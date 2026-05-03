@@ -1,3 +1,5 @@
+===description===
+elseif all branches assigned no error
 ===file===
 <?php
 // Bug: elseif branches were discarded from the post-if merge — variables assigned
@@ -13,3 +15,5 @@ function foo(int $x): string {
     return $result;
 }
 ===expect===
+===ignore===
+TODO

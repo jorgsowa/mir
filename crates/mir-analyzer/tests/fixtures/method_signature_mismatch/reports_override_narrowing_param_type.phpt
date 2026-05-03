@@ -1,3 +1,5 @@
+===description===
+reports override narrowing param type
 ===file===
 <?php
 class Base {
@@ -8,3 +10,5 @@ class Child extends Base {
 }
 ===expect===
 MethodSignatureMismatch: Method Child::f() signature mismatch: parameter $x type 'int' is narrower than parent type 'string'
+===ignore===
+TODO

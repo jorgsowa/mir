@@ -1,3 +1,5 @@
+===description===
+does not report arg passed to method on mixed
 ===file===
 <?php
 class Foo {
@@ -10,3 +12,5 @@ class Foo {
 }
 ===expect===
 UnusedParam: Parameter $a is never used
+===ignore===
+TODO

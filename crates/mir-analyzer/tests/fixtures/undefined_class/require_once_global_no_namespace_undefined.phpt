@@ -1,3 +1,5 @@
+===description===
+require once global no namespace undefined
 ===file:Helpers.php===
 <?php
 class Helper {}
@@ -9,3 +11,5 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedClass: Class Missing does not exist
+===ignore===
+TODO

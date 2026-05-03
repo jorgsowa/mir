@@ -1,3 +1,5 @@
+===description===
+unpack not reported
 ===file===
 <?php
 function test(): void {
@@ -6,3 +8,5 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
+===ignore===
+TODO

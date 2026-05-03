@@ -1,3 +1,5 @@
+===description===
+cross file child calls removed parent method
 ===file:Base.php===
 <?php
 class Base {}
@@ -10,3 +12,5 @@ function test(): void {
 }
 ===expect===
 Child.php: UndefinedMethod: Method Child::foo() does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+reports on class method
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ class Foo {
 }
 ===expect===
 InvalidDocblock: Invalid docblock: @return has unclosed generic type `array<`
+===ignore===
+TODO

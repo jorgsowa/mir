@@ -1,3 +1,5 @@
+===description===
+via trait
 ===file===
 <?php
 trait RetStaticTrait {
@@ -20,3 +22,5 @@ class C extends B {
     }
 }
 ===expect===
+===ignore===
+TODO

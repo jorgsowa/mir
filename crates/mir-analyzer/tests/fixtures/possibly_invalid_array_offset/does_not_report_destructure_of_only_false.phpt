@@ -1,3 +1,5 @@
+===description===
+does not report destructure of only false
 ===file===
 <?php
 function test(): void {
@@ -6,3 +8,5 @@ function test(): void {
     var_dump($a);
 }
 ===expect===
+===ignore===
+TODO

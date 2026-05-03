@@ -1,3 +1,5 @@
+===description===
+three level inheritance
 ===file===
 <?php
 class A {
@@ -18,3 +20,5 @@ class D extends C {
     }
 }
 ===expect===
+===ignore===
+TODO

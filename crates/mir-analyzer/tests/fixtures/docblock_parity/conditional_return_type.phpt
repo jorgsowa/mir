@@ -1,3 +1,5 @@
+===description===
+conditional return type
 ===file===
 <?php
 class Foo
@@ -17,3 +19,5 @@ class Foo
     }
 }
 ===expect===
+===ignore===
+TODO

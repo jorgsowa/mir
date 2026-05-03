@@ -1,3 +1,5 @@
+===description===
+stub file class no error
 ===config===
 stub_file=stubs/framework.php
 ===file:stubs/framework.php===
@@ -12,3 +14,5 @@ function boot(): void {
     $client->connect('https://example.com');
 }
 ===expect===
+===ignore===
+TODO

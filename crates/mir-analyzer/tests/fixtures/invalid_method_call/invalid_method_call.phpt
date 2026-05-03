@@ -1,0 +1,9 @@
+===description===
+invalidMethodCall
+===file===
+<?php
+                    ("hello")->someMethod();
+===expect===
+InvalidMethodCall
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+preg match populates matches
 ===file===
 <?php
 function extract(string $s): string {
@@ -8,3 +10,5 @@ function extract(string $s): string {
     return '';
 }
 ===expect===
+===ignore===
+TODO

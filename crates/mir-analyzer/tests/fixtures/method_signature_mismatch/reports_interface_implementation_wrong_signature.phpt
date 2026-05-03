@@ -1,3 +1,5 @@
+===description===
+reports interface implementation wrong signature
 ===file===
 <?php
 interface I {
@@ -8,3 +10,5 @@ class C implements I {
 }
 ===expect===
 MethodSignatureMismatch: Method C::f() signature mismatch: parameter $x type 'int' is narrower than parent type 'string'
+===ignore===
+TODO

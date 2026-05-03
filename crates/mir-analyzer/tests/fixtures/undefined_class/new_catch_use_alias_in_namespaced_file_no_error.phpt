@@ -1,3 +1,5 @@
+===description===
+new catch use alias in namespaced file no error
 ===file:Entity.php===
 <?php
 namespace App\Model;
@@ -15,3 +17,5 @@ function wrap(): void {
 ===expect===
 Service.php: UnusedVariable: Variable $x is never read
 Service.php: UnusedVariable: Variable $e is never read
+===ignore===
+TODO

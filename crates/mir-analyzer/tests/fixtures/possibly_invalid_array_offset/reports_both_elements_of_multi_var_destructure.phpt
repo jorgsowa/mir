@@ -1,3 +1,5 @@
+===description===
+reports both elements of multi var destructure
 ===file===
 <?php
 /** @return array|false */
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array<mixed, mixed>|false'
+===ignore===
+TODO

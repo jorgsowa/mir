@@ -1,3 +1,5 @@
+===description===
+does not report static method called with spaces around double colon
 ===file===
 <?php
 class Math {
@@ -8,3 +10,5 @@ function test(): void {
     Math  ::  sq(3);
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+cross file trait method body
 ===file:Trait.php===
 <?php
 trait MyTrait {
@@ -12,3 +14,5 @@ class MyClass {
 }
 ===expect===
 Trait.php: UndefinedFunction: Function missing_function() is not defined
+===ignore===
+TODO

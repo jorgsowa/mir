@@ -1,3 +1,5 @@
+===description===
+property type hint cross file missing
 ===file:Dep.php===
 <?php
 namespace Vendor\Lib;
@@ -10,3 +12,5 @@ class Bar {
 }
 ===expect===
 Main.php: UndefinedClass: Class Vendor\Lib\Missing does not exist
+===ignore===
+TODO

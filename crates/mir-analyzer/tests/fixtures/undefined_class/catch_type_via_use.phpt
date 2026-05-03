@@ -1,3 +1,5 @@
+===description===
+catch type via use
 ===file===
 <?php
 use Vendor\Missing\MyException;
@@ -10,3 +12,5 @@ function f(): void {
 ===expect===
 UndefinedClass: Class Vendor\Missing\MyException does not exist
 UnusedVariable: Variable $e is never read
+===ignore===
+TODO

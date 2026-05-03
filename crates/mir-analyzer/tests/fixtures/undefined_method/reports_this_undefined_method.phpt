@@ -1,3 +1,5 @@
+===description===
+reports this undefined method
 ===file===
 <?php
 class Svc {
@@ -7,3 +9,5 @@ class Svc {
 }
 ===expect===
 UndefinedMethod: Method Svc::nonExistent() does not exist
+===ignore===
+TODO

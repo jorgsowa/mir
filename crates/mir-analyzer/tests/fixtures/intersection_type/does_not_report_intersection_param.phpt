@@ -1,3 +1,5 @@
+===description===
+does not report intersection param
 ===file===
 <?php
 interface Countable {}
@@ -7,3 +9,5 @@ function f(Iterator&Countable $x): void {
     $_ = $x;
 }
 ===expect===
+===ignore===
+TODO

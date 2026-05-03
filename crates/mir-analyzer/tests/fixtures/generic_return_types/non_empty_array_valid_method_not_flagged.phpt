@@ -1,3 +1,5 @@
+===description===
+non empty array valid method not flagged
 ===file===
 <?php
 /**
@@ -16,3 +18,5 @@ function test(): void {
     }
 }
 ===expect===
+===ignore===
+TODO

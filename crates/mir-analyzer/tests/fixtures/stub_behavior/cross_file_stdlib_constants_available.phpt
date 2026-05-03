@@ -1,3 +1,5 @@
+===description===
+cross file stdlib constants available
 ===file:Limits.php===
 <?php
 function getMaxId(): int {
@@ -17,3 +19,5 @@ function isValidId(int $id): bool {
 $max = getMaxId();
 $ok = isValidId(99);
 ===expect===
+===ignore===
+TODO

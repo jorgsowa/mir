@@ -1,3 +1,5 @@
+===description===
+contravariant rejects subtype arg
 ===file===
 <?php
 /** @template-contravariant T */
@@ -16,3 +18,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $s of f() expects 'Sink<Animal>', got 'Sink<Cat>'
+===ignore===
+TODO

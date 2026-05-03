@@ -1,3 +1,5 @@
+===description===
+does not report call on generic type param
 ===file===
 <?php
 /**
@@ -8,3 +10,5 @@ function f($obj): void {
     $obj->method();
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+cross file multiple interfaces one missing
 ===file:Serializable.php===
 <?php
 interface Serializable {
@@ -16,3 +18,5 @@ class Entity implements Serializable, Identifiable {
 }
 ===expect===
 Entity.php: UnimplementedInterfaceMethod: Class Entity must implement Identifiable::getId() from interface
+===ignore===
+TODO

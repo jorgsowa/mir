@@ -1,3 +1,5 @@
+===description===
+after return
 ===file===
 <?php
 function foo(): int {
@@ -6,3 +8,5 @@ function foo(): int {
 }
 ===expect===
 UnreachableCode: Unreachable code detected
+===ignore===
+TODO

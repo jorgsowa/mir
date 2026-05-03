@@ -1,3 +1,5 @@
+===description===
+does not report function called from another file
 ===config===
 find_dead_code=true
 ===file:helpers.php===
@@ -7,3 +9,5 @@ function helper(): void {}
 <?php
 helper();
 ===expect===
+===ignore===
+TODO

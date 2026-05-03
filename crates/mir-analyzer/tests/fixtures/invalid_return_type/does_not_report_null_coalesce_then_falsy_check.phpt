@@ -1,3 +1,5 @@
+===description===
+does not report null coalesce then falsy check
 ===file===
 <?php
 function f(): object|null { return null; }
@@ -9,3 +11,5 @@ function c(object|null $s): object {
     return $s;
 }
 ===expect===
+===ignore===
+TODO

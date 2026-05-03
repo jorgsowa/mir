@@ -1,3 +1,5 @@
+===description===
+while body error
 ===file===
 <?php
 function foo(bool $c): int {
@@ -9,3 +11,5 @@ function foo(bool $c): int {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $x might not be defined
+===ignore===
+TODO

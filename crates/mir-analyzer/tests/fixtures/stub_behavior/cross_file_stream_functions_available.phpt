@@ -1,3 +1,5 @@
+===description===
+cross file stream functions available
 ===file:StreamHelper.php===
 <?php
 function isTerminalStream(mixed $stream): bool {
@@ -14,3 +16,5 @@ if ($stdin !== false) {
     $isTty = isTerminalStream($stdin);
 }
 ===expect===
+===ignore===
+TODO

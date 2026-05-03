@@ -1,3 +1,5 @@
+===description===
+psalm type alias used by magic method
 ===file===
 <?php
 class User {
@@ -19,3 +21,5 @@ function test(Repository $repo): void {
 }
 ===expect===
 UndefinedMethod: Method User::missing() does not exist
+===ignore===
+TODO

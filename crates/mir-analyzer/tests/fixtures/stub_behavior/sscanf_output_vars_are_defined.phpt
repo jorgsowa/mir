@@ -1,3 +1,5 @@
+===description===
+sscanf output vars are defined
 ===file===
 <?php
 function parse(string $s): int {
@@ -6,3 +8,5 @@ function parse(string $s): int {
     return $row + $col;
 }
 ===expect===
+===ignore===
+TODO

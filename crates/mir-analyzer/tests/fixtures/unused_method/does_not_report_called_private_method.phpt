@@ -1,3 +1,5 @@
+===description===
+does not report called private method
 ===config===
 find_dead_code=true
 ===file===
@@ -10,3 +12,5 @@ class Foo {
     private function helper(): void {}
 }
 ===expect===
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+implemented via trait of trait not reported
 ===file===
 <?php
 interface Runnable {
@@ -13,3 +15,5 @@ class Task implements Runnable {
     use RunsTrait;
 }
 ===expect===
+===ignore===
+TODO

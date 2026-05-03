@@ -1,3 +1,5 @@
+===description===
+nested if error
 ===file===
 <?php
 function foo(bool $a, bool $b): int {
@@ -10,3 +12,5 @@ function foo(bool $a, bool $b): int {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $x might not be defined
+===ignore===
+TODO

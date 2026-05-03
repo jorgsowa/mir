@@ -1,3 +1,5 @@
+===description===
+reports override adds required param
 ===file===
 <?php
 class Base {
@@ -8,3 +10,5 @@ class Child extends Base {
 }
 ===expect===
 MethodSignatureMismatch: Method Child::f() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
+===ignore===
+TODO

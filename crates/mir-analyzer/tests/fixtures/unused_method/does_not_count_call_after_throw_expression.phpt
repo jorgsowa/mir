@@ -1,3 +1,5 @@
+===description===
+does not count call after throw expression
 ===config===
 find_dead_code=true
 ===file===
@@ -13,3 +15,5 @@ class Foo {
 ===expect===
 UnreachableCode: Unreachable code detected
 UnusedMethod: Private method Foo::helper() is never called
+===ignore===
+TODO

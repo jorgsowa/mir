@@ -1,3 +1,5 @@
+===description===
+reports incompatible named object override
 ===file===
 <?php
 class Animal {}
@@ -10,3 +12,5 @@ class Child extends Base {
 }
 ===expect===
 MethodSignatureMismatch: Method Child::get() signature mismatch: return type 'Dog' is not a subtype of parent 'Animal'
+===ignore===
+TODO

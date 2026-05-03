@@ -1,3 +1,5 @@
+===description===
+reports on method call
 ===file===
 <?php
 class Parser {
@@ -10,3 +12,5 @@ function test(Parser $parser): void {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $input of parse() expects 'string', possibly different type 'string|false' provided
+===ignore===
+TODO

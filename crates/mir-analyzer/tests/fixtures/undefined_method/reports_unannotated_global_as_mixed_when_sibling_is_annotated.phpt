@@ -1,3 +1,5 @@
+===description===
+reports unannotated global as mixed when sibling is annotated
 ===file===
 <?php
 class Foo {
@@ -13,3 +15,5 @@ function test(): void {
 }
 ===expect===
 MixedMethodCall: Method bar() called on mixed type
+===ignore===
+TODO

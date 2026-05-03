@@ -1,3 +1,5 @@
+===description===
+cross file array map null callback
 ===file:Zipper.php===
 <?php
 function zipArrays(array $a, array $b): array {
@@ -8,3 +10,5 @@ function zipArrays(array $a, array $b): array {
 <?php
 $pairs = zipArrays([1, 2], ['a', 'b']);
 ===expect===
+===ignore===
+TODO

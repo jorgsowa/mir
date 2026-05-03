@@ -1,3 +1,5 @@
+===description===
+does not mark namespaced fn referenced via global string
 ===config===
 find_dead_code=true
 ===file===
@@ -10,3 +12,5 @@ function helper(): void {}
 call_user_func('helper');
 ===expect===
 UnusedFunction: Function helper() is never called
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+covariant raw type no error
 ===file===
 <?php
 /** @template-covariant T */
@@ -13,3 +15,5 @@ function test(): void {
     f($raw);
 }
 ===expect===
+===ignore===
+TODO

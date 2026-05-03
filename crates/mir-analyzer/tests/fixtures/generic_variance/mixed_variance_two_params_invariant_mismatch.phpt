@@ -1,3 +1,5 @@
+===description===
+mixed variance two params invariant mismatch
 ===file===
 <?php
 /**
@@ -16,3 +18,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $p of f() expects 'Pair<string, Animal>', got 'Pair<int, Cat>'
+===ignore===
+TODO

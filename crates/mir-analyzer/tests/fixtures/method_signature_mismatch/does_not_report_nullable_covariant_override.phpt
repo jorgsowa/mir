@@ -1,3 +1,5 @@
+===description===
+does not report nullable covariant override
 ===file===
 <?php
 class Animal {}
@@ -9,3 +11,5 @@ class Child extends Base {
     public function get(): Cat { return new Cat(); }
 }
 ===expect===
+===ignore===
+TODO

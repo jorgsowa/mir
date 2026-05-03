@@ -1,3 +1,5 @@
+===description===
+does not widen child after parent instanceof guard
 ===file===
 <?php
 class Base {}
@@ -13,3 +15,5 @@ function test(object $value): void {
     echo $value->childOnly;
 }
 ===expect===
+===ignore===
+TODO

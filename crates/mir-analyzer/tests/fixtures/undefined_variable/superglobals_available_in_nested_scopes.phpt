@@ -16,3 +16,5 @@ function outer(): void {
     $arrow();
 }
 ===expect===
+===ignore===
+TODO

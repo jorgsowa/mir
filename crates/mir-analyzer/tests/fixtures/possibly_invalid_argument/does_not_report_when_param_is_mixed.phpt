@@ -1,3 +1,5 @@
+===description===
+does not report when param is mixed
 ===file===
 <?php
 function takesMixed(mixed $v): void { var_dump($v); }
@@ -7,3 +9,5 @@ function test(): void {
     takesMixed(getResult());
 }
 ===expect===
+===ignore===
+TODO

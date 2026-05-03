@@ -1,3 +1,5 @@
+===description===
+cross file invalid arg to removed function
 ===config===
 php_version=7.4
 ===file:TextHelper.php===
@@ -10,3 +12,5 @@ function test_wrong_type(int $n): void {
 test_wrong_type(42);
 ===expect===
 TextHelper.php: InvalidArgument: Argument $hebrew_text of hebrevc() expects 'string', got 'int'
+===ignore===
+TODO

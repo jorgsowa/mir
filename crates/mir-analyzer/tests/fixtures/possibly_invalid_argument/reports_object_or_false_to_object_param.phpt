@@ -1,3 +1,5 @@
+===description===
+reports object or false to object param
 ===file===
 <?php
 class Connection {}
@@ -9,3 +11,5 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided
+===ignore===
+TODO

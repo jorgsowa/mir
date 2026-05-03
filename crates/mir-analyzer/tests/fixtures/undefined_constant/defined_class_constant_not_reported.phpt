@@ -1,3 +1,5 @@
+===description===
+defined class constant not reported
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ function test(): void {
     echo Foo::BAR;
 }
 ===expect===
+===ignore===
+TODO

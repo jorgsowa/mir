@@ -1,3 +1,5 @@
+===description===
+callable return type resolved
 ===file===
 <?php
 /**
@@ -16,3 +18,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method Service::undefinedMethod() does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report defined method
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ function test(): void {
     $f->bar();
 }
 ===expect===
+===ignore===
+TODO

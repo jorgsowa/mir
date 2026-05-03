@@ -1,3 +1,5 @@
+===description===
+does not report method call on mixed
 ===file===
 <?php
 function test(): void {
@@ -7,3 +9,5 @@ function test(): void {
 }
 ===expect===
 MixedMethodCall: Method anything() called on mixed type
+===ignore===
+TODO

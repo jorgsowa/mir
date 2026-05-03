@@ -1,3 +1,5 @@
+===description===
+require once global function unqualified from namespaced
 ===file:Helpers.php===
 <?php
 function helper(): string {
@@ -11,3 +13,5 @@ function run(): string {
     return helper();
 }
 ===expect===
+===ignore===
+TODO

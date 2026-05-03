@@ -1,3 +1,5 @@
+===description===
+cross file wrong class passed
 ===file:User.php===
 <?php
 class User {}
@@ -12,3 +14,5 @@ function test(): void {
 }
 ===expect===
 Service.php: InvalidArgument: Argument $u of createUser() expects 'User', got 'Admin'
+===ignore===
+TODO

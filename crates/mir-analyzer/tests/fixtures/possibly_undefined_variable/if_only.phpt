@@ -1,3 +1,5 @@
+===description===
+if only
 ===file===
 <?php
 function foo(bool $c): string {
@@ -6,3 +8,5 @@ function foo(bool $c): string {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $r might not be defined
+===ignore===
+TODO

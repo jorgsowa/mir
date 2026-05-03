@@ -1,3 +1,5 @@
+===description===
+cross file since 8 1 constant not defined on php 8 0
 ===config===
 php_version=8.0
 ===file:ImageHelper.php===
@@ -10,3 +12,5 @@ function is_avif(int $type): void {
 is_avif(19);
 ===expect===
 ImageHelper.php: UndefinedConstant: Constant IMAGETYPE_AVIF is not defined
+===ignore===
+TODO

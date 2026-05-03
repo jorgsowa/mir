@@ -1,3 +1,5 @@
+===description===
+variadic reported
 ===file===
 <?php
 function sum(int ...$nums): int {
@@ -5,3 +7,5 @@ function sum(int ...$nums): int {
 }
 ===expect===
 UnusedParam: Parameter $nums is never used
+===ignore===
+TODO

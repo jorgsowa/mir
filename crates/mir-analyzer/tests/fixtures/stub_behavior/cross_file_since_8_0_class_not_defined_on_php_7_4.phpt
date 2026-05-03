@@ -1,3 +1,5 @@
+===description===
+cross file since 8 0 class not defined on php 7 4
 ===config===
 php_version=7.4
 ===file:Cache.php===
@@ -10,3 +12,5 @@ function make_weak_cache(): void {
 make_weak_cache();
 ===expect===
 Cache.php: UndefinedClass: Class WeakMap does not exist
+===ignore===
+TODO

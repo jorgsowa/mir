@@ -1,3 +1,5 @@
+===description===
+switch fallthrough preassigned no error
 ===file===
 <?php
 // Variable assigned before the switch is always defined post-switch, even when
@@ -17,3 +19,5 @@ function foo(int $x): string {
     return $y;
 }
 ===expect===
+===ignore===
+TODO

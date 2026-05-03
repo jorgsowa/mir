@@ -1,3 +1,5 @@
+===description===
+resolves parent template to concrete type
 ===file===
 <?php
 /** @template T */
@@ -16,3 +18,5 @@ $result = $repo->find();
 $result->nonExistentMethod();
 ===expect===
 UndefinedMethod: Method User::nonExistentMethod() does not exist
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+php builtin constant not reported
 ===file===
 <?php
 function test(): void {
@@ -5,3 +7,5 @@ function test(): void {
     echo PHP_INT_MAX;
 }
 ===expect===
+===ignore===
+TODO

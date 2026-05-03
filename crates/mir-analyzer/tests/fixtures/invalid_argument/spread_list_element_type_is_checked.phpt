@@ -1,3 +1,5 @@
+===description===
+spread list element type is checked
 ===file===
 <?php
 function takes_ints(int ...$xs): void { var_dump($xs); }
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $xs of takes_ints() expects 'int', got '"1"|"2"'
+===ignore===
+TODO

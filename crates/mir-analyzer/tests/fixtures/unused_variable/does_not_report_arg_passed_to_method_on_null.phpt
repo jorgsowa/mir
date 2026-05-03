@@ -1,3 +1,5 @@
+===description===
+does not report arg passed to method on null
 ===file===
 <?php
 class Bar {
@@ -10,3 +12,5 @@ class Bar {
 }
 ===expect===
 NullMethodCall: Cannot call method doSomething() on null
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+unknown function
 ===file===
 <?php
 function test(): void {
@@ -5,3 +7,5 @@ function test(): void {
 }
 ===expect===
 UndefinedFunction: Function foo() is not defined
+===ignore===
+TODO

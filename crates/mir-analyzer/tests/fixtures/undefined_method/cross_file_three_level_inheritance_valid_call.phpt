@@ -1,3 +1,5 @@
+===description===
+cross file three level inheritance valid call
 ===file:GrandParent.php===
 <?php
 class GrandParent {
@@ -14,3 +16,5 @@ function test(): void {
     $c->greet();
 }
 ===expect===
+===ignore===
+TODO

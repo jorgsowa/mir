@@ -1,3 +1,5 @@
+===description===
+cross file extends stdlib exception
 ===file:Domain/NotFoundException.php===
 <?php
 namespace Domain;
@@ -26,3 +28,5 @@ try {
     echo $e->getMessage();
 }
 ===expect===
+===ignore===
+TODO

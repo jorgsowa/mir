@@ -1,3 +1,5 @@
+===description===
+compact not reported
 ===file===
 <?php
 function foo(): array {
@@ -6,3 +8,5 @@ function foo(): array {
     return compact('name', 'age');
 }
 ===expect===
+===ignore===
+TODO

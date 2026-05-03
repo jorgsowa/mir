@@ -1,3 +1,5 @@
+===description===
+require once namespaced function unqualified from global
 ===file:Helpers.php===
 <?php
 namespace Vendor\Lib;
@@ -12,3 +14,5 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedFunction: Function helper() is not defined
+===ignore===
+TODO

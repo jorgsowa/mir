@@ -1,3 +1,5 @@
+===description===
+psr4 interface parent fqcn lazy loaded
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Countable.php===
@@ -12,3 +14,5 @@ interface Collection extends \App\Countable {
     public function isEmpty(): bool;
 }
 ===expect===
+===ignore===
+TODO

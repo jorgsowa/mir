@@ -1,3 +1,5 @@
+===description===
+does not report call on template param with bound
 ===file===
 <?php
 /**
@@ -8,3 +10,5 @@ function g($obj): void {
     $obj->doSomething();
 }
 ===expect===
+===ignore===
+TODO

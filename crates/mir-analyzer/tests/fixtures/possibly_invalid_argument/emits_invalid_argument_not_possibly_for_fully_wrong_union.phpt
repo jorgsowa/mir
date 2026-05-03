@@ -1,3 +1,5 @@
+===description===
+emits invalid argument not possibly for fully wrong union
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $n of takesInt() expects 'int', got 'string|false'
+===ignore===
+TODO

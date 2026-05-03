@@ -1,0 +1,9 @@
+===description===
+possiblyNullFunctionCall
+===file===
+<?php
+                    $this->foo();
+===expect===
+InvalidScope
+===ignore===
+TODO

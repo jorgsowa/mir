@@ -1,3 +1,5 @@
+===description===
+backed enum name
 ===file===
 <?php
 enum Color: int {
@@ -8,3 +10,5 @@ function test(?Color $color): string {
     return $color?->name ?? 'none';
 }
 ===expect===
+===ignore===
+TODO

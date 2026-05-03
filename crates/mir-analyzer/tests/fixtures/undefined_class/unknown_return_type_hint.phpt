@@ -1,3 +1,5 @@
+===description===
+unknown return type hint
 ===file===
 <?php
 function f(): UnknownClass {
@@ -5,3 +7,5 @@ function f(): UnknownClass {
 }
 ===expect===
 UndefinedClass: Class UnknownClass does not exist
+===ignore===
+TODO

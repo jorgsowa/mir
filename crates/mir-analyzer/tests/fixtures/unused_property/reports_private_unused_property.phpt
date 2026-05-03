@@ -1,3 +1,5 @@
+===description===
+reports private unused property
 ===config===
 find_dead_code=true
 ===file===
@@ -7,3 +9,5 @@ class Foo {
 }
 ===expect===
 UnusedProperty: Private property Foo::$name is never read
+===ignore===
+TODO

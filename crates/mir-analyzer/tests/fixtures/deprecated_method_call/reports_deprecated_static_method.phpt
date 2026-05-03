@@ -1,3 +1,5 @@
+===description===
+reports deprecated static method
 ===file===
 <?php
 class Greeter {
@@ -11,3 +13,5 @@ function test(): void {
 ===expect===
 UnusedParam: Parameter $name is never used
 DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead
+===ignore===
+TODO

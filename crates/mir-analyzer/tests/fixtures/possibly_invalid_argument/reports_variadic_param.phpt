@@ -1,3 +1,5 @@
+===description===
+reports variadic param
 ===file===
 <?php
 function takesInts(int ...$ns): void { var_dump($ns); }
@@ -9,3 +11,5 @@ function test(): void {
 ===expect===
 PossiblyInvalidArgument: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
 PossiblyInvalidArgument: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
+===ignore===
+TODO

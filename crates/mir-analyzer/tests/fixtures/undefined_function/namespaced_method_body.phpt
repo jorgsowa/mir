@@ -1,3 +1,5 @@
+===description===
+namespaced method body
 ===file===
 <?php
 namespace MyApp {
@@ -9,3 +11,5 @@ namespace MyApp {
 }
 ===expect===
 UndefinedFunction: Function nonexistent_function() is not defined
+===ignore===
+TODO

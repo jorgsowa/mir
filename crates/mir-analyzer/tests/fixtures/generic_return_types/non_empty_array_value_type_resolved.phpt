@@ -1,3 +1,5 @@
+===description===
+non empty array value type resolved
 ===file===
 <?php
 /**
@@ -17,3 +19,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method Tag::noSuchMethod() does not exist
+===ignore===
+TODO

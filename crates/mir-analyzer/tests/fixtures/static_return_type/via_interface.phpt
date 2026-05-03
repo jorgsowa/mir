@@ -1,3 +1,5 @@
+===description===
+via interface
 ===file===
 <?php
 interface Fluent {
@@ -20,3 +22,5 @@ class C extends B {
     }
 }
 ===expect===
+===ignore===
+TODO

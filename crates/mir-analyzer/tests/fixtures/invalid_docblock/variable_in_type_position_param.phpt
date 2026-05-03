@@ -1,3 +1,5 @@
+===description===
+variable in type position param
 ===file===
 <?php
 /**
@@ -7,3 +9,5 @@ function foo(mixed $x): void {}
 ===expect===
 InvalidDocblock: Invalid docblock: @param contains variable `$invalid` in type position
 UnusedParam: Parameter $x is never used
+===ignore===
+TODO

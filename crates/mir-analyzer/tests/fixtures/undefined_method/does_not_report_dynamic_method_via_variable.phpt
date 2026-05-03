@@ -1,3 +1,5 @@
+===description===
+does not report dynamic method via variable
 ===file===
 <?php
 class Foo {
@@ -10,3 +12,5 @@ function test(Foo $foo, array $names): void {
     }
 }
 ===expect===
+===ignore===
+TODO

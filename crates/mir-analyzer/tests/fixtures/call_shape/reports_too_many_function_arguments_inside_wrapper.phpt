@@ -1,3 +1,5 @@
+===description===
+reports too many function arguments inside wrapper
 ===file===
 <?php
 function takes_one(string $s): void {}
@@ -7,3 +9,5 @@ function wrap(): void {
 ===expect===
 UnusedParam: Parameter $s is never used
 TooManyArguments: Too many arguments for takes_one(): expected 1, got 3
+===ignore===
+TODO

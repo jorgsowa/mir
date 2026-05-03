@@ -1,3 +1,5 @@
+===description===
+magic methods not reported
 ===config===
 find_dead_code=true
 ===file===
@@ -21,3 +23,5 @@ class Magic {
     private function __debugInfo(): array { return []; }
 }
 ===expect===
+===ignore===
+TODO

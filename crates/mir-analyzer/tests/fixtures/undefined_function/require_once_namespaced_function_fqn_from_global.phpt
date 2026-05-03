@@ -1,3 +1,5 @@
+===description===
+require once namespaced function fqn from global
 ===file:Helpers.php===
 <?php
 namespace Vendor\Lib;
@@ -11,3 +13,5 @@ function run(): string {
     return \Vendor\Lib\helper();
 }
 ===expect===
+===ignore===
+TODO

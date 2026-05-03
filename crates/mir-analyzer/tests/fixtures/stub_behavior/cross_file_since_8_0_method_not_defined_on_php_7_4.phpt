@@ -1,3 +1,5 @@
+===description===
+cross file since 8 0 method not defined on php 7 4
 ===config===
 php_version=7.4
 ===file:DateHelper.php===
@@ -10,3 +12,5 @@ function from_interface(\DateTimeInterface $dt): void {
 from_interface(new DateTime());
 ===expect===
 DateHelper.php: UndefinedMethod: Method DateTimeImmutable::createFromInterface() does not exist
+===ignore===
+TODO

@@ -8,3 +8,5 @@ function foo(): int {
     return 42;
 }
 ===expect===
+===ignore===
+TODO

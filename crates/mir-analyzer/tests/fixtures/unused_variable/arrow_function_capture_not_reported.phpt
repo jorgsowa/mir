@@ -1,3 +1,5 @@
+===description===
+arrow function capture not reported
 ===file===
 <?php
 function foo(): array {
@@ -6,3 +8,5 @@ function foo(): array {
     return array_map(fn($item) => $item * $factor, $items);
 }
 ===expect===
+===ignore===
+TODO

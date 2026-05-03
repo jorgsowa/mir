@@ -1,3 +1,5 @@
+===description===
+reports on static method call
 ===file===
 <?php
 class Converter {
@@ -10,3 +12,5 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $s of process() expects 'string', possibly different type 'string|false' provided
+===ignore===
+TODO

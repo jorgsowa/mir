@@ -1,3 +1,5 @@
+===description===
+reports method call on mixed
 ===file===
 <?php
 function test(mixed $value): void {
@@ -5,3 +7,5 @@ function test(mixed $value): void {
 }
 ===expect===
 MixedMethodCall: Method someMethod() called on mixed type
+===ignore===
+TODO

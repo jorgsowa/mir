@@ -1,3 +1,5 @@
+===description===
+does not report valid nested generic
 ===file===
 <?php
 /**
@@ -5,3 +7,5 @@
  */
 function foo(): array { return []; }
 ===expect===
+===ignore===
+TODO

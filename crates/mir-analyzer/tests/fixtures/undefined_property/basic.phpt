@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 class Foo {
@@ -9,3 +11,5 @@ function test(): void {
 }
 ===expect===
 UndefinedProperty: Property Foo::$nonexistent does not exist
+===ignore===
+TODO

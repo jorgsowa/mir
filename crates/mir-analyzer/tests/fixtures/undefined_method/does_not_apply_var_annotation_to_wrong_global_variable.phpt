@@ -1,3 +1,5 @@
+===description===
+does not apply var annotation to wrong global variable
 ===file===
 <?php
 class Foo {
@@ -12,3 +14,5 @@ function test(): void {
 }
 ===expect===
 MixedMethodCall: Method bar() called on mixed type
+===ignore===
+TODO

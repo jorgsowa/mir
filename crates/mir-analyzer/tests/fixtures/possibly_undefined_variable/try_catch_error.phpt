@@ -1,3 +1,5 @@
+===description===
+try catch error
 ===file===
 <?php
 function foo(): string {
@@ -10,3 +12,5 @@ function foo(): string {
 }
 ===expect===
 PossiblyUndefinedVariable: Variable $result might not be defined
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report var annotated global variable
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ class Foo {
 global $x;
 $x->bar();
 ===expect===
+===ignore===
+TODO

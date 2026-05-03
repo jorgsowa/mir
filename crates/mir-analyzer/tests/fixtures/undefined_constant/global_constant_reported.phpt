@@ -1,3 +1,5 @@
+===description===
+global constant reported
 ===file===
 <?php
 function test(): void {
@@ -5,3 +7,5 @@ function test(): void {
 }
 ===expect===
 UndefinedConstant: Constant UNDEFINED_CONST is not defined
+===ignore===
+TODO

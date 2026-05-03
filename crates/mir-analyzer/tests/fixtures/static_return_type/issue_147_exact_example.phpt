@@ -1,3 +1,5 @@
+===description===
+issue 147 exact example
 ===file===
 <?php
 class A {
@@ -21,3 +23,5 @@ class C extends B {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $param of foo() expects 'string', possibly different type 'string|false' provided
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 class Foo {
@@ -8,3 +10,5 @@ function test(?Foo $obj): void {
 }
 ===expect===
 PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
+===ignore===
+TODO

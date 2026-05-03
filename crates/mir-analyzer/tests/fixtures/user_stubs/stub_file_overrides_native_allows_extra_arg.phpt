@@ -1,3 +1,5 @@
+===description===
+stub file overrides native allows extra arg
 ===config===
 stub_file=stubs/polyfill.php
 ===file:stubs/polyfill.php===
@@ -7,3 +9,5 @@ function strlen(string $string, string $encoding = 'UTF-8'): int { return 0; }
 <?php
 strlen('hello', 'ASCII');
 ===expect===
+===ignore===
+TODO

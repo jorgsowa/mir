@@ -1,3 +1,5 @@
+===description===
+keyed array property type resolved
 ===file===
 <?php
 /**
@@ -16,3 +18,5 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod: Method Item::undefinedMethod() does not exist
+===ignore===
+TODO

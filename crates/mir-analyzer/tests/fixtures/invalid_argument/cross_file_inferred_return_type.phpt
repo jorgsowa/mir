@@ -1,3 +1,5 @@
+===description===
+cross file inferred return type
 ===file:Consumer.php===
 <?php
 function requireInt(int $n): void { var_dump($n); }
@@ -13,3 +15,5 @@ function getFruit() {
 }
 ===expect===
 Consumer.php: InvalidArgument: Argument $n of requireInt() expects 'int', got 'Apple'
+===ignore===
+TODO

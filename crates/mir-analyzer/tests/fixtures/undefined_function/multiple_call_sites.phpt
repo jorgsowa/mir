@@ -1,3 +1,5 @@
+===description===
+multiple call sites
 ===file===
 <?php
 function test(): void {
@@ -7,3 +9,5 @@ function test(): void {
 ===expect===
 UndefinedFunction: Function foo() is not defined
 UndefinedFunction: Function foo() is not defined
+===ignore===
+TODO

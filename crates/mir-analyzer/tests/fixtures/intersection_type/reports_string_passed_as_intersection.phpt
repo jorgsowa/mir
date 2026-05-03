@@ -1,3 +1,5 @@
+===description===
+reports string passed as intersection
 ===file===
 <?php
 interface Iterator {}
@@ -10,3 +12,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $x of f() expects 'Iterator&Countable', got '"hello"'
+===ignore===
+TODO

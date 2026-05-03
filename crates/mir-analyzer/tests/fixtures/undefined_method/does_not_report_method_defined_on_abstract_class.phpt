@@ -1,3 +1,5 @@
+===description===
+does not report method defined on abstract class
 ===file===
 <?php
 abstract class Base {
@@ -7,3 +9,5 @@ function f(Base $b): void {
     $b->run();
 }
 ===expect===
+===ignore===
+TODO

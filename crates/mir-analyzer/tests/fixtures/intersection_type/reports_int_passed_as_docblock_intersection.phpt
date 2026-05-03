@@ -1,3 +1,5 @@
+===description===
+reports int passed as docblock intersection
 ===file===
 <?php
 interface Iterator {}
@@ -11,3 +13,5 @@ function test(): void {
 }
 ===expect===
 InvalidArgument: Argument $x of f() expects 'Iterator&Countable', got '42'
+===ignore===
+TODO

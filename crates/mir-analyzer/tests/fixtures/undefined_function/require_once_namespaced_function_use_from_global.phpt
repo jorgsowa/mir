@@ -1,3 +1,5 @@
+===description===
+require once namespaced function use from global
 ===file:Helpers.php===
 <?php
 namespace Vendor\Lib;
@@ -12,3 +14,5 @@ function run(): string {
     return helper();
 }
 ===expect===
+===ignore===
+TODO

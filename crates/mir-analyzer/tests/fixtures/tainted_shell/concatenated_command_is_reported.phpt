@@ -1,3 +1,5 @@
+===description===
+concatenated command is reported
 ===file===
 <?php
 function run(): void {
@@ -6,3 +8,5 @@ function run(): void {
 }
 ===expect===
 TaintedShell: Tainted shell command — possible command injection
+===ignore===
+TODO

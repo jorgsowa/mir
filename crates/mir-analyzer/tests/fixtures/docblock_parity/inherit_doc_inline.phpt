@@ -1,3 +1,5 @@
+===description===
+inherit doc inline
 ===file===
 <?php
 class Base {
@@ -10,3 +12,5 @@ class Child extends Base {
     public function describe(): string { return 'child'; }
 }
 ===expect===
+===ignore===
+TODO

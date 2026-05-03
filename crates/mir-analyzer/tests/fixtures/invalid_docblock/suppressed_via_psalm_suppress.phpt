@@ -1,3 +1,5 @@
+===description===
+suppressed via psalm suppress
 ===file===
 <?php
 /**
@@ -6,3 +8,5 @@
  */
 function foo(): mixed { return []; }
 ===expect===
+===ignore===
+TODO

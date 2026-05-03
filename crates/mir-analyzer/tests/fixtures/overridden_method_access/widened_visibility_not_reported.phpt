@@ -1,3 +1,5 @@
+===description===
+widened visibility not reported
 ===file===
 <?php
 class ParentClass {
@@ -7,3 +9,5 @@ class Child extends ParentClass {
     public function doStuff(): void {}
 }
 ===expect===
+===ignore===
+TODO

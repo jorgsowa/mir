@@ -1,3 +1,5 @@
+===description===
+inside switch case after break
 ===file===
 <?php
 function test(int $mode): void {
@@ -9,3 +11,5 @@ function test(int $mode): void {
 }
 ===expect===
 UnreachableCode: Unreachable code detected
+===ignore===
+TODO

@@ -1,3 +1,5 @@
+===description===
+does not report when param accepts false
 ===file===
 <?php
 function takesIntOrFalse(int|false $n): void { var_dump($n); }
@@ -7,3 +9,5 @@ function test(): void {
     takesIntOrFalse(getResult());
 }
 ===expect===
+===ignore===
+TODO

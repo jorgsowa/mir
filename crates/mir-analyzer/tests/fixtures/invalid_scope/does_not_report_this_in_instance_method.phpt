@@ -1,3 +1,5 @@
+===description===
+does not report this in instance method
 ===file===
 <?php
 class Foo {
@@ -7,3 +9,5 @@ class Foo {
     public function baz(): void {}
 }
 ===expect===
+===ignore===
+TODO

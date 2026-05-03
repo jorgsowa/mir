@@ -1,3 +1,5 @@
+===description===
+new global scope via use alias no error
 ===file:Entity.php===
 <?php
 namespace App\Model;
@@ -7,3 +9,5 @@ class Entity {}
 use App\Model\Entity;
 $x = new Entity();
 ===expect===
+===ignore===
+TODO

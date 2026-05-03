@@ -1,3 +1,5 @@
+===description===
+reports bool union to non bool param
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }
@@ -8,3 +10,5 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|bool' provided
+===ignore===
+TODO

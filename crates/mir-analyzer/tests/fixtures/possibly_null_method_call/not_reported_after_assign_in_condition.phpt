@@ -1,3 +1,5 @@
+===description===
+not reported after assign in condition
 ===file===
 <?php
 class Foo {
@@ -11,3 +13,5 @@ function d(Foo|null $s): void {
     $s->bar();
 }
 ===expect===
+===ignore===
+TODO

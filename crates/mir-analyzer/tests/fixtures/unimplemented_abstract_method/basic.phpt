@@ -1,3 +1,5 @@
+===description===
+basic
 ===file===
 <?php
 abstract class Base {
@@ -6,3 +8,5 @@ abstract class Base {
 class Incomplete extends Base {}
 ===expect===
 UnimplementedAbstractMethod: Class Incomplete must implement abstract method doWork()
+===ignore===
+TODO

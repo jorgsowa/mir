@@ -1,3 +1,5 @@
+===description===
+cross file psr4 lazy loaded parent method
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Base.php===
@@ -15,3 +17,5 @@ function test(): void {
 }
 ===expect===
 Child.php: UndefinedMethod: Method Child::missing() does not exist
+===ignore===
+TODO

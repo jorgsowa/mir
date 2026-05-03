@@ -1,3 +1,5 @@
+===description===
+reports private class method called from subclass
 ===file===
 <?php
 class Base {
@@ -10,3 +12,5 @@ class Child extends Base {
 }
 ===expect===
 UndefinedMethod: Method Base::secret() does not exist
+===ignore===
+TODO

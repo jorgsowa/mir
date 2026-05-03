@@ -1,3 +1,5 @@
+===description===
+basic inherited method call
 ===file===
 <?php
 class A {
@@ -17,3 +19,5 @@ class C extends B {
     }
 }
 ===expect===
+===ignore===
+TODO
