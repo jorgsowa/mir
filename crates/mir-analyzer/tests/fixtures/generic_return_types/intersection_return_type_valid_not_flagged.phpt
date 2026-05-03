@@ -28,6 +28,5 @@ function test(): void {
     $w->unwrap()->get()->process();
 }
 ===expect===
-
 ===ignore===
 TODO

@@ -9,6 +9,6 @@ function test(): void {
     takes_string($row['id']);
 }
 ===expect===
-InvalidArgument: Argument $s of takes_string() expects 'string', got '123'
+InvalidArgument@6:17: Argument $s of takes_string() expects 'string', got '123'
 ===ignore===
 TODO

@@ -17,6 +17,5 @@ function test(): void {
     $result['item']->process();
 }
 ===expect===
-
 ===ignore===
 TODO

@@ -100,11 +100,11 @@
 //!
 //! # Expect format
 //!
-//! Single-file fixtures use `KindName: message` or `KindName@line:col: message`.
-//! Multi-file fixtures use `FileName.php: KindName: message` or `FileName.php: KindName@line:col: message`.
+//! Single-file fixtures use `KindName@line:col: message`.
+//! Multi-file fixtures use `FileName.php: KindName@line:col: message`.
 //!
-//! Location assertions (`@line:col`) are optional. When specified, both line and column
-//! must match for the issue to be considered a match.
+//! Location assertions (`@line:col`) are **required**. Both line and column must be specified
+//! and must match for the issue to be considered a match.
 //!
 //! Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output (including locations).
 
@@ -415,7 +415,7 @@ fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
     assert_eq!(
         parts.len(),
         2,
-        "fixture {path}: invalid expect line {line:?} — expected \"KindName: message\" or \"KindName@line:col: message\""
+        "fixture {path}: invalid expect line {line:?} — expected \"KindName@line:col: message\" (location is required)"
     );
 
     let kind_part = parts[0];
@@ -459,7 +459,7 @@ fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
     assert_eq!(
         parts.len(),
         3,
-        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName: message\" or \"FileName.php: KindName@line:col: message\""
+        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName@line:col: message\" (location is required)"
     );
 
     let kind_part = parts[1];
@@ -642,6 +642,12 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
     let mut failures: Vec<String> = Vec::new();
 
     for exp in &fixture.expected {
+        if exp.line.is_none() || exp.col_start.is_none() {
+            failures.push(format!(
+                "  MISSING LOCATION  {}: expected issue must include @line:col (e.g., {}@1:1: {})",
+                exp.kind_name, exp.kind_name, exp.message
+            ));
+        }
         if !actual.iter().any(|a| issue_matches(a, exp)) {
             failures.push(format!(
                 "  MISSING  {}",
@@ -666,7 +672,7 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
             .map(|d| format!("\n\nDescription: {d}"))
             .unwrap_or_default();
         panic!(
-            "fixture {path} FAILED:{desc}\n{}\n\nAll actual issues:\n{}",
+            "fixture {path} FAILED:{desc}\n{}\n\nTo fix: ensure all expected issues have @line:col locations, then run: UPDATE_FIXTURES=1 cargo test --lib fixture\n\nAll actual issues:\n{}",
             failures.join("\n"),
             fmt_issues(actual, fixture.is_multi)
         );

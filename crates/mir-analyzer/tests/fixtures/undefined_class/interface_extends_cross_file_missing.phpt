@@ -7,6 +7,6 @@ interface Collection extends Countable {
     public function isEmpty(): bool;
 }
 ===expect===
-Collection.php: UndefinedClass: Class App\Countable does not exist
+Collection.php: UndefinedClass@3:29: Class App\Countable does not exist
 ===ignore===
 TODO

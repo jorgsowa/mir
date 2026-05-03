@@ -9,6 +9,6 @@ function foo(array $items): string {
     return $last;
 }
 ===expect===
-PossiblyUndefinedVariable: Variable $last might not be defined
+PossiblyUndefinedVariable@6:11: Variable $last might not be defined
 ===ignore===
 TODO

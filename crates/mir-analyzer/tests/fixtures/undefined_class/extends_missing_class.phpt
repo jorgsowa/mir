@@ -4,6 +4,6 @@ extends missing class
 <?php
 class Foo extends MissingBase {}
 ===expect===
-UndefinedClass: Class MissingBase does not exist
+UndefinedClass@2:18: Class MissingBase does not exist
 ===ignore===
 TODO

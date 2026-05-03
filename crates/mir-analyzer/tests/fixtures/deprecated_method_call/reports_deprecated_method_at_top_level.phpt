@@ -10,7 +10,7 @@ class Greeter {
 $g = new Greeter();
 $g->oldGreet('Alice');
 ===expect===
-UnusedParam: Parameter $name is never used
-DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead
+UnusedParam@4:29: Parameter $name is never used
+DeprecatedMethodCall@8:0: Call to deprecated method Greeter::oldGreet: use newGreet() instead
 ===ignore===
 TODO

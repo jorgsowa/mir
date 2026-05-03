@@ -8,6 +8,6 @@ function test(): void {
     $obj = new ActiveClass();
 }
 ===expect===
-UnusedVariable: Variable $obj is never read
+UnusedVariable@5:4: Variable $obj is never read
 ===ignore===
 TODO

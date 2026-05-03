@@ -11,6 +11,6 @@ function make_weak_cache(): void {
 <?php
 make_weak_cache();
 ===expect===
-Cache.php: UndefinedClass: Class WeakMap does not exist
+Cache.php: UndefinedClass@3:8: Class WeakMap does not exist
 ===ignore===
 TODO

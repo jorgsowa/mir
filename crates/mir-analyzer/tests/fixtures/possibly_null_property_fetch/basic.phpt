@@ -9,6 +9,6 @@ function test(?Foo $obj): void {
     echo $obj->value;
 }
 ===expect===
-PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
+PossiblyNullPropertyFetch@6:9: Cannot access property $value on possibly null value
 ===ignore===
 TODO

@@ -7,7 +7,7 @@ reports unclosed generic param
  */
 function foo(mixed $items): void {}
 ===expect===
-InvalidDocblock: Invalid docblock: @param has unclosed generic type `array< $items`
-UnusedParam: Parameter $items is never used
+InvalidDocblock@2:0: Invalid docblock: @param has unclosed generic type `array< $items`
+UnusedParam@5:13: Parameter $items is never used
 ===ignore===
 TODO

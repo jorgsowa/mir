@@ -9,6 +9,6 @@ function test(Status $status): void {
     echo $status->label;
 }
 ===expect===
-UndefinedProperty: Property Status::$label does not exist
+UndefinedProperty@6:18: Property Status::$label does not exist
 ===ignore===
 TODO

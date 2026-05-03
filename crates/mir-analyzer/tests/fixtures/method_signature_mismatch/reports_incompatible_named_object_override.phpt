@@ -11,6 +11,6 @@ class Child extends Base {
     public function get(): Dog { return new Dog(); }
 }
 ===expect===
-MethodSignatureMismatch: Method Child::get() signature mismatch: return type 'Dog' is not a subtype of parent 'Animal'
+MethodSignatureMismatch@8:4: Method Child::get() signature mismatch: return type 'Dog' is not a subtype of parent 'Animal'
 ===ignore===
 TODO

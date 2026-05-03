@@ -11,6 +11,6 @@ function check_contains(string $text, string $needle): void {
 <?php
 check_contains('hello world', 'world');
 ===expect===
-StringHelper.php: UndefinedFunction: Function str_contains() is not defined
+StringHelper.php: UndefinedFunction@3:4: Function str_contains() is not defined
 ===ignore===
 TODO

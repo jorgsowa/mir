@@ -5,7 +5,7 @@ reports too many function arguments
 function takes_one(int $a): void {}
 takes_one(1, 2);
 ===expect===
-UnusedParam: Parameter $a is never used
-TooManyArguments: Too many arguments for takes_one(): expected 1, got 2
+UnusedParam@2:19: Parameter $a is never used
+TooManyArguments@3:13: Too many arguments for takes_one(): expected 1, got 2
 ===ignore===
 TODO

@@ -7,6 +7,6 @@ function test(): void {
     $x->foo();
 }
 ===expect===
-NullMethodCall: Cannot call method foo() on null
+NullMethodCall@4:4: Cannot call method foo() on null
 ===ignore===
 TODO

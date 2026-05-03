@@ -6,6 +6,6 @@ function test(): void {
     \nonExistent();
 }
 ===expect===
-UndefinedFunction: Function nonExistent() is not defined
+UndefinedFunction@3:4: Function nonExistent() is not defined
 ===ignore===
 TODO

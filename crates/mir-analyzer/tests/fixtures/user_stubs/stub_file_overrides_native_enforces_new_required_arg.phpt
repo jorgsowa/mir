@@ -9,6 +9,6 @@ function strlen(string $string, string $encoding): int { return 0; }
 <?php
 strlen('hello');
 ===expect===
-App.php: TooFewArguments: Too few arguments for strlen(): expected 2, got 1
+App.php: TooFewArguments@2:0: Too few arguments for strlen(): expected 2, got 1
 ===ignore===
 TODO

@@ -9,6 +9,6 @@ function test(): void {
     echo Foo::MISSING;
 }
 ===expect===
-UndefinedConstant: Constant Foo::MISSING is not defined
+UndefinedConstant@6:9: Constant Foo::MISSING is not defined
 ===ignore===
 TODO

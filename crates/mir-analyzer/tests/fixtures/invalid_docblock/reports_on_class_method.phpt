@@ -9,6 +9,6 @@ class Foo {
     public function bar(): mixed { return []; }
 }
 ===expect===
-InvalidDocblock: Invalid docblock: @return has unclosed generic type `array<`
+InvalidDocblock@3:0: Invalid docblock: @return has unclosed generic type `array<`
 ===ignore===
 TODO

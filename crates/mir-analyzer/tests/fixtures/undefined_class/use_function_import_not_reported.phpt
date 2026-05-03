@@ -7,6 +7,6 @@ function run(): void {
     helper();
 }
 ===expect===
-UndefinedFunction: Function helper() is not defined
+UndefinedFunction@4:4: Function helper() is not defined
 ===ignore===
 TODO

@@ -7,6 +7,6 @@ function foo(): int {
     return 42;
 }
 ===expect===
-UnusedVariable: Variable $unused is never read
+UnusedVariable@3:4: Variable $unused is never read
 ===ignore===
 TODO

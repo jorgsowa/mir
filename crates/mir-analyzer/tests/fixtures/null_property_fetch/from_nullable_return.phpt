@@ -13,6 +13,6 @@ function test(): void {
     echo $x->val;
 }
 ===expect===
-PossiblyNullPropertyFetch: Cannot access property $val on possibly null value
+PossiblyNullPropertyFetch@10:9: Cannot access property $val on possibly null value
 ===ignore===
 TODO

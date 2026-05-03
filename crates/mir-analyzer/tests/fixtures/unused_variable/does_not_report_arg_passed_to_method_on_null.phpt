@@ -11,6 +11,6 @@ class Bar {
     }
 }
 ===expect===
-NullMethodCall: Cannot call method doSomething() on null
+NullMethodCall@6:12: Cannot call method doSomething() on null
 ===ignore===
 TODO

@@ -8,6 +8,6 @@ class A {
     }
 }
 ===expect===
-UndefinedClass: Class UnknownClass does not exist
+UndefinedClass@4:29: Class UnknownClass does not exist
 ===ignore===
 TODO

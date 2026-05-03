@@ -7,6 +7,6 @@ function test(bool $flag): void {
     echo $x[0];
 }
 ===expect===
-PossiblyNullArrayAccess: Cannot access array on possibly null value
+PossiblyNullArrayAccess@4:9: Cannot access array on possibly null value
 ===ignore===
 TODO

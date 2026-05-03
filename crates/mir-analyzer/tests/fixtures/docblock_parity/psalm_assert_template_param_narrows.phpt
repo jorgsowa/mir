@@ -19,6 +19,6 @@ function test(?Bar $x): void {
     $x->missing();
 }
 ===expect===
-UndefinedMethod: Method Bar::missing() does not exist
+UndefinedMethod@16:4: Method Bar::missing() does not exist
 ===ignore===
 TODO

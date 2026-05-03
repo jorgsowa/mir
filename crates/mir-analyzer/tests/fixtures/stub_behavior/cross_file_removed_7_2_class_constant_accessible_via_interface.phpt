@@ -11,6 +11,5 @@ function get_atom_format(): void {
 <?php
 get_atom_format();
 ===expect===
-
 ===ignore===
 TODO

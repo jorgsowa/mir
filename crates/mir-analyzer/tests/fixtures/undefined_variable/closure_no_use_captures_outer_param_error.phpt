@@ -8,6 +8,6 @@ function outer(string $x): callable {
     };
 }
 ===expect===
-UndefinedVariable: Variable $x is not defined
+UndefinedVariable@4:15: Variable $x is not defined
 ===ignore===
 TODO

@@ -9,6 +9,6 @@ function foo(): void {
     };
 }
 ===expect===
-UnreachableCode: Unreachable code detected
+UnreachableCode@4:4: Unreachable code detected
 ===ignore===
 TODO

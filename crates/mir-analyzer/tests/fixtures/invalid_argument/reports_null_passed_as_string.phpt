@@ -5,6 +5,6 @@ reports null passed as string
 function f(string $x): void { var_dump($x); }
 function test(): void { f(null); }
 ===expect===
-NullArgument: Argument $x of f() cannot be null
+NullArgument@3:26: Argument $x of f() cannot be null
 ===ignore===
 TODO

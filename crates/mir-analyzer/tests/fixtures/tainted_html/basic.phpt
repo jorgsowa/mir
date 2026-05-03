@@ -6,6 +6,6 @@ function test(): void {
     echo $_GET['x'];
 }
 ===expect===
-TaintedHtml: Tainted HTML output — possible XSS
+TaintedHtml@3:4: Tainted HTML output — possible XSS
 ===ignore===
 TODO

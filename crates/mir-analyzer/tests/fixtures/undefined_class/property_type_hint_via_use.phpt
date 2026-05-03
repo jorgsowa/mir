@@ -7,6 +7,6 @@ class Bar {
     public Foo $prop;
 }
 ===expect===
-UndefinedClass: Class Vendor\Missing\Foo does not exist
+UndefinedClass@4:11: Class Vendor\Missing\Foo does not exist
 ===ignore===
 TODO

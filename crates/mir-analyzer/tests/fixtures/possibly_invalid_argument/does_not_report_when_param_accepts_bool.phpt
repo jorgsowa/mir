@@ -9,6 +9,6 @@ function test(): void {
     takesBool(getResult());
 }
 ===expect===
-InvalidArgument: Argument $b of takesBool() expects 'bool', got 'int|false'
+InvalidArgument@6:14: Argument $b of takesBool() expects 'bool', got 'int|false'
 ===ignore===
 TODO

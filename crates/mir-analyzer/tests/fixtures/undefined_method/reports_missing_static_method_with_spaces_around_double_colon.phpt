@@ -7,6 +7,6 @@ function test(): void {
     Math :: missing();
 }
 ===expect===
-UndefinedMethod: Method Math::missing() does not exist
+UndefinedMethod@4:4: Method Math::missing() does not exist
 ===ignore===
 TODO

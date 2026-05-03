@@ -6,6 +6,6 @@ function test(): void {
     foo();
 }
 ===expect===
-UndefinedFunction: Function foo() is not defined
+UndefinedFunction@3:4: Function foo() is not defined
 ===ignore===
 TODO

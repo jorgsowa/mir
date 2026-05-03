@@ -6,6 +6,6 @@ function foo(): string {
     return $result;
 }
 ===expect===
-UndefinedVariable: Variable $result is not defined
+UndefinedVariable@3:11: Variable $result is not defined
 ===ignore===
 TODO

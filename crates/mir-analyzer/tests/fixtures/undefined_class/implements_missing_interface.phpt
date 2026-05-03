@@ -4,6 +4,6 @@ implements missing interface
 <?php
 class Bar implements MissingInterface {}
 ===expect===
-UndefinedClass: Class MissingInterface does not exist
+UndefinedClass@2:21: Class MissingInterface does not exist
 ===ignore===
 TODO

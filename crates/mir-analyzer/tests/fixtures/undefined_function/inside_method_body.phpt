@@ -8,6 +8,6 @@ class A {
     }
 }
 ===expect===
-UndefinedFunction: Function missing() is not defined
+UndefinedFunction@4:8: Function missing() is not defined
 ===ignore===
 TODO

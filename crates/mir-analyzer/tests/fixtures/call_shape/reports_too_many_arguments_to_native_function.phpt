@@ -4,6 +4,6 @@ reports too many arguments to native function
 <?php
 strlen('hello', 'extra');
 ===expect===
-TooManyArguments: Too many arguments for strlen(): expected 1, got 2
+TooManyArguments@2:16: Too many arguments for strlen(): expected 1, got 2
 ===ignore===
 TODO

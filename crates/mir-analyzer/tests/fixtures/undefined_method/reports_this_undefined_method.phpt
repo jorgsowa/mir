@@ -8,6 +8,6 @@ class Svc {
     }
 }
 ===expect===
-UndefinedMethod: Method Svc::nonExistent() does not exist
+UndefinedMethod@4:8: Method Svc::nonExistent() does not exist
 ===ignore===
 TODO

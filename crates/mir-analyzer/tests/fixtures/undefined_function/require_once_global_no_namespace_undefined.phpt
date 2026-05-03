@@ -12,6 +12,6 @@ function run(): void {
     missing_helper();
 }
 ===expect===
-Main.php: UndefinedFunction: Function missing_helper() is not defined
+Main.php: UndefinedFunction@4:4: Function missing_helper() is not defined
 ===ignore===
 TODO
