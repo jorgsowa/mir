@@ -16,6 +16,6 @@ class Label implements \Stringable {
 $label = new Label('hello');
 echo $label;
 ===expect===
-Printable.php: UndefinedClass: Class Stringable does not exist
+Printable.php: UndefinedClass@2:23: Class Stringable does not exist
 ===ignore===
 TODO

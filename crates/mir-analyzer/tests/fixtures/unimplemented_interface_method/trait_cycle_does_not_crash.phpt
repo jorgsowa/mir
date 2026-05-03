@@ -17,6 +17,6 @@ class Task implements Runnable {
     use TraitA;
 }
 ===expect===
-UnimplementedInterfaceMethod: Class Task must implement Runnable::run() from interface
+UnimplementedInterfaceMethod@13:0: Class Task must implement Runnable::run() from interface
 ===ignore===
 TODO

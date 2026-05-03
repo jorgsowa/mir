@@ -7,7 +7,7 @@ variable in type position param
  */
 function foo(mixed $x): void {}
 ===expect===
-InvalidDocblock: Invalid docblock: @param contains variable `$invalid` in type position
-UnusedParam: Parameter $x is never used
+InvalidDocblock@2:0: Invalid docblock: @param contains variable `$invalid` in type position
+UnusedParam@5:13: Parameter $x is never used
 ===ignore===
 TODO

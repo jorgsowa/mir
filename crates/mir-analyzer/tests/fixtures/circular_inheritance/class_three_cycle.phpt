@@ -6,6 +6,6 @@ class A extends B {}
 class B extends C {}
 class C extends A {}
 ===expect===
-CircularInheritance: Class C has a circular inheritance chain
+CircularInheritance@4:0: Class C has a circular inheritance chain
 ===ignore===
 TODO

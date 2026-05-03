@@ -9,6 +9,6 @@ function test(?Status $status): string {
     return $status->value;
 }
 ===expect===
-PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
+PossiblyNullPropertyFetch@6:11: Cannot access property $value on possibly null value
 ===ignore===
 TODO

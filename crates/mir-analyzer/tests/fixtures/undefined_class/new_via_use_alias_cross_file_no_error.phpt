@@ -11,6 +11,6 @@ function wrap(): void {
     $x = new Entity();
 }
 ===expect===
-Service.php: UnusedVariable: Variable $x is never read
+Service.php: UnusedVariable@4:4: Variable $x is never read
 ===ignore===
 TODO

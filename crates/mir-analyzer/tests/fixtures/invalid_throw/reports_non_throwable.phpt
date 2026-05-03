@@ -8,6 +8,6 @@ function test(): void {
     throw new NotAnException();
 }
 ===expect===
-InvalidThrow: Thrown type 'NotAnException' does not extend Throwable
+InvalidThrow@5:4: Thrown type 'NotAnException' does not extend Throwable
 ===ignore===
 TODO

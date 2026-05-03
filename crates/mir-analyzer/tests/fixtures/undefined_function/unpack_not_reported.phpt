@@ -7,6 +7,6 @@ function test(): void {
     var_dump($r);
 }
 ===expect===
-PossiblyInvalidArgument: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
+PossiblyInvalidArgument@3:22: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
 ===ignore===
 TODO

@@ -6,6 +6,6 @@ function transform(string $input): string {
     return $input . $suffix;
 }
 ===expect===
-UndefinedVariable: Variable $suffix is not defined
+UndefinedVariable@3:20: Variable $suffix is not defined
 ===ignore===
 TODO

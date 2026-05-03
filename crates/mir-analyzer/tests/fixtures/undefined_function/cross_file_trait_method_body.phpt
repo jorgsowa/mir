@@ -13,6 +13,6 @@ class MyClass {
     use MyTrait;
 }
 ===expect===
-Trait.php: UndefinedFunction: Function missing_function() is not defined
+Trait.php: UndefinedFunction@4:8: Function missing_function() is not defined
 ===ignore===
 TODO

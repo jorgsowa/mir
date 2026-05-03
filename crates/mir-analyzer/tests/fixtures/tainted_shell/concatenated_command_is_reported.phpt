@@ -7,6 +7,6 @@ function run(): void {
     shell_exec($cmd);
 }
 ===expect===
-TaintedShell: Tainted shell command — possible command injection
+TaintedShell@4:4: Tainted shell command — possible command injection
 ===ignore===
 TODO

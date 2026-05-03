@@ -11,6 +11,6 @@ class Bar {
     public Missing $prop;
 }
 ===expect===
-Main.php: UndefinedClass: Class Vendor\Lib\Missing does not exist
+Main.php: UndefinedClass@4:11: Class Vendor\Lib\Missing does not exist
 ===ignore===
 TODO

@@ -14,6 +14,6 @@ function foo(int $x): string {
     return $y;
 }
 ===expect===
-PossiblyUndefinedVariable: Variable $y might not be defined
+PossiblyUndefinedVariable@11:11: Variable $y might not be defined
 ===ignore===
 TODO

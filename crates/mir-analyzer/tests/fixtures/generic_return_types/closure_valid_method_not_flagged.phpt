@@ -17,6 +17,5 @@ function test(): void {
     $maker()->render();
 }
 ===expect===
-
 ===ignore===
 TODO

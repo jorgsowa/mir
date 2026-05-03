@@ -17,6 +17,6 @@ function test(): void {
     f($c);
 }
 ===expect===
-InvalidArgument: Argument $s of f() expects 'Sink<Animal>', got 'Sink<Cat>'
+InvalidArgument@14:6: Argument $s of f() expects 'Sink<Animal>', got 'Sink<Cat>'
 ===ignore===
 TODO

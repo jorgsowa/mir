@@ -5,7 +5,7 @@ reports duplicate named argument
 function greet(string $name): void {}
 greet(name: 'Ada', name: 'Grace');
 ===expect===
-UnusedParam: Parameter $name is never used
-InvalidNamedArgument: greet() has no parameter named $name
+UnusedParam@2:15: Parameter $name is never used
+InvalidNamedArgument@3:19: greet() has no parameter named $name
 ===ignore===
 TODO

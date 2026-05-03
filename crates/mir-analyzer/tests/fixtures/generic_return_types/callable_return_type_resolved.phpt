@@ -17,6 +17,6 @@ function test(): void {
     $resolver()->undefinedMethod();
 }
 ===expect===
-UndefinedMethod: Method Service::undefinedMethod() does not exist
+UndefinedMethod@14:4: Method Service::undefinedMethod() does not exist
 ===ignore===
 TODO

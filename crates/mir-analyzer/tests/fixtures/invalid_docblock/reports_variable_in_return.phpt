@@ -7,6 +7,6 @@ reports variable in return
  */
 function foo(): mixed { return null; }
 ===expect===
-InvalidDocblock: Invalid docblock: @return contains variable `$bar` in type position
+InvalidDocblock@2:0: Invalid docblock: @return contains variable `$bar` in type position
 ===ignore===
 TODO

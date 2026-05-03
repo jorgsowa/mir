@@ -9,7 +9,7 @@ function test(): void {
     $obj = new OldClass();
 }
 ===expect===
-UnusedVariable: Variable $obj is never read
-DeprecatedClass: Class OldClass is deprecated: use NewClass instead
+UnusedVariable@6:4: Variable $obj is never read
+DeprecatedClass@6:15: Class OldClass is deprecated: use NewClass instead
 ===ignore===
 TODO

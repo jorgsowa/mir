@@ -7,6 +7,6 @@ function test(): void {
     exec($cmd);
 }
 ===expect===
-TaintedShell: Tainted shell command — possible command injection
+TaintedShell@4:4: Tainted shell command — possible command injection
 ===ignore===
 TODO

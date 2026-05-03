@@ -28,6 +28,6 @@ function test(): void {
     $w->unwrap()->get()->undefinedMethod();
 }
 ===expect===
-UndefinedMethod: Method Item::undefinedMethod() does not exist
+UndefinedMethod@25:4: Method Item::undefinedMethod() does not exist
 ===ignore===
 TODO

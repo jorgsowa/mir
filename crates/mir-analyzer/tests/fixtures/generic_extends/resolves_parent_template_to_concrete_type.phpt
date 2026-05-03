@@ -17,6 +17,6 @@ $repo = new UserRepo();
 $result = $repo->find();
 $result->nonExistentMethod();
 ===expect===
-UndefinedMethod: Method User::nonExistentMethod() does not exist
+UndefinedMethod@15:0: Method User::nonExistentMethod() does not exist
 ===ignore===
 TODO

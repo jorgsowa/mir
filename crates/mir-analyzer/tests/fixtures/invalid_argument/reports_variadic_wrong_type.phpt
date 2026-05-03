@@ -5,6 +5,6 @@ reports variadic wrong type
 function f(int ...$xs): void { var_dump($xs); }
 function test(): void { f('a'); }
 ===expect===
-InvalidArgument: Argument $xs of f() expects 'int', got '"a"'
+InvalidArgument@3:26: Argument $xs of f() expects 'int', got '"a"'
 ===ignore===
 TODO

@@ -9,6 +9,6 @@ function foo(): array {
     return compact('name');
 }
 ===expect===
-UnusedVariable: Variable $unlisted is never read
+UnusedVariable@4:4: Variable $unlisted is never read
 ===ignore===
 TODO

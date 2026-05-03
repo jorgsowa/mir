@@ -9,6 +9,6 @@ class Foo {
 $f = new Foo();
 $f->bar(null);
 ===expect===
-NullArgument: Argument $n of bar() cannot be null
+NullArgument@7:8: Argument $n of bar() cannot be null
 ===ignore===
 TODO

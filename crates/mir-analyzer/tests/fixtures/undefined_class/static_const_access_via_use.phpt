@@ -5,6 +5,6 @@ static const access via use
 use Vendor\Missing\Foo;
 echo Foo::BAR;
 ===expect===
-UndefinedClass: Class Vendor\Missing\Foo does not exist
+UndefinedClass@3:5: Class Vendor\Missing\Foo does not exist
 ===ignore===
 TODO

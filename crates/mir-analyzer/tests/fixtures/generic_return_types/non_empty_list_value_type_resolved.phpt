@@ -18,6 +18,6 @@ function test(): void {
     }
 }
 ===expect===
-UndefinedMethod: Method Item::undefinedMethod() does not exist
+UndefinedMethod@14:8: Method Item::undefinedMethod() does not exist
 ===ignore===
 TODO

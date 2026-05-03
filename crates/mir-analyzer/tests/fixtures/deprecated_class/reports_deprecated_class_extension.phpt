@@ -7,6 +7,6 @@ class OldBase {}
 
 class Child extends OldBase {}
 ===expect===
-DeprecatedClass: Class OldBase is deprecated: use NewBase instead
+DeprecatedClass@5:0: Class OldBase is deprecated: use NewBase instead
 ===ignore===
 TODO

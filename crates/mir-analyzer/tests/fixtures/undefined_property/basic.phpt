@@ -10,6 +10,6 @@ function test(): void {
     echo $f->nonexistent;
 }
 ===expect===
-UndefinedProperty: Property Foo::$nonexistent does not exist
+UndefinedProperty@7:13: Property Foo::$nonexistent does not exist
 ===ignore===
 TODO

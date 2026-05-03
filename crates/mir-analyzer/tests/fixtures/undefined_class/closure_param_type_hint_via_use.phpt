@@ -5,6 +5,6 @@ closure param type hint via use
 use Vendor\Missing\Foo;
 $fn = function(Foo $x): void {};
 ===expect===
-UndefinedClass: Class Vendor\Missing\Foo does not exist
+UndefinedClass@3:15: Class Vendor\Missing\Foo does not exist
 ===ignore===
 TODO

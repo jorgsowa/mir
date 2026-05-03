@@ -15,6 +15,6 @@ function test(): void {
     acceptsDogBox(new CatBox());
 }
 ===expect===
-InvalidArgument: Argument $box of acceptsDogBox() expects 'Box<Dog>', got 'Box<Cat>'
+InvalidArgument@12:18: Argument $box of acceptsDogBox() expects 'Box<Dog>', got 'Box<Cat>'
 ===ignore===
 TODO

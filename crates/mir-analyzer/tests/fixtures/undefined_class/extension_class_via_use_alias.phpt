@@ -5,7 +5,7 @@ extension class via use alias
 use ast\Node;
 function f(Node $x): void {}
 ===expect===
-UnusedParam: Parameter $x is never used
-UndefinedClass: Class ast\Node does not exist
+UndefinedClass@3:11: Class ast\Node does not exist
+UnusedParam@3:11: Parameter $x is never used
 ===ignore===
 TODO

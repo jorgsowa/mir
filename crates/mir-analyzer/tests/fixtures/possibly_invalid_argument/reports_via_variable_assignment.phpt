@@ -8,6 +8,6 @@ function test(string $s): void {
     takesInt($pos);
 }
 ===expect===
-PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
+PossiblyInvalidArgument@5:13: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
 ===ignore===
 TODO

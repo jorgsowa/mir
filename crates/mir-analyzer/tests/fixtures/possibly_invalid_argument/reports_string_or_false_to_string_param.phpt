@@ -9,6 +9,6 @@ function test(): void {
     takesString(getResult());
 }
 ===expect===
-PossiblyInvalidArgument: Argument $s of takesString() expects 'string', possibly different type 'string|false' provided
+PossiblyInvalidArgument@6:16: Argument $s of takesString() expects 'string', possibly different type 'string|false' provided
 ===ignore===
 TODO

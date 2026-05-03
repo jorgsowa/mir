@@ -10,9 +10,9 @@ function wrap(): void {
     } catch (MissingEntity $e) {}
 }
 ===expect===
-UnusedVariable: Variable $x is never read
-UnusedVariable: Variable $e is never read
-UndefinedClass: Class App\Model\MissingEntity does not exist
-UndefinedClass: Class App\Model\MissingEntity does not exist
+UnusedVariable@1:0: Variable $e is never read
+UnusedVariable@4:4: Variable $x is never read
+UndefinedClass@4:13: Class App\Model\MissingEntity does not exist
+UndefinedClass@7:13: Class App\Model\MissingEntity does not exist
 ===ignore===
 TODO

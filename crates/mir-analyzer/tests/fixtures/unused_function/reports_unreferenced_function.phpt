@@ -6,6 +6,6 @@ find_dead_code=true
 <?php
 function helper(): void {}
 ===expect===
-UnusedFunction: Function helper() is never called
+UnusedFunction@1:0: Function helper() is never called
 ===ignore===
 TODO

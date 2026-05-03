@@ -7,6 +7,6 @@ function foo(): void {
     $x = 2;
 }
 ===expect===
-UnreachableCode: Unreachable code detected
+UnreachableCode@4:4: Unreachable code detected
 ===ignore===
 TODO

@@ -4,6 +4,6 @@ class self extends
 <?php
 class A extends A {}
 ===expect===
-CircularInheritance: Class A has a circular inheritance chain
+CircularInheritance@2:0: Class A has a circular inheritance chain
 ===ignore===
 TODO

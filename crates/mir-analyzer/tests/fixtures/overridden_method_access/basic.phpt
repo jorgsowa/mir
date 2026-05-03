@@ -9,6 +9,6 @@ class Child extends ParentClass {
     private function doStuff(): void {}
 }
 ===expect===
-OverriddenMethodAccess: Method Child::dostuff() overrides with less visibility
+OverriddenMethodAccess@6:4: Method Child::dostuff() overrides with less visibility
 ===ignore===
 TODO

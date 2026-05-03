@@ -6,6 +6,6 @@ function f(): string {
     return null;
 }
 ===expect===
-InvalidReturnType: Return type 'null' is not compatible with declared 'string'
+InvalidReturnType@3:4: Return type 'null' is not compatible with declared 'string'
 ===ignore===
 TODO

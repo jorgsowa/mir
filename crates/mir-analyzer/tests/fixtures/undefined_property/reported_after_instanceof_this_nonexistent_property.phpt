@@ -15,6 +15,6 @@ abstract class A
     }
 }
 ===expect===
-UndefinedProperty: Property A::$nonexistent does not exist
+UndefinedProperty@11:21: Property A::$nonexistent does not exist
 ===ignore===
 TODO

@@ -11,6 +11,6 @@ function test(): void {
     echo 'unreachable';
 }
 ===expect===
-UnreachableCode: Unreachable code detected
+UnreachableCode@8:4: Unreachable code detected
 ===ignore===
 TODO

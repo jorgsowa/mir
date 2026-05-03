@@ -9,7 +9,6 @@ function helper(): void {}
 $fn = 'helper';
 call_user_func($fn);
 ===expect===
-# Variable-based callable cannot be statically resolved — helper is still flagged
-UnusedFunction: Function helper() is never called
+UnusedFunction@1:0: Function helper() is never called
 ===ignore===
 TODO

@@ -14,6 +14,5 @@ unsupportedReferenceUsageContinuesAnalysis
                     /** @psalm-trace $bar */;
                 
 ===expect===
-- $bar: string
 ===ignore===
 TODO

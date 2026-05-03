@@ -8,6 +8,6 @@ function outer(): void {
     }
 }
 ===expect===
-UndefinedClass: Class UnknownClass does not exist
+UndefinedClass@4:12: Class UnknownClass does not exist
 ===ignore===
 TODO

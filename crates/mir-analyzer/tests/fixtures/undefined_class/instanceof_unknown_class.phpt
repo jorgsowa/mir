@@ -6,6 +6,6 @@ function test($x): bool {
     return $x instanceof NoSuchClass;
 }
 ===expect===
-UndefinedClass: Class NoSuchClass does not exist
+UndefinedClass@3:25: Class NoSuchClass does not exist
 ===ignore===
 TODO

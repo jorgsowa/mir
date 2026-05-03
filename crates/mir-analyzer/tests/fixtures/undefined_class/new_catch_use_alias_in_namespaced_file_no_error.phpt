@@ -15,7 +15,7 @@ function wrap(): void {
     } catch (Entity $e) {}
 }
 ===expect===
-Service.php: UnusedVariable: Variable $x is never read
-Service.php: UnusedVariable: Variable $e is never read
+Service.php: UnusedVariable@1:0: Variable $e is never read
+Service.php: UnusedVariable@5:4: Variable $x is never read
 ===ignore===
 TODO

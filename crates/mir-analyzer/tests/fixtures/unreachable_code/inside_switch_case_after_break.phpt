@@ -10,6 +10,6 @@ function test(int $mode): void {
     }
 }
 ===expect===
-UnreachableCode: Unreachable code detected
+UnreachableCode@6:12: Unreachable code detected
 ===ignore===
 TODO

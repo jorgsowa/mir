@@ -16,8 +16,7 @@ function handle(): void {
     }
 }
 ===expect===
-Handler.php: UndefinedClass: Class App\MissingException does not exist
-Handler.php: UnusedVariable: Variable $e is never read
-Handler.php: UnusedVariable: Variable $e is never read
+Handler.php: UnusedVariable@1:0: Variable $e is never read
+Handler.php: UndefinedClass@8:13: Class App\MissingException does not exist
 ===ignore===
 TODO

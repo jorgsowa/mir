@@ -12,6 +12,6 @@ class Circle extends Shape {
     public function area(): float { return 3.14; }
 }
 ===expect===
-Circle.php: UnimplementedAbstractMethod: Class Circle must implement abstract method perimeter()
+Circle.php: UnimplementedAbstractMethod@2:0: Class Circle must implement abstract method perimeter()
 ===ignore===
 TODO

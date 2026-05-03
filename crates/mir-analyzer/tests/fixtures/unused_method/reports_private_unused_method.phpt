@@ -8,6 +8,6 @@ class Foo {
     private function helper(): void {}
 }
 ===expect===
-UnusedMethod: Private method Foo::helper() is never called
+UnusedMethod@1:0: Private method Foo::helper() is never called
 ===ignore===
 TODO

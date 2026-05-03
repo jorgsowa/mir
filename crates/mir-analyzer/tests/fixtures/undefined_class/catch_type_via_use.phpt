@@ -10,7 +10,7 @@ function f(): void {
     }
 }
 ===expect===
-UndefinedClass: Class Vendor\Missing\MyException does not exist
-UnusedVariable: Variable $e is never read
+UnusedVariable@1:0: Variable $e is never read
+UndefinedClass@6:13: Class Vendor\Missing\MyException does not exist
 ===ignore===
 TODO

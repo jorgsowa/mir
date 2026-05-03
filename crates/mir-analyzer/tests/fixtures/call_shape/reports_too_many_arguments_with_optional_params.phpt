@@ -5,8 +5,8 @@ reports too many arguments with optional params
 function greet(string $name, string $suffix = ''): void {}
 greet('Ada', 'Mrs.', 'extra');
 ===expect===
-UnusedParam: Parameter $name is never used
-UnusedParam: Parameter $suffix is never used
-TooManyArguments: Too many arguments for greet(): expected 2, got 3
+UnusedParam@2:15: Parameter $name is never used
+UnusedParam@2:29: Parameter $suffix is never used
+TooManyArguments@3:21: Too many arguments for greet(): expected 2, got 3
 ===ignore===
 TODO

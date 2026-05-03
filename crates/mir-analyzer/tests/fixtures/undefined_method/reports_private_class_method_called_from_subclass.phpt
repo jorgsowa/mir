@@ -11,6 +11,6 @@ class Child extends Base {
     }
 }
 ===expect===
-UndefinedMethod: Method Base::secret() does not exist
+UndefinedMethod@7:8: Method Base::secret() does not exist
 ===ignore===
 TODO
