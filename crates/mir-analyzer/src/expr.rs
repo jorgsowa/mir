@@ -205,6 +205,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // .= always produces string
                         if let Some(var_name) = extract_simple_var(a.target) {
                             ctx.set_var(&var_name, Union::single(Atomic::TString));
+                            let (line, col_start) = self.offset_to_line_col(a.target.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
+                            ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                         }
                         Union::single(Atomic::TString)
                     }
@@ -218,6 +221,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let result_ty = infer_arithmetic(&lhs_ty, &rhs_ty);
                         if let Some(var_name) = extract_simple_var(a.target) {
                             ctx.set_var(&var_name, result_ty.clone());
+                            let (line, col_start) = self.offset_to_line_col(a.target.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
+                            ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                         }
                         result_ty
                     }
@@ -227,12 +233,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let merged = Union::merge(&lhs_ty.remove_null(), &rhs_ty);
                         if let Some(var_name) = extract_simple_var(a.target) {
                             ctx.set_var(&var_name, merged.clone());
+                            let (line, col_start) = self.offset_to_line_col(a.target.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
+                            ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                         }
                         merged
                     }
                     _ => {
                         if let Some(var_name) = extract_simple_var(a.target) {
                             ctx.set_var(&var_name, Union::mixed());
+                            let (line, col_start) = self.offset_to_line_col(a.target.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
+                            ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                         }
                         Union::mixed()
                     }
@@ -268,6 +280,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Union::single(Atomic::TInt)
                             };
                             ctx.set_var(&var_name, new_ty.clone());
+                            let (line, col_start) = self.offset_to_line_col(u.operand.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(u.operand.span.end);
+                            ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                             new_ty
                         } else {
                             Union::single(Atomic::TInt)
@@ -290,6 +305,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Union::single(Atomic::TInt)
                             };
                             ctx.set_var(&var_name, new_ty);
+                            let (line, col_start) = self.offset_to_line_col(u.operand.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(u.operand.span.end);
+                            ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                         }
                         operand_ty // returns original value
                     }
