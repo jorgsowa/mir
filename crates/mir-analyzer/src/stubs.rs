@@ -611,6 +611,43 @@ mod tests {
     }
 
     #[test]
+    fn function_lookup_is_case_insensitive() {
+        // PHP function names are case-insensitive: `STRLEN($x)` must resolve
+        // to the same node as `strlen($x)`. Regression for users seeing
+        // `UndefinedFunction: Function Restore_Error_Handler() is not defined`
+        // on mixed-case calls of built-ins.
+        let cb = stubs_codebase();
+        assert!(function_exists_via_db(&cb, "strlen"));
+        assert!(function_exists_via_db(&cb, "STRLEN"));
+        assert!(function_exists_via_db(&cb, "StrLen"));
+        assert!(function_exists_via_db(&cb, "Restore_Error_Handler"));
+        assert!(function_exists_via_db(&cb, "RESTORE_ERROR_HANDLER"));
+    }
+
+    #[test]
+    fn class_lookup_is_case_insensitive() {
+        // PHP class names are case-insensitive: `new arrayobject()` must
+        // resolve to `ArrayObject`. Regression for `UndefinedClass` on
+        // lower- or upper-cased built-in class references.
+        let cb = stubs_codebase();
+        assert!(type_exists_via_db(&cb, "ArrayObject"));
+        assert!(type_exists_via_db(&cb, "arrayobject"));
+        assert!(type_exists_via_db(&cb, "ARRAYOBJECT"));
+        assert!(type_exists_via_db(&cb, "ArrayOBJECT"));
+    }
+
+    #[test]
+    fn constant_lookup_stays_case_sensitive() {
+        // PHP global constants ARE case-sensitive (except true/false/null).
+        // Make sure the case-insensitivity fix for functions/classes did not
+        // leak into constants.
+        let cb = stubs_codebase();
+        assert!(constant_exists_via_db(&cb, "PHP_INT_MAX"));
+        assert!(!constant_exists_via_db(&cb, "php_int_max"));
+        assert!(!constant_exists_via_db(&cb, "Php_Int_Max"));
+    }
+
+    #[test]
     fn stdlib_symbols_are_loaded() {
         let cb = stubs_codebase();
 
