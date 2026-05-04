@@ -111,8 +111,9 @@ fn generate_builtin_fn_names(manifest_dir: &Path, out_dir: &Path) {
     let content = fs::read_to_string(&map_path).unwrap();
 
     // Build lowercase set of stub directory names from the stubs/ directory for O(1) lookup.
-    let workspace_root = find_workspace_root(manifest_dir);
-    let stubs_dir = workspace_root.join("stubs");
+    // `stubs/` lives inside the crate so it is included in `cargo package` and survives
+    // publication to crates.io — see `generate_stub_files` for the regression history.
+    let stubs_dir = manifest_dir.join("stubs");
     let stub_dirs_lower: std::collections::HashSet<String> = if stubs_dir.is_dir() {
         fs::read_dir(&stubs_dir)
             .unwrap()
@@ -222,19 +223,22 @@ fn collect_php_files(dir: &Path, stubs_root: &Path, code: &mut String) {
 /// Paths use the workspace root as the prefix so they look like
 /// `"stubs/standard/standard_9.php"` — stable virtual identifiers for go-to-definition.
 fn generate_stub_files(manifest_dir: &Path, out_dir: &Path) {
-    let workspace_root = find_workspace_root(manifest_dir);
-    let stubs_dir = workspace_root.join("stubs");
+    let stubs_dir = manifest_dir.join("stubs");
     let out_path = out_dir.join("stub_files.rs");
 
-    if !stubs_dir.exists() {
-        fs::write(
-            &out_path,
-            "/// No stubs/ directory found.\n\
-             pub(crate) static STUB_FILES: &[(&str, &str)] = &[];\n",
-        )
-        .unwrap();
-        return;
-    }
+    // Hard fail rather than silently emit an empty `STUB_FILES`. An empty static is the
+    // exact failure mode that shipped in 0.17.1: the workspace `stubs/` directory was
+    // not packaged into the crate, the build script took the "no stubs" path, and every
+    // built-in function/class was reported `UndefinedFunction` / `UndefinedClass` for
+    // every downstream consumer. `tests/packaging.rs` guards the packaging side; this
+    // guard catches the local-build side.
+    assert!(
+        stubs_dir.is_dir(),
+        "mir-analyzer build.rs: stubs/ directory is missing at {} — \
+         the published crate would have no built-in symbols. \
+         If this fired in cargo package, ensure stubs/ lives inside the crate.",
+        stubs_dir.display()
+    );
 
     println!("cargo:rerun-if-changed={}", stubs_dir.display());
 
@@ -254,8 +258,9 @@ fn generate_stub_files(manifest_dir: &Path, out_dir: &Path) {
 
     for ext_dir in &ext_dirs {
         println!("cargo:rerun-if-changed={}", ext_dir.display());
-        // Use workspace_root as the prefix so paths are workspace-relative.
-        collect_php_files(ext_dir, &workspace_root, &mut code);
+        // Strip the crate root so embedded paths look like `"stubs/Core/Core.php"` —
+        // stable virtual identifiers used by go-to-definition.
+        collect_php_files(ext_dir, manifest_dir, &mut code);
     }
 
     code.push_str("];\n");
@@ -275,25 +280,5 @@ fn extract_description(content: &str) -> Option<String> {
         None
     } else {
         Some(text.to_string())
-    }
-}
-
-/// Walk up from `start` until finding a directory that contains a `Cargo.toml`
-/// with `[workspace]`.  Falls back to `start` if nothing is found.
-fn find_workspace_root(start: &Path) -> PathBuf {
-    let mut dir = start.to_path_buf();
-    loop {
-        let toml = dir.join("Cargo.toml");
-        if toml.exists() {
-            if let Ok(content) = fs::read_to_string(&toml) {
-                if content.contains("[workspace]") {
-                    return dir;
-                }
-            }
-        }
-        match dir.parent() {
-            Some(p) => dir = p.to_path_buf(),
-            None => return start.to_path_buf(),
-        }
     }
 }

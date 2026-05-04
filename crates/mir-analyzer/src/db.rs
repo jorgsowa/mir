@@ -1220,10 +1220,20 @@ pub struct MirDb {
     // these maps only hold stable input handles, so copy-on-write insertion is
     // enough for the canonical mutable db paths.
     /// FQCN → ClassNode handle registry (not tracked by Salsa; see
-    /// `lookup_class_node` for the rationale).
+    /// `lookup_class_node` for the rationale). Keys are canonical FQCNs;
+    /// case-insensitive lookups go through `class_node_keys_lower`.
     class_nodes: Arc<FxHashMap<Arc<str>, ClassNode>>,
-    /// FQN → FunctionNode handle registry.
+    /// Lowercased FQCN → canonical FQCN. Maintained in lockstep with
+    /// `class_nodes` so callers can resolve PHP's case-insensitive class
+    /// names (`new arrayobject()` → `ArrayObject`).
+    class_node_keys_lower: Arc<FxHashMap<String, Arc<str>>>,
+    /// FQN → FunctionNode handle registry. Keys are canonical FQNs;
+    /// case-insensitive lookups go through `function_node_keys_lower`.
     function_nodes: Arc<FxHashMap<Arc<str>, FunctionNode>>,
+    /// Lowercased FQN → canonical FQN. Maintained in lockstep with
+    /// `function_nodes` so callers can resolve PHP's case-insensitive
+    /// function names (`STRLEN($x)` → `strlen`).
+    function_node_keys_lower: Arc<FxHashMap<String, Arc<str>>>,
     /// (owner FQCN) → (method_name_lower → MethodNode) handle registry.
     method_nodes: MemberRegistry<MethodNode>,
     /// (owner FQCN) → (prop_name → PropertyNode) handle registry.
@@ -1254,11 +1264,21 @@ impl MirDatabase for MirDb {
     }
 
     fn lookup_class_node(&self, fqcn: &str) -> Option<ClassNode> {
-        self.class_nodes.get(fqcn).copied()
+        if let Some(&node) = self.class_nodes.get(fqcn) {
+            return Some(node);
+        }
+        let lower = fqcn.to_ascii_lowercase();
+        let canonical = self.class_node_keys_lower.get(&lower)?;
+        self.class_nodes.get(canonical.as_ref()).copied()
     }
 
     fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode> {
-        self.function_nodes.get(fqn).copied()
+        if let Some(&node) = self.function_nodes.get(fqn) {
+            return Some(node);
+        }
+        let lower = fqn.to_ascii_lowercase();
+        let canonical = self.function_node_keys_lower.get(&lower)?;
+        self.function_nodes.get(canonical.as_ref()).copied()
     }
 
     fn lookup_method_node(&self, fqcn: &str, method_name_lower: &str) -> Option<MethodNode> {
@@ -1931,6 +1951,8 @@ impl MirDb {
                 extends_type_args,
                 implements_type_args,
             );
+            Arc::make_mut(&mut self.class_node_keys_lower)
+                .insert(fqcn.to_ascii_lowercase(), fqcn.clone());
             Arc::make_mut(&mut self.class_nodes).insert(fqcn, node);
             node
         }
@@ -2001,6 +2023,8 @@ impl MirDb {
                 storage.is_pure,
                 storage.location.clone(),
             );
+            Arc::make_mut(&mut self.function_node_keys_lower)
+                .insert(fqn.to_ascii_lowercase(), fqn.clone());
             Arc::make_mut(&mut self.function_nodes).insert(fqn.clone(), node);
             node
         }
