@@ -146,6 +146,12 @@ impl fmt::Display for Atomic {
             Atomic::TInterfaceString => write!(f, "interface-string"),
             Atomic::TEnumString => write!(f, "enum-string"),
             Atomic::TTraitString => write!(f, "trait-string"),
+            Atomic::TLiteralEnumCase {
+                enum_fqcn,
+                case_name,
+            } => {
+                write!(f, "{enum_fqcn}::{case_name}")
+            }
 
             Atomic::TIntersection { parts } => {
                 let mut iter = parts.iter();

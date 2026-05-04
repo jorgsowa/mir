@@ -97,6 +97,36 @@ pub fn narrow_from_condition<'arena, 'src>(
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
                 }
             }
+            // `$x === EnumName::CaseName`
+            else if let ExprKind::StaticPropertyAccess(_) = &b.right.kind {
+                if let Some(var_name) = extract_var_name(b.left) {
+                    if let Some((enum_fqcn, case_name)) =
+                        extract_enum_case(b.right, ctx.self_fqcn.as_deref(), db, file)
+                    {
+                        narrow_var_to_literal_enum_case(
+                            ctx,
+                            &var_name,
+                            &enum_fqcn,
+                            &case_name,
+                            effective_true,
+                        );
+                    }
+                }
+            } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
+                if let Some(var_name) = extract_var_name(b.right) {
+                    if let Some((enum_fqcn, case_name)) =
+                        extract_enum_case(b.left, ctx.self_fqcn.as_deref(), db, file)
+                    {
+                        narrow_var_to_literal_enum_case(
+                            ctx,
+                            &var_name,
+                            &enum_fqcn,
+                            &case_name,
+                            effective_true,
+                        );
+                    }
+                }
+            }
         }
 
         // $x == null  (loose equality)
@@ -596,6 +626,29 @@ fn narrow_var_literal_int(ctx: &mut Context, name: &str, value: i64, is_value: b
     set_narrowed(ctx, name, &current, narrowed, false);
 }
 
+fn narrow_var_to_literal_enum_case(
+    ctx: &mut Context,
+    name: &str,
+    enum_fqcn: &str,
+    case_name: &str,
+    is_case: bool,
+) {
+    let current = ctx.get_var(name);
+    let narrowed = if is_case {
+        Union::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: enum_fqcn.into(),
+            case_name: case_name.into(),
+        })
+    } else {
+        // For !== comparison with enum case, remove that specific case from the union.
+        current.filter(|t| {
+            !matches!(t, Atomic::TLiteralEnumCase { enum_fqcn: fqcn, case_name: c }
+                if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
+        })
+    };
+    set_narrowed(ctx, name, &current, narrowed, true);
+}
+
 fn extract_var_name<'a, 'arena, 'src>(
     expr: &'a php_ast::ast::Expr<'arena, 'src>,
 ) -> Option<String> {
@@ -618,6 +671,23 @@ fn extract_class_name<'arena, 'src>(
         ExprKind::Variable(_) => None, // dynamic class — can't narrow
         _ => None,
     }
+}
+
+fn extract_enum_case<'arena, 'src>(
+    expr: &php_ast::ast::Expr<'arena, 'src>,
+    self_fqcn: Option<&str>,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(String, String)> {
+    if let ExprKind::StaticPropertyAccess(spa) = &expr.kind {
+        if let Some(enum_short_name) = extract_class_name(spa.class, self_fqcn) {
+            let enum_fqcn = crate::db::resolve_name_via_db(db, file, &enum_short_name);
+            if let ExprKind::Identifier(case_name) = &spa.member.kind {
+                return Some((enum_fqcn, case_name.to_string()));
+            }
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------
