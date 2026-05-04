@@ -1357,6 +1357,32 @@ function strnatcasecmp(string $string1, string $string2): int {}
  * the end of haystack.
  * </p>
  * @return int<0,max> This functions returns an integer.
+ * @removed 7.4
+ */
+#[Pure]
+function substr_count(string $haystack, string $needle, int $offset, ?int $length = null): int {}
+
+/**
+ * Count the number of substring occurrences (with optional offset)
+ * @link https://php.net/manual/en/function.substr-count.php
+ * @param string $haystack <p>
+ * The string to search in
+ * </p>
+ * @param string $needle <p>
+ * The substring to search for
+ * </p>
+ * @param int $offset [optional] <p>
+ * The offset where to start counting. If the offset is negative,
+ * counting starts from the end of the string.
+ * </p>
+ * @param int|null $length [optional] <p>
+ * The maximum length after the specified offset to search for the
+ * substring. It outputs a warning if the offset plus the length is
+ * greater than the haystack length. A negative length counts from
+ * the end of haystack.
+ * </p>
+ * @return int<0,max> This functions returns an integer.
+ * @since 7.4
  */
 #[Pure]
 function substr_count(string $haystack, string $needle, int $offset = 0, ?int $length = null): int {}
