@@ -9,4 +9,3 @@ function test() {
     return $value;
 }
 ===expect===
-UndefinedVariable@5:11: Variable $value is not defined

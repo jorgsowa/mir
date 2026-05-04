@@ -1574,8 +1574,29 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::VariableVariable(inner) => {
-                // $$key = value  — the operand $key must be read to determine which variable to assign
-                self.analyze(inner, ctx);
+                // $$key = value — when the operand is a variable with a known literal string value,
+                // we can track that we're assigning to a variable with that name.
+                if let Some(var_name) = extract_simple_var(inner) {
+                    // The operand is read to determine the assignment target name
+                    ctx.read_vars.insert(var_name.clone());
+                    let var_ty = ctx.get_var(&var_name);
+                    // If the variable contains a literal string, track the dynamic assignment
+                    for atomic in &var_ty.types {
+                        if let Atomic::TLiteralString(accessed_var_name) = atomic {
+                            // Create/track the dynamically-assigned variable without marking it as read
+                            ctx.set_var(accessed_var_name.to_string(), ty.clone());
+                            let (line, col_start) = self.offset_to_line_col(target.span.start);
+                            let (line_end, col_end) = self.offset_to_line_col(target.span.end);
+                            ctx.record_var_location(
+                                accessed_var_name,
+                                line,
+                                col_start,
+                                line_end,
+                                col_end,
+                            );
+                        }
+                    }
+                }
             }
             _ => {}
         }
