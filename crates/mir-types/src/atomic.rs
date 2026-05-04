@@ -189,6 +189,13 @@ pub enum Atomic {
     /// `trait-string`
     TTraitString,
 
+    // --- Enum cases ---
+    /// `EnumName::CaseName` — a specific enum case literal
+    TLiteralEnumCase {
+        enum_fqcn: Arc<str>,
+        case_name: Arc<str>,
+    },
+
     // --- Intersection ---
     /// `A&B&C` — PHP 8.1+ pure intersection type
     TIntersection { parts: Vec<Union> },
@@ -363,6 +370,7 @@ impl Atomic {
             Atomic::TInterfaceString => "interface-string",
             Atomic::TEnumString => "enum-string",
             Atomic::TTraitString => "trait-string",
+            Atomic::TLiteralEnumCase { .. } => "enum-case",
             Atomic::TIntersection { .. } => "intersection",
         }
     }
