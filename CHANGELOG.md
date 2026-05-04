@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.2] - 2026-05-04
+
+### Fixed
+
+- The published `mir-analyzer` crate is no longer shipped with an empty stub set. The `stubs/` directory lived at the workspace root, outside the package, so `cargo package` excluded it; downstream consumers (e.g. `php-lsp`) saw `STUB_FILES = &[]` and every PHP built-in resolved as `UndefinedFunction` / `UndefinedClass`. Stubs now live inside the crate at `crates/mir-analyzer/stubs/` and are included in the published artifact. `build.rs` panics if the directory is missing, and a new `tests/packaging.rs` test asserts `cargo package --list` includes `stubs/Core/Core.php` plus the rest of the stub set — closing the publish-time gap.
+- Built-in function and class lookups are now case-insensitive, matching PHP semantics. `Restore_Error_Handler()`, `RESTORE_ERROR_HANDLER()`, `new arrayobject([])`, and `new ARRAYOBJECT([])` no longer produce false-positive `UndefinedFunction` / `UndefinedClass` diagnostics. Implemented as side indices on `MirDb` (`function_node_keys_lower`, `class_node_keys_lower`) so the canonical-FQN storage that `active_*_node_fqns`, `function_count`, `type_count`, and `clear_file_references` depend on is unchanged. Constants remain case-sensitive (PHP semantics).
+
 ## [0.17.1] - 2026-05-03
 
 ### Fixed
