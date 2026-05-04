@@ -147,7 +147,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ty
             }
 
-            ExprKind::VariableVariable(_) => Union::mixed(), // $$x — unknowable
+            ExprKind::VariableVariable(inner) => {
+                let inner_ty = self.analyze(inner, ctx);
+                // Mark the operand as read (e.g., $key in $$key)
+                if let Some(var_name) = extract_simple_var(inner) {
+                    ctx.read_vars.insert(var_name.clone());
+                    // If the operand's type is a known literal string, mark that variable as read too
+                    // (e.g., if $key = 'foo', then $$key reads $foo)
+                    for atomic in &inner_ty.types {
+                        if let Atomic::TLiteralString(accessed_var_name) = atomic {
+                            ctx.read_vars.insert(accessed_var_name.to_string());
+                        }
+                    }
+                }
+                Union::mixed()
+            }
 
             ExprKind::Identifier(name) => {
                 // Bare identifier used as value — a global constant reference.
@@ -1558,6 +1572,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         _ => break,
                     }
                 }
+            }
+            ExprKind::VariableVariable(inner) => {
+                // $$key = value  — the operand $key must be read to determine which variable to assign
+                self.analyze(inner, ctx);
             }
             _ => {}
         }
