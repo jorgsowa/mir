@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.3] - 2026-05-05
+
+### Performance
+
+- Deduplicate parameter types across all function/method signatures via `Arc<Union>` interning, eliminating redundant type allocations.
+- Resolve function node once per call site instead of twice, reducing redundant database lookups.
+- Use `SimpleType` for atomic function parameters, reducing type envelope overhead.
+- Deduplicate return types via `Arc<Union>` interning for all callables.
+- Deduplicate parameter lists across vendor method signatures, further reducing memory footprint.
+- Skip re-caching `StubSlice` in Salsa during vendor collection, improving vendor ingestion performance.
+
 ## [0.17.2] - 2026-05-04
 
 ### Fixed
