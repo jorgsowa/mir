@@ -12,8 +12,11 @@ use crate::Union;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FnParam {
     pub name: Arc<str>,
-    pub ty: Option<Union>,
-    pub default: Option<Union>,
+    /// Parameter type stored as SimpleType for compact representation.
+    /// Most params are simple scalars (string, int, etc.) and fit inline.
+    pub ty: Option<crate::compact::SimpleType>,
+    /// Default value stored as SimpleType. Usually None or a simple scalar.
+    pub default: Option<crate::compact::SimpleType>,
     pub is_variadic: bool,
     pub is_byref: bool,
     pub is_optional: bool,

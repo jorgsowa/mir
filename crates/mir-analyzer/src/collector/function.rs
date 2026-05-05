@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::{wrap_return_type, FnParam, FunctionStorage, TemplateParam};
-use mir_types::Union;
 
 use super::DefinitionCollector;
 use crate::parser::type_from_hint;
@@ -42,13 +41,26 @@ impl DefinitionCollector<'_> {
                 .or_else(|| {
                     self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None)))
                 });
+            // Profiling: track scalar vs complex param types
+            if let Some(ty_ref) = &ty {
+                if super::is_simple_scalar(ty_ref) {
+                    super::SCALAR_PARAM_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                } else {
+                    super::COMPLEX_PARAM_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            let has_default = p.default.is_some();
+            if has_default {
+                super::PARAM_WITH_DEFAULT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+
             params.push(FnParam {
                 name: p.name.into(),
                 ty: mir_codebase::wrap_param_type(ty),
-                default: p.default.as_ref().map(|_| Union::mixed()),
+                has_default,
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
-                is_optional: p.default.is_some() || p.variadic,
+                is_optional: has_default || p.variadic,
             });
         }
 

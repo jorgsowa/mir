@@ -500,6 +500,33 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
 
     eprintln!("\n=== FULL ANALYSIS DETAILED PROFILING ===\n");
 
+    // Print struct sizes for optimization profiling
+    use mir_codebase::storage::FnParam as CodebaseFnParam;
+    use mir_types::atomic::Atomic;
+    use mir_types::union::Union;
+    eprintln!("  [struct sizes]");
+    eprintln!(
+        "    size_of::<Union>()                    = {} bytes",
+        std::mem::size_of::<Union>()
+    );
+    eprintln!(
+        "    size_of::<Atomic>()                   = {} bytes",
+        std::mem::size_of::<Atomic>()
+    );
+    eprintln!(
+        "    size_of::<CodebaseFnParam>()          = {} bytes",
+        std::mem::size_of::<CodebaseFnParam>()
+    );
+    eprintln!(
+        "    size_of::<Option<Union>>()            = {} bytes",
+        std::mem::size_of::<Option<Union>>()
+    );
+    eprintln!(
+        "    size_of::<Option<Arc<Union>>>()       = {} bytes",
+        std::mem::size_of::<Option<std::sync::Arc<Union>>>()
+    );
+    eprintln!();
+
     reset_alloc_counters();
     let analyzer = ProjectAnalyzer::new();
     checkpoint_alloc("After analyzer::new()");

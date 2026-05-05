@@ -52,7 +52,7 @@ fn ast_derived_fn_params<'arena, 'src>(
         .map(|p| mir_codebase::FnParam {
             name: Arc::from(p.name),
             ty: None,
-            default: p.default.as_ref().map(|_| Union::mixed()),
+            has_default: p.default.is_some(),
             is_variadic: p.variadic,
             is_byref: p.by_ref,
             is_optional: p.default.is_some() || p.variadic,

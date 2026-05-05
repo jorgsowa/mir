@@ -144,7 +144,9 @@ pub struct FnParam {
         serialize_with = "serialize_param_type"
     )]
     pub ty: Option<Arc<Union>>,
-    pub default: Option<Union>,
+    /// Whether this parameter has a default value. During analysis, defaults are
+    /// never used for their value — only for marking parameters as optional.
+    pub has_default: bool,
     pub is_variadic: bool,
     pub is_byref: bool,
     pub is_optional: bool,

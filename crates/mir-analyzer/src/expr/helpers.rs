@@ -145,7 +145,7 @@ pub(crate) fn ast_params_to_fn_params_resolved<'arena, 'src>(
             mir_codebase::FnParam {
                 name: p.name.trim_start_matches('$').into(),
                 ty: mir_codebase::wrap_param_type(ty),
-                default: p.default.as_ref().map(|_| Union::mixed()),
+                has_default: p.default.is_some(),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
                 is_optional: p.default.is_some() || p.variadic,
