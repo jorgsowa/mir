@@ -59,6 +59,12 @@ fn print_alloc_stats(label: &str) {
     );
 }
 
+fn checkpoint_alloc(label: &str) {
+    let peak = PEAK_BYTES.load(Relaxed) as f64 / 1_048_576.0;
+    let total = TOTAL_BYTES.load(Relaxed) as f64 / 1_048_576.0;
+    eprintln!("    [checkpoint] {label:40} peak {peak:7.1} MiB, total {total:7.1} MiB");
+}
+
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
@@ -455,11 +461,36 @@ fn bench_vendor_collection(c: &mut Criterion) {
     group.finish();
 }
 
+/// Detailed memory profiling: measure allocation at each phase of vendor collection.
+fn bench_vendor_collection_detailed(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+
+    let vendor_files = ProjectAnalyzer::discover_files(&root.join("vendor"));
+
+    eprintln!("\n=== VENDOR COLLECTION DETAILED PROFILING ===\n");
+
+    reset_alloc_counters();
+    let analyzer = ProjectAnalyzer::new();
+    checkpoint_alloc("After analyzer::new()");
+
+    analyzer.load_stubs();
+    checkpoint_alloc("After load_stubs()");
+
+    analyzer.collect_types_only(&vendor_files);
+    checkpoint_alloc("After collect_types_only() - TOTAL VENDOR ALLOCATION");
+
+    eprintln!();
+}
+
 criterion_group!(
     benches,
     bench_full_analysis,
     bench_reanalysis,
     bench_reanalysis_project_only,
-    bench_vendor_collection
+    bench_vendor_collection,
+    bench_vendor_collection_detailed
 );
 criterion_main!(benches);

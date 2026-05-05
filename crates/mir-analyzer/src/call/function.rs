@@ -39,6 +39,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
+        .map(|t| (*t).clone())
         .unwrap_or_else(Union::mixed);
     Some(ResolvedFn {
         fqn: node.fqn(db),

@@ -403,8 +403,8 @@ pub struct FunctionNode {
     pub short_name: Arc<str>,
     pub active: bool,
     pub params: Arc<[FnParam]>,
-    pub return_type: Option<Union>,
-    pub inferred_return_type: Option<Union>,
+    pub return_type: Option<Arc<Union>>,
+    pub inferred_return_type: Option<Arc<Union>>,
     pub template_params: Arc<[TemplateParam]>,
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
@@ -437,8 +437,8 @@ pub struct MethodNode {
     pub name: Arc<str>,
     pub active: bool,
     pub params: Arc<[FnParam]>,
-    pub return_type: Option<Union>,
-    pub inferred_return_type: Option<Union>,
+    pub return_type: Option<Arc<Union>>,
+    pub inferred_return_type: Option<Arc<Union>>,
     pub template_params: Arc<[TemplateParam]>,
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
@@ -1657,6 +1657,10 @@ impl MirDb {
                 self.prune_class_methods(&cls.fqcn, &method_keep);
             }
             for method in cls.own_methods.values() {
+                // Avoid cloning complex return type Unions during vendor ingestion
+                // by wrapping in Arc upfront. This is a per-method operation during
+                // vendor type collection (rare after initialization), so the Arc
+                // allocation is amortized.
                 self.upsert_method_node(method.as_ref());
             }
             if self.property_nodes.contains_key(cls.fqcn.as_ref()) {
@@ -1983,7 +1987,7 @@ impl MirDb {
                 && node.short_name(self) == storage.short_name
                 && node.is_pure(self) == storage.is_pure
                 && node.deprecated(self) == storage.deprecated
-                && node.return_type(self) == storage.return_type
+                && node.return_type(self).as_deref() == storage.return_type.as_ref()
                 && node.location(self) == storage.location
                 && *node.params(self) == *storage.params.as_slice()
                 && *node.template_params(self) == *storage.template_params.as_slice()
@@ -1996,7 +2000,8 @@ impl MirDb {
             node.set_short_name(self).to(storage.short_name.clone());
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
-            node.set_return_type(self).to(storage.return_type.clone());
+            node.set_return_type(self)
+                .to(storage.return_type.as_ref().map(|t| Arc::new(t.clone())));
             node.set_template_params(self)
                 .to(Arc::from(storage.template_params.as_slice()));
             node.set_assertions(self)
@@ -2014,8 +2019,11 @@ impl MirDb {
                 storage.short_name.clone(),
                 true,
                 Arc::from(storage.params.as_slice()),
-                storage.return_type.clone(),
-                storage.inferred_return_type.clone(),
+                storage.return_type.as_ref().map(|t| Arc::new(t.clone())),
+                storage
+                    .inferred_return_type
+                    .as_ref()
+                    .map(|t| Arc::new(t.clone())),
                 Arc::from(storage.template_params.as_slice()),
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
@@ -2049,7 +2057,7 @@ impl MirDb {
                 if !node.active(self) {
                     continue;
                 }
-                let new = Some(inferred);
+                let new = Some(Arc::new(inferred));
                 if node.inferred_return_type(self) == new {
                     continue;
                 }
@@ -2072,7 +2080,7 @@ impl MirDb {
                 if !node.active(self) {
                     continue;
                 }
-                let new = Some(inferred);
+                let new = Some(Arc::new(inferred));
                 if node.inferred_return_type(self) == new {
                     continue;
                 }
@@ -2113,7 +2121,7 @@ impl MirDb {
                 && node.is_constructor(self) == storage.is_constructor
                 && node.is_pure(self) == storage.is_pure
                 && node.deprecated(self) == storage.deprecated
-                && node.return_type(self) == storage.return_type
+                && node.return_type(self).as_deref() == storage.return_type.as_ref()
                 && node.location(self) == storage.location
                 && *node.params(self) == *storage.params.as_slice()
                 && *node.template_params(self) == *storage.template_params.as_slice()
@@ -2125,7 +2133,8 @@ impl MirDb {
             node.set_active(self).to(true);
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
-            node.set_return_type(self).to(storage.return_type.clone());
+            node.set_return_type(self)
+                .to(storage.return_type.as_ref().map(|t| Arc::new(t.clone())));
             node.set_template_params(self)
                 .to(Arc::from(storage.template_params.as_slice()));
             node.set_assertions(self)
@@ -2149,8 +2158,11 @@ impl MirDb {
                 storage.name.clone(),
                 true,
                 Arc::from(storage.params.as_slice()),
-                storage.return_type.clone(),
-                storage.inferred_return_type.clone(),
+                storage.return_type.as_ref().map(|t| Arc::new(t.clone())),
+                storage
+                    .inferred_return_type
+                    .as_ref()
+                    .map(|t| Arc::new(t.clone())),
                 Arc::from(storage.template_params.as_slice()),
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
@@ -3331,8 +3343,9 @@ mod tests {
             // Sweep is done — clones owned by `for_each_with` are dropped.
             // If any worker-thread retains thread-local Salsa state pointing
             // at a clone, this setter will hang in `Storage::cancel_others`.
-            node.set_return_type(&mut db).to(Some(Union::mixed()));
-            assert_eq!(node.return_type(&db), Some(Union::mixed()));
+            node.set_return_type(&mut db)
+                .to(Some(Arc::new(Union::mixed())));
+            assert_eq!(node.return_type(&db), Some(Arc::new(Union::mixed())));
             tx.send(()).unwrap();
         });
 
@@ -3381,7 +3394,8 @@ mod tests {
         // without blocking the test.  Channel signals when the setter returns.
         let (tx, rx) = mpsc::channel::<()>();
         let writer = std::thread::spawn(move || {
-            node.set_return_type(&mut db).to(Some(Union::mixed()));
+            node.set_return_type(&mut db)
+                .to(Some(Arc::new(Union::mixed())));
             tx.send(()).unwrap();
         });
 

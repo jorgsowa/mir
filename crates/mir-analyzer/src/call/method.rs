@@ -49,6 +49,7 @@ pub(super) fn resolve_method_from_db(
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
+        .map(|t| (*t).clone())
         .unwrap_or_else(Union::mixed);
 
     Some(ResolvedMethod {
