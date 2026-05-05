@@ -1,0 +1,750 @@
+/// Pass 1 — Definition collector.
+///
+/// Visits every top-level declaration in the AST and produces a `StubSlice`
+/// containing class, function, and constant signatures. No type inference
+/// happens here.
+use std::sync::Arc;
+
+use php_ast::ast::{Program, StmtKind, Visibility as AstVisibility};
+use std::ops::ControlFlow;
+
+use php_ast::visitor::Visitor;
+
+use crate::parser::{name_to_string, type_from_hint};
+use crate::php_version::PhpVersion;
+use mir_codebase::storage::{
+    Assertion, FnParam, Location, MethodStorage, PropertyStorage, StubSlice, TemplateParam,
+    Visibility,
+};
+use mir_issues::{Issue, IssueBuffer};
+use mir_types::Union;
+
+mod annotation;
+mod class;
+mod r#enum;
+mod function;
+mod interface;
+mod resolution;
+mod r#trait;
+
+// ---------------------------------------------------------------------------
+// DefinitionCollector
+// ---------------------------------------------------------------------------
+
+pub struct DefinitionCollector<'a> {
+    slice: StubSlice,
+    file: Arc<str>,
+    source: &'a str,
+    source_map: &'a php_rs_parser::source_map::SourceMap,
+    namespace: Option<String>,
+    /// `use` aliases: alias → FQCN
+    use_aliases: std::collections::HashMap<String, String>,
+    issues: IssueBuffer,
+    /// When `Some`, stub symbols annotated with `@since`/`@removed` are filtered
+    /// against this target version. `None` disables filtering (user code).
+    php_version: Option<PhpVersion>,
+    /// The first namespace declaration seen in this file. Matches the semantics
+    /// of `project.rs` which only records the first namespace per file.
+    first_namespace: Option<String>,
+    /// All `use` imports ever encountered in this file, accumulated across all
+    /// namespace blocks. Unlike `use_aliases`, this is never cleared or restored,
+    /// so braced-namespace imports are not lost.
+    accumulated_imports: std::collections::HashMap<String, String>,
+}
+
+impl<'a> DefinitionCollector<'a> {
+    pub fn new_for_slice(
+        file: Arc<str>,
+        source: &'a str,
+        source_map: &'a php_rs_parser::source_map::SourceMap,
+    ) -> Self {
+        let slice = StubSlice {
+            file: Some(file.clone()),
+            ..StubSlice::default()
+        };
+        Self {
+            source_map,
+            slice,
+            file,
+            source,
+            namespace: None,
+            use_aliases: std::collections::HashMap::new(),
+            issues: IssueBuffer::new(),
+            php_version: None,
+            first_namespace: None,
+            accumulated_imports: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Enable `@since`/`@removed` filtering against the given target PHP
+    /// version. Used by the stub loader so that symbols introduced after, or
+    /// removed at or before, the target version are not registered.
+    pub fn with_php_version(mut self, version: PhpVersion) -> Self {
+        self.php_version = Some(version);
+        self
+    }
+
+    /// Returns `true` if a docblock's `@since`/`@removed` tags allow this
+    /// symbol to exist at the configured target version. When no target is
+    /// configured (user code), always returns `true`.
+    fn version_allows(&self, doc: &crate::parser::ParsedDocblock) -> bool {
+        match self.php_version {
+            Some(v) => v.includes_symbol(doc.since.as_deref(), doc.removed.as_deref()),
+            None => true,
+        }
+    }
+
+    /// Writes accumulated namespace and import data into `self.slice` so that
+    /// `MirDatabase::ingest_stub_slice` can populate the db's `file_namespaces`
+    /// and `file_imports` tables. Called at the end of `collect_slice` to
+    /// ensure the slice carries the complete data.
+    fn finalize_slice(&mut self) {
+        if let Some(ns) = self.first_namespace.take() {
+            self.slice.namespace = Some(Arc::from(ns.as_str()));
+        }
+        if !self.accumulated_imports.is_empty() {
+            self.slice.imports = std::mem::take(&mut self.accumulated_imports);
+        }
+    }
+
+    pub fn collect_slice<'arena, 'src>(
+        mut self,
+        program: &Program<'arena, 'src>,
+    ) -> (StubSlice, Vec<Issue>) {
+        let _ = self.visit_program(program);
+        self.finalize_slice();
+        (self.slice, self.issues.into_issues())
+    }
+
+    // -----------------------------------------------------------------------
+    // FQCN resolution helpers
+    // -----------------------------------------------------------------------
+    // Type Resolution (delegating to resolution module)
+    // -----------------------------------------------------------------------
+
+    fn resolve_name(&self, name: &str) -> String {
+        resolution::resolve_name(name, &self.namespace, &self.use_aliases)
+    }
+
+    fn resolve_type_name(&self, name: &Arc<str>, full_qualify: bool) -> Arc<str> {
+        resolution::resolve_type_name(name, full_qualify, &self.namespace, &self.use_aliases)
+    }
+
+    fn fill_self_static_parent(union: Union, class_fqcn: &str) -> Union {
+        resolution::fill_self_static_parent(union, class_fqcn)
+    }
+
+    fn resolve_union(&self, union: Union) -> Union {
+        resolution::resolve_union(union, &self.namespace, &self.use_aliases)
+    }
+
+    fn resolve_union_doc(&self, union: Union) -> Union {
+        resolution::resolve_union_doc(union, &self.namespace, &self.use_aliases)
+    }
+
+    fn resolve_union_doc_with_aliases(
+        &self,
+        union: Union,
+        aliases: &std::collections::HashMap<String, Union>,
+    ) -> Union {
+        resolution::resolve_union_doc_with_aliases(
+            union,
+            aliases,
+            &self.namespace,
+            &self.use_aliases,
+        )
+    }
+
+    fn resolve_union_opt(&self, opt: Option<Union>) -> Option<Union> {
+        resolution::resolve_union_opt(opt, &self.namespace, &self.use_aliases)
+    }
+
+    fn build_assertions(&self, doc: &crate::parser::ParsedDocblock) -> Vec<Assertion> {
+        annotation::build_assertions(doc, |u| self.resolve_union_doc(u))
+    }
+
+    fn location(&self, start: u32, end: u32) -> Location {
+        let src = self.source;
+        let start_off = start as usize;
+        let line_start = src[..start_off].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line = self.source_map.offset_to_line_col(start).line + 1;
+        let col_start = src[line_start..start_off].chars().count() as u16;
+
+        let end_off = (end as usize).min(src.len());
+        let end_line_start = src[..end_off].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = self.source_map.offset_to_line_col(end_off as u32).line + 1;
+        let col_end = src[end_line_start..end_off].chars().count() as u16;
+
+        Location::new(self.file.clone(), line, line_end, col_start, col_end)
+    }
+
+    // -----------------------------------------------------------------------
+    // Docblock issue emission
+    // -----------------------------------------------------------------------
+
+    fn emit_docblock_issues(&mut self, doc: &crate::parser::ParsedDocblock, span_start: u32) {
+        annotation::emit_docblock_issues(
+            doc,
+            span_start,
+            self.php_version,
+            self.file.clone(),
+            self.source_map,
+            &mut self.issues,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Visibility conversion
+    // -----------------------------------------------------------------------
+
+    fn convert_visibility(v: Option<AstVisibility>) -> Visibility {
+        match v {
+            Some(AstVisibility::Public) | None => Visibility::Public,
+            Some(AstVisibility::Protected) => Visibility::Protected,
+            Some(AstVisibility::Private) => Visibility::Private,
+        }
+    }
+
+    fn build_type_aliases(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+    ) -> std::collections::HashMap<String, Union> {
+        let mut aliases = std::collections::HashMap::new();
+        for alias in &doc.type_aliases {
+            if alias.name.is_empty() || alias.type_expr.is_empty() {
+                continue;
+            }
+            let mut ty = crate::parser::docblock::parse_type_string(&alias.type_expr);
+            ty.from_docblock = true;
+            aliases.insert(alias.name.clone(), self.resolve_union_doc(ty));
+        }
+
+        // Resolve same-file @psalm-import-type declarations. Cross-file imports
+        // stay in `pending_import_types` and are resolved after all slices are
+        // injected.
+        for import in &doc.import_types {
+            if import.from_class.is_empty() {
+                continue;
+            }
+            let from_resolved =
+                self.resolve_type_name(&Arc::from(import.from_class.as_str()), true);
+            let resolved = self
+                .slice
+                .classes
+                .iter()
+                .find(|cls| cls.fqcn.as_ref() == from_resolved.as_ref())
+                .and_then(|cls| cls.type_aliases.get(import.original.as_str()).cloned());
+            if let Some(ty) = resolved {
+                aliases.insert(import.local.clone(), ty);
+            }
+        }
+
+        aliases
+    }
+
+    fn add_docblock_members(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+        aliases: &std::collections::HashMap<String, Union>,
+        class_fqcn: &str,
+        own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodStorage>>,
+        own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyStorage>,
+        location: Option<Location>,
+    ) {
+        for prop in &doc.properties {
+            if prop.name.is_empty() || own_properties.contains_key(prop.name.as_str()) {
+                continue;
+            }
+            let ty = if prop.type_hint.is_empty() {
+                None
+            } else {
+                let mut parsed = crate::parser::docblock::parse_type_string(&prop.type_hint);
+                parsed.from_docblock = true;
+                Some(self.resolve_union_doc_with_aliases(parsed, aliases))
+            };
+            own_properties.insert(
+                Arc::from(prop.name.as_str()),
+                PropertyStorage {
+                    name: Arc::from(prop.name.as_str()),
+                    ty,
+                    inferred_ty: None,
+                    visibility: Visibility::Public,
+                    is_static: false,
+                    is_readonly: prop.read_only,
+                    default: None,
+                    location: location.clone(),
+                },
+            );
+        }
+
+        for method in &doc.methods {
+            if method.name.is_empty() {
+                continue;
+            }
+            let key = Arc::from(method.name.to_lowercase().as_str());
+            if own_methods.contains_key(&key) {
+                continue;
+            }
+            let return_type = if method.return_type.is_empty() {
+                None
+            } else {
+                let mut parsed = crate::parser::docblock::parse_type_string(&method.return_type);
+                parsed.from_docblock = true;
+                Some(Self::fill_self_static_parent(
+                    self.resolve_union_doc_with_aliases(parsed, aliases),
+                    class_fqcn,
+                ))
+            };
+            let params = method
+                .params
+                .iter()
+                .map(|p| {
+                    let ty = if p.type_hint.is_empty() {
+                        None
+                    } else {
+                        let mut parsed = crate::parser::docblock::parse_type_string(&p.type_hint);
+                        parsed.from_docblock = true;
+                        Some(self.resolve_union_doc_with_aliases(parsed, aliases))
+                    };
+                    FnParam {
+                        name: Arc::from(p.name.as_str()),
+                        ty,
+                        default: if p.is_optional {
+                            Some(Union::mixed())
+                        } else {
+                            None
+                        },
+                        is_variadic: p.is_variadic,
+                        is_byref: p.is_byref,
+                        is_optional: p.is_optional,
+                    }
+                })
+                .collect();
+            own_methods.insert(
+                key,
+                Arc::new(MethodStorage {
+                    name: Arc::from(method.name.as_str()),
+                    fqcn: Arc::from(class_fqcn),
+                    params,
+                    return_type,
+                    inferred_return_type: None,
+                    visibility: Visibility::Public,
+                    is_static: method.is_static,
+                    is_abstract: false,
+                    is_final: false,
+                    is_constructor: false,
+                    template_params: vec![],
+                    assertions: vec![],
+                    throws: vec![],
+                    deprecated: None,
+                    is_internal: false,
+                    is_pure: false,
+                    location: location.clone(),
+                }),
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Process statements
+    // -----------------------------------------------------------------------
+
+    fn process_stmts<'arena, 'src>(
+        &mut self,
+        stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
+    ) -> ControlFlow<()> {
+        for stmt in stmts.iter() {
+            self.visit_stmt(stmt)?;
+        }
+        ControlFlow::Continue(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Global variable registry
+    // -----------------------------------------------------------------------
+
+    /// Scan a single statement: if it is `global $x` with a preceding
+    /// `/** @var Type $x */` docblock, register the type in the codebase.
+    fn try_collect_global_var_annotation(&mut self, stmt: &php_ast::ast::Stmt<'_, '_>) {
+        let php_ast::ast::StmtKind::Global(vars) = &stmt.kind else {
+            return;
+        };
+        let Some(doc_text) = crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+        else {
+            return;
+        };
+        let parsed = crate::parser::DocblockParser::parse(&doc_text);
+        self.emit_docblock_issues(&parsed, stmt.span.start);
+        let Some(var_type) = parsed.var_type else {
+            return;
+        };
+        let resolved_ty = self.resolve_union_doc(var_type);
+
+        for var in vars.iter() {
+            if let php_ast::ast::ExprKind::Variable(raw_name) = &var.kind {
+                let name = raw_name.as_str().trim_start_matches('$');
+                // If @var specifies a variable name, only register when it matches.
+                if let Some(ref ann_name) = parsed.var_name {
+                    if ann_name != name {
+                        continue;
+                    }
+                }
+                self.slice
+                    .global_vars
+                    .push((Arc::from(name), resolved_ty.clone()));
+            }
+        }
+    }
+
+    /// Scan a list of statements and register any `@var`-annotated `global`
+    /// declarations. Used for function bodies where the visitor does not recurse.
+    fn scan_stmts_for_global_vars<'arena, 'src>(
+        &mut self,
+        stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
+    ) {
+        for stmt in stmts.iter() {
+            self.try_collect_global_var_annotation(stmt);
+        }
+    }
+}
+
+impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
+    fn visit_stmt(&mut self, stmt: &php_ast::ast::Stmt<'arena, 'src>) -> ControlFlow<()> {
+        match &stmt.kind {
+            StmtKind::Namespace(ns) => {
+                let new_ns = ns.name.as_ref().map(name_to_string);
+                if self.first_namespace.is_none() {
+                    self.first_namespace = new_ns.clone();
+                }
+                self.namespace = new_ns;
+                match &ns.body {
+                    php_ast::ast::NamespaceBody::Braced(stmts) => {
+                        // Save and restore use aliases per namespace block
+                        let saved_aliases = self.use_aliases.clone();
+                        self.use_aliases.clear();
+                        let flow = self.process_stmts(stmts);
+                        self.use_aliases = saved_aliases;
+                        flow?;
+                    }
+                    php_ast::ast::NamespaceBody::Simple => {
+                        // Simple namespace — affects all subsequent declarations
+                    }
+                }
+            }
+
+            StmtKind::Use(use_decl) => {
+                for item in use_decl.uses.iter() {
+                    let full_name = name_to_string(&item.name)
+                        .trim_start_matches('\\')
+                        .to_string();
+                    let alias = item
+                        .alias
+                        .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
+                    self.use_aliases
+                        .insert(alias.to_string(), full_name.clone());
+                    self.accumulated_imports
+                        .insert(alias.to_string(), full_name);
+                }
+            }
+
+            StmtKind::Function(decl) => {
+                self.collect_function(decl, stmt.span);
+            }
+
+            StmtKind::Global(_) => {
+                self.collect_global_stmt(stmt);
+            }
+
+            StmtKind::Class(decl) => {
+                return self.collect_class(decl, stmt.span);
+            }
+
+            StmtKind::Interface(decl) => {
+                return self.collect_interface(decl, stmt.span);
+            }
+
+            StmtKind::Trait(decl) => {
+                return self.collect_trait(decl, stmt.span);
+            }
+
+            StmtKind::Enum(decl) => {
+                self.collect_enum(decl, stmt.span);
+            }
+
+            StmtKind::Const(items) => {
+                for item in items.iter() {
+                    let const_doc = item
+                        .doc_comment
+                        .as_ref()
+                        .map(|c| crate::parser::DocblockParser::parse(c.text))
+                        .or_else(|| {
+                            crate::parser::find_preceding_docblock(self.source, item.span.start)
+                                .map(|t| crate::parser::DocblockParser::parse(&t))
+                        })
+                        .unwrap_or_default();
+                    let const_doc_span = item
+                        .doc_comment
+                        .as_ref()
+                        .map(|c| c.span.start)
+                        .unwrap_or(item.span.start);
+                    self.emit_docblock_issues(&const_doc, const_doc_span);
+                    if !self.version_allows(&const_doc) {
+                        continue;
+                    }
+                    let fqn: Arc<str> = if let Some(ns) = &self.namespace {
+                        format!("{}\\{}", ns, item.name).into()
+                    } else {
+                        item.name.into()
+                    };
+                    self.slice.constants.push((fqn, Union::mixed()));
+                }
+            }
+
+            StmtKind::Block(stmts) => {
+                return self.process_stmts(stmts);
+            }
+
+            // Collect top-level define('NAME', value) calls as global constants.
+            // phpstorm-stubs uses this form extensively in *_defines.php files.
+            StmtKind::Expression(expr) => {
+                if let php_ast::ast::ExprKind::FunctionCall(call) = &expr.kind {
+                    if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
+                        if fn_name.eq_ignore_ascii_case("define") {
+                            if let Some(name_arg) = call.args.first() {
+                                if let php_ast::ast::ExprKind::String(name) = &name_arg.value.kind {
+                                    // Check for @since/@removed on the docblock preceding this define().
+                                    let define_doc = crate::parser::find_preceding_docblock(
+                                        self.source,
+                                        stmt.span.start,
+                                    )
+                                    .map(|t| crate::parser::DocblockParser::parse(&t))
+                                    .unwrap_or_default();
+                                    self.emit_docblock_issues(&define_doc, stmt.span.start);
+                                    if self.version_allows(&define_doc) {
+                                        let fqn: Arc<str> = Arc::from(&**name);
+                                        self.slice.constants.push((fqn, Union::mixed()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+impl<'a> DefinitionCollector<'a> {
+    fn build_method_storage(
+        &mut self,
+        m: &php_ast::ast::MethodDecl<'_, '_>,
+        class_fqcn: &str,
+        span: Option<&php_ast::Span>,
+        aliases: Option<&std::collections::HashMap<String, Union>>,
+    ) -> Option<MethodStorage> {
+        let doc = m
+            .doc_comment
+            .as_ref()
+            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .unwrap_or_default();
+
+        if let Some(c) = m.doc_comment.as_ref() {
+            self.emit_docblock_issues(&doc, c.span.start);
+        }
+
+        if !self.version_allows(&doc) {
+            return None;
+        }
+
+        let mut params = Vec::new();
+        for p in m.params.iter() {
+            let ty = doc
+                .get_param_type(p.name)
+                .cloned()
+                .map(|u| {
+                    aliases
+                        .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
+                        .unwrap_or_else(|| self.resolve_union_doc(u))
+                })
+                .or_else(|| {
+                    self.resolve_union_opt(
+                        p.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint(h, Some(class_fqcn))),
+                    )
+                });
+            params.push(FnParam {
+                name: p.name.into(),
+                ty,
+                default: p.default.as_ref().map(|_| Union::mixed()),
+                is_variadic: p.variadic,
+                is_byref: p.by_ref,
+                is_optional: p.default.is_some() || p.variadic,
+            });
+        }
+
+        let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {
+            (Some(mut ty), _) => {
+                ty.from_docblock = true;
+                let resolved = aliases
+                    .map(|a| self.resolve_union_doc_with_aliases(ty.clone(), a))
+                    .unwrap_or_else(|| self.resolve_union_doc(ty));
+                Some(Self::fill_self_static_parent(resolved, class_fqcn))
+            }
+            (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, Some(class_fqcn)))),
+            (None, None) => None,
+        };
+
+        let template_params: Vec<TemplateParam> = doc
+            .templates
+            .iter()
+            .map(|(name, bound, variance)| TemplateParam {
+                name: name.as_str().into(),
+                bound: bound.clone(),
+                defining_entity: class_fqcn.into(),
+                variance: *variance,
+            })
+            .collect();
+
+        Some(MethodStorage {
+            name: m.name.into(),
+            fqcn: class_fqcn.into(),
+            params,
+            return_type,
+            inferred_return_type: None,
+            visibility: Self::convert_visibility(m.visibility),
+            is_static: m.is_static,
+            is_abstract: m.is_abstract,
+            is_final: m.is_final,
+            is_constructor: m.name == "__construct",
+            template_params,
+            assertions: self.build_assertions(&doc),
+            throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
+            deprecated: doc.deprecated.as_deref().map(Arc::from),
+            is_internal: doc.is_internal,
+            is_pure: doc.is_pure,
+            location: span.map(|s| self.location(s.start, s.end)),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_and_collect_slice(file: &str, src: &str) -> StubSlice {
+        let arena = bumpalo::Bump::new();
+        let result = php_rs_parser::parse(&arena, src);
+        let collector =
+            DefinitionCollector::new_for_slice(Arc::from(file), src, &result.source_map);
+        let (slice, _) = collector.collect_slice(&result.program);
+        slice
+    }
+
+    // These three tests guard the DefinitionCollector → StubSlice contract for
+    // namespace and import data.
+    //
+    // Background: collect_slice is the pure output path used by incremental /
+    // salsa pipelines (LSP, re_analyze_file). For StubSlice-based consumers to
+    // produce correct diagnostics, the slice must carry the same namespace and
+    // import data that project.rs collects via its separate AST walk. If either
+    // field is missing from the slice, StatementsAnalyzer receives empty maps
+    // during Pass 2 and emits false UndefinedClass diagnostics for use-aliased
+    // or same-namespace classes.
+
+    #[test]
+    fn collect_slice_captures_namespace() {
+        // The first namespace declaration must end up in slice.namespace so
+        // that ingest_stub_slice can populate the db's file_namespaces table.
+        let slice = parse_and_collect_slice(
+            "src/Service.php",
+            "<?php\nnamespace App\\Service;\nclass Handler {}\n",
+        );
+        assert_eq!(
+            slice.namespace.as_deref(),
+            Some("App\\Service"),
+            "collect_slice must capture the file namespace"
+        );
+    }
+
+    #[test]
+    fn collect_slice_captures_use_imports() {
+        // All `use` imports (plain and aliased) must end up in slice.imports so
+        // that ingest_stub_slice can populate the db's file_imports table and
+        // Pass 2 can resolve short names like `new Entity()` correctly.
+        let slice = parse_and_collect_slice(
+            "src/Handler.php",
+            "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\nuse App\\Repository\\EntityRepo as Repo;\nclass Handler {}\n",
+        );
+        let imports = &slice.imports;
+        assert_eq!(
+            imports.get("Entity").map(|s| s.as_str()),
+            Some("App\\Model\\Entity"),
+            "collect_slice must capture plain use import"
+        );
+        assert_eq!(
+            imports.get("Repo").map(|s| s.as_str()),
+            Some("App\\Repository\\EntityRepo"),
+            "collect_slice must capture aliased use import"
+        );
+    }
+
+    #[test]
+    fn collect_slice_captures_namespace_none_when_no_namespace() {
+        // Global-scope files have no namespace declaration; slice.namespace must
+        // be None so inject_stub_slice does not insert a spurious entry into
+        // file_namespaces.
+        let slice = parse_and_collect_slice("src/global.php", "<?php\nfunction foo(): void {}\n");
+        assert!(
+            slice.namespace.is_none(),
+            "collect_slice must not set namespace for global-scope files"
+        );
+    }
+
+    #[test]
+    fn trait_require_extends_is_collected() {
+        let src = r#"<?php
+class Model {}
+
+/**
+ * @psalm-require-extends Model
+ */
+trait HasTimestamps {}
+"#;
+        let slice = parse_and_collect_slice("test.php", src);
+        let tr = slice
+            .traits
+            .iter()
+            .find(|tr| tr.fqcn.as_ref() == "HasTimestamps")
+            .expect("HasTimestamps should be collected");
+        assert_eq!(
+            tr.require_extends,
+            vec![std::sync::Arc::from("Model")],
+            "require_extends should contain Model"
+        );
+    }
+
+    #[test]
+    fn trait_require_extends_via_project_analyzer() {
+        let src = r#"<?php
+/** @psalm-require-extends Model */
+trait HasTimestamps {
+    public function touch(): void {}
+}
+
+class Model {}
+
+class NotAModel {
+    use HasTimestamps;
+}
+"#;
+        let result = crate::test_utils::check(src);
+        assert!(
+            result.iter().any(|i| i.kind.name() == "InvalidTraitUse"),
+            "Expected InvalidTraitUse issue"
+        );
+    }
+}

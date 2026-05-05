@@ -1,0 +1,370 @@
+use super::helpers::extract_string_from_expr;
+use super::ExpressionAnalyzer;
+use crate::context::Context;
+use crate::symbol::SymbolKind;
+use mir_issues::{IssueKind, Severity};
+use mir_types::{Atomic, Union};
+use php_ast::ast::{ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
+use std::sync::Arc;
+
+impl<'a> ExpressionAnalyzer<'a> {
+    pub(super) fn analyze_new<'arena, 'src>(
+        &mut self,
+        n: &NewExpr<'arena, 'src>,
+        call_span: php_ast::Span,
+        ctx: &mut Context,
+    ) -> Union {
+        let arg_types: Vec<Union> = n
+            .args
+            .iter()
+            .map(|a| {
+                let ty = self.analyze(&a.value, ctx);
+                if a.unpack {
+                    crate::call::spread_element_type(&ty)
+                } else {
+                    ty
+                }
+            })
+            .collect();
+        let arg_spans: Vec<php_ast::Span> = n.args.iter().map(|a| a.span).collect();
+        let arg_names: Vec<Option<String>> = n
+            .args
+            .iter()
+            .map(|a| a.name.as_ref().map(|nm| nm.to_string_repr().into_owned()))
+            .collect();
+        let arg_can_be_byref: Vec<bool> = n
+            .args
+            .iter()
+            .map(|a| crate::call::expr_can_be_passed_by_reference(&a.value))
+            .collect();
+
+        let class_ty = match &n.class.kind {
+            ExprKind::Identifier(name) => {
+                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, name.as_ref());
+                let fqcn: Arc<str> = match resolved.as_str() {
+                    "self" | "static" => ctx
+                        .self_fqcn
+                        .clone()
+                        .or_else(|| ctx.static_fqcn.clone())
+                        .unwrap_or_else(|| Arc::from(resolved.as_str())),
+                    "parent" => ctx
+                        .parent_fqcn
+                        .clone()
+                        .unwrap_or_else(|| Arc::from(resolved.as_str())),
+                    _ => Arc::from(resolved.as_str()),
+                };
+                let type_exists = crate::db::type_exists_via_db(self.db, fqcn.as_ref());
+                if !matches!(resolved.as_str(), "self" | "static" | "parent") && !type_exists {
+                    self.emit(
+                        IssueKind::UndefinedClass {
+                            name: resolved.clone(),
+                        },
+                        Severity::Error,
+                        n.class.span,
+                    );
+                } else if type_exists {
+                    if let Some(node) = self
+                        .db
+                        .lookup_class_node(fqcn.as_ref())
+                        .filter(|n| n.active(self.db))
+                    {
+                        if let Some(msg) = node.deprecated(self.db) {
+                            self.emit(
+                                IssueKind::DeprecatedClass {
+                                    name: fqcn.to_string(),
+                                    message: Some(msg).filter(|m| !m.is_empty()),
+                                },
+                                Severity::Info,
+                                n.class.span,
+                            );
+                        }
+                    }
+                    let ctor_params =
+                        crate::db::lookup_method_in_chain(self.db, &fqcn, "__construct")
+                            .map(|n| n.params(self.db).to_vec());
+                    if let Some(ctor_params) = ctor_params {
+                        crate::call::check_constructor_args(
+                            self,
+                            &fqcn,
+                            crate::call::CheckArgsParams {
+                                fn_name: "__construct",
+                                params: &ctor_params,
+                                arg_types: &arg_types,
+                                arg_spans: &arg_spans,
+                                arg_names: &arg_names,
+                                arg_can_be_byref: &arg_can_be_byref,
+                                call_span,
+                                has_spread: n.args.iter().any(|a| a.unpack),
+                            },
+                        );
+                    }
+                }
+                let ty = Union::single(Atomic::TNamedObject {
+                    fqcn: fqcn.clone(),
+                    type_params: vec![],
+                });
+                self.record_symbol(
+                    n.class.span,
+                    SymbolKind::ClassReference(fqcn.clone()),
+                    ty.clone(),
+                );
+                if !self.inference_only {
+                    let (line, col_start, col_end) = self.span_to_ref_loc(n.class.span);
+                    self.db.record_reference_location(crate::db::RefLoc {
+                        symbol_key: fqcn.clone(),
+                        file: self.file.clone(),
+                        line,
+                        col_start,
+                        col_end,
+                    });
+                }
+                ty
+            }
+            _ => {
+                self.analyze(n.class, ctx);
+                Union::single(Atomic::TObject)
+            }
+        };
+        class_ty
+    }
+
+    pub(super) fn analyze_property_access<'arena, 'src>(
+        &mut self,
+        pa: &PropertyAccessExpr<'arena, 'src>,
+        expr_span: php_ast::Span,
+        ctx: &mut Context,
+    ) -> Union {
+        let obj_ty = self.analyze(pa.object, ctx);
+        let prop_name =
+            extract_string_from_expr(pa.property).unwrap_or_else(|| "<dynamic>".to_string());
+
+        if obj_ty.contains(|t| matches!(t, Atomic::TNull)) && obj_ty.is_single() {
+            self.emit(
+                IssueKind::NullPropertyFetch {
+                    property: prop_name.clone(),
+                },
+                Severity::Error,
+                expr_span,
+            );
+            return Union::mixed();
+        }
+        if obj_ty.is_nullable() {
+            self.emit(
+                IssueKind::PossiblyNullPropertyFetch {
+                    property: prop_name.clone(),
+                },
+                Severity::Info,
+                expr_span,
+            );
+        }
+
+        if prop_name == "<dynamic>" {
+            return Union::mixed();
+        }
+        let resolved = self.resolve_property_type(&obj_ty, &prop_name, pa.property.span);
+        for atomic in &obj_ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                self.record_symbol(
+                    pa.property.span,
+                    SymbolKind::PropertyAccess {
+                        class: fqcn.clone(),
+                        property: Arc::from(prop_name.as_str()),
+                    },
+                    resolved.clone(),
+                );
+                break;
+            }
+        }
+        resolved
+    }
+
+    pub(super) fn analyze_nullsafe_property_access<'arena, 'src>(
+        &mut self,
+        pa: &PropertyAccessExpr<'arena, 'src>,
+        ctx: &mut Context,
+    ) -> Union {
+        let obj_ty = self.analyze(pa.object, ctx);
+        let prop_name =
+            extract_string_from_expr(pa.property).unwrap_or_else(|| "<dynamic>".to_string());
+        if prop_name == "<dynamic>" {
+            return Union::mixed();
+        }
+        let non_null_ty = obj_ty.remove_null();
+        let mut prop_ty = self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span);
+        prop_ty.add_type(Atomic::TNull);
+        for atomic in &non_null_ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                self.record_symbol(
+                    pa.property.span,
+                    SymbolKind::PropertyAccess {
+                        class: fqcn.clone(),
+                        property: Arc::from(prop_name.as_str()),
+                    },
+                    prop_ty.clone(),
+                );
+                break;
+            }
+        }
+        prop_ty
+    }
+
+    pub(super) fn analyze_static_property_access<'arena, 'src>(
+        &mut self,
+        spa: &StaticAccessExpr<'arena, 'src>,
+    ) -> Union {
+        if let ExprKind::Identifier(id) = &spa.class.kind {
+            let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+            if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                && !crate::db::type_exists_via_db(self.db, &resolved)
+            {
+                self.emit(
+                    IssueKind::UndefinedClass { name: resolved },
+                    Severity::Error,
+                    spa.class.span,
+                );
+            }
+        }
+        Union::mixed()
+    }
+
+    pub(super) fn analyze_class_const_access<'arena, 'src>(
+        &mut self,
+        cca: &StaticAccessExpr<'arena, 'src>,
+        expr_span: php_ast::Span,
+    ) -> Union {
+        if cca.member.name_str() == Some("class") {
+            let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
+                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+                Some(Arc::from(resolved.as_str()))
+            } else {
+                None
+            };
+            return Union::single(Atomic::TClassString(fqcn));
+        }
+
+        let const_name = match cca.member.name_str() {
+            Some(n) => n.to_string(),
+            None => return Union::mixed(),
+        };
+
+        let fqcn = match &cca.class.kind {
+            ExprKind::Identifier(id) => {
+                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+                if matches!(resolved.as_str(), "self" | "static" | "parent") {
+                    return Union::mixed();
+                }
+                resolved
+            }
+            _ => return Union::mixed(),
+        };
+
+        if !crate::db::type_exists_via_db(self.db, &fqcn) {
+            self.emit(
+                IssueKind::UndefinedClass { name: fqcn },
+                Severity::Error,
+                cca.class.span,
+            );
+            return Union::mixed();
+        }
+
+        let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
+        if !const_exists && !crate::db::has_unknown_ancestor_via_db(self.db, &fqcn) {
+            self.emit(
+                IssueKind::UndefinedConstant {
+                    name: format!("{fqcn}::{const_name}"),
+                },
+                Severity::Error,
+                expr_span,
+            );
+        }
+        Union::mixed()
+    }
+
+    pub(super) fn resolve_property_type(
+        &mut self,
+        obj_ty: &Union,
+        prop_name: &str,
+        span: php_ast::Span,
+    ) -> Union {
+        for atomic in &obj_ty.types {
+            match atomic {
+                Atomic::TNamedObject { fqcn, .. }
+                    if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
+                        .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
+                {
+                    let prop_found: Option<Union> =
+                        crate::db::lookup_property_in_chain(self.db, fqcn.as_ref(), prop_name)
+                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed));
+                    if let Some(ty) = prop_found {
+                        if !self.inference_only {
+                            let (line, col_start, col_end) = self.span_to_ref_loc(span);
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(format!("{}::{}", fqcn, prop_name)),
+                                file: self.file.clone(),
+                                line,
+                                col_start,
+                                col_end,
+                            });
+                        }
+                        return ty;
+                    }
+                    if !crate::db::has_unknown_ancestor_via_db(self.db, fqcn.as_ref())
+                        && !crate::db::method_exists_via_db(self.db, fqcn.as_ref(), "__get")
+                    {
+                        self.emit(
+                            IssueKind::UndefinedProperty {
+                                class: fqcn.to_string(),
+                                property: prop_name.to_string(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                    return Union::mixed();
+                }
+                Atomic::TNamedObject { fqcn, .. }
+                    if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
+                        .is_some_and(|k| k.is_enum) =>
+                {
+                    match prop_name {
+                        "name" => return Union::single(Atomic::TNonEmptyString),
+                        "value" => {
+                            if let Some(node) = self
+                                .db
+                                .lookup_class_node(fqcn.as_ref())
+                                .filter(|n| n.active(self.db))
+                            {
+                                if let Some(scalar_ty) = node.enum_scalar_type(self.db) {
+                                    return scalar_ty;
+                                }
+                            }
+                            self.emit(
+                                IssueKind::UndefinedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Warning,
+                                span,
+                            );
+                            return Union::mixed();
+                        }
+                        _ => {
+                            self.emit(
+                                IssueKind::UndefinedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Warning,
+                                span,
+                            );
+                            return Union::mixed();
+                        }
+                    }
+                }
+                Atomic::TMixed => return Union::mixed(),
+                _ => {}
+            }
+        }
+        Union::mixed()
+    }
+}
