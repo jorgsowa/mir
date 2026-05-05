@@ -1,0 +1,9 @@
+===description===
+Using float value as array key in array construction - silently truncated to int
+
+===file===
+<?php
+$arr = [1.5 => "value"];
+
+===expect===
+ImplicitFloatToIntCast@2:8: Implicit cast from 1.5 to int truncates the fractional part
