@@ -69,6 +69,10 @@ pub struct Context {
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: HashMap<String, (u32, u16, u32, u16)>,
+
+    /// Names of template parameters in the current function/method.
+    /// Used during type narrowing to correctly handle generic template variables.
+    pub template_param_names: HashSet<String>,
 }
 
 impl Context {
@@ -91,6 +95,7 @@ impl Context {
             byref_param_names: HashSet::new(),
             diverges: false,
             var_locations: HashMap::new(),
+            template_param_names: HashSet::new(),
         };
         // PHP superglobals — always in scope in any context
         for sg in &[
@@ -137,6 +142,22 @@ impl Context {
         inside_constructor: bool,
         is_static: bool,
     ) -> Self {
+        Self::for_method_with_templates(params, return_type, self_fqcn, parent_fqcn, static_fqcn, strict_types, inside_constructor, is_static, None)
+    }
+
+    /// Like `for_method` but also accepts template parameters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn for_method_with_templates(
+        params: &[mir_codebase::FnParam],
+        return_type: Option<Union>,
+        self_fqcn: Option<Arc<str>>,
+        parent_fqcn: Option<Arc<str>>,
+        static_fqcn: Option<Arc<str>>,
+        strict_types: bool,
+        inside_constructor: bool,
+        is_static: bool,
+        template_params: Option<&[mir_codebase::TemplateParam]>,
+    ) -> Self {
         let mut ctx = Self::new();
         ctx.fn_return_type = return_type;
         ctx.self_fqcn = self_fqcn.clone();
@@ -145,11 +166,37 @@ impl Context {
         ctx.strict_types = strict_types;
         ctx.inside_constructor = inside_constructor;
 
+        // Build a map of template names to their bounds for parameter type resolution
+        let mut template_bounds_map: std::collections::HashMap<String, Union> =
+            std::collections::HashMap::new();
+        if let Some(templates) = template_params {
+            for tp in templates {
+                ctx.template_param_names.insert(tp.name.to_string());
+                if let Some(bound) = &tp.bound {
+                    template_bounds_map.insert(tp.name.to_string(), bound.clone());
+                }
+            }
+        }
+
         for p in params {
-            let elem_ty =
+            let mut elem_ty =
                 p.ty.as_ref()
                     .map(|arc| (**arc).clone())
                     .unwrap_or_else(Union::mixed);
+
+            // Resolve template references to their bounds
+            // If the parameter type is a bare unqualified name matching a template parameter,
+            // replace it with the template's bound
+            if elem_ty.types.len() == 1 {
+                if let mir_types::Atomic::TNamedObject { fqcn, type_params } = &elem_ty.types[0] {
+                    if type_params.is_empty() && !fqcn.contains('\\') {
+                        if let Some(bound) = template_bounds_map.get(fqcn.as_ref()) {
+                            elem_ty = bound.clone();
+                        }
+                    }
+                }
+            }
+
             // Variadic params like `Type ...$name` are accessed as `list<Type>` in the body.
             // If the docblock already provides a list/array collection type, don't double-wrap.
             let ty = if p.is_variadic {

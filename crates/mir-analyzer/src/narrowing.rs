@@ -167,7 +167,7 @@ pub fn narrow_from_condition<'arena, 'src>(
                     let class_name = crate::db::resolve_name_via_db(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
                     let narrowed = if effective_is_true {
-                        narrow_instanceof_preserving_subtypes(&current, &class_name, db)
+                        narrow_instanceof_preserving_subtypes(&current, &class_name, db, &ctx.template_param_names)
                     } else {
                         filter_out_instanceof_match(&current, &class_name, db)
                     };
@@ -384,7 +384,7 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                 // Narrow to the union of all instanceof types: take union of narrow_instanceof results
                 let mut narrowed = Union::empty();
                 for cn in &class_names {
-                    let n = narrow_instanceof_preserving_subtypes(&current, cn, db);
+                    let n = narrow_instanceof_preserving_subtypes(&current, cn, db, &ctx.template_param_names);
                     narrowed = Union::merge(&narrowed, &n);
                 }
                 // Fall back to current if narrowed is empty (e.g. mixed)
@@ -405,6 +405,7 @@ fn narrow_instanceof_preserving_subtypes(
     current: &Union,
     class_name: &str,
     db: &dyn MirDatabase,
+    template_param_names: &std::collections::HashSet<String>,
 ) -> Union {
     let narrowed_ty = Atomic::TNamedObject {
         fqcn: class_name.into(),
@@ -428,6 +429,16 @@ fn narrow_instanceof_preserving_subtypes(
                 if named_object_matches_instanceof(fqcn, class_name, db) =>
             {
                 result.add_type(atomic.clone());
+            }
+            // Handle template parameters: if a bare unqualified name matches a template param,
+            // treat it as matching any typeof and keep it in the result (it represents the narrowed bound)
+            Atomic::TNamedObject { fqcn, type_params }
+                if type_params.is_empty()
+                    && !fqcn.contains('\\')
+                    && template_param_names.contains(fqcn.as_ref()) =>
+            {
+                // Keep the template parameter in the result — it will be constrained by the instanceof check
+                result.add_type(narrowed_ty.clone());
             }
             Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
             _ => {}
