@@ -142,7 +142,17 @@ impl Context {
         inside_constructor: bool,
         is_static: bool,
     ) -> Self {
-        Self::for_method_with_templates(params, return_type, self_fqcn, parent_fqcn, static_fqcn, strict_types, inside_constructor, is_static, None)
+        Self::for_method_with_templates(
+            params,
+            return_type,
+            self_fqcn,
+            parent_fqcn,
+            static_fqcn,
+            strict_types,
+            inside_constructor,
+            is_static,
+            None,
+        )
     }
 
     /// Like `for_method` but also accepts template parameters.
