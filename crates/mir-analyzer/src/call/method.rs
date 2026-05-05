@@ -336,7 +336,9 @@ fn resolve_method_return<'a, 'arena, 'src>(
                 .params
                 .iter()
                 .map(|p| FnParam {
-                    ty: p.ty.as_ref().map(|t| t.substitute_templates(&bindings)),
+                    ty: mir_codebase::wrap_param_type(
+                        p.ty.as_ref().map(|t| t.substitute_templates(&bindings)),
+                    ),
                     ..p.clone()
                 })
                 .collect();

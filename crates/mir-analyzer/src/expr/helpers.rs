@@ -144,7 +144,7 @@ pub(crate) fn ast_params_to_fn_params_resolved<'arena, 'src>(
                 .map(|u| resolve_named_objects_in_union(u, db, file));
             mir_codebase::FnParam {
                 name: p.name.trim_start_matches('$').into(),
-                ty,
+                ty: mir_codebase::wrap_param_type(ty),
                 default: p.default.as_ref().map(|_| Union::mixed()),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,

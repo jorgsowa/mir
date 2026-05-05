@@ -5,6 +5,99 @@ use mir_types::Union;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
+// Interned common types for deduplication
+// ---------------------------------------------------------------------------
+
+/// Interned Union types for common parameter/property types.
+/// Deduplicates allocations when thousands of parameters share types like `string`, `int`, etc.
+mod interned_types {
+    use super::*;
+    use std::sync::OnceLock;
+
+    fn intern_string() -> Arc<Union> {
+        Arc::new(Union::string())
+    }
+
+    fn intern_int() -> Arc<Union> {
+        Arc::new(Union::int())
+    }
+
+    fn intern_float() -> Arc<Union> {
+        Arc::new(Union::float())
+    }
+
+    fn intern_bool() -> Arc<Union> {
+        Arc::new(Union::bool())
+    }
+
+    fn intern_mixed() -> Arc<Union> {
+        Arc::new(Union::mixed())
+    }
+
+    fn intern_null() -> Arc<Union> {
+        Arc::new(Union::null())
+    }
+
+    fn intern_void() -> Arc<Union> {
+        Arc::new(Union::void())
+    }
+
+    static STRING: OnceLock<Arc<Union>> = OnceLock::new();
+    static INT: OnceLock<Arc<Union>> = OnceLock::new();
+    static FLOAT: OnceLock<Arc<Union>> = OnceLock::new();
+    static BOOL: OnceLock<Arc<Union>> = OnceLock::new();
+    static MIXED: OnceLock<Arc<Union>> = OnceLock::new();
+    static NULL: OnceLock<Arc<Union>> = OnceLock::new();
+    static VOID: OnceLock<Arc<Union>> = OnceLock::new();
+
+    pub fn string() -> Arc<Union> {
+        STRING.get_or_init(intern_string).clone()
+    }
+
+    pub fn int() -> Arc<Union> {
+        INT.get_or_init(intern_int).clone()
+    }
+
+    pub fn float() -> Arc<Union> {
+        FLOAT.get_or_init(intern_float).clone()
+    }
+
+    pub fn bool() -> Arc<Union> {
+        BOOL.get_or_init(intern_bool).clone()
+    }
+
+    pub fn mixed() -> Arc<Union> {
+        MIXED.get_or_init(intern_mixed).clone()
+    }
+
+    pub fn null() -> Arc<Union> {
+        NULL.get_or_init(intern_null).clone()
+    }
+
+    pub fn void() -> Arc<Union> {
+        VOID.get_or_init(intern_void).clone()
+    }
+
+    /// Try to intern a Union if it matches a common type, otherwise wrap in Arc.
+    pub fn intern_or_wrap(union: Union) -> Arc<Union> {
+        // Check if this is a single-atomic type that we intern
+        if union.types.len() == 1 && !union.possibly_undefined && !union.from_docblock {
+            match &union.types[0] {
+                mir_types::Atomic::TString => return string(),
+                mir_types::Atomic::TInt => return int(),
+                mir_types::Atomic::TFloat => return float(),
+                mir_types::Atomic::TBool => return bool(),
+                mir_types::Atomic::TMixed => return mixed(),
+                mir_types::Atomic::TNull => return null(),
+                mir_types::Atomic::TVoid => return void(),
+                _ => {}
+            }
+        }
+        Arc::new(union)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Shared primitives
 // ---------------------------------------------------------------------------
 
@@ -43,11 +136,39 @@ pub struct TemplateParam {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FnParam {
     pub name: Arc<str>,
-    pub ty: Option<Union>,
+    /// Parameter type. Stored as `Option<Arc<Union>>` to enable deduplication of
+    /// common types across parameters. Many parameters share types like `string`,
+    /// `int`, `bool`, etc., so interning via Arc saves allocations.
+    #[serde(
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub ty: Option<Arc<Union>>,
     pub default: Option<Union>,
     pub is_variadic: bool,
     pub is_byref: bool,
     pub is_optional: bool,
+}
+
+// Serde helpers to transparently convert between Option<Union> and Option<Arc<Union>>
+fn deserialize_param_type<'de, D>(deserializer: D) -> Result<Option<Arc<Union>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<Union>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
+}
+
+fn serialize_param_type<S>(value: &Option<Arc<Union>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let opt = value.as_ref().map(|arc| (**arc).clone());
+    opt.serialize(serializer)
+}
+
+/// Helper to wrap Option<Union> in interned Arc<Union>.
+pub fn wrap_param_type(ty: Option<Union>) -> Option<Arc<Union>> {
+    ty.map(interned_types::intern_or_wrap)
 }
 
 // ---------------------------------------------------------------------------

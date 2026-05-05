@@ -44,7 +44,7 @@ impl DefinitionCollector<'_> {
                 });
             params.push(FnParam {
                 name: p.name.into(),
-                ty,
+                ty: mir_codebase::wrap_param_type(ty),
                 default: p.default.as_ref().map(|_| Union::mixed()),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,

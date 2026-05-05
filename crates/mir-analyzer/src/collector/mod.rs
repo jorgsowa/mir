@@ -308,7 +308,7 @@ impl<'a> DefinitionCollector<'a> {
                     };
                     FnParam {
                         name: Arc::from(p.name.as_str()),
-                        ty,
+                        ty: mir_codebase::wrap_param_type(ty),
                         default: if p.is_optional {
                             Some(Union::mixed())
                         } else {
@@ -578,7 +578,7 @@ impl<'a> DefinitionCollector<'a> {
                 });
             params.push(FnParam {
                 name: p.name.into(),
-                ty,
+                ty: mir_codebase::wrap_param_type(ty),
                 default: p.default.as_ref().map(|_| Union::mixed()),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,

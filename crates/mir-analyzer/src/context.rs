@@ -146,7 +146,10 @@ impl Context {
         ctx.inside_constructor = inside_constructor;
 
         for p in params {
-            let elem_ty = p.ty.clone().unwrap_or_else(Union::mixed);
+            let elem_ty =
+                p.ty.as_ref()
+                    .map(|arc| (**arc).clone())
+                    .unwrap_or_else(Union::mixed);
             // Variadic params like `Type ...$name` are accessed as `list<Type>` in the body.
             // If the docblock already provides a list/array collection type, don't double-wrap.
             let ty = if p.is_variadic {
