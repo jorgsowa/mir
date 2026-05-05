@@ -73,7 +73,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::Mod
             | BinaryOp::Pow => infer_arithmetic(&left_ty, &right_ty),
 
-            BinaryOp::Concat => Union::single(Atomic::TString),
+            BinaryOp::Concat => {
+                self.check_implicit_to_string_cast(&left_ty, b.left.span);
+                self.check_implicit_to_string_cast(&right_ty, b.right.span);
+                Union::single(Atomic::TString)
+            }
 
             BinaryOp::Equal
             | BinaryOp::NotEqual
@@ -103,6 +107,25 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             BinaryOp::Pipe => right_ty,
             BinaryOp::Instanceof => Union::single(Atomic::TBool),
+        }
+    }
+
+    fn check_implicit_to_string_cast(&mut self, ty: &Union, span: Span) {
+        for atomic in &ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                let fqcn_str = fqcn.as_ref();
+                if crate::db::lookup_method_in_chain(self.db, fqcn_str, "__toString").is_none()
+                    && !crate::db::extends_or_implements_via_db(self.db, fqcn_str, "Stringable")
+                {
+                    self.emit(
+                        IssueKind::ImplicitToStringCast {
+                            class: fqcn_str.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+            }
         }
     }
 }

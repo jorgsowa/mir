@@ -94,7 +94,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
                 for part in parts.iter() {
                     if let php_ast::StringPart::Expr(e) = part {
-                        self.analyze(e, ctx);
+                        let expr_ty = self.analyze(e, ctx);
+                        self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                     }
                 }
                 Union::single(Atomic::TString)
@@ -150,7 +151,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- print ------------------------------------------------------
             ExprKind::Print(inner) => {
-                self.analyze(inner, ctx);
+                let expr_ty = self.analyze(inner, ctx);
+                self.check_interpolation_implicit_to_string_cast(&expr_ty, inner.span);
                 Union::single(Atomic::TLiteralInt(1))
             }
 
@@ -363,6 +365,25 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         self.issues.add(issue);
+    }
+
+    fn check_interpolation_implicit_to_string_cast(&mut self, ty: &Union, span: php_ast::Span) {
+        for atomic in &ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                let fqcn_str = fqcn.as_ref();
+                if crate::db::lookup_method_in_chain(self.db, fqcn_str, "__toString").is_none()
+                    && !crate::db::extends_or_implements_via_db(self.db, fqcn_str, "Stringable")
+                {
+                    self.emit(
+                        IssueKind::ImplicitToStringCast {
+                            class: fqcn_str.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+            }
+        }
     }
 }
 
