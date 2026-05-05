@@ -666,7 +666,7 @@ impl<'a> DefinitionCollector<'a> {
         Some(MethodStorage {
             name: m.name.into(),
             fqcn: class_fqcn.into(),
-            params,
+            params: Arc::from(params.into_boxed_slice()),
             return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             visibility: Self::convert_visibility(m.visibility),
