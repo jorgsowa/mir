@@ -1158,8 +1158,14 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
 // collect_file_definitions tracked query (S1)
 // ---------------------------------------------------------------------------
 
-#[salsa::tracked]
-pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileDefinitions {
+/// Uncached version of collect_file_definitions for bulk operations like vendor
+/// collection, where we don't need Salsa to cache the intermediate StubSlice
+/// results. This avoids holding Arc<StubSlice> in Salsa's query cache after
+/// ingestion.
+pub fn collect_file_definitions_uncached(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+) -> FileDefinitions {
     let path = file.path(db);
     let text = file.text(db);
 
@@ -1194,6 +1200,11 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
         slice: Arc::new(slice),
         issues: Arc::new(all_issues),
     }
+}
+
+#[salsa::tracked]
+pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileDefinitions {
+    collect_file_definitions_uncached(db, file)
 }
 
 // ---------------------------------------------------------------------------

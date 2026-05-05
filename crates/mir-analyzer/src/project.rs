@@ -8,7 +8,10 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
-use crate::db::{collect_file_definitions, FileDefinitions, MirDatabase, MirDb, SourceFile};
+use crate::db::{
+    collect_file_definitions, collect_file_definitions_uncached, FileDefinitions, MirDatabase,
+    MirDb, SourceFile,
+};
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use mir_issues::Issue;
@@ -939,7 +942,7 @@ impl ProjectAnalyzer {
         let file_defs: Vec<FileDefinitions> = source_files
             .par_iter()
             .map_with(db_pass1, |db, salsa_file| {
-                collect_file_definitions(&*db, *salsa_file)
+                collect_file_definitions_uncached(&*db, *salsa_file)
             })
             .collect();
 
