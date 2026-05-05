@@ -167,7 +167,12 @@ pub fn narrow_from_condition<'arena, 'src>(
                     let class_name = crate::db::resolve_name_via_db(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
                     let narrowed = if effective_is_true {
-                        narrow_instanceof_preserving_subtypes(&current, &class_name, db, &ctx.template_param_names)
+                        narrow_instanceof_preserving_subtypes(
+                            &current,
+                            &class_name,
+                            db,
+                            &ctx.template_param_names,
+                        )
                     } else {
                         filter_out_instanceof_match(&current, &class_name, db)
                     };
@@ -384,7 +389,12 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                 // Narrow to the union of all instanceof types: take union of narrow_instanceof results
                 let mut narrowed = Union::empty();
                 for cn in &class_names {
-                    let n = narrow_instanceof_preserving_subtypes(&current, cn, db, &ctx.template_param_names);
+                    let n = narrow_instanceof_preserving_subtypes(
+                        &current,
+                        cn,
+                        db,
+                        &ctx.template_param_names,
+                    );
                     narrowed = Union::merge(&narrowed, &n);
                 }
                 // Fall back to current if narrowed is empty (e.g. mixed)

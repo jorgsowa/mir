@@ -454,26 +454,27 @@ impl<'a> Pass2Driver<'a> {
 
         let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), fn_name);
         let fqn = node_opt.map(|n| n.fqn(self.db));
-        let (params, return_ty, template_params): (Vec<mir_codebase::FnParam>, _, Vec<_>) = match node_opt {
-            Some(n) => {
-                let stored = n.params(self.db);
-                if stored.len() == decl.params.len()
-                    && stored
-                        .iter()
-                        .zip(decl.params.iter())
-                        .all(|(cp, ap)| cp.name.as_ref() == ap.name)
-                {
-                    (
-                        stored.to_vec(),
-                        n.return_type(self.db).map(|t| (*t).clone()),
-                        n.template_params(self.db).to_vec(),
-                    )
-                } else {
-                    (ast_derived_fn_params(&decl.params), None, vec![])
+        let (params, return_ty, template_params): (Vec<mir_codebase::FnParam>, _, Vec<_>) =
+            match node_opt {
+                Some(n) => {
+                    let stored = n.params(self.db);
+                    if stored.len() == decl.params.len()
+                        && stored
+                            .iter()
+                            .zip(decl.params.iter())
+                            .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+                    {
+                        (
+                            stored.to_vec(),
+                            n.return_type(self.db).map(|t| (*t).clone()),
+                            n.template_params(self.db).to_vec(),
+                        )
+                    } else {
+                        (ast_derived_fn_params(&decl.params), None, vec![])
+                    }
                 }
-            }
-            None => (ast_derived_fn_params(&decl.params), None, vec![]),
-        };
+                None => (ast_derived_fn_params(&decl.params), None, vec![]),
+            };
 
         let mut ctx = Context::for_method_with_templates(
             &params,
@@ -565,15 +566,16 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty, template_params) = crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
-                .map(|n| {
-                    (
-                        n.params(self.db).to_vec(),
-                        n.return_type(self.db).map(|t| (*t).clone()),
-                        n.template_params(self.db).to_vec(),
-                    )
-                })
-                .unwrap_or_default();
+            let (params, return_ty, template_params) =
+                crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                    .map(|n| {
+                        (
+                            n.params(self.db).to_vec(),
+                            n.return_type(self.db).map(|t| (*t).clone()),
+                            n.template_params(self.db).to_vec(),
+                        )
+                    })
+                    .unwrap_or_default();
 
             let is_ctor = method.name == "__construct";
             let mut ctx = Context::for_method_with_templates(
