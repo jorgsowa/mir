@@ -74,7 +74,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: p.name.clone(),
-                ty: p.ty.clone(),
+                ty: p.ty.as_ref().map(|arc| (**arc).clone()),
                 default: p.default.clone(),
                 is_variadic: p.is_variadic,
                 is_byref: p.is_byref,
@@ -145,7 +145,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: p.name.clone(),
-                ty: p.ty.clone(),
+                ty: p.ty.as_ref().map(|arc| (**arc).clone()),
                 default: p.default.clone(),
                 is_variadic: p.is_variadic,
                 is_byref: p.is_byref,
