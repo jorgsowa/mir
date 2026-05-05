@@ -2,7 +2,7 @@ use super::DefinitionCollector;
 use crate::parser::{name_to_string, type_from_hint};
 use mir_codebase::storage::{ConstantStorage, PropertyStorage, TemplateParam};
 use mir_codebase::ClassStorage;
-use mir_types::{intern, Atomic};
+use mir_types::Atomic;
 use php_ast::ast::{ClassDecl, ClassMemberKind};
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -23,11 +23,11 @@ impl<'a> DefinitionCollector<'a> {
         let parent = decl
             .extends
             .as_ref()
-            .map(|n| intern(&self.resolve_name(&name_to_string(n))));
+            .map(|n| self.resolve_name(&name_to_string(n)).into());
         let interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
-            .map(|n| intern(&self.resolve_name(&name_to_string(n))))
+            .map(|n| self.resolve_name(&name_to_string(n)).into())
             .collect();
 
         let mut own_methods = indexmap::IndexMap::new();
@@ -86,7 +86,10 @@ impl<'a> DefinitionCollector<'a> {
                     if let Some(method) =
                         self.build_method_storage(m, &fqcn, Some(&member.span), Some(&type_aliases))
                     {
-                        own_methods.insert(intern(&method.name.to_lowercase()), Arc::new(method));
+                        own_methods.insert(
+                            Arc::from(method.name.to_lowercase().as_str()),
+                            Arc::new(method),
+                        );
                     }
                 }
                 ClassMemberKind::Property(p) => {
@@ -152,7 +155,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        trait_uses.push(intern(&self.resolve_name(&name_to_string(t))));
+                        trait_uses.push(self.resolve_name(&name_to_string(t)).into());
                     }
                 }
             }
@@ -171,9 +174,9 @@ impl<'a> DefinitionCollector<'a> {
             .templates
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
-                name: intern(name.as_str()),
+                name: name.as_str().into(),
                 bound: bound.clone(),
-                defining_entity: intern(&fqcn),
+                defining_entity: fqcn.as_str().into(),
                 variance: *variance,
             })
             .collect();
@@ -214,8 +217,8 @@ impl<'a> DefinitionCollector<'a> {
             .collect();
 
         let storage = ClassStorage {
-            fqcn: intern(&fqcn),
-            short_name: intern(&short_name),
+            fqcn: fqcn.clone().into(),
+            short_name: short_name.into(),
             parent,
             interfaces,
             traits: trait_uses,
@@ -225,7 +228,7 @@ impl<'a> DefinitionCollector<'a> {
             mixins: class_doc
                 .mixins
                 .iter()
-                .map(|m| self.resolve_type_name(&intern(m.as_str()), true))
+                .map(|m| self.resolve_type_name(&Arc::from(m.as_str()), true))
                 .collect(),
             template_params,
             extends_type_args,
@@ -233,22 +236,22 @@ impl<'a> DefinitionCollector<'a> {
             is_abstract: decl.modifiers.is_abstract,
             is_final: decl.modifiers.is_final,
             is_readonly: decl.modifiers.is_readonly,
-            deprecated: class_doc.deprecated.as_deref().map(intern),
+            deprecated: class_doc.deprecated.as_deref().map(Arc::from),
             is_internal: class_doc.is_internal,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             type_aliases: type_aliases
                 .iter()
-                .map(|(k, v)| (intern(k.as_str()), v.clone()))
+                .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
                 .collect(),
             pending_import_types: class_doc
                 .import_types
                 .iter()
                 .map(|imp| {
                     let from_resolved =
-                        self.resolve_type_name(&intern(imp.from_class.as_str()), true);
+                        self.resolve_type_name(&Arc::from(imp.from_class.as_str()), true);
                     (
-                        intern(imp.local.as_str()),
-                        intern(imp.original.as_str()),
+                        Arc::from(imp.local.as_str()),
+                        Arc::from(imp.original.as_str()),
                         from_resolved,
                     )
                 })

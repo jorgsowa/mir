@@ -17,7 +17,7 @@ use mir_codebase::storage::{
     Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
-use mir_types::{intern, Union};
+use mir_types::Union;
 
 mod annotation;
 mod class;
@@ -100,7 +100,7 @@ impl<'a> DefinitionCollector<'a> {
     /// ensure the slice carries the complete data.
     fn finalize_slice(&mut self) {
         if let Some(ns) = self.first_namespace.take() {
-            self.slice.namespace = Some(intern(&ns));
+            self.slice.namespace = Some(Arc::from(ns.as_str()));
         }
         if !self.accumulated_imports.is_empty() {
             self.slice.imports = std::mem::take(&mut self.accumulated_imports);
@@ -127,9 +127,7 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     fn resolve_type_name(&self, name: &Arc<str>, full_qualify: bool) -> Arc<str> {
-        let resolved =
-            resolution::resolve_type_name(name, full_qualify, &self.namespace, &self.use_aliases);
-        intern(&resolved)
+        resolution::resolve_type_name(name, full_qualify, &self.namespace, &self.use_aliases)
     }
 
     fn fill_self_static_parent(union: Union, class_fqcn: &str) -> Union {
@@ -264,11 +262,10 @@ impl<'a> DefinitionCollector<'a> {
                 parsed.from_docblock = true;
                 Some(self.resolve_union_doc_with_aliases(parsed, aliases))
             };
-            let name = intern(prop.name.as_str());
             own_properties.insert(
-                name.clone(),
+                Arc::from(prop.name.as_str()),
                 PropertyStorage {
-                    name,
+                    name: Arc::from(prop.name.as_str()),
                     ty,
                     inferred_ty: None,
                     visibility: Visibility::Public,
@@ -284,7 +281,7 @@ impl<'a> DefinitionCollector<'a> {
             if method.name.is_empty() {
                 continue;
             }
-            let key = intern(&method.name.to_lowercase());
+            let key = Arc::from(method.name.to_lowercase().as_str());
             if own_methods.contains_key(&key) {
                 continue;
             }
@@ -310,7 +307,7 @@ impl<'a> DefinitionCollector<'a> {
                         Some(self.resolve_union_doc_with_aliases(parsed, aliases))
                     };
                     FnParam {
-                        name: intern(p.name.as_str()),
+                        name: Arc::from(p.name.as_str()),
                         ty,
                         default: if p.is_optional {
                             Some(Union::mixed())
@@ -326,8 +323,8 @@ impl<'a> DefinitionCollector<'a> {
             own_methods.insert(
                 key,
                 Arc::new(MethodStorage {
-                    name: intern(method.name.as_str()),
-                    fqcn: intern(class_fqcn),
+                    name: Arc::from(method.name.as_str()),
+                    fqcn: Arc::from(class_fqcn),
                     params,
                     return_type,
                     inferred_return_type: None,
@@ -394,7 +391,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 self.slice
                     .global_vars
-                    .push((intern(name), resolved_ty.clone()));
+                    .push((Arc::from(name), resolved_ty.clone()));
             }
         }
     }
@@ -580,7 +577,7 @@ impl<'a> DefinitionCollector<'a> {
                     )
                 });
             params.push(FnParam {
-                name: intern(p.name),
+                name: p.name.into(),
                 ty,
                 default: p.default.as_ref().map(|_| Union::mixed()),
                 is_variadic: p.variadic,
@@ -605,16 +602,16 @@ impl<'a> DefinitionCollector<'a> {
             .templates
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
-                name: intern(name.as_str()),
+                name: name.as_str().into(),
                 bound: bound.clone(),
-                defining_entity: intern(class_fqcn),
+                defining_entity: class_fqcn.into(),
                 variance: *variance,
             })
             .collect();
 
         Some(MethodStorage {
-            name: intern(m.name),
-            fqcn: intern(class_fqcn),
+            name: m.name.into(),
+            fqcn: class_fqcn.into(),
             params,
             return_type,
             inferred_return_type: None,
@@ -625,8 +622,8 @@ impl<'a> DefinitionCollector<'a> {
             is_constructor: m.name == "__construct",
             template_params,
             assertions: self.build_assertions(&doc),
-            throws: doc.throws.iter().map(|t| intern(t.as_str())).collect(),
-            deprecated: doc.deprecated.as_deref().map(intern),
+            throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
+            deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
             location: span.map(|s| self.location(s.start, s.end)),

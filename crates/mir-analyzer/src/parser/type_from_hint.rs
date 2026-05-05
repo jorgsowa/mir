@@ -1,6 +1,4 @@
-use mir_types::{
-    intern, {Atomic, Union},
-};
+use mir_types::{Atomic, Union};
 /// Convert an AST `TypeHint` node into a `mir_types::Union`.
 use php_ast::ast::{BuiltinType, TypeHint, TypeHintKind};
 
@@ -70,21 +68,21 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Union {
         BuiltinType::False => Union::single(Atomic::TFalse),
         BuiltinType::Self_ => {
             if let Some(fqcn) = context_fqcn {
-                Union::single(Atomic::TSelf { fqcn: intern(fqcn) })
+                Union::single(Atomic::TSelf { fqcn: fqcn.into() })
             } else {
                 Union::single(Atomic::TObject)
             }
         }
         BuiltinType::Parent_ => {
             if let Some(fqcn) = context_fqcn {
-                Union::single(Atomic::TParent { fqcn: intern(fqcn) })
+                Union::single(Atomic::TParent { fqcn: fqcn.into() })
             } else {
                 Union::single(Atomic::TObject)
             }
         }
         BuiltinType::Static => {
             if let Some(fqcn) = context_fqcn {
-                Union::single(Atomic::TStaticObject { fqcn: intern(fqcn) })
+                Union::single(Atomic::TStaticObject { fqcn: fqcn.into() })
             } else {
                 Union::single(Atomic::TObject)
             }
@@ -96,27 +94,27 @@ fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Union {
     match name.to_lowercase().as_str() {
         "self" => {
             if let Some(fqcn) = context_fqcn {
-                Union::single(Atomic::TSelf { fqcn: intern(fqcn) })
+                Union::single(Atomic::TSelf { fqcn: fqcn.into() })
             } else {
                 Union::single(Atomic::TObject)
             }
         }
         "parent" => {
             if let Some(fqcn) = context_fqcn {
-                Union::single(Atomic::TParent { fqcn: intern(fqcn) })
+                Union::single(Atomic::TParent { fqcn: fqcn.into() })
             } else {
                 Union::single(Atomic::TObject)
             }
         }
         "static" => {
             if let Some(fqcn) = context_fqcn {
-                Union::single(Atomic::TStaticObject { fqcn: intern(fqcn) })
+                Union::single(Atomic::TStaticObject { fqcn: fqcn.into() })
             } else {
                 Union::single(Atomic::TObject)
             }
         }
         _ => Union::single(Atomic::TNamedObject {
-            fqcn: intern(&normalize_fqcn(name)),
+            fqcn: normalize_fqcn(name).into(),
             type_params: vec![],
         }),
     }
