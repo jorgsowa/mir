@@ -181,19 +181,36 @@ fn return_type_params_compatible(
     true
 }
 
-/// Returns true if the declared return type contains template-like types (unknown FQCNs
-/// without namespace separator that don't exist in the codebase) — we can't validate
-/// return types against generic type parameters without full template instantiation.
+/// Returns true if the union recursively contains a `TTemplateParam` anywhere.
+fn union_contains_template(u: &Union) -> bool {
+    u.types.iter().any(|a| match a {
+        Atomic::TTemplateParam { .. } => true,
+        Atomic::TNamedObject { type_params, .. } => type_params.iter().any(union_contains_template),
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            union_contains_template(key) || union_contains_template(value)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => union_contains_template(value),
+        _ => false,
+    })
+}
+
+/// Returns true when the declared return type cannot be validated without full template
+/// instantiation (bare template params, unknown types, or interfaces whose implementations
+/// satisfy the type in ways we don't track).
+///
+/// Concrete generic instantiations like `Result<string, void>` are NOT bailed on — their
+/// type arguments are concrete and `named_object_return_compatible` handles them.
 pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabase) -> bool {
     declared.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
-        // Generic class instantiation (e.g. Result<string, void>) — skip without full template inference.
-        // Also skip when the named class doesn't exist in the codebase (e.g. type aliases
-        // that were resolved to a fully-qualified name but aren't real classes).
-        // Also skip when the type is an interface — concrete implementations may satisfy the
+        // Skip when the named class doesn't exist in the codebase (e.g. type aliases
+        // resolved to a fully-qualified name that isn't a real class).
+        // Skip when the type is an interface — concrete implementations may satisfy the
         // declared type in ways we don't track (not flagged at default error level).
+        // Skip when any type argument itself contains a template param — those require
+        // substitution context we don't have at the return-site.
         Atomic::TNamedObject { fqcn, type_params } => {
-            !type_params.is_empty()
+            type_params.iter().any(union_contains_template)
                 || !crate::db::type_exists_via_db(db, fqcn.as_ref())
                 || crate::db::class_kind_via_db(db, fqcn.as_ref()).is_some_and(|k| k.is_interface)
         }

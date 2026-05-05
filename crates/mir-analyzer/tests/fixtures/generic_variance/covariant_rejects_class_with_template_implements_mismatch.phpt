@@ -16,5 +16,3 @@ function test(): void {
 }
 ===expect===
 InvalidArgument@12:21: Argument $source of acceptsDogSource() expects 'Source<Dog>', got 'Source<Cat>'
-===ignore===
-TODO

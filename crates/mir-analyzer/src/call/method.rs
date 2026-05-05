@@ -316,11 +316,37 @@ fn resolve_method_return<'a, 'arena, 'src>(
             .iter()
             .map(|a| expr_can_be_passed_by_reference(&a.value))
             .collect();
+        // Build class-level template bindings before arg-checking so we can substitute
+        // template params (e.g. T → int from Box<int>) into param types.
+        let class_tps = crate::db::class_template_params_via_db(ea.db, fqcn)
+            .map(|tps| tps.to_vec())
+            .unwrap_or_default();
+        let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
+        for (k, v) in crate::db::inherited_template_bindings_via_db(ea.db, fqcn) {
+            bindings.entry(k).or_insert(v);
+        }
+
+        // Substitute class bindings into param types so argument checking resolves T → int etc.
+        let substituted_params: Vec<FnParam>;
+        let effective_params: &[FnParam] = if bindings.is_empty() {
+            &resolved.params
+        } else {
+            substituted_params = resolved
+                .params
+                .iter()
+                .map(|p| FnParam {
+                    ty: p.ty.as_ref().map(|t| t.substitute_templates(&bindings)),
+                    ..p.clone()
+                })
+                .collect();
+            &substituted_params
+        };
+
         check_args(
             ea,
             CheckArgsParams {
                 fn_name: method_name,
-                params: &resolved.params,
+                params: effective_params,
                 arg_types,
                 arg_spans,
                 arg_names: &arg_names,
@@ -331,14 +357,6 @@ fn resolve_method_return<'a, 'arena, 'src>(
         );
 
         let ret_raw = substitute_static_in_return(resolved.return_ty_raw, fqcn);
-
-        let class_tps = crate::db::class_template_params_via_db(ea.db, fqcn)
-            .map(|tps| tps.to_vec())
-            .unwrap_or_default();
-        let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
-        for (k, v) in crate::db::inherited_template_bindings_via_db(ea.db, fqcn) {
-            bindings.entry(k).or_insert(v);
-        }
 
         if !resolved.template_params.is_empty() {
             let method_bindings =

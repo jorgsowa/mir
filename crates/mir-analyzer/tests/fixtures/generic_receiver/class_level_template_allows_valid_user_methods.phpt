@@ -17,5 +17,3 @@ function test(): void {
     $first->getName();
 }
 ===expect===
-===ignore===
-TODO
