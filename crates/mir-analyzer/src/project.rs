@@ -948,6 +948,7 @@ impl ProjectAnalyzer {
         for defs in file_defs {
             db.ingest_stub_slice(&defs.slice);
         }
+        drop(guard);
     }
 }
 

@@ -485,12 +485,65 @@ fn bench_vendor_collection_detailed(_c: &mut Criterion) {
     eprintln!();
 }
 
+/// Full analysis with detailed phase breakdown.
+fn bench_full_analysis_detailed(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+
+    let (vendor_files, project_files) = split_vendor_project(&root);
+
+    eprintln!("\n=== FULL ANALYSIS DETAILED PROFILING ===\n");
+
+    reset_alloc_counters();
+    let analyzer = ProjectAnalyzer::new();
+    checkpoint_alloc("After analyzer::new()");
+
+    analyzer.load_stubs();
+    checkpoint_alloc("After load_stubs()");
+
+    analyzer.collect_types_only(&vendor_files);
+    checkpoint_alloc("After collect_types_only() - VENDOR COLLECTION");
+
+    let _ = analyzer.analyze(&project_files);
+    checkpoint_alloc("After analyze() - FULL ANALYSIS COMPLETE");
+
+    eprintln!();
+}
+
+/// Vendor collection with finer-grained breakdown (file parsing vs ingestion).
+fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+
+    let vendor_files = ProjectAnalyzer::discover_files(&root.join("vendor"));
+    eprintln!("\n=== VENDOR COLLECTION PHASE BREAKDOWN ===\n");
+    eprintln!("  {} vendor files to collect\n", vendor_files.len());
+
+    reset_alloc_counters();
+    {
+        let analyzer = ProjectAnalyzer::new();
+        analyzer.load_stubs();
+        checkpoint_alloc("After load_stubs()");
+
+        // Just loading and parsing files (no ingestion yet)
+        analyzer.collect_types_only(&vendor_files);
+        checkpoint_alloc("After collect_types_only() [parse + ingest complete]");
+    }
+    eprintln!();
+}
+
 criterion_group!(
     benches,
     bench_full_analysis,
     bench_reanalysis,
     bench_reanalysis_project_only,
     bench_vendor_collection,
-    bench_vendor_collection_detailed
+    bench_vendor_collection_detailed,
+    bench_full_analysis_detailed,
+    bench_vendor_collection_phase_breakdown
 );
 criterion_main!(benches);
