@@ -13,8 +13,8 @@ use php_ast::visitor::Visitor;
 use crate::parser::{name_to_string, type_from_hint};
 use crate::php_version::PhpVersion;
 use mir_codebase::storage::{
-    Assertion, FnParam, Location, MethodStorage, PropertyStorage, StubSlice, TemplateParam,
-    Visibility,
+    wrap_return_type, Assertion, FnParam, Location, MethodStorage, PropertyStorage, StubSlice,
+    TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
 use mir_types::Union;
@@ -285,7 +285,7 @@ impl<'a> DefinitionCollector<'a> {
             if own_methods.contains_key(&key) {
                 continue;
             }
-            let return_type = if method.return_type.is_empty() {
+            let return_type_opt = if method.return_type.is_empty() {
                 None
             } else {
                 let mut parsed = crate::parser::docblock::parse_type_string(&method.return_type);
@@ -326,7 +326,7 @@ impl<'a> DefinitionCollector<'a> {
                     name: Arc::from(method.name.as_str()),
                     fqcn: Arc::from(class_fqcn),
                     params,
-                    return_type,
+                    return_type: wrap_return_type(return_type_opt),
                     inferred_return_type: None,
                     visibility: Visibility::Public,
                     is_static: method.is_static,
@@ -613,7 +613,7 @@ impl<'a> DefinitionCollector<'a> {
             name: m.name.into(),
             fqcn: class_fqcn.into(),
             params,
-            return_type,
+            return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             visibility: Self::convert_visibility(m.visibility),
             is_static: m.is_static,

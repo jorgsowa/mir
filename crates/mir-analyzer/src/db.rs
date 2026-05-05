@@ -1786,7 +1786,7 @@ impl MirDb {
                 fqcn: en.fqcn.clone(),
                 name: Arc::from(name),
                 params: vec![],
-                return_type: Some(Union::mixed()),
+                return_type: Some(Arc::new(Union::mixed())),
                 inferred_return_type: None,
                 visibility: Visibility::Public,
                 is_static: true,
@@ -1998,7 +1998,7 @@ impl MirDb {
                 && node.short_name(self) == storage.short_name
                 && node.is_pure(self) == storage.is_pure
                 && node.deprecated(self) == storage.deprecated
-                && node.return_type(self).as_deref() == storage.return_type.as_ref()
+                && node.return_type(self).as_deref() == storage.return_type.as_deref()
                 && node.location(self) == storage.location
                 && *node.params(self) == *storage.params.as_slice()
                 && *node.template_params(self) == *storage.template_params.as_slice()
@@ -2011,8 +2011,7 @@ impl MirDb {
             node.set_short_name(self).to(storage.short_name.clone());
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
-            node.set_return_type(self)
-                .to(storage.return_type.as_ref().map(|t| Arc::new(t.clone())));
+            node.set_return_type(self).to(storage.return_type.clone());
             node.set_template_params(self)
                 .to(Arc::from(storage.template_params.as_slice()));
             node.set_assertions(self)
@@ -2030,7 +2029,7 @@ impl MirDb {
                 storage.short_name.clone(),
                 true,
                 Arc::from(storage.params.as_slice()),
-                storage.return_type.as_ref().map(|t| Arc::new(t.clone())),
+                storage.return_type.clone(),
                 storage
                     .inferred_return_type
                     .as_ref()
@@ -2132,7 +2131,7 @@ impl MirDb {
                 && node.is_constructor(self) == storage.is_constructor
                 && node.is_pure(self) == storage.is_pure
                 && node.deprecated(self) == storage.deprecated
-                && node.return_type(self).as_deref() == storage.return_type.as_ref()
+                && node.return_type(self).as_deref() == storage.return_type.as_deref()
                 && node.location(self) == storage.location
                 && *node.params(self) == *storage.params.as_slice()
                 && *node.template_params(self) == *storage.template_params.as_slice()
@@ -2144,8 +2143,7 @@ impl MirDb {
             node.set_active(self).to(true);
             node.set_params(self)
                 .to(Arc::from(storage.params.as_slice()));
-            node.set_return_type(self)
-                .to(storage.return_type.as_ref().map(|t| Arc::new(t.clone())));
+            node.set_return_type(self).to(storage.return_type.clone());
             node.set_template_params(self)
                 .to(Arc::from(storage.template_params.as_slice()));
             node.set_assertions(self)
@@ -2169,7 +2167,7 @@ impl MirDb {
                 storage.name.clone(),
                 true,
                 Arc::from(storage.params.as_slice()),
-                storage.return_type.as_ref().map(|t| Arc::new(t.clone())),
+                storage.return_type.clone(),
                 storage
                     .inferred_return_type
                     .as_ref()
