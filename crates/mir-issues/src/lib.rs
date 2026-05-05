@@ -296,6 +296,9 @@ pub enum IssueKind {
     MissingThrowsDocblock {
         class: String,
     },
+    ImplicitToStringCast {
+        class: String,
+    },
     ParseError {
         message: String,
     },
@@ -380,6 +383,7 @@ impl IssueKind {
             | IssueKind::InvalidOperand { .. }
             | IssueKind::OverriddenMethodAccess { .. }
             | IssueKind::MissingThrowsDocblock { .. }
+            | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::UnusedVariable { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -488,6 +492,7 @@ impl IssueKind {
             IssueKind::MissingParamType { .. } => "MissingParamType",
             IssueKind::InvalidThrow { .. } => "InvalidThrow",
             IssueKind::MissingThrowsDocblock { .. } => "MissingThrowsDocblock",
+            IssueKind::ImplicitToStringCast { .. } => "ImplicitToStringCast",
             IssueKind::ParseError { .. } => "ParseError",
             IssueKind::InvalidDocblock { .. } => "InvalidDocblock",
             IssueKind::MixedArgument { .. } => "MixedArgument",
@@ -754,6 +759,9 @@ impl IssueKind {
             }
             IssueKind::MissingThrowsDocblock { class } => {
                 format!("Exception {class} is thrown but not declared in @throws")
+            }
+            IssueKind::ImplicitToStringCast { class } => {
+                format!("Class {class} does not implement __toString()")
             }
             IssueKind::ParseError { message } => format!("Parse error: {message}"),
             IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),
