@@ -567,8 +567,16 @@ fn substitute_in_fn_param(
 ) -> crate::atomic::FnParam {
     crate::atomic::FnParam {
         name: p.name.clone(),
-        ty: p.ty.as_ref().map(|t| t.substitute_templates(bindings)),
-        default: p.default.as_ref().map(|d| d.substitute_templates(bindings)),
+        ty: p.ty.as_ref().map(|t| {
+            let u = t.to_union();
+            let substituted = u.substitute_templates(bindings);
+            crate::compact::SimpleType::from_union(substituted)
+        }),
+        default: p.default.as_ref().map(|d| {
+            let u = d.to_union();
+            let substituted = u.substitute_templates(bindings);
+            crate::compact::SimpleType::from_union(substituted)
+        }),
         is_variadic: p.is_variadic,
         is_byref: p.is_byref,
         is_optional: p.is_optional,
@@ -1031,7 +1039,7 @@ mod tests {
         let ty = Union::single(Atomic::TCallable {
             params: Some(vec![FnParam {
                 name: Arc::from("x"),
-                ty: Some(t_param("T")),
+                ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 default: None,
                 is_variadic: false,
                 is_byref: false,
@@ -1048,7 +1056,8 @@ mod tests {
             panic!("expected TCallable");
         };
         let param_ty = params.as_ref().unwrap()[0].ty.as_ref().unwrap();
-        assert!(matches!(param_ty.types[0], Atomic::TString));
+        let param_union = param_ty.to_union();
+        assert!(matches!(param_union.types[0], Atomic::TString));
         let ret = return_type.as_ref().unwrap();
         assert!(matches!(ret.types[0], Atomic::TString));
     }
@@ -1076,8 +1085,8 @@ mod tests {
         let ty = Union::single(Atomic::TClosure {
             params: vec![FnParam {
                 name: Arc::from("a"),
-                ty: Some(t_param("T")),
-                default: Some(t_param("T")),
+                ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
+                default: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 is_variadic: true,
                 is_byref: true,
                 is_optional: true,
@@ -1095,11 +1104,10 @@ mod tests {
             panic!("expected TClosure");
         };
         let p = &params[0];
-        assert!(matches!(p.ty.as_ref().unwrap().types[0], Atomic::TString));
-        assert!(matches!(
-            p.default.as_ref().unwrap().types[0],
-            Atomic::TString
-        ));
+        let ty_union = p.ty.as_ref().unwrap().to_union();
+        let default_union = p.default.as_ref().unwrap().to_union();
+        assert!(matches!(ty_union.types[0], Atomic::TString));
+        assert!(matches!(default_union.types[0], Atomic::TString));
         // flags preserved
         assert!(p.is_variadic);
         assert!(p.is_byref);

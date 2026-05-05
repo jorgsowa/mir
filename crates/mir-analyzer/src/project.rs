@@ -952,6 +952,9 @@ impl ProjectAnalyzer {
             db.ingest_stub_slice(&defs.slice);
         }
         drop(guard);
+
+        // Print profiling statistics for the collection phase.
+        crate::collector::print_collector_stats();
     }
 }
 

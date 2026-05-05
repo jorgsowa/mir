@@ -765,7 +765,7 @@ fn parse_callable_syntax(s: &str) -> Option<Union> {
             };
             mir_types::atomic::FnParam {
                 name: name.into(),
-                ty: Some(parse_type_string(ty_str)),
+                ty: Some(mir_types::SimpleType::from_union(parse_type_string(ty_str))),
                 default: None,
                 is_variadic: false,
                 is_byref: false,

@@ -74,8 +74,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: p.name.clone(),
-                ty: p.ty.as_ref().map(|arc| (**arc).clone()),
-                default: p.default.clone(),
+                ty: p
+                    .ty
+                    .as_ref()
+                    .map(|arc| mir_types::SimpleType::from_union((**arc).clone())),
+                default: if p.has_default {
+                    Some(mir_types::SimpleType::from_union(Union::mixed()))
+                } else {
+                    None
+                },
                 is_variadic: p.is_variadic,
                 is_byref: p.is_byref,
                 is_optional: p.is_optional,
@@ -145,8 +152,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: p.name.clone(),
-                ty: p.ty.as_ref().map(|arc| (**arc).clone()),
-                default: p.default.clone(),
+                ty: p
+                    .ty
+                    .as_ref()
+                    .map(|arc| mir_types::SimpleType::from_union((**arc).clone())),
+                default: if p.has_default {
+                    Some(mir_types::SimpleType::from_union(Union::mixed()))
+                } else {
+                    None
+                },
                 is_variadic: p.is_variadic,
                 is_byref: p.is_byref,
                 is_optional: p.is_optional,

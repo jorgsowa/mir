@@ -1,6 +1,5 @@
 use super::StatementsAnalyzer;
 use crate::context::Context;
-use mir_types::Union;
 use std::sync::Arc;
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -15,7 +14,7 @@ impl<'a> StatementsAnalyzer<'a> {
             .map(|p| mir_codebase::FnParam {
                 name: Arc::from(p.name.trim_start_matches('$')),
                 ty: None,
-                default: p.default.as_ref().map(|_| Union::mixed()),
+                has_default: p.default.is_some(),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
                 is_optional: p.default.is_some() || p.variadic,
@@ -69,7 +68,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             .map(|p| mir_codebase::FnParam {
                                 name: p.name.trim_start_matches('$').into(),
                                 ty: None,
-                                default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
+                                has_default: p.default.is_some(),
                                 is_variadic: p.variadic,
                                 is_byref: p.by_ref,
                                 is_optional: p.default.is_some() || p.variadic,

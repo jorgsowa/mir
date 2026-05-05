@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 /// Pass 1 — Definition collector.
 ///
 /// Visits every top-level declaration in the AST and produces a `StubSlice`
@@ -26,6 +27,50 @@ mod function;
 mod interface;
 mod resolution;
 mod r#trait;
+
+// ---------------------------------------------------------------------------
+// Profiling counters for scalar type frequency
+// ---------------------------------------------------------------------------
+
+pub(crate) static SCALAR_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static COMPLEX_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static PARAM_WITH_DEFAULT: AtomicUsize = AtomicUsize::new(0);
+
+/// Check if a Union is a simple scalar type (for profiling).
+fn is_simple_scalar(u: &Union) -> bool {
+    if u.possibly_undefined || u.from_docblock || u.types.len() != 1 {
+        return false;
+    }
+    use mir_types::atomic::Atomic;
+    matches!(
+        &u.types[0],
+        Atomic::TString
+            | Atomic::TInt
+            | Atomic::TFloat
+            | Atomic::TBool
+            | Atomic::TMixed
+            | Atomic::TNull
+            | Atomic::TVoid
+            | Atomic::TNever
+    )
+}
+
+/// Print profiling statistics for type collection.
+pub(crate) fn print_collector_stats() {
+    let scalar = SCALAR_PARAM_COUNT.load(Relaxed);
+    let complex = COMPLEX_PARAM_COUNT.load(Relaxed);
+    let with_default = PARAM_WITH_DEFAULT.load(Relaxed);
+    let total = scalar + complex;
+    let scalar_pct = if total > 0 {
+        (scalar as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
+    eprintln!("  [collector stats]");
+    eprintln!("    scalar params:        {} ({:.1}%)", scalar, scalar_pct);
+    eprintln!("    complex params:       {}", complex);
+    eprintln!("    params with default:  {}", with_default);
+}
 
 // ---------------------------------------------------------------------------
 // DefinitionCollector
@@ -309,11 +354,7 @@ impl<'a> DefinitionCollector<'a> {
                     FnParam {
                         name: Arc::from(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
-                        default: if p.is_optional {
-                            Some(Union::mixed())
-                        } else {
-                            None
-                        },
+                        has_default: p.is_optional,
                         is_variadic: p.is_variadic,
                         is_byref: p.is_byref,
                         is_optional: p.is_optional,
@@ -576,13 +617,26 @@ impl<'a> DefinitionCollector<'a> {
                             .map(|h| type_from_hint(h, Some(class_fqcn))),
                     )
                 });
+            // Profiling: track scalar vs complex param types
+            if let Some(ty_ref) = &ty {
+                if is_simple_scalar(ty_ref) {
+                    SCALAR_PARAM_COUNT.fetch_add(1, Relaxed);
+                } else {
+                    COMPLEX_PARAM_COUNT.fetch_add(1, Relaxed);
+                }
+            }
+            let has_default = p.default.is_some();
+            if has_default {
+                PARAM_WITH_DEFAULT.fetch_add(1, Relaxed);
+            }
+
             params.push(FnParam {
                 name: p.name.into(),
                 ty: mir_codebase::wrap_param_type(ty),
-                default: p.default.as_ref().map(|_| Union::mixed()),
+                has_default,
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
-                is_optional: p.default.is_some() || p.variadic,
+                is_optional: has_default || p.variadic,
             });
         }
 
