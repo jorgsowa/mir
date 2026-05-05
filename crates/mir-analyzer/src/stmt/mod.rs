@@ -384,11 +384,18 @@ impl<'a> StatementsAnalyzer<'a> {
     /// * `entry` — context on first iteration entry (may be narrowed / seeded)
     /// * `body`  — closure that analyses one loop iteration, receives `&mut Self`
     ///   and `&mut Context` for the current iteration context
+    /// * `loop_guaranteed` — whether the loop is guaranteed to execute at least once
     ///
     /// Returns the post-loop context that merges:
     ///   - the stable widened context after normal loop exit
     ///   - any contexts captured at `break` statements
-    fn analyze_loop_widened<F>(&mut self, pre: &Context, entry: Context, mut body: F) -> Context
+    fn analyze_loop_widened<F>(
+        &mut self,
+        pre: &Context,
+        entry: Context,
+        mut body: F,
+        loop_guaranteed: bool,
+    ) -> Context
     where
         F: FnMut(&mut Self, &mut Context),
     {
@@ -415,8 +422,8 @@ impl<'a> StatementsAnalyzer<'a> {
             current = next;
         }
 
-        // Widen any variable still unstable after MAX_ITERS to `mixed`
-        widen_unstable(&pre.vars, &mut current.vars);
+        // Widen any variable still unstable after MAX_ITERS to the union of types
+        widen_unstable(&pre.vars, &mut current.vars, loop_guaranteed);
 
         // Pop break contexts and merge them into the post-loop result
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
