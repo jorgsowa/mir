@@ -159,10 +159,15 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut entry = ctx.fork();
         narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
 
-        let post = self.analyze_loop_widened(&pre, entry, |sa, iter| {
-            sa.analyze_stmt(w.body, iter);
-            sa.expr_analyzer(iter).analyze(&w.condition, iter);
-        });
+        let post = self.analyze_loop_widened(
+            &pre,
+            entry,
+            |sa, iter| {
+                sa.analyze_stmt(w.body, iter);
+                sa.expr_analyzer(iter).analyze(&w.condition, iter);
+            },
+            false,
+        );
         *ctx = post;
     }
 
@@ -173,10 +178,16 @@ impl<'a> StatementsAnalyzer<'a> {
     ) {
         let pre = ctx.clone();
         let entry = ctx.fork();
-        let post = self.analyze_loop_widened(&pre, entry, |sa, iter| {
-            sa.analyze_stmt(dw.body, iter);
-            sa.expr_analyzer(iter).analyze(&dw.condition, iter);
-        });
+        // Do-while always executes at least once (body before condition check)
+        let post = self.analyze_loop_widened(
+            &pre,
+            entry,
+            |sa, iter| {
+                sa.analyze_stmt(dw.body, iter);
+                sa.expr_analyzer(iter).analyze(&dw.condition, iter);
+            },
+            true,
+        );
         *ctx = post;
     }
 
@@ -194,15 +205,20 @@ impl<'a> StatementsAnalyzer<'a> {
             self.expr_analyzer(&entry).analyze(cond, &mut entry);
         }
 
-        let post = self.analyze_loop_widened(&pre, entry, |sa, iter| {
-            sa.analyze_stmt(f.body, iter);
-            for update in f.update.iter() {
-                sa.expr_analyzer(iter).analyze(update, iter);
-            }
-            for cond in f.condition.iter() {
-                sa.expr_analyzer(iter).analyze(cond, iter);
-            }
-        });
+        let post = self.analyze_loop_widened(
+            &pre,
+            entry,
+            |sa, iter| {
+                sa.analyze_stmt(f.body, iter);
+                for update in f.update.iter() {
+                    sa.expr_analyzer(iter).analyze(update, iter);
+                }
+                for cond in f.condition.iter() {
+                    sa.expr_analyzer(iter).analyze(cond, iter);
+                }
+            },
+            false,
+        );
         *ctx = post;
     }
 
@@ -241,21 +257,27 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
 
-        let post = self.analyze_loop_widened(&pre, entry, |sa, iter| {
-            if let Some(key_expr) = &fe.key {
-                if let Some(var_name) = extract_simple_var(key_expr) {
-                    iter.set_var(var_name, key_ty.clone());
+        let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
+        let post = self.analyze_loop_widened(
+            &pre,
+            entry,
+            |sa, iter| {
+                if let Some(key_expr) = &fe.key {
+                    if let Some(var_name) = extract_simple_var(key_expr) {
+                        iter.set_var(var_name, key_ty.clone());
+                    }
                 }
-            }
-            if let Some(ref vname) = value_var {
-                iter.set_var(vname.as_str(), value_ty.clone());
-            } else {
-                for vname in &value_destructure_vars {
-                    iter.set_var(vname, Union::mixed());
+                if let Some(ref vname) = value_var {
+                    iter.set_var(vname.as_str(), value_ty.clone());
+                } else {
+                    for vname in &value_destructure_vars {
+                        iter.set_var(vname, Union::mixed());
+                    }
                 }
-            }
-            sa.analyze_stmt(fe.body, iter);
-        });
+                sa.analyze_stmt(fe.body, iter);
+            },
+            loop_guaranteed,
+        );
         *ctx = post;
     }
 

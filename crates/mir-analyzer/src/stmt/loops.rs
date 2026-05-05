@@ -2,6 +2,29 @@ use indexmap::IndexMap;
 use mir_types::{ArrayKey, Atomic, Union};
 
 // ---------------------------------------------------------------------------
+// Loop execution guarantees
+// ---------------------------------------------------------------------------
+
+/// Returns true if a foreach loop over `arr_ty` is guaranteed to execute at least once.
+/// A loop is guaranteed to execute if the array is known to be non-empty.
+pub(super) fn loop_guaranteed_to_execute(arr_ty: &Union) -> bool {
+    for atomic in &arr_ty.types {
+        match atomic {
+            // Non-empty array types guarantee at least one iteration
+            Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. } => return true,
+            // Keyed arrays with known properties are non-empty if closed and not empty
+            Atomic::TKeyedArray {
+                properties,
+                is_open: false,
+                ..
+            } if !properties.is_empty() => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+// ---------------------------------------------------------------------------
 // Loop widening helpers
 // ---------------------------------------------------------------------------
 
@@ -19,14 +42,28 @@ pub(super) fn vars_stabilized(
 }
 
 /// For any variable whose type changed relative to `pre_vars`, widen to
-/// `mixed`.  Called after MAX_ITERS to avoid non-termination.
+/// the union of both types.  Called after MAX_ITERS to avoid non-termination.
+///
+/// If `loop_guaranteed` is true (loop is guaranteed to execute at least once),
+/// variables that are new in the loop (only in current, not in pre) won't be
+/// merged with null/undefined, since the loop will definitely assign them.
 pub(super) fn widen_unstable(
     pre_vars: &IndexMap<String, Union>,
     current_vars: &mut IndexMap<String, Union>,
+    loop_guaranteed: bool,
 ) {
     for (name, ty) in current_vars.iter_mut() {
-        if pre_vars.get(name).map(|p| p != ty).unwrap_or(true) && !ty.is_mixed() {
-            *ty = Union::mixed();
+        if let Some(pre_ty) = pre_vars.get(name) {
+            if pre_ty != ty {
+                *ty = Union::merge(pre_ty, ty);
+            }
+        } else if loop_guaranteed {
+            // Variable is new in loop and loop is guaranteed to execute.
+            // Don't merge with pre-type (which would be null/undefined).
+            // The variable type is just its assigned value.
+        } else {
+            // Loop might not execute; variable might be undefined.
+            // Leave as-is since it's already set in the entry context.
         }
     }
 }
