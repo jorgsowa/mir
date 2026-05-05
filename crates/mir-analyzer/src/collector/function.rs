@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{FnParam, FunctionStorage, TemplateParam};
+use mir_codebase::storage::{wrap_return_type, FnParam, FunctionStorage, TemplateParam};
 use mir_types::Union;
 
 use super::DefinitionCollector;
@@ -76,7 +76,7 @@ impl DefinitionCollector<'_> {
             fqn: fqn.clone().into(),
             short_name: short_name.into(),
             params,
-            return_type,
+            return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             template_params,
             assertions: self.build_assertions(&doc),

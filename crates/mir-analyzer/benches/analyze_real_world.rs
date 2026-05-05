@@ -141,9 +141,13 @@ fn bench_full_analysis(c: &mut Criterion) {
     reset_alloc_counters();
     {
         let analyzer = ProjectAnalyzer::new();
+        checkpoint_alloc("after new analyzer");
         analyzer.load_stubs();
+        checkpoint_alloc("after load_stubs");
         analyzer.collect_types_only(&vendor_files);
+        checkpoint_alloc("after collect_types_only (vendor)");
         let _ = analyzer.analyze(&project_files);
+        checkpoint_alloc("after analyze (project)");
     }
     print_alloc_stats("full_analysis/laravel");
 

@@ -166,8 +166,28 @@ where
     opt.serialize(serializer)
 }
 
+fn deserialize_return_type<'de, D>(deserializer: D) -> Result<Option<Arc<Union>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<Union>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
+}
+
+fn serialize_return_type<S>(value: &Option<Arc<Union>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let opt = value.as_ref().map(|arc| (**arc).clone());
+    opt.serialize(serializer)
+}
+
 /// Helper to wrap Option<Union> in interned Arc<Union>.
 pub fn wrap_param_type(ty: Option<Union>) -> Option<Arc<Union>> {
+    ty.map(interned_types::intern_or_wrap)
+}
+
+/// Helper to wrap return type Option<Union> in interned Arc<Union>.
+pub fn wrap_return_type(ty: Option<Union>) -> Option<Arc<Union>> {
     ty.map(interned_types::intern_or_wrap)
 }
 
@@ -233,7 +253,13 @@ pub struct MethodStorage {
     pub fqcn: Arc<str>,
     pub params: Vec<FnParam>,
     /// Type from annotation (`@return` / native type hint). `None` means unannotated.
-    pub return_type: Option<Union>,
+    /// Stored as `Option<Arc<Union>>` to enable deduplication of common return types
+    /// (e.g., `void`, `string`, `mixed`, `bool`) across thousands of methods.
+    #[serde(
+        deserialize_with = "deserialize_return_type",
+        serialize_with = "serialize_return_type"
+    )]
+    pub return_type: Option<Arc<Union>>,
     /// Type inferred from body analysis (filled in during pass 2).
     pub inferred_return_type: Option<Union>,
     pub visibility: Visibility,
@@ -253,7 +279,7 @@ pub struct MethodStorage {
 impl MethodStorage {
     pub fn effective_return_type(&self) -> Option<&Union> {
         self.return_type
-            .as_ref()
+            .as_deref()
             .or(self.inferred_return_type.as_ref())
     }
 }
@@ -412,7 +438,13 @@ pub struct FunctionStorage {
     pub fqn: Arc<str>,
     pub short_name: Arc<str>,
     pub params: Vec<FnParam>,
-    pub return_type: Option<Union>,
+    /// Type from annotation (`@return` / native type hint). `None` means unannotated.
+    /// Stored as `Option<Arc<Union>>` to enable deduplication of common return types.
+    #[serde(
+        deserialize_with = "deserialize_return_type",
+        serialize_with = "serialize_return_type"
+    )]
+    pub return_type: Option<Arc<Union>>,
     pub inferred_return_type: Option<Union>,
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
@@ -425,7 +457,7 @@ pub struct FunctionStorage {
 impl FunctionStorage {
     pub fn effective_return_type(&self) -> Option<&Union> {
         self.return_type
-            .as_ref()
+            .as_deref()
             .or(self.inferred_return_type.as_ref())
     }
 }
