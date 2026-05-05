@@ -15,5 +15,3 @@ function test(): void {
     f($raw);
 }
 ===expect===
-===ignore===
-TODO

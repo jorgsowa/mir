@@ -14,5 +14,3 @@ function test(): void {
     acceptsAnimalBox(new CatBox());
 }
 ===expect===
-===ignore===
-TODO
