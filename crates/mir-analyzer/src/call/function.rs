@@ -124,8 +124,11 @@ impl CallAnalyzer {
             }
         };
 
+        // Resolve once; reused below for by-ref pre-marking and full analysis.
+        let resolved = resolve_fn(ea, resolved_fn_name.as_str());
+
         // Pre-mark by-reference parameter variables as defined BEFORE evaluating args
-        if let Some(resolved) = resolve_fn(ea, resolved_fn_name.as_str()) {
+        if let Some(ref resolved) = resolved {
             for (i, param) in resolved.params.iter().enumerate() {
                 if param.is_byref {
                     if param.is_variadic {
@@ -200,7 +203,7 @@ impl CallAnalyzer {
             }
         }
 
-        if let Some(resolved) = resolve_fn(ea, resolved_fn_name.as_str()) {
+        if let Some(resolved) = resolved {
             if !ea.inference_only {
                 let (line, col_start, col_end) = ea.span_to_ref_loc(call.name.span);
                 ea.db.record_reference_location(crate::db::RefLoc {
