@@ -182,7 +182,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
         db.upsert_function_node(&mir_codebase::FunctionStorage {
             fqn: Arc::from("ghost_fn"),
             short_name: Arc::from("ghost_fn"),
-            params: vec![],
+            params: Arc::from([].as_slice()),
             return_type: None,
             inferred_return_type: None,
             template_params: vec![],

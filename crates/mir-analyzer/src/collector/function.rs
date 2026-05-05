@@ -87,7 +87,7 @@ impl DefinitionCollector<'_> {
         let storage = FunctionStorage {
             fqn: fqn.clone().into(),
             short_name: short_name.into(),
-            params,
+            params: Arc::from(params.into_boxed_slice()),
             return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             template_params,

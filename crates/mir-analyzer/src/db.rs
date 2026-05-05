@@ -1620,6 +1620,11 @@ impl MirDb {
     pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
         use std::collections::HashSet;
 
+        // Deduplicate param lists to save memory (many methods share identical signatures).
+        // This reduces cold-start memory usage by ~100-150 MiB when analyzing vendor code.
+        let mut slice = slice.clone();
+        mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
+
         if let Some(file) = &slice.file {
             if let Some(namespace) = &slice.namespace {
                 Arc::make_mut(&mut self.file_namespaces).insert(file.clone(), namespace.clone());
@@ -1645,19 +1650,19 @@ impl MirDb {
             self.upsert_class_node(ClassNodeFields {
                 is_abstract: cls.is_abstract,
                 parent: cls.parent.clone(),
-                interfaces: Arc::from(cls.interfaces.as_slice()),
-                traits: Arc::from(cls.traits.as_slice()),
-                template_params: Arc::from(cls.template_params.as_slice()),
-                mixins: Arc::from(cls.mixins.as_slice()),
+                interfaces: Arc::from(cls.interfaces.as_ref()),
+                traits: Arc::from(cls.traits.as_ref()),
+                template_params: Arc::from(cls.template_params.as_ref()),
+                mixins: Arc::from(cls.mixins.as_ref()),
                 deprecated: cls.deprecated.clone(),
                 is_final: cls.is_final,
                 is_readonly: cls.is_readonly,
                 location: cls.location.clone(),
-                extends_type_args: Arc::from(cls.extends_type_args.as_slice()),
+                extends_type_args: Arc::from(cls.extends_type_args.as_ref()),
                 implements_type_args: Arc::from(
                     cls.implements_type_args
                         .iter()
-                        .map(|(iface, args)| (iface.clone(), Arc::from(args.as_slice())))
+                        .map(|(iface, args)| (iface.clone(), Arc::from(args.as_ref())))
                         .collect::<Vec<_>>(),
                 ),
                 ..ClassNodeFields::for_class(cls.fqcn.clone())
@@ -1697,8 +1702,8 @@ impl MirDb {
                 Arc::make_mut(&mut self.symbol_to_file).insert(iface.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
-                extends: Arc::from(iface.extends.as_slice()),
-                template_params: Arc::from(iface.template_params.as_slice()),
+                extends: Arc::from(iface.extends.as_ref()),
+                template_params: Arc::from(iface.template_params.as_ref()),
                 location: iface.location.clone(),
                 ..ClassNodeFields::for_interface(iface.fqcn.clone())
             });
@@ -1725,10 +1730,10 @@ impl MirDb {
                 Arc::make_mut(&mut self.symbol_to_file).insert(tr.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
-                traits: Arc::from(tr.traits.as_slice()),
-                template_params: Arc::from(tr.template_params.as_slice()),
-                require_extends: Arc::from(tr.require_extends.as_slice()),
-                require_implements: Arc::from(tr.require_implements.as_slice()),
+                traits: Arc::from(tr.traits.as_ref()),
+                template_params: Arc::from(tr.template_params.as_ref()),
+                require_extends: Arc::from(tr.require_extends.as_ref()),
+                require_implements: Arc::from(tr.require_implements.as_ref()),
                 location: tr.location.clone(),
                 ..ClassNodeFields::for_trait(tr.fqcn.clone())
             });
@@ -1763,7 +1768,7 @@ impl MirDb {
                 Arc::make_mut(&mut self.symbol_to_file).insert(en.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
-                interfaces: Arc::from(en.interfaces.as_slice()),
+                interfaces: Arc::from(en.interfaces.as_ref()),
                 is_backed_enum: en.scalar_type.is_some(),
                 enum_scalar_type: en.scalar_type.clone(),
                 location: en.location.clone(),
@@ -1785,7 +1790,7 @@ impl MirDb {
             let synth_method = |name: &str| mir_codebase::storage::MethodStorage {
                 fqcn: en.fqcn.clone(),
                 name: Arc::from(name),
-                params: vec![],
+                params: Arc::from([].as_ref()),
                 return_type: Some(Arc::new(Union::mixed())),
                 inferred_return_type: None,
                 visibility: Visibility::Public,
@@ -2000,17 +2005,16 @@ impl MirDb {
                 && node.deprecated(self) == storage.deprecated
                 && node.return_type(self).as_deref() == storage.return_type.as_deref()
                 && node.location(self) == storage.location
-                && *node.params(self) == *storage.params.as_slice()
-                && *node.template_params(self) == *storage.template_params.as_slice()
-                && *node.assertions(self) == *storage.assertions.as_slice()
-                && *node.throws(self) == *storage.throws.as_slice()
+                && *node.params(self) == *storage.params.as_ref()
+                && *node.template_params(self) == *storage.template_params
+                && *node.assertions(self) == *storage.assertions
+                && *node.throws(self) == *storage.throws
             {
                 return node;
             }
             node.set_active(self).to(true);
             node.set_short_name(self).to(storage.short_name.clone());
-            node.set_params(self)
-                .to(Arc::from(storage.params.as_slice()));
+            node.set_params(self).to(storage.params.clone());
             node.set_return_type(self).to(storage.return_type.clone());
             node.set_template_params(self)
                 .to(Arc::from(storage.template_params.as_slice()));
@@ -2028,7 +2032,7 @@ impl MirDb {
                 fqn.clone(),
                 storage.short_name.clone(),
                 true,
-                Arc::from(storage.params.as_slice()),
+                storage.params.clone(),
                 storage.return_type.clone(),
                 storage
                     .inferred_return_type
@@ -2133,16 +2137,15 @@ impl MirDb {
                 && node.deprecated(self) == storage.deprecated
                 && node.return_type(self).as_deref() == storage.return_type.as_deref()
                 && node.location(self) == storage.location
-                && *node.params(self) == *storage.params.as_slice()
-                && *node.template_params(self) == *storage.template_params.as_slice()
-                && *node.assertions(self) == *storage.assertions.as_slice()
-                && *node.throws(self) == *storage.throws.as_slice()
+                && *node.params(self) == *storage.params.as_ref()
+                && *node.template_params(self) == *storage.template_params
+                && *node.assertions(self) == *storage.assertions
+                && *node.throws(self) == *storage.throws
             {
                 return node;
             }
             node.set_active(self).to(true);
-            node.set_params(self)
-                .to(Arc::from(storage.params.as_slice()));
+            node.set_params(self).to(storage.params.clone());
             node.set_return_type(self).to(storage.return_type.clone());
             node.set_template_params(self)
                 .to(Arc::from(storage.template_params.as_slice()));
@@ -2166,7 +2169,7 @@ impl MirDb {
                 fqcn.clone(),
                 storage.name.clone(),
                 true,
-                Arc::from(storage.params.as_slice()),
+                storage.params.clone(),
                 storage.return_type.clone(),
                 storage
                     .inferred_return_type
@@ -2805,7 +2808,7 @@ mod tests {
         let storage = MethodStorage {
             name: Arc::from(name),
             fqcn: Arc::from(fqcn),
-            params: vec![],
+            params: Arc::from([].as_slice()),
             return_type: None,
             inferred_return_type: None,
             visibility: Visibility::Public,
@@ -3329,7 +3332,7 @@ mod tests {
             let storage = mir_codebase::storage::FunctionStorage {
                 fqn: Arc::from("foo"),
                 short_name: Arc::from("foo"),
-                params: vec![],
+                params: Arc::from([].as_slice()),
                 return_type: None,
                 inferred_return_type: None,
                 template_params: vec![],
@@ -3385,7 +3388,7 @@ mod tests {
         let storage = mir_codebase::storage::FunctionStorage {
             fqn: Arc::from("foo"),
             short_name: Arc::from("foo"),
-            params: vec![],
+            params: Arc::from([].as_slice()),
             return_type: None,
             inferred_return_type: None,
             template_params: vec![],

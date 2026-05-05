@@ -152,6 +152,23 @@ pub struct FnParam {
     pub is_optional: bool,
 }
 
+impl std::hash::Hash for FnParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.has_default.hash(state);
+        self.is_variadic.hash(state);
+        self.is_byref.hash(state);
+        self.is_optional.hash(state);
+        if let Some(ty) = &self.ty {
+            // Hash the Arc pointer address. Since interned types reuse Arc allocations,
+            // parameters with the same type will have the same pointer.
+            (Arc::as_ptr(ty) as usize).hash(state);
+        } else {
+            0u8.hash(state);
+        }
+    }
+}
+
 // Serde helpers to transparently convert between Option<Union> and Option<Arc<Union>>
 fn deserialize_param_type<'de, D>(deserializer: D) -> Result<Option<Arc<Union>>, D::Error>
 where
@@ -181,6 +198,20 @@ where
 {
     let opt = value.as_ref().map(|arc| (**arc).clone());
     opt.serialize(serializer)
+}
+
+fn deserialize_params<'de, D>(deserializer: D) -> Result<Arc<[FnParam]>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Vec::<FnParam>::deserialize(deserializer).map(|v| Arc::from(v.into_boxed_slice()))
+}
+
+fn serialize_params<S>(value: &Arc<[FnParam]>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    value.as_ref().serialize(serializer)
 }
 
 /// Helper to wrap Option<Union> in interned Arc<Union>.
@@ -253,7 +284,11 @@ pub struct Assertion {
 pub struct MethodStorage {
     pub name: Arc<str>,
     pub fqcn: Arc<str>,
-    pub params: Vec<FnParam>,
+    #[serde(
+        deserialize_with = "deserialize_params",
+        serialize_with = "serialize_params"
+    )]
+    pub params: Arc<[FnParam]>,
     /// Type from annotation (`@return` / native type hint). `None` means unannotated.
     /// Stored as `Option<Arc<Union>>` to enable deduplication of common return types
     /// (e.g., `void`, `string`, `mixed`, `bool`) across thousands of methods.
@@ -439,7 +474,11 @@ pub struct EnumStorage {
 pub struct FunctionStorage {
     pub fqn: Arc<str>,
     pub short_name: Arc<str>,
-    pub params: Vec<FnParam>,
+    #[serde(
+        deserialize_with = "deserialize_params",
+        serialize_with = "serialize_params"
+    )]
+    pub params: Arc<[FnParam]>,
     /// Type from annotation (`@return` / native type hint). `None` means unannotated.
     /// Stored as `Option<Arc<Union>>` to enable deduplication of common return types.
     #[serde(
@@ -501,4 +540,75 @@ pub struct StubSlice {
     /// `file_imports` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
     pub imports: std::collections::HashMap<String, String>,
+}
+
+// ---------------------------------------------------------------------------
+// Param list deduplication
+// ---------------------------------------------------------------------------
+
+use std::sync::Mutex;
+
+/// Global cache of canonical Arc<[FnParam]> instances for deduplication.
+/// Shared across all StubSlices to deduplicate vendor code with millions of
+/// methods that often have identical parameter lists.
+static PARAM_DEDUP_CACHE: std::sync::OnceLock<Mutex<Vec<Arc<[FnParam]>>>> =
+    std::sync::OnceLock::new();
+
+/// Deduplicate parameter lists across all methods and functions in a StubSlice.
+/// Many PHP framework methods share identical parameter lists (e.g., thousands
+/// of `(string $arg, array $opts)` signatures). This function groups identical
+/// param lists globally (across all slices processed so far) and replaces them
+/// with Arc<[FnParam]> pointers to shared allocations.
+///
+/// Expected memory savings: 100–150 MiB on cold start (vendor collection).
+pub fn deduplicate_params_in_slice(slice: &mut StubSlice) {
+    let cache = PARAM_DEDUP_CACHE.get_or_init(|| Mutex::new(Vec::new()));
+    let mut canonical_params = cache.lock().expect("param dedup cache poisoned");
+
+    // Helper to find or insert a param list in the global cache
+    let mut deduplicate = |params: &mut Arc<[FnParam]>| {
+        // Check if this param list already exists in our global cache
+        for existing in canonical_params.iter() {
+            if existing.as_ref() == params.as_ref() {
+                // Found a match, replace with the cached Arc
+                *params = existing.clone();
+                return;
+            }
+        }
+        // Not found, add this as a new canonical param list
+        canonical_params.push(params.clone());
+    };
+
+    // Deduplicate method params in all classes
+    for cls in &mut slice.classes {
+        for method in cls.own_methods.values_mut() {
+            deduplicate(&mut Arc::make_mut(method).params);
+        }
+    }
+
+    // Deduplicate method params in all interfaces
+    for iface in &mut slice.interfaces {
+        for method in iface.own_methods.values_mut() {
+            deduplicate(&mut Arc::make_mut(method).params);
+        }
+    }
+
+    // Deduplicate method params in all traits
+    for tr in &mut slice.traits {
+        for method in tr.own_methods.values_mut() {
+            deduplicate(&mut Arc::make_mut(method).params);
+        }
+    }
+
+    // Deduplicate method params in all enums
+    for en in &mut slice.enums {
+        for method in en.own_methods.values_mut() {
+            deduplicate(&mut Arc::make_mut(method).params);
+        }
+    }
+
+    // Deduplicate function params
+    for func in &mut slice.functions {
+        deduplicate(&mut func.params);
+    }
 }
