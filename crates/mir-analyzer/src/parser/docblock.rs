@@ -1,7 +1,6 @@
-use mir_types::{ArrayKey, Atomic, Union, Variance};
-/// Docblock parser — delegates to `php_rs_parser::phpdoc` for tag extraction,
-/// then converts `PhpDocTag`s into mir's `ParsedDocblock` with resolved types.
-use std::sync::Arc;
+use mir_types::{
+    intern, {ArrayKey, Atomic, Union, Variance},
+};
 
 use indexmap::IndexMap;
 
@@ -548,15 +547,9 @@ pub fn parse_type_string(s: &str) -> Union {
         "numeric" => Union::single(Atomic::TNumeric),
         "resource" => Union::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
-        "static" => Union::single(Atomic::TStaticObject {
-            fqcn: Arc::from(""),
-        }),
-        "self" | "$this" => Union::single(Atomic::TSelf {
-            fqcn: Arc::from(""),
-        }),
-        "parent" => Union::single(Atomic::TParent {
-            fqcn: Arc::from(""),
-        }),
+        "static" => Union::single(Atomic::TStaticObject { fqcn: intern("") }),
+        "self" | "$this" => Union::single(Atomic::TSelf { fqcn: intern("") }),
+        "parent" => Union::single(Atomic::TParent { fqcn: intern("") }),
 
         // Named class
         _ if !s.is_empty()
@@ -566,7 +559,7 @@ pub fn parse_type_string(s: &str) -> Union {
                 .unwrap_or(false) =>
         {
             Union::single(Atomic::TNamedObject {
-                fqcn: normalize_fqcn(s).into(),
+                fqcn: intern(&normalize_fqcn(s)),
                 type_params: vec![],
             })
         }
@@ -637,9 +630,9 @@ fn parse_generic(name: &str, inner: &str) -> Union {
                 value: Box::new(value),
             })
         }
-        "class-string" => Union::single(Atomic::TClassString(Some(
-            normalize_fqcn(inner.trim()).into(),
-        ))),
+        "class-string" => Union::single(Atomic::TClassString(Some(intern(&normalize_fqcn(
+            inner.trim(),
+        ))))),
         "int" => {
             // int<min, max>
             Union::single(Atomic::TIntRange {
@@ -654,7 +647,7 @@ fn parse_generic(name: &str, inner: &str) -> Union {
                 .map(|p| parse_type_string(p.trim()))
                 .collect();
             Union::single(Atomic::TNamedObject {
-                fqcn: normalize_fqcn(name).into(),
+                fqcn: intern(&normalize_fqcn(name)),
                 type_params: params,
             })
         }
@@ -662,7 +655,7 @@ fn parse_generic(name: &str, inner: &str) -> Union {
 }
 
 fn parse_keyed_array(inner: &str, is_list: bool) -> Union {
-    use mir_types::atomic::KeyedProperty;
+    use mir_types::{atomic::KeyedProperty, intern};
     let mut properties: IndexMap<ArrayKey, KeyedProperty> = IndexMap::new();
     let mut is_open = false;
     let mut auto_index = 0i64;
@@ -701,7 +694,7 @@ fn parse_keyed_array(inner: &str, is_list: bool) -> Union {
             let key = if let Ok(n) = key_str.parse::<i64>() {
                 ArrayKey::Int(n)
             } else {
-                ArrayKey::String(Arc::from(key_str))
+                ArrayKey::String(intern(key_str))
             };
             properties.insert(
                 key,
