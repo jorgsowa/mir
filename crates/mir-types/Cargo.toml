@@ -12,4 +12,3 @@ homepage.workspace   = true
 smallvec = { workspace = true }
 indexmap = { workspace = true }
 serde    = { workspace = true, features = ["rc"] }
-dashmap  = { workspace = true }

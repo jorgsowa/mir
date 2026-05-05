@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use mir_codebase::storage::{FnParam, FunctionStorage, TemplateParam};
-use mir_types::{intern, Union};
+use mir_types::Union;
 
 use super::DefinitionCollector;
 use crate::parser::type_from_hint;
@@ -41,7 +43,7 @@ impl DefinitionCollector<'_> {
                     self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None)))
                 });
             params.push(FnParam {
-                name: intern(p.name),
+                name: p.name.into(),
                 ty,
                 default: p.default.as_ref().map(|_| Union::mixed()),
                 is_variadic: p.variadic,
@@ -63,23 +65,23 @@ impl DefinitionCollector<'_> {
             .templates
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
-                name: intern(name.as_str()),
+                name: name.as_str().into(),
                 bound: bound.clone(),
-                defining_entity: intern(&fqn),
+                defining_entity: fqn.as_str().into(),
                 variance: *variance,
             })
             .collect();
 
         let storage = FunctionStorage {
-            fqn: intern(&fqn),
-            short_name: intern(&short_name),
+            fqn: fqn.clone().into(),
+            short_name: short_name.into(),
             params,
             return_type,
             inferred_return_type: None,
             template_params,
             assertions: self.build_assertions(&doc),
-            throws: doc.throws.iter().map(|t| intern(t.as_str())).collect(),
-            deprecated: doc.deprecated.as_deref().map(intern),
+            throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
+            deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_pure: doc.is_pure,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
         };
