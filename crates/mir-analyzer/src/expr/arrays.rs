@@ -37,6 +37,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             let array_key = if let Some(key_expr) = &elem.key {
                 is_list = false;
                 let key_ty = self.analyze(key_expr, ctx);
+                // Float keys are silently truncated to int in PHP
+                if key_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+                    self.emit(
+                        IssueKind::ImplicitFloatToIntCast {
+                            from: key_ty.to_string(),
+                        },
+                        Severity::Warning,
+                        key_expr.span,
+                    );
+                }
                 match key_ty.types.as_slice() {
                     [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
                     [Atomic::TLiteralInt(i)] => {
@@ -82,6 +92,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 all_value_types = Union::merge(&all_value_types, &value_ty);
                 if let Some(key_expr) = &elem.key {
                     let key_ty = self.analyze(key_expr, ctx);
+                    // Float keys are silently truncated to int in PHP
+                    if key_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+                    {
+                        self.emit(
+                            IssueKind::ImplicitFloatToIntCast {
+                                from: key_ty.to_string(),
+                            },
+                            Severity::Warning,
+                            key_expr.span,
+                        );
+                    }
                     key_union = Union::merge(&key_union, &key_ty);
                 } else {
                     key_union.add_type(Atomic::TInt);
@@ -111,7 +132,17 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Union {
         let arr_ty = self.analyze(aa.array, ctx);
         if let Some(idx) = &aa.index {
-            self.analyze(idx, ctx);
+            let idx_ty = self.analyze(idx, ctx);
+            // Float keys are silently truncated to int in PHP
+            if idx_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+                self.emit(
+                    IssueKind::ImplicitFloatToIntCast {
+                        from: idx_ty.to_string(),
+                    },
+                    Severity::Warning,
+                    idx.span,
+                );
+            }
         }
 
         if arr_ty.contains(|t| matches!(t, Atomic::TNull)) && arr_ty.is_single() {

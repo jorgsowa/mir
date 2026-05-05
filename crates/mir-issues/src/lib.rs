@@ -299,6 +299,9 @@ pub enum IssueKind {
     ImplicitToStringCast {
         class: String,
     },
+    ImplicitFloatToIntCast {
+        from: String,
+    },
     ParseError {
         message: String,
     },
@@ -384,6 +387,7 @@ impl IssueKind {
             | IssueKind::OverriddenMethodAccess { .. }
             | IssueKind::MissingThrowsDocblock { .. }
             | IssueKind::ImplicitToStringCast { .. }
+            | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -493,6 +497,7 @@ impl IssueKind {
             IssueKind::InvalidThrow { .. } => "InvalidThrow",
             IssueKind::MissingThrowsDocblock { .. } => "MissingThrowsDocblock",
             IssueKind::ImplicitToStringCast { .. } => "ImplicitToStringCast",
+            IssueKind::ImplicitFloatToIntCast { .. } => "ImplicitFloatToIntCast",
             IssueKind::ParseError { .. } => "ParseError",
             IssueKind::InvalidDocblock { .. } => "InvalidDocblock",
             IssueKind::MixedArgument { .. } => "MixedArgument",
@@ -762,6 +767,9 @@ impl IssueKind {
             }
             IssueKind::ImplicitToStringCast { class } => {
                 format!("Class {class} does not implement __toString()")
+            }
+            IssueKind::ImplicitFloatToIntCast { from } => {
+                format!("Implicit cast from {from} to int truncates the fractional part")
             }
             IssueKind::ParseError { message } => format!("Parse error: {message}"),
             IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),

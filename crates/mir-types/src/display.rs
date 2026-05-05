@@ -38,7 +38,11 @@ impl fmt::Display for Atomic {
             Atomic::TNonNegativeInt => write!(f, "non-negative-int"),
 
             Atomic::TFloat => write!(f, "float"),
-            Atomic::TLiteralFloat(i, frac) => write!(f, "{i}.{frac}"),
+            Atomic::TLiteralFloat(high, low) => {
+                let bits = ((*high as u64) << 32) | (*low as u32 as u64);
+                let value = f64::from_bits(bits);
+                write!(f, "{value}")
+            }
 
             Atomic::TBool => write!(f, "bool"),
             Atomic::TTrue => write!(f, "true"),

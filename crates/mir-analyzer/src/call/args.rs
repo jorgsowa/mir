@@ -397,6 +397,20 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 }
             }
 
+            // Check for float → int implicit coercion
+            if arg_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+                && param_ty.is_single()
+                && param_ty.contains(|t| t.is_int())
+            {
+                ea.emit(
+                    IssueKind::ImplicitFloatToIntCast {
+                        from: arg_ty.to_string(),
+                    },
+                    Severity::Warning,
+                    arg_span,
+                );
+            }
+
             let arg_core = arg_ty.remove_null().remove_false();
             if !arg_ty.is_subtype_of_simple(param_ty)
                 && !param_ty.is_mixed()
