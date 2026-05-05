@@ -935,6 +935,7 @@ impl ProjectAnalyzer {
             let guard = self.salsa.lock().expect("salsa lock poisoned");
             guard.0.clone()
         };
+
         let file_defs: Vec<FileDefinitions> = source_files
             .par_iter()
             .map_with(db_pass1, |db, salsa_file| {

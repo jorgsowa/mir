@@ -56,7 +56,12 @@ impl<'a> StatementsAnalyzer<'a> {
             let Some(body) = &method.body else { continue };
             let (params, return_ty) =
                 crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), method.name)
-                    .map(|n| (n.params(self.db).to_vec(), n.return_type(self.db)))
+                    .map(|n| {
+                        (
+                            n.params(self.db).to_vec(),
+                            n.return_type(self.db).map(|t| (*t).clone()),
+                        )
+                    })
                     .unwrap_or_else(|| {
                         let ast_params = method
                             .params
