@@ -9,4 +9,3 @@ function riskyOperation(): void {
     throw new \RuntimeException('fail');
 }
 ===expect===
-===ignore===

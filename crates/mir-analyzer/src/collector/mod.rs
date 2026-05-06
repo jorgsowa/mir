@@ -663,6 +663,14 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
+        let throws = doc
+            .throws
+            .iter()
+            .map(|t| {
+                Arc::from(resolution::resolve_name(t, &self.namespace, &self.use_aliases).as_str())
+            })
+            .collect();
+
         Some(MethodStorage {
             name: m.name.into(),
             fqcn: class_fqcn.into(),
@@ -676,7 +684,7 @@ impl<'a> DefinitionCollector<'a> {
             is_constructor: m.name == "__construct",
             template_params,
             assertions: self.build_assertions(&doc),
-            throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
+            throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
