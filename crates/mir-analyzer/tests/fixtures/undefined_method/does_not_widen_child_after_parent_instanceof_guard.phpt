@@ -15,5 +15,3 @@ function test(object $value): void {
     $value->childOnly();
 }
 ===expect===
-===ignore===
-TODO

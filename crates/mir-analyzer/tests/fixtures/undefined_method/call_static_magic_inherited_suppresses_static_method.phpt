@@ -13,5 +13,3 @@ function test(): void {
     Child::anotherMissing(1, 2);
 }
 ===expect===
-===ignore===
-TODO

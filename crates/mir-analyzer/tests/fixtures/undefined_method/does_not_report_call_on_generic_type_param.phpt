@@ -10,5 +10,3 @@ function f($obj): void {
     $obj->method();
 }
 ===expect===
-===ignore===
-TODO

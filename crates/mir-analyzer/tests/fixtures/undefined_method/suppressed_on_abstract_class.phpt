@@ -9,5 +9,3 @@ function call_run(Base $b): void {
     $b->nonExistentMethod();
 }
 ===expect===
-===ignore===
-TODO

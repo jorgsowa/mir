@@ -10,5 +10,3 @@ class Foo {
 global $x;
 $x->bar();
 ===expect===
-===ignore===
-TODO

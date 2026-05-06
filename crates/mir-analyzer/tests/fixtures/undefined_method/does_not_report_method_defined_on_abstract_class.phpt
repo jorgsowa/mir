@@ -9,5 +9,3 @@ function f(Base $b): void {
     $b->run();
 }
 ===expect===
-===ignore===
-TODO

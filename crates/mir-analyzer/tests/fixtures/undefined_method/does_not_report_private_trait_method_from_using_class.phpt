@@ -12,5 +12,3 @@ class MyClass {
     }
 }
 ===expect===
-===ignore===
-TODO

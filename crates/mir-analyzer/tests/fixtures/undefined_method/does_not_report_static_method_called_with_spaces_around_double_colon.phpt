@@ -10,5 +10,3 @@ function test(): void {
     Math  ::  sq(3);
 }
 ===expect===
-===ignore===
-TODO
