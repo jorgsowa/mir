@@ -241,6 +241,9 @@ pub enum IssueKind {
         method: String,
         parent: String,
     },
+    AbstractInstantiation {
+        class: String,
+    },
 
     // --- Security (taint) ---------------------------------------------------
     TaintedInput {
@@ -362,6 +365,7 @@ impl IssueKind {
             | IssueKind::MethodSignatureMismatch { .. }
             | IssueKind::FinalClassExtended { .. }
             | IssueKind::FinalMethodOverridden { .. }
+            | IssueKind::AbstractInstantiation { .. }
             | IssueKind::InvalidTemplateParam { .. }
             | IssueKind::ReadonlyPropertyAssignment { .. }
             | IssueKind::ParseError { .. }
@@ -480,6 +484,7 @@ impl IssueKind {
             IssueKind::OverriddenMethodAccess { .. } => "OverriddenMethodAccess",
             IssueKind::FinalClassExtended { .. } => "FinalClassExtended",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
+            IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
             IssueKind::InvalidTemplateParam { .. } => "InvalidTemplateParam",
             IssueKind::ShadowedTemplateParam { .. } => "ShadowedTemplateParam",
@@ -717,6 +722,9 @@ impl IssueKind {
                 parent,
             } => {
                 format!("Method {class}::{method}() cannot override final method from {parent}")
+            }
+            IssueKind::AbstractInstantiation { class } => {
+                format!("Cannot instantiate abstract class {class}")
             }
 
             IssueKind::TaintedInput { sink } => format!("Tainted input reaching sink '{sink}'"),

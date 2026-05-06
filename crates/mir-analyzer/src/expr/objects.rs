@@ -68,6 +68,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .lookup_class_node(fqcn.as_ref())
                         .filter(|n| n.active(self.db))
                     {
+                        if node.is_abstract(self.db) {
+                            self.emit(
+                                IssueKind::AbstractInstantiation {
+                                    class: fqcn.to_string(),
+                                },
+                                Severity::Error,
+                                n.class.span,
+                            );
+                        }
                         if let Some(msg) = node.deprecated(self.db) {
                             self.emit(
                                 IssueKind::DeprecatedClass {

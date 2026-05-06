@@ -5,6 +5,4 @@ abstractClassInstantiation
                     abstract class A {}
                     new A();
 ===expect===
-AbstractInstantiation
-===ignore===
-TODO
+AbstractInstantiation@3:24: Cannot instantiate abstract class A
