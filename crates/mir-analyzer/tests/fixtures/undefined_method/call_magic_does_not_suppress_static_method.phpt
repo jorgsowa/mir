@@ -12,5 +12,3 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod@8:4: Method Magic::missing() does not exist
-===ignore===
-TODO
