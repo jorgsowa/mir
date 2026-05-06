@@ -30,6 +30,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.issues,
             self.symbols,
             self.php_version,
+            self.inference_only,
         );
         sa.analyze_stmts(&decl.body, &mut fn_ctx);
     }
@@ -94,6 +95,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.issues,
                 self.symbols,
                 self.php_version,
+                self.inference_only,
             );
             sa.analyze_stmts(body, &mut method_ctx);
         }
