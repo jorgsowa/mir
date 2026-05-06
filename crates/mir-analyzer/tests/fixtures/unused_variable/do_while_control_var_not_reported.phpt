@@ -12,5 +12,3 @@ function foo(): void {
     } while ($run);
 }
 ===expect===
-===ignore===
-TODO

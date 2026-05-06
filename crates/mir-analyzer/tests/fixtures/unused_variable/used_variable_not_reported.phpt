@@ -7,5 +7,3 @@ function foo(): int {
     return $x;
 }
 ===expect===
-===ignore===
-TODO

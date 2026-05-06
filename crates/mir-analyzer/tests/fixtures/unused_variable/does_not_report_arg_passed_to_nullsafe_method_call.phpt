@@ -9,5 +9,3 @@ class Qux {
     }
 }
 ===expect===
-===ignore===
-TODO

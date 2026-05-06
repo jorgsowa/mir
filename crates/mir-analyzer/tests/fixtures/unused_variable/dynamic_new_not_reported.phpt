@@ -7,5 +7,3 @@ function test(): object {
     return new $class();
 }
 ===expect===
-===ignore===
-TODO

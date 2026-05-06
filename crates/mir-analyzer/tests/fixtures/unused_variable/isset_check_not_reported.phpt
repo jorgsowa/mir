@@ -7,5 +7,3 @@ function foo(): bool {
     return isset($val);
 }
 ===expect===
-===ignore===
-TODO

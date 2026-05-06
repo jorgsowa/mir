@@ -9,5 +9,3 @@ Hello $name!
 EOT;
 }
 ===expect===
-===ignore===
-TODO

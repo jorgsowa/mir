@@ -7,5 +7,3 @@ function foo(): string {
     return "Hello $name!";
 }
 ===expect===
-===ignore===
-TODO
