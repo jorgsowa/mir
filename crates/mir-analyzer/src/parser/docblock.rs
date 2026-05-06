@@ -146,7 +146,11 @@ impl DocblockParser {
                 }
                 PhpDocTag::See { reference } => result.see.push(reference.to_string()),
                 PhpDocTag::Link { url } => result.see.push(url.to_string()),
-                PhpDocTag::Mixin { class } => result.mixins.push(class.to_string()),
+                PhpDocTag::Mixin { class } => {
+                    // Strip generic parameters from mixin class name (e.g., "Foo<T>" → "Foo")
+                    let base_class = class.split('<').next().unwrap_or(class).to_string();
+                    result.mixins.push(base_class);
+                }
                 PhpDocTag::Property {
                     type_str,
                     name: Some(n),
