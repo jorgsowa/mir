@@ -68,6 +68,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             if ctx.is_tainted(name) {
                 closure_ctx.taint_var(name);
             }
+            // Mark the captured variable as read in the parent context
+            ctx.read_vars.insert(name.to_string());
         }
 
         let inferred_return = {

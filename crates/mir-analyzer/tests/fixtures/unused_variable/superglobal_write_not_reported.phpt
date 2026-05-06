@@ -6,5 +6,3 @@ function test(): void {
     $_GET['debug'] = '1';
 }
 ===expect===
-===ignore===
-TODO

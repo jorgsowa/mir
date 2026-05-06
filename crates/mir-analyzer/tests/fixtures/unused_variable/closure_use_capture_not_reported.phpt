@@ -10,5 +10,3 @@ function foo(): array {
     }, $items);
 }
 ===expect===
-===ignore===
-TODO

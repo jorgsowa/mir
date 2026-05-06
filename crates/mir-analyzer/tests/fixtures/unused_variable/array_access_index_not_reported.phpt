@@ -7,5 +7,3 @@ function test(array $arr): mixed {
     return $arr[$keys[0]];
 }
 ===expect===
-===ignore===
-TODO

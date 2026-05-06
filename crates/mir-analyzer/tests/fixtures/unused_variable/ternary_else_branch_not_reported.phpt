@@ -7,5 +7,3 @@ function test(bool $flag): string {
     return $flag ? 'yes' : $default;
 }
 ===expect===
-===ignore===
-TODO

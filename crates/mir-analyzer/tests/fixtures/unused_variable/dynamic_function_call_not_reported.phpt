@@ -7,5 +7,3 @@ function test(): string {
     return $fn();
 }
 ===expect===
-===ignore===
-TODO

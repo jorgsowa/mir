@@ -10,5 +10,3 @@ function test(string $type): string {
     };
 }
 ===expect===
-===ignore===
-TODO

@@ -7,5 +7,3 @@ function foo(array $extra): array {
     return [...$base, ...$extra];
 }
 ===expect===
-===ignore===
-TODO

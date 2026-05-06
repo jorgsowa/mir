@@ -8,5 +8,3 @@ function foo(): array {
     return compact('name', 'age');
 }
 ===expect===
-===ignore===
-TODO
