@@ -8,6 +8,4 @@ arrayMapTooManyArgs
 
                     array_map("foo", [1, 2, 3]);
 ===expect===
-TooManyArguments
-===ignore===
-TODO
+TooManyArguments@6:30: Too many arguments for foo(): expected 0, got 1

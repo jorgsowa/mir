@@ -343,6 +343,22 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 raw_param_ty
             };
 
+            // Check typed callable signature compatibility when param type is callable(T1,T2,...):R
+            for param_atomic in &param_ty.types {
+                if let Atomic::TCallable {
+                    params: Some(expected_params),
+                    ..
+                } = param_atomic
+                {
+                    super::callable::check_typed_callable_arg(
+                        ea,
+                        &arg_ty,
+                        expected_params,
+                        arg_span,
+                    );
+                }
+            }
+
             if !param_ty.is_nullable()
                 && !param_ty.is_mixed()
                 && arg_ty.is_single()
