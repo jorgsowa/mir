@@ -12,5 +12,3 @@ namespace Inner {
     class Foo {}
 }
 ===expect===
-===ignore===
-TODO

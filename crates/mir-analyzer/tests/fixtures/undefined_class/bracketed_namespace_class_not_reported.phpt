@@ -10,5 +10,3 @@ namespace MyApp {
     }
 }
 ===expect===
-===ignore===
-TODO
