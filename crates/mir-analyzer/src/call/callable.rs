@@ -61,11 +61,12 @@ pub(crate) fn extract_callable_params(
 ///
 /// Returns false only for types that are clearly NOT callable at runtime:
 /// - TList<T>, TNonEmptyList<T> — sequential arrays, never callable
-/// - TArray, TNonEmptyArray — general arrays, not valid callables (only keyed arrays might be)
+/// - TArray, TNonEmptyArray — general arrays, not valid callables
+/// - TKeyedArray marked as is_list — known to be a numeric list, not callable
 ///
 /// Returns true (safe fallback) for:
 /// - TClosure, TCallable, TString, TLiteralString, TNull
-/// - TKeyedArray (could be [$obj, 'method'] form)
+/// - TKeyedArray NOT marked as is_list (could be [$obj, 'method'] form)
 /// - Unknown/other types
 pub(crate) fn is_valid_callable_type(union: &Union) -> bool {
     for atomic in &union.types {
@@ -75,8 +76,15 @@ pub(crate) fn is_valid_callable_type(union: &Union) -> bool {
             | Atomic::TString
             | Atomic::TNonEmptyString
             | Atomic::TLiteralString(_)
-            | Atomic::TNull
-            | Atomic::TKeyedArray { .. } => {
+            | Atomic::TNull => {
+                return true;
+            }
+            Atomic::TKeyedArray { is_list, .. } => {
+                // TKeyedArray marked as is_list is a numeric list, not a callable
+                if *is_list {
+                    return false;
+                }
+                // Otherwise it could be [obj, 'method'] form, accept it
                 return true;
             }
             Atomic::TList { .. }
