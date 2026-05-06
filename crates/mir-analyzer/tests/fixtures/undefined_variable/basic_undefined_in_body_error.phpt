@@ -7,5 +7,3 @@ function foo(): string {
 }
 ===expect===
 UndefinedVariable@3:11: Variable $result is not defined
-===ignore===
-TODO

@@ -8,6 +8,4 @@ undefinedVarInBareCallable
                     }
                     a($fn);
 ===expect===
-UndefinedVariable
-===ignore===
-TODO
+UndefinedVariable@4:28: Variable $a is not defined

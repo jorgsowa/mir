@@ -5,6 +5,4 @@ undefinedVariableInInterpolatedString
                     fn(): string => "$a";
                 
 ===expect===
-UndefinedVariable
-===ignore===
-TODO
+UndefinedVariable@2:37: Variable $a is not defined

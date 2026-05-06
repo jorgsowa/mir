@@ -7,5 +7,3 @@ function transform(string $input): string {
 }
 ===expect===
 UndefinedVariable@3:20: Variable $suffix is not defined
-===ignore===
-TODO
