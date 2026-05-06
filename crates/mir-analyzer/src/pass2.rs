@@ -1123,6 +1123,7 @@ pub(crate) fn infer_one_function(
 
 /// Infer return type for a single method body via inference-only Pass 2.
 /// Used by `inferred_method_return_type` tracked query.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn infer_one_method(
     db: &dyn MirDatabase,
     node: MethodNode,
