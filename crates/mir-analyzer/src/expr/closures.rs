@@ -42,6 +42,26 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
         for use_var in c.use_vars.iter() {
             let name = use_var.name.trim_start_matches('$');
+            // Check if variable is defined in parent context
+            if !ctx.var_is_defined(name) {
+                if ctx.var_possibly_defined(name) {
+                    self.emit(
+                        mir_issues::IssueKind::PossiblyUndefinedVariable {
+                            name: name.to_string(),
+                        },
+                        mir_issues::Severity::Warning,
+                        use_var.span,
+                    );
+                } else {
+                    self.emit(
+                        mir_issues::IssueKind::UndefinedVariable {
+                            name: name.to_string(),
+                        },
+                        mir_issues::Severity::Error,
+                        use_var.span,
+                    );
+                }
+            }
             closure_ctx.set_var(name, ctx.get_var(name));
             if ctx.is_tainted(name) {
                 closure_ctx.taint_var(name);
