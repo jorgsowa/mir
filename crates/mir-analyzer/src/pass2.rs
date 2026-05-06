@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use mir_issues::Issue;
 use mir_types::Union;
@@ -9,6 +9,12 @@ use crate::diagnostics::{
 };
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
+
+#[derive(Clone)]
+pub(crate) struct InferredTypes {
+    pub(crate) functions: Vec<(Arc<str>, Union)>,
+    pub(crate) methods: Vec<(Arc<str>, Arc<str>, Union)>,
+}
 
 /// Resolve a function declaration's `FunctionNode` via the salsa db,
 /// matching the pre-S5 fallback chain (qualified FQN → raw name →
@@ -60,17 +66,11 @@ fn ast_derived_fn_params<'arena, 'src>(
         .collect()
 }
 
-// ---------------------------------------------------------------------------
-// Pass2Driver
-// ---------------------------------------------------------------------------
-
 pub(crate) struct Pass2Driver<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     inference_only: bool,
-    /// Optional buffer for inferred return types. Set during the priming sweep
-    /// and committed to the database after the sweep completes.
-    pub(crate) inferred_buffer: Option<&'a crate::project::InferredReturnBuffer>,
+    inferred_types: Arc<Mutex<InferredTypes>>,
 }
 
 impl<'a> Pass2Driver<'a> {
@@ -79,7 +79,10 @@ impl<'a> Pass2Driver<'a> {
             db,
             php_version,
             inference_only: false,
-            inferred_buffer: None,
+            inferred_types: Arc::new(Mutex::new(InferredTypes {
+                functions: Vec::new(),
+                methods: Vec::new(),
+            })),
         }
     }
 
@@ -88,27 +91,40 @@ impl<'a> Pass2Driver<'a> {
             db,
             php_version,
             inference_only: true,
-            inferred_buffer: None,
+            inferred_types: Arc::new(Mutex::new(InferredTypes {
+                functions: Vec::new(),
+                methods: Vec::new(),
+            })),
         }
     }
 
-    pub(crate) fn with_inferred_buffer(
-        mut self,
-        buf: &'a crate::project::InferredReturnBuffer,
-    ) -> Self {
-        self.inferred_buffer = Some(buf);
-        self
+    pub(crate) fn take_inferred_types(&self) -> InferredTypes {
+        let types = Arc::clone(&self.inferred_types);
+        Arc::try_unwrap(types)
+            .map(|mutex| {
+                mutex.into_inner().unwrap_or_else(|_| InferredTypes {
+                    functions: Vec::new(),
+                    methods: Vec::new(),
+                })
+            })
+            .unwrap_or_else(|arc| arc.lock().unwrap().clone())
     }
 
     fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Union) {
-        if let Some(buf) = self.inferred_buffer {
-            buf.push_function(fqn.clone(), inferred.clone());
+        if self.inference_only {
+            if let Ok(mut types) = self.inferred_types.lock() {
+                types.functions.push((fqn.clone(), inferred.clone()));
+            }
         }
     }
 
     fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Union) {
-        if let Some(buf) = self.inferred_buffer {
-            buf.push_method(Arc::from(fqcn), Arc::from(name), inferred.clone());
+        if self.inference_only {
+            if let Ok(mut types) = self.inferred_types.lock() {
+                types
+                    .methods
+                    .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
+            }
         }
     }
 
@@ -1120,8 +1136,6 @@ impl<'a> Pass2Driver<'a> {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
 
 /// Seed `ctx.var_locations` for function/method parameters using their AST spans.
 fn seed_param_locations(

@@ -11,9 +11,7 @@ use mir_codebase::StubSlice;
 use mir_issues::Issue;
 use mir_types::Union;
 
-// ---------------------------------------------------------------------------
 // MirDatabase trait
-// ---------------------------------------------------------------------------
 
 /// Salsa database trait for mir incremental analysis.
 #[salsa::db]
@@ -103,9 +101,7 @@ pub trait MirDatabase: salsa::Database {
     fn clear_file_references(&self, file: &str);
 }
 
-// ---------------------------------------------------------------------------
 // SourceFile input (S1)
-// ---------------------------------------------------------------------------
 
 /// Source file registered as a Salsa input.
 /// Setting `text` on an existing `SourceFile` is the single write that drives
@@ -116,9 +112,7 @@ pub struct SourceFile {
     pub text: Arc<str>,
 }
 
-// ---------------------------------------------------------------------------
 // FileDefinitions (S1)
-// ---------------------------------------------------------------------------
 
 /// Result of the `collect_file_definitions` tracked query.
 #[derive(Clone, Debug)]
@@ -140,9 +134,7 @@ unsafe impl salsa::Update for FileDefinitions {
     }
 }
 
-// ---------------------------------------------------------------------------
 // ClassNode input (S2)
-// ---------------------------------------------------------------------------
 
 /// `(interface_fqcn, type_args)` pairs from `@implements Iface<T1, T2>`
 /// docblocks.  Stored on `ClassNode` for classes only.
@@ -381,9 +373,7 @@ pub fn inherited_template_bindings_via_db(
     bindings
 }
 
-// ---------------------------------------------------------------------------
 // FunctionNode input (S5-PR2)
-// ---------------------------------------------------------------------------
 
 /// Salsa input representing a single global function.
 ///
@@ -415,9 +405,7 @@ pub struct FunctionNode {
     pub location: Option<Location>,
 }
 
-// ---------------------------------------------------------------------------
 // MethodNode input (S5-PR3)
-// ---------------------------------------------------------------------------
 
 /// Salsa input representing a single method or interface/trait method.
 ///
@@ -454,9 +442,7 @@ pub struct MethodNode {
     pub location: Option<Location>,
 }
 
-// ---------------------------------------------------------------------------
 // PropertyNode input (S5-PR4)
-// ---------------------------------------------------------------------------
 
 /// Salsa input representing a single class/trait property.
 ///
@@ -476,9 +462,7 @@ pub struct PropertyNode {
     pub location: Option<Location>,
 }
 
-// ---------------------------------------------------------------------------
 // ClassConstantNode input (S5-PR4)
-// ---------------------------------------------------------------------------
 
 /// Salsa input representing a single class/interface/enum constant.
 ///
@@ -497,9 +481,7 @@ pub struct ClassConstantNode {
     pub location: Option<Location>,
 }
 
-// ---------------------------------------------------------------------------
 // GlobalConstantNode input (S5-PR47)
-// ---------------------------------------------------------------------------
 
 /// Salsa input representing a global PHP constant (e.g. `PHP_EOL`).
 /// Mirrors `Codebase::constants`.
@@ -510,9 +492,7 @@ pub struct GlobalConstantNode {
     pub ty: Union,
 }
 
-// ---------------------------------------------------------------------------
 // Ancestors return type (S2)
-// ---------------------------------------------------------------------------
 
 /// The computed ancestor list for a class or interface.
 ///
@@ -543,9 +523,7 @@ unsafe impl salsa::Update for Ancestors {
     }
 }
 
-// ---------------------------------------------------------------------------
 // class_ancestors tracked query (S2)
-// ---------------------------------------------------------------------------
 
 fn ancestors_initial(_db: &dyn MirDatabase, _id: salsa::Id, _node: ClassNode) -> Ancestors {
     Ancestors(vec![])
@@ -1154,9 +1132,7 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
         .any(|p| p.as_ref() == ancestor)
 }
 
-// ---------------------------------------------------------------------------
 // collect_file_definitions tracked query (S1)
-// ---------------------------------------------------------------------------
 
 /// Uncached version of collect_file_definitions for bulk operations like vendor
 /// collection, where we don't need Salsa to cache the intermediate StubSlice
@@ -1207,9 +1183,7 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
     collect_file_definitions_uncached(db, file)
 }
 
-// ---------------------------------------------------------------------------
 // MirDb concrete database
-// ---------------------------------------------------------------------------
 
 /// Concrete in-process Salsa database.
 ///
@@ -2376,9 +2350,7 @@ impl MirDb {
     }
 }
 
-// ---------------------------------------------------------------------------
 // S4 Step 1: analyze_file accumulators + tracked-query skeleton
-// ---------------------------------------------------------------------------
 //
 // First step toward S4 (issues + reference locations as Salsa accumulators,
 // `analyze_file` as a tracked query).  This step is purely additive:
@@ -2483,9 +2455,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, _input: AnalyzeFileI
     }
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
