@@ -15,7 +15,6 @@ use crate::db::{
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use mir_issues::Issue;
-use mir_types::Union;
 use salsa::Setter as _;
 
 pub use crate::pass2::merge_return_types;
@@ -474,7 +473,7 @@ impl ProjectAnalyzer {
             // Cache the results for this file
             if let Some(cache) = &self.cache {
                 let text = sf.text(&db_read);
-                let h = hash_content(&*text);
+                let h = hash_content(&text);
                 let ref_locs = db_read.extract_file_reference_locations(file_path);
                 let ref_locs_for_cache: Vec<(String, u32, u16, u16)> = ref_locs
                     .into_iter()
