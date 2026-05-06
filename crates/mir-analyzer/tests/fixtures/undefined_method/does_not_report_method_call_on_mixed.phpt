@@ -9,5 +9,3 @@ function test(): void {
 }
 ===expect===
 MixedMethodCall@5:4: Method anything() called on mixed type
-===ignore===
-TODO
