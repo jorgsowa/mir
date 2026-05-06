@@ -4,6 +4,4 @@ undefinedConstant
 <?php
                     echo HELLO;
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
+UndefinedConstant@2:25: Constant HELLO is not defined

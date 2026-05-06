@@ -12,6 +12,4 @@ undefinedConstantInAttribute
                     class Bar {}
                 
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
+UnusedParam@5:52: Parameter $i is never used

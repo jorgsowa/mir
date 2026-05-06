@@ -7,5 +7,3 @@ function test(): void {
 }
 ===expect===
 UndefinedConstant@3:9: Constant UNDEFINED_CONST is not defined
-===ignore===
-TODO

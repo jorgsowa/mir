@@ -11,6 +11,3 @@ nonExistentClassConstant
                         return 5;
                     }
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
