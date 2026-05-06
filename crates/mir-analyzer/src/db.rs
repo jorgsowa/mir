@@ -1461,50 +1461,6 @@ impl MirDatabase for MirDb {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Inferred-return-type buffer (S3 deadlock resolution)
-// ---------------------------------------------------------------------------
-
-/// Thread-safe buffer used by Pass 2's priming sweep to record inferred
-/// return types per (function|method).  The sweep runs in parallel across
-/// rayon workers each holding its own `MirDb` clone, so writing setters
-/// from inside the closure would deadlock against `Storage::cancel_others`
-/// (which waits for all clones to drop before allowing a write).
-///
-/// Instead, workers push into this buffer (a `Mutex<Vec<…>>` — pushes are
-/// fast, contention is negligible vs the work each worker does).  After
-/// the parallel sweep returns, all worker clones are dropped and
-/// [`MirDb::commit_inferred_return_types`] drains the buffer into Salsa
-/// setters on the canonical db (which now has strong-count==1).
-#[derive(Default)]
-#[allow(clippy::type_complexity)]
-pub struct InferredReturnTypes {
-    /// `(fqn, inferred)` pairs for free functions.
-    functions: std::sync::Mutex<Vec<(Arc<str>, Union)>>,
-    /// `(fqcn, method_name, inferred)` triples for methods.  `method_name`
-    /// is the original (non-lowercased) name; `commit` lowercases at
-    /// lookup time to match `MirDb::method_nodes`' key convention.
-    methods: std::sync::Mutex<Vec<(Arc<str>, Arc<str>, Union)>>,
-}
-
-impl InferredReturnTypes {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn push_function(&self, fqn: Arc<str>, inferred: Union) {
-        if let Ok(mut g) = self.functions.lock() {
-            g.push((fqn, inferred));
-        }
-    }
-
-    pub fn push_method(&self, fqcn: Arc<str>, name: Arc<str>, inferred: Union) {
-        if let Ok(mut g) = self.methods.lock() {
-            g.push((fqcn, name, inferred));
-        }
-    }
-}
-
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
 /// to fill in the fields that don't apply to your kind (e.g. interfaces leave
 /// `parent`, `traits`, `mixins`, `is_abstract`, etc. at their defaults).
@@ -2063,10 +2019,15 @@ impl MirDb {
     /// value (preserves PR21's fast-skip semantics).  Skips inactive
     /// nodes — there's no point committing an inferred return for a node
     /// that has been deactivated by a re-analyze.
-    pub fn commit_inferred_return_types(&mut self, buf: &InferredReturnTypes) {
+    /// Commit inferred return types collected during the priming sweep.
+    /// Takes ownership of the function and method inferred type vectors.
+    pub fn commit_inferred_return_types(
+        &mut self,
+        functions: Vec<(Arc<str>, mir_types::Union)>,
+        methods: Vec<(Arc<str>, Arc<str>, mir_types::Union)>,
+    ) {
         use salsa::Setter as _;
-        let funcs = std::mem::take(&mut *buf.functions.lock().expect("inferred buffer poisoned"));
-        for (fqn, inferred) in funcs {
+        for (fqn, inferred) in functions {
             if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
                 if !node.active(self) {
                     continue;
@@ -2078,7 +2039,6 @@ impl MirDb {
                 node.set_inferred_return_type(self).to(new);
             }
         }
-        let methods = std::mem::take(&mut *buf.methods.lock().expect("inferred buffer poisoned"));
         for (fqcn, name, inferred) in methods {
             let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
                 name.clone()

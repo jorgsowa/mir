@@ -15,10 +15,55 @@ use crate::db::{
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use mir_issues::Issue;
+use mir_types::Union;
 use salsa::Setter as _;
 
 // Re-exports for downstream callers in this crate.
 pub use crate::pass2::merge_return_types;
+
+// ---------------------------------------------------------------------------
+// InferredReturnBuffer
+// ---------------------------------------------------------------------------
+
+/// Thread-safe buffer for recording inferred return types during the
+/// parallel priming sweep. After the sweep completes and all workers drop
+/// their database clones, the buffer is committed to the canonical database.
+#[derive(Default)]
+#[allow(clippy::type_complexity)]
+pub(crate) struct InferredReturnBuffer {
+    /// `(fqn, inferred)` pairs for free functions.
+    functions: std::sync::Mutex<Vec<(Arc<str>, Union)>>,
+    /// `(fqcn, method_name, inferred)` triples for methods.  `method_name`
+    /// is the original (non-lowercased) name; `commit` lowercases at
+    /// lookup time to match `MirDb::method_nodes`' key convention.
+    methods: std::sync::Mutex<Vec<(Arc<str>, Arc<str>, Union)>>,
+}
+
+impl InferredReturnBuffer {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn push_function(&self, fqn: Arc<str>, inferred: Union) {
+        if let Ok(mut g) = self.functions.lock() {
+            g.push((fqn, inferred));
+        }
+    }
+
+    pub(crate) fn push_method(&self, fqcn: Arc<str>, name: Arc<str>, inferred: Union) {
+        if let Ok(mut g) = self.methods.lock() {
+            g.push((fqcn, name, inferred));
+        }
+    }
+
+    pub(crate) fn take_functions(&self) -> Vec<(Arc<str>, Union)> {
+        std::mem::take(&mut *self.functions.lock().expect("inferred buffer poisoned"))
+    }
+
+    pub(crate) fn take_methods(&self) -> Vec<(Arc<str>, Arc<str>, Union)> {
+        std::mem::take(&mut *self.methods.lock().expect("inferred buffer poisoned"))
+    }
+}
 
 // ---------------------------------------------------------------------------
 // ProjectAnalyzer
@@ -429,12 +474,11 @@ impl ProjectAnalyzer {
         // Run a first inference-only sweep so that cross-file inferred return
         // types are available before the issue-emitting pass below (G6).
         //
-        // Inferred types are also collected into a thread-safe buffer here and
-        // committed to the Salsa db serially after the sweep returns.  Using
-        // `rayon::scope` inside a helper function ensures that all worker
-        // threads and their thread-local Salsa state drop before we call
-        // `commit_inferred_return_types` on the canonical db.  See issue #S3.
-        let inferred_buffer = crate::db::InferredReturnTypes::new();
+        // Inferred types are collected into a thread-safe buffer during the
+        // parallel sweep and committed to the Salsa db serially after the sweep
+        // returns. Using `rayon::in_place_scope` ensures all worker threads and
+        // their thread-local Salsa state drop before we commit to the canonical db.
+        let inferred_buffer = InferredReturnBuffer::new();
         let filtered_parsed: Vec<_> = parsed_files
             .par_iter()
             .filter(|parsed| {
@@ -454,7 +498,7 @@ impl ProjectAnalyzer {
         // Now safe to commit inferred types into the Salsa db.
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.0.commit_inferred_return_types(&inferred_buffer);
+            commit_inferred_return_types(&mut guard.0, &inferred_buffer);
         }
 
         let db_main = {
@@ -698,7 +742,7 @@ impl ProjectAnalyzer {
             // definitions; collect inferred return types for a serial commit
             // after the parallel sweep returns (same buffer-and-commit
             // pattern as the main batch priming sweep).
-            let inferred_buffer = crate::db::InferredReturnTypes::new();
+            let inferred_buffer = InferredReturnBuffer::new();
             let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
                 .par_iter()
                 .filter(|(f, _)| {
@@ -716,7 +760,7 @@ impl ProjectAnalyzer {
 
             {
                 let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-                guard.0.commit_inferred_return_types(&inferred_buffer);
+                commit_inferred_return_types(&mut guard.0, &inferred_buffer);
             }
 
             for (issues, symbols) in reanalysis {
@@ -795,7 +839,7 @@ impl ProjectAnalyzer {
                 // commit pattern is overkill for the single-threaded LSP path but kept
                 // for symmetry with the parallel batch path (and so the analyzer's
                 // Salsa node reads see the inferred values).
-                let inferred_buffer = crate::db::InferredReturnTypes::new();
+                let inferred_buffer = InferredReturnBuffer::new();
                 {
                     let db_ref: &dyn MirDatabase = db;
                     Pass2Driver::new_inference_only(db_ref, self.resolved_php_version())
@@ -807,7 +851,7 @@ impl ProjectAnalyzer {
                             &parsed.source_map,
                         );
                 }
-                db.commit_inferred_return_types(&inferred_buffer);
+                commit_inferred_return_types(db, &inferred_buffer);
 
                 let db_ref: &dyn MirDatabase = db;
                 let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
@@ -865,11 +909,11 @@ impl ProjectAnalyzer {
         // inferred values.  Single-threaded — no buffer / commit dance
         // needed in principle, but we use the same pattern for symmetry
         // with the parallel batch path.
-        let inferred_buffer = crate::db::InferredReturnTypes::new();
+        let inferred_buffer = InferredReturnBuffer::new();
         Pass2Driver::new_inference_only(&db, analyzer.resolved_php_version())
             .with_inferred_buffer(&inferred_buffer)
             .analyze_bodies(&result.program, file.clone(), source, &result.source_map);
-        db.commit_inferred_return_types(&inferred_buffer);
+        commit_inferred_return_types(&mut db, &inferred_buffer);
 
         let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
@@ -963,14 +1007,14 @@ impl Default for ProjectAnalyzer {
 // ---------------------------------------------------------------------------
 
 /// Helper to run the inference sweep using `rayon::in_place_scope` instead of
-/// `for_each_with`. The scope guarantees all worker threads and their
-/// thread-local Salsa state drop before the function returns, preventing
-/// deadlock when calling `commit_inferred_return_types` on the canonical db.
+/// Run the priming sweep to collect inferred return types.
+/// The scope guarantees all worker threads and their thread-local Salsa state
+/// drop before the function returns, allowing safe serialcommit to the canonical db.
 fn run_inference_sweep(
     db_priming: MirDb,
     parsed_files: Vec<&ParsedProjectFile>,
     php_version: PhpVersion,
-    inferred_buffer: &crate::db::InferredReturnTypes,
+    inferred_buffer: &InferredReturnBuffer,
 ) {
     rayon::in_place_scope(|s| {
         for parsed in parsed_files {
@@ -1109,6 +1153,14 @@ fn extract_reference_locations(
         .into_iter()
         .map(|(sym, line, col_start, col_end)| (sym.to_string(), line, col_start, col_end))
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Inferred return type commitment
+// ---------------------------------------------------------------------------
+
+fn commit_inferred_return_types(db: &mut MirDb, buf: &InferredReturnBuffer) {
+    db.commit_inferred_return_types(buf.take_functions(), buf.take_methods());
 }
 
 // ---------------------------------------------------------------------------

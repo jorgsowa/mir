@@ -3,7 +3,7 @@ use std::sync::Arc;
 use mir_issues::Issue;
 use mir_types::Union;
 
-use crate::db::{resolve_name_via_db, FunctionNode, InferredReturnTypes, MirDatabase};
+use crate::db::{resolve_name_via_db, FunctionNode, MirDatabase};
 use crate::diagnostics::{
     check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
 };
@@ -68,12 +68,9 @@ pub(crate) struct Pass2Driver<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     inference_only: bool,
-    /// Optional buffer for inferred return types; populated by `analyze_*`
-    /// during the priming sweep.  See [`InferredReturnTypes`] and
-    /// `MirDb::commit_inferred_return_types`.  `None` means "skip the
-    /// salsa-side commit" — the main sweep doesn't need to publish
-    /// inferred types because the priming sweep already did.
-    inferred_buffer: Option<&'a InferredReturnTypes>,
+    /// Optional buffer for inferred return types. Set during the priming sweep
+    /// and committed to the database after the sweep completes.
+    pub(crate) inferred_buffer: Option<&'a crate::project::InferredReturnBuffer>,
 }
 
 impl<'a> Pass2Driver<'a> {
@@ -95,22 +92,20 @@ impl<'a> Pass2Driver<'a> {
         }
     }
 
-    /// Attach an inferred-return-type buffer.  Used during the priming
-    /// sweep so workers record their inferred types for the post-sweep
-    /// commit phase.
-    pub(crate) fn with_inferred_buffer(mut self, buf: &'a InferredReturnTypes) -> Self {
+    pub(crate) fn with_inferred_buffer(
+        mut self,
+        buf: &'a crate::project::InferredReturnBuffer,
+    ) -> Self {
         self.inferred_buffer = Some(buf);
         self
     }
 
-    /// Push a function inference into the buffer (if attached).
     fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Union) {
         if let Some(buf) = self.inferred_buffer {
             buf.push_function(fqn.clone(), inferred.clone());
         }
     }
 
-    /// Push a method inference into the buffer (if attached).
     fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Union) {
         if let Some(buf) = self.inferred_buffer {
             buf.push_method(Arc::from(fqcn), Arc::from(name), inferred.clone());
