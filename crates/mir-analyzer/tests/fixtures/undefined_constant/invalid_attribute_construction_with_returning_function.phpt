@@ -23,6 +23,4 @@ invalidAttributeConstructionWithReturningFunction
                     }
                 
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
+UnusedParam@10:52: Parameter $e is never used

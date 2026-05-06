@@ -6,6 +6,4 @@ undefinedClassConstantInParamDefault
                         public function doSomething(int $howManyTimes = self::DEFAULT_TIMES): void {}
                     }
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
+UnusedParam@3:52: Parameter $howManyTimes is never used

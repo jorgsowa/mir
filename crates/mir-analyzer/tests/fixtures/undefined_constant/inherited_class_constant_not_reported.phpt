@@ -10,5 +10,3 @@ function test(): void {
     echo Child::VALUE;
 }
 ===expect===
-===ignore===
-TODO

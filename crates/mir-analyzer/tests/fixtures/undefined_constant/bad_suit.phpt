@@ -13,6 +13,4 @@ badSuit
                         if ($s === Suit::Clu) {}
                     }
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
+UndefinedConstant@10:35: Constant Suit::Clu is not defined

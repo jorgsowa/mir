@@ -7,5 +7,3 @@ function test(): void {
     echo PHP_INT_MAX;
 }
 ===expect===
-===ignore===
-TODO

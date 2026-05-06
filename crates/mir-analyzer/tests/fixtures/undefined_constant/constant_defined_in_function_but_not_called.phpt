@@ -11,6 +11,4 @@ constantDefinedInFunctionButNotCalled
 
                     echo CONSTANT;
 ===expect===
-UndefinedConstant
-===ignore===
-TODO
+UndefinedConstant@9:25: Constant CONSTANT is not defined

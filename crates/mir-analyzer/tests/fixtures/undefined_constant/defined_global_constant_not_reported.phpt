@@ -7,5 +7,3 @@ function test(): void {
     echo MY_CONST;
 }
 ===expect===
-===ignore===
-TODO

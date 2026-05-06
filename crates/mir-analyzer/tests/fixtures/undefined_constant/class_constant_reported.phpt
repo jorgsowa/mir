@@ -10,5 +10,3 @@ function test(): void {
 }
 ===expect===
 UndefinedConstant@6:9: Constant Foo::MISSING is not defined
-===ignore===
-TODO

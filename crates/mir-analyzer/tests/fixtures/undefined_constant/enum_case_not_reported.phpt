@@ -10,5 +10,3 @@ function test(): Status {
     return Status::Active;
 }
 ===expect===
-===ignore===
-TODO

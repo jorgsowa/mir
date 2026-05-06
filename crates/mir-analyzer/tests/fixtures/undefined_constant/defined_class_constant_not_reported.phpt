@@ -9,5 +9,3 @@ function test(): void {
     echo Foo::BAR;
 }
 ===expect===
-===ignore===
-TODO
