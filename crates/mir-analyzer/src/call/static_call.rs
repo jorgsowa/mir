@@ -119,10 +119,10 @@ impl CallAnalyzer {
             let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, &fqcn)
                 .map(|k| (k.is_interface, k.is_abstract))
                 .unwrap_or((false, false));
-            if is_interface
-                || is_abstract
-                || crate::db::method_exists_via_db(ea.db, &fqcn, "__callStatic")
-            {
+            // Check for __callStatic in the full inheritance chain (not just direct methods)
+            let has_callstatic_magic =
+                crate::db::lookup_method_in_chain(ea.db, &fqcn, "__callstatic").is_some();
+            if is_interface || is_abstract || has_callstatic_magic {
                 Union::mixed()
             } else {
                 ea.emit(
