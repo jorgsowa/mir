@@ -12,7 +12,7 @@ impl<'a> StatementsAnalyzer<'a> {
             .params
             .iter()
             .map(|p| mir_codebase::FnParam {
-                name: Arc::from(p.name.trim_start_matches('$')),
+                name: Arc::from(p.name.to_string().trim_start_matches('$')),
                 ty: None,
                 has_default: p.default.is_some(),
                 is_variadic: p.variadic,
@@ -48,7 +48,11 @@ impl<'a> StatementsAnalyzer<'a> {
         decl: &php_ast::ast::ClassDecl<'arena, 'src>,
         ctx: &mut Context,
     ) {
-        let class_name = decl.name.unwrap_or("<anonymous>");
+        let class_name_owned = decl
+            .name
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "<anonymous>".to_string());
+        let class_name = class_name_owned.as_str();
         let resolved = crate::db::resolve_name_via_db(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
         let parent_fqcn = self
@@ -62,7 +66,7 @@ impl<'a> StatementsAnalyzer<'a> {
             };
             let Some(body) = &method.body else { continue };
             let (params, return_ty) =
-                crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), method.name)
+                crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), &method.name.to_string())
                     .map(|n| {
                         (
                             n.params(self.db).to_vec(),
@@ -74,7 +78,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             .params
                             .iter()
                             .map(|p| mir_codebase::FnParam {
-                                name: p.name.trim_start_matches('$').into(),
+                                name: Arc::from(p.name.to_string().trim_start_matches('$')),
                                 ty: None,
                                 has_default: p.default.is_some(),
                                 is_variadic: p.variadic,

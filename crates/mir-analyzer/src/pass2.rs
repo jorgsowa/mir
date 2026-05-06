@@ -56,7 +56,7 @@ fn ast_derived_fn_params<'arena, 'src>(
     params
         .iter()
         .map(|p| mir_codebase::FnParam {
-            name: Arc::from(p.name),
+            name: Arc::from(p.name.to_string()),
             ty: None,
             has_default: p.default.is_some(),
             is_variadic: p.variadic,
@@ -449,7 +449,7 @@ impl<'a> Pass2Driver<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        let fn_name = decl.name;
+        let fn_name = decl.name.to_string();
         let body = &decl.body;
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
@@ -463,7 +463,7 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), fn_name);
+        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
         let fqn = node_opt.map(|n| n.fqn(self.db));
         let (params, return_ty, template_params, declared_throws): (
             Vec<mir_codebase::FnParam>,
@@ -477,7 +477,7 @@ impl<'a> Pass2Driver<'a> {
                     && stored
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+                        .all(|(cp, ap)| ap.name.to_string() == *cp.name)
                 {
                     (
                         stored.to_vec(),
@@ -556,7 +556,11 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let class_name = decl.name.unwrap_or("<anonymous>");
+        let class_name_owned = decl
+            .name
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "<anonymous>".to_string());
+        let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
         let parent_fqcn = self
@@ -594,7 +598,7 @@ impl<'a> Pass2Driver<'a> {
             let Some(body) = &method.body else { continue };
 
             let (params, return_ty, template_params, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
                     .map(|n| {
                         (
                             n.params(self.db).to_vec(),
@@ -635,11 +639,11 @@ impl<'a> Pass2Driver<'a> {
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
-            emit_unused_params(&params, &ctx, method.name, file, all_issues);
+            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, method.name, &inferred);
+            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -663,7 +667,7 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let fn_name = decl.name;
+        let fn_name = decl.name.to_string();
         let body = &decl.body;
 
         for param in decl.params.iter() {
@@ -675,7 +679,7 @@ impl<'a> Pass2Driver<'a> {
             check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
         }
 
-        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), fn_name);
+        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
         let fqn = node_opt.map(|n| n.fqn(self.db));
         let (params, return_ty, declared_throws): (Vec<mir_codebase::FnParam>, _, Arc<[Arc<str>]>) =
             match node_opt {
@@ -685,7 +689,7 @@ impl<'a> Pass2Driver<'a> {
                         && stored
                             .iter()
                             .zip(decl.params.iter())
-                            .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+                            .all(|(cp, ap)| ap.name.to_string() == *cp.name)
                     {
                         (
                             stored.to_vec(),
@@ -762,7 +766,11 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let class_name = decl.name.unwrap_or("<anonymous>");
+        let class_name_owned = decl
+            .name
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "<anonymous>".to_string());
+        let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
         let parent_fqcn = self
@@ -800,7 +808,7 @@ impl<'a> Pass2Driver<'a> {
             let Some(body) = &method.body else { continue };
 
             let (params, return_ty, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
                     .map(|n| {
                         (
                             n.params(self.db).to_vec(),
@@ -842,16 +850,16 @@ impl<'a> Pass2Driver<'a> {
             type_envs.insert(
                 crate::type_env::ScopeId::Method {
                     class: Arc::from(fqcn),
-                    method: Arc::from(method.name),
+                    method: Arc::from(method.name.to_string()),
                 },
                 crate::type_env::TypeEnv::new(ctx.vars.clone()),
             );
 
-            emit_unused_params(&params, &ctx, method.name, file, all_issues);
+            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, method.name, &inferred);
+            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -948,7 +956,7 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved = resolve_name_via_db(self.db, file.as_ref(), decl.name);
+        let resolved = resolve_name_via_db(self.db, file.as_ref(), &decl.name.to_string());
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
@@ -974,7 +982,7 @@ impl<'a> Pass2Driver<'a> {
             let Some(body) = &method.body else { continue };
 
             let (params, return_ty, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
                     .map(|n| {
                         (
                             n.params(self.db).to_vec(),
@@ -1013,11 +1021,11 @@ impl<'a> Pass2Driver<'a> {
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
-            emit_unused_params(&params, &ctx, method.name, file, all_issues);
+            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, method.name, &inferred);
+            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
         }
     }
 
@@ -1039,7 +1047,7 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved = resolve_name_via_db(self.db, file.as_ref(), decl.name);
+        let resolved = resolve_name_via_db(self.db, file.as_ref(), &decl.name.to_string());
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
@@ -1065,7 +1073,7 @@ impl<'a> Pass2Driver<'a> {
             let Some(body) = &method.body else { continue };
 
             let (params, return_ty, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, method.name)
+                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
                     .map(|n| {
                         (
                             n.params(self.db).to_vec(),
@@ -1107,16 +1115,16 @@ impl<'a> Pass2Driver<'a> {
             type_envs.insert(
                 crate::type_env::ScopeId::Method {
                     class: Arc::from(fqcn),
-                    method: Arc::from(method.name),
+                    method: Arc::from(method.name.to_string()),
                 },
                 crate::type_env::TypeEnv::new(ctx.vars.clone()),
             );
 
-            emit_unused_params(&params, &ctx, method.name, file, all_issues);
+            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, method.name, &inferred);
+            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
         }
     }
 
@@ -1183,7 +1191,8 @@ fn seed_param_locations(
     source_map: &php_rs_parser::source_map::SourceMap,
 ) {
     for p in ast_params.iter() {
-        let name = p.name.trim_start_matches('$');
+        let name_str = p.name.to_string();
+        let name = name_str.trim_start_matches('$');
         let (line, col_start) =
             crate::diagnostics::offset_to_line_col(source, p.span.start, source_map);
         let (line_end, col_end) =

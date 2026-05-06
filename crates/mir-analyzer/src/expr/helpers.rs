@@ -1,5 +1,6 @@
 use mir_types::{Atomic, Union};
 use php_ast::ast::{Expr, ExprKind};
+use std::sync::Arc;
 
 pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
     let mut result = Union::empty();
@@ -143,7 +144,7 @@ pub(crate) fn ast_params_to_fn_params_resolved<'arena, 'src>(
                 .map(|h| crate::parser::type_from_hint(h, self_fqcn))
                 .map(|u| resolve_named_objects_in_union(u, db, file));
             mir_codebase::FnParam {
-                name: p.name.trim_start_matches('$').into(),
+                name: Arc::from(p.name.to_string().trim_start_matches('$')),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default: p.default.is_some(),
                 is_variadic: p.variadic,

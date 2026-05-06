@@ -13,7 +13,8 @@ impl DefinitionCollector<'_> {
         decl: &php_ast::ast::EnumDecl<'arena, 'src>,
         stmt_span: php_ast::Span,
     ) {
-        let fqcn = self.resolve_name(decl.name);
+        let enum_name = decl.name.to_string();
+        let fqcn = self.resolve_name(&enum_name);
 
         let scalar_type = decl
             .scalar_type
@@ -34,9 +35,9 @@ impl DefinitionCollector<'_> {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
                     cases.insert(
-                        Arc::from(c.name),
+                        Arc::from(c.name.to_string()),
                         EnumCaseStorage {
-                            name: c.name.into(),
+                            name: Arc::from(c.name.to_string()),
                             value: c.value.as_ref().map(|_| Union::mixed()),
                             location: Some(self.location(member.span.start, member.span.end)),
                         },
@@ -54,9 +55,9 @@ impl DefinitionCollector<'_> {
                 }
                 EnumMemberKind::ClassConst(c) => {
                     own_constants.insert(
-                        Arc::from(c.name),
+                        Arc::from(c.name.to_string()),
                         ConstantStorage {
-                            name: c.name.into(),
+                            name: Arc::from(c.name.to_string()),
                             ty: Union::mixed(),
                             visibility: None,
                             is_final: c.is_final,
@@ -70,7 +71,7 @@ impl DefinitionCollector<'_> {
 
         self.slice.enums.push(mir_codebase::EnumStorage {
             fqcn: fqcn.into(),
-            short_name: decl.name.into(),
+            short_name: Arc::from(decl.name.to_string()),
             scalar_type,
             interfaces,
             cases,

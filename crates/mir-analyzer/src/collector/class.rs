@@ -39,10 +39,6 @@ impl<'a> DefinitionCollector<'a> {
             .doc_comment
             .as_ref()
             .map(|c| crate::parser::DocblockParser::parse(c.text))
-            .or_else(|| {
-                crate::parser::find_preceding_docblock(self.source, stmt_span.start)
-                    .map(|t| crate::parser::DocblockParser::parse(&t))
-            })
             .unwrap_or_default();
 
         let class_doc_span = decl
@@ -68,7 +64,7 @@ impl<'a> DefinitionCollector<'a> {
                                     p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
                                 );
                                 let prop = PropertyStorage {
-                                    name: p.name.into(),
+                                    name: Arc::from(p.name.to_string()),
                                     ty,
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
@@ -79,7 +75,7 @@ impl<'a> DefinitionCollector<'a> {
                                         self.location(member.span.start, member.span.end),
                                     ),
                                 };
-                                own_properties.insert(p.name.into(), prop);
+                                own_properties.insert(Arc::from(p.name.to_string()), prop);
                             }
                         }
                     }
@@ -112,7 +108,7 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let prop = PropertyStorage {
-                        name: p.name.into(),
+                        name: Arc::from(p.name.to_string()),
                         ty: self.resolve_union_opt(
                             p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
                         ),
@@ -123,7 +119,7 @@ impl<'a> DefinitionCollector<'a> {
                         default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
                         location: Some(self.location(member.span.start, member.span.end)),
                     };
-                    own_properties.insert(p.name.into(), prop);
+                    own_properties.insert(Arc::from(p.name.to_string()), prop);
                 }
                 ClassMemberKind::ClassConst(c) => {
                     let const_doc = c
@@ -145,13 +141,13 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let constant = ConstantStorage {
-                        name: c.name.into(),
+                        name: Arc::from(c.name.to_string()),
                         ty: mir_types::Union::mixed(),
                         visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                         is_final: c.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
                     };
-                    own_constants.insert(c.name.into(), constant);
+                    own_constants.insert(Arc::from(c.name.to_string()), constant);
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {

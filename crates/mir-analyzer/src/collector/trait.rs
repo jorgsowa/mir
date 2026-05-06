@@ -12,16 +12,13 @@ impl<'a> DefinitionCollector<'a> {
         decl: &TraitDecl<'arena, 'src>,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let fqcn = self.resolve_name(decl.name);
+        let trait_name = decl.name.to_string();
+        let fqcn = self.resolve_name(&trait_name);
 
         let trait_doc = decl
             .doc_comment
             .as_ref()
             .map(|c| crate::parser::DocblockParser::parse(c.text))
-            .or_else(|| {
-                crate::parser::find_preceding_docblock(self.source, stmt_span.start)
-                    .map(|t| crate::parser::DocblockParser::parse(&t))
-            })
             .unwrap_or_default();
 
         let trait_doc_span = decl
@@ -61,7 +58,7 @@ impl<'a> DefinitionCollector<'a> {
                                     p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
                                 );
                                 let prop = PropertyStorage {
-                                    name: p.name.into(),
+                                    name: Arc::from(p.name.to_string()),
                                     ty,
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
@@ -72,7 +69,7 @@ impl<'a> DefinitionCollector<'a> {
                                         self.location(member.span.start, member.span.end),
                                     ),
                                 };
-                                own_properties.insert(p.name.into(), prop);
+                                own_properties.insert(Arc::from(p.name.to_string()), prop);
                             }
                         }
                     }
@@ -105,9 +102,9 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     own_properties.insert(
-                        Arc::from(p.name),
+                        Arc::from(p.name.to_string()),
                         PropertyStorage {
-                            name: p.name.into(),
+                            name: Arc::from(p.name.to_string()),
                             ty: self.resolve_union_opt(
                                 p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
                             ),
@@ -140,9 +137,9 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     own_constants.insert(
-                        Arc::from(c.name),
+                        Arc::from(c.name.to_string()),
                         ConstantStorage {
-                            name: c.name.into(),
+                            name: Arc::from(c.name.to_string()),
                             ty: Union::mixed(),
                             visibility: None,
                             is_final: c.is_final,
@@ -171,7 +168,7 @@ impl<'a> DefinitionCollector<'a> {
 
         self.slice.traits.push(TraitStorage {
             fqcn: fqcn.into(),
-            short_name: decl.name.into(),
+            short_name: Arc::from(decl.name.to_string()),
             own_methods,
             own_properties,
             own_constants,

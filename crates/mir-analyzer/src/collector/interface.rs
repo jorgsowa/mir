@@ -12,16 +12,13 @@ impl<'a> DefinitionCollector<'a> {
         decl: &InterfaceDecl<'arena, 'src>,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let fqcn = self.resolve_name(decl.name);
+        let interface_name = decl.name.to_string();
+        let fqcn = self.resolve_name(&interface_name);
 
         let iface_doc = decl
             .doc_comment
             .as_ref()
             .map(|c| crate::parser::DocblockParser::parse(c.text))
-            .or_else(|| {
-                crate::parser::find_preceding_docblock(self.source, stmt_span.start)
-                    .map(|t| crate::parser::DocblockParser::parse(&t))
-            })
             .unwrap_or_default();
 
         let iface_doc_span = decl
@@ -87,9 +84,9 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     own_constants.insert(
-                        Arc::from(c.name),
+                        Arc::from(c.name.to_string()),
                         ConstantStorage {
-                            name: c.name.into(),
+                            name: Arc::from(c.name.to_string()),
                             ty: Union::mixed(),
                             visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                             is_final: c.is_final,
@@ -103,7 +100,7 @@ impl<'a> DefinitionCollector<'a> {
 
         self.slice.interfaces.push(InterfaceStorage {
             fqcn: fqcn.into(),
-            short_name: decl.name.into(),
+            short_name: Arc::from(decl.name.to_string()),
             extends,
             own_methods,
             own_constants,
