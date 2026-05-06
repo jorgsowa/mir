@@ -84,6 +84,16 @@ impl DefinitionCollector<'_> {
             })
             .collect();
 
+        let throws = doc
+            .throws
+            .iter()
+            .map(|t| {
+                Arc::from(
+                    super::resolution::resolve_name(t, &self.namespace, &self.use_aliases).as_str(),
+                )
+            })
+            .collect();
+
         let storage = FunctionStorage {
             fqn: fqn.clone().into(),
             short_name: short_name.into(),
@@ -92,7 +102,7 @@ impl DefinitionCollector<'_> {
             inferred_return_type: None,
             template_params,
             assertions: self.build_assertions(&doc),
-            throws: doc.throws.iter().map(|t| Arc::from(t.as_str())).collect(),
+            throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_pure: doc.is_pure,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
