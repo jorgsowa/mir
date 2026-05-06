@@ -6,5 +6,3 @@ function test(): void {
     strlen('hello');
 }
 ===expect===
-===ignore===
-TODO

@@ -11,5 +11,3 @@ function outer(): void {
 }
 ===expect===
 UndefinedFunction@5:12: Function nonexistent_function() is not defined
-===ignore===
-TODO
