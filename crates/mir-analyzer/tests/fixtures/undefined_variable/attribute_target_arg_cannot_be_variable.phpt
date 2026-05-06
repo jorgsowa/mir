@@ -8,6 +8,3 @@ attributeTargetArgCannotBeVariable
                     class Foo {}
                 
 ===expect===
-UndefinedVariable
-===ignore===
-TODO

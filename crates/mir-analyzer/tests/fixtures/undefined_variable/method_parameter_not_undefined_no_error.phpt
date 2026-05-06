@@ -8,5 +8,3 @@ class Greeter {
     }
 }
 ===expect===
-===ignore===
-TODO

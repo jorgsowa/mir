@@ -6,5 +6,3 @@ $fn = function(string $name): string {
     return $name;
 };
 ===expect===
-===ignore===
-TODO

@@ -5,6 +5,4 @@ undefinedVariableInStringCast
                     fn(): string => (string) $a;
                 
 ===expect===
-UndefinedVariable
-===ignore===
-TODO
+UndefinedVariable@2:45: Variable $a is not defined

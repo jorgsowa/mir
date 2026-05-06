@@ -10,5 +10,3 @@ function outer(): void {
     }
 }
 ===expect===
-===ignore===
-TODO

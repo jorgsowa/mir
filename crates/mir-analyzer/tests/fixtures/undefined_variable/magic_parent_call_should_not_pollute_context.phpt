@@ -22,6 +22,4 @@ magicParentCallShouldNotPolluteContext
                         }
                     }
 ===expect===
-UndefinedVariable
-===ignore===
-TODO
+UndefinedVariable@18:35: Variable $__tmp_parent_var__ is not defined

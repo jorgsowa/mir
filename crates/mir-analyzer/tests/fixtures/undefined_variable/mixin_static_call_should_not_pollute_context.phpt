@@ -23,6 +23,5 @@ mixinStaticCallShouldNotPolluteContext
                         }
                     }
 ===expect===
-UndefinedVariable
-===ignore===
-TODO
+UndefinedMethod@18:28: Method Bar::foobar() does not exist
+UndefinedVariable@19:35: Variable $__tmp_mixin_var__ is not defined
