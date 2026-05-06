@@ -14,5 +14,3 @@ function test(): void {
     $c->anotherMissing(1, 2);
 }
 ===expect===
-===ignore===
-TODO

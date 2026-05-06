@@ -11,5 +11,3 @@ class Child extends Base {
     }
 }
 ===expect===
-===ignore===
-TODO

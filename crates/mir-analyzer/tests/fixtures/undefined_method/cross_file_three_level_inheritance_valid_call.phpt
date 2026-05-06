@@ -16,5 +16,3 @@ function test(): void {
     $c->greet();
 }
 ===expect===
-===ignore===
-TODO

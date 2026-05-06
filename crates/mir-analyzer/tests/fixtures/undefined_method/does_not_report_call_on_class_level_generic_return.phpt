@@ -28,5 +28,3 @@ $box = new Box(new User());
 $user = $box->get();
 $user->getName();
 ===expect===
-===ignore===
-TODO

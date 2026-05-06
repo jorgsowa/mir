@@ -12,5 +12,3 @@ function test(): void {
     $x->bar();
 }
 ===expect===
-===ignore===
-TODO

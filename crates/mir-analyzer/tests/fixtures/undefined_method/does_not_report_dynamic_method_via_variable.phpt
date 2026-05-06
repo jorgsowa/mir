@@ -12,5 +12,3 @@ function test(Foo $foo, array $names): void {
     }
 }
 ===expect===
-===ignore===
-TODO

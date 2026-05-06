@@ -27,5 +27,3 @@ function test(): void {
 
 class Worker extends \App\NullLogger {}
 ===expect===
-===ignore===
-TODO

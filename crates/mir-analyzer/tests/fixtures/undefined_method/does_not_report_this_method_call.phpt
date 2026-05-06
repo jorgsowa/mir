@@ -9,5 +9,3 @@ class Svc {
     }
 }
 ===expect===
-===ignore===
-TODO

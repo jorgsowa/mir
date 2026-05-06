@@ -9,5 +9,3 @@ function f(I $i): void {
     $i->doIt();
 }
 ===expect===
-===ignore===
-TODO

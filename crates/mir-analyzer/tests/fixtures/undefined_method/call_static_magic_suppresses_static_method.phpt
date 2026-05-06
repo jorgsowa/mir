@@ -12,5 +12,3 @@ function test(): void {
     Magic::anotherMissing(1, 2);
 }
 ===expect===
-===ignore===
-TODO
