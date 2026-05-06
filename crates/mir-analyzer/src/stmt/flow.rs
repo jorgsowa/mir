@@ -371,7 +371,7 @@ impl<'a> StatementsAnalyzer<'a> {
     ) {
         for sv in vars.iter() {
             let ty = Union::mixed(); // static vars are indeterminate on entry
-            ctx.set_var(sv.name.trim_start_matches('$'), ty);
+            ctx.set_var(sv.name.to_string().trim_start_matches('$'), ty);
         }
     }
 

@@ -35,7 +35,7 @@ impl DefinitionCollector<'_> {
         let mut params = Vec::new();
         for p in decl.params.iter() {
             let ty = doc
-                .get_param_type(p.name)
+                .get_param_type(&p.name.to_string())
                 .cloned()
                 .map(|u| self.resolve_union_doc(u))
                 .or_else(|| {
@@ -55,7 +55,7 @@ impl DefinitionCollector<'_> {
             }
 
             params.push(FnParam {
-                name: p.name.into(),
+                name: Arc::from(p.name.to_string()),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,

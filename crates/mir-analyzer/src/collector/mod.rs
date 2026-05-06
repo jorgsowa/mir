@@ -535,7 +535,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     let fqn: Arc<str> = if let Some(ns) = &self.namespace {
                         format!("{}\\{}", ns, item.name).into()
                     } else {
-                        item.name.into()
+                        Arc::from(item.name.to_string())
                     };
                     self.slice.constants.push((fqn, Union::mixed()));
                 }
@@ -603,7 +603,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut params = Vec::new();
         for p in m.params.iter() {
             let ty = doc
-                .get_param_type(p.name)
+                .get_param_type(&p.name.to_string())
                 .cloned()
                 .map(|u| {
                     aliases
@@ -631,7 +631,7 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             params.push(FnParam {
-                name: p.name.into(),
+                name: Arc::from(p.name.to_string()),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,
@@ -672,7 +672,7 @@ impl<'a> DefinitionCollector<'a> {
             .collect();
 
         Some(MethodStorage {
-            name: m.name.into(),
+            name: Arc::from(m.name.to_string()),
             fqcn: class_fqcn.into(),
             params: Arc::from(params.into_boxed_slice()),
             return_type: wrap_return_type(return_type),
