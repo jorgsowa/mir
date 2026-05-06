@@ -2433,23 +2433,33 @@ pub struct AnalyzeFileInput {
 /// Called on-demand during Pass 2 analysis when we encounter a call to this function.
 /// Results are cached by Salsa; re-analysis of dependent files that don't call this
 /// function re-uses the cached inferred type.
+///
+/// **Current behavior (S4 PR3):** Reads from the already-committed `inferred_return_type`
+/// field on `FunctionNode`. Double-pass orchestration (Pass 2a inference + commit) still
+/// happens in `project.rs::analyze()`.
+///
+/// **Future (S4 PR4):** Will compute types on-demand by extracting the function body
+/// from source and running inference-only Pass 2, eliminating the double-pass.
 #[salsa::tracked]
-pub fn inferred_function_return_type(_db: &dyn MirDatabase, _node: FunctionNode) -> Arc<Union> {
-    let _php_version = PhpVersion::LATEST; // TODO: thread php_version from caller
-
-    // TODO: extract just this function's body from the source file and analyze it
-    // For now, return a placeholder that forces callers to use type hints
-    Arc::new(Union::mixed())
+pub fn inferred_function_return_type(db: &dyn MirDatabase, node: FunctionNode) -> Arc<Union> {
+    // For now, read the already-committed inferred type from the FunctionNode input.
+    // This is set via commit_inferred_return_types() after Pass 2a completes.
+    node.inferred_return_type(db)
+        .unwrap_or_else(|| Arc::new(Union::mixed()))
 }
 
 /// Lazily computes the inferred return type for a method.
+///
+/// **Current behavior (S4 PR3):** Reads from the already-committed `inferred_return_type`
+/// field on `MethodNode`.
+///
+/// **Future (S4 PR4):** Will compute types on-demand by extracting the method body
+/// from source and running inference-only Pass 2.
 #[salsa::tracked]
-pub fn inferred_method_return_type(_db: &dyn MirDatabase, _node: MethodNode) -> Arc<Union> {
-    let _php_version = PhpVersion::LATEST; // TODO: thread php_version from caller
-
-    // TODO: extract just this method's body from the source file and analyze it
-    // For now, return a placeholder that forces callers to use type hints
-    Arc::new(Union::mixed())
+pub fn inferred_method_return_type(db: &dyn MirDatabase, node: MethodNode) -> Arc<Union> {
+    // For now, read the already-committed inferred type from the MethodNode input.
+    node.inferred_return_type(db)
+        .unwrap_or_else(|| Arc::new(Union::mixed()))
 }
 
 // Helper: collect analysis results via tracked query accumulators
@@ -2674,6 +2684,62 @@ mod tests {
         assert!(issues
             .iter()
             .any(|acc| matches!(acc.0.kind, mir_issues::IssueKind::UndefinedClass { .. })));
+    }
+
+    #[test]
+    fn inferred_function_return_type_query_defined() {
+        let mut db = MirDb::default();
+
+        // Create a simple function via FunctionStorage
+        let func_storage = FunctionStorage {
+            fqn: Arc::from("test_fn"),
+            short_name: Arc::from("test_fn"),
+            params: Arc::from([]),
+            return_type: None,
+            inferred_return_type: Some(Union::int()),
+            template_params: Vec::new(),
+            assertions: Vec::new(),
+            throws: Vec::new(),
+            deprecated: None,
+            is_pure: false,
+            location: None,
+        };
+        let node = db.upsert_function_node(&func_storage);
+
+        // Query should return the inferred type
+        let inferred = inferred_function_return_type(&db, node);
+        assert_eq!(inferred.as_ref(), &Union::int());
+    }
+
+    #[test]
+    fn inferred_method_return_type_query_defined() {
+        let mut db = MirDb::default();
+
+        // Create a simple method via MethodStorage
+        let method_storage = MethodStorage {
+            fqcn: Arc::from("TestClass"),
+            name: Arc::from("testMethod"),
+            params: Arc::from([]),
+            return_type: None,
+            inferred_return_type: Some(Union::string()),
+            template_params: Vec::new(),
+            assertions: Vec::new(),
+            throws: Vec::new(),
+            deprecated: None,
+            visibility: Visibility::Public,
+            is_static: false,
+            is_abstract: false,
+            is_final: false,
+            is_constructor: false,
+            is_pure: false,
+            is_internal: false,
+            location: None,
+        };
+        let node = db.upsert_method_node(&method_storage);
+
+        // Query should return the inferred type
+        let inferred = inferred_method_return_type(&db, node);
+        assert_eq!(inferred.as_ref(), &Union::string());
     }
 
     #[test]
