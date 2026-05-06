@@ -94,7 +94,7 @@ fn re_analyze_file_removes_old_definitions() {
 
     // Verify the old method bar() is gone and baz() exists
     let guard = analyzer.salsa_db_for_test().lock().unwrap();
-    let db = &guard.0;
+    let db = &*guard;
     assert!(
         db.lookup_method_node("Foo", "baz")
             .is_some_and(|n| n.active(db)),
@@ -178,7 +178,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     // find it and produce no issues.
     {
         let mut guard = analyzer.salsa_db_for_test().lock().unwrap();
-        let db = &mut guard.0;
+        let db = &mut *guard;
         db.upsert_function_node(&mir_codebase::FunctionStorage {
             fqn: Arc::from("ghost_fn"),
             short_name: Arc::from("ghost_fn"),

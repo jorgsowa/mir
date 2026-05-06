@@ -193,7 +193,7 @@ mod tests {
         analyzer.load_stubs();
         let salsa = analyzer.salsa_db_for_test();
         let salsa = salsa.lock().unwrap();
-        let issues = DeadCodeAnalyzer::new(&salsa.0).analyze();
+        let issues = DeadCodeAnalyzer::new(&*salsa).analyze();
         let builtin_false_positives: Vec<_> = issues
             .iter()
             .filter(|i| {

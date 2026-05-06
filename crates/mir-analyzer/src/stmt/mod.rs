@@ -36,7 +36,6 @@ pub struct StatementsAnalyzer<'a> {
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
-    pub inference_only: bool,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Union>,
     /// Break-context stack: one entry per active loop nesting level.
@@ -54,7 +53,6 @@ impl<'a> StatementsAnalyzer<'a> {
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
         php_version: PhpVersion,
-        inference_only: bool,
     ) -> Self {
         Self {
             db,
@@ -64,7 +62,6 @@ impl<'a> StatementsAnalyzer<'a> {
             issues,
             symbols,
             php_version,
-            inference_only,
             return_types: Vec::new(),
             break_ctx_stack: Vec::new(),
         }
@@ -283,7 +280,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.issues,
             self.symbols,
             self.php_version,
-            self.inference_only,
+            false, // inference_only is always false now (single-pass execution)
         )
     }
 

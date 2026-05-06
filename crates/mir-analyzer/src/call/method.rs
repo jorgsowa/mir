@@ -8,6 +8,7 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::Union;
 
 use crate::context::Context;
+use crate::db::inferred_method_return_type;
 use crate::expr::ExpressionAnalyzer;
 use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
 use crate::symbol::SymbolKind;
@@ -41,15 +42,15 @@ pub(super) fn resolve_method_from_db(
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
-    // `inferred_return_type` is published on `MethodNode` by the priming
-    // sweep's serial commit phase; see `MirDb::commit_inferred_return_types`.
-    // Every analyzer entry path runs a priming sweep + commit before the
-    // issue-emitting pass, so the read-side codebase fallback is gone.
-    let inferred = node.inferred_return_type(db);
+    // Query the lazily-computed inferred return type via Salsa.
+    // For explicit return types, the tracked query short-circuits and returns them.
+    // For inferred types, it either parses the source (if available) or falls back
+    // to the double-pass buffer (for synthetic/stub nodes).
+    let inferred = inferred_method_return_type(db, node);
     let return_ty_raw = node
         .return_type(db)
-        .or(inferred)
         .map(|t| (*t).clone())
+        .or_else(|| Some((*inferred).clone()))
         .unwrap_or_else(Union::mixed);
 
     Some(ResolvedMethod {

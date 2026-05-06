@@ -1,20 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use mir_issues::Issue;
 use mir_types::Union;
 
-use crate::db::{resolve_name_via_db, FunctionNode, MirDatabase};
+use crate::db::{resolve_name_via_db, FunctionNode, MethodNode, MirDatabase};
 use crate::diagnostics::{
     check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
 };
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
-
-#[derive(Clone)]
-pub(crate) struct InferredTypes {
-    pub(crate) functions: Vec<(Arc<str>, Union)>,
-    pub(crate) methods: Vec<(Arc<str>, Arc<str>, Union)>,
-}
 
 /// Resolve a function declaration's `FunctionNode` via the salsa db,
 /// matching the pre-S5 fallback chain (qualified FQN → raw name →
@@ -69,63 +63,11 @@ fn ast_derived_fn_params<'arena, 'src>(
 pub(crate) struct Pass2Driver<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
-    inference_only: bool,
-    inferred_types: Arc<Mutex<InferredTypes>>,
 }
 
 impl<'a> Pass2Driver<'a> {
     pub(crate) fn new(db: &'a dyn MirDatabase, php_version: PhpVersion) -> Self {
-        Self {
-            db,
-            php_version,
-            inference_only: false,
-            inferred_types: Arc::new(Mutex::new(InferredTypes {
-                functions: Vec::new(),
-                methods: Vec::new(),
-            })),
-        }
-    }
-
-    pub(crate) fn new_inference_only(db: &'a dyn MirDatabase, php_version: PhpVersion) -> Self {
-        Self {
-            db,
-            php_version,
-            inference_only: true,
-            inferred_types: Arc::new(Mutex::new(InferredTypes {
-                functions: Vec::new(),
-                methods: Vec::new(),
-            })),
-        }
-    }
-
-    pub(crate) fn take_inferred_types(&self) -> InferredTypes {
-        let types = Arc::clone(&self.inferred_types);
-        Arc::try_unwrap(types)
-            .map(|mutex| {
-                mutex.into_inner().unwrap_or_else(|_| InferredTypes {
-                    functions: Vec::new(),
-                    methods: Vec::new(),
-                })
-            })
-            .unwrap_or_else(|arc| arc.lock().unwrap().clone())
-    }
-
-    fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Union) {
-        if self.inference_only {
-            if let Ok(mut types) = self.inferred_types.lock() {
-                types.functions.push((fqn.clone(), inferred.clone()));
-            }
-        }
-    }
-
-    fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Union) {
-        if self.inference_only {
-            if let Ok(mut types) = self.inferred_types.lock() {
-                types
-                    .methods
-                    .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
-            }
-        }
+        Self { db, php_version }
     }
 
     /// Pass 2: walk all function/method bodies in one file, return issues, and
@@ -244,7 +186,7 @@ impl<'a> Pass2Driver<'a> {
         // Analyze top-level executable statements in global scope. The
         // inference-only sweep only primes function/method return types; top-
         // level diagnostics and references are produced by the main sweep.
-        if !self.inference_only {
+        {
             use crate::context::Context;
             use crate::stmt::StatementsAnalyzer;
             use mir_issues::IssueBuffer;
@@ -259,7 +201,6 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 &mut all_symbols,
                 self.php_version,
-                self.inference_only,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -417,7 +358,6 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -464,7 +404,7 @@ impl<'a> Pass2Driver<'a> {
         use mir_issues::IssueBuffer;
 
         let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), fn_name);
-        let fqn = node_opt.map(|n| n.fqn(self.db));
+        let _fqn = node_opt.map(|n| n.fqn(self.db));
         let (params, return_ty, template_params): (Vec<mir_codebase::FnParam>, _, Vec<_>) =
             match node_opt {
                 Some(n) => {
@@ -508,22 +448,17 @@ impl<'a> Pass2Driver<'a> {
             &mut buf,
             all_symbols,
             self.php_version,
-            self.inference_only,
         );
         sa.analyze_stmts(body, &mut ctx);
-        let inferred = merge_return_types(&sa.return_types);
+        let _inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
         emit_unused_params(&params, &ctx, "", file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Inferred return type → Salsa `FunctionNode::inferred_return_type`
-        // via the parallel-safe buffer (committed serially after the
-        // priming sweep returns).  See `InferredReturnTypes`.
-        if let Some(fqn) = fqn {
-            self.record_function_inference(&fqn, &inferred);
-        }
+        // Inferred return type is computed lazily via tracked queries
+        // (inferred_function_return_type) during subsequent analyses.
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -611,17 +546,14 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
+            let _inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
             emit_unused_params(&params, &ctx, method.name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method.name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -690,10 +622,9 @@ impl<'a> Pass2Driver<'a> {
             &mut buf,
             all_symbols,
             self.php_version,
-            self.inference_only,
         );
         sa.analyze_stmts(body, &mut ctx);
-        let inferred = merge_return_types(&sa.return_types);
+        let _inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
         let scope_name = fqn.clone().unwrap_or_else(|| Arc::from(fn_name));
@@ -709,10 +640,8 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Inferred return type → Salsa, via the priming-sweep buffer.
-        if let Some(fqn) = fqn {
-            self.record_function_inference(&fqn, &inferred);
-        }
+        // Inferred return type is computed lazily via tracked queries
+        // (inferred_function_return_type) during subsequent analyses.
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -801,10 +730,9 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
+            let _inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
             type_envs.insert(
@@ -818,8 +746,6 @@ impl<'a> Pass2Driver<'a> {
             emit_unused_params(&params, &ctx, method.name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method.name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -972,17 +898,14 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
+            let _inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
             emit_unused_params(&params, &ctx, method.name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method.name, &inferred);
         }
     }
 
@@ -1060,10 +983,9 @@ impl<'a> Pass2Driver<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
             );
             sa.analyze_stmts(body, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
+            let _inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
             type_envs.insert(
@@ -1077,8 +999,6 @@ impl<'a> Pass2Driver<'a> {
             emit_unused_params(&params, &ctx, method.name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method.name, &inferred);
         }
     }
 
@@ -1152,6 +1072,113 @@ fn seed_param_locations(
             crate::diagnostics::offset_to_line_col(source, p.span.end, source_map);
         ctx.record_var_location(name, line, col_start, line_end, col_end);
     }
+}
+
+/// Infer return type for a single function body via inference-only Pass 2.
+/// Used by `inferred_function_return_type` tracked query.
+pub(crate) fn infer_one_function(
+    db: &dyn MirDatabase,
+    node: FunctionNode,
+    decl: &php_ast::ast::FunctionDecl<'_, '_>,
+    file: Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    php_version: PhpVersion,
+) -> Union {
+    use crate::context::Context;
+    use crate::stmt::StatementsAnalyzer;
+    use mir_issues::IssueBuffer;
+
+    let body = &decl.body;
+    let (params, return_ty) = {
+        let stored = node.params(db);
+        if stored.len() == decl.params.len()
+            && stored
+                .iter()
+                .zip(decl.params.iter())
+                .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+        {
+            (stored.to_vec(), node.return_type(db).map(|t| (*t).clone()))
+        } else {
+            (ast_derived_fn_params(&decl.params), None)
+        }
+    };
+
+    let mut ctx = Context::for_function(&params, return_ty, None, None, None, false, true);
+    seed_param_locations(&mut ctx, &decl.params, source, source_map);
+    let mut buf = IssueBuffer::new();
+    let mut symbols = Vec::new();
+    let mut sa = StatementsAnalyzer::new(
+        db,
+        file,
+        source,
+        source_map,
+        &mut buf,
+        &mut symbols,
+        php_version,
+    );
+    sa.analyze_stmts(body, &mut ctx);
+    merge_return_types(&sa.return_types)
+}
+
+/// Infer return type for a single method body via inference-only Pass 2.
+/// Used by `inferred_method_return_type` tracked query.
+pub(crate) fn infer_one_method(
+    db: &dyn MirDatabase,
+    node: MethodNode,
+    method_name: &str,
+    method_params: &php_ast::ast::ArenaVec<'_, php_ast::ast::Param<'_, '_>>,
+    method_body: &php_ast::ast::ArenaVec<'_, php_ast::ast::Stmt<'_, '_>>,
+    is_static: bool,
+    fqcn: &str,
+    file: Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    php_version: PhpVersion,
+) -> Union {
+    use crate::context::Context;
+    use crate::stmt::StatementsAnalyzer;
+    use mir_issues::IssueBuffer;
+
+    let (params, return_ty) = {
+        let stored = node.params(db);
+        if stored.len() == method_params.len()
+            && stored
+                .iter()
+                .zip(method_params.iter())
+                .all(|(cp, ap)| cp.name.as_ref() == ap.name)
+        {
+            (stored.to_vec(), node.return_type(db).map(|t| (*t).clone()))
+        } else {
+            (ast_derived_fn_params(method_params), None)
+        }
+    };
+
+    let is_ctor = method_name == "__construct";
+    let mut ctx = Context::for_method(
+        &params,
+        return_ty,
+        Some(Arc::from(fqcn)),
+        None,
+        Some(Arc::from(fqcn)),
+        false,
+        is_ctor,
+        is_static,
+    );
+    seed_param_locations(&mut ctx, method_params, source, source_map);
+    let mut buf = IssueBuffer::new();
+    let mut symbols = Vec::new();
+    let mut sa = StatementsAnalyzer::new(
+        db,
+        file,
+        source,
+        source_map,
+        &mut buf,
+        &mut symbols,
+        php_version,
+    );
+    sa.analyze_stmts(method_body, &mut ctx);
+    merge_return_types(&sa.return_types)
 }
 
 pub fn merge_return_types(return_types: &[Union]) -> Union {
