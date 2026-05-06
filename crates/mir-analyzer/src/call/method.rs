@@ -26,6 +26,7 @@ pub(super) struct ResolvedMethod {
     pub(super) params: Vec<FnParam>,
     pub(super) template_params: Vec<TemplateParam>,
     pub(super) return_ty_raw: Union,
+    pub(super) throws: Arc<[Arc<str>]>,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -60,6 +61,7 @@ pub(super) fn resolve_method_from_db(
         params: node.params(db).to_vec(),
         template_params: node.template_params(db).to_vec(),
         return_ty_raw,
+        throws: node.throws(db),
     })
 }
 
@@ -386,6 +388,26 @@ fn resolve_method_return<'a, 'arena, 'src>(
                         actual: format!("{inferred}"),
                     },
                     Severity::Error,
+                    span,
+                );
+            }
+        }
+
+        // Check inter-procedural throws: if callee declares @throws, check if caller covers them
+        for callee_throw in resolved.throws.iter() {
+            if !ctx.fn_declared_throws.iter().any(|declared| {
+                declared.as_ref() == callee_throw.as_ref()
+                    || crate::db::extends_or_implements_via_db(
+                        ea.db,
+                        callee_throw.as_ref(),
+                        declared.as_ref(),
+                    )
+            }) {
+                ea.emit(
+                    IssueKind::MissingThrowsDocblock {
+                        class: callee_throw.to_string(),
+                    },
+                    Severity::Info,
                     span,
                 );
             }

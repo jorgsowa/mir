@@ -25,6 +25,7 @@ struct ResolvedFn {
     template_params: Vec<TemplateParam>,
     assertions: Vec<Assertion>,
     return_ty_raw: Union,
+    throws: Arc<[Arc<str>]>,
 }
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
@@ -48,6 +49,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
         template_params: node.template_params(db).to_vec(),
         assertions: node.assertions(db).to_vec(),
         return_ty_raw,
+        throws: node.throws(db),
     })
 }
 
@@ -310,6 +312,26 @@ impl CallAnalyzer {
                 Some(bindings) => return_ty_raw.substitute_templates(bindings),
                 None => return_ty_raw,
             };
+
+            // Check inter-procedural throws: if callee declares @throws, check if caller covers them
+            for callee_throw in resolved.throws.iter() {
+                if !ctx.fn_declared_throws.iter().any(|declared| {
+                    declared.as_ref() == callee_throw.as_ref()
+                        || crate::db::extends_or_implements_via_db(
+                            ea.db,
+                            callee_throw.as_ref(),
+                            declared.as_ref(),
+                        )
+                }) {
+                    ea.emit(
+                        IssueKind::MissingThrowsDocblock {
+                            class: callee_throw.to_string(),
+                        },
+                        Severity::Info,
+                        span,
+                    );
+                }
+            }
 
             ea.record_symbol(
                 call.name.span,

@@ -3,6 +3,7 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_types::{Atomic, Union};
 use php_ast::ast::{ArrowFunctionExpr, ClosureExpr};
+use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_closure<'arena, 'src>(
@@ -34,6 +35,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut closure_ctx = crate::context::Context::for_function(
             &params,
             return_ty_hint.clone(),
+            Arc::from([]),
             ctx.self_fqcn.clone(),
             ctx.parent_fqcn.clone(),
             ctx.static_fqcn.clone(),
@@ -150,6 +152,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut arrow_ctx = crate::context::Context::for_function(
             &params,
             return_ty_hint.clone(),
+            Arc::from([]),
             ctx.self_fqcn.clone(),
             ctx.parent_fqcn.clone(),
             ctx.static_fqcn.clone(),

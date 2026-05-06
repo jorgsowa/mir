@@ -20,8 +20,16 @@ impl<'a> StatementsAnalyzer<'a> {
                 is_optional: p.default.is_some() || p.variadic,
             })
             .collect();
-        let mut fn_ctx =
-            Context::for_function(&params, None, None, None, None, ctx.strict_types, true);
+        let mut fn_ctx = Context::for_function(
+            &params,
+            None,
+            Arc::from([]),
+            None,
+            None,
+            None,
+            ctx.strict_types,
+            true,
+        );
         let mut sa = StatementsAnalyzer::new(
             self.db,
             self.file.clone(),
@@ -80,6 +88,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut method_ctx = Context::for_method(
                 &params,
                 return_ty,
+                Arc::from([]),
                 Some(fqcn.clone()),
                 parent_fqcn.clone(),
                 Some(fqcn.clone()),
