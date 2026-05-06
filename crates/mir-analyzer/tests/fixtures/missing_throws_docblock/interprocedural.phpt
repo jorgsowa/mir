@@ -13,5 +13,4 @@ function callerNoThrows(): void {
     riskyOperation();
 }
 ===expect===
-===ignore===
-TODO: Inter-procedural throw detection depends on proper stub class loading
+MissingThrowsDocblock@10:4: Exception RuntimeException is thrown but not declared in @throws
