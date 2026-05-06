@@ -11,6 +11,9 @@ use mir_codebase::StubSlice;
 use mir_issues::Issue;
 use mir_types::Union;
 
+use crate::pass2::Pass2Driver;
+use crate::PhpVersion;
+
 // MirDatabase trait
 
 /// Salsa database trait for mir incremental analysis.
@@ -2415,22 +2418,80 @@ pub struct AnalyzeFileInput {
     pub php_version: Arc<str>,
 }
 
+// S4 Step 3: Lazy inferred-type queries
+//
+// These tracked queries compute inferred return types on-demand during Pass 2.
+// When `Pass2Driver` encounters a function/method call, it reads the inferred
+// type via these queries instead of from a pre-computed buffer.
+//
+// This enables two key optimizations:
+// 1. Single-pass execution: inferred types are computed as needed, not upfront
+// 2. Incremental caching: if a dependent file doesn't call a function, its
+//    inferred type is never computed (Salsa skips the query)
+
+/// Lazily computes the inferred return type for a function.
+/// Called on-demand during Pass 2 analysis when we encounter a call to this function.
+/// Results are cached by Salsa; re-analysis of dependent files that don't call this
+/// function re-uses the cached inferred type.
+#[salsa::tracked]
+pub fn inferred_function_return_type(_db: &dyn MirDatabase, _node: FunctionNode) -> Arc<Union> {
+    let _php_version = PhpVersion::LATEST; // TODO: thread php_version from caller
+
+    // TODO: extract just this function's body from the source file and analyze it
+    // For now, return a placeholder that forces callers to use type hints
+    Arc::new(Union::mixed())
+}
+
+/// Lazily computes the inferred return type for a method.
+#[salsa::tracked]
+pub fn inferred_method_return_type(_db: &dyn MirDatabase, _node: MethodNode) -> Arc<Union> {
+    let _php_version = PhpVersion::LATEST; // TODO: thread php_version from caller
+
+    // TODO: extract just this method's body from the source file and analyze it
+    // For now, return a placeholder that forces callers to use type hints
+    Arc::new(Union::mixed())
+}
+
+// Helper: collect analysis results via tracked query accumulators
+
+/// Collects all accumulated issues from a set of files analyzed via the
+/// `analyze_file` tracked query. Used during batch analysis to read issues
+/// that were emitted during tracked-query evaluation.
+#[allow(dead_code)]
+pub(crate) fn collect_accumulated_issues(
+    db: &dyn MirDatabase,
+    files: &[(Arc<str>, SourceFile)],
+    php_version: &str,
+) -> Vec<Issue> {
+    let mut all_issues = Vec::new();
+    let input = AnalyzeFileInput::new(db, Arc::from(php_version));
+
+    for (_path, file) in files {
+        // Call the tracked query to trigger analysis + accumulation
+        analyze_file(db, *file, input);
+
+        // Read back the accumulated issues for this file
+        let accumulated: Vec<&IssueAccumulator> = analyze_file::accumulated(db, *file, input);
+        for acc in accumulated {
+            all_issues.push(acc.0.clone());
+        }
+    }
+
+    all_issues
+}
+
 /// Tracked-query skeleton for `analyze_file`.
 ///
-/// **Current behavior (S4 step 1):** parses the file and emits parse-error
-/// issues via `IssueAccumulator`.  Does NOT call into Pass 2 / the
-/// statement / expression analyzer; full body analysis stays in
-/// `Pass2Driver` until later S4 PRs migrate it.
+/// **Current behavior (S4 step 2):** parses the file, emits parse-error issues,
+/// and calls Pass 2 to analyze function/method bodies. Issues and reference
+/// locations are emitted via `IssueAccumulator` and `RefLocAccumulator`.
 ///
-/// The query exists at this stage to:
-/// - validate that accumulators compile and accumulate against the
-///   concrete `MirDb`,
-/// - give subsequent PRs a stable signature to extend without churning
-///   the public surface of `db.rs` again,
-/// - provide a readable test of the accumulator round-trip
-///   (`accumulate` → `accumulated::<…>(db, …)`).
+/// This is still a hybrid: inferred types come from the prior
+/// `run_inference_sweep` → `commit_inferred_return_types` in the double-pass
+/// orchestration. Future S4 PRs will replace that with lazy
+/// `inferred_return_type(node)` tracked queries.
 #[salsa::tracked]
-pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, _input: AnalyzeFileInput) {
+pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileInput) {
     use salsa::Accumulator as _;
     let path = file.path(db);
     let text = file.text(db);
@@ -2438,6 +2499,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, _input: AnalyzeFileI
     let arena = bumpalo::Bump::new();
     let parsed = php_rs_parser::parse(&arena, &text);
 
+    // Emit parse errors
     for err in &parsed.errors {
         let issue = Issue::new(
             mir_issues::IssueKind::ParseError {
@@ -2452,6 +2514,38 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, _input: AnalyzeFileI
             },
         );
         IssueAccumulator(issue).accumulate(db);
+    }
+
+    // If no parse errors, run full analysis via Pass2Driver
+    if parsed.errors.is_empty() {
+        use std::str::FromStr as _;
+        let php_version =
+            PhpVersion::from_str(input.php_version(db).as_ref()).unwrap_or(PhpVersion::LATEST);
+        let driver = Pass2Driver::new(db, php_version);
+        let (issues, _symbols) = driver.analyze_bodies(
+            &parsed.program,
+            path.clone(),
+            text.as_ref(),
+            &parsed.source_map,
+        );
+
+        // Emit issues via accumulator
+        for issue in issues {
+            IssueAccumulator(issue).accumulate(db);
+        }
+
+        // Emit reference locations via accumulator
+        let ref_locs = db.extract_file_reference_locations(&path);
+        for (symbol_key, line, col_start, col_end) in ref_locs {
+            let ref_loc = RefLoc {
+                symbol_key,
+                file: path.clone(),
+                line,
+                col_start,
+                col_end,
+            };
+            RefLocAccumulator(ref_loc).accumulate(db);
+        }
     }
 }
 
@@ -2554,6 +2648,32 @@ mod tests {
         let refs: Vec<&RefLocAccumulator> = analyze_file::accumulated(&db, file, input);
         assert!(issues.is_empty());
         assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn analyze_file_calls_pass2_for_undefined_class() {
+        let mut db = MirDb::default();
+        // Load stubs so we have a baseline codebase
+        for slice in crate::stubs::builtin_stub_slices_for_version(crate::PhpVersion::LATEST) {
+            db.ingest_stub_slice(&slice);
+        }
+
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/test_pass2.php"),
+            Arc::from("<?php function foo() { new UndefinedClass(); }"),
+        );
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        analyze_file(&db, file, input);
+        let issues: Vec<&IssueAccumulator> = analyze_file::accumulated(&db, file, input);
+
+        assert!(
+            !issues.is_empty(),
+            "Pass2Driver should emit UndefinedClass issue"
+        );
+        assert!(issues
+            .iter()
+            .any(|acc| matches!(acc.0.kind, mir_issues::IssueKind::UndefinedClass { .. })));
     }
 
     #[test]
