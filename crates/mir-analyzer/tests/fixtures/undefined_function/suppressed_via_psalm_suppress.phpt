@@ -9,5 +9,3 @@ function test(): void {
     noSuchFunction();
 }
 ===expect===
-===ignore===
-TODO

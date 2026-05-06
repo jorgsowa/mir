@@ -9,5 +9,3 @@ function test(): void {
 ===expect===
 UndefinedFunction@3:4: Function foo() is not defined
 UndefinedFunction@4:4: Function foo() is not defined
-===ignore===
-TODO

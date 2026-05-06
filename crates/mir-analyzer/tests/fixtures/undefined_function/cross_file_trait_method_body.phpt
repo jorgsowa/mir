@@ -14,5 +14,3 @@ class MyClass {
 }
 ===expect===
 Trait.php: UndefinedFunction@4:8: Function missing_function() is not defined
-===ignore===
-TODO

@@ -13,5 +13,3 @@ function run(): string {
     return \Vendor\Lib\helper();
 }
 ===expect===
-===ignore===
-TODO
