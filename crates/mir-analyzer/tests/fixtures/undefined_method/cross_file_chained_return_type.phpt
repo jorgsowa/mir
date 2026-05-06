@@ -19,5 +19,3 @@ function use_repo(Repository $r): void {
 }
 ===expect===
 Service.php: UndefinedMethod@5:4: Method Entity::missing() does not exist
-===ignore===
-TODO

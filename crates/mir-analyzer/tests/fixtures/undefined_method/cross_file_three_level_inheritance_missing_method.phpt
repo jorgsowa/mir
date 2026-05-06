@@ -17,5 +17,3 @@ function test(): void {
 }
 ===expect===
 Child.php: UndefinedMethod@5:4: Method Child::missing() does not exist
-===ignore===
-TODO
