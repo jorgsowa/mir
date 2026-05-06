@@ -167,6 +167,8 @@ impl CallAnalyzer {
             })
             .collect();
 
+        let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+
         // When call_user_func / call_user_func_array is called with a bare string
         // literal as the callable argument, treat that string as a direct FQN
         // reference so the named function is not flagged as dead code.
@@ -238,7 +240,7 @@ impl CallAnalyzer {
                     fn_name: &fn_name,
                     params: &params,
                     arg_types: &arg_types,
-                    arg_spans: &call.args.iter().map(|a| a.span).collect::<Vec<_>>(),
+                    arg_spans: &arg_spans,
                     arg_names: &call
                         .args
                         .iter()
@@ -253,6 +255,27 @@ impl CallAnalyzer {
                     has_spread: call.args.iter().any(|a| a.unpack),
                 },
             );
+
+            match resolved_fn_name.as_str() {
+                "array_map" => {
+                    super::callable::check_array_map_callback(ea, &arg_types, &arg_spans)
+                }
+                "array_filter" => {
+                    super::callable::check_array_filter_callback(ea, &arg_types, &arg_spans)
+                }
+                "array_reduce" => {
+                    super::callable::check_array_reduce_callback(ea, &arg_types, &arg_spans)
+                }
+                "usort" | "uasort" | "uksort" | "array_walk" | "array_walk_recursive" => {
+                    super::callable::check_sort_callback(
+                        ea,
+                        &resolved_fn_name,
+                        &arg_types,
+                        &arg_spans,
+                    )
+                }
+                _ => {}
+            }
 
             for (i, param) in params.iter().enumerate() {
                 if param.is_byref {

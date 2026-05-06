@@ -12,6 +12,4 @@ arrayReduceInvalidClosureTooFewArgs
                         1
                     );
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@6:24: Argument $callback of array_reduce() expects 'callable accepting at least 2 arguments', got 'callable accepting 0 argument(s)'
