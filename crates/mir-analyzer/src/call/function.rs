@@ -8,7 +8,6 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
 
 use crate::context::Context;
-use crate::db::inferred_function_return_type;
 use crate::expr::ExpressionAnalyzer;
 use crate::generic::{check_template_bounds, infer_template_bindings};
 use crate::symbol::SymbolKind;
@@ -31,15 +30,16 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    // Query the lazily-computed inferred return type via Salsa.
-    // For explicit return types, the tracked query short-circuits and returns them.
-    // For inferred types, it either parses the source (if available) or falls back
-    // to the double-pass buffer (for synthetic/stub nodes).
-    let inferred = inferred_function_return_type(db, node);
+    // `inferred_return_type` is the priming-sweep-derived type, published
+    // on `FunctionNode` via `MirDb::commit_inferred_return_types` after
+    // each priming sweep returns.  Every entry path (batch `analyze`,
+    // `re_analyze_file`, lazy-load reanalysis sweep, `analyze_source`)
+    // runs a priming-sweep + commit before the issue-emitting pass.
+    let inferred = node.inferred_return_type(db);
     let return_ty_raw = node
         .return_type(db)
+        .or(inferred)
         .map(|t| (*t).clone())
-        .or_else(|| Some((*inferred).clone()))
         .unwrap_or_else(Union::mixed);
     Some(ResolvedFn {
         fqn: node.fqn(db),

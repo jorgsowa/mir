@@ -41,7 +41,7 @@ pub struct ProjectAnalyzer {
     /// Salsa database for incremental Pass-1 memoization.
     /// `MirDb` is `Send` but `!Sync` (thread-local query state); `Mutex`
     /// provides the `Sync` bound rayon requires without needing `T: Sync`.
-    salsa: std::sync::Mutex<MirDb>,
+    salsa: std::sync::Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
 }
 
 struct ParsedProjectFile {
@@ -107,7 +107,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: std::sync::Mutex::new(MirDb::default()),
+            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -122,7 +122,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: std::sync::Mutex::new(MirDb::default()),
+            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -143,7 +143,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: std::sync::Mutex::new(MirDb::default()),
+            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
         };
         Ok((analyzer, map))
     }
@@ -162,12 +162,12 @@ impl ProjectAnalyzer {
 
     fn type_exists(&self, fqcn: &str) -> bool {
         let guard = self.salsa.lock().expect("salsa lock poisoned");
-        crate::db::type_exists_via_db(&*guard, fqcn)
+        crate::db::type_exists_via_db(&guard.0, fqcn)
     }
 
     /// Internal: expose the salsa Mutex for unit tests that need a `&dyn MirDatabase`.
     #[doc(hidden)]
-    pub fn salsa_db_for_test(&self) -> &std::sync::Mutex<MirDb> {
+    pub fn salsa_db_for_test(&self) -> &std::sync::Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)> {
         &self.salsa
     }
 
@@ -181,12 +181,12 @@ impl ProjectAnalyzer {
         member_name: &str,
     ) -> Option<mir_codebase::storage::Location> {
         let guard = self.salsa.lock().expect("salsa lock poisoned");
-        crate::db::member_location_via_db(&*guard, fqcn, member_name)
+        crate::db::member_location_via_db(&guard.0, fqcn, member_name)
     }
 
     pub fn symbol_location(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
         let guard = self.salsa.lock().expect("salsa lock poisoned");
-        let db = &*guard;
+        let db = &guard.0;
         db.lookup_class_node(symbol)
             .filter(|n| n.active(db))
             .and_then(|n| n.location(db))
@@ -199,7 +199,7 @@ impl ProjectAnalyzer {
 
     pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
         let guard = self.salsa.lock().expect("salsa lock poisoned");
-        guard.reference_locations(symbol)
+        guard.0.reference_locations(symbol)
     }
 
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
@@ -217,12 +217,12 @@ impl ProjectAnalyzer {
                     let slice =
                         crate::stubs::stub_slice_from_source(filename, content, Some(php_version));
                     let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-                    guard.ingest_stub_slice(&slice);
+                    guard.0.ingest_stub_slice(&slice);
                 });
 
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             for slice in crate::stubs::user_stub_slices(&self.stub_files, &self.stub_dirs) {
-                guard.ingest_stub_slice(&slice);
+                guard.0.ingest_stub_slice(&slice);
             }
         }
     }
@@ -230,25 +230,26 @@ impl ProjectAnalyzer {
     fn collect_and_ingest_source(&self, file: Arc<str>, src: &str) -> FileDefinitions {
         let file_defs = {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-            let salsa_file = match guard.lookup_source_file(&file) {
-                Some(sf) => {
-                    if sf.text(&*guard).as_ref() != src {
-                        sf.set_text(&mut *guard).to(Arc::from(src));
+            let (ref mut db, ref mut files) = *guard;
+            let salsa_file = match files.get(&file) {
+                Some(&sf) => {
+                    if sf.text(db).as_ref() != src {
+                        sf.set_text(db).to(Arc::from(src));
                     }
                     sf
                 }
                 None => {
-                    let sf = SourceFile::new(&*guard, file.clone(), Arc::from(src));
-                    guard.register_source_file(file.clone(), sf);
+                    let sf = SourceFile::new(db, file.clone(), Arc::from(src));
+                    files.insert(file.clone(), sf);
                     sf
                 }
             };
-            collect_file_definitions(&*guard, salsa_file)
+            collect_file_definitions(db, salsa_file)
         };
 
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.ingest_stub_slice(&file_defs.slice);
+            guard.0.ingest_stub_slice(&file_defs.slice);
         }
         file_defs
     }
@@ -301,17 +302,17 @@ impl ProjectAnalyzer {
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref mut db, ref mut files) = *guard;
             for parsed in &parsed_files {
-                match guard.lookup_source_file(parsed.file.as_ref()) {
-                    Some(sf) => {
-                        if sf.text(&*guard).as_ref() != parsed.source() {
-                            sf.set_text(&mut *guard).to(parsed.source.clone());
+                match files.get(parsed.file.as_ref()) {
+                    Some(&sf) => {
+                        if sf.text(db).as_ref() != parsed.source() {
+                            sf.set_text(db).to(parsed.source.clone());
                         }
                     }
                     None => {
-                        let sf =
-                            SourceFile::new(&*guard, parsed.file.clone(), parsed.source.clone());
-                        guard.register_source_file(parsed.file.clone(), sf);
+                        let sf = SourceFile::new(db, parsed.file.clone(), parsed.source.clone());
+                        files.insert(parsed.file.clone(), sf);
                     }
                 }
             }
@@ -360,6 +361,7 @@ impl ProjectAnalyzer {
             std::collections::HashSet::new();
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref mut db, _) = *guard;
             for defs in file_defs {
                 for issue in defs.issues.iter() {
                     if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. }) {
@@ -371,7 +373,7 @@ impl ProjectAnalyzer {
                         files_needing_inference.insert(file.clone());
                     }
                 }
-                guard.ingest_stub_slice(&defs.slice);
+                db.ingest_stub_slice(&defs.slice);
                 all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
         }
@@ -387,7 +389,7 @@ impl ProjectAnalyzer {
         if let Some(cache) = &self.cache {
             let db_snapshot = {
                 let guard = self.salsa.lock().expect("salsa lock poisoned");
-                guard.clone()
+                guard.0.clone()
             };
             let rev = build_reverse_deps(&db_snapshot);
             cache.set_reverse_deps(rev);
@@ -403,7 +405,7 @@ impl ProjectAnalyzer {
         {
             let class_db = {
                 let guard = self.salsa.lock().expect("salsa lock poisoned");
-                guard.clone()
+                guard.0.clone()
             };
             let class_issues =
                 crate::class::ClassAnalyzer::with_files(&class_db, analyzed_file_set, &file_data)
@@ -411,77 +413,87 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- PR4: Single-pass execution via on-demand inferred types ----
-        // Inferred return types are now computed lazily during Pass 2 via tracked
-        // queries (inferred_function_return_type, inferred_method_return_type),
-        // eliminating the prior two-pass design.
+        // ---- S5-PR10b: clone the salsa db once per parallel sweep so each
+        // rayon worker gets its own clone (Salsa databases are `Send` but
+        // `!Sync`; cloning shares the underlying memoization storage).
+        let db_priming = {
+            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.clone()
+        };
+
+        // ---- Pass 2 priming: populate inferred_return_type for all functions  --
+        // Run a first inference-only sweep so that cross-file inferred return
+        // types are available before the issue-emitting pass below (G6).
+        //
+        // Inferred types are collected into a thread-safe buffer during the
+        // parallel sweep and committed to the Salsa db serially after the sweep
+        // returns. Using `rayon::in_place_scope` ensures all worker threads and
+        // their thread-local Salsa state drop before we commit to the canonical db.
+        let filtered_parsed: Vec<_> = parsed_files
+            .par_iter()
+            .filter(|parsed| {
+                !files_with_parse_errors.contains(&parsed.file)
+                    && files_needing_inference.contains(&parsed.file)
+            })
+            .collect();
+
+        let (functions, methods) =
+            run_inference_sweep(db_priming, filtered_parsed, self.resolved_php_version());
+
+        {
+            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            guard.0.commit_inferred_return_types(functions, methods);
+        }
+
         let db_main = {
             let guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.clone()
+            guard.0.clone()
         };
 
-        // ---- Pass 2: analyze function/method bodies in parallel via tracked query ----
-        let php_version_str = Arc::from(self.resolved_php_version().to_string());
-        let analyze_input = crate::db::AnalyzeFileInput::new(&db_main, php_version_str);
-
-        // Build list of SourceFile inputs for files without parse errors
-        let files_to_analyze: Vec<(Arc<str>, crate::db::SourceFile)> = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
-            parsed_files
-                .iter()
-                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
-                .filter_map(|parsed| {
-                    guard
-                        .lookup_source_file(parsed.file.as_ref())
-                        .map(|sf| (parsed.file.clone(), sf))
-                })
-                .collect()
-        };
-
-        // Parallel sweep: call analyze_file tracked query for each file
-        files_to_analyze
+        // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
+        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = parsed_files
             .par_iter()
-            .for_each_with(db_main.clone(), |db, (_path, sf)| {
-                crate::db::analyze_file(db as &dyn crate::db::MirDatabase, *sf, analyze_input);
+            .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
+            .map_with(db_main, |db, parsed| {
+                let driver =
+                    Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
+                let result = if let Some(cache) = &self.cache {
+                    let h = hash_content(parsed.source());
+                    if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
+                        db.replay_reference_locations(parsed.file.clone(), &ref_locs);
+                        (cached_issues, Vec::new())
+                    } else {
+                        let parse_result = parsed.parsed();
+                        let (issues, symbols) = driver.analyze_bodies(
+                            &parse_result.program,
+                            parsed.file.clone(),
+                            parsed.source(),
+                            &parse_result.source_map,
+                        );
+                        let ref_locs = extract_reference_locations(&*db, &parsed.file);
+                        cache.put(&parsed.file, h, issues.clone(), ref_locs);
+                        (issues, symbols)
+                    }
+                } else {
+                    let parse_result = parsed.parsed();
+                    driver.analyze_bodies(
+                        &parse_result.program,
+                        parsed.file.clone(),
+                        parsed.source(),
+                        &parse_result.source_map,
+                    )
+                };
                 if let Some(cb) = &self.on_file_done {
                     cb();
                 }
-            });
-
-        // Serial read of accumulated issues, symbols, and reference locations
-        let db_read = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.clone()
-        };
+                result
+            })
+            .collect();
 
         let mut all_symbols = Vec::new();
-        for (file_path, sf) in &files_to_analyze {
-            // Read accumulated issues for this file
-            let issues_acc: Vec<&crate::db::IssueAccumulator> =
-                crate::db::analyze_file::accumulated(&db_read, *sf, analyze_input);
-            let file_issues: Vec<Issue> = issues_acc.iter().map(|acc| acc.0.clone()).collect();
-            for issue in &file_issues {
-                all_issues.push(issue.clone());
-            }
-
-            // Read accumulated symbols for this file
-            let symbols_acc: Vec<&crate::db::SymbolAccumulator> =
-                crate::db::analyze_file::accumulated(&db_read, *sf, analyze_input);
-            for acc in symbols_acc {
-                all_symbols.push(acc.0.clone());
-            }
-
-            // Cache the results for this file
-            if let Some(cache) = &self.cache {
-                let text = sf.text(&db_read);
-                let h = hash_content(&*text);
-                let ref_locs = db_read.extract_file_reference_locations(file_path);
-                let ref_locs_for_cache: Vec<(String, u32, u16, u16)> = ref_locs
-                    .into_iter()
-                    .map(|(k, l, cs, ce)| (k.to_string(), l, cs, ce))
-                    .collect();
-                cache.put(file_path.as_ref(), h, file_issues, ref_locs_for_cache);
-            }
+        for (issues, symbols) in pass2_results {
+            all_issues.extend(issues);
+            all_symbols.extend(symbols);
         }
 
         // ---- Post-Pass-2 lazy loading: FQCNs used without `use` imports ------
@@ -508,7 +520,7 @@ impl ProjectAnalyzer {
         // ---- Dead-code detection (M18) --------------------------------------
         if self.find_dead_code {
             let salsa = self.salsa.lock().unwrap();
-            let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&*salsa).analyze();
+            let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa.0).analyze();
             drop(salsa);
             all_issues.extend(dead_code_issues);
         }
@@ -541,7 +553,7 @@ impl ProjectAnalyzer {
             let mut inheritance_candidates = Vec::new();
             let import_candidates = {
                 let guard = self.salsa.lock().expect("salsa lock poisoned");
-                let db = &*guard;
+                let db = &guard.0;
                 for fqcn in db.active_class_node_fqcns() {
                     let Some(node) = db.lookup_class_node(&fqcn) else {
                         continue;
@@ -667,17 +679,33 @@ impl ProjectAnalyzer {
 
             let db_reanalysis = {
                 let guard = self.salsa.lock().expect("salsa lock poisoned");
-                guard.clone()
+                guard.0.clone()
             };
 
-            // Lazy-loaded files re-run Pass 2 to pick up the just-loaded definitions.
-            // Use on-demand inferred types (no priming sweep needed).
+            // Lazy-loaded files re-run Pass 2 to pick up the just-loaded
+            // definitions; collect inferred return types for a serial commit
+            // For lazy-loaded files, we run the priming sweep inline during reanalysis.
             let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
                 .par_iter()
                 .filter(|(f, _)| {
                     !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
                 })
                 .map_with(db_reanalysis, |db, (file, src)| {
+                    let driver = Pass2Driver::new_inference_only(
+                        &*db as &dyn MirDatabase,
+                        self.resolved_php_version(),
+                    );
+                    let arena = bumpalo::Bump::new();
+                    let parsed = php_rs_parser::parse(&arena, src);
+                    driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map);
+
+                    let inferred = driver.take_inferred_types();
+                    let mut guard_db = self.salsa.lock().expect("salsa lock poisoned");
+                    guard_db
+                        .0
+                        .commit_inferred_return_types(inferred.functions, inferred.methods);
+                    drop(guard_db);
+
                     let driver =
                         Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
                     let arena = bumpalo::Bump::new();
@@ -708,7 +736,7 @@ impl ProjectAnalyzer {
             if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
                 let guard = self.salsa.lock().expect("salsa lock poisoned");
-                guard.replay_reference_locations(file, &ref_locs);
+                guard.0.replay_reference_locations(file, &ref_locs);
                 return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
         }
@@ -717,84 +745,80 @@ impl ProjectAnalyzer {
 
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.remove_file_definitions(file_path);
+            let (ref mut db, _) = *guard;
+            db.remove_file_definitions(file_path);
         }
 
         // --- Salsa-backed Pass 1: memoized parse + definition collection ------
         let file_defs = {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-            let salsa_file = match guard.lookup_source_file(&file) {
-                Some(sf) => {
-                    sf.set_text(&mut *guard).to(Arc::from(new_content));
+            let (ref mut db, ref mut files) = *guard;
+            let salsa_file = match files.get(&file) {
+                Some(&sf) => {
+                    sf.set_text(db).to(Arc::from(new_content));
                     sf
                 }
                 None => {
-                    let sf = SourceFile::new(&*guard, file.clone(), Arc::from(new_content));
-                    guard.register_source_file(file.clone(), sf);
+                    let sf = SourceFile::new(db, file.clone(), Arc::from(new_content));
+                    files.insert(file.clone(), sf);
                     sf
                 }
             };
-            collect_file_definitions(&*guard, salsa_file)
+            collect_file_definitions(db, salsa_file)
         };
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
-        // --- Pass 1 ingestion + Pass 2 via tracked query ----
-        // Ingest stub slice (ClassNode updates) while holding lock.
-        let sf = {
+        // --- S2 + Pass 2: hold the Salsa lock for ClassNode upserts and body
+        // analysis so the db reference is live during Pass 2 (S5).
+        let symbols = {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.ingest_stub_slice(&file_defs.slice);
-            guard
-                .lookup_source_file(file.as_ref())
-                .expect("SourceFile must exist")
+            let (ref mut db, _) = *guard;
+
+            db.ingest_stub_slice(&file_defs.slice);
+
+            // Resolve any newly-collected @psalm-import-type declarations so
+            // Pass 2 reads the imported aliases out of `type_aliases`.
+            // Re-parse in the arena so Pass 2 can walk the AST.
+            let arena = bumpalo::Bump::new();
+            let parsed = php_rs_parser::parse(&arena, new_content);
+
+            if parsed.errors.is_empty() {
+                let db_ref: &dyn MirDatabase = db;
+                let driver = Pass2Driver::new_inference_only(db_ref, self.resolved_php_version());
+                driver.analyze_bodies(
+                    &parsed.program,
+                    file.clone(),
+                    new_content,
+                    &parsed.source_map,
+                );
+                let inferred = driver.take_inferred_types();
+                db.commit_inferred_return_types(inferred.functions, inferred.methods);
+
+                let db_ref: &dyn MirDatabase = db;
+                let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
+                let (body_issues, symbols) = driver.analyze_bodies(
+                    &parsed.program,
+                    file.clone(),
+                    new_content,
+                    &parsed.source_map,
+                );
+                all_issues.extend(body_issues);
+                symbols
+            } else {
+                Vec::new()
+            }
         };
-
-        // Call analyze_file tracked query with fresh db clone to leverage lazy inference
-        let php_version_str = Arc::from(self.resolved_php_version().to_string());
-        let analyze_input = crate::db::AnalyzeFileInput::new(
-            &{
-                let guard = self.salsa.lock().expect("salsa lock poisoned");
-                guard.clone()
-            },
-            php_version_str,
-        );
-
-        let db_for_analysis = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.clone()
-        };
-        crate::db::analyze_file(&db_for_analysis, sf, analyze_input);
-
-        // Read accumulated issues and symbols
-        let db_read = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.clone()
-        };
-        let issues_acc: Vec<&crate::db::IssueAccumulator> =
-            crate::db::analyze_file::accumulated(&db_read, sf, analyze_input);
-        for acc in issues_acc {
-            all_issues.push(acc.0.clone());
-        }
-
-        let symbols_from_analysis: Vec<crate::symbol::ResolvedSymbol> =
-            crate::db::analyze_file::accumulated::<crate::db::SymbolAccumulator>(
-                &db_read,
-                sf,
-                analyze_input,
-            )
-            .iter()
-            .map(|acc| acc.0.clone())
-            .collect();
 
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
             let guard = self.salsa.lock().expect("salsa lock poisoned");
-            let ref_locs = extract_reference_locations(&*guard, &file);
+            let ref_locs = extract_reference_locations(&guard.0, &file);
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
 
-        AnalysisResult::build(all_issues, HashMap::new(), symbols_from_analysis)
+        AnalysisResult::build(all_issues, HashMap::new(), symbols)
     }
 
     /// Analyze a PHP source string without a real file path.
@@ -817,22 +841,20 @@ impl ProjectAnalyzer {
         {
             return AnalysisResult::build(all_issues, std::collections::HashMap::new(), Vec::new());
         }
-        // PR4: Use on-demand inferred types (no priming sweep).
-        // Pass 2 still collects type_envs for LSP features.
         let mut type_envs = std::collections::HashMap::new();
         let mut all_symbols = Vec::new();
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse(&arena, source);
 
-        if !result.errors.is_empty() {
-            return AnalysisResult::build(all_issues, std::collections::HashMap::new(), Vec::new());
-        }
+        let driver = Pass2Driver::new_inference_only(&db, analyzer.resolved_php_version());
+        driver.analyze_bodies(&result.program, file.clone(), source, &result.source_map);
+        let inferred = driver.take_inferred_types();
+        db.commit_inferred_return_types(inferred.functions, inferred.methods);
 
-        // Single Pass 2 that uses on-demand inferred types via tracked queries
         let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
             &result.program,
-            file,
+            file.clone(),
             source,
             &result.source_map,
             &mut type_envs,
@@ -867,18 +889,19 @@ impl ProjectAnalyzer {
 
         let source_files: Vec<SourceFile> = {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let (ref mut db, ref mut files) = *guard;
             file_data
                 .iter()
-                .map(|(file, src)| match guard.lookup_source_file(file) {
-                    Some(sf) => {
-                        if sf.text(&*guard).as_ref() != src.as_ref() {
-                            sf.set_text(&mut *guard).to(src.clone());
+                .map(|(file, src)| match files.get(file) {
+                    Some(&sf) => {
+                        if sf.text(db).as_ref() != src.as_ref() {
+                            sf.set_text(db).to(src.clone());
                         }
                         sf
                     }
                     None => {
-                        let sf = SourceFile::new(&*guard, file.clone(), src.clone());
-                        guard.register_source_file(file.clone(), sf);
+                        let sf = SourceFile::new(db, file.clone(), src.clone());
+                        files.insert(file.clone(), sf);
                         sf
                     }
                 })
@@ -887,7 +910,7 @@ impl ProjectAnalyzer {
 
         let db_pass1 = {
             let guard = self.salsa.lock().expect("salsa lock poisoned");
-            guard.clone()
+            guard.0.clone()
         };
 
         let file_defs: Vec<FileDefinitions> = source_files
@@ -898,8 +921,9 @@ impl ProjectAnalyzer {
             .collect();
 
         let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+        let (ref mut db, _) = *guard;
         for defs in file_defs {
-            guard.ingest_stub_slice(&defs.slice);
+            db.ingest_stub_slice(&defs.slice);
         }
         drop(guard);
 
@@ -912,6 +936,54 @@ impl Default for ProjectAnalyzer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// Helper: Inference sweep with rayon::in_place_scope
+
+#[allow(clippy::type_complexity)]
+fn run_inference_sweep(
+    db_priming: MirDb,
+    parsed_files: Vec<&ParsedProjectFile>,
+    php_version: PhpVersion,
+) -> (Vec<(Arc<str>, Union)>, Vec<(Arc<str>, Arc<str>, Union)>) {
+    let functions = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let methods = Arc::new(std::sync::Mutex::new(Vec::new()));
+
+    rayon::in_place_scope(|s| {
+        for parsed in parsed_files {
+            let db = db_priming.clone();
+            let functions = Arc::clone(&functions);
+            let methods = Arc::clone(&methods);
+
+            s.spawn(move |_| {
+                let driver = Pass2Driver::new_inference_only(&db as &dyn MirDatabase, php_version);
+                let parse_result = parsed.parsed();
+                driver.analyze_bodies(
+                    &parse_result.program,
+                    parsed.file.clone(),
+                    parsed.source(),
+                    &parse_result.source_map,
+                );
+
+                let inferred = driver.take_inferred_types();
+                if let Ok(mut funcs) = functions.lock() {
+                    funcs.extend(inferred.functions);
+                }
+                if let Ok(mut meths) = methods.lock() {
+                    meths.extend(inferred.methods);
+                }
+            });
+        }
+    });
+
+    let functions = Arc::try_unwrap(functions)
+        .map(|mutex| mutex.into_inner().unwrap_or_default())
+        .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+    let methods = Arc::try_unwrap(methods)
+        .map(|mutex| mutex.into_inner().unwrap_or_default())
+        .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+
+    (functions, methods)
 }
 
 fn stub_slice_needs_inference(slice: &mir_codebase::storage::StubSlice) -> bool {

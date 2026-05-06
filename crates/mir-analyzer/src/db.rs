@@ -102,9 +102,6 @@ pub trait MirDatabase: salsa::Database {
 
     /// Clear reference locations for a file before re-analysis.
     fn clear_file_references(&self, file: &str);
-
-    /// Look up the [`SourceFile`] handle registered for `path`, if any.
-    fn lookup_source_file(&self, path: &str) -> Option<SourceFile>;
 }
 
 // SourceFile input (S1)
@@ -1243,8 +1240,6 @@ pub struct MirDb {
     symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
     /// Public symbol key → reference locations.
     reference_locations: ReferenceLocations,
-    /// File path → SourceFile handle registry.
-    source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
 }
 
 #[salsa::db]
@@ -1441,10 +1436,6 @@ impl MirDatabase for MirDb {
             locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
         }
     }
-
-    fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
-        self.source_files.get(path).copied()
-    }
 }
 
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
@@ -1530,12 +1521,7 @@ impl MirDb {
         Arc::make_mut(&mut self.file_namespaces).retain(|path, _| path.as_ref() != file);
         Arc::make_mut(&mut self.file_imports).retain(|path, _| path.as_ref() != file);
         Arc::make_mut(&mut self.global_vars).retain(|name, _| !symbol_set.contains(name));
-        Arc::make_mut(&mut self.source_files).remove(file);
         self.clear_file_references(file);
-    }
-
-    pub fn register_source_file(&mut self, path: Arc<str>, sf: SourceFile) {
-        Arc::make_mut(&mut self.source_files).insert(path, sf);
     }
 
     pub fn type_count(&self) -> usize {
@@ -2010,7 +1996,50 @@ impl MirDb {
     /// value (preserves PR21's fast-skip semantics).  Skips inactive
     /// nodes — there's no point committing an inferred return for a node
     /// that has been deactivated by a re-analyze.
-    ///
+    /// Commit inferred return types collected during the priming sweep.
+    /// Takes ownership of the function and method inferred type vectors.
+    pub fn commit_inferred_return_types(
+        &mut self,
+        functions: Vec<(Arc<str>, mir_types::Union)>,
+        methods: Vec<(Arc<str>, Arc<str>, mir_types::Union)>,
+    ) {
+        use salsa::Setter as _;
+        for (fqn, inferred) in functions {
+            if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
+                if !node.active(self) {
+                    continue;
+                }
+                let new = Some(Arc::new(inferred));
+                if node.inferred_return_type(self) == new {
+                    continue;
+                }
+                node.set_inferred_return_type(self).to(new);
+            }
+        }
+        for (fqcn, name, inferred) in methods {
+            let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
+                name.clone()
+            } else {
+                Arc::from(name.to_lowercase().as_str())
+            };
+            let node = self
+                .method_nodes
+                .get(fqcn.as_ref())
+                .and_then(|m| m.get(&name_lower))
+                .copied();
+            if let Some(node) = node {
+                if !node.active(self) {
+                    continue;
+                }
+                let new = Some(Arc::new(inferred));
+                if node.inferred_return_type(self) == new {
+                    continue;
+                }
+                node.set_inferred_return_type(self).to(new);
+            }
+        }
+    }
+
     /// Mark the `FunctionNode` for `fqn` as inactive.
     pub fn deactivate_function_node(&mut self, fqn: &str) {
         use salsa::Setter as _;
@@ -2378,13 +2407,6 @@ pub struct RefLoc {
 #[derive(Clone, Debug)]
 pub struct RefLocAccumulator(pub RefLoc);
 
-/// Salsa accumulator carrying resolved symbols from Pass 2.
-/// Used by downstream consumers (LSP, dead-code analysis) to build
-/// position indexes for hover, go-to-definition, completions.
-#[salsa::accumulator]
-#[derive(Clone, Debug)]
-pub struct SymbolAccumulator(pub crate::symbol::ResolvedSymbol);
-
 /// Salsa tracked-query input for `analyze_file`.  Carries the analysis
 /// parameters that aren't already captured by `SourceFile` itself.  Kept
 /// minimal in this PR; subsequent PRs in the S4 chain will extend it as
@@ -2418,77 +2440,12 @@ pub struct AnalyzeFileInput {
 ///
 /// **Future (S4 PR4):** Will compute types on-demand by extracting the function body
 /// from source and running inference-only Pass 2, eliminating the double-pass.
-fn inferred_fn_return_initial(
-    _db: &dyn MirDatabase,
-    _id: salsa::Id,
-    _node: FunctionNode,
-) -> Arc<Union> {
-    Arc::new(Union::mixed())
-}
-
-fn inferred_fn_return_cycle(
-    _db: &dyn MirDatabase,
-    _cycle: &salsa::Cycle,
-    _last: &Arc<Union>,
-    _value: Arc<Union>,
-    _node: FunctionNode,
-) -> Arc<Union> {
-    Arc::new(Union::mixed())
-}
-
-#[salsa::tracked(cycle_fn = inferred_fn_return_cycle, cycle_initial = inferred_fn_return_initial)]
+#[salsa::tracked]
 pub fn inferred_function_return_type(db: &dyn MirDatabase, node: FunctionNode) -> Arc<Union> {
-    // Short-circuit: if node has explicit return type, skip inference.
-    if let Some(return_type) = node.return_type(db) {
-        return return_type.clone();
-    }
-
-    // Get source location and file.
-    let Some(loc) = node.location(db) else {
-        // Fall back to the inferred_return_type field (from the double-pass buffer).
-        // This handles synthetic/stub nodes and the bootstrap case.
-        return node
-            .inferred_return_type(db)
-            .unwrap_or_else(|| Arc::new(Union::mixed()));
-    };
-    let Some(sf) = db.lookup_source_file(loc.file.as_ref()) else {
-        return Arc::new(Union::mixed());
-    };
-
-    // Parse the source.
-    let text = sf.text(db);
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse(&arena, &text);
-
-    // Walk AST to find Function at loc.line.
-    let target_line = loc.line;
-    let mut found_decl = None;
-    for stmt in parsed.program.stmts.iter() {
-        if let php_ast::ast::StmtKind::Function(decl) = &stmt.kind {
-            let (stmt_line, _) =
-                crate::diagnostics::offset_to_line_col(&text, stmt.span.start, &parsed.source_map);
-            if stmt_line == target_line {
-                found_decl = Some(decl);
-                break;
-            }
-        }
-    }
-
-    let Some(decl) = found_decl else {
-        return Arc::new(Union::mixed());
-    };
-
-    // Infer the return type via the helper.
-    let inferred = crate::pass2::infer_one_function(
-        db,
-        node,
-        decl,
-        loc.file.clone(),
-        &text,
-        &parsed.source_map,
-        crate::PhpVersion::LATEST, // TODO: get from db or context
-    );
-    Arc::new(inferred)
+    // For now, read the already-committed inferred type from the FunctionNode input.
+    // This is set via commit_inferred_return_types() after Pass 2a completes.
+    node.inferred_return_type(db)
+        .unwrap_or_else(|| Arc::new(Union::mixed()))
 }
 
 /// Lazily computes the inferred return type for a method.
@@ -2498,102 +2455,11 @@ pub fn inferred_function_return_type(db: &dyn MirDatabase, node: FunctionNode) -
 ///
 /// **Future (S4 PR4):** Will compute types on-demand by extracting the method body
 /// from source and running inference-only Pass 2.
-fn inferred_method_return_initial(
-    _db: &dyn MirDatabase,
-    _id: salsa::Id,
-    _node: MethodNode,
-) -> Arc<Union> {
-    Arc::new(Union::mixed())
-}
-
-fn inferred_method_return_cycle(
-    _db: &dyn MirDatabase,
-    _cycle: &salsa::Cycle,
-    _last: &Arc<Union>,
-    _value: Arc<Union>,
-    _node: MethodNode,
-) -> Arc<Union> {
-    Arc::new(Union::mixed())
-}
-
-#[salsa::tracked(cycle_fn = inferred_method_return_cycle, cycle_initial = inferred_method_return_initial)]
+#[salsa::tracked]
 pub fn inferred_method_return_type(db: &dyn MirDatabase, node: MethodNode) -> Arc<Union> {
-    // Short-circuit: if node has explicit return type, skip inference.
-    if let Some(return_type) = node.return_type(db) {
-        return return_type.clone();
-    }
-
-    // Get source location and file.
-    let Some(loc) = node.location(db) else {
-        // Fall back to the inferred_return_type field (from the double-pass buffer).
-        // This handles synthetic/stub nodes and the bootstrap case.
-        return node
-            .inferred_return_type(db)
-            .unwrap_or_else(|| Arc::new(Union::mixed()));
-    };
-    let Some(sf) = db.lookup_source_file(loc.file.as_ref()) else {
-        return Arc::new(Union::mixed());
-    };
-
-    // Parse the source.
-    let text = sf.text(db);
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse(&arena, &text);
-
-    // Walk AST to find Class → Method at loc.line.
-    let target_line = loc.line;
-    let mut found_method = None;
-    let mut found_class_fqcn = None;
-    'outer: for stmt in parsed.program.stmts.iter() {
-        if let php_ast::ast::StmtKind::Class(class_decl) = &stmt.kind {
-            // Walk methods in this class.
-            for member in class_decl.members.iter() {
-                if let php_ast::ast::ClassMemberKind::Method(method) = &member.kind {
-                    let (method_line, _) = crate::diagnostics::offset_to_line_col(
-                        &text,
-                        member.span.start,
-                        &parsed.source_map,
-                    );
-                    if method_line == target_line {
-                        found_method = Some(method);
-                        // Extract FQCN from ClassNode lookup (or estimate from class_decl.name).
-                        if let Some(class_name) = class_decl.name {
-                            if let Some(class_node) = db.lookup_class_node(class_name) {
-                                found_class_fqcn = Some(class_node.fqcn(db));
-                            } else {
-                                found_class_fqcn = Some(Arc::from(class_name.to_string()));
-                            }
-                        }
-                        break 'outer;
-                    }
-                }
-            }
-        }
-    }
-
-    let (Some(method), Some(fqcn)) = (found_method, found_class_fqcn) else {
-        return Arc::new(Union::mixed());
-    };
-
-    let Some(body) = &method.body else {
-        return Arc::new(Union::mixed()); // abstract method
-    };
-
-    // Infer the return type via the helper.
-    let inferred = crate::pass2::infer_one_method(
-        db,
-        node,
-        method.name,
-        &method.params,
-        body,
-        method.is_static,
-        &fqcn,
-        loc.file.clone(),
-        &text,
-        &parsed.source_map,
-        crate::PhpVersion::LATEST, // TODO: get from db or context
-    );
-    Arc::new(inferred)
+    // For now, read the already-committed inferred type from the MethodNode input.
+    node.inferred_return_type(db)
+        .unwrap_or_else(|| Arc::new(Union::mixed()))
 }
 
 // Helper: collect analysis results via tracked query accumulators
@@ -2666,7 +2532,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
         let php_version =
             PhpVersion::from_str(input.php_version(db).as_ref()).unwrap_or(PhpVersion::LATEST);
         let driver = Pass2Driver::new(db, php_version);
-        let (issues, symbols) = driver.analyze_bodies(
+        let (issues, _symbols) = driver.analyze_bodies(
             &parsed.program,
             path.clone(),
             text.as_ref(),
@@ -2676,11 +2542,6 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
         // Emit issues via accumulator
         for issue in issues {
             IssueAccumulator(issue).accumulate(db);
-        }
-
-        // Emit symbols via accumulator
-        for symbol in symbols {
-            SymbolAccumulator(symbol).accumulate(db);
         }
 
         // Emit reference locations via accumulator

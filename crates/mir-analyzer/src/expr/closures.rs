@@ -57,6 +57,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.issues,
                 self.symbols,
                 self.php_version,
+                self.inference_only,
             );
             sa.analyze_stmts(&c.body, &mut closure_ctx);
             let ret = crate::project::merge_return_types(&sa.return_types);
