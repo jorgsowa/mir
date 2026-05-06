@@ -16,4 +16,3 @@ function callerWithThrows(): void {
     riskyOperation();
 }
 ===expect===
-===ignore===
