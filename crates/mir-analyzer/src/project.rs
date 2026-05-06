@@ -430,34 +430,28 @@ impl ProjectAnalyzer {
         // types are available before the issue-emitting pass below (G6).
         //
         // Inferred types are also collected into a thread-safe buffer here and
-        // committed to the Salsa db serially after the sweep returns.  Writing
-        // setters from inside `for_each_with` would deadlock against
-        // `Storage::cancel_others` (which waits for sibling worker clones to
-        // drop); the post-sweep commit runs against the canonical db with
-        // strong-count==1.  See `crate::db::InferredReturnTypes`.
+        // committed to the Salsa db serially after the sweep returns.  Using
+        // `rayon::scope` inside a helper function ensures that all worker
+        // threads and their thread-local Salsa state drop before we call
+        // `commit_inferred_return_types` on the canonical db.  See issue #S3.
         let inferred_buffer = crate::db::InferredReturnTypes::new();
-        parsed_files
+        let filtered_parsed: Vec<_> = parsed_files
             .par_iter()
             .filter(|parsed| {
                 !files_with_parse_errors.contains(&parsed.file)
                     && files_needing_inference.contains(&parsed.file)
             })
-            .for_each_with(db_priming, |db, parsed| {
-                let driver = Pass2Driver::new_inference_only(
-                    &*db as &dyn MirDatabase,
-                    self.resolved_php_version(),
-                )
-                .with_inferred_buffer(&inferred_buffer);
-                let parse_result = parsed.parsed();
-                driver.analyze_bodies(
-                    &parse_result.program,
-                    parsed.file.clone(),
-                    parsed.source(),
-                    &parse_result.source_map,
-                );
-            });
+            .collect();
 
-        // Sweep clones are dropped — commit inferred types into the Salsa db.
+        run_inference_sweep(
+            db_priming,
+            filtered_parsed,
+            self.resolved_php_version(),
+            &inferred_buffer,
+        );
+
+        // Scope has exited — all spawned work completed and all clones dropped.
+        // Now safe to commit inferred types into the Salsa db.
         {
             let mut guard = self.salsa.lock().expect("salsa lock poisoned");
             guard.0.commit_inferred_return_types(&inferred_buffer);
@@ -962,6 +956,38 @@ impl Default for ProjectAnalyzer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Inference sweep with rayon::in_place_scope
+// ---------------------------------------------------------------------------
+
+/// Helper to run the inference sweep using `rayon::in_place_scope` instead of
+/// `for_each_with`. The scope guarantees all worker threads and their
+/// thread-local Salsa state drop before the function returns, preventing
+/// deadlock when calling `commit_inferred_return_types` on the canonical db.
+fn run_inference_sweep(
+    db_priming: MirDb,
+    parsed_files: Vec<&ParsedProjectFile>,
+    php_version: PhpVersion,
+    inferred_buffer: &crate::db::InferredReturnTypes,
+) {
+    rayon::in_place_scope(|s| {
+        for parsed in parsed_files {
+            let db = db_priming.clone();
+            s.spawn(move |_| {
+                let driver = Pass2Driver::new_inference_only(&db as &dyn MirDatabase, php_version)
+                    .with_inferred_buffer(inferred_buffer);
+                let parse_result = parsed.parsed();
+                driver.analyze_bodies(
+                    &parse_result.program,
+                    parsed.file.clone(),
+                    parsed.source(),
+                    &parse_result.source_map,
+                );
+            });
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
