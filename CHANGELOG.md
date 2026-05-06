@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-05-06
+
+### Added
+
+- `AbstractInstantiation` diagnostic to detect attempts to instantiate abstract classes via `new ClassName()`.
+
+### Fixed
+
+- Closure `use()` clause validation: now detects undefined variables referenced in closure use() clauses. Example: `use ($i)` will report `UndefinedVariable` if `$i` is not defined in the parent scope.
+- Mixin method resolution with generics: docblock `@mixin Foo<T>` annotations now correctly resolve to class `Foo` instead of attempting to look up a non-existent class named `Foo<T>`.
+- All 17 `undefined_variable` fixture tests now pass with correct line/column/message expectations.
+- All 15 `undefined_constant` fixture tests now pass with correct line/column/message expectations.
+
 ## [0.17.3] - 2026-05-05
 
 ### Performance
