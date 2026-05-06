@@ -32,6 +32,9 @@ pub struct Context {
     /// Declared return type for the current function/method.
     pub fn_return_type: Option<Union>,
 
+    /// Declared exception types for the current function/method (@throws).
+    pub fn_declared_throws: Arc<[Arc<str>]>,
+
     /// Whether we are currently inside a loop.
     pub inside_loop: bool,
 
@@ -85,6 +88,7 @@ impl Context {
             parent_fqcn: None,
             static_fqcn: None,
             fn_return_type: None,
+            fn_declared_throws: Arc::from([]),
             inside_loop: false,
             inside_finally: false,
             inside_constructor: false,
@@ -109,9 +113,11 @@ impl Context {
     }
 
     /// Create a context seeded with the given parameters.
+    #[allow(clippy::too_many_arguments)]
     pub fn for_function(
         params: &[mir_codebase::FnParam],
         return_type: Option<Union>,
+        declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
         parent_fqcn: Option<Arc<str>>,
         static_fqcn: Option<Arc<str>>,
@@ -121,6 +127,7 @@ impl Context {
         Self::for_method(
             params,
             return_type,
+            declared_throws,
             self_fqcn,
             parent_fqcn,
             static_fqcn,
@@ -135,6 +142,7 @@ impl Context {
     pub fn for_method(
         params: &[mir_codebase::FnParam],
         return_type: Option<Union>,
+        declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
         parent_fqcn: Option<Arc<str>>,
         static_fqcn: Option<Arc<str>>,
@@ -145,6 +153,7 @@ impl Context {
         Self::for_method_with_templates(
             params,
             return_type,
+            declared_throws,
             self_fqcn,
             parent_fqcn,
             static_fqcn,
@@ -160,6 +169,7 @@ impl Context {
     pub fn for_method_with_templates(
         params: &[mir_codebase::FnParam],
         return_type: Option<Union>,
+        declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
         parent_fqcn: Option<Arc<str>>,
         static_fqcn: Option<Arc<str>>,
@@ -170,6 +180,7 @@ impl Context {
     ) -> Self {
         let mut ctx = Self::new();
         ctx.fn_return_type = return_type;
+        ctx.fn_declared_throws = declared_throws;
         ctx.self_fqcn = self_fqcn.clone();
         ctx.parent_fqcn = parent_fqcn;
         ctx.static_fqcn = static_fqcn;

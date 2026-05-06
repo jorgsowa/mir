@@ -182,6 +182,41 @@ impl<'a> StatementsAnalyzer<'a> {
                                 col_end: col_end.max(col_start + 1),
                             },
                         ));
+                    } else {
+                        // Check if thrown exception is covered by @throws declarations
+                        let thrown_fqcn = if crate::db::type_exists_via_db(self.db, &resolved) {
+                            &resolved
+                        } else {
+                            fqcn.as_ref()
+                        };
+                        if !ctx.fn_declared_throws.iter().any(|declared| {
+                            declared.as_ref() == thrown_fqcn
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db,
+                                    thrown_fqcn,
+                                    declared.as_ref(),
+                                )
+                        }) {
+                            let (line, col_start) = self.offset_to_line_col(stmt_span.start);
+                            let (line_end, col_end) = if stmt_span.start < stmt_span.end {
+                                let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
+                                (end_line, end_col)
+                            } else {
+                                (line, col_start)
+                            };
+                            self.issues.add(mir_issues::Issue::new(
+                                IssueKind::MissingThrowsDocblock {
+                                    class: thrown_fqcn.to_string(),
+                                },
+                                Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    line_end,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
+                                },
+                            ));
+                        }
                     }
                 }
                 // self/static/parent resolve to the class itself — check via fqcn
@@ -220,6 +255,41 @@ impl<'a> StatementsAnalyzer<'a> {
                                 col_end: col_end.max(col_start + 1),
                             },
                         ));
+                    } else {
+                        // Check if thrown exception is covered by @throws declarations
+                        let thrown_fqcn = if crate::db::type_exists_via_db(self.db, &resolved) {
+                            &resolved
+                        } else {
+                            fqcn.as_ref()
+                        };
+                        if !ctx.fn_declared_throws.iter().any(|declared| {
+                            declared.as_ref() == thrown_fqcn
+                                || crate::db::extends_or_implements_via_db(
+                                    self.db,
+                                    thrown_fqcn,
+                                    declared.as_ref(),
+                                )
+                        }) {
+                            let (line, col_start) = self.offset_to_line_col(stmt_span.start);
+                            let (line_end, col_end) = if stmt_span.start < stmt_span.end {
+                                let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
+                                (end_line, end_col)
+                            } else {
+                                (line, col_start)
+                            };
+                            self.issues.add(mir_issues::Issue::new(
+                                IssueKind::MissingThrowsDocblock {
+                                    class: thrown_fqcn.to_string(),
+                                },
+                                Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    line_end,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
+                                },
+                            ));
+                        }
                     }
                 }
                 mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}

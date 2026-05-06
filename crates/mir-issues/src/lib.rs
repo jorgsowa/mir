@@ -389,7 +389,6 @@ impl IssueKind {
             | IssueKind::UndefinedProperty { .. }
             | IssueKind::InvalidOperand { .. }
             | IssueKind::OverriddenMethodAccess { .. }
-            | IssueKind::MissingThrowsDocblock { .. }
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. } => Severity::Warning,
@@ -429,7 +428,8 @@ impl IssueKind {
             | IssueKind::MixedAssignment { .. }
             | IssueKind::MixedMethodCall { .. }
             | IssueKind::MixedPropertyFetch { .. }
-            | IssueKind::ShadowedTemplateParam { .. } => Severity::Info,
+            | IssueKind::ShadowedTemplateParam { .. }
+            | IssueKind::MissingThrowsDocblock { .. } => Severity::Info,
         }
     }
 
