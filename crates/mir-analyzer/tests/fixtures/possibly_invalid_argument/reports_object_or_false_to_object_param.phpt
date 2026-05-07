@@ -11,5 +11,3 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument@7:20: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided
-===ignore===
-TODO

@@ -11,6 +11,5 @@ function f(): void {
 }
 ===expect===
 UnusedVariable@1:0: Variable $e is never read
+MissingThrowsDocblock@5:8: Exception Exception is thrown but not declared in @throws
 UndefinedClass@6:13: Class Vendor\Missing\MyException does not exist
-===ignore===
-TODO

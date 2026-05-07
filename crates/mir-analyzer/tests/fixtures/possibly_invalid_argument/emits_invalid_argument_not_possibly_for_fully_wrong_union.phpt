@@ -10,5 +10,3 @@ function test(): void {
 }
 ===expect===
 InvalidArgument@6:13: Argument $n of takesInt() expects 'int', got 'string|false'
-===ignore===
-TODO

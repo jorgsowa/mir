@@ -8,5 +8,3 @@ function run(): void {
 }
 ===expect===
 TaintedShell@4:4: Tainted shell command — possible command injection
-===ignore===
-TODO

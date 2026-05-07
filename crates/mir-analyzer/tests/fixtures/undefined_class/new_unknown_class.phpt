@@ -7,5 +7,3 @@ function test(): void {
 }
 ===expect===
 UndefinedClass@3:8: Class UnknownClass does not exist
-===ignore===
-TODO

@@ -8,5 +8,3 @@ class Bar {
 }
 ===expect===
 UndefinedClass@4:11: Class Vendor\Missing\Foo does not exist
-===ignore===
-TODO

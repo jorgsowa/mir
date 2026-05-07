@@ -8,5 +8,3 @@ function run_query(mysqli $db): void {
 }
 ===expect===
 TaintedSql@4:4: Tainted SQL query — possible SQL injection
-===ignore===
-TODO

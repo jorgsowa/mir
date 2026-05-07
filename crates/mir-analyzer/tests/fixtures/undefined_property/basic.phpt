@@ -11,5 +11,3 @@ function test(): void {
 }
 ===expect===
 UndefinedProperty@7:13: Property Foo::$nonexistent does not exist
-===ignore===
-TODO

@@ -8,5 +8,3 @@ function f(): int {
 }
 ===expect===
 InvalidReturnType@4:4: Return type '1|"hello"' is not compatible with declared 'int'
-===ignore===
-TODO

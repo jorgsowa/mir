@@ -9,5 +9,3 @@ function test(string $s): void {
 }
 ===expect===
 PossiblyInvalidArgument@5:13: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
-===ignore===
-TODO

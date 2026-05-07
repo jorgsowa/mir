@@ -11,5 +11,3 @@ function test(Color $color): string {
 }
 ===expect===
 InvalidReturnType@7:4: Return type 'int' is not compatible with declared 'string'
-===ignore===
-TODO

@@ -7,5 +7,3 @@ function f(): UnknownClass {
 }
 ===expect===
 UndefinedClass@2:14: Class UnknownClass does not exist
-===ignore===
-TODO

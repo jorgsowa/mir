@@ -11,5 +11,3 @@ function test(Direction $dir): mixed {
 }
 ===expect===
 UndefinedProperty@7:17: Property Direction::$value does not exist
-===ignore===
-TODO

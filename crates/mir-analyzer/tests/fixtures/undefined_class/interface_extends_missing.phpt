@@ -5,5 +5,3 @@ interface extends missing
 interface MyInterface extends MissingParentInterface {}
 ===expect===
 UndefinedClass@2:30: Class MissingParentInterface does not exist
-===ignore===
-TODO

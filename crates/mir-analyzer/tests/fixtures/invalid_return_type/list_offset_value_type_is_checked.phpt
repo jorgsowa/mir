@@ -8,5 +8,3 @@ function first(): int {
 }
 ===expect===
 InvalidReturnType@4:4: Return type '"alpha"' is not compatible with declared 'int'
-===ignore===
-TODO

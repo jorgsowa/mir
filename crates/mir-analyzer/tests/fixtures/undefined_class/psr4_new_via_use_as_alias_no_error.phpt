@@ -14,5 +14,3 @@ function wrap(): void {
 }
 ===expect===
 Service.php: UnusedVariable@4:4: Variable $x is never read
-===ignore===
-TODO

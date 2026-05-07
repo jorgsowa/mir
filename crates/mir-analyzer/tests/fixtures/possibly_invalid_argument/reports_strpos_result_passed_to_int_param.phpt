@@ -8,5 +8,3 @@ function test(string $haystack, string $needle): void {
 }
 ===expect===
 PossiblyInvalidArgument@4:13: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
-===ignore===
-TODO
