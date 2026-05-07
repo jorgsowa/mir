@@ -157,8 +157,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             // --- clone ------------------------------------------------------
-            ExprKind::Clone(inner) => self.analyze(inner, ctx),
-            ExprKind::CloneWith(inner, _props) => self.analyze(inner, ctx),
+            ExprKind::Clone(inner) => {
+                let ty = self.analyze(inner, ctx);
+                if ty.is_mixed() {
+                    self.emit(IssueKind::MixedClone, Severity::Info, expr.span);
+                }
+                ty
+            }
+            ExprKind::CloneWith(inner, _props) => {
+                let ty = self.analyze(inner, ctx);
+                if ty.is_mixed() {
+                    self.emit(IssueKind::MixedClone, Severity::Info, expr.span);
+                }
+                ty
+            }
 
             // --- new ClassName(...) ----------------------------------------
             ExprKind::New(n) => self.analyze_new(n, expr.span, ctx),
