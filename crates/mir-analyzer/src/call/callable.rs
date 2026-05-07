@@ -210,7 +210,10 @@ pub(crate) fn check_array_filter_callback(
             .iter()
             .filter(|p| !p.is_optional && !p.is_variadic)
             .count();
-        if required_count > expected_arity {
+        let has_variadic = params.iter().any(|p| p.is_variadic);
+        let max_params = params.len();
+
+        if required_count > expected_arity || (!has_variadic && max_params < expected_arity) {
             ea.emit(
                 IssueKind::InvalidArgument {
                     param: "callback".to_string(),
