@@ -35,11 +35,8 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_constants = indexmap::IndexMap::new();
         let mut trait_uses: Vec<Arc<str>> = vec![];
 
-        let class_doc = decl
-            .doc_comment
-            .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
-            .unwrap_or_default();
+        let class_doc =
+            self.parse_docblock_from_node_or_preceding(decl.doc_comment.as_ref(), stmt_span.start);
 
         let class_doc_span = decl
             .doc_comment
@@ -89,15 +86,10 @@ impl<'a> DefinitionCollector<'a> {
                     }
                 }
                 ClassMemberKind::Property(p) => {
-                    let prop_doc = p
-                        .doc_comment
-                        .as_ref()
-                        .map(|c| crate::parser::DocblockParser::parse(c.text))
-                        .or_else(|| {
-                            crate::parser::find_preceding_docblock(self.source, member.span.start)
-                                .map(|t| crate::parser::DocblockParser::parse(&t))
-                        })
-                        .unwrap_or_default();
+                    let prop_doc = self.parse_docblock_from_node_or_preceding(
+                        p.doc_comment.as_ref(),
+                        member.span.start,
+                    );
                     let prop_doc_span = p
                         .doc_comment
                         .as_ref()
@@ -122,15 +114,10 @@ impl<'a> DefinitionCollector<'a> {
                     own_properties.insert(Arc::from(p.name.to_string()), prop);
                 }
                 ClassMemberKind::ClassConst(c) => {
-                    let const_doc = c
-                        .doc_comment
-                        .as_ref()
-                        .map(|c| crate::parser::DocblockParser::parse(c.text))
-                        .or_else(|| {
-                            crate::parser::find_preceding_docblock(self.source, member.span.start)
-                                .map(|t| crate::parser::DocblockParser::parse(&t))
-                        })
-                        .unwrap_or_default();
+                    let const_doc = self.parse_docblock_from_node_or_preceding(
+                        c.doc_comment.as_ref(),
+                        member.span.start,
+                    );
                     let const_doc_span = c
                         .doc_comment
                         .as_ref()

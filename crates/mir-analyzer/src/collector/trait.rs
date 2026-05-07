@@ -83,15 +83,10 @@ impl<'a> DefinitionCollector<'a> {
                     }
                 }
                 ClassMemberKind::Property(p) => {
-                    let prop_doc = p
-                        .doc_comment
-                        .as_ref()
-                        .map(|c| crate::parser::DocblockParser::parse(c.text))
-                        .or_else(|| {
-                            crate::parser::find_preceding_docblock(self.source, member.span.start)
-                                .map(|t| crate::parser::DocblockParser::parse(&t))
-                        })
-                        .unwrap_or_default();
+                    let prop_doc = self.parse_docblock_from_node_or_preceding(
+                        p.doc_comment.as_ref(),
+                        member.span.start,
+                    );
                     let prop_doc_span = p
                         .doc_comment
                         .as_ref()
@@ -118,15 +113,10 @@ impl<'a> DefinitionCollector<'a> {
                     );
                 }
                 ClassMemberKind::ClassConst(c) => {
-                    let const_doc = c
-                        .doc_comment
-                        .as_ref()
-                        .map(|c| crate::parser::DocblockParser::parse(c.text))
-                        .or_else(|| {
-                            crate::parser::find_preceding_docblock(self.source, member.span.start)
-                                .map(|t| crate::parser::DocblockParser::parse(&t))
-                        })
-                        .unwrap_or_default();
+                    let const_doc = self.parse_docblock_from_node_or_preceding(
+                        c.doc_comment.as_ref(),
+                        member.span.start,
+                    );
                     let const_doc_span = c
                         .doc_comment
                         .as_ref()

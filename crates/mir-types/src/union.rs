@@ -210,6 +210,11 @@ impl Union {
         self.filter(|t| !matches!(t, Atomic::TFalse | Atomic::TBool))
     }
 
+    /// Remove both `null` and `false` from the union (core type without nullable/falsy variants).
+    pub fn core_type(&self) -> Union {
+        self.remove_null().remove_false()
+    }
+
     /// Keep only truthy atomics (e.g. after `if ($x)`).
     pub fn narrow_to_truthy(&self) -> Union {
         if self.is_mixed() {

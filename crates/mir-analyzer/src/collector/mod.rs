@@ -178,6 +178,21 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
+    /// Parse a docblock from a node's doc_comment, falling back to preceding docblock if not found.
+    fn parse_docblock_from_node_or_preceding(
+        &self,
+        doc_comment: Option<&php_ast::ast::Comment>,
+        span_start: u32,
+    ) -> crate::parser::ParsedDocblock {
+        doc_comment
+            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .or_else(|| {
+                crate::parser::find_preceding_docblock(self.source, span_start)
+                    .map(|t| crate::parser::DocblockParser::parse(&t))
+            })
+            .unwrap_or_default()
+    }
+
     /// Writes accumulated namespace and import data into `self.slice` so that
     /// `MirDatabase::ingest_stub_slice` can populate the db's `file_namespaces`
     /// and `file_imports` tables. Called at the end of `collect_slice` to
