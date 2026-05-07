@@ -10,5 +10,3 @@ function test(string $key): void {
 }
 ===expect===
 InvalidArgument@6:14: Argument $value of takes_int() expects 'int', got '123|"Ada"'
-===ignore===
-TODO

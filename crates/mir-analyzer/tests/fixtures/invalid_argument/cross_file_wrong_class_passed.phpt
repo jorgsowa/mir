@@ -14,5 +14,3 @@ function test(): void {
 }
 ===expect===
 Service.php: InvalidArgument@4:15: Argument $u of createUser() expects 'User', got 'Admin'
-===ignore===
-TODO
