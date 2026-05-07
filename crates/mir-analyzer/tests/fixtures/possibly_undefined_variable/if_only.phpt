@@ -8,5 +8,3 @@ function foo(bool $c): string {
 }
 ===expect===
 PossiblyUndefinedVariable@4:11: Variable $r might not be defined
-===ignore===
-TODO

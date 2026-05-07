@@ -12,5 +12,3 @@ class Child extends Base {
 }
 ===expect===
 Child.php: MethodSignatureMismatch@3:4: Method Child::fetch() signature mismatch: return type 'string|null' is not a subtype of parent 'string'
-===ignore===
-TODO

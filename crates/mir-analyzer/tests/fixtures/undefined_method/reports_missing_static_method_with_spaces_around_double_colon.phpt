@@ -8,5 +8,3 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod@4:4: Method Math::missing() does not exist
-===ignore===
-TODO

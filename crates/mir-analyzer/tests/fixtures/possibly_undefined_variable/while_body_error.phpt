@@ -11,5 +11,3 @@ function foo(bool $c): int {
 }
 ===expect===
 PossiblyUndefinedVariable@7:11: Variable $x might not be defined
-===ignore===
-TODO

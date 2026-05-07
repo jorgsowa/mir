@@ -9,5 +9,3 @@ trait Auditable {
 }
 ===expect===
 UndefinedFunction@4:8: Function nonexistent_function() is not defined
-===ignore===
-TODO

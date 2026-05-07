@@ -9,5 +9,3 @@ trait MyTrait {
 }
 ===expect===
 UndefinedFunction@4:8: Function missing_function() is not defined
-===ignore===
-TODO

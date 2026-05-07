@@ -7,5 +7,3 @@ function test(): void {
 }
 ===expect===
 UndefinedFunction@3:4: Function foo() is not defined
-===ignore===
-TODO

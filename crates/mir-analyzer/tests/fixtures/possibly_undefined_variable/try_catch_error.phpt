@@ -12,5 +12,3 @@ function foo(): string {
 }
 ===expect===
 PossiblyUndefinedVariable@8:11: Variable $result might not be defined
-===ignore===
-TODO
