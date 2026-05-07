@@ -18,7 +18,7 @@ use mir_codebase::storage::{
     TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
-use mir_types::Union;
+use mir_types::{Atomic, Union};
 
 mod annotation;
 mod class;
@@ -70,6 +70,45 @@ pub(crate) fn print_collector_stats() {
     eprintln!("    scalar params:        {} ({:.1}%)", scalar, scalar_pct);
     eprintln!("    complex params:       {}", complex);
     eprintln!("    params with default:  {}", with_default);
+}
+
+// ---------------------------------------------------------------------------
+// Constant value inference
+// ---------------------------------------------------------------------------
+
+/// Infer the type of a constant value from its AST expression.
+/// This handles literal values like integers, strings, etc. used in define().
+fn infer_const_value(expr_kind: &php_ast::ast::ExprKind) -> Option<Union> {
+    use php_ast::ast::UnaryPrefixOp;
+
+    match expr_kind {
+        php_ast::ast::ExprKind::Int(i) => Some(Union::single(Atomic::TLiteralInt(*i))),
+        php_ast::ast::ExprKind::String(s) => {
+            Some(Union::single(Atomic::TLiteralString(Arc::from(&**s))))
+        }
+        php_ast::ast::ExprKind::Float(_f) => Some(Union::single(Atomic::TFloat)),
+        php_ast::ast::ExprKind::Bool(_b) => Some(Union::single(Atomic::TBool)),
+        php_ast::ast::ExprKind::Null => Some(Union::single(Atomic::TNull)),
+        // For unary expressions like -1, try to evaluate them
+        php_ast::ast::ExprKind::UnaryPrefix(u) => match u.op {
+            UnaryPrefixOp::Negate => {
+                if let php_ast::ast::ExprKind::Int(i) = &u.operand.kind {
+                    Some(Union::single(Atomic::TLiteralInt(-i)))
+                } else {
+                    None
+                }
+            }
+            UnaryPrefixOp::Plus => {
+                if let php_ast::ast::ExprKind::Int(i) = &u.operand.kind {
+                    Some(Union::single(Atomic::TLiteralInt(*i)))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +602,13 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                                     self.emit_docblock_issues(&define_doc, stmt.span.start);
                                     if self.version_allows(&define_doc) {
                                         let fqn: Arc<str> = Arc::from(&**name);
-                                        self.slice.constants.push((fqn, Union::mixed()));
+                                        // Try to infer the type of the constant value from the second argument
+                                        let const_type = call
+                                            .args
+                                            .get(1)
+                                            .and_then(|arg| infer_const_value(&arg.value.kind))
+                                            .unwrap_or(Union::mixed());
+                                        self.slice.constants.push((fqn, const_type));
                                     }
                                 }
                             }
