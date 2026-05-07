@@ -13,5 +13,3 @@ function test(): void {
 }
 ===expect===
 InvalidArgument@9:6: Argument $x of f() expects 'Iterator&Countable|null', got '"hello"'
-===ignore===
-TODO

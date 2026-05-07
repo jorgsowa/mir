@@ -10,5 +10,3 @@ $fn = 'helper';
 call_user_func($fn);
 ===expect===
 UnusedFunction@1:0: Function helper() is never called
-===ignore===
-TODO

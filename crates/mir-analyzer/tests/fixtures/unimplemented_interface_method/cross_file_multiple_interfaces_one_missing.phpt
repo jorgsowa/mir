@@ -18,5 +18,3 @@ class Entity implements Serializable, Identifiable {
 }
 ===expect===
 Entity.php: UnimplementedInterfaceMethod@2:0: Class Entity must implement Identifiable::getId() from interface
-===ignore===
-TODO

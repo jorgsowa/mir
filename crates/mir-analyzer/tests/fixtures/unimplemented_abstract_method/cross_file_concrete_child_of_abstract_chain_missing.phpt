@@ -15,5 +15,3 @@ class Triangle extends Polygon {
 }
 ===expect===
 Triangle.php: UnimplementedAbstractMethod@2:0: Class Triangle must implement abstract method area()
-===ignore===
-TODO

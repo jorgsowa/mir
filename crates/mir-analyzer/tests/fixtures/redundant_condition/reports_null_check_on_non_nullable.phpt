@@ -7,5 +7,3 @@ function f(string $x): void {
 }
 ===expect===
 RedundantCondition@3:8: Condition is always true/false for type 'bool'
-===ignore===
-TODO

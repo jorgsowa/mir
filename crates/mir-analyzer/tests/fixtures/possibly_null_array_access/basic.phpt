@@ -10,5 +10,3 @@ function test(?array $arr): void {
 }
 ===expect===
 PossiblyNullArrayAccess@6:9: Cannot access array on possibly null value
-===ignore===
-TODO

@@ -10,5 +10,3 @@ class Baz {
 }
 ===expect===
 PossiblyNullMethodCall@5:8: Cannot call method doSomething() on possibly null value
-===ignore===
-TODO

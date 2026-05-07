@@ -20,5 +20,3 @@ class Foo {
 ===expect===
 UnusedMethod@1:0: Private method Foo::helper() is never called
 UnreachableCode@10:8: Unreachable code detected
-===ignore===
-TODO

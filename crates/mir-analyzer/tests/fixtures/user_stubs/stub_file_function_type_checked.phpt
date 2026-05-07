@@ -10,5 +10,3 @@ function my_helper(string $s): string { return $s; }
 function test(): void { my_helper(42); }
 ===expect===
 App.php: InvalidArgument@2:34: Argument $s of my_helper() expects 'string', got '42'
-===ignore===
-TODO

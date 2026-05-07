@@ -10,5 +10,3 @@ $f = new Foo();
 $f->bar(null);
 ===expect===
 NullArgument@7:8: Argument $n of bar() cannot be null
-===ignore===
-TODO

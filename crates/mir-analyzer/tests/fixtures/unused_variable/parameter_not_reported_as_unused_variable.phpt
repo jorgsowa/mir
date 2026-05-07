@@ -7,5 +7,3 @@ function foo(int $param): int {
 }
 ===expect===
 UnusedParam@2:13: Parameter $param is never used
-===ignore===
-TODO

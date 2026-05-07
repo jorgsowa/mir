@@ -11,5 +11,3 @@ function test(bool $flag): void {
 ===expect===
 PossiblyNullMethodCall@4:4: Cannot call method foo() on possibly null value
 UndefinedMethod@4:4: Method stdClass::foo() does not exist
-===ignore===
-TODO

@@ -12,5 +12,3 @@ $g->oldGreet('Alice');
 ===expect===
 UnusedParam@4:29: Parameter $name is never used
 DeprecatedMethodCall@8:0: Call to deprecated method Greeter::oldGreet: use newGreet() instead
-===ignore===
-TODO

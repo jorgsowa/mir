@@ -8,5 +8,3 @@ function test(): void {
 }
 ===expect===
 NullMethodCall@4:4: Cannot call method foo() on null
-===ignore===
-TODO

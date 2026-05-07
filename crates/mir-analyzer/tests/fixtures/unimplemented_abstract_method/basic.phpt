@@ -8,5 +8,3 @@ abstract class Base {
 class Incomplete extends Base {}
 ===expect===
 UnimplementedAbstractMethod@5:0: Class Incomplete must implement abstract method doWork()
-===ignore===
-TODO

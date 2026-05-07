@@ -9,5 +9,3 @@ class Foo {
 }
 ===expect===
 UnusedProperty@1:0: Private property Foo::$name is never read
-===ignore===
-TODO

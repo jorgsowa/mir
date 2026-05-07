@@ -9,5 +9,3 @@ oldGreet('Alice');
 ===expect===
 UnusedParam@3:18: Parameter $name is never used
 DeprecatedCall@5:0: Call to deprecated function oldGreet: use newGreet() instead
-===ignore===
-TODO
