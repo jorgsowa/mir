@@ -13,5 +13,3 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedFunction@4:4: Function missing_helper() is not defined
-===ignore===
-TODO

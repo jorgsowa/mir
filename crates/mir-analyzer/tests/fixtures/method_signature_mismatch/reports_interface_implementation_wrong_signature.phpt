@@ -10,5 +10,3 @@ class C implements I {
 }
 ===expect===
 MethodSignatureMismatch@6:4: Method C::f() signature mismatch: parameter $x type 'int' is narrower than parent type 'string'
-===ignore===
-TODO

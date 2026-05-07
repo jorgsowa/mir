@@ -8,5 +8,3 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument@3:22: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
-===ignore===
-TODO

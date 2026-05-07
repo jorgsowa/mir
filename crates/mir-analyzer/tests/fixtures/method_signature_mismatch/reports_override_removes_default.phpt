@@ -10,5 +10,3 @@ class Child extends Base {
 }
 ===expect===
 MethodSignatureMismatch@6:4: Method Child::f() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
-===ignore===
-TODO

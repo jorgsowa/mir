@@ -15,5 +15,3 @@ class GrandChild extends ParentClass {
 }
 ===expect===
 GrandChild.php: MethodSignatureMismatch@3:4: Method GrandChild::f() signature mismatch: parameter $x type 'int' is narrower than parent type 'string'
-===ignore===
-TODO

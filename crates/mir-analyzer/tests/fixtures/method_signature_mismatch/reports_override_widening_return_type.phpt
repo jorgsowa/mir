@@ -10,5 +10,3 @@ class Child extends Base {
 }
 ===expect===
 MethodSignatureMismatch@6:4: Method Child::f() signature mismatch: return type 'int|string' is not a subtype of parent 'int'
-===ignore===
-TODO

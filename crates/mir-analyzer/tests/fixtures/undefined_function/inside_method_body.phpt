@@ -9,5 +9,3 @@ class A {
 }
 ===expect===
 UndefinedFunction@4:8: Function missing() is not defined
-===ignore===
-TODO

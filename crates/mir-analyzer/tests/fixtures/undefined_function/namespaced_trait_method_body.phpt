@@ -11,5 +11,3 @@ namespace App {
 }
 ===expect===
 UndefinedFunction@5:12: Function missing_function() is not defined
-===ignore===
-TODO

@@ -12,5 +12,3 @@ class Dog extends Animal {
 }
 ===expect===
 Dog.php: MethodSignatureMismatch@3:4: Method Dog::eat() signature mismatch: parameter $food type 'int' is narrower than parent type 'string'
-===ignore===
-TODO
