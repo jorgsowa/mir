@@ -9,5 +9,3 @@ Greeter::say('Ada', 'Grace');
 ===expect===
 UnusedParam@3:31: Parameter $name is never used
 TooManyArguments@5:20: Too many arguments for say(): expected 1, got 2
-===ignore===
-TODO

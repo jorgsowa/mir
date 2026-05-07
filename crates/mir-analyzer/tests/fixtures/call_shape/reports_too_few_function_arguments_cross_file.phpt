@@ -10,5 +10,3 @@ greet('Ada');
 App.php: TooFewArguments@2:0: Too few arguments for greet(): expected 2, got 1
 Helper.php: UnusedParam@2:15: Parameter $name is never used
 Helper.php: UnusedParam@2:29: Parameter $suffix is never used
-===ignore===
-TODO

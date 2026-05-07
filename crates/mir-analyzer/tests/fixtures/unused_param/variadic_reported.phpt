@@ -7,5 +7,3 @@ function sum(int ...$nums): int {
 }
 ===expect===
 UnusedParam@2:13: Parameter $nums is never used
-===ignore===
-TODO

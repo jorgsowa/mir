@@ -11,5 +11,3 @@ function test(int $mode): void {
 }
 ===expect===
 UnreachableCode@6:12: Unreachable code detected
-===ignore===
-TODO
