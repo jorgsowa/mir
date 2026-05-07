@@ -80,19 +80,28 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Union {
         let name_str: &str = name.as_str();
         let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
-        let found = {
-            let ns_qualified = self
-                .db
-                .file_namespace(self.file.as_ref())
-                .map(|ns| format!("{}\\{}", ns, name_str));
-            let exists = |fqn: &str| -> bool {
+        let ns_qualified = self
+            .db
+            .file_namespace(self.file.as_ref())
+            .map(|ns| format!("{}\\{}", ns, name_str));
+
+        // Try to look up the constant in namespace-qualified form first, then globally
+        let const_node = ns_qualified
+            .as_deref()
+            .and_then(|fqn| {
                 self.db
                     .lookup_global_constant_node(fqn)
-                    .is_some_and(|n| n.active(self.db))
-            };
-            ns_qualified.as_deref().is_some_and(exists) || exists(name_str)
-        };
-        if !found {
+                    .filter(|n| n.active(self.db))
+            })
+            .or_else(|| {
+                self.db
+                    .lookup_global_constant_node(name_str)
+                    .filter(|n| n.active(self.db))
+            });
+
+        if let Some(node) = const_node {
+            node.ty(self.db)
+        } else {
             self.emit(
                 IssueKind::UndefinedConstant {
                     name: name_str.to_string(),
@@ -100,7 +109,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Severity::Error,
                 expr.span,
             );
+            Union::mixed()
         }
-        Union::mixed()
     }
 }
