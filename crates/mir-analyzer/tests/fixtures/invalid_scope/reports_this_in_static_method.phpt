@@ -9,5 +9,3 @@ class Foo {
 }
 ===expect===
 InvalidScope@4:8: $this cannot be used in a static method
-===ignore===
-TODO

@@ -7,5 +7,3 @@ function test(): void {
 }
 ===expect===
 InvalidScope@3:4: $this cannot be used outside of a class
-===ignore===
-TODO

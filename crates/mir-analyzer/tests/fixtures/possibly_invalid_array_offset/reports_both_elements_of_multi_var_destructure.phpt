@@ -10,5 +10,3 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArrayOffset@5:4: Array offset might be invalid: expects 'array', got 'array<mixed, mixed>|false'
-===ignore===
-TODO

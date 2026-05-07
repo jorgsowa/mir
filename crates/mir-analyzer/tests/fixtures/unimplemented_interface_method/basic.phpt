@@ -8,5 +8,3 @@ interface Runnable {
 class Task implements Runnable {}
 ===expect===
 UnimplementedInterfaceMethod@5:0: Class Task must implement Runnable::run() from interface
-===ignore===
-TODO

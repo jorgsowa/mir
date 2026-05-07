@@ -14,5 +14,3 @@ abstract class A
 }
 ===expect===
 MixedMethodCall@8:8: Method greet() called on mixed type
-===ignore===
-TODO

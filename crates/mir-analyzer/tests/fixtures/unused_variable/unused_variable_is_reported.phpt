@@ -8,5 +8,3 @@ function foo(): int {
 }
 ===expect===
 UnusedVariable@3:4: Variable $unused is never read
-===ignore===
-TODO

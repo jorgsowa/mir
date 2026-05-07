@@ -18,5 +18,3 @@ class Stream implements ReadWritable {
 }
 ===expect===
 Stream.php: UnimplementedInterfaceMethod@2:0: Class Stream must implement Readable::read() from interface
-===ignore===
-TODO

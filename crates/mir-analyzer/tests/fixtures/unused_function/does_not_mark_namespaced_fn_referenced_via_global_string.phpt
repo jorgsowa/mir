@@ -12,5 +12,3 @@ function helper(): void {}
 call_user_func('helper');
 ===expect===
 UnusedFunction@1:0: Function helper() is never called
-===ignore===
-TODO

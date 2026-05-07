@@ -10,5 +10,3 @@ class Child extends ParentClass {
 }
 ===expect===
 FinalMethodOverridden@6:4: Method Child::locked() cannot override final method from ParentClass
-===ignore===
-TODO

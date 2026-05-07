@@ -12,5 +12,3 @@ function test(Foo $foo): void {
 }
 ===expect===
 DeprecatedMethodCall@8:4: Call to deprecated method Foo::oldMethod: use newMethod() instead
-===ignore===
-TODO

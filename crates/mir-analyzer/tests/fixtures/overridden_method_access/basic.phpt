@@ -10,5 +10,3 @@ class Child extends ParentClass {
 }
 ===expect===
 OverriddenMethodAccess@6:4: Method Child::dostuff() overrides with less visibility
-===ignore===
-TODO

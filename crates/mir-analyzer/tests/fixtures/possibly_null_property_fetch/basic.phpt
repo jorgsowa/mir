@@ -10,5 +10,3 @@ function test(?Foo $obj): void {
 }
 ===expect===
 PossiblyNullPropertyFetch@6:9: Cannot access property $value on possibly null value
-===ignore===
-TODO

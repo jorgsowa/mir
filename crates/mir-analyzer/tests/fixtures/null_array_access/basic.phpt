@@ -8,5 +8,3 @@ function test(): void {
 }
 ===expect===
 NullArrayAccess@4:9: Cannot access array on null
-===ignore===
-TODO

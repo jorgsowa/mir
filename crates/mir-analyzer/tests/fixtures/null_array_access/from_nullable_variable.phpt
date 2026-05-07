@@ -8,5 +8,3 @@ function test(bool $flag): void {
 }
 ===expect===
 PossiblyNullArrayAccess@4:9: Cannot access array on possibly null value
-===ignore===
-TODO

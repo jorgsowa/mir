@@ -13,5 +13,3 @@ class Task implements Runnable {
 }
 ===expect===
 Task.php: UnimplementedInterfaceMethod@2:0: Class Task must implement Runnable::stop() from interface
-===ignore===
-TODO

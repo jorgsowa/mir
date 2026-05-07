@@ -10,5 +10,3 @@ function test(?Foo $obj): void {
 }
 ===expect===
 PossiblyNullMethodCall@6:4: Cannot call method bar() on possibly null value
-===ignore===
-TODO

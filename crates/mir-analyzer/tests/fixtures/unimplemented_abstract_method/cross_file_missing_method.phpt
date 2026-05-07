@@ -13,5 +13,3 @@ class Circle extends Shape {
 }
 ===expect===
 Circle.php: UnimplementedAbstractMethod@2:0: Class Circle must implement abstract method perimeter()
-===ignore===
-TODO

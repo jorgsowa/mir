@@ -9,5 +9,3 @@ function test(): void {
 }
 ===expect===
 InvalidThrow@5:4: Thrown type 'NotAnException' does not extend Throwable
-===ignore===
-TODO

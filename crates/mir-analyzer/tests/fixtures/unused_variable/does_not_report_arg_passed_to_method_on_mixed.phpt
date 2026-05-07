@@ -12,5 +12,3 @@ class Foo {
 }
 ===expect===
 UnusedParam@8:33: Parameter $a is never used
-===ignore===
-TODO
