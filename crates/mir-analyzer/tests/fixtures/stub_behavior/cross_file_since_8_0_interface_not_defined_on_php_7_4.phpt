@@ -17,5 +17,3 @@ $label = new Label('hello');
 echo $label;
 ===expect===
 Printable.php: UndefinedClass@2:23: Class Stringable does not exist
-===ignore===
-TODO

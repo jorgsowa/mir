@@ -11,5 +11,3 @@ function test(): void {
 ===expect===
 UnusedVariable@6:4: Variable $obj is never read
 DeprecatedClass@6:15: Class OldClass is deprecated: use NewClass instead
-===ignore===
-TODO

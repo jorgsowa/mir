@@ -20,5 +20,3 @@ class Bag {
 }
 ===expect===
 InvalidTraitUse@1:0: Trait HasCount used incorrectly: Class Bag uses trait HasCount but does not implement Countable
-===ignore===
-TODO

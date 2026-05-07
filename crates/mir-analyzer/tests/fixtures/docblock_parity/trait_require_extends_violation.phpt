@@ -20,5 +20,3 @@ class NotAModel {
 }
 ===expect===
 InvalidTraitUse@1:0: Trait HasTimestamps used incorrectly: Class NotAModel uses trait HasTimestamps but does not extend Model
-===ignore===
-TODO

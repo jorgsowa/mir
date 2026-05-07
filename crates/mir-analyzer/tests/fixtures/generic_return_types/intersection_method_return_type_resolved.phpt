@@ -22,5 +22,3 @@ function test(object $c): void {
 }
 ===expect===
 UndefinedMethod@18:4: Method Item::undefinedMethod() does not exist
-===ignore===
-TODO

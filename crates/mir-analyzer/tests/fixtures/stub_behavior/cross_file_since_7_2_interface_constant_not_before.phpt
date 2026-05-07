@@ -12,5 +12,3 @@ function get_atom_format(): void {
 get_atom_format();
 ===expect===
 DateHelper.php: UndefinedConstant@3:9: Constant DateTimeInterface::ATOM is not defined
-===ignore===
-TODO

@@ -12,5 +12,3 @@ function format_hebrew(string $text): void {
 format_hebrew('שלום');
 ===expect===
 TextHelper.php: UndefinedFunction@3:4: Function hebrevc() is not defined
-===ignore===
-TODO

@@ -19,5 +19,3 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod@14:8: Method Tag::noSuchMethod() does not exist
-===ignore===
-TODO

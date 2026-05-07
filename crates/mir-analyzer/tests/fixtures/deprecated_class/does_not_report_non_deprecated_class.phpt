@@ -9,5 +9,3 @@ function test(): void {
 }
 ===expect===
 UnusedVariable@5:4: Variable $obj is never read
-===ignore===
-TODO

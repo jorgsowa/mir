@@ -19,5 +19,3 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod@14:8: Method Item::undefinedMethod() does not exist
-===ignore===
-TODO

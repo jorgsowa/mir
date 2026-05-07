@@ -12,5 +12,3 @@ function is_avif(int $type): void {
 is_avif(19);
 ===expect===
 ImageHelper.php: UndefinedConstant@3:20: Constant IMAGETYPE_AVIF is not defined
-===ignore===
-TODO
