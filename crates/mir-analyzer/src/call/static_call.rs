@@ -17,6 +17,14 @@ use super::args::{
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
 
+fn extract_namespace(fqcn: &str) -> Option<&str> {
+    if let Some(pos) = fqcn.rfind('\\') {
+        Some(&fqcn[..pos])
+    } else {
+        None
+    }
+}
+
 impl CallAnalyzer {
     pub fn analyze_static_method_call<'a, 'arena, 'src>(
         ea: &mut ExpressionAnalyzer<'a>,
@@ -78,6 +86,21 @@ impl CallAnalyzer {
                     Severity::Info,
                     span,
                 );
+            }
+            if resolved.is_internal {
+                let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
+                let method_namespace =
+                    extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());
+                if calling_namespace != method_namespace {
+                    ea.emit(
+                        IssueKind::InternalMethod {
+                            class: fqcn.clone(),
+                            method: method_name.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
             }
             let arg_names: Vec<Option<String>> = call
                 .args

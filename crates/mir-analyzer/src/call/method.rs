@@ -18,11 +18,20 @@ use super::args::{
 };
 use super::CallAnalyzer;
 
+fn extract_namespace(fqcn: &str) -> Option<&str> {
+    if let Some(pos) = fqcn.rfind('\\') {
+        Some(&fqcn[..pos])
+    } else {
+        None
+    }
+}
+
 pub(super) struct ResolvedMethod {
     pub(super) owner_fqcn: Arc<str>,
     pub(super) name: Arc<str>,
     pub(super) visibility: Visibility,
     pub(super) deprecated: Option<Arc<str>>,
+    pub(super) is_internal: bool,
     pub(super) params: Vec<FnParam>,
     pub(super) template_params: Vec<TemplateParam>,
     pub(super) return_ty_raw: Union,
@@ -58,6 +67,7 @@ pub(super) fn resolve_method_from_db(
         name,
         visibility: node.visibility(db),
         deprecated: node.deprecated(db),
+        is_internal: node.is_internal(db),
         params: node.params(db).to_vec(),
         template_params: node.template_params(db).to_vec(),
         return_ty_raw,
@@ -299,6 +309,20 @@ fn resolve_method_return<'a, 'arena, 'src>(
                 Severity::Info,
                 span,
             );
+        }
+        if resolved.is_internal {
+            let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
+            let method_namespace = extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());
+            if calling_namespace != method_namespace {
+                ea.emit(
+                    IssueKind::InternalMethod {
+                        class: fqcn.to_string(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Warning,
+                    span,
+                );
+            }
         }
         check_method_visibility(
             ea,
