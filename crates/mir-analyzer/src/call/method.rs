@@ -201,11 +201,13 @@ impl CallAnalyzer {
                                 let fqcn_resolved =
                                     crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
                                 let resolved_arc = Arc::from(fqcn_resolved.as_str());
-                                if crate::db::method_exists_via_db(
+                                if crate::db::lookup_method_in_chain(
                                     ea.db,
                                     &resolved_arc,
                                     method_name,
-                                ) {
+                                )
+                                .is_some()
+                                {
                                     found_method = true;
                                     intersection_result = Union::merge(
                                         &intersection_result,
