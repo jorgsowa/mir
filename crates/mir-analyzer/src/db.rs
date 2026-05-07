@@ -434,6 +434,7 @@ pub struct MethodNode {
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
     pub deprecated: Option<Arc<str>>,
+    pub is_internal: bool,
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_abstract: bool,
@@ -2071,6 +2072,7 @@ impl MirDb {
                 && node.is_final(self) == storage.is_final
                 && node.is_constructor(self) == storage.is_constructor
                 && node.is_pure(self) == storage.is_pure
+                && node.is_internal(self) == storage.is_internal
                 && node.deprecated(self) == storage.deprecated
                 && node.return_type(self).as_deref() == storage.return_type.as_deref()
                 && node.location(self) == storage.location
@@ -2091,6 +2093,7 @@ impl MirDb {
             node.set_throws(self)
                 .to(Arc::from(storage.throws.as_slice()));
             node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_is_internal(self).to(storage.is_internal);
             node.set_visibility(self).to(storage.visibility);
             node.set_is_static(self).to(storage.is_static);
             node.set_is_abstract(self).to(storage.is_abstract);
@@ -2116,6 +2119,7 @@ impl MirDb {
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
                 storage.deprecated.clone(),
+                storage.is_internal,
                 storage.visibility,
                 storage.is_static,
                 storage.is_abstract,
