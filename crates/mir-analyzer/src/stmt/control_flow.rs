@@ -61,14 +61,8 @@ impl<'a> StatementsAnalyzer<'a> {
                 &self.file,
             );
             if !pre_elseif_diverges && (elseif_true_ctx.diverges || elseif_false_ctx.diverges) {
-                let (line, col_start) = self.offset_to_line_col(elseif.condition.span.start);
-                let (line_end, col_end) = if elseif.condition.span.start < elseif.condition.span.end
-                {
-                    let (end_line, end_col) = self.offset_to_line_col(elseif.condition.span.end);
-                    (end_line, end_col)
-                } else {
-                    (line, col_start)
-                };
+                let (line, line_end, col_start, col_end) =
+                    self.span_to_location(elseif.condition.span);
                 let elseif_cond_type = self
                     .expr_analyzer(ctx)
                     .analyze(&elseif.condition, &mut ctx.fork());
@@ -116,13 +110,8 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         if !pre_diverges && (then_unreachable_from_narrowing || else_unreachable_from_narrowing) {
-            let (line, col_start) = self.offset_to_line_col(if_stmt.condition.span.start);
-            let (line_end, col_end) = if if_stmt.condition.span.start < if_stmt.condition.span.end {
-                let (end_line, end_col) = self.offset_to_line_col(if_stmt.condition.span.end);
-                (end_line, end_col)
-            } else {
-                (line, col_start)
-            };
+            let (line, line_end, col_start, col_end) =
+                self.span_to_location(if_stmt.condition.span);
             self.issues.add(
                 Issue::new(
                     IssueKind::RedundantCondition {

@@ -395,6 +395,17 @@ impl<'a> StatementsAnalyzer<'a> {
         (line, col)
     }
 
+    /// Convert a span to Location (line, line_end, col_start, col_end).
+    fn span_to_location(&self, span: php_ast::Span) -> (u32, u32, u16, u16) {
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let (line_end, col_end) = if span.start < span.end {
+            self.offset_to_line_col(span.end)
+        } else {
+            (line, col_start)
+        };
+        (line, line_end, col_start, col_end)
+    }
+
     /// Emit `UndefinedClass` for a `Name` AST node if the resolved class does not exist.
     fn check_name_undefined_class(&mut self, name: &php_ast::ast::Name<'_, '_>) {
         let raw = crate::parser::name_to_string(name);

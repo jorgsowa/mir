@@ -65,13 +65,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         && !named_object_return_compatible(declared, &check_ty, self.db, &self.file)
                         && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.db, &self.file)))
                 {
-                    let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                    let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                        let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                        (end_line, end_col)
-                    } else {
-                        (line, col_start)
-                    };
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::InvalidReturnType {
@@ -98,13 +92,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // Bare `return;` from a non-void declared function is an error.
             if let Some(declared) = &ctx.fn_return_type.clone() {
                 if !declared.is_void() && !declared.is_mixed() {
-                    let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                    let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                        let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                        (end_line, end_col)
-                    } else {
-                        (line, col_start)
-                    };
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::InvalidReturnType {
@@ -163,13 +151,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         // Suppress if class is not in codebase at all (could be extension class)
                         || (!crate::db::type_exists_via_db(self.db, &resolved) && !crate::db::type_exists_via_db(self.db, fqcn));
                     if !is_throwable {
-                        let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                        let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                            let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                            (end_line, end_col)
-                        } else {
-                            (line, col_start)
-                        };
+                        let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                         self.issues.add(mir_issues::Issue::new(
                             IssueKind::InvalidThrow {
                                 ty: fqcn.to_string(),
@@ -197,13 +179,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     declared.as_ref(),
                                 )
                         }) {
-                            let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                            let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                                let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                                (end_line, end_col)
-                            } else {
-                                (line, col_start)
-                            };
+                            let (line, line_end, col_start, col_end) =
+                                self.span_to_location(stmt_span);
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::MissingThrowsDocblock {
                                     class: thrown_fqcn.to_string(),
@@ -236,13 +213,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         || crate::db::has_unknown_ancestor_via_db(self.db, &resolved)
                         || crate::db::has_unknown_ancestor_via_db(self.db, fqcn);
                     if !is_throwable {
-                        let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                        let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                            let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                            (end_line, end_col)
-                        } else {
-                            (line, col_start)
-                        };
+                        let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                         self.issues.add(mir_issues::Issue::new(
                             IssueKind::InvalidThrow {
                                 ty: fqcn.to_string(),
@@ -270,13 +241,8 @@ impl<'a> StatementsAnalyzer<'a> {
                                     declared.as_ref(),
                                 )
                         }) {
-                            let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                            let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                                let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                                (end_line, end_col)
-                            } else {
-                                (line, col_start)
-                            };
+                            let (line, line_end, col_start, col_end) =
+                                self.span_to_location(stmt_span);
                             self.issues.add(mir_issues::Issue::new(
                                 IssueKind::MissingThrowsDocblock {
                                     class: thrown_fqcn.to_string(),
@@ -294,13 +260,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
                 mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
                 _ => {
-                    let (line, col_start) = self.offset_to_line_col(stmt_span.start);
-                    let (line_end, col_end) = if stmt_span.start < stmt_span.end {
-                        let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);
-                        (end_line, end_col)
-                    } else {
-                        (line, col_start)
-                    };
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(mir_issues::Issue::new(
                         IssueKind::InvalidThrow {
                             ty: format!("{thrown_ty}"),

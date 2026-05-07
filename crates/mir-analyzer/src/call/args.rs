@@ -393,7 +393,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
             {
                 let arg_without_false = arg_ty.remove_false();
                 // Strip null too: handles int|null|false → int (alongside PossiblyNullArgument)
-                let arg_core = arg_without_false.remove_null();
+                let arg_core = arg_ty.core_type();
                 if !arg_core.types.is_empty()
                     && (arg_without_false.is_subtype_of_simple(param_ty)
                         || arg_core.is_subtype_of_simple(param_ty)
@@ -427,7 +427,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 );
             }
 
-            let arg_core = arg_ty.remove_null().remove_false();
+            let arg_core = arg_ty.core_type();
             if !arg_ty.is_subtype_of_simple(param_ty)
                 && !param_ty.is_mixed()
                 && !arg_ty.is_mixed()
