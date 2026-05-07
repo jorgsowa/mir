@@ -12,5 +12,3 @@ function make_fiber(callable $fn): void {
 make_fiber(function (): void {});
 ===expect===
 Async.php: UndefinedClass@3:8: Class Fiber does not exist
-===ignore===
-TODO

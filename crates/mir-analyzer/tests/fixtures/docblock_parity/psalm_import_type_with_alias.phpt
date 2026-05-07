@@ -20,5 +20,3 @@ function test(ProductService $s): void {
 }
 ===expect===
 UndefinedMethod@16:4: Method Product::missing() does not exist
-===ignore===
-TODO

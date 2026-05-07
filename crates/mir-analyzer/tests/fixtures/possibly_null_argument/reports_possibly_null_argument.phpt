@@ -10,5 +10,3 @@ function test(?string $value): void {
 ===expect===
 UnusedParam@2:15: Parameter $name is never used
 PossiblyNullArgument@5:10: Argument $name of greet() might be null
-===ignore===
-TODO

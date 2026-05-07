@@ -23,5 +23,3 @@ function test(Service $s): void {
 }
 ===expect===
 UndefinedMethod@19:4: Method User::missing() does not exist
-===ignore===
-TODO

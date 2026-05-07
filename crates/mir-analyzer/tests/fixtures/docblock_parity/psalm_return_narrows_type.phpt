@@ -17,5 +17,3 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod@13:4: Method Product::missing() does not exist
-===ignore===
-TODO

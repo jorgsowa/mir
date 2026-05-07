@@ -16,5 +16,3 @@ function process($value): void {
 }
 ===expect===
 UndefinedMethod@12:4: Method User::missing() does not exist
-===ignore===
-TODO

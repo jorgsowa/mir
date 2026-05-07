@@ -12,5 +12,3 @@ function test_wrong_type(int $n): void {
 test_wrong_type(42);
 ===expect===
 StringHelper.php: InvalidArgument@3:17: Argument $haystack of str_contains() expects 'string', got 'int'
-===ignore===
-TODO

@@ -18,5 +18,3 @@ function test(): void {
 }
 ===expect===
 UndefinedMethod@14:4: Method Widget::undefinedMethod() does not exist
-===ignore===
-TODO

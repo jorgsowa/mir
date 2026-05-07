@@ -12,5 +12,3 @@ function test_null(string $needle): void {
 test_null('hello');
 ===expect===
 StringHelper.php: NullArgument@3:17: Argument $haystack of str_contains() cannot be null
-===ignore===
-TODO
