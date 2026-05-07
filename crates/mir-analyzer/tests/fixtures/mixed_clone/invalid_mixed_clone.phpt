@@ -6,6 +6,4 @@ invalidMixedClone
                     $a = 5;
                     clone $a;
 ===expect===
-MixedClone
-===ignore===
-TODO
+MixedClone@7:2: cannot clone mixed

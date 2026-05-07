@@ -324,6 +324,7 @@ pub enum IssueKind {
     MixedPropertyFetch {
         property: String,
     },
+    MixedClone,
     CircularInheritance {
         class: String,
     },
@@ -428,6 +429,7 @@ impl IssueKind {
             | IssueKind::MixedAssignment { .. }
             | IssueKind::MixedMethodCall { .. }
             | IssueKind::MixedPropertyFetch { .. }
+            | IssueKind::MixedClone
             | IssueKind::ShadowedTemplateParam { .. }
             | IssueKind::MissingThrowsDocblock { .. } => Severity::Info,
         }
@@ -509,6 +511,7 @@ impl IssueKind {
             IssueKind::MixedAssignment { .. } => "MixedAssignment",
             IssueKind::MixedMethodCall { .. } => "MixedMethodCall",
             IssueKind::MixedPropertyFetch { .. } => "MixedPropertyFetch",
+            IssueKind::MixedClone => "MixedClone",
             IssueKind::CircularInheritance { .. } => "CircularInheritance",
             IssueKind::InvalidTraitUse { .. } => "InvalidTraitUse",
         }
@@ -793,6 +796,7 @@ impl IssueKind {
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${property} fetched on mixed type")
             }
+            IssueKind::MixedClone => "cannot clone mixed".to_string(),
             IssueKind::CircularInheritance { class } => {
                 format!("Class {class} has a circular inheritance chain")
             }
