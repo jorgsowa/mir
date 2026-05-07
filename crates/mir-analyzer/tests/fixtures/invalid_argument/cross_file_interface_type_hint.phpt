@@ -17,5 +17,3 @@ function test(): void {
     render(new Doc());
 }
 ===expect===
-===ignore===
-TODO

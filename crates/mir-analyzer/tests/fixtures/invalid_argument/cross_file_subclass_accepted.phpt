@@ -13,5 +13,3 @@ function test(): void {
     accept(new Child());
 }
 ===expect===
-===ignore===
-TODO
