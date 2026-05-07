@@ -138,6 +138,37 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
 
+            // Additional fallback: If this is an assignment and no var_annotation was found,
+            // try to extract one directly from the docblock as a fallback
+            // This handles cases where the initial extract_var_annotation might have issues
+            if var_annotation.is_none() {
+                if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
+                    if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
+                        if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
+                            if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
+                                let lhs = lhs_name.trim_start_matches('$').to_string();
+                                // Try to extract var annotation directly
+                                if let Some(doc) = crate::parser::find_preceding_docblock(
+                                    self.source,
+                                    stmt.span.start,
+                                ) {
+                                    let parsed = crate::parser::DocblockParser::parse(&doc);
+                                    if let Some(var_type) = parsed.var_type {
+                                        // Check if this annotation is for the variable we're assigning to
+                                        if let Some(var_name) = parsed.var_name {
+                                            if var_name == lhs {
+                                                let resolved = crate::stmt::return_type::resolve_union_for_file(var_type, self.db, &self.file);
+                                                ctx.set_var(&lhs, resolved);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if !suppressions.is_empty() {
                 self.issues.suppress_range(before, &suppressions);
             }
@@ -149,6 +180,14 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt: &php_ast::ast::Stmt<'arena, 'src>,
         ctx: &mut Context,
     ) {
+        // Extract @var annotation for this statement.
+        let var_annotation = self.extract_var_annotation(stmt.span);
+
+        // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
+        if let Some((Some(ref var_name), ref var_ty)) = var_annotation {
+            ctx.set_var(var_name.as_str(), var_ty.clone());
+        }
+
         match &stmt.kind {
             // ---- Expression statement ----------------------------------------
             StmtKind::Expression(expr) => {
@@ -264,6 +303,54 @@ impl<'a> StatementsAnalyzer<'a> {
             | StmtKind::HaltCompiler(_) => {}
 
             StmtKind::Error => {}
+        }
+
+        // Post-narrow: `@var Type $varname` before `$varname = expr()` overrides
+        // the inferred type with the annotated type. Only applies when the assignment
+        // target IS the annotated variable.
+        if let Some((Some(ref var_name), ref var_ty)) = var_annotation {
+            if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
+                if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
+                    if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
+                        if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
+                            let lhs = lhs_name.trim_start_matches('$');
+                            if lhs == var_name.as_str() {
+                                ctx.set_var(var_name.as_str(), var_ty.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Additional fallback: If this is an assignment and no var_annotation was found,
+        // try to extract one directly from the docblock as a fallback
+        if var_annotation.is_none() {
+            if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
+                if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
+                    if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
+                        if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
+                            let lhs = lhs_name.trim_start_matches('$').to_string();
+                            if let Some(doc) =
+                                crate::parser::find_preceding_docblock(self.source, stmt.span.start)
+                            {
+                                let parsed = crate::parser::DocblockParser::parse(&doc);
+                                if let Some(var_type) = parsed.var_type {
+                                    if let Some(var_name) = parsed.var_name {
+                                        if var_name == lhs {
+                                            let resolved =
+                                                crate::stmt::return_type::resolve_union_for_file(
+                                                    var_type, self.db, &self.file,
+                                                );
+                                            ctx.set_var(&lhs, resolved);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
