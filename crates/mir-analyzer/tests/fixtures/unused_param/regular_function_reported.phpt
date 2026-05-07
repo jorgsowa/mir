@@ -7,5 +7,3 @@ function greet(string $name): string {
 }
 ===expect===
 UnusedParam@2:15: Parameter $name is never used
-===ignore===
-TODO

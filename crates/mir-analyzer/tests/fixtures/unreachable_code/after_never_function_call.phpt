@@ -11,6 +11,5 @@ function test(): void {
     echo 'unreachable';
 }
 ===expect===
+MissingThrowsDocblock@3:4: Exception RuntimeException is thrown but not declared in @throws
 UnreachableCode@8:4: Unreachable code detected
-===ignore===
-TODO

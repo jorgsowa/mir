@@ -10,5 +10,3 @@ class Foo {
 }
 ===expect===
 InvalidDocblock@3:0: Invalid docblock: @return has unclosed generic type `array<`
-===ignore===
-TODO

@@ -13,5 +13,3 @@ function test(): void {
 }
 ===expect===
 UnreachableCode@9:4: Unreachable code detected
-===ignore===
-TODO

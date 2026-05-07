@@ -9,5 +9,3 @@ class Greeter {
 ===expect===
 UnusedParam@3:24: Parameter $name is never used
 TooManyArguments@5:28: Too many arguments for say(): expected 1, got 2
-===ignore===
-TODO

@@ -8,5 +8,3 @@ takes_two(1);
 UnusedParam@2:19: Parameter $a is never used
 UnusedParam@2:27: Parameter $b is never used
 TooFewArguments@3:0: Too few arguments for takes_two(): expected 2, got 1
-===ignore===
-TODO

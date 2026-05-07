@@ -7,5 +7,3 @@ $arr = [1, 2, 3];
 takes_one(...$arr);
 ===expect===
 UnusedParam@2:19: Parameter $a is never used
-===ignore===
-TODO

@@ -7,5 +7,3 @@ greet(who: 'Ada');
 ===expect===
 UnusedParam@2:15: Parameter $name is never used
 InvalidNamedArgument@3:6: greet() has no parameter named $who
-===ignore===
-TODO

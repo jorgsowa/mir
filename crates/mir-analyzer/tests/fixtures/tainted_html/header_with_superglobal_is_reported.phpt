@@ -7,5 +7,3 @@ function redirect(): void {
 }
 ===expect===
 TaintedHtml@3:4: Tainted HTML output — possible XSS
-===ignore===
-TODO

@@ -7,6 +7,5 @@ function foo(): void {
     $x = 2;
 }
 ===expect===
+MissingThrowsDocblock@3:4: Exception RuntimeException is thrown but not declared in @throws
 UnreachableCode@4:4: Unreachable code detected
-===ignore===
-TODO
