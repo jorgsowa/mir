@@ -214,12 +214,17 @@ pub(crate) fn check_array_filter_callback(
         let max_params = params.len();
 
         if required_count > expected_arity || (!has_variadic && max_params < expected_arity) {
+            let actual_msg = if has_variadic {
+                format!("callable accepting at least {} argument(s)", required_count)
+            } else {
+                format!("callable accepting {} argument(s)", max_params)
+            };
             ea.emit(
                 IssueKind::InvalidArgument {
                     param: "callback".to_string(),
                     fn_name: "array_filter".to_string(),
                     expected: format!("callable accepting {} arg(s)", expected_arity),
-                    actual: callback_ty.to_string(),
+                    actual: actual_msg,
                 },
                 Severity::Error,
                 callback_span,
