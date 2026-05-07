@@ -9,5 +9,3 @@ class A {
 }
 ===expect===
 UndefinedClass@4:29: Class UnknownClass does not exist
-===ignore===
-TODO

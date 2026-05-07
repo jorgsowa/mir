@@ -8,5 +8,3 @@ function run(): void {
 }
 ===expect===
 UndefinedFunction@4:4: Function helper() is not defined
-===ignore===
-TODO

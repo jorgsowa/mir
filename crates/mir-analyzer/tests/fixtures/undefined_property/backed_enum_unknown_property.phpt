@@ -10,5 +10,3 @@ function test(Status $status): void {
 }
 ===expect===
 UndefinedProperty@6:18: Property Status::$label does not exist
-===ignore===
-TODO

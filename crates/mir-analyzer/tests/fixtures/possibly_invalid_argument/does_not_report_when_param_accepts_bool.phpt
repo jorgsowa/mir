@@ -10,5 +10,3 @@ function test(): void {
 }
 ===expect===
 InvalidArgument@6:14: Argument $b of takesBool() expects 'bool', got 'int|false'
-===ignore===
-TODO

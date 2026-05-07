@@ -8,5 +8,3 @@ function test(): void {
 }
 ===expect===
 NullPropertyFetch@4:9: Cannot access property $prop on null
-===ignore===
-TODO

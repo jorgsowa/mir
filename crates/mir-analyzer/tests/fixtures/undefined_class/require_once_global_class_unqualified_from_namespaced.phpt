@@ -12,5 +12,3 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedClass@5:8: Class App\Service\Foo does not exist
-===ignore===
-TODO

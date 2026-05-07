@@ -9,5 +9,3 @@ function getStatus(): MissingEnum {
 ===expect===
 Service.php: UndefinedClass@3:22: Class App\MissingEnum does not exist
 Service.php: UndefinedClass@4:11: Class App\MissingEnum does not exist
-===ignore===
-TODO

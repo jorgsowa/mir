@@ -7,5 +7,3 @@ function test($x): bool {
 }
 ===expect===
 UndefinedClass@3:25: Class NoSuchClass does not exist
-===ignore===
-TODO

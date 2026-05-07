@@ -12,5 +12,3 @@ class Bar {
 }
 ===expect===
 Main.php: UndefinedClass@4:11: Class Vendor\Lib\Missing does not exist
-===ignore===
-TODO

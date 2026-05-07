@@ -12,5 +12,3 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArgument@8:14: Argument $sql of Query::__construct() expects 'string', possibly different type 'string|false' provided
-===ignore===
-TODO

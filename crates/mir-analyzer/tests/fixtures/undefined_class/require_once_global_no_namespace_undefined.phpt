@@ -11,5 +11,3 @@ function run(): void {
 }
 ===expect===
 Main.php: UndefinedClass@4:8: Class Missing does not exist
-===ignore===
-TODO

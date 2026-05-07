@@ -12,5 +12,3 @@ function test(Parser $parser): void {
 }
 ===expect===
 PossiblyInvalidArgument@8:19: Argument $input of parse() expects 'string', possibly different type 'string|false' provided
-===ignore===
-TODO

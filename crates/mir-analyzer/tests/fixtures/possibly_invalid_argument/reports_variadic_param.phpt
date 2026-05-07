@@ -11,5 +11,3 @@ function test(): void {
 ===expect===
 PossiblyInvalidArgument@6:14: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
 PossiblyInvalidArgument@6:27: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
-===ignore===
-TODO

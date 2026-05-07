@@ -10,9 +10,8 @@ function wrap(): void {
     } catch (MissingEntity $e) {}
 }
 ===expect===
-UnusedVariable@1:0: Variable $e is never read
 UnusedVariable@4:4: Variable $x is never read
 UndefinedClass@4:13: Class App\Model\MissingEntity does not exist
+MissingThrowsDocblock@6:8: Exception Exception is thrown but not declared in @throws
 UndefinedClass@7:13: Class App\Model\MissingEntity does not exist
-===ignore===
-TODO
+UnusedVariable@1:0: Variable $e is never read

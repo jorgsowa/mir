@@ -8,5 +8,3 @@ interface Collection extends Countable {
 }
 ===expect===
 Collection.php: UndefinedClass@3:29: Class App\Countable does not exist
-===ignore===
-TODO
