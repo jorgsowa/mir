@@ -14,5 +14,3 @@ function foo(): void {
     }
 }
 ===expect===
-===ignore===
-TODO
