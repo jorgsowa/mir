@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-05-07
+
+### Added
+
+- Trait method undefined function detection: diagnostics now detect when trait methods reference undefined functions, improving visibility into broken trait implementations.
+- Enhanced inheritance chain checking for magic methods (`__get`, `__invoke`): full ancestor chain is now properly examined, catching edge cases where magic methods are defined in distant parent classes.
+
+### Fixed
+
+- Magic method resolution (`__get`, `__invoke`) now checks the complete ancestor chain instead of stopping at the immediate parent, fixing false negatives where inherited magic methods were not detected.
+- Unused method tests now properly handle collateral errors, improving test reliability and reducing false positives in fixture validation.
+
 ## [0.18.0] - 2026-05-06
 
 ### Added
