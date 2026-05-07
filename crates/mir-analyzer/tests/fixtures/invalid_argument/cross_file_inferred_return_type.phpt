@@ -15,5 +15,3 @@ function getFruit() {
 }
 ===expect===
 Consumer.php: InvalidArgument@4:15: Argument $n of requireInt() expects 'int', got 'Apple'
-===ignore===
-TODO

@@ -10,5 +10,3 @@ function test(): void {
 }
 ===expect===
 InvalidArgument@6:17: Argument $s of takes_string() expects 'string', got '123'
-===ignore===
-TODO
