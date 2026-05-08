@@ -1,25 +1,20 @@
 // Integration tests for incremental single-file re-analysis (mir#79).
 
-use std::fs;
-use std::path::PathBuf;
+mod common;
+
 use std::sync::Arc;
 
 use mir_analyzer::db::MirDatabase;
 use mir_analyzer::ProjectAnalyzer;
-use tempfile::TempDir;
 
-fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
-    let path = dir.path().join(name);
-    fs::write(&path, content).unwrap();
-    path
-}
+use self::common::{create_temp_dir, write_file};
 
 #[test]
 fn re_analyze_file_picks_up_new_error() {
-    let src_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("test");
 
     // Initial file: valid code, no issues expected for undefined functions
-    let file_a = write(
+    let file_a = write_file(
         &src_dir,
         "A.php",
         "<?php\nfunction greet(): string { return 'hello'; }\n",
@@ -62,15 +57,15 @@ fn re_analyze_file_picks_up_new_error() {
 
 #[test]
 fn re_analyze_file_removes_old_definitions() {
-    let src_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("test");
 
     // Initial: defines class Foo with method bar()
-    let file_a = write(
+    let file_a = write_file(
         &src_dir,
         "A.php",
         "<?php\nclass Foo { public function bar(): void {} }\n",
     );
-    let file_b = write(
+    let file_b = write_file(
         &src_dir,
         "B.php",
         "<?php\nfunction test(): void { $f = new Foo(); $f->bar(); }\n",
@@ -109,10 +104,10 @@ fn re_analyze_file_removes_old_definitions() {
 
 #[test]
 fn re_analyze_file_fixes_error() {
-    let src_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("test");
 
     // Initial: code with a call to an undefined function
-    let file_a = write(
+    let file_a = write_file(
         &src_dir,
         "A.php",
         "<?php\nfunction test(): void { missing_fn(); }\n",
@@ -153,12 +148,12 @@ fn re_analyze_file_fixes_error() {
 /// - slow path (re-analyze) → no issue (function now exists in codebase)
 #[test]
 fn re_analyze_file_uses_cache_on_unchanged_content() {
-    let src_dir = TempDir::new().unwrap();
-    let cache_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("test");
+    let cache_dir = create_temp_dir("cache");
 
     // Content that calls an undefined function → produces UndefinedFunction
     let content = "<?php\nfunction test(): void { ghost_fn(); }\n";
-    let file_a = write(&src_dir, "A.php", content);
+    let file_a = write_file(&src_dir, "A.php", content);
     let file_path = file_a.to_string_lossy().to_string();
 
     let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
@@ -222,10 +217,10 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
 /// type hints, etc.).
 #[test]
 fn re_analyze_preserves_namespace_and_use_alias_resolution() {
-    let src_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("test");
 
     // Entity lives in App\Model.
-    let _entity = write(
+    let _entity = write_file(
         &src_dir,
         "Entity.php",
         "<?php\nnamespace App\\Model;\nclass Entity {}\n",
@@ -234,7 +229,7 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
     // Handler is in App\Service and imports Entity via `use`.
     let handler_src = "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\n\
         function handle(): void { $e = new Entity(); }\n";
-    let handler = write(&src_dir, "Handler.php", handler_src);
+    let handler = write_file(&src_dir, "Handler.php", handler_src);
 
     let analyzer = ProjectAnalyzer::new();
     let result1 = analyzer.analyze(&[src_dir.path().join("Entity.php"), handler.clone()]);
@@ -275,13 +270,13 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
 /// `InvalidReturnType` for `foo(): string { return bar(); }`.
 #[test]
 fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
-    let src_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("test");
 
     // bar() has no return type hint; its return type must be inferred.
     // foo() has an explicit `: string` return type and delegates to bar().
     let content =
         "<?php\nfunction bar() { return 'hello'; }\nfunction foo(): string { return bar(); }\n";
-    let file = write(&src_dir, "A.php", content);
+    let file = write_file(&src_dir, "A.php", content);
     let file_path = file.to_string_lossy().to_string();
 
     let analyzer = ProjectAnalyzer::new();

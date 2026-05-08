@@ -3,30 +3,24 @@
 // When file B changes, dependents of B (files that extend/implement/use it)
 // must have their cache entries evicted so Pass 2 re-analyzes them.
 
-use std::fs;
-use std::path::PathBuf;
+mod common;
 
 use mir_analyzer::ProjectAnalyzer;
-use tempfile::TempDir;
 
-fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
-    let path = dir.path().join(name);
-    fs::write(&path, content).unwrap();
-    path
-}
+use self::common::{create_temp_dir, write_file};
 
 #[test]
 fn dependent_file_is_reanalyzed_when_base_changes() {
-    let src_dir = TempDir::new().unwrap();
-    let cache_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("cache_invalidation: source files");
+    let cache_dir = create_temp_dir("cache_invalidation: cache");
 
     // --- First run: Base defines method foo(), Child calls it — no issues ---
-    let base = write(
+    let base = write_file(
         &src_dir,
         "Base.php",
         "<?php\nclass Base {\n    public function foo(): void {}\n}\n",
     );
-    let child = write(
+    let child = write_file(
         &src_dir,
         "Child.php",
         "<?php\nclass Child extends Base {}\nfunction test(): void {\n    $c = new Child();\n    $c->foo();\n}\n",
@@ -42,7 +36,7 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
     assert_eq!(undefined_method_count, 0, "first run: no issues expected");
 
     // --- Modify Base: remove foo() ---
-    write(
+    write_file(
         &src_dir,
         "Base.php",
         "<?php\nclass Base {\n    // foo() removed\n}\n",
@@ -65,15 +59,15 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
 
 #[test]
 fn unrelated_file_cache_entry_survives() {
-    let src_dir = TempDir::new().unwrap();
-    let cache_dir = TempDir::new().unwrap();
+    let src_dir = create_temp_dir("unrelated_file: source files");
+    let cache_dir = create_temp_dir("unrelated_file: cache");
 
-    let base = write(
+    let base = write_file(
         &src_dir,
         "Base.php",
         "<?php\nclass Base {\n    public function foo(): void {}\n}\n",
     );
-    let unrelated = write(
+    let unrelated = write_file(
         &src_dir,
         "Unrelated.php",
         "<?php\nfunction helper(): void {}\n",
@@ -84,7 +78,7 @@ fn unrelated_file_cache_entry_survives() {
     analyzer.analyze(&[base.clone(), unrelated.clone()]);
 
     // Modify only Base.
-    write(
+    write_file(
         &src_dir,
         "Base.php",
         "<?php\nclass Base {\n    public function bar(): void {}\n}\n",

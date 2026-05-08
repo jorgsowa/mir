@@ -1,28 +1,23 @@
 // Integration tests for symbol_reference_locations (mir#184).
 
-use std::fs;
-use std::path::PathBuf;
+mod common;
+
 use std::sync::Arc;
 
 use mir_analyzer::ProjectAnalyzer;
-use tempfile::TempDir;
 
-fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
-    let path = dir.path().join(name);
-    fs::write(&path, content).unwrap();
-    path
-}
+use self::common::{create_temp_dir, pathbuf_to_arc_str, write_file};
 
 #[test]
 fn function_call_records_reference_location() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // The call must be inside a function body — analyze_bodies only processes declarations.
-    let file = write(
+    let file = write_file(
         &dir,
         "a.php",
         "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n",
     );
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -37,15 +32,15 @@ fn function_call_records_reference_location() {
 
 #[test]
 fn function_call_span_covers_only_name() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     //                  0123456789...
     // "<?php\n"        = 6 bytes
     // "function greet(): void {}\n"
     // "function caller(): void { greet(); }\n"
     //                            ^-- 'greet' starts here
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "b.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "b.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -68,14 +63,14 @@ fn function_call_span_covers_only_name() {
 
 #[test]
 fn method_call_span_covers_only_name() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // "<?php\n"                                          = 6 bytes
     // "class Svc { public function run(): void {} }\n"   = 45 bytes  (offset 6)
     // "function caller(): void { $s = new Svc(); $s->run(); }\n"
     //                                             ^-- 'run' starts at offset 97
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
-    let file = write(&dir, "h.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "h.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -98,14 +93,14 @@ fn method_call_span_covers_only_name() {
 
 #[test]
 fn property_access_span_covers_only_name() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // "<?php\n"                                          = 6 bytes
     // "class Counter { public int $count = 0; }\n"      = 41 bytes  (offset 6)
     // "function read(Counter $c): int { return $c->count; }\n"
     //                                              ^-- 'count' starts at offset 91
     let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
-    let file = write(&dir, "i.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "i.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -128,15 +123,15 @@ fn property_access_span_covers_only_name() {
 
 #[test]
 fn nullsafe_property_access_records_reference_location() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // "<?php\n"                                     = 6 bytes
     // "class Box { public int $val = 0; }\n"        = 35 bytes  (offset 6)
     // "function read(?Box $b): void { $b?->val; }\n"
     //                                        ^-- 'val' starts at offset 77
     let src =
         "<?php\nclass Box { public int $val = 0; }\nfunction read(?Box $b): void { $b?->val; }\n";
-    let file = write(&dir, "j.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "j.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -159,8 +154,8 @@ fn nullsafe_property_access_records_reference_location() {
 
 #[test]
 fn method_call_records_reference_location() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "c.php",
         "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n",
@@ -177,13 +172,13 @@ fn method_call_records_reference_location() {
 
 #[test]
 fn multiple_calls_in_same_file_produce_multiple_spans() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "d.php",
         "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); ping(); }\n",
     );
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -199,13 +194,13 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
 
 #[test]
 fn new_expression_records_class_reference() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "e.php",
         "<?php\nclass Widget {}\nfunction make(): void { $w = new Widget(); }\n",
     );
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -219,8 +214,8 @@ fn new_expression_records_class_reference() {
 
 #[test]
 fn re_analyze_removes_stale_reference_locations() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "f.php",
         "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n",
@@ -258,14 +253,14 @@ fn re_analyze_removes_stale_reference_locations() {
 
 #[test]
 fn static_method_call_span_covers_only_name() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // "<?php\n"                                                                    = 6 bytes
     // "class Math { public static function sq(int $n): int { return $n * $n; } }\n" = 74 bytes
     // "function caller(): void { Math::sq(3); }\n"
     //                                    ^-- 'sq' starts at byte 6+74+32 = 112
     let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::sq(3); }\n";
-    let file = write(&dir, "static_span.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "static_span.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -288,14 +283,14 @@ fn static_method_call_span_covers_only_name() {
 
 #[test]
 fn cache_hit_replays_reference_locations() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let cache_dir = dir.path().join("cache");
-    let file = write(
+    let file = write_file(
         &dir,
         "g.php",
         "<?php\nfunction cached_fn(): void {}\nfunction caller(): void { cached_fn(); }\n",
     );
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file_arc = pathbuf_to_arc_str(&file);
 
     // First run — populates cache
     {
@@ -328,10 +323,10 @@ fn cache_hit_replays_reference_locations() {
 fn compact_index_preserves_reference_locations() {
     // After analyze() calls compact_reference_index(), queries must return the
     // same results as before compaction.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); }\n";
-    let file = write(&dir, "compact.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "compact.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -354,8 +349,8 @@ fn compact_index_preserves_reference_locations() {
 fn compact_index_survives_re_analyze() {
     // re_analyze_file() must work correctly even when the index was compacted
     // by a preceding full analyze() call.
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "reanalyze.php",
         "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n",
@@ -396,8 +391,8 @@ fn this_method_call_records_reference_location() {
     // $this->method() calls were previously invisible to the reference index
     // because $this was untyped and the mixed-receiver guard fired before
     // record_symbol could be called (issue #191).
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "this_ref.php",
         "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n",
@@ -416,10 +411,10 @@ fn this_method_call_records_reference_location() {
 fn this_method_call_span_covers_only_name() {
     // The recorded span for $this->helper() must cover only the method name
     // identifier, matching the behaviour for non-$this receivers.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n";
-    let file = write(&dir, "this_span.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "this_span.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
@@ -442,14 +437,14 @@ fn this_method_call_span_covers_only_name() {
 
 #[test]
 fn nullsafe_method_call_records_reference_location() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // "<?php\n"                                       = 6 bytes
     // "class Svc { public function run(): void {} }\n" = 45 bytes  (offset 6)
     // "function caller(?Svc $s): void { $s?->run(); }\n"
     //                                          ^-- 'run' starts at offset 88
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(?Svc $s): void { $s?->run(); }\n";
-    let file = write(&dir, "nullsafe_method.php", src);
-    let file_arc: Arc<str> = Arc::from(file.to_str().unwrap());
+    let file = write_file(&dir, "nullsafe_method.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(std::slice::from_ref(&file));
