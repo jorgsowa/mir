@@ -56,6 +56,13 @@ struct CacheFile {
     reverse_deps: HashMap<String, HashSet<String>>,
 }
 
+/// View for serializing cache data without cloning.
+#[derive(Serialize)]
+struct CacheFileView<'a> {
+    entries: &'a HashMap<String, CacheEntry>,
+    reverse_deps: &'a HashMap<String, HashSet<String>>,
+}
+
 /// Thread-safe, disk-backed cache for per-file analysis results.
 pub struct AnalysisCache {
     cache_dir: PathBuf,
@@ -131,11 +138,13 @@ impl AnalysisCache {
             return;
         }
         let cache_file = self.cache_dir.join("cache.json");
-        let file = CacheFile {
-            entries: self.entries.lock().clone(),
-            reverse_deps: self.reverse_deps.lock().clone(),
+        let entries = self.entries.lock();
+        let reverse_deps = self.reverse_deps.lock();
+        let view = CacheFileView {
+            entries: &entries,
+            reverse_deps: &reverse_deps,
         };
-        if let Ok(json) = serde_json::to_string(&file) {
+        if let Ok(json) = serde_json::to_string(&view) {
             std::fs::write(cache_file, json).ok();
         }
     }
