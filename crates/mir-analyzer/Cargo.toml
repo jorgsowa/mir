@@ -33,3 +33,7 @@ criterion = { version = "0.8", features = ["html_reports"] }
 [[bench]]
 name    = "analyze_real_world"
 harness = false
+
+[[bench]]
+name    = "incremental_workload"
+harness = false
