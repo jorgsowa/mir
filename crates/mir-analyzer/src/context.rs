@@ -209,12 +209,20 @@ impl Context {
             // If the parameter type is a bare unqualified name matching a template parameter,
             // replace it with the template's bound
             if elem_ty.types.len() == 1 {
-                if let mir_types::Atomic::TNamedObject { fqcn, type_params } = &elem_ty.types[0] {
-                    if type_params.is_empty() && !fqcn.contains('\\') {
+                match &elem_ty.types[0] {
+                    mir_types::Atomic::TNamedObject { fqcn, type_params }
+                        if type_params.is_empty() && !fqcn.contains('\\') =>
+                    {
                         if let Some(bound) = template_bounds_map.get(fqcn.as_ref()) {
                             elem_ty = bound.clone();
                         }
                     }
+                    mir_types::Atomic::TTemplateParam { as_type, .. } if !as_type.is_mixed() => {
+                        // If the template has a non-mixed bound, use it
+                        // Otherwise keep the TTemplateParam to avoid MixedMethodCall errors
+                        elem_ty = (**as_type).clone();
+                    }
+                    _ => {}
                 }
             }
 
