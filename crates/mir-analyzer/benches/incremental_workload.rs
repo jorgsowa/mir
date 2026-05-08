@@ -331,11 +331,109 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.finish();
 }
 
+/// Concurrent-read workload: N reader threads do `definition_of` lookups in
+/// a tight loop while one writer thread re-ingests Login.php at editor-typing
+/// cadence. Validates the central architectural claim that
+/// `AnalysisSession::snapshot_db` lets readers proceed without blocking on
+/// the writer's brief lock.
+///
+/// Reports per-iteration wall time for a fixed batch of reads across all
+/// reader threads. Lower is better; flat scaling with reader count means
+/// the lock discipline is working.
+fn bench_concurrent_read_under_edits(c: &mut Criterion) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::thread;
+
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+
+    let (vendor_files, project_files) = split_vendor_project(&root);
+    let cache: TempDir = tempfile::tempdir().unwrap();
+    let session = Arc::new(warm_session(&cache, &vendor_files, &project_files));
+
+    // Pick a class that exists in the warmed session so reads are cache-hot.
+    let target_class = "Illuminate\\Auth\\Events\\Login";
+
+    // Pre-load the editing target's source so the writer doesn't pay disk I/O.
+    let edit_path = root.join("src/Illuminate/Auth/Events/Login.php");
+    let edit_path_str: Arc<str> = Arc::from(edit_path.to_string_lossy().as_ref());
+    let original = std::fs::read_to_string(&edit_path).unwrap();
+
+    let mut group = c.benchmark_group("concurrent_read_under_edits");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(20));
+
+    // Constants kept modest so the bench finishes in reasonable time per
+    // iteration. The reader work dwarfs the writer work, so adjusting reads
+    // per iteration is what controls measurement granularity.
+    const READS_PER_THREAD: u32 = 5_000;
+    let thread_counts = [1usize, 4, 8];
+
+    for &n_readers in &thread_counts {
+        let id = format!("{n_readers}_readers");
+        let session_outer = Arc::clone(&session);
+        let edit_path_outer = edit_path_str.clone();
+        let original_outer = original.clone();
+
+        group.bench_function(&id, |b| {
+            b.iter_custom(|iters| {
+                let mut total = Duration::ZERO;
+                for _ in 0..iters {
+                    let stop = Arc::new(AtomicBool::new(false));
+
+                    // Background writer: re-ingest the target file repeatedly.
+                    let writer_session = Arc::clone(&session_outer);
+                    let writer_path = edit_path_outer.clone();
+                    let writer_orig = original_outer.clone();
+                    let writer_stop = Arc::clone(&stop);
+                    let writer = thread::spawn(move || {
+                        let mut counter: u32 = 0;
+                        while !writer_stop.load(Ordering::Relaxed) {
+                            counter = counter.wrapping_add(1);
+                            let new_src: Arc<str> =
+                                Arc::from(format!("{writer_orig}\n// edit {counter}\n"));
+                            writer_session.ingest_file(writer_path.clone(), new_src);
+                        }
+                    });
+
+                    // Spawn readers and time their combined wall-clock work.
+                    let start = std::time::Instant::now();
+                    let mut handles = Vec::with_capacity(n_readers);
+                    for _ in 0..n_readers {
+                        let s = Arc::clone(&session_outer);
+                        handles.push(thread::spawn(move || {
+                            for _ in 0..READS_PER_THREAD {
+                                std::hint::black_box(s.definition_of(target_class));
+                            }
+                        }));
+                    }
+                    for h in handles {
+                        h.join().unwrap();
+                    }
+                    total += start.elapsed();
+
+                    stop.store(true, Ordering::Relaxed);
+                    writer.join().unwrap();
+                }
+                total
+            });
+        });
+    }
+
+    group.finish();
+
+    // Restore source content.
+    std::fs::write(&edit_path, &original).unwrap();
+}
+
 criterion_group!(
     benches,
     bench_single_file_edit,
     bench_high_fanout_edit,
     bench_read_query_latency,
     bench_stub_loading,
+    bench_concurrent_read_under_edits,
 );
 criterion_main!(benches);
