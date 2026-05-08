@@ -340,6 +340,84 @@ target(); function target(): void {}
     );
 }
 
+/// `location_from_span` translates a parser span to a `Location` using the
+/// crate's own conventions. Round-trip sanity check: spans from a parsed
+/// program convert to lines/columns that match the source text.
+#[test]
+fn location_from_span_translates_pass2_spans_to_source_locations() {
+    let src = "<?php
+function helper(): string { return 'x'; }
+function caller(): string { return helper(); }
+";
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, src);
+    assert!(parsed.errors.is_empty());
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("/proj/loc.php");
+    session.ingest_file(file.clone(), Arc::from(src));
+    let analysis =
+        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+
+    // The helper() call site produces a FunctionCall ResolvedSymbol whose
+    // span we can translate. Pick that one explicitly so the test doesn't
+    // depend on iteration order.
+    let call = analysis
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, mir_analyzer::SymbolKind::FunctionCall(_)))
+        .expect("expected a FunctionCall symbol for helper()");
+    let loc = mir_analyzer::location_from_span(call.span, file.clone(), src, &parsed.source_map);
+
+    assert_eq!(loc.file.as_ref(), file.as_ref());
+    assert_eq!(
+        loc.line, 3,
+        "helper() is called on the 3rd line; got {loc:?}"
+    );
+    assert!(loc.line_end >= loc.line);
+    assert!(
+        loc.col_end > loc.col_start,
+        "non-empty span must produce a non-empty column range: {loc:?}"
+    );
+}
+
+/// Soft-stub-fallback regression guard: a name that the build-time stub
+/// index does *not* know about must still trigger `UndefinedFunction`. The
+/// fallback should only suppress diagnostics for names mir is confident are
+/// real PHP built-ins.
+#[test]
+fn truly_unknown_function_still_emits_undefined_function() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("/proj/unknown_fn.php");
+    let src = "<?php
+function caller(): void {
+    definitely_not_a_real_php_function_xyz123();
+}
+";
+    session.ingest_file(file.clone(), Arc::from(src));
+
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, src);
+    let analysis =
+        FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
+
+    let undefined: Vec<_> = analysis
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedFunction")
+        .collect();
+    assert_eq!(
+        undefined.len(),
+        1,
+        "user-defined unknown function must still emit UndefinedFunction; got: {:?}",
+        analysis
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
+    );
+}
+
 /// Unknown names return `false` and do not spuriously ingest anything.
 #[test]
 fn ensure_stub_for_unknown_symbol_returns_false() {

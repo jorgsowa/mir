@@ -50,6 +50,12 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
             }
             let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
             if !type_exists_via_db(db, &resolved) {
+                // Soft-fallback: build-time stub index recognises this class
+                // as a PHP built-in → assume lazy-stub timing rather than
+                // user error. See call/function.rs for the parallel path.
+                if crate::stubs::stub_path_for_class(&resolved).is_some() {
+                    return;
+                }
                 let (line, col_start) = offset_to_line_col(source, hint.span.start, source_map);
                 let (line_end, col_end) = if hint.span.start < hint.span.end {
                     let (end_line, end_col) = offset_to_line_col(source, hint.span.end, source_map);
@@ -95,6 +101,10 @@ pub(crate) fn check_name_class(
     let name_str = crate::parser::name_to_string(name);
     let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
     if !type_exists_via_db(db, &resolved) {
+        // Soft-fallback: see call/function.rs for the rationale.
+        if crate::stubs::stub_path_for_class(&resolved).is_some() {
+            return;
+        }
         let span = name.span();
         let (line, col_start) = offset_to_line_col(source, span.start, source_map);
         let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);

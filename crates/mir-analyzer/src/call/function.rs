@@ -364,6 +364,16 @@ impl CallAnalyzer {
             return return_ty;
         }
 
+        // Soft-fallback: if the build-time stub index recognises this name as
+        // a PHP built-in, the codebase miss is a stub-loading race rather
+        // than user error — the auto-discovery scanner missed it, the
+        // session is in essentials-only mode without auto-discovery, or the
+        // analyzer is mid-ingest. Suppressing the diagnostic avoids a class
+        // of false positives that would otherwise plague consumers running
+        // the lazy-stub setup.
+        if crate::stubs::stub_path_for_function(&fn_name).is_some() {
+            return Union::mixed();
+        }
         ea.emit(
             IssueKind::UndefinedFunction { name: fn_name },
             Severity::Error,
