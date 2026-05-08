@@ -59,7 +59,7 @@ blake3     = "1"
 rustc-hash = "2"
 
 # Incremental computation
-salsa = "0.26"
+salsa = "0.26.2"
 
 [profile.release]
 lto           = "thin"

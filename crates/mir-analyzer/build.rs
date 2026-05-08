@@ -90,8 +90,19 @@ fn main() {
     fs::write(&out_path, code).unwrap();
 }
 
-/// Parse `PhpStormStubsMap.php` FUNCTIONS section and generate a sorted static slice of
-/// built-in function names for the extensions present in `stubs/`.
+/// Parse `PhpStormStubsMap.php` and generate four sorted static slices for the
+/// extensions present in `stubs/`:
+/// * `BUILTIN_FN_NAMES` — function names (legacy; used for existence checks)
+/// * `STUB_FN_INDEX` — lowercased fn name → stub virtual path
+/// * `STUB_CLASS_INDEX` — lowercased FQCN → stub virtual path (PHP class
+///   names are case-insensitive so the lookup key is lowercased; backslashes
+///   preserved)
+/// * `STUB_CONST_INDEX` — case-sensitive constant name → stub virtual path
+///
+/// All `*_INDEX` entries store the stub virtual path that matches keys of
+/// `STUB_FILES` (e.g. `"stubs/standard/standard_0.php"`), so the lazy-stub-
+/// loading code in `crate::stubs` can resolve a name → path → embedded
+/// content in two `O(log n)` lookups.
 fn generate_builtin_fn_names(manifest_dir: &Path, out_dir: &Path) {
     let stubs_root = manifest_dir.join("phpstorm-stubs");
     let map_path = stubs_root.join("PhpStormStubsMap.php");
@@ -100,7 +111,10 @@ fn generate_builtin_fn_names(manifest_dir: &Path, out_dir: &Path) {
     if !map_path.exists() {
         fs::write(
             &out_path,
-            "pub(crate) static BUILTIN_FN_NAMES: &[&str] = &[];\n",
+            "pub(crate) static BUILTIN_FN_NAMES: &[&str] = &[];\n\
+             pub(crate) static STUB_FN_INDEX: &[(&str, &str)] = &[];\n\
+             pub(crate) static STUB_CLASS_INDEX: &[(&str, &str)] = &[];\n\
+             pub(crate) static STUB_CONST_INDEX: &[(&str, &str)] = &[];\n",
         )
         .unwrap();
         return;
@@ -125,51 +139,130 @@ fn generate_builtin_fn_names(manifest_dir: &Path, out_dir: &Path) {
         std::collections::HashSet::new()
     };
 
+    // Section state: which array we're currently parsing. Sections appear in
+    // file order: CLASSES, FUNCTIONS, CONSTANTS.
+    enum Section {
+        None,
+        Classes,
+        Functions,
+        Constants,
+    }
+    let mut section = Section::None;
+
     let mut fn_names: Vec<String> = Vec::new();
-    let mut in_functions = false;
+    // Index entries: (lookup_key, virtual_path). Virtual path matches STUB_FILES keys.
+    let mut fn_index: Vec<(String, String)> = Vec::new();
+    let mut class_index: Vec<(String, String)> = Vec::new();
+    let mut const_index: Vec<(String, String)> = Vec::new();
 
     for line in content.lines() {
         let trimmed = line.trim();
 
-        if trimmed == "const FUNCTIONS = array (" {
-            in_functions = true;
+        match trimmed {
+            "const CLASSES = array (" => {
+                section = Section::Classes;
+                continue;
+            }
+            "const FUNCTIONS = array (" => {
+                section = Section::Functions;
+                continue;
+            }
+            "const CONSTANTS = array (" => {
+                section = Section::Constants;
+                continue;
+            }
+            ");" => {
+                section = Section::None;
+                continue;
+            }
+            _ => {}
+        }
+
+        // Each entry: '\\some\\name' => 'ext_dir/file.php',
+        let Some(rest) = trimmed.strip_prefix('\'') else {
+            continue;
+        };
+        let Some((raw_name, rest)) = rest.split_once('\'') else {
+            continue;
+        };
+        let Some(rest) = rest.trim().strip_prefix("=> '") else {
+            continue;
+        };
+        let Some((path, _)) = rest.split_once('\'') else {
+            continue;
+        };
+        let Some((dir, _)) = path.split_once('/') else {
+            continue;
+        };
+        if !stub_dirs_lower.contains(&dir.to_lowercase()) {
             continue;
         }
 
-        if in_functions {
-            // End of the FUNCTIONS array.
-            if trimmed == ");" {
-                break;
+        // PHP source `'\\Foo'` represents the literal string `\Foo`; un-escape.
+        let name = raw_name.replace("\\\\", "\\");
+        let virtual_path = format!("stubs/{path}");
+
+        match section {
+            Section::Functions => {
+                fn_names.push(name.clone());
+                fn_index.push((name.to_lowercase(), virtual_path));
             }
-            // Each entry: '\\some\\func_name' => 'ext_dir/file.php',
-            if let Some(rest) = trimmed.strip_prefix('\'') {
-                if let Some((name, rest)) = rest.split_once('\'') {
-                    if let Some(rest) = rest.trim().strip_prefix("=> '") {
-                        if let Some((path, _)) = rest.split_once('\'') {
-                            if let Some((dir, _)) = path.split_once('/') {
-                                if stub_dirs_lower.contains(&dir.to_lowercase()) {
-                                    fn_names.push(name.to_owned());
-                                }
-                            }
-                        }
-                    }
-                }
+            Section::Classes => {
+                class_index.push((name.to_lowercase(), virtual_path));
             }
+            Section::Constants => {
+                const_index.push((name, virtual_path));
+            }
+            Section::None => {}
         }
     }
 
     fn_names.sort();
     fn_names.dedup();
+    fn_index.sort_by(|a, b| a.0.cmp(&b.0));
+    fn_index.dedup_by(|a, b| a.0 == b.0);
+    class_index.sort_by(|a, b| a.0.cmp(&b.0));
+    class_index.dedup_by(|a, b| a.0 == b.0);
+    const_index.sort_by(|a, b| a.0.cmp(&b.0));
+    const_index.dedup_by(|a, b| a.0 == b.0);
 
     let mut code = String::from(
-        "/// Sorted list of PHP built-in function names from PhpStormStubsMap.php.\n\
-         /// Auto-generated by build.rs — do not edit directly.\n\
+        "// Auto-generated by build.rs from PhpStormStubsMap.php — do not edit directly.\n\n\
+         /// Sorted list of PHP built-in function names. Used for fast existence checks.\n\
          pub(crate) static BUILTIN_FN_NAMES: &[&str] = &[\n",
     );
     for name in &fn_names {
         writeln!(code, "    {name:?},").unwrap();
     }
-    code.push_str("];\n");
+    code.push_str("];\n\n");
+
+    fn write_index(code: &mut String, doc: &str, name: &str, entries: &[(String, String)]) {
+        writeln!(code, "/// {doc}").unwrap();
+        writeln!(code, "pub(crate) static {name}: &[(&str, &str)] = &[").unwrap();
+        for (key, path) in entries {
+            writeln!(code, "    ({key:?}, {path:?}),").unwrap();
+        }
+        code.push_str("];\n\n");
+    }
+
+    write_index(
+        &mut code,
+        "Sorted lowercased function name → stub virtual path.",
+        "STUB_FN_INDEX",
+        &fn_index,
+    );
+    write_index(
+        &mut code,
+        "Sorted lowercased class FQCN → stub virtual path.",
+        "STUB_CLASS_INDEX",
+        &class_index,
+    );
+    write_index(
+        &mut code,
+        "Sorted constant name (case-sensitive) → stub virtual path.",
+        "STUB_CONST_INDEX",
+        &const_index,
+    );
 
     fs::write(&out_path, code).unwrap();
 }

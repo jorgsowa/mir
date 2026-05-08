@@ -161,8 +161,17 @@ impl ProjectAnalyzer {
     }
 
     fn type_exists(&self, fqcn: &str) -> bool {
+        let db = self.snapshot_db();
+        crate::db::type_exists_via_db(&db, fqcn)
+    }
+
+    /// Acquire a cheap clone of the salsa db for a read-only query.
+    /// The lock is held only for the duration of the clone, so concurrent
+    /// readers never serialize on each other or on writes longer than the
+    /// clone itself.
+    fn snapshot_db(&self) -> MirDb {
         let guard = self.salsa.lock().expect("salsa lock poisoned");
-        crate::db::type_exists_via_db(&guard.0, fqcn)
+        guard.0.clone()
     }
 
     /// Internal: expose the salsa Mutex for unit tests that need a `&dyn MirDatabase`.
@@ -180,26 +189,25 @@ impl ProjectAnalyzer {
         fqcn: &str,
         member_name: &str,
     ) -> Option<mir_codebase::storage::Location> {
-        let guard = self.salsa.lock().expect("salsa lock poisoned");
-        crate::db::member_location_via_db(&guard.0, fqcn, member_name)
+        let db = self.snapshot_db();
+        crate::db::member_location_via_db(&db, fqcn, member_name)
     }
 
     pub fn symbol_location(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
-        let guard = self.salsa.lock().expect("salsa lock poisoned");
-        let db = &guard.0;
+        let db = self.snapshot_db();
         db.lookup_class_node(symbol)
-            .filter(|n| n.active(db))
-            .and_then(|n| n.location(db))
+            .filter(|n| n.active(&db))
+            .and_then(|n| n.location(&db))
             .or_else(|| {
                 db.lookup_function_node(symbol)
-                    .filter(|n| n.active(db))
-                    .and_then(|n| n.location(db))
+                    .filter(|n| n.active(&db))
+                    .and_then(|n| n.location(&db))
             })
     }
 
     pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let guard = self.salsa.lock().expect("salsa lock poisoned");
-        guard.0.reference_locations(symbol)
+        let db = self.snapshot_db();
+        db.reference_locations(symbol)
     }
 
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
@@ -677,35 +685,54 @@ impl ProjectAnalyzer {
             all_issues.retain(|i| !files_to_reanalyze.contains(&i.location.file));
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
-            let db_reanalysis = {
+            // Two-phase reanalysis to avoid the salsa `cancel_others` deadlock:
+            //
+            // Phase 1: parallel inference-only Pass 2 on a cloned db. The
+            //   priming clone is consumed by `gather_inferred_types`, so all
+            //   per-thread db handles are dropped before we touch the canonical
+            //   db.
+            // Phase 1.5: single-threaded commit of the inferred return types.
+            // Phase 2: parallel full Pass 2 emits the actual issues + symbols.
+            //
+            // The previous in-line per-file commit (commit while a `db` clone
+            // was still alive in `map_with`) deadlocked salsa: `cancel_others`
+            // waits for outstanding storage references and the local clone is
+            // exactly one such reference.
+            let sweep: Vec<(Arc<str>, Arc<str>)> = file_data
+                .iter()
+                .filter(|(f, _)| {
+                    !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
+                })
+                .cloned()
+                .collect();
+
+            let (inferred_fns, inferred_methods) = crate::session::gather_inferred_types(
+                {
+                    let guard = self.salsa.lock().expect("salsa lock poisoned");
+                    guard.0.clone()
+                },
+                &sweep,
+                self.resolved_php_version(),
+            );
+
+            {
+                let mut guard_db = self.salsa.lock().expect("salsa lock poisoned");
+                guard_db
+                    .0
+                    .commit_inferred_return_types(inferred_fns, inferred_methods);
+            }
+
+            let db_full = {
                 let guard = self.salsa.lock().expect("salsa lock poisoned");
                 guard.0.clone()
             };
 
-            // Lazy-loaded files re-run Pass 2 to pick up the just-loaded
-            // definitions; collect inferred return types for a serial commit
-            // For lazy-loaded files, we run the priming sweep inline during reanalysis.
             let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
                 .par_iter()
                 .filter(|(f, _)| {
                     !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
                 })
-                .map_with(db_reanalysis, |db, (file, src)| {
-                    let driver = Pass2Driver::new_inference_only(
-                        &*db as &dyn MirDatabase,
-                        self.resolved_php_version(),
-                    );
-                    let arena = bumpalo::Bump::new();
-                    let parsed = php_rs_parser::parse(&arena, src);
-                    driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map);
-
-                    let inferred = driver.take_inferred_types();
-                    let mut guard_db = self.salsa.lock().expect("salsa lock poisoned");
-                    guard_db
-                        .0
-                        .commit_inferred_return_types(inferred.functions, inferred.methods);
-                    drop(guard_db);
-
+                .map_with(db_full, |db, (file, src)| {
                     let driver =
                         Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
                     let arena = bumpalo::Bump::new();

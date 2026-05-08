@@ -149,6 +149,35 @@ impl AnalysisCache {
         *self.dirty.lock().unwrap() = true;
     }
 
+    /// Update the reverse-dep graph for a single file in place.
+    ///
+    /// `new_targets` is the set of files `file` depends on (its imports'
+    /// defining files plus parent / interfaces / traits' defining files).
+    /// This removes `file` from every existing dependent set, then inserts it
+    /// into each of `new_targets`' dependent sets — preserving the invariant
+    /// that the graph reflects the file's *current* outgoing edges.
+    ///
+    /// Used by `AnalysisSession::ingest_file` to keep cross-file invalidation
+    /// correct without rebuilding the whole graph on every edit.
+    pub fn update_reverse_deps_for_file(&self, file: &str, new_targets: &HashSet<String>) {
+        let mut deps = self.reverse_deps.lock().unwrap();
+
+        for dependents in deps.values_mut() {
+            dependents.remove(file);
+        }
+        deps.retain(|_, dependents| !dependents.is_empty());
+
+        for target in new_targets {
+            if target != file {
+                deps.entry(target.clone())
+                    .or_default()
+                    .insert(file.to_string());
+            }
+        }
+
+        *self.dirty.lock().unwrap() = true;
+    }
+
     /// BFS from each changed file through the reverse dep graph.
     /// Evicts every reachable dependent's cache entry.
     /// Returns the number of entries evicted.

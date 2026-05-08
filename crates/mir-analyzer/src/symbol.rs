@@ -2,8 +2,8 @@
 //!
 //! The static analyzer already resolves types for every expression during
 //! analysis but historically discarded the intermediate state.  This module
-//! exposes that data so that downstream consumers (e.g. php-lsp) can build
-//! position indexes for hover, go-to-definition, and completions.
+//! exposes that data so that downstream tools can build position indexes for
+//! hover, go-to-definition, and completions.
 
 use std::sync::Arc;
 
@@ -43,6 +43,35 @@ impl ResolvedSymbol {
             SymbolKind::Variable(_) => None,
         }
     }
+}
+
+/// One declaration emitted by [`crate::AnalysisSession::document_symbols`].
+/// Tool-agnostic shape for outline / breadcrumb features; consumers map this
+/// onto whatever protocol-specific symbol type they need.
+#[derive(Debug, Clone)]
+pub struct DocumentSymbol {
+    /// FQCN for classes/interfaces/traits/enums; FQN for functions /
+    /// constants. Consumers typically display the unqualified last segment.
+    pub name: Arc<str>,
+    /// Coarse kind suitable for icon / severity selection in outlines.
+    pub kind: DocumentSymbolKind,
+    /// Source location of the declaration (file + 1-based lines, 0-based
+    /// columns). `None` only for synthetic stub-only definitions that don't
+    /// have a recorded source span.
+    pub location: Option<mir_codebase::storage::Location>,
+}
+
+/// Coarse declaration kind used by [`DocumentSymbol`]. Six categories chosen
+/// so consumers can map cleanly onto outline-style symbol kinds in any
+/// protocol they target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentSymbolKind {
+    Class,
+    Interface,
+    Trait,
+    Enum,
+    Function,
+    Constant,
 }
 
 /// The kind of symbol that was resolved.
