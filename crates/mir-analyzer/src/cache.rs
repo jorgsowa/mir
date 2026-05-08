@@ -190,8 +190,9 @@ impl AnalysisCache {
             while let Some(file) = queue.pop_front() {
                 if let Some(dependents) = deps.get(&file) {
                     for dep in dependents {
-                        if visited.insert(dep.clone()) {
-                            queue.push_back(dep.clone());
+                        let cloned = dep.clone();
+                        if visited.insert(cloned.clone()) {
+                            queue.push_back(cloned);
                             result.push(dep.clone());
                         }
                     }

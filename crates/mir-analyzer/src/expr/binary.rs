@@ -37,8 +37,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             for (name, ty) in &right_ctx.vars {
                 if !ctx.vars.contains_key(name.as_str()) {
-                    ctx.vars.insert(name.clone(), ty.clone());
-                    ctx.possibly_assigned_vars.insert(name.clone());
+                    let name_cloned = name.clone();
+                    ctx.vars.insert(name_cloned.clone(), ty.clone());
+                    ctx.possibly_assigned_vars.insert(name_cloned);
                 }
             }
             return Union::single(Atomic::TBool);
