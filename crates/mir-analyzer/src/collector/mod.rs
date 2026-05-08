@@ -258,6 +258,38 @@ impl<'a> DefinitionCollector<'a> {
         resolution::resolve_union_opt(opt, &self.namespace, &self.use_aliases)
     }
 
+    fn resolve_union_doc_with_templates(
+        &self,
+        union: Union,
+        template_names: &std::collections::HashSet<String>,
+        defining_entity: &str,
+    ) -> Union {
+        let mut result = Union::empty();
+        result.possibly_undefined = union.possibly_undefined;
+        result.from_docblock = union.from_docblock;
+        for atomic in union.types {
+            match &atomic {
+                mir_types::Atomic::TNamedObject { fqcn, type_params }
+                    if type_params.is_empty() && template_names.contains(fqcn.as_ref()) =>
+                {
+                    // This is a template parameter reference
+                    result.add_type(mir_types::Atomic::TTemplateParam {
+                        name: fqcn.clone(),
+                        as_type: Box::new(Union::mixed()),
+                        defining_entity: defining_entity.into(),
+                    });
+                }
+                _ => {
+                    let resolved_union = self.resolve_union_doc(Union::single(atomic.clone()));
+                    for resolved_atomic in resolved_union.types {
+                        result.add_type(resolved_atomic);
+                    }
+                }
+            }
+        }
+        result
+    }
+
     fn build_assertions(&self, doc: &crate::parser::ParsedDocblock) -> Vec<Assertion> {
         annotation::build_assertions(doc, |u| self.resolve_union_doc(u))
     }
