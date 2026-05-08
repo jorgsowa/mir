@@ -110,7 +110,11 @@ impl Union {
     }
 
     pub fn is_mixed(&self) -> bool {
-        self.types.iter().any(|t| matches!(t, Atomic::TMixed))
+        self.types.iter().any(|t| match t {
+            Atomic::TMixed => true,
+            Atomic::TTemplateParam { as_type, .. } => as_type.is_mixed(),
+            _ => false,
+        })
     }
 
     pub fn is_never(&self) -> bool {

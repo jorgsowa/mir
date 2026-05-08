@@ -32,12 +32,35 @@ impl DefinitionCollector<'_> {
             return;
         }
 
+        // Extract template parameters first so they're available during type resolution
+        let template_params = doc
+            .templates
+            .iter()
+            .map(|(name, bound, variance)| TemplateParam {
+                name: name.as_str().into(),
+                bound: bound.clone(),
+                defining_entity: fqn.as_str().into(),
+                variance: *variance,
+            })
+            .collect::<Vec<_>>();
+
+        // Build a set of template names for use during param type resolution
+        let template_names: std::collections::HashSet<String> = doc
+            .templates
+            .iter()
+            .map(|(n, _, _)| n.to_string())
+            .collect();
+
         let mut params = Vec::new();
         for p in decl.params.iter() {
             let ty = doc
                 .get_param_type(&p.name.to_string())
                 .cloned()
-                .map(|u| self.resolve_union_doc(u))
+                .map(|u| {
+                    // If the type is a simple named object that matches a template param,
+                    // convert it to a TTemplateParam
+                    self.resolve_union_doc_with_templates(u, &template_names, &fqn)
+                })
                 .or_else(|| {
                     self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None)))
                 });
@@ -67,22 +90,11 @@ impl DefinitionCollector<'_> {
         let return_type = match (doc.return_type.clone(), decl.return_type.as_ref()) {
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
-                Some(self.resolve_union_doc(ty))
+                Some(self.resolve_union_doc_with_templates(ty, &template_names, &fqn))
             }
             (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, None))),
             (None, None) => None,
         };
-
-        let template_params = doc
-            .templates
-            .iter()
-            .map(|(name, bound, variance)| TemplateParam {
-                name: name.as_str().into(),
-                bound: bound.clone(),
-                defining_entity: fqn.as_str().into(),
-                variance: *variance,
-            })
-            .collect();
 
         let throws = doc
             .throws

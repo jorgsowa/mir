@@ -10,6 +10,4 @@ mixedGenericClone
                         clone $a;
                     }
 ===expect===
-MixedClone
-===ignore===
-TODO
+MixedClone@7:24: cannot clone mixed
