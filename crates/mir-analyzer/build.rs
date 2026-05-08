@@ -2,6 +2,13 @@ use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
+struct FixtureCategory {
+    mod_name: String,
+    fixtures: Vec<(PathBuf, String, String)>,
+}
+
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -30,6 +37,9 @@ fn main() {
         .collect();
     categories.sort_by_key(|e| e.file_name());
 
+    // Collect all fixtures before reading (separate collection from I/O).
+    let mut all_fixture_data: Vec<FixtureCategory> = Vec::new();
+
     for cat_entry in categories {
         let cat_dir_name = cat_entry.file_name().to_string_lossy().into_owned();
         let cat_mod_name = cat_dir_name.replace('-', "_");
@@ -48,28 +58,54 @@ fn main() {
             continue;
         }
 
-        code.push_str(&format!("\nmod {cat_mod_name} {{\n"));
+        let fixture_data: Vec<_> = fixtures
+            .into_iter()
+            .map(|f| {
+                let path = f.path();
+                let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+                let rel = format!("tests/fixtures/{cat_dir_name}/{file_name}");
+                (path, file_name, rel)
+            })
+            .collect();
 
-        for fixture in fixtures {
-            let path = fixture.path();
+        all_fixture_data.push(FixtureCategory {
+            mod_name: cat_mod_name,
+            fixtures: fixture_data,
+        });
+    }
+
+    // Parallel file reading: flatten all fixtures and read in parallel.
+    let all_paths: Vec<_> = all_fixture_data
+        .iter()
+        .flat_map(|cat| cat.fixtures.iter().map(|(path, _, _)| path.clone()))
+        .collect();
+
+    let file_contents: std::collections::HashMap<PathBuf, String> = all_paths
+        .par_iter()
+        .map(|path| (path.clone(), fs::read_to_string(path).unwrap_or_default()))
+        .collect();
+
+    // Emit cargo directives and generate code.
+    for category in all_fixture_data {
+        code.push_str(&format!("\nmod {} {{\n", category.mod_name));
+
+        for (path, _file_name, rel) in category.fixtures {
             let stem = path
                 .file_stem()
                 .unwrap()
                 .to_string_lossy()
                 .replace('-', "_");
-            let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
-            let rel = format!("tests/fixtures/{cat_dir_name}/{file_name}");
 
             // Rerun when this specific fixture file changes.
             println!("cargo:rerun-if-changed={manifest_dir}/{rel}");
 
-            let content = fs::read_to_string(&path).unwrap_or_default();
+            let content = &file_contents[&path];
             let ignore_attr = if content.contains("===ignore===") {
                 "    #[ignore]\n"
             } else {
                 ""
             };
-            let doc_comment = extract_description(&content)
+            let doc_comment = extract_description(content)
                 .map(|d| {
                     d.lines()
                         .map(|l| format!("    /// {}\n", l.trim()))

@@ -25,6 +25,9 @@ serde_json    = { workspace = true }
 quick-xml     = "0.39"
 salsa         = { workspace = true }
 
+[build-dependencies]
+rayon = { workspace = true }
+
 [dev-dependencies]
 mir-issues     = { workspace = true }
 tempfile = "3.27.0"
