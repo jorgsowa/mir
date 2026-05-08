@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-05-08
+
+### Added
+
+- Session-based per-file analysis API (`AnalysisSession` + `FileAnalyzer`) for incremental, file-scoped analysis suitable for LSP-style consumers.
+- `mir_analyzer::location_from_span(span, file, source, source_map) -> Location`: public free function that converts a parser `Span` (byte-offset range) to the crate's `Location` type (1-based lines, 0-based codepoint columns), so consumers can translate Pass-2 spans to their own protocol's position format without re-implementing column math.
+- Soft fallback for unknown stubs: when Pass 2 would emit `UndefinedFunction` / `UndefinedClass` for a name the build-time stub index recognises as a real PHP built-in, the diagnostic is suppressed. Defends against lazy-stub timing races (auto-discovery scanner false negatives, essentials-only sessions without auto-discovery, mid-ingest reads). Genuinely unknown names still emit.
+- Concurrent-read benchmark: N reader threads call `definition_of()` in a tight loop while a writer continuously re-ingests a fixture, reporting wall time per fixed-size batch for 1 / 4 / 8 readers. Surfaces real contention characteristics under flat-out write pressure (per-read latency: 324ns @ 1 reader, 1.4µs @ 4, 1.9µs @ 8); realistic LSP edit cadence stays at the 324ns figure.
+- `MixedClone` issue type: detects `clone` / `clone with` expressions on `mixed`-typed values in `ExpressionAnalyzer`.
+
+### Fixed
+
+- `@var` annotation narrowing now applies to global-scope statements, not just function bodies. Previously `analyze_stmt()` (used for top-level statements) skipped the pre/post narrowing that `analyze_stmts()` performed for function bodies, so `@var` had no effect at global scope. Fixes `global_with_var_no_indent`, `function_with_var`, and `invalid_mixed_clone` fixtures.
+
+### Changed
+
+- Analyzer boilerplate simplifications:
+  - `Union::core_type()` collapses 10+ chained `remove_null().remove_false()` call sites in type-checking logic.
+  - `DefinitionCollector::parse_docblock_from_node_or_preceding()` consolidates the "check `doc_comment`, fall back to preceding docblock" pattern repeated 11+ times across class/trait/interface collectors.
+  - `StatementsAnalyzer::span_to_location()` replaces 7 instances of verbose span-to-location computation in flow analysis.
+
 ## [0.19.0] - 2026-05-07
 
 ### Added
