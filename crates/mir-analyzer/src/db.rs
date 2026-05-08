@@ -1373,10 +1373,7 @@ impl MirDatabase for MirDb {
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
-        let mut refs = self
-            .reference_locations
-            .lock()
-            .expect("reference lock poisoned");
+        let mut refs = self.reference_locations.lock().unwrap();
         let entry = refs.entry(loc.symbol_key).or_default();
         let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
         if !entry.iter().any(|existing| existing == &tuple) {
@@ -1397,10 +1394,7 @@ impl MirDatabase for MirDb {
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let refs = self
-            .reference_locations
-            .lock()
-            .expect("reference lock poisoned");
+        let refs = self.reference_locations.lock().unwrap();
         let mut out = Vec::new();
         for (symbol, locs) in refs.iter() {
             for (loc_file, line, col_start, col_end) in locs {
@@ -1413,26 +1407,17 @@ impl MirDatabase for MirDb {
     }
 
     fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let refs = self
-            .reference_locations
-            .lock()
-            .expect("reference lock poisoned");
+        let refs = self.reference_locations.lock().unwrap();
         refs.get(symbol).cloned().unwrap_or_default()
     }
 
     fn has_reference(&self, symbol: &str) -> bool {
-        let refs = self
-            .reference_locations
-            .lock()
-            .expect("reference lock poisoned");
+        let refs = self.reference_locations.lock().unwrap();
         refs.get(symbol).is_some_and(|locs| !locs.is_empty())
     }
 
     fn clear_file_references(&self, file: &str) {
-        let mut refs = self
-            .reference_locations
-            .lock()
-            .expect("reference lock poisoned");
+        let mut refs = self.reference_locations.lock().unwrap();
         for locs in refs.values_mut() {
             locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
         }
