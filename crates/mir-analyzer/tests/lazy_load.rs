@@ -5,12 +5,16 @@
 // the discovered file, and re-finalize the codebase so that inheritance
 // relationships are visible during Pass 2.
 
+mod common;
+
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use mir_analyzer::ProjectAnalyzer;
 use tempfile::TempDir;
+
+use self::common::create_temp_dir;
 
 fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
     let path = dir.path().join(name);
@@ -42,7 +46,7 @@ fn analyze_with_psr4(
     consumer_file: &str,
     consumer_src: &str,
 ) -> mir_analyzer::project::AnalysisResult {
-    let root = TempDir::new().unwrap();
+    let root = create_temp_dir("test");
     fs::create_dir_all(root.path().join("src")).unwrap();
     fs::write(root.path().join("src").join(lib_file), lib_src).unwrap();
     let consumer_path = write(&root, consumer_file, consumer_src);
@@ -97,7 +101,7 @@ fn lazy_loads_interface_from_psr4() {
 
 #[test]
 fn does_not_loop_when_class_has_no_psr4_match() {
-    let root = TempDir::new().unwrap();
+    let root = create_temp_dir("test");
     fs::create_dir_all(root.path().join("src")).unwrap();
 
     // Write a class that extends something that does NOT exist on disk
@@ -224,7 +228,7 @@ fn lazy_loads_interface_implemented_by_enum_from_psr4() {
 fn lazy_loads_fqcn_with_inherited_parent_used_without_use_import() {
     // Consumer.php uses \App\Child as FQCN (no `use`).
     // Child extends \App\Base — Base must be transitively loaded.
-    let root = TempDir::new().unwrap();
+    let root = create_temp_dir("test");
     fs::create_dir_all(root.path().join("src")).unwrap();
     fs::write(
         root.path().join("src").join("Base.php"),
@@ -281,7 +285,7 @@ fn lazy_loads_fqcn_used_directly_without_use_import_from_psr4() {
 
 #[test]
 fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
-    let root = TempDir::new().unwrap();
+    let root = create_temp_dir("test");
     fs::create_dir_all(root.path().join("src/Model")).unwrap();
     fs::create_dir_all(root.path().join("src/Service")).unwrap();
 

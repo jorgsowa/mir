@@ -5,9 +5,13 @@
 //!   * stubs are loaded lazily on first ingest/analyze,
 //!   * concurrent reads can take cheap snapshots while edits proceed.
 
+mod common;
+
 use std::sync::Arc;
 
 use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+
+use self::common::create_temp_dir;
 
 fn parse_and_analyze(source: &str) -> mir_analyzer::FileAnalysis {
     let session = AnalysisSession::new(PhpVersion::LATEST);
@@ -498,9 +502,8 @@ function foo(): string { return bar(); }
 #[test]
 fn invalidate_file_releases_all_per_file_state() {
     use mir_analyzer::cache::AnalysisCache;
-    use tempfile::TempDir;
 
-    let cache_dir = TempDir::new().unwrap();
+    let cache_dir = create_temp_dir("cache");
     let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
 
@@ -603,9 +606,8 @@ function caller_v2() { bar(); }
 #[test]
 fn ingest_file_maintains_reverse_dep_graph_for_session_callers() {
     use mir_analyzer::cache::AnalysisCache;
-    use tempfile::TempDir;
 
-    let cache_dir = TempDir::new().unwrap();
+    let cache_dir = create_temp_dir("cache");
     let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
 

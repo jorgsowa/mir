@@ -1,10 +1,14 @@
 // Integration tests for user-injectable stubs via ProjectAnalyzer::stub_files/stub_dirs.
 
+mod common;
+
 use std::fs;
 use std::path::PathBuf;
 
 use mir_analyzer::ProjectAnalyzer;
 use tempfile::TempDir;
+
+use self::common::create_temp_dir;
 
 fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
     let path = dir.path().join(name);
@@ -17,8 +21,8 @@ fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
 
 #[test]
 fn stub_file_function_resolves_without_undefined_function_error() {
-    let stubs_dir = TempDir::new().unwrap();
-    let src_dir = TempDir::new().unwrap();
+    let stubs_dir = create_temp_dir("stubs");
+    let src_dir = create_temp_dir("source");
 
     let stub_file = write(
         &stubs_dir,
@@ -49,8 +53,8 @@ fn stub_file_function_resolves_without_undefined_function_error() {
 
 #[test]
 fn stub_directory_function_resolves_without_undefined_function_error() {
-    let stubs_dir = TempDir::new().unwrap();
-    let src_dir = TempDir::new().unwrap();
+    let stubs_dir = create_temp_dir("stubs");
+    let src_dir = create_temp_dir("source");
 
     write(
         &stubs_dir,

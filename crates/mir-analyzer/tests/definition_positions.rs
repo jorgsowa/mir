@@ -4,23 +4,17 @@
 // top-level symbols and class members, and the get_symbol_location /
 // get_member_location APIs should return them.
 
-use std::fs;
-use std::path::PathBuf;
+mod common;
 
 use mir_analyzer::ProjectAnalyzer;
-use tempfile::TempDir;
 
-fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
-    let path = dir.path().join(name);
-    fs::write(&path, content).unwrap();
-    path
-}
+use self::common::{create_temp_dir, path_to_str, write_file};
 
 #[test]
 fn get_symbol_location_finds_class() {
-    let dir = TempDir::new().unwrap();
-    let file = write(&dir, "Foo.php", "<?php\nclass Foo {}\n");
-    let file_str = file.to_str().unwrap().to_string();
+    let dir = create_temp_dir("test");
+    let file = write_file(&dir, "Foo.php", "<?php\nclass Foo {}\n");
+    let file_str = path_to_str(&file).to_string();
 
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
@@ -33,8 +27,8 @@ fn get_symbol_location_finds_class() {
 
 #[test]
 fn get_symbol_location_finds_function() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "funcs.php",
         "<?php\nfunction my_func(): int { return 1; }\n",
@@ -49,8 +43,8 @@ fn get_symbol_location_finds_function() {
 
 #[test]
 fn get_symbol_location_finds_interface() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "Iface.php",
         "<?php\ninterface Renderable { public function render(): string; }\n",
@@ -65,8 +59,8 @@ fn get_symbol_location_finds_interface() {
 
 #[test]
 fn get_member_location_finds_method() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "Bar.php",
         "<?php\nclass Bar {\n    public function baz(): void {}\n}\n",
@@ -81,8 +75,8 @@ fn get_member_location_finds_method() {
 
 #[test]
 fn get_member_location_finds_property() {
-    let dir = TempDir::new().unwrap();
-    let file = write(
+    let dir = create_temp_dir("test");
+    let file = write_file(
         &dir,
         "Qux.php",
         "<?php\nclass Qux {\n    public string $name = '';\n}\n",

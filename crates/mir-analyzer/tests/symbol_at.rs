@@ -4,18 +4,12 @@
 // position to a ResolvedSymbol, and that codebase_key() returns the same key
 // format used by Codebase::symbol_reference_locations.
 
-use std::fs;
-use std::path::PathBuf;
+mod common;
 
 use mir_analyzer::symbol::SymbolKind;
 use mir_analyzer::ProjectAnalyzer;
-use tempfile::TempDir;
 
-fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
-    let path = dir.path().join(name);
-    fs::write(&path, content).unwrap();
-    path
-}
+use self::common::{create_temp_dir, path_to_str, write_file};
 
 // ---------------------------------------------------------------------------
 // symbol_at — basic resolution
@@ -23,10 +17,10 @@ fn write(dir: &TempDir, name: &str, content: &str) -> PathBuf {
 
 #[test]
 fn symbol_at_finds_function_call() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("symbol_at_finds_function_call");
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "a.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -45,10 +39,10 @@ fn symbol_at_finds_function_call() {
 
 #[test]
 fn symbol_at_returns_none_for_unknown_offset() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction foo(): void {}\n";
-    let file = write(&dir, "b.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "b.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -66,14 +60,14 @@ fn symbol_at_returns_none_for_unknown_offset() {
 
 #[test]
 fn symbol_at_matches_at_span_start() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // "<?php\n"                               = 6 bytes
     // "function greet(): void {}\n"           = 26 bytes  → total 32
     // "function caller(): void { greet(); }\n"
     //                            ^-- greet starts at 32 + 26 = 58
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "c.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "c.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -95,10 +89,10 @@ fn symbol_at_matches_at_span_start() {
 
 #[test]
 fn symbol_at_matches_at_last_byte_of_span() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "d.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "d.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -119,10 +113,10 @@ fn symbol_at_matches_at_last_byte_of_span() {
 
 #[test]
 fn symbol_at_returns_none_one_past_span_end() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "e.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "e.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -155,21 +149,21 @@ fn symbol_at_returns_none_one_past_span_end() {
 
 #[test]
 fn symbol_at_isolates_symbols_by_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     // Both files define and call a function named "run" so their symbol spans
     // overlap in byte-offset space. symbol_at must not confuse them.
-    let file_a = write(
+    let file_a = write_file(
         &dir,
         "a.php",
         "<?php\nfunction run(): void {}\nfunction a(): void { run(); }\n",
     );
-    let file_b = write(
+    let file_b = write_file(
         &dir,
         "b.php",
         "<?php\nfunction run(): void {}\nfunction b(): void { run(); }\n",
     );
-    let file_a_str = file_a.to_str().unwrap();
-    let file_b_str = file_b.to_str().unwrap();
+    let file_a_str = path_to_str(&file_a);
+    let file_b_str = path_to_str(&file_b);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(&[file_a.clone(), file_b.clone()]);
@@ -224,10 +218,10 @@ fn symbol_at_finds_this_method_call() {
     // $this->method() was previously invisible to symbol_at because $this was
     // not typed in the method context, causing analyze_method_call to hit the
     // mixed-receiver guard and return early without recording a symbol.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n";
-    let file = write(&dir, "this_call.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "this_call.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -249,10 +243,10 @@ fn symbol_at_finds_this_method_call() {
 fn symbol_at_finds_this_property_access() {
     // $this->prop was invisible for the same reason as $this->method() — $this
     // was untyped so the mixed-receiver guard fired before record_symbol.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Counter { public int $count = 0;\npublic function inc(): void { $this->count++; } }\n";
-    let file = write(&dir, "this_prop.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "this_prop.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -278,10 +272,10 @@ fn symbol_at_finds_this_property_access() {
 fn symbol_at_this_method_call_full_lsp_flow() {
     // Verify the full LSP flow: cursor → codebase_key → get_reference_locations.
     // Two calls to $this->helper() from the same method must both be indexed.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc {\n  public function helper(): void {}\n  public function run(): void { $this->helper(); $this->helper(); }\n}\n";
-    let file = write(&dir, "this_flow.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "this_flow.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -311,10 +305,10 @@ fn symbol_at_this_method_call_full_lsp_flow() {
 fn symbol_at_this_in_non_static_closure() {
     // A non-static closure inside a non-static method inherits $this, so
     // $this->method() calls inside the closure should also be resolved.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc {\n  public function helper(): void {}\n  public function run(): void { $fn = function() { $this->helper(); }; $fn(); }\n}\n";
-    let file = write(&dir, "closure_this.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "closure_this.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -337,10 +331,10 @@ fn symbol_at_this_in_non_static_closure() {
 
 #[test]
 fn symbol_at_returns_innermost_symbol() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
-    let file = write(&dir, "f.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "f.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -365,9 +359,9 @@ fn symbol_at_returns_innermost_symbol() {
 
 #[test]
 fn codebase_key_for_function_call_matches_reference_index() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "g.php", src);
+    let file = write_file(&dir, "g.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -391,9 +385,9 @@ fn codebase_key_for_function_call_matches_reference_index() {
 
 #[test]
 fn codebase_key_for_method_call_is_lowercased() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function Run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->Run(); }\n";
-    let file = write(&dir, "h.php", src);
+    let file = write_file(&dir, "h.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -417,9 +411,9 @@ fn codebase_key_for_method_call_is_lowercased() {
 
 #[test]
 fn codebase_key_for_static_call_matches_reference_index() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Math { public static function square(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::square(3); }\n";
-    let file = write(&dir, "i.php", src);
+    let file = write_file(&dir, "i.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -442,9 +436,9 @@ fn codebase_key_for_static_call_matches_reference_index() {
 
 #[test]
 fn codebase_key_for_property_access_matches_reference_index() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
-    let file = write(&dir, "j.php", src);
+    let file = write_file(&dir, "j.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -467,9 +461,9 @@ fn codebase_key_for_property_access_matches_reference_index() {
 
 #[test]
 fn codebase_key_for_class_reference_matches_reference_index() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Widget {}\nfunction make(): void { $w = new Widget(); }\n";
-    let file = write(&dir, "k.php", src);
+    let file = write_file(&dir, "k.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -512,13 +506,13 @@ fn codebase_key_for_variable_is_none() {
 
 #[test]
 fn full_flow_cursor_to_reference_locations() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); }\n";
-    let file = write(&dir, "l.php", src);
+    let file = write_file(&dir, "l.php", src);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
-    let file_str = file.to_str().unwrap();
+    let file_str = path_to_str(&file);
 
     let first_call_offset = src.find("{ ping").unwrap() as u32 + 2;
 
@@ -540,10 +534,10 @@ fn full_flow_cursor_to_reference_locations() {
 #[test]
 fn symbol_at_function_call_span_is_identifier_only() {
     // Cursor on '(' (one past the identifier) must NOT find the function symbol.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "span_fn.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "span_fn.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -579,10 +573,10 @@ fn symbol_at_function_call_span_is_identifier_only() {
 #[test]
 fn symbol_at_method_call_span_is_identifier_only() {
     // Cursor on '(' (one past the method identifier) must NOT find the method symbol.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
-    let file = write(&dir, "span_method.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "span_method.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -618,10 +612,10 @@ fn symbol_at_method_call_span_is_identifier_only() {
 #[test]
 fn symbol_at_static_call_span_is_identifier_only() {
     // Cursor on '(' (one past the static method identifier) must NOT find the symbol.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::sq(3); }\n";
-    let file = write(&dir, "span_static.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "span_static.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -661,10 +655,10 @@ fn symbol_at_static_call_span_is_identifier_only() {
 
 #[test]
 fn symbol_at_finds_property_access() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
-    let file = write(&dir, "m.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "m.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -694,11 +688,11 @@ fn symbol_at_finds_property_access() {
 
 #[test]
 fn symbol_at_finds_nullsafe_property_access() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src =
         "<?php\nclass Box { public int $val = 0; }\nfunction read(?Box $b): void { $b?->val; }\n";
-    let file = write(&dir, "n.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "n.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -728,10 +722,10 @@ fn symbol_at_finds_nullsafe_property_access() {
 
 #[test]
 fn symbol_at_finds_nullsafe_method_call() {
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(?Svc $s): void { $s?->run(); }\n";
-    let file = write(&dir, "o.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "o.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -764,10 +758,10 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
     // Regression guard for #186: record_symbol and mark_method_referenced_at
     // must use the same identifier-only span so an LSP client sees consistent
     // ranges when highlighting the current symbol and listing its references.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n";
-    let file = write(&dir, "span_eq_method.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "span_eq_method.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
@@ -796,10 +790,10 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
 #[test]
 fn symbol_at_function_call_span_matches_reference_location_span() {
     // Regression guard for #186: same consistency check for function calls.
-    let dir = TempDir::new().unwrap();
+    let dir = create_temp_dir("test");
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
-    let file = write(&dir, "span_eq_fn.php", src);
-    let file_str = file.to_str().unwrap();
+    let file = write_file(&dir, "span_eq_fn.php", src);
+    let file_str = path_to_str(&file);
 
     let analyzer = ProjectAnalyzer::new();
     let result = analyzer.analyze(std::slice::from_ref(&file));
