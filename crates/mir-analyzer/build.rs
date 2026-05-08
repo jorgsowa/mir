@@ -164,16 +164,19 @@ fn generate_builtin_fn_names(manifest_dir: &Path, out_dir: &Path) {
     // `stubs/` lives inside the crate so it is included in `cargo package` and survives
     // publication to crates.io — see `generate_stub_files` for the regression history.
     let stubs_dir = manifest_dir.join("stubs");
-    let stub_dirs_lower: std::collections::HashSet<String> = if stubs_dir.is_dir() {
-        fs::read_dir(&stubs_dir)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-            .map(|e| e.file_name().to_string_lossy().to_lowercase())
-            .collect()
-    } else {
-        std::collections::HashSet::new()
-    };
+    assert!(
+        stubs_dir.is_dir(),
+        "mir-analyzer build.rs: stubs/ directory is missing at {} — \
+         the stub index would be empty and all built-ins would be reported as undefined. \
+         If this fired in cargo package, ensure stubs/ lives inside the crate.",
+        stubs_dir.display()
+    );
+    let stub_dirs_lower: std::collections::HashSet<String> = fs::read_dir(&stubs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        .map(|e| e.file_name().to_string_lossy().to_lowercase())
+        .collect();
 
     // Section state: which array we're currently parsing. Sections appear in
     // file order: CLASSES, FUNCTIONS, CONSTANTS.
