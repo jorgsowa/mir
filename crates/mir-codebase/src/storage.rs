@@ -563,7 +563,7 @@ static PARAM_DEDUP_CACHE: std::sync::OnceLock<Mutex<Vec<Arc<[FnParam]>>>> =
 /// Expected memory savings: 100–150 MiB on cold start (vendor collection).
 pub fn deduplicate_params_in_slice(slice: &mut StubSlice) {
     let cache = PARAM_DEDUP_CACHE.get_or_init(|| Mutex::new(Vec::new()));
-    let mut canonical_params = cache.lock().expect("param dedup cache poisoned");
+    let mut canonical_params = cache.lock().unwrap();
 
     // Helper to find or insert a param list in the global cache
     let mut deduplicate = |params: &mut Arc<[FnParam]>| {

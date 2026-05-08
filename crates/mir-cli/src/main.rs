@@ -118,7 +118,10 @@ fn main() {
         if let Some(cache_dir) = &cli.cache_dir {
             let cache_file = cache_dir.join("cache.json");
             if cache_file.exists() {
-                std::fs::remove_file(&cache_file).expect("Failed to remove cache file");
+                if let Err(e) = std::fs::remove_file(&cache_file) {
+                    eprintln!("mir: failed to remove cache file: {}", e);
+                    std::process::exit(1);
+                }
             }
             if !cli.quiet {
                 eprintln!("mir: cache cleared ({})", cache_dir.display());
