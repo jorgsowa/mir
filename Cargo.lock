@@ -675,6 +675,7 @@ dependencies = [
  "mir-codebase",
  "mir-issues",
  "mir-types",
+ "parking_lot",
  "php-ast",
  "php-rs-parser",
  "quick-xml",

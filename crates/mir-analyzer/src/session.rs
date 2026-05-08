@@ -12,7 +12,10 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use rayon::prelude::*;
 use salsa::Setter as _;
@@ -39,7 +42,7 @@ pub struct AnalysisSession {
     /// True once user stubs (configured via [`Self::with_user_stubs`]) have
     /// been ingested. They are loaded together with the essential set on the
     /// first call to a stubs-loading method.
-    user_stubs_loaded: Mutex<bool>,
+    user_stubs_loaded: AtomicBool,
     php_version: PhpVersion,
     user_stub_files: Vec<PathBuf>,
     user_stub_dirs: Vec<PathBuf>,
@@ -53,7 +56,7 @@ impl AnalysisSession {
             cache: None,
             psr4: None,
             loaded_stubs: Mutex::new(HashSet::new()),
-            user_stubs_loaded: Mutex::new(false),
+            user_stubs_loaded: AtomicBool::new(false),
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
@@ -157,7 +160,7 @@ impl AnalysisSession {
     /// Number of distinct embedded stubs currently ingested into the session.
     /// Useful for diagnostics and bench reporting.
     pub fn loaded_stub_count(&self) -> usize {
-        self.loaded_stubs.lock().expect("loaded_stubs lock").len()
+        self.loaded_stubs.lock().len()
     }
 
     /// Auto-discover and ingest the embedded stubs needed to cover every
@@ -180,7 +183,7 @@ impl AnalysisSession {
         // have everything. Avoids a ~50-500µs source walk on every analyze
         // call in batch / warm-session scenarios.
         {
-            let loaded = self.loaded_stubs.lock().expect("loaded_stubs lock");
+            let loaded = self.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
                 return;
             }
@@ -198,7 +201,7 @@ impl AnalysisSession {
     fn ingest_stub_paths(&self, paths: &[&'static str]) {
         // Pick out the not-yet-loaded paths first to avoid redundant parsing.
         let needed: Vec<&'static str> = {
-            let loaded = self.loaded_stubs.lock().expect("loaded_stubs lock");
+            let loaded = self.loaded_stubs.lock();
             paths
                 .iter()
                 .copied()
@@ -222,8 +225,8 @@ impl AnalysisSession {
             })
             .collect();
 
-        let mut guard = self.salsa.lock().expect("salsa lock poisoned");
-        let mut loaded = self.loaded_stubs.lock().expect("loaded_stubs lock");
+        let mut guard = self.salsa.lock();
+        let mut loaded = self.loaded_stubs.lock();
         for (path, slice) in slices {
             if loaded.insert(path) {
                 guard.0.ingest_stub_slice(&slice);
@@ -235,23 +238,23 @@ impl AnalysisSession {
         if self.user_stub_files.is_empty() && self.user_stub_dirs.is_empty() {
             return;
         }
-        let mut guard = self.user_stubs_loaded.lock().expect("user_stubs lock");
-        if *guard {
+        let was_loaded = self.user_stubs_loaded.load(Ordering::Relaxed);
+        if was_loaded {
             return;
         }
         let slices = crate::stubs::user_stub_slices(&self.user_stub_files, &self.user_stub_dirs);
-        let mut salsa = self.salsa.lock().expect("salsa lock poisoned");
+        let mut salsa = self.salsa.lock();
         for slice in slices {
             salsa.0.ingest_stub_slice(&slice);
         }
-        *guard = true;
+        self.user_stubs_loaded.store(true, Ordering::Relaxed);
     }
 
     /// Cheap clone of the salsa db for a read-only query. The lock is held
     /// only for the duration of the clone, so concurrent readers never
     /// serialize on each other or on writes for longer than the clone itself.
     pub fn snapshot_db(&self) -> MirDb {
-        let guard = self.salsa.lock().expect("salsa lock poisoned");
+        let guard = self.salsa.lock();
         guard.0.clone()
     }
 
@@ -275,7 +278,7 @@ impl AnalysisSession {
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) -> FileDefinitions {
         self.ensure_stubs_loaded();
         let file_defs = {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             let salsa_file = match files.get(&file) {
                 Some(&sf) => {
@@ -297,7 +300,7 @@ impl AnalysisSession {
             collect_file_definitions(db, salsa_file)
         };
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             guard.0.ingest_stub_slice(&file_defs.slice);
         }
         self.update_reverse_deps_for(&file);
@@ -315,7 +318,7 @@ impl AnalysisSession {
     /// remove the salsa input handle — call this for full cleanup.)
     pub fn invalidate_file(&self, file: &str) {
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             db.remove_file_definitions(file);
             files.remove(file);
@@ -329,7 +332,7 @@ impl AnalysisSession {
     /// Number of files currently tracked in this session's salsa input set.
     /// Stable across reads; useful for diagnostics and memory bounds checks.
     pub fn tracked_file_count(&self) -> usize {
-        let guard = self.salsa.lock().expect("salsa lock poisoned");
+        let guard = self.salsa.lock();
         guard.1.len()
     }
 
@@ -463,7 +466,7 @@ impl AnalysisSession {
         let (functions, methods) =
             gather_inferred_types(self.snapshot_db(), files, self.php_version);
 
-        let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+        let mut guard = self.salsa.lock();
         guard.0.commit_inferred_return_types(functions, methods);
     }
 }
@@ -486,12 +489,11 @@ pub(crate) fn gather_inferred_types(
 ) {
     use crate::pass2::Pass2Driver;
     use mir_types::Union;
-    use std::sync::Mutex as StdMutex;
 
     type Functions = Vec<(Arc<str>, Union)>;
     type Methods = Vec<(Arc<str>, Arc<str>, Union)>;
-    let functions: Arc<StdMutex<Functions>> = Arc::new(StdMutex::new(Vec::new()));
-    let methods: Arc<StdMutex<Methods>> = Arc::new(StdMutex::new(Vec::new()));
+    let functions: Arc<Mutex<Functions>> = Arc::new(Mutex::new(Vec::new()));
+    let methods: Arc<Mutex<Methods>> = Arc::new(Mutex::new(Vec::new()));
 
     rayon::in_place_scope(|s| {
         for (file, source) in files {
@@ -510,10 +512,12 @@ pub(crate) fn gather_inferred_types(
                 let driver = Pass2Driver::new_inference_only(&db as &dyn MirDatabase, php_version);
                 driver.analyze_bodies(&parsed.program, file, source.as_ref(), &parsed.source_map);
                 let inferred = driver.take_inferred_types();
-                if let Ok(mut f) = functions.lock() {
+                {
+                    let mut f = functions.lock();
                     f.extend(inferred.functions);
                 }
-                if let Ok(mut m) = methods.lock() {
+                {
+                    let mut m = methods.lock();
                     m.extend(inferred.methods);
                 }
             });
@@ -521,11 +525,11 @@ pub(crate) fn gather_inferred_types(
     });
 
     let functions = Arc::try_unwrap(functions)
-        .map(|m| m.into_inner().unwrap_or_default())
-        .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+        .map(|m| m.into_inner())
+        .unwrap_or_else(|arc| arc.lock().clone());
     let methods = Arc::try_unwrap(methods)
-        .map(|m| m.into_inner().unwrap_or_default())
-        .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+        .map(|m| m.into_inner())
+        .unwrap_or_else(|arc| arc.lock().clone());
 
     (functions, methods)
 }

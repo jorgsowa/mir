@@ -17,6 +17,7 @@ php-rs-parser = { workspace = true }
 bumpalo       = { workspace = true }
 indexmap      = { workspace = true }
 rayon         = { workspace = true }
+parking_lot   = { workspace = true }
 thiserror     = { workspace = true }
 blake3        = { workspace = true }
 rustc-hash    = { workspace = true }

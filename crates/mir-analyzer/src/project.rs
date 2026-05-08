@@ -3,6 +3,8 @@ use std::mem::ManuallyDrop;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use parking_lot::Mutex;
+
 use rayon::prelude::*;
 
 use std::collections::{HashMap, HashSet};
@@ -41,7 +43,7 @@ pub struct ProjectAnalyzer {
     /// Salsa database for incremental Pass-1 memoization.
     /// `MirDb` is `Send` but `!Sync` (thread-local query state); `Mutex`
     /// provides the `Sync` bound rayon requires without needing `T: Sync`.
-    salsa: std::sync::Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
+    salsa: Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
 }
 
 struct ParsedProjectFile {
@@ -107,7 +109,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
+            salsa: Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -122,7 +124,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
+            salsa: Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -143,7 +145,7 @@ impl ProjectAnalyzer {
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: std::sync::Mutex::new((MirDb::default(), HashMap::new())),
+            salsa: Mutex::new((MirDb::default(), HashMap::new())),
         };
         Ok((analyzer, map))
     }
@@ -170,13 +172,13 @@ impl ProjectAnalyzer {
     /// readers never serialize on each other or on writes longer than the
     /// clone itself.
     fn snapshot_db(&self) -> MirDb {
-        let guard = self.salsa.lock().expect("salsa lock poisoned");
+        let guard = self.salsa.lock();
         guard.0.clone()
     }
 
     /// Internal: expose the salsa Mutex for unit tests that need a `&dyn MirDatabase`.
     #[doc(hidden)]
-    pub fn salsa_db_for_test(&self) -> &std::sync::Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)> {
+    pub fn salsa_db_for_test(&self) -> &Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)> {
         &self.salsa
     }
 
@@ -224,11 +226,11 @@ impl ProjectAnalyzer {
                 .for_each(|(filename, content)| {
                     let slice =
                         crate::stubs::stub_slice_from_source(filename, content, Some(php_version));
-                    let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+                    let mut guard = self.salsa.lock();
                     guard.0.ingest_stub_slice(&slice);
                 });
 
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             for slice in crate::stubs::user_stub_slices(&self.stub_files, &self.stub_dirs) {
                 guard.0.ingest_stub_slice(&slice);
             }
@@ -237,7 +239,7 @@ impl ProjectAnalyzer {
 
     fn collect_and_ingest_source(&self, file: Arc<str>, src: &str) -> FileDefinitions {
         let file_defs = {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             let salsa_file = match files.get(&file) {
                 Some(&sf) => {
@@ -256,7 +258,7 @@ impl ProjectAnalyzer {
         };
 
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             guard.0.ingest_stub_slice(&file_defs.slice);
         }
         file_defs
@@ -309,7 +311,7 @@ impl ProjectAnalyzer {
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             for parsed in &parsed_files {
                 match files.get(parsed.file.as_ref()) {
@@ -368,7 +370,7 @@ impl ProjectAnalyzer {
         let mut files_needing_inference: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, _) = *guard;
             for defs in file_defs {
                 for issue in defs.issues.iter() {
@@ -396,7 +398,7 @@ impl ProjectAnalyzer {
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let db_snapshot = {
-                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                let guard = self.salsa.lock();
                 guard.0.clone()
             };
             let rev = build_reverse_deps(&db_snapshot);
@@ -412,7 +414,7 @@ impl ProjectAnalyzer {
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
             let class_db = {
-                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                let guard = self.salsa.lock();
                 guard.0.clone()
             };
             let class_issues =
@@ -425,7 +427,7 @@ impl ProjectAnalyzer {
         // rayon worker gets its own clone (Salsa databases are `Send` but
         // `!Sync`; cloning shares the underlying memoization storage).
         let db_priming = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            let guard = self.salsa.lock();
             guard.0.clone()
         };
 
@@ -449,12 +451,12 @@ impl ProjectAnalyzer {
             run_inference_sweep(db_priming, filtered_parsed, self.resolved_php_version());
 
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             guard.0.commit_inferred_return_types(functions, methods);
         }
 
         let db_main = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            let guard = self.salsa.lock();
             guard.0.clone()
         };
 
@@ -527,7 +529,7 @@ impl ProjectAnalyzer {
         // ---- Compact the reference index ------------------------------------
         // ---- Dead-code detection (M18) --------------------------------------
         if self.find_dead_code {
-            let salsa = self.salsa.lock().unwrap();
+            let salsa = self.salsa.lock();
             let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa.0).analyze();
             drop(salsa);
             all_issues.extend(dead_code_issues);
@@ -560,7 +562,7 @@ impl ProjectAnalyzer {
             // Drive the inheritance scan from already-ingested `ClassNode`s.
             let mut inheritance_candidates = Vec::new();
             let import_candidates = {
-                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                let guard = self.salsa.lock();
                 let db = &guard.0;
                 for fqcn in db.active_class_node_fqcns() {
                     let Some(node) = db.lookup_class_node(&fqcn) else {
@@ -708,7 +710,7 @@ impl ProjectAnalyzer {
 
             let (inferred_fns, inferred_methods) = crate::session::gather_inferred_types(
                 {
-                    let guard = self.salsa.lock().expect("salsa lock poisoned");
+                    let guard = self.salsa.lock();
                     guard.0.clone()
                 },
                 &sweep,
@@ -716,14 +718,14 @@ impl ProjectAnalyzer {
             );
 
             {
-                let mut guard_db = self.salsa.lock().expect("salsa lock poisoned");
+                let mut guard_db = self.salsa.lock();
                 guard_db
                     .0
                     .commit_inferred_return_types(inferred_fns, inferred_methods);
             }
 
             let db_full = {
-                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                let guard = self.salsa.lock();
                 guard.0.clone()
             };
 
@@ -762,7 +764,7 @@ impl ProjectAnalyzer {
             let h = hash_content(new_content);
             if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
-                let guard = self.salsa.lock().expect("salsa lock poisoned");
+                let guard = self.salsa.lock();
                 guard.0.replay_reference_locations(file, &ref_locs);
                 return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
@@ -771,14 +773,14 @@ impl ProjectAnalyzer {
         let file: Arc<str> = Arc::from(file_path);
 
         {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, _) = *guard;
             db.remove_file_definitions(file_path);
         }
 
         // --- Salsa-backed Pass 1: memoized parse + definition collection ------
         let file_defs = {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             let salsa_file = match files.get(&file) {
                 Some(&sf) => {
@@ -799,7 +801,7 @@ impl ProjectAnalyzer {
         // --- S2 + Pass 2: hold the Salsa lock for ClassNode upserts and body
         // analysis so the db reference is live during Pass 2 (S5).
         let symbols = {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, _) = *guard;
 
             db.ingest_stub_slice(&file_defs.slice);
@@ -840,7 +842,7 @@ impl ProjectAnalyzer {
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            let guard = self.salsa.lock();
             let ref_locs = extract_reference_locations(&guard.0, &file);
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
@@ -915,7 +917,7 @@ impl ProjectAnalyzer {
             .collect();
 
         let source_files: Vec<SourceFile> = {
-            let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+            let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             file_data
                 .iter()
@@ -936,7 +938,7 @@ impl ProjectAnalyzer {
         };
 
         let db_pass1 = {
-            let guard = self.salsa.lock().expect("salsa lock poisoned");
+            let guard = self.salsa.lock();
             guard.0.clone()
         };
 
@@ -947,7 +949,7 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        let mut guard = self.salsa.lock().expect("salsa lock poisoned");
+        let mut guard = self.salsa.lock();
         let (ref mut db, _) = *guard;
         for defs in file_defs {
             db.ingest_stub_slice(&defs.slice);
@@ -973,8 +975,8 @@ fn run_inference_sweep(
     parsed_files: Vec<&ParsedProjectFile>,
     php_version: PhpVersion,
 ) -> (Vec<(Arc<str>, Union)>, Vec<(Arc<str>, Arc<str>, Union)>) {
-    let functions = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let methods = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let functions = Arc::new(Mutex::new(Vec::new()));
+    let methods = Arc::new(Mutex::new(Vec::new()));
 
     rayon::in_place_scope(|s| {
         for parsed in parsed_files {
@@ -993,10 +995,12 @@ fn run_inference_sweep(
                 );
 
                 let inferred = driver.take_inferred_types();
-                if let Ok(mut funcs) = functions.lock() {
+                {
+                    let mut funcs = functions.lock();
                     funcs.extend(inferred.functions);
                 }
-                if let Ok(mut meths) = methods.lock() {
+                {
+                    let mut meths = methods.lock();
                     meths.extend(inferred.methods);
                 }
             });
@@ -1004,11 +1008,11 @@ fn run_inference_sweep(
     });
 
     let functions = Arc::try_unwrap(functions)
-        .map(|mutex| mutex.into_inner().unwrap_or_default())
-        .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+        .map(|mutex| mutex.into_inner())
+        .unwrap_or_else(|arc| arc.lock().clone());
     let methods = Arc::try_unwrap(methods)
-        .map(|mutex| mutex.into_inner().unwrap_or_default())
-        .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+        .map(|mutex| mutex.into_inner())
+        .unwrap_or_else(|arc| arc.lock().clone());
 
     (functions, methods)
 }
