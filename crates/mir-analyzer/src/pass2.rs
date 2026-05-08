@@ -1,7 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use mir_issues::Issue;
 use mir_types::Union;
+use parking_lot::Mutex;
 
 use crate::db::{resolve_name_via_db, FunctionNode, MirDatabase};
 use crate::diagnostics::{
@@ -101,30 +102,23 @@ impl<'a> Pass2Driver<'a> {
     pub(crate) fn take_inferred_types(&self) -> InferredTypes {
         let types = Arc::clone(&self.inferred_types);
         Arc::try_unwrap(types)
-            .map(|mutex| {
-                mutex.into_inner().unwrap_or_else(|_| InferredTypes {
-                    functions: Vec::new(),
-                    methods: Vec::new(),
-                })
-            })
-            .unwrap_or_else(|arc| arc.lock().unwrap().clone())
+            .map(|mutex| mutex.into_inner())
+            .unwrap_or_else(|arc| arc.lock().clone())
     }
 
     fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Union) {
         if self.inference_only {
-            if let Ok(mut types) = self.inferred_types.lock() {
-                types.functions.push((fqn.clone(), inferred.clone()));
-            }
+            let mut types = self.inferred_types.lock();
+            types.functions.push((fqn.clone(), inferred.clone()));
         }
     }
 
     fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Union) {
         if self.inference_only {
-            if let Ok(mut types) = self.inferred_types.lock() {
-                types
-                    .methods
-                    .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
-            }
+            let mut types = self.inferred_types.lock();
+            types
+                .methods
+                .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
         }
     }
 

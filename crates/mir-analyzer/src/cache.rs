@@ -5,7 +5,9 @@
 /// and Pass 2 analysis is skipped for that file.
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use parking_lot::Mutex;
 
 use serde::{Deserialize, Serialize};
 
@@ -60,7 +62,7 @@ pub struct AnalysisCache {
     entries: Mutex<HashMap<String, CacheEntry>>,
     /// Reverse dependency graph loaded from disk (from the previous run).
     reverse_deps: Mutex<HashMap<String, HashSet<String>>>,
-    dirty: Mutex<bool>,
+    dirty: AtomicBool,
 }
 
 impl AnalysisCache {
@@ -74,7 +76,7 @@ impl AnalysisCache {
             cache_dir: cache_dir.to_path_buf(),
             entries: Mutex::new(file.entries),
             reverse_deps: Mutex::new(file.reverse_deps),
-            dirty: Mutex::new(false),
+            dirty: AtomicBool::new(false),
         }
     }
 
@@ -89,7 +91,7 @@ impl AnalysisCache {
     /// `(symbol_key, line, col_start, col_end)` entries to replay into
     /// the salsa db via `MirDatabase::replay_reference_locations`.
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
-        let entries = self.entries.lock().unwrap();
+        let entries = self.entries.lock();
         entries.get(file_path).and_then(|e| {
             if e.content_hash == content_hash {
                 Some((e.issues.clone(), e.reference_locations.clone()))
@@ -109,7 +111,7 @@ impl AnalysisCache {
         issues: Vec<Issue>,
         reference_locations: Vec<(String, u32, u16, u16)>,
     ) {
-        let mut entries = self.entries.lock().unwrap();
+        let mut entries = self.entries.lock();
         entries.insert(
             file_path.to_string(),
             CacheEntry {
@@ -118,25 +120,20 @@ impl AnalysisCache {
                 reference_locations,
             },
         );
-        *self.dirty.lock().unwrap() = true;
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     /// Persist the in-memory cache to `{cache_dir}/cache.json`.
     /// This is a no-op if nothing changed since the last flush.
     pub fn flush(&self) {
-        let dirty = {
-            let mut d = self.dirty.lock().unwrap();
-            let was = *d;
-            *d = false;
-            was
-        };
-        if !dirty {
+        let was_dirty = self.dirty.swap(false, Ordering::Relaxed);
+        if !was_dirty {
             return;
         }
         let cache_file = self.cache_dir.join("cache.json");
         let file = CacheFile {
-            entries: self.entries.lock().unwrap().clone(),
-            reverse_deps: self.reverse_deps.lock().unwrap().clone(),
+            entries: self.entries.lock().clone(),
+            reverse_deps: self.reverse_deps.lock().clone(),
         };
         if let Ok(json) = serde_json::to_string(&file) {
             std::fs::write(cache_file, json).ok();
@@ -145,8 +142,8 @@ impl AnalysisCache {
 
     /// Replace the reverse dependency graph (called after each Pass 1).
     pub fn set_reverse_deps(&self, deps: HashMap<String, HashSet<String>>) {
-        *self.reverse_deps.lock().unwrap() = deps;
-        *self.dirty.lock().unwrap() = true;
+        *self.reverse_deps.lock() = deps;
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     /// Update the reverse-dep graph for a single file in place.
@@ -160,7 +157,7 @@ impl AnalysisCache {
     /// Used by `AnalysisSession::ingest_file` to keep cross-file invalidation
     /// correct without rebuilding the whole graph on every edit.
     pub fn update_reverse_deps_for_file(&self, file: &str, new_targets: &HashSet<String>) {
-        let mut deps = self.reverse_deps.lock().unwrap();
+        let mut deps = self.reverse_deps.lock();
 
         for dependents in deps.values_mut() {
             dependents.remove(file);
@@ -175,7 +172,7 @@ impl AnalysisCache {
             }
         }
 
-        *self.dirty.lock().unwrap() = true;
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     /// BFS from each changed file through the reverse dep graph.
@@ -184,7 +181,7 @@ impl AnalysisCache {
     pub fn evict_with_dependents(&self, changed_files: &[String]) -> usize {
         // Phase 1: collect all dependents to evict via BFS (lock held only here).
         let to_evict: Vec<String> = {
-            let deps = self.reverse_deps.lock().unwrap();
+            let deps = self.reverse_deps.lock();
             let mut visited: HashSet<String> = changed_files.iter().cloned().collect();
             let mut queue: std::collections::VecDeque<String> =
                 changed_files.iter().cloned().collect();
@@ -213,9 +210,9 @@ impl AnalysisCache {
 
     /// Remove a single file's cache entry.
     pub fn evict(&self, file_path: &str) {
-        let mut entries = self.entries.lock().unwrap();
+        let mut entries = self.entries.lock();
         entries.remove(file_path);
-        *self.dirty.lock().unwrap() = true;
+        self.dirty.store(true, Ordering::Relaxed);
     }
 
     // -----------------------------------------------------------------------
