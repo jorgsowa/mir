@@ -370,9 +370,26 @@ impl CallAnalyzer {
         // session is in essentials-only mode without auto-discovery, or the
         // analyzer is mid-ingest. Suppressing the diagnostic avoids a class
         // of false positives that would otherwise plague consumers running
-        // the lazy-stub setup.
-        if crate::stubs::stub_path_for_function(&fn_name).is_some() {
-            return Union::mixed();
+        // the lazy-stub setup. However, don't suppress if the function is
+        // version-filtered (e.g. @removed in the target version) — it should
+        // be reported as undefined.
+        if let Some(stub_path) = crate::stubs::stub_path_for_function(&fn_name) {
+            if let Some(stub_src) = crate::stubs::stub_content_for_path(stub_path) {
+                // Parse the stub to check if this function is version-compatible.
+                if let Some(docblock_text) = extract_function_docblock(stub_src, &fn_name) {
+                    let doc = crate::parser::DocblockParser::parse(docblock_text);
+                    // Check if the function is available in the current PHP version.
+                    if ea
+                        .php_version
+                        .includes_symbol(doc.since.as_deref(), doc.removed.as_deref())
+                    {
+                        return Union::mixed();
+                    }
+                } else {
+                    // No docblock found; assume the function is available (conservative).
+                    return Union::mixed();
+                }
+            }
         }
         ea.emit(
             IssueKind::UndefinedFunction { name: fn_name },
@@ -381,4 +398,62 @@ impl CallAnalyzer {
         );
         Union::mixed()
     }
+}
+
+/// Extract the docblock for a function from PHP stub source code.
+/// Returns the docblock text (without /** */ delimiters) if found.
+fn extract_function_docblock<'a>(src: &'a str, fn_name: &str) -> Option<&'a str> {
+    // Simple extraction: find /** ... */ followed by function declaration.
+    let fn_pattern = format!("function {fn_name}");
+    extract_docblock_before(src, &fn_pattern)
+}
+
+/// Extract the docblock for a class from PHP stub source code.
+/// Returns the docblock text (without /** */ delimiters) if found.
+pub(crate) fn extract_class_docblock<'a>(src: &'a str, class_name: &str) -> Option<&'a str> {
+    // Handle both class and interface declarations.
+    // Extract the short name (after last backslash if present).
+    let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
+
+    // Try case-insensitive matching for "class" declarations.
+    let class_pattern_lower = format!("class {}", short_name.to_lowercase());
+    if let Some(docblock) = extract_docblock_case_insensitive(src, &class_pattern_lower) {
+        return Some(docblock);
+    }
+
+    // Try case-insensitive matching for "interface" declarations.
+    let interface_pattern_lower = format!("interface {}", short_name.to_lowercase());
+    extract_docblock_case_insensitive(src, &interface_pattern_lower)
+}
+
+/// Generic docblock extraction: find /** ... */ before a pattern (case-sensitive).
+fn extract_docblock_before<'a>(src: &'a str, pattern: &str) -> Option<&'a str> {
+    if let Some(pos) = src.find(pattern) {
+        extract_docblock_at_position(src, pos)
+    } else {
+        None
+    }
+}
+
+/// Case-insensitive docblock extraction: find /** ... */ before a pattern.
+fn extract_docblock_case_insensitive<'a>(src: &'a str, pattern: &str) -> Option<&'a str> {
+    let src_lower = src.to_lowercase();
+    if let Some(pos) = src_lower.find(pattern) {
+        extract_docblock_at_position(src, pos)
+    } else {
+        None
+    }
+}
+
+/// Extract docblock before a given byte position in the source.
+fn extract_docblock_at_position(src: &str, pos: usize) -> Option<&str> {
+    // Look back for /** from the position.
+    if let Some(doc_start_pos) = src[..pos].rfind("/**") {
+        if let Some(doc_end_pos) = src[doc_start_pos..].find("*/") {
+            let end_abs = doc_start_pos + doc_end_pos;
+            let docblock_raw = &src[doc_start_pos + 3..end_abs];
+            return Some(docblock_raw);
+        }
+    }
+    None
 }

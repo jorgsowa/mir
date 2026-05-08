@@ -453,11 +453,27 @@ impl<'a> Pass2Driver<'a> {
         let body = &decl.body;
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+            check_type_hint_classes(
+                hint,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -569,16 +585,40 @@ impl<'a> Pass2Driver<'a> {
             .and_then(|node| node.parent(self.db));
 
         if let Some(parent) = &decl.extends {
-            check_name_class(parent, self.db, file, source, source_map, all_issues);
+            check_name_class(
+                parent,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
         for iface in decl.implements.iter() {
-            check_name_class(iface, self.db, file, source, source_map, all_issues);
+            check_name_class(
+                iface,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
 
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
                 continue;
             }
@@ -588,11 +628,27 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
 
             let Some(body) = &method.body else { continue };
@@ -672,11 +728,27 @@ impl<'a> Pass2Driver<'a> {
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+            check_type_hint_classes(
+                hint,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
 
         let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
@@ -779,16 +851,40 @@ impl<'a> Pass2Driver<'a> {
             .and_then(|node| node.parent(self.db));
 
         if let Some(parent) = &decl.extends {
-            check_name_class(parent, self.db, file, source, source_map, all_issues);
+            check_name_class(
+                parent,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
         for iface in decl.implements.iter() {
-            check_name_class(iface, self.db, file, source, source_map, all_issues);
+            check_name_class(
+                iface,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
 
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
                 continue;
             }
@@ -798,11 +894,27 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
 
             let Some(body) = &method.body else { continue };
@@ -962,7 +1074,15 @@ impl<'a> Pass2Driver<'a> {
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
                 continue;
             }
@@ -972,11 +1092,27 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
 
             let Some(body) = &method.body else { continue };
@@ -1053,7 +1189,15 @@ impl<'a> Pass2Driver<'a> {
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
                 continue;
             }
@@ -1063,11 +1207,27 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
 
             let Some(body) = &method.body else { continue };
@@ -1138,7 +1298,15 @@ impl<'a> Pass2Driver<'a> {
     ) {
         use php_ast::ast::EnumMemberKind;
         for iface in decl.implements.iter() {
-            check_name_class(iface, self.db, file, source, source_map, all_issues);
+            check_name_class(
+                iface,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
         for member in decl.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
@@ -1146,11 +1314,27 @@ impl<'a> Pass2Driver<'a> {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
         }
     }
@@ -1165,7 +1349,15 @@ impl<'a> Pass2Driver<'a> {
     ) {
         use php_ast::ast::ClassMemberKind;
         for parent in decl.extends.iter() {
-            check_name_class(parent, self.db, file, source, source_map, all_issues);
+            check_name_class(
+                parent,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
         }
         for member in decl.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
@@ -1173,11 +1365,27 @@ impl<'a> Pass2Driver<'a> {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                    check_type_hint_classes(
+                        hint,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        self.php_version,
+                    );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(hint, self.db, file, source, source_map, all_issues);
+                check_type_hint_classes(
+                    hint,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
             }
         }
     }
