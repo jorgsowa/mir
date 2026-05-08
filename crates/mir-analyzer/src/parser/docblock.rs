@@ -583,16 +583,16 @@ fn parse_generic(name: &str, inner: &str) -> Union {
     match name.to_lowercase().as_str() {
         "array" => {
             let params = split_generics(inner);
-            let (key, value) = if params.len() >= 2 {
-                (
+            let (key, value) = match params.len() {
+                n if n >= 2 => (
                     parse_type_string(params[0].trim()),
                     parse_type_string(params[1].trim()),
-                )
-            } else {
-                (
+                ),
+                1 => (
                     Union::single(Atomic::TInt),
                     parse_type_string(params[0].trim()),
-                )
+                ),
+                _ => (Union::single(Atomic::TInt), Union::mixed()),
             };
             Union::single(Atomic::TArray {
                 key: Box::new(key),
@@ -613,16 +613,16 @@ fn parse_generic(name: &str, inner: &str) -> Union {
         }
         "non-empty-array" => {
             let params = split_generics(inner);
-            let (key, value) = if params.len() >= 2 {
-                (
+            let (key, value) = match params.len() {
+                n if n >= 2 => (
                     parse_type_string(params[0].trim()),
                     parse_type_string(params[1].trim()),
-                )
-            } else {
-                (
+                ),
+                1 => (
                     Union::single(Atomic::TInt),
                     parse_type_string(params[0].trim()),
-                )
+                ),
+                _ => (Union::single(Atomic::TInt), Union::mixed()),
             };
             Union::single(Atomic::TNonEmptyArray {
                 key: Box::new(key),
@@ -631,10 +631,10 @@ fn parse_generic(name: &str, inner: &str) -> Union {
         }
         "iterable" => {
             let params = split_generics(inner);
-            let value = if params.len() >= 2 {
-                parse_type_string(params[1].trim())
-            } else {
-                parse_type_string(params[0].trim())
+            let value = match params.len() {
+                n if n >= 2 => parse_type_string(params[1].trim()),
+                1 => parse_type_string(params[0].trim()),
+                _ => Union::mixed(),
             };
             Union::single(Atomic::TArray {
                 key: Box::new(Union::single(Atomic::TMixed)),
@@ -993,6 +993,9 @@ fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     if is_inside_generics(s) {
         return Some(format!("@{tag} has unclosed generic type `{s}`"));
     }
+    if has_empty_generics(s) {
+        return Some(format!("@{tag} has empty generic type parameter in `{s}`"));
+    }
     for part in split_union(s) {
         let p = part.trim();
         if p.starts_with('$') && p != "$this" {
@@ -1000,6 +1003,36 @@ fn validate_type_str(s: &str, tag: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn has_empty_generics(s: &str) -> bool {
+    let mut depth = 0;
+    let mut prev_open = false;
+    for ch in s.chars() {
+        match ch {
+            '<' | '(' | '{' => {
+                if prev_open && depth == 0 {
+                    return true;
+                }
+                prev_open = true;
+                depth += 1;
+            }
+            '>' | ')' | '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    if prev_open {
+                        return true;
+                    }
+                    prev_open = false;
+                }
+            }
+            c if !c.is_whitespace() => {
+                prev_open = false;
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Parse `[static] [ReturnType] name(...)` for @method tags.
@@ -1406,6 +1439,24 @@ mod tests {
             "got: {}",
             parsed.invalid_annotations[0]
         );
+    }
+
+    #[test]
+    fn parse_empty_generic_array_graceful() {
+        let u = parse_type_string("array<>");
+        assert!(u.contains(|t| matches!(t, Atomic::TArray { .. })));
+    }
+
+    #[test]
+    fn parse_empty_generic_iterable_graceful() {
+        let u = parse_type_string("iterable<>");
+        assert!(u.contains(|t| matches!(t, Atomic::TArray { .. })));
+    }
+
+    #[test]
+    fn parse_empty_generic_non_empty_array_graceful() {
+        let u = parse_type_string("non-empty-array<>");
+        assert!(u.contains(|t| matches!(t, Atomic::TNonEmptyArray { .. })));
     }
 
     #[test]
