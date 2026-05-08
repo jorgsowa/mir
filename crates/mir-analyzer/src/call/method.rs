@@ -132,13 +132,20 @@ impl CallAnalyzer {
         }
 
         if obj_ty.is_mixed() {
-            ea.emit(
-                IssueKind::MixedMethodCall {
-                    method: method_name.to_string(),
-                },
-                Severity::Info,
-                span,
-            );
+            // Don't report MixedMethodCall on template parameters, since they can be any type
+            let is_only_template_params = obj_ty
+                .types
+                .iter()
+                .all(|t| matches!(t, mir_types::Atomic::TTemplateParam { .. }));
+            if !is_only_template_params {
+                ea.emit(
+                    IssueKind::MixedMethodCall {
+                        method: method_name.to_string(),
+                    },
+                    Severity::Info,
+                    span,
+                );
+            }
             return Union::mixed();
         }
 

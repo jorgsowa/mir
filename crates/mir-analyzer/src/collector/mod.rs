@@ -263,6 +263,7 @@ impl<'a> DefinitionCollector<'a> {
         union: Union,
         template_names: &std::collections::HashSet<String>,
         defining_entity: &str,
+        template_params: &[TemplateParam],
     ) -> Union {
         let mut result = Union::empty();
         result.possibly_undefined = union.possibly_undefined;
@@ -272,10 +273,17 @@ impl<'a> DefinitionCollector<'a> {
                 mir_types::Atomic::TNamedObject { fqcn, type_params }
                     if type_params.is_empty() && template_names.contains(fqcn.as_ref()) =>
                 {
+                    // Find the bound for this template parameter
+                    let bound = template_params
+                        .iter()
+                        .find(|tp| tp.name.as_ref() == fqcn.as_ref())
+                        .and_then(|tp| tp.bound.clone())
+                        .unwrap_or_else(Union::mixed);
+
                     // This is a template parameter reference
                     result.add_type(mir_types::Atomic::TTemplateParam {
                         name: fqcn.clone(),
-                        as_type: Box::new(Union::mixed()),
+                        as_type: Box::new(bound),
                         defining_entity: defining_entity.into(),
                     });
                 }

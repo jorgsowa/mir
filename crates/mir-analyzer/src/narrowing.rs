@@ -450,6 +450,10 @@ fn narrow_instanceof_preserving_subtypes(
                 // Keep the template parameter in the result — it will be constrained by the instanceof check
                 result.add_type(narrowed_ty.clone());
             }
+            // Handle TTemplateParam: narrow it to the instanceof check class
+            Atomic::TTemplateParam { .. } => {
+                result.add_type(narrowed_ty.clone());
+            }
             Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
             _ => {}
         }

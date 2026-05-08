@@ -59,7 +59,12 @@ impl DefinitionCollector<'_> {
                 .map(|u| {
                     // If the type is a simple named object that matches a template param,
                     // convert it to a TTemplateParam
-                    self.resolve_union_doc_with_templates(u, &template_names, &fqn)
+                    self.resolve_union_doc_with_templates(
+                        u,
+                        &template_names,
+                        &fqn,
+                        &template_params,
+                    )
                 })
                 .or_else(|| {
                     self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None)))
@@ -90,7 +95,12 @@ impl DefinitionCollector<'_> {
         let return_type = match (doc.return_type.clone(), decl.return_type.as_ref()) {
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
-                Some(self.resolve_union_doc_with_templates(ty, &template_names, &fqn))
+                Some(self.resolve_union_doc_with_templates(
+                    ty,
+                    &template_names,
+                    &fqn,
+                    &template_params,
+                ))
             }
             (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, None))),
             (None, None) => None,
