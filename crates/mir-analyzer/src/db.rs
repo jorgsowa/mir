@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
@@ -130,6 +131,11 @@ impl PartialEq for FileDefinitions {
     }
 }
 
+// SAFETY: FileDefinitions contains Arc pointers and Vec, which are Move-safe.
+// The pointer passed to maybe_update is provided by Salsa and points to
+// properly aligned and initialized memory. We have exclusive write access
+// through the mutable pointer (Salsa guarantees this). The in-place update
+// is safe because we own both the old and new values.
 unsafe impl salsa::Update for FileDefinitions {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         unsafe { *old_pointer = new_value };
@@ -516,6 +522,12 @@ impl PartialEq for Ancestors {
     }
 }
 
+// SAFETY: Ancestors contains Arc pointers, which are Move-safe.
+// The pointer passed to maybe_update is provided by Salsa and points to
+// properly aligned and initialized memory. We dereference it to check equality
+// and conditionally update. Salsa guarantees exclusive write access through
+// the mutable pointer. The comparison is safe because we're comparing valid
+// initialized values.
 unsafe impl salsa::Update for Ancestors {
     unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
         let old = unsafe { &mut *old_ptr };
@@ -1197,8 +1209,7 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 /// underlying memoization storage).  Sharing `&MirDb` across threads is
 /// **not** supported because `salsa::Database: Send` (not `Sync`).
 type MemberRegistry<V> = Arc<FxHashMap<Arc<str>, FxHashMap<Arc<str>, V>>>;
-type ReferenceLocations =
-    Arc<std::sync::Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
+type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
 
 #[salsa::db]
 #[derive(Default, Clone)]
@@ -1373,7 +1384,7 @@ impl MirDatabase for MirDb {
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
-        let mut refs = self.reference_locations.lock().unwrap();
+        let mut refs = self.reference_locations.lock();
         let entry = refs.entry(loc.symbol_key).or_default();
         let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
         if !entry.iter().any(|existing| existing == &tuple) {
@@ -1394,7 +1405,7 @@ impl MirDatabase for MirDb {
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let refs = self.reference_locations.lock().unwrap();
+        let refs = self.reference_locations.lock();
         let mut out = Vec::new();
         for (symbol, locs) in refs.iter() {
             for (loc_file, line, col_start, col_end) in locs {
@@ -1407,17 +1418,17 @@ impl MirDatabase for MirDb {
     }
 
     fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let refs = self.reference_locations.lock().unwrap();
+        let refs = self.reference_locations.lock();
         refs.get(symbol).cloned().unwrap_or_default()
     }
 
     fn has_reference(&self, symbol: &str) -> bool {
-        let refs = self.reference_locations.lock().unwrap();
+        let refs = self.reference_locations.lock();
         refs.get(symbol).is_some_and(|locs| !locs.is_empty())
     }
 
     fn clear_file_references(&self, file: &str) {
-        let mut refs = self.reference_locations.lock().unwrap();
+        let mut refs = self.reference_locations.lock();
         for locs in refs.values_mut() {
             locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
         }

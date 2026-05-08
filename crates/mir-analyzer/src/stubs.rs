@@ -145,10 +145,9 @@ pub(crate) fn collect_referenced_builtin_paths(source: &str) -> Vec<&'static str
                 break;
             }
         }
-        // SAFETY: token bytes are all ASCII (per the loop condition above),
-        // so the slice is valid UTF-8.
-        let token = unsafe { std::str::from_utf8_unchecked(&bytes[start..i]) };
-        tokens.insert(token);
+        if let Ok(token) = std::str::from_utf8(&bytes[start..i]) {
+            tokens.insert(token);
+        }
     }
 
     let mut paths: HashSet<&'static str> = HashSet::new();
