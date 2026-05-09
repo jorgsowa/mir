@@ -195,6 +195,29 @@ impl AnalysisSession {
         self.ingest_stub_paths(&paths);
     }
 
+    /// Discover and ingest stubs by walking the parsed AST of a PHP file.
+    ///
+    /// Similar to [`Self::ensure_stubs_for_source`], but takes an already-parsed
+    /// AST instead of raw source text. Produces zero false positives since it
+    /// only extracts identifiers from actual AST nodes (not from strings or
+    /// comments). Preferred over `ensure_stubs_for_source` when the AST is
+    /// already available (e.g., in [`crate::FileAnalyzer`]).
+    ///
+    /// Idempotent and skips the scan if all stubs are already loaded.
+    pub fn ensure_stubs_for_ast(&self, program: &php_ast::ast::Program<'_, '_>) {
+        {
+            let loaded = self.loaded_stubs.lock();
+            if loaded.len() >= crate::stubs::stub_files().len() {
+                return;
+            }
+        }
+        let paths = crate::stubs::collect_referenced_builtin_paths_from_ast(program);
+        if paths.is_empty() {
+            return;
+        }
+        self.ingest_stub_paths(&paths);
+    }
+
     /// Internal: parse + ingest each path in `paths` that hasn't already been
     /// ingested. Holds the salsa write lock per file (brief), and the
     /// `loaded_stubs` set lock briefly to record paths.

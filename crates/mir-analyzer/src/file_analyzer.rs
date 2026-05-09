@@ -74,7 +74,7 @@ impl<'a> FileAnalyzer<'a> {
         source_map: &SourceMap,
     ) -> FileAnalysis {
         self.session.ensure_essential_stubs_loaded();
-        self.session.ensure_stubs_for_source(source);
+        self.session.ensure_stubs_for_ast(program);
         let db = self.session.snapshot_db();
         let driver = Pass2Driver::new(&db, self.session.php_version());
         let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
