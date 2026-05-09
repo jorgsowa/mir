@@ -1,0 +1,1177 @@
+use std::collections::{HashMap, HashSet};
+
+use parking_lot::Mutex;
+use rustc_hash::FxHashMap;
+use std::sync::Arc;
+
+use mir_codebase::storage::{
+    ConstantStorage, FunctionStorage, Location, MethodStorage, PropertyStorage, TemplateParam,
+    Visibility,
+};
+use mir_codebase::StubSlice;
+use mir_types::Union;
+
+use super::*;
+
+// MirDb concrete database
+
+/// Concrete in-process Salsa database.
+///
+/// `Clone` is required for parallel batch analysis: salsa's supported
+/// pattern for sharing a db across threads is to give each worker its
+/// own clone (each clone gets a fresh `ZalsaLocal`, sharing the
+/// underlying memoization storage).  Sharing `&MirDb` across threads is
+/// **not** supported because `salsa::Database: Send` (not `Sync`).
+type MemberRegistry<V> = Arc<FxHashMap<Arc<str>, FxHashMap<Arc<str>, V>>>;
+type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
+
+#[salsa::db]
+#[derive(Default, Clone)]
+pub struct MirDb {
+    storage: salsa::Storage<Self>,
+    // Keep registries behind `Arc`s so `MirDb::clone()` stays cheap for
+    // parallel analysis workers. The salsa storage is already shared by clone;
+    // these maps only hold stable input handles, so copy-on-write insertion is
+    // enough for the canonical mutable db paths.
+    /// FQCN → ClassNode handle registry (not tracked by Salsa; see
+    /// `lookup_class_node` for the rationale). Keys are canonical FQCNs;
+    /// case-insensitive lookups go through `class_node_keys_lower`.
+    class_nodes: Arc<FxHashMap<Arc<str>, ClassNode>>,
+    /// Lowercased FQCN → canonical FQCN. Maintained in lockstep with
+    /// `class_nodes` so callers can resolve PHP's case-insensitive class
+    /// names (`new arrayobject()` → `ArrayObject`).
+    class_node_keys_lower: Arc<FxHashMap<String, Arc<str>>>,
+    /// FQN → FunctionNode handle registry. Keys are canonical FQNs;
+    /// case-insensitive lookups go through `function_node_keys_lower`.
+    function_nodes: Arc<FxHashMap<Arc<str>, FunctionNode>>,
+    /// Lowercased FQN → canonical FQN. Maintained in lockstep with
+    /// `function_nodes` so callers can resolve PHP's case-insensitive
+    /// function names (`STRLEN($x)` → `strlen`).
+    function_node_keys_lower: Arc<FxHashMap<String, Arc<str>>>,
+    /// (owner FQCN) → (method_name_lower → MethodNode) handle registry.
+    method_nodes: MemberRegistry<MethodNode>,
+    /// (owner FQCN) → (prop_name → PropertyNode) handle registry.
+    property_nodes: MemberRegistry<PropertyNode>,
+    /// (owner FQCN) → (const_name → ClassConstantNode) handle registry.
+    class_constant_nodes: MemberRegistry<ClassConstantNode>,
+    /// FQN → GlobalConstantNode handle registry.
+    global_constant_nodes: Arc<FxHashMap<Arc<str>, GlobalConstantNode>>,
+    /// File path → first declared namespace.
+    file_namespaces: Arc<FxHashMap<Arc<str>, Arc<str>>>,
+    /// File path → use-alias imports.
+    file_imports: Arc<FxHashMap<Arc<str>, HashMap<String, String>>>,
+    /// Global variable name (without `$`) → collected type.
+    global_vars: Arc<FxHashMap<Arc<str>, Union>>,
+    /// Symbol FQN → defining file.
+    symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
+    /// Public symbol key → reference locations.
+    reference_locations: ReferenceLocations,
+}
+
+#[salsa::db]
+impl salsa::Database for MirDb {}
+
+#[salsa::db]
+impl MirDatabase for MirDb {
+    fn php_version_str(&self) -> Arc<str> {
+        Arc::from("8.2")
+    }
+
+    fn lookup_class_node(&self, fqcn: &str) -> Option<ClassNode> {
+        if let Some(&node) = self.class_nodes.get(fqcn) {
+            return Some(node);
+        }
+        let lower = fqcn.to_ascii_lowercase();
+        let canonical = self.class_node_keys_lower.get(&lower)?;
+        self.class_nodes.get(canonical.as_ref()).copied()
+    }
+
+    fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode> {
+        if let Some(&node) = self.function_nodes.get(fqn) {
+            return Some(node);
+        }
+        let lower = fqn.to_ascii_lowercase();
+        let canonical = self.function_node_keys_lower.get(&lower)?;
+        self.function_nodes.get(canonical.as_ref()).copied()
+    }
+
+    fn lookup_method_node(&self, fqcn: &str, method_name_lower: &str) -> Option<MethodNode> {
+        self.method_nodes
+            .get(fqcn)
+            .and_then(|m| m.get(method_name_lower).copied())
+    }
+
+    fn lookup_property_node(&self, fqcn: &str, prop_name: &str) -> Option<PropertyNode> {
+        self.property_nodes
+            .get(fqcn)
+            .and_then(|m| m.get(prop_name).copied())
+    }
+
+    fn lookup_class_constant_node(
+        &self,
+        fqcn: &str,
+        const_name: &str,
+    ) -> Option<ClassConstantNode> {
+        self.class_constant_nodes
+            .get(fqcn)
+            .and_then(|m| m.get(const_name).copied())
+    }
+
+    fn lookup_global_constant_node(&self, fqn: &str) -> Option<GlobalConstantNode> {
+        self.global_constant_nodes.get(fqn).copied()
+    }
+
+    fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode> {
+        self.method_nodes
+            .get(fqcn)
+            .map(|m| m.values().copied().collect())
+            .unwrap_or_default()
+    }
+
+    fn class_own_properties(&self, fqcn: &str) -> Vec<PropertyNode> {
+        self.property_nodes
+            .get(fqcn)
+            .map(|m| m.values().copied().collect())
+            .unwrap_or_default()
+    }
+
+    fn active_class_node_fqcns(&self) -> Vec<Arc<str>> {
+        self.class_nodes
+            .iter()
+            .filter_map(|(fqcn, node)| {
+                if node.active(self) {
+                    Some(fqcn.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn active_function_node_fqns(&self) -> Vec<Arc<str>> {
+        self.function_nodes
+            .iter()
+            .filter_map(|(fqn, node)| {
+                if node.active(self) {
+                    Some(fqn.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
+        self.file_namespaces.get(file).cloned()
+    }
+
+    fn file_imports(&self, file: &str) -> HashMap<String, String> {
+        self.file_imports.get(file).cloned().unwrap_or_default()
+    }
+
+    fn global_var_type(&self, name: &str) -> Option<Union> {
+        self.global_vars.get(name).cloned()
+    }
+
+    fn file_import_snapshots(&self) -> Vec<(Arc<str>, HashMap<String, String>)> {
+        self.file_imports
+            .iter()
+            .map(|(file, imports)| (file.clone(), imports.clone()))
+            .collect()
+    }
+
+    fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
+        self.symbol_to_file.get(symbol).cloned()
+    }
+
+    fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>> {
+        self.symbol_to_file
+            .iter()
+            .filter_map(|(sym, defining_file)| {
+                if defining_file.as_ref() == file {
+                    Some(sym.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn record_reference_location(&self, loc: RefLoc) {
+        let mut refs = self.reference_locations.lock();
+        let entry = refs.entry(loc.symbol_key).or_default();
+        let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
+        if !entry.iter().any(|existing| existing == &tuple) {
+            entry.push(tuple);
+        }
+    }
+
+    fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]) {
+        for (symbol, line, col_start, col_end) in locs {
+            self.record_reference_location(RefLoc {
+                symbol_key: Arc::from(symbol.as_str()),
+                file: file.clone(),
+                line: *line,
+                col_start: *col_start,
+                col_end: *col_end,
+            });
+        }
+    }
+
+    fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
+        let refs = self.reference_locations.lock();
+        let mut out = Vec::new();
+        for (symbol, locs) in refs.iter() {
+            for (loc_file, line, col_start, col_end) in locs {
+                if loc_file.as_ref() == file {
+                    out.push((symbol.clone(), *line, *col_start, *col_end));
+                }
+            }
+        }
+        out
+    }
+
+    fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
+        let refs = self.reference_locations.lock();
+        refs.get(symbol).cloned().unwrap_or_default()
+    }
+
+    fn has_reference(&self, symbol: &str) -> bool {
+        let refs = self.reference_locations.lock();
+        refs.get(symbol).is_some_and(|locs| !locs.is_empty())
+    }
+
+    fn clear_file_references(&self, file: &str) {
+        let mut refs = self.reference_locations.lock();
+        for locs in refs.values_mut() {
+            locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
+        }
+    }
+}
+
+/// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
+/// to fill in the fields that don't apply to your kind (e.g. interfaces leave
+/// `parent`, `traits`, `mixins`, `is_abstract`, etc. at their defaults).
+///
+/// Per-kind constructors (`for_class` / `for_interface` / `for_trait` /
+/// `for_enum`) seed the kind discriminators so the caller only has to populate
+/// kind-specific fields.
+#[derive(Debug, Clone, Default)]
+pub struct ClassNodeFields {
+    pub fqcn: Arc<str>,
+    pub is_interface: bool,
+    pub is_trait: bool,
+    pub is_enum: bool,
+    pub is_abstract: bool,
+    pub parent: Option<Arc<str>>,
+    pub interfaces: Arc<[Arc<str>]>,
+    pub traits: Arc<[Arc<str>]>,
+    pub extends: Arc<[Arc<str>]>,
+    pub template_params: Arc<[TemplateParam]>,
+    pub require_extends: Arc<[Arc<str>]>,
+    pub require_implements: Arc<[Arc<str>]>,
+    pub is_backed_enum: bool,
+    pub mixins: Arc<[Arc<str>]>,
+    pub deprecated: Option<Arc<str>>,
+    pub enum_scalar_type: Option<Union>,
+    pub is_final: bool,
+    pub is_readonly: bool,
+    pub location: Option<Location>,
+    pub extends_type_args: Arc<[Union]>,
+    pub implements_type_args: ImplementsTypeArgs,
+}
+
+impl ClassNodeFields {
+    pub fn for_class(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            ..Self::default()
+        }
+    }
+
+    pub fn for_interface(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            is_interface: true,
+            ..Self::default()
+        }
+    }
+
+    pub fn for_trait(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            is_trait: true,
+            ..Self::default()
+        }
+    }
+
+    pub fn for_enum(fqcn: Arc<str>) -> Self {
+        Self {
+            fqcn,
+            is_enum: true,
+            ..Self::default()
+        }
+    }
+}
+
+impl MirDb {
+    pub fn remove_file_definitions(&mut self, file: &str) {
+        let symbols = self.symbols_defined_in_file(file);
+        for symbol in &symbols {
+            self.deactivate_class_node(symbol);
+            self.deactivate_function_node(symbol);
+            self.deactivate_class_methods(symbol);
+            self.deactivate_class_properties(symbol);
+            self.deactivate_class_constants(symbol);
+            self.deactivate_global_constant_node(symbol);
+        }
+        let symbol_set: HashSet<Arc<str>> = symbols.into_iter().collect();
+        Arc::make_mut(&mut self.symbol_to_file).retain(|sym, defining_file| {
+            defining_file.as_ref() != file && !symbol_set.contains(sym)
+        });
+        Arc::make_mut(&mut self.file_namespaces).retain(|path, _| path.as_ref() != file);
+        Arc::make_mut(&mut self.file_imports).retain(|path, _| path.as_ref() != file);
+        Arc::make_mut(&mut self.global_vars).retain(|name, _| !symbol_set.contains(name));
+        self.clear_file_references(file);
+    }
+
+    pub fn type_count(&self) -> usize {
+        self.class_nodes
+            .values()
+            .filter(|node| node.active(self))
+            .count()
+    }
+
+    pub fn function_count(&self) -> usize {
+        self.function_nodes
+            .values()
+            .filter(|node| node.active(self))
+            .count()
+    }
+
+    pub fn constant_count(&self) -> usize {
+        self.global_constant_nodes
+            .values()
+            .filter(|node| node.active(self))
+            .count()
+    }
+
+    /// Walk one collected [`StubSlice`] and upsert the corresponding db nodes.
+    ///
+    /// This is the canonical post-Pass-1 ingestion path: each file's slice is
+    /// fed in directly, so batch analysis does not need any intermediate
+    /// mutable codebase store between Pass 1 and Pass 2.
+    pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
+        use std::collections::HashSet;
+
+        // Deduplicate param lists to save memory (many methods share identical signatures).
+        // This reduces cold-start memory usage by ~100-150 MiB when analyzing vendor code.
+        let mut slice = slice.clone();
+        mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
+
+        if let Some(file) = &slice.file {
+            let file_cloned = file.clone();
+            if let Some(namespace) = &slice.namespace {
+                Arc::make_mut(&mut self.file_namespaces)
+                    .insert(file_cloned.clone(), namespace.clone());
+            }
+            if !slice.imports.is_empty() {
+                Arc::make_mut(&mut self.file_imports)
+                    .insert(file_cloned.clone(), slice.imports.clone());
+            }
+            for (name, _) in &slice.global_vars {
+                let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
+                Arc::make_mut(&mut self.symbol_to_file)
+                    .insert(Arc::from(global_name), file_cloned.clone());
+            }
+        }
+        for (name, ty) in &slice.global_vars {
+            let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
+            Arc::make_mut(&mut self.global_vars).insert(Arc::from(global_name), ty.clone());
+        }
+
+        let slice_file = slice.file.as_ref().map(|f| f.clone());
+        for cls in &slice.classes {
+            if let Some(file) = &slice_file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(cls.fqcn.clone(), file.clone());
+            }
+            let fqcn_cloned = cls.fqcn.clone();
+            self.upsert_class_node(ClassNodeFields {
+                is_abstract: cls.is_abstract,
+                parent: cls.parent.clone(),
+                interfaces: Arc::from(cls.interfaces.as_ref()),
+                traits: Arc::from(cls.traits.as_ref()),
+                template_params: Arc::from(cls.template_params.as_ref()),
+                mixins: Arc::from(cls.mixins.as_ref()),
+                deprecated: cls.deprecated.clone(),
+                is_final: cls.is_final,
+                is_readonly: cls.is_readonly,
+                location: cls.location.clone(),
+                extends_type_args: Arc::from(cls.extends_type_args.as_ref()),
+                implements_type_args: Arc::from(
+                    cls.implements_type_args
+                        .iter()
+                        .map(|(iface, args)| (iface.clone(), Arc::from(args.as_ref())))
+                        .collect::<Vec<_>>(),
+                ),
+                ..ClassNodeFields::for_class(fqcn_cloned)
+            });
+            if self.method_nodes.contains_key(cls.fqcn.as_ref()) {
+                let method_keep: HashSet<&str> =
+                    cls.own_methods.keys().map(|m| m.as_ref()).collect();
+                self.prune_class_methods(&cls.fqcn, &method_keep);
+            }
+            for method in cls.own_methods.values() {
+                // Avoid cloning complex return type Unions during vendor ingestion
+                // by wrapping in Arc upfront. This is a per-method operation during
+                // vendor type collection (rare after initialization), so the Arc
+                // allocation is amortized.
+                self.upsert_method_node(method.as_ref());
+            }
+            if self.property_nodes.contains_key(cls.fqcn.as_ref()) {
+                let prop_keep: HashSet<&str> =
+                    cls.own_properties.keys().map(|p| p.as_ref()).collect();
+                self.prune_class_properties(&cls.fqcn, &prop_keep);
+            }
+            for prop in cls.own_properties.values() {
+                self.upsert_property_node(&cls.fqcn, prop);
+            }
+            if self.class_constant_nodes.contains_key(cls.fqcn.as_ref()) {
+                let const_keep: HashSet<&str> =
+                    cls.own_constants.keys().map(|c| c.as_ref()).collect();
+                self.prune_class_constants(&cls.fqcn, &const_keep);
+            }
+            for constant in cls.own_constants.values() {
+                self.upsert_class_constant_node(&cls.fqcn, constant);
+            }
+        }
+
+        for iface in &slice.interfaces {
+            if let Some(file) = &slice_file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(iface.fqcn.clone(), file.clone());
+            }
+            let fqcn_cloned = iface.fqcn.clone();
+            self.upsert_class_node(ClassNodeFields {
+                extends: Arc::from(iface.extends.as_ref()),
+                template_params: Arc::from(iface.template_params.as_ref()),
+                location: iface.location.clone(),
+                ..ClassNodeFields::for_interface(fqcn_cloned)
+            });
+            if self.method_nodes.contains_key(iface.fqcn.as_ref()) {
+                let method_keep: HashSet<&str> =
+                    iface.own_methods.keys().map(|m| m.as_ref()).collect();
+                self.prune_class_methods(&iface.fqcn, &method_keep);
+            }
+            for method in iface.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            if self.class_constant_nodes.contains_key(iface.fqcn.as_ref()) {
+                let const_keep: HashSet<&str> =
+                    iface.own_constants.keys().map(|c| c.as_ref()).collect();
+                self.prune_class_constants(&iface.fqcn, &const_keep);
+            }
+            for constant in iface.own_constants.values() {
+                self.upsert_class_constant_node(&iface.fqcn, constant);
+            }
+        }
+
+        for tr in &slice.traits {
+            if let Some(file) = &slice_file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(tr.fqcn.clone(), file.clone());
+            }
+            let fqcn_cloned = tr.fqcn.clone();
+            self.upsert_class_node(ClassNodeFields {
+                traits: Arc::from(tr.traits.as_ref()),
+                template_params: Arc::from(tr.template_params.as_ref()),
+                require_extends: Arc::from(tr.require_extends.as_ref()),
+                require_implements: Arc::from(tr.require_implements.as_ref()),
+                location: tr.location.clone(),
+                ..ClassNodeFields::for_trait(fqcn_cloned)
+            });
+            if self.method_nodes.contains_key(tr.fqcn.as_ref()) {
+                let method_keep: HashSet<&str> =
+                    tr.own_methods.keys().map(|m| m.as_ref()).collect();
+                self.prune_class_methods(&tr.fqcn, &method_keep);
+            }
+            for method in tr.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            if self.property_nodes.contains_key(tr.fqcn.as_ref()) {
+                let prop_keep: HashSet<&str> =
+                    tr.own_properties.keys().map(|p| p.as_ref()).collect();
+                self.prune_class_properties(&tr.fqcn, &prop_keep);
+            }
+            for prop in tr.own_properties.values() {
+                self.upsert_property_node(&tr.fqcn, prop);
+            }
+            if self.class_constant_nodes.contains_key(tr.fqcn.as_ref()) {
+                let const_keep: HashSet<&str> =
+                    tr.own_constants.keys().map(|c| c.as_ref()).collect();
+                self.prune_class_constants(&tr.fqcn, &const_keep);
+            }
+            for constant in tr.own_constants.values() {
+                self.upsert_class_constant_node(&tr.fqcn, constant);
+            }
+        }
+
+        for en in &slice.enums {
+            if let Some(file) = &slice_file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(en.fqcn.clone(), file.clone());
+            }
+            let fqcn_cloned = en.fqcn.clone();
+            self.upsert_class_node(ClassNodeFields {
+                interfaces: Arc::from(en.interfaces.as_ref()),
+                is_backed_enum: en.scalar_type.is_some(),
+                enum_scalar_type: en.scalar_type.clone(),
+                location: en.location.clone(),
+                ..ClassNodeFields::for_enum(fqcn_cloned)
+            });
+            if self.method_nodes.contains_key(en.fqcn.as_ref()) {
+                let mut method_keep: HashSet<&str> =
+                    en.own_methods.keys().map(|m| m.as_ref()).collect();
+                method_keep.insert("cases");
+                if en.scalar_type.is_some() {
+                    method_keep.insert("from");
+                    method_keep.insert("tryfrom");
+                }
+                self.prune_class_methods(&en.fqcn, &method_keep);
+            }
+            for method in en.own_methods.values() {
+                self.upsert_method_node(method.as_ref());
+            }
+            let synth_method = |name: &str| mir_codebase::storage::MethodStorage {
+                fqcn: en.fqcn.clone(),
+                name: Arc::from(name),
+                params: Arc::from([].as_ref()),
+                return_type: Some(Arc::new(Union::mixed())),
+                inferred_return_type: None,
+                visibility: Visibility::Public,
+                is_static: true,
+                is_abstract: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                is_final: false,
+                is_internal: false,
+                is_pure: false,
+                deprecated: None,
+                location: None,
+            };
+            let already = |name: &str| {
+                en.own_methods
+                    .keys()
+                    .any(|k| k.as_ref().eq_ignore_ascii_case(name))
+            };
+            if !already("cases") {
+                self.upsert_method_node(&synth_method("cases"));
+            }
+            if en.scalar_type.is_some() {
+                if !already("from") {
+                    self.upsert_method_node(&synth_method("from"));
+                }
+                if !already("tryFrom") {
+                    self.upsert_method_node(&synth_method("tryFrom"));
+                }
+            }
+            if self.class_constant_nodes.contains_key(en.fqcn.as_ref()) {
+                let mut const_keep: HashSet<&str> =
+                    en.own_constants.keys().map(|c| c.as_ref()).collect();
+                for case in en.cases.values() {
+                    const_keep.insert(case.name.as_ref());
+                }
+                self.prune_class_constants(&en.fqcn, &const_keep);
+            }
+            for constant in en.own_constants.values() {
+                self.upsert_class_constant_node(&en.fqcn, constant);
+            }
+            for case in en.cases.values() {
+                let case_const = ConstantStorage {
+                    name: case.name.clone(),
+                    ty: mir_types::Union::mixed(),
+                    visibility: None,
+                    is_final: false,
+                    location: case.location.clone(),
+                };
+                self.upsert_class_constant_node(&en.fqcn, &case_const);
+            }
+        }
+
+        for func in &slice.functions {
+            if let Some(file) = &slice_file {
+                Arc::make_mut(&mut self.symbol_to_file).insert(func.fqn.clone(), file.clone());
+            }
+            self.upsert_function_node(func);
+        }
+        for (fqn, ty) in &slice.constants {
+            let fqn_cloned = fqn.clone();
+            self.upsert_global_constant_node(fqn_cloned, ty.clone());
+        }
+    }
+
+    /// Create or update the `ClassNode` for `fqcn`.
+    ///
+    /// If a handle already exists, its fields are updated in-place so Salsa
+    /// can track the change.  A new handle is created only on first registration.
+    #[allow(clippy::too_many_arguments)]
+    pub fn upsert_class_node(&mut self, fields: ClassNodeFields) -> ClassNode {
+        use salsa::Setter as _;
+        let ClassNodeFields {
+            fqcn,
+            is_interface,
+            is_trait,
+            is_enum,
+            is_abstract,
+            parent,
+            interfaces,
+            traits,
+            extends,
+            template_params,
+            require_extends,
+            require_implements,
+            is_backed_enum,
+            mixins,
+            deprecated,
+            enum_scalar_type,
+            is_final,
+            is_readonly,
+            location,
+            extends_type_args,
+            implements_type_args,
+        } = fields;
+        if let Some(&node) = self.class_nodes.get(&fqcn) {
+            // Fast-skip: an already-active node whose Salsa-tracked fields
+            // match the upsert input.  Bulk re-ingest paths
+            // (`ingest_stub_slice` / `lazy_load_*`) call this for every class
+            // on every iteration; without the skip each call fires 13
+            // setters, each acquiring the Salsa write lock.  Schema doesn't
+            // mutate after Pass 1 (Pass 2 only writes `inferred_return_type`),
+            // so an active node with matching fields is by construction up
+            // to date.
+            //
+            // Mutation paths (LSP re-analyze) call `deactivate_class_node`
+            // first; that flips `active=false`, defeating this guard so the
+            // setters run as before.
+            if node.active(self)
+                && node.is_interface(self) == is_interface
+                && node.is_trait(self) == is_trait
+                && node.is_enum(self) == is_enum
+                && node.is_abstract(self) == is_abstract
+                && node.is_backed_enum(self) == is_backed_enum
+                && node.parent(self) == parent
+                && *node.interfaces(self) == *interfaces
+                && *node.traits(self) == *traits
+                && *node.extends(self) == *extends
+                && *node.template_params(self) == *template_params
+                && *node.require_extends(self) == *require_extends
+                && *node.require_implements(self) == *require_implements
+                && *node.mixins(self) == *mixins
+                && node.deprecated(self) == deprecated
+                && node.enum_scalar_type(self) == enum_scalar_type
+                && node.is_final(self) == is_final
+                && node.is_readonly(self) == is_readonly
+                && node.location(self) == location
+                && *node.extends_type_args(self) == *extends_type_args
+                && *node.implements_type_args(self) == *implements_type_args
+            {
+                return node;
+            }
+            node.set_active(self).to(true);
+            node.set_is_interface(self).to(is_interface);
+            node.set_is_trait(self).to(is_trait);
+            node.set_is_enum(self).to(is_enum);
+            node.set_is_abstract(self).to(is_abstract);
+            node.set_parent(self).to(parent);
+            node.set_interfaces(self).to(interfaces);
+            node.set_traits(self).to(traits);
+            node.set_extends(self).to(extends);
+            node.set_template_params(self).to(template_params);
+            node.set_require_extends(self).to(require_extends);
+            node.set_require_implements(self).to(require_implements);
+            node.set_is_backed_enum(self).to(is_backed_enum);
+            node.set_mixins(self).to(mixins);
+            node.set_deprecated(self).to(deprecated);
+            node.set_enum_scalar_type(self).to(enum_scalar_type);
+            node.set_is_final(self).to(is_final);
+            node.set_is_readonly(self).to(is_readonly);
+            node.set_location(self).to(location);
+            node.set_extends_type_args(self).to(extends_type_args);
+            node.set_implements_type_args(self).to(implements_type_args);
+            node
+        } else {
+            let node = ClassNode::new(
+                self,
+                fqcn.clone(),
+                true,
+                is_interface,
+                is_trait,
+                is_enum,
+                is_abstract,
+                parent,
+                interfaces,
+                traits,
+                extends,
+                template_params,
+                require_extends,
+                require_implements,
+                is_backed_enum,
+                mixins,
+                deprecated,
+                enum_scalar_type,
+                is_final,
+                is_readonly,
+                location,
+                extends_type_args,
+                implements_type_args,
+            );
+            Arc::make_mut(&mut self.class_node_keys_lower)
+                .insert(fqcn.to_ascii_lowercase(), fqcn.clone());
+            Arc::make_mut(&mut self.class_nodes).insert(fqcn, node);
+            node
+        }
+    }
+
+    /// Mark the `ClassNode` for `fqcn` as inactive.
+    ///
+    /// Dependent `class_ancestors` queries will observe the change and re-run,
+    /// returning an empty list.
+    pub fn deactivate_class_node(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        if let Some(&node) = self.class_nodes.get(fqcn) {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `FunctionNode` for the given `FunctionStorage`.
+    pub fn upsert_function_node(&mut self, storage: &FunctionStorage) -> FunctionNode {
+        use salsa::Setter as _;
+        let fqn = &storage.fqn;
+        if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            // `inferred_return_type` is intentionally NOT compared / written:
+            // it is owned by the priming sweep's serial commit phase
+            // (`commit_inferred_return_types`) and Pass-1 re-ingest must not
+            // clobber a previously-inferred value.
+            if node.active(self)
+                && node.short_name(self) == storage.short_name
+                && node.is_pure(self) == storage.is_pure
+                && node.deprecated(self) == storage.deprecated
+                && node.return_type(self).as_deref() == storage.return_type.as_deref()
+                && node.location(self) == storage.location
+                && *node.params(self) == *storage.params.as_ref()
+                && *node.template_params(self) == *storage.template_params
+                && *node.assertions(self) == *storage.assertions
+                && *node.throws(self) == *storage.throws
+            {
+                return node;
+            }
+            node.set_active(self).to(true);
+            node.set_short_name(self).to(storage.short_name.clone());
+            node.set_params(self).to(storage.params.clone());
+            node.set_return_type(self).to(storage.return_type.clone());
+            node.set_template_params(self)
+                .to(Arc::from(storage.template_params.as_slice()));
+            node.set_assertions(self)
+                .to(Arc::from(storage.assertions.as_slice()));
+            node.set_throws(self)
+                .to(Arc::from(storage.throws.as_slice()));
+            node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_is_pure(self).to(storage.is_pure);
+            node.set_location(self).to(storage.location.clone());
+            node
+        } else {
+            let node = FunctionNode::new(
+                self,
+                fqn.clone(),
+                storage.short_name.clone(),
+                true,
+                storage.params.clone(),
+                storage.return_type.clone(),
+                storage
+                    .inferred_return_type
+                    .as_ref()
+                    .map(|t| Arc::new(t.clone())),
+                Arc::from(storage.template_params.as_slice()),
+                Arc::from(storage.assertions.as_slice()),
+                Arc::from(storage.throws.as_slice()),
+                storage.deprecated.clone(),
+                storage.is_pure,
+                storage.location.clone(),
+            );
+            Arc::make_mut(&mut self.function_node_keys_lower)
+                .insert(fqn.to_ascii_lowercase(), fqn.clone());
+            Arc::make_mut(&mut self.function_nodes).insert(fqn.clone(), node);
+            node
+        }
+    }
+
+    /// Commit a parallel-sweep-collected [`InferredReturnTypes`] buffer
+    /// into the Salsa db.  **Must be called serially**, after all rayon
+    /// workers from the priming sweep have dropped their db clones, so
+    /// that `Storage::cancel_others` sees strong-count==1 inside the
+    /// setter.  Calling this from inside a `for_each_with` / `map_with`
+    /// closure will deadlock.
+    ///
+    /// Skips writes whose value already matches the current Salsa-tracked
+    /// value (preserves PR21's fast-skip semantics).  Skips inactive
+    /// nodes — there's no point committing an inferred return for a node
+    /// that has been deactivated by a re-analyze.
+    /// Commit inferred return types collected during the priming sweep.
+    /// Takes ownership of the function and method inferred type vectors.
+    pub fn commit_inferred_return_types(
+        &mut self,
+        functions: Vec<(Arc<str>, mir_types::Union)>,
+        methods: Vec<(Arc<str>, Arc<str>, mir_types::Union)>,
+    ) {
+        use salsa::Setter as _;
+        for (fqn, inferred) in functions {
+            if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
+                if !node.active(self) {
+                    continue;
+                }
+                let new = Some(Arc::new(inferred));
+                if node.inferred_return_type(self) == new {
+                    continue;
+                }
+                node.set_inferred_return_type(self).to(new);
+            }
+        }
+        for (fqcn, name, inferred) in methods {
+            let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
+                name.clone()
+            } else {
+                Arc::from(name.to_lowercase().as_str())
+            };
+            let node = self
+                .method_nodes
+                .get(fqcn.as_ref())
+                .and_then(|m| m.get(&name_lower))
+                .copied();
+            if let Some(node) = node {
+                if !node.active(self) {
+                    continue;
+                }
+                let new = Some(Arc::new(inferred));
+                if node.inferred_return_type(self) == new {
+                    continue;
+                }
+                node.set_inferred_return_type(self).to(new);
+            }
+        }
+    }
+
+    /// Mark the `FunctionNode` for `fqn` as inactive.
+    pub fn deactivate_function_node(&mut self, fqn: &str) {
+        use salsa::Setter as _;
+        if let Some(&node) = self.function_nodes.get(fqn) {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `MethodNode` for `(storage.fqcn, storage.name.to_lowercase())`.
+    pub fn upsert_method_node(&mut self, storage: &MethodStorage) -> MethodNode {
+        use salsa::Setter as _;
+        let fqcn = &storage.fqcn;
+        let name_lower: Arc<str> = Arc::from(storage.name.to_lowercase().as_str());
+        // Copy the existing handle out to release the immutable borrow before
+        // calling node.set_*(self), which needs &mut self.
+        let existing = self
+            .method_nodes
+            .get(fqcn.as_ref())
+            .and_then(|m| m.get(&name_lower))
+            .copied();
+        if let Some(node) = existing {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            // `inferred_return_type` intentionally not compared / written here;
+            // ownership is in the priming-sweep commit phase.
+            if node.active(self)
+                && node.visibility(self) == storage.visibility
+                && node.is_static(self) == storage.is_static
+                && node.is_abstract(self) == storage.is_abstract
+                && node.is_final(self) == storage.is_final
+                && node.is_constructor(self) == storage.is_constructor
+                && node.is_pure(self) == storage.is_pure
+                && node.is_internal(self) == storage.is_internal
+                && node.deprecated(self) == storage.deprecated
+                && node.return_type(self).as_deref() == storage.return_type.as_deref()
+                && node.location(self) == storage.location
+                && *node.params(self) == *storage.params.as_ref()
+                && *node.template_params(self) == *storage.template_params
+                && *node.assertions(self) == *storage.assertions
+                && *node.throws(self) == *storage.throws
+            {
+                return node;
+            }
+            node.set_active(self).to(true);
+            node.set_params(self).to(storage.params.clone());
+            node.set_return_type(self).to(storage.return_type.clone());
+            node.set_template_params(self)
+                .to(Arc::from(storage.template_params.as_slice()));
+            node.set_assertions(self)
+                .to(Arc::from(storage.assertions.as_slice()));
+            node.set_throws(self)
+                .to(Arc::from(storage.throws.as_slice()));
+            node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_is_internal(self).to(storage.is_internal);
+            node.set_visibility(self).to(storage.visibility);
+            node.set_is_static(self).to(storage.is_static);
+            node.set_is_abstract(self).to(storage.is_abstract);
+            node.set_is_final(self).to(storage.is_final);
+            node.set_is_constructor(self).to(storage.is_constructor);
+            node.set_is_pure(self).to(storage.is_pure);
+            node.set_location(self).to(storage.location.clone());
+            node
+        } else {
+            // MethodNode::new takes &mut self; insert after it returns.
+            let node = MethodNode::new(
+                self,
+                fqcn.clone(),
+                storage.name.clone(),
+                true,
+                storage.params.clone(),
+                storage.return_type.clone(),
+                storage
+                    .inferred_return_type
+                    .as_ref()
+                    .map(|t| Arc::new(t.clone())),
+                Arc::from(storage.template_params.as_slice()),
+                Arc::from(storage.assertions.as_slice()),
+                Arc::from(storage.throws.as_slice()),
+                storage.deprecated.clone(),
+                storage.is_internal,
+                storage.visibility,
+                storage.is_static,
+                storage.is_abstract,
+                storage.is_final,
+                storage.is_constructor,
+                storage.is_pure,
+                storage.location.clone(),
+            );
+            Arc::make_mut(&mut self.method_nodes)
+                .entry(fqcn.clone())
+                .or_default()
+                .insert(name_lower, node);
+            node
+        }
+    }
+
+    /// Mark all `MethodNode`s owned by `fqcn` as inactive.
+    pub fn deactivate_class_methods(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        let nodes: Vec<MethodNode> = match self.method_nodes.get(fqcn) {
+            Some(methods) => methods.values().copied().collect(),
+            None => return,
+        };
+        for node in nodes {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Deactivate `MethodNode`s for `fqcn` whose lowercased name is not in
+    /// `keep_lower`.  Used by `ingest_stub_slice` to prune stale stub methods
+    /// when a user file shadows a bundled-stub class with a different method
+    /// set.  Active-only check preserves PR21's fast-skip — already-inactive
+    /// nodes don't fire a setter.
+    pub fn prune_class_methods<T>(&mut self, fqcn: &str, keep_lower: &std::collections::HashSet<T>)
+    where
+        T: Eq + std::hash::Hash + std::borrow::Borrow<str>,
+    {
+        use salsa::Setter as _;
+        let candidates: Vec<MethodNode> = self
+            .method_nodes
+            .get(fqcn)
+            .map(|m| {
+                m.iter()
+                    .filter(|(k, _)| !keep_lower.contains(k.as_ref()))
+                    .map(|(_, n)| *n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for node in candidates {
+            if node.active(self) {
+                node.set_active(self).to(false);
+            }
+        }
+    }
+
+    /// Deactivate `PropertyNode`s for `fqcn` whose name is not in `keep`.
+    pub fn prune_class_properties<T>(&mut self, fqcn: &str, keep: &std::collections::HashSet<T>)
+    where
+        T: Eq + std::hash::Hash + std::borrow::Borrow<str>,
+    {
+        use salsa::Setter as _;
+        let candidates: Vec<PropertyNode> = self
+            .property_nodes
+            .get(fqcn)
+            .map(|m| {
+                m.iter()
+                    .filter(|(k, _)| !keep.contains(k.as_ref()))
+                    .map(|(_, n)| *n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for node in candidates {
+            if node.active(self) {
+                node.set_active(self).to(false);
+            }
+        }
+    }
+
+    /// Deactivate `ClassConstantNode`s for `fqcn` whose name is not in `keep`.
+    pub fn prune_class_constants<T>(&mut self, fqcn: &str, keep: &std::collections::HashSet<T>)
+    where
+        T: Eq + std::hash::Hash + std::borrow::Borrow<str>,
+    {
+        use salsa::Setter as _;
+        let candidates: Vec<ClassConstantNode> = self
+            .class_constant_nodes
+            .get(fqcn)
+            .map(|m| {
+                m.iter()
+                    .filter(|(k, _)| !keep.contains(k.as_ref()))
+                    .map(|(_, n)| *n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for node in candidates {
+            if node.active(self) {
+                node.set_active(self).to(false);
+            }
+        }
+    }
+
+    /// Create or update the `PropertyNode` for `(storage.fqcn, storage.name)`.
+    pub fn upsert_property_node(&mut self, fqcn: &Arc<str>, storage: &PropertyStorage) {
+        use salsa::Setter as _;
+        let existing = self
+            .property_nodes
+            .get(fqcn.as_ref())
+            .and_then(|m| m.get(storage.name.as_ref()))
+            .copied();
+        if let Some(node) = existing {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self)
+                && node.visibility(self) == storage.visibility
+                && node.is_static(self) == storage.is_static
+                && node.is_readonly(self) == storage.is_readonly
+                && node.ty(self) == storage.ty
+                && node.location(self) == storage.location
+            {
+                return;
+            }
+            node.set_active(self).to(true);
+            node.set_ty(self).to(storage.ty.clone());
+            node.set_visibility(self).to(storage.visibility);
+            node.set_is_static(self).to(storage.is_static);
+            node.set_is_readonly(self).to(storage.is_readonly);
+            node.set_location(self).to(storage.location.clone());
+        } else {
+            let node = PropertyNode::new(
+                self,
+                fqcn.clone(),
+                storage.name.clone(),
+                true,
+                storage.ty.clone(),
+                storage.visibility,
+                storage.is_static,
+                storage.is_readonly,
+                storage.location.clone(),
+            );
+            Arc::make_mut(&mut self.property_nodes)
+                .entry(fqcn.clone())
+                .or_default()
+                .insert(storage.name.clone(), node);
+        }
+    }
+
+    /// Mark all `PropertyNode`s owned by `fqcn` as inactive.
+    pub fn deactivate_class_properties(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        let nodes: Vec<PropertyNode> = match self.property_nodes.get(fqcn) {
+            Some(props) => props.values().copied().collect(),
+            None => return,
+        };
+        for node in nodes {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Create or update the `ClassConstantNode` for `(fqcn, storage.name)`.
+    pub fn upsert_class_constant_node(&mut self, fqcn: &Arc<str>, storage: &ConstantStorage) {
+        use salsa::Setter as _;
+        let existing = self
+            .class_constant_nodes
+            .get(fqcn.as_ref())
+            .and_then(|m| m.get(storage.name.as_ref()))
+            .copied();
+        if let Some(node) = existing {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self)
+                && node.visibility(self) == storage.visibility
+                && node.is_final(self) == storage.is_final
+                && node.ty(self) == storage.ty
+                && node.location(self) == storage.location
+            {
+                return;
+            }
+            node.set_active(self).to(true);
+            node.set_ty(self).to(storage.ty.clone());
+            node.set_visibility(self).to(storage.visibility);
+            node.set_is_final(self).to(storage.is_final);
+            node.set_location(self).to(storage.location.clone());
+        } else {
+            let node = ClassConstantNode::new(
+                self,
+                fqcn.clone(),
+                storage.name.clone(),
+                true,
+                storage.ty.clone(),
+                storage.visibility,
+                storage.is_final,
+                storage.location.clone(),
+            );
+            Arc::make_mut(&mut self.class_constant_nodes)
+                .entry(fqcn.clone())
+                .or_default()
+                .insert(storage.name.clone(), node);
+        }
+    }
+
+    /// Create or update the `GlobalConstantNode` for `fqn`.
+    pub fn upsert_global_constant_node(&mut self, fqn: Arc<str>, ty: Union) -> GlobalConstantNode {
+        use salsa::Setter as _;
+        if let Some(&node) = self.global_constant_nodes.get(&fqn) {
+            // Fast-skip identical re-ingest — see `upsert_class_node` for rationale.
+            if node.active(self) && node.ty(self) == ty {
+                return node;
+            }
+            node.set_active(self).to(true);
+            node.set_ty(self).to(ty);
+            node
+        } else {
+            let node = GlobalConstantNode::new(self, fqn.clone(), true, ty);
+            Arc::make_mut(&mut self.global_constant_nodes).insert(fqn, node);
+            node
+        }
+    }
+
+    /// Mark the `GlobalConstantNode` for `fqn` as inactive.
+    pub fn deactivate_global_constant_node(&mut self, fqn: &str) {
+        use salsa::Setter as _;
+        if let Some(&node) = self.global_constant_nodes.get(fqn) {
+            node.set_active(self).to(false);
+        }
+    }
+
+    /// Mark all `ClassConstantNode`s owned by `fqcn` as inactive.
+    pub fn deactivate_class_constants(&mut self, fqcn: &str) {
+        use salsa::Setter as _;
+        let nodes: Vec<ClassConstantNode> = match self.class_constant_nodes.get(fqcn) {
+            Some(consts) => consts.values().copied().collect(),
+            None => return,
+        };
+        for node in nodes {
+            node.set_active(self).to(false);
+        }
+    }
+}
