@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-05-09
+
+### Added
+
+- Tier 1 & 2 parser optimizations: pre-sized arena allocators and parallel user stub discovery for improved cold-start performance (25-40% improvement expected).
+
+### Fixed
+
+- `cargo-deny` configuration format corrected to use proper advisories section syntax.
+- Security audit findings: eliminated unwrap calls and unsafe UTF-8 conversions.
+- Panic on empty generic type parameters in docblock parsing.
+- Outdated lock poison `.expect()` calls replaced with proper error handling.
+- Template parameter bounds preservation and improved generic type narrowing.
+- MixedClone detection for unconstrained template parameters.
+- Missing stubs directory safety check in build.rs.
+- Soft stub fallback version-gating for both functions and classes.
+
+### Changed
+
+- Refactored AST-based stub discovery in FileAnalyzer for clarity and performance.
+- Split db.rs into focused sub-modules for maintainability.
+- Improved code quality with centralized test utilities.
+- Eliminated HashMap/HashSet clones in cache flush hot paths.
+- Reduced string clone allocations in hot paths.
+- Replaced std::sync::Mutex with parking_lot::Mutex to eliminate poison panics.
+
+### Performance
+
+- Parallelized fixture discovery in build script.
+
 ## [0.20.0] - 2026-05-08
 
 ### Added
