@@ -15,10 +15,13 @@
 /// let src  = stub_vfs.get(&file).unwrap();           // → &'static str PHP source
 /// ```
 use std::collections::{HashMap, HashSet};
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
 use mir_codebase::storage::StubSlice;
+use php_ast::ast::ExprKind;
+use php_ast::visitor::{walk_expr, walk_program, Visitor};
 use rayon::prelude::*;
 
 use crate::db::MirDb;
@@ -163,6 +166,71 @@ pub(crate) fn collect_referenced_builtin_paths(source: &str) -> Vec<&'static str
         }
     }
     paths.into_iter().collect()
+}
+
+/// Walk the parsed AST to find identifiers that match known built-in functions /
+/// classes / constants, and return the deduplicated list of stub virtual paths.
+///
+/// Unlike [`collect_referenced_builtin_paths`], this walks the real AST instead
+/// of doing a byte-level heuristic scan. This eliminates false positives from
+/// function names appearing inside string literals or comments. Used by
+/// [`crate::AnalysisSession::ensure_stubs_for_ast`] for single-file analysis
+/// where the AST is already available.
+pub(crate) fn collect_referenced_builtin_paths_from_ast(
+    program: &php_ast::ast::Program<'_, '_>,
+) -> Vec<&'static str> {
+    let mut visitor = BuiltinRefVisitor {
+        paths: HashSet::new(),
+    };
+    let _ = walk_program(&mut visitor, program);
+    visitor.paths.into_iter().collect()
+}
+
+/// Visitor for extracting function/class/constant references from the AST.
+struct BuiltinRefVisitor {
+    paths: HashSet<&'static str>,
+}
+
+impl<'arena, 'src> Visitor<'arena, 'src> for BuiltinRefVisitor {
+    fn visit_expr(&mut self, expr: &php_ast::ast::Expr<'arena, 'src>) -> ControlFlow<()> {
+        match &expr.kind {
+            ExprKind::FunctionCall(call) => {
+                if let ExprKind::Identifier(name) = &call.name.kind {
+                    if let Some(p) = stub_path_for_function(name.as_str()) {
+                        self.paths.insert(p);
+                    }
+                }
+            }
+            ExprKind::New(new_expr) => {
+                if let ExprKind::Identifier(name) = &new_expr.class.kind {
+                    if let Some(p) = stub_path_for_class(name.as_str()) {
+                        self.paths.insert(p);
+                    }
+                }
+            }
+            ExprKind::StaticMethodCall(call) => {
+                if let ExprKind::Identifier(name) = &call.class.kind {
+                    if let Some(p) = stub_path_for_class(name.as_str()) {
+                        self.paths.insert(p);
+                    }
+                }
+            }
+            ExprKind::ClassConstAccess(access) => {
+                if let ExprKind::Identifier(name) = &access.class.kind {
+                    if let Some(p) = stub_path_for_class(name.as_str()) {
+                        self.paths.insert(p);
+                    }
+                }
+            }
+            ExprKind::Identifier(name) => {
+                if let Some(p) = stub_path_for_constant(name.as_str()) {
+                    self.paths.insert(p);
+                }
+            }
+            _ => {}
+        }
+        walk_expr(self, expr)
+    }
 }
 
 // ---------------------------------------------------------------------------
