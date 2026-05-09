@@ -1,10 +1,10 @@
 [advisories]
-vulnerability = "deny"
-notice = "warn"
+vulnerabilities = "deny"
+unmaintained = "warn"
+unsound = "deny"
+notices = "warn"
 
 [licenses]
-unlicensed = "deny"
-copyleft = "warn"
 allow = [
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
