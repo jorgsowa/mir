@@ -1,3 +1,4 @@
+pub mod arena;
 pub mod cache;
 pub mod call;
 pub mod class;

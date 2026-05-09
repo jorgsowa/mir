@@ -528,7 +528,7 @@ pub(crate) fn gather_inferred_types(
             let source = source.clone();
 
             s.spawn(move |_| {
-                let arena = bumpalo::Bump::new();
+                let arena = crate::arena::create_parse_arena(source.len());
                 let parsed = php_rs_parser::parse(&arena, source.as_ref());
                 if !parsed.errors.is_empty() {
                     return;

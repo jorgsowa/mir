@@ -127,7 +127,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
     let path = file.path(db);
     let text = file.text(db);
 
-    let arena = bumpalo::Bump::new();
+    let arena = crate::arena::create_parse_arena(text.len());
     let parsed = php_rs_parser::parse(&arena, &text);
 
     // Emit parse errors
