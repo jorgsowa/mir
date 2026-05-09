@@ -620,7 +620,7 @@ pub fn collect_file_definitions_uncached(
     let path = file.path(db);
     let text = file.text(db);
 
-    let arena = bumpalo::Bump::new();
+    let arena = crate::arena::create_parse_arena(text.len());
     let parsed = php_rs_parser::parse(&arena, &text);
 
     let mut all_issues: Vec<Issue> = parsed

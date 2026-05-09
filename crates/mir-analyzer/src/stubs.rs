@@ -273,16 +273,15 @@ pub fn builtin_stub_slices_for_version(php_version: PhpVersion) -> Vec<StubSlice
 }
 
 pub fn user_stub_slices(files: &[PathBuf], dirs: &[PathBuf]) -> Vec<StubSlice> {
-    let mut slices = Vec::new();
-    for path in files {
-        if let Some(slice) = parse_stub_file_slice(path) {
-            slices.push(slice);
-        }
-    }
+    let mut all_paths: Vec<PathBuf> = files.to_vec();
     for dir in dirs {
-        walk_stub_dir_slices(dir, &mut slices);
+        collect_stub_dir_paths(dir, &mut all_paths);
     }
-    slices
+
+    all_paths
+        .par_iter()
+        .filter_map(|path| parse_stub_file_slice(path))
+        .collect()
 }
 
 pub fn stub_slice_from_source(
@@ -290,7 +289,7 @@ pub fn stub_slice_from_source(
     content: &str,
     php_version: Option<PhpVersion>,
 ) -> StubSlice {
-    let arena = bumpalo::Bump::new();
+    let arena = crate::arena::create_parse_arena(content.len());
     let result = php_rs_parser::parse(&arena, content);
     let file: Arc<str> = Arc::from(filename);
     let collector =
@@ -318,7 +317,7 @@ fn parse_stub_file_slice(path: &Path) -> Option<StubSlice> {
     ))
 }
 
-fn walk_stub_dir_slices(dir: &Path, slices: &mut Vec<StubSlice>) {
+fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) => {
@@ -326,15 +325,13 @@ fn walk_stub_dir_slices(dir: &Path, slices: &mut Vec<StubSlice>) {
             return;
         }
     };
-    let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
-    paths.sort_unstable();
-    for path in paths {
+    let mut dir_entries: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+    dir_entries.sort_unstable();
+    for path in dir_entries {
         if path.is_dir() {
-            walk_stub_dir_slices(&path, slices);
+            collect_stub_dir_paths(&path, paths);
         } else if path.extension().is_some_and(|e| e == "php") {
-            if let Some(slice) = parse_stub_file_slice(&path) {
-                slices.push(slice);
-            }
+            paths.push(path);
         }
     }
 }

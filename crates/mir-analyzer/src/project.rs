@@ -55,7 +55,7 @@ struct ParsedProjectFile {
 
 impl ParsedProjectFile {
     fn new(file: Arc<str>, source: Arc<str>) -> Self {
-        let arena = Box::new(bumpalo::Bump::new());
+        let arena = Box::new(crate::arena::create_parse_arena(source.len()));
         let parsed = php_rs_parser::parse(&arena, &source);
         // SAFETY: `parsed` borrows from `arena` and `source`, both owned by this
         // struct and kept alive until `Drop`. `Drop` manually destroys `parsed`
@@ -221,17 +221,19 @@ impl ProjectAnalyzer {
             .swap(true, std::sync::atomic::Ordering::SeqCst)
         {
             let php_version = self.resolved_php_version();
-            crate::stubs::stub_files()
-                .par_iter()
-                .for_each(|(filename, content)| {
-                    let slice =
-                        crate::stubs::stub_slice_from_source(filename, content, Some(php_version));
-                    let mut guard = self.salsa.lock();
-                    guard.0.ingest_stub_slice(&slice);
-                });
 
+            // Parallelize built-in stub parsing.
+            let builtin_slices = crate::stubs::builtin_stub_slices_for_version(php_version);
+
+            // Parallelize user stub parsing (parallelization in user_stub_slices()).
+            let user_slices = crate::stubs::user_stub_slices(&self.stub_files, &self.stub_dirs);
+
+            // Lock once and ingest all slices together.
             let mut guard = self.salsa.lock();
-            for slice in crate::stubs::user_stub_slices(&self.stub_files, &self.stub_dirs) {
+            for slice in builtin_slices {
+                guard.0.ingest_stub_slice(&slice);
+            }
+            for slice in user_slices {
                 guard.0.ingest_stub_slice(&slice);
             }
         }
@@ -738,7 +740,7 @@ impl ProjectAnalyzer {
                 .map_with(db_full, |db, (file, src)| {
                     let driver =
                         Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
-                    let arena = bumpalo::Bump::new();
+                    let arena = crate::arena::create_parse_arena(src.len());
                     let parsed = php_rs_parser::parse(&arena, src);
                     driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
                 })

@@ -798,7 +798,7 @@ mod tests {
     use super::*;
 
     fn parse_and_collect_slice(file: &str, src: &str) -> StubSlice {
-        let arena = bumpalo::Bump::new();
+        let arena = crate::arena::create_parse_arena(src.len());
         let result = php_rs_parser::parse(&arena, src);
         let collector =
             DefinitionCollector::new_for_slice(Arc::from(file), src, &result.source_map);
