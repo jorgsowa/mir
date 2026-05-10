@@ -14,5 +14,3 @@ interface Collection extends \App\Countable {
     public function isEmpty(): bool;
 }
 ===expect===
-===ignore===
-TODO

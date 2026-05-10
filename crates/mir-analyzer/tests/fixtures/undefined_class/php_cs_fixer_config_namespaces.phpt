@@ -32,5 +32,3 @@ namespace StubTests\CodeStyle;
 
 class BracesOneLineFixer {}
 ===expect===
-===ignore===
-TODO

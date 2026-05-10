@@ -9,5 +9,3 @@ class Entity {}
 use App\Model\Entity;
 $x = new Entity();
 ===expect===
-===ignore===
-TODO

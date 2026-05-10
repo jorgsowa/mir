@@ -7,5 +7,3 @@ function test(): void {
     new MyClass();
 }
 ===expect===
-===ignore===
-TODO

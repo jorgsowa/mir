@@ -9,5 +9,3 @@ function test(): void {
     new NoSuchClass();
 }
 ===expect===
-===ignore===
-TODO

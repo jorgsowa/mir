@@ -11,5 +11,3 @@ class Bar {
     public Dep $prop;
 }
 ===expect===
-===ignore===
-TODO
