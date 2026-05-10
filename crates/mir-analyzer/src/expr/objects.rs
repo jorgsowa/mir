@@ -7,6 +7,16 @@ use mir_types::{Atomic, Union};
 use php_ast::ast::{ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
+fn is_valid_class_name_type(ty: &Union) -> bool {
+    // Class names must be strings or class-string types
+    ty.contains(|t| {
+        matches!(
+            t,
+            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_)
+        )
+    })
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_new<'arena, 'src>(
         &mut self,
@@ -130,7 +140,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ty
             }
             _ => {
-                self.analyze(n.class, ctx);
+                let ty = self.analyze(n.class, ctx);
+                // Check if the expression could evaluate to a valid class name
+                // (but skip anonymous class definitions, which are valid)
+                if !matches!(n.class.kind, ExprKind::AnonymousClass(_))
+                    && !is_valid_class_name_type(&ty)
+                {
+                    self.emit(
+                        IssueKind::UndefinedClass {
+                            name: "<dynamic>".to_string(),
+                        },
+                        Severity::Error,
+                        n.class.span,
+                    );
+                }
                 Union::single(Atomic::TObject)
             }
         };

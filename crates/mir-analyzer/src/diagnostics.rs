@@ -115,6 +115,50 @@ pub(crate) fn check_name_class(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
 ) {
+    check_name_class_with_context(
+        name,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+        php_version,
+        false,
+    );
+}
+
+pub(crate) fn check_name_class_for_extends(
+    name: &php_ast::ast::Name<'_, '_>,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+    php_version: PhpVersion,
+) {
+    check_name_class_with_context(
+        name,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+        php_version,
+        true,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn check_name_class_with_context(
+    name: &php_ast::ast::Name<'_, '_>,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+    php_version: PhpVersion,
+    is_extends: bool,
+) {
     let name_str = crate::parser::name_to_string(name);
     let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
     if !type_exists_via_db(db, &resolved) {
@@ -150,6 +194,31 @@ pub(crate) fn check_name_class(
             )
             .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
         );
+        return;
+    }
+
+    // Check if extending an interface
+    if is_extends {
+        if let Some(node) = db.lookup_class_node(&resolved) {
+            if node.is_interface(db) {
+                let span = name.span();
+                let (line, col_start) = offset_to_line_col(source, span.start, source_map);
+                let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
+                issues.push(
+                    mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedClass { name: resolved },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    )
+                    .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
+                );
+            }
+        }
     }
 }
 
@@ -169,6 +238,50 @@ fn is_pseudo_type(name: &str) -> bool {
             | "callable"
             | "iterable"
     )
+}
+
+// ---------------------------------------------------------------------------
+// Expression class checking
+// ---------------------------------------------------------------------------
+
+pub(crate) fn check_expr_for_undefined_classes<'arena, 'src>(
+    expr: &php_ast::ast::Expr<'arena, 'src>,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+    _php_version: PhpVersion,
+) {
+    use php_ast::ast::ExprKind;
+    if let ExprKind::ClassConstAccess(cca) = &expr.kind {
+        // Check for undefined class in ::CONSTANT or ::class
+        if let ExprKind::Identifier(class_name) = &cca.class.kind {
+            let name_str = class_name.to_string();
+            let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
+            if !type_exists_via_db(db, &resolved) {
+                let (line, col_start) =
+                    offset_to_line_col(source, cca.class.span.start, source_map);
+                let (line_end, col_end) =
+                    offset_to_line_col(source, cca.class.span.end, source_map);
+                issues.push(
+                    mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedClass { name: resolved },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    )
+                    .with_snippet(
+                        crate::parser::span_text(source, cca.class.span).unwrap_or_default(),
+                    ),
+                );
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -11,5 +11,3 @@ function run(): void {
     new \Vendor\Lib\Foo();
 }
 ===expect===
-===ignore===
-TODO
