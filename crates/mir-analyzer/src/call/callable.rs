@@ -16,6 +16,7 @@ pub(crate) struct ParamInfo {
 /// Extract callable parameter list for arity checking from a union when it can be determined statically:
 /// - TClosure: return params directly
 /// - TLiteralString: resolve to function node and return its params
+/// - TIntersection: check parts for callable/closure types
 /// - Everything else: None (param list is unknown at compile time)
 pub(crate) fn extract_callable_params(
     union: &Union,
@@ -49,6 +50,13 @@ pub(crate) fn extract_callable_params(
                             })
                             .collect(),
                     );
+                }
+            }
+            Atomic::TIntersection { parts } => {
+                for part in parts {
+                    if let Some(params) = extract_callable_params(part, ea) {
+                        return Some(params);
+                    }
                 }
             }
             _ => {}
