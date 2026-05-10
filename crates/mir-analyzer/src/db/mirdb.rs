@@ -370,19 +370,16 @@ impl MirDb {
         mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
         if let Some(file) = &slice.file {
-            let file_cloned = file.clone();
             if let Some(namespace) = &slice.namespace {
-                Arc::make_mut(&mut self.file_namespaces)
-                    .insert(file_cloned.clone(), namespace.clone());
+                Arc::make_mut(&mut self.file_namespaces).insert(file.clone(), namespace.clone());
             }
             if !slice.imports.is_empty() {
-                Arc::make_mut(&mut self.file_imports)
-                    .insert(file_cloned.clone(), slice.imports.clone());
+                Arc::make_mut(&mut self.file_imports).insert(file.clone(), slice.imports.clone());
             }
             for (name, _) in &slice.global_vars {
                 let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
                 Arc::make_mut(&mut self.symbol_to_file)
-                    .insert(Arc::from(global_name), file_cloned.clone());
+                    .insert(Arc::from(global_name), file.clone());
             }
         }
         for (name, ty) in &slice.global_vars {
@@ -390,12 +387,11 @@ impl MirDb {
             Arc::make_mut(&mut self.global_vars).insert(Arc::from(global_name), ty.clone());
         }
 
-        let slice_file = slice.file.as_ref().map(|f| f.clone());
+        let slice_file = slice.file.clone();
         for cls in &slice.classes {
             if let Some(file) = &slice_file {
                 Arc::make_mut(&mut self.symbol_to_file).insert(cls.fqcn.clone(), file.clone());
             }
-            let fqcn_cloned = cls.fqcn.clone();
             self.upsert_class_node(ClassNodeFields {
                 is_abstract: cls.is_abstract,
                 parent: cls.parent.clone(),
@@ -414,7 +410,7 @@ impl MirDb {
                         .map(|(iface, args)| (iface.clone(), Arc::from(args.as_ref())))
                         .collect::<Vec<_>>(),
                 ),
-                ..ClassNodeFields::for_class(fqcn_cloned)
+                ..ClassNodeFields::for_class(cls.fqcn.clone())
             });
             if self.method_nodes.contains_key(cls.fqcn.as_ref()) {
                 let method_keep: HashSet<&str> =
@@ -450,12 +446,11 @@ impl MirDb {
             if let Some(file) = &slice_file {
                 Arc::make_mut(&mut self.symbol_to_file).insert(iface.fqcn.clone(), file.clone());
             }
-            let fqcn_cloned = iface.fqcn.clone();
             self.upsert_class_node(ClassNodeFields {
                 extends: Arc::from(iface.extends.as_ref()),
                 template_params: Arc::from(iface.template_params.as_ref()),
                 location: iface.location.clone(),
-                ..ClassNodeFields::for_interface(fqcn_cloned)
+                ..ClassNodeFields::for_interface(iface.fqcn.clone())
             });
             if self.method_nodes.contains_key(iface.fqcn.as_ref()) {
                 let method_keep: HashSet<&str> =
@@ -479,14 +474,13 @@ impl MirDb {
             if let Some(file) = &slice_file {
                 Arc::make_mut(&mut self.symbol_to_file).insert(tr.fqcn.clone(), file.clone());
             }
-            let fqcn_cloned = tr.fqcn.clone();
             self.upsert_class_node(ClassNodeFields {
                 traits: Arc::from(tr.traits.as_ref()),
                 template_params: Arc::from(tr.template_params.as_ref()),
                 require_extends: Arc::from(tr.require_extends.as_ref()),
                 require_implements: Arc::from(tr.require_implements.as_ref()),
                 location: tr.location.clone(),
-                ..ClassNodeFields::for_trait(fqcn_cloned)
+                ..ClassNodeFields::for_trait(tr.fqcn.clone())
             });
             if self.method_nodes.contains_key(tr.fqcn.as_ref()) {
                 let method_keep: HashSet<&str> =
@@ -518,13 +512,12 @@ impl MirDb {
             if let Some(file) = &slice_file {
                 Arc::make_mut(&mut self.symbol_to_file).insert(en.fqcn.clone(), file.clone());
             }
-            let fqcn_cloned = en.fqcn.clone();
             self.upsert_class_node(ClassNodeFields {
                 interfaces: Arc::from(en.interfaces.as_ref()),
                 is_backed_enum: en.scalar_type.is_some(),
                 enum_scalar_type: en.scalar_type.clone(),
                 location: en.location.clone(),
-                ..ClassNodeFields::for_enum(fqcn_cloned)
+                ..ClassNodeFields::for_enum(en.fqcn.clone())
             });
             if self.method_nodes.contains_key(en.fqcn.as_ref()) {
                 let mut method_keep: HashSet<&str> =
@@ -604,8 +597,7 @@ impl MirDb {
             self.upsert_function_node(func);
         }
         for (fqn, ty) in &slice.constants {
-            let fqn_cloned = fqn.clone();
-            self.upsert_global_constant_node(fqn_cloned, ty.clone());
+            self.upsert_global_constant_node(fqn.clone(), ty.clone());
         }
     }
 

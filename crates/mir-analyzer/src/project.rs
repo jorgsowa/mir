@@ -323,9 +323,9 @@ impl ProjectAnalyzer {
                         }
                     }
                     None => {
-                        let file_cloned = parsed.file.clone();
-                        let sf = SourceFile::new(db, file_cloned.clone(), parsed.source.clone());
-                        files.insert(file_cloned, sf);
+                        let file = parsed.file.clone();
+                        let sf = SourceFile::new(db, file.clone(), parsed.source.clone());
+                        files.insert(file, sf);
                     }
                 }
             }
@@ -932,9 +932,9 @@ impl ProjectAnalyzer {
                         sf
                     }
                     None => {
-                        let file_cloned = file.clone();
-                        let sf = SourceFile::new(db, file_cloned.clone(), src.clone());
-                        files.insert(file_cloned, sf);
+                        let file = file.clone();
+                        let sf = SourceFile::new(db, file.clone(), src.clone());
+                        files.insert(file, sf);
                         sf
                     }
                 })

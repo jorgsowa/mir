@@ -315,9 +315,9 @@ impl AnalysisSession {
                     sf
                 }
                 None => {
-                    let file_cloned = file.clone();
-                    let sf = SourceFile::new(db, file_cloned.clone(), source.clone());
-                    files.insert(file_cloned, sf);
+                    let file = file.clone();
+                    let sf = SourceFile::new(db, file.clone(), source.clone());
+                    files.insert(file, sf);
                     sf
                 }
             };
