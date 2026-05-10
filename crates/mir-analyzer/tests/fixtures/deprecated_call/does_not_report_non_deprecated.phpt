@@ -10,5 +10,3 @@ function test(): void {
     greet('Alice');
 }
 ===expect===
-===ignore===
-TODO
