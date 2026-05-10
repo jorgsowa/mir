@@ -10,6 +10,4 @@ closureWithTooFewArgs
                     }
 
 ===expect===
-TooFewArguments
-===ignore===
-TODO
+TooFewArguments@6:24: Too few arguments for callable(): expected 2, got 1
