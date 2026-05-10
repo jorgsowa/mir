@@ -384,12 +384,11 @@ impl Context {
             match (ty_if, ty_else) {
                 (Some(a), Some(b)) => {
                     let merged = Union::merge(a, b);
-                    let name_cloned = name.clone();
-                    result.vars.insert(name_cloned.clone(), merged);
+                    result.vars.insert(name.clone(), merged);
                     if in_if && in_else {
-                        result.assigned_vars.insert(name_cloned);
+                        result.assigned_vars.insert(name.clone());
                     } else {
-                        result.possibly_assigned_vars.insert(name_cloned);
+                        result.possibly_assigned_vars.insert(name.clone());
                     }
                 }
                 (Some(a), None) => {
@@ -397,29 +396,25 @@ impl Context {
                         // var existed before: merge with pre type
                         let pre_ty = pre.vars.get(name).cloned().unwrap_or_else(Union::mixed);
                         let merged = Union::merge(a, &pre_ty);
-                        let name_cloned = name.clone();
-                        result.vars.insert(name_cloned.clone(), merged);
-                        result.assigned_vars.insert(name_cloned);
+                        result.vars.insert(name.clone(), merged);
+                        result.assigned_vars.insert(name.clone());
                     } else {
                         // only assigned in if branch
                         let ty = a.clone().possibly_undefined();
-                        let name_cloned = name.clone();
-                        result.vars.insert(name_cloned.clone(), ty);
-                        result.possibly_assigned_vars.insert(name_cloned);
+                        result.vars.insert(name.clone(), ty);
+                        result.possibly_assigned_vars.insert(name.clone());
                     }
                 }
                 (None, Some(b)) => {
                     if in_pre {
                         let pre_ty = pre.vars.get(name).cloned().unwrap_or_else(Union::mixed);
                         let merged = Union::merge(&pre_ty, b);
-                        let name_cloned = name.clone();
-                        result.vars.insert(name_cloned.clone(), merged);
-                        result.assigned_vars.insert(name_cloned);
+                        result.vars.insert(name.clone(), merged);
+                        result.assigned_vars.insert(name.clone());
                     } else {
                         let ty = b.clone().possibly_undefined();
-                        let name_cloned = name.clone();
-                        result.vars.insert(name_cloned.clone(), ty);
-                        result.possibly_assigned_vars.insert(name_cloned);
+                        result.vars.insert(name.clone(), ty);
+                        result.possibly_assigned_vars.insert(name.clone());
                     }
                 }
                 (None, None) => {}
