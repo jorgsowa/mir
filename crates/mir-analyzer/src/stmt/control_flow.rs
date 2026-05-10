@@ -392,7 +392,11 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                     u
                 };
-                catch_ctx.set_var(var.trim_start_matches('$'), exc_ty);
+                let var_name = var.trim_start_matches('$');
+                catch_ctx.set_var(var_name, exc_ty);
+                let (line, col_start) = self.offset_to_line_col(catch.span.start);
+                let (line_end, col_end) = self.offset_to_line_col(catch.span.end);
+                catch_ctx.record_var_location(var_name, line, col_start, line_end, col_end);
             }
             self.analyze_stmts(&catch.body, &mut catch_ctx);
             if !catch_ctx.diverges {

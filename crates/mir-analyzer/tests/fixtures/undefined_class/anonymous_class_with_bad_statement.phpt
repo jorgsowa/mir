@@ -8,6 +8,4 @@ anonymousClassWithBadStatement
                         }
                     };
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@4:32: Class B does not exist

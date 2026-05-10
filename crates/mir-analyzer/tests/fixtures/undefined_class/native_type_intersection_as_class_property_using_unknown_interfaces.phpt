@@ -2,17 +2,14 @@
 nativeTypeIntersectionAsClassPropertyUsingUnknownInterfaces
 ===file===
 <?php
-                    class C {
-                        private ExampleUnknownA&ExampleUnknownB $other;
-                        public function __construct()
-                        {
-                            $this->other = new ExampleUnknownAB();
-                        }
-                    }
-                '
-                // @todo decide whether a fall-back should be implemented, that allows to by-pass this failure (opt-in config)
-                // `UndefinedClass - src/somefile.php:3:33 - Class, interface or enum named ExampleUnknownB does not exist`
+class C {
+    private ExampleUnknownA&ExampleUnknownB $other;
+    public function __construct() {
+        $this->other = new ExampleUnknownAB();
+    }
+}
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@3:12: Class ExampleUnknownA does not exist
+UndefinedClass@3:28: Class ExampleUnknownB does not exist
+InvalidPropertyAssignment@5:8: Property $other expects 'ExampleUnknownA&ExampleUnknownB', cannot assign 'ExampleUnknownAB'
+UndefinedClass@5:27: Class ExampleUnknownAB does not exist
