@@ -244,6 +244,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         if cca.member.name_str() == Some("class") {
             let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+                if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                    && !crate::db::type_exists_via_db(self.db, &resolved)
+                {
+                    self.emit(
+                        IssueKind::UndefinedClass {
+                            name: resolved.clone(),
+                        },
+                        Severity::Error,
+                        cca.class.span,
+                    );
+                }
                 Some(Arc::from(resolved.as_str()))
             } else {
                 None

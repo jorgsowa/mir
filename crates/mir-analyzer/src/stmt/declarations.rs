@@ -8,6 +8,12 @@ impl<'a> StatementsAnalyzer<'a> {
         decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
         ctx: &mut Context,
     ) {
+        for p in decl.params.iter() {
+            if let Some(default) = &p.default {
+                let mut ea = self.expr_analyzer(ctx);
+                let _ = ea.analyze(default, ctx);
+            }
+        }
         let params: Vec<mir_codebase::FnParam> = decl
             .params
             .iter()
@@ -64,6 +70,12 @@ impl<'a> StatementsAnalyzer<'a> {
             let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
+            for p in method.params.iter() {
+                if let Some(default) = &p.default {
+                    let mut ea = self.expr_analyzer(ctx);
+                    let _ = ea.analyze(default, ctx);
+                }
+            }
             let Some(body) = &method.body else { continue };
             let (params, return_ty) =
                 crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), &method.name.to_string())

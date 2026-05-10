@@ -175,7 +175,35 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- new ClassName(...) ----------------------------------------
             ExprKind::New(n) => self.analyze_new(n, expr.span, ctx),
 
-            ExprKind::AnonymousClass(_) => Union::single(Atomic::TObject),
+            ExprKind::AnonymousClass(anon) => {
+                for member in anon.members.iter() {
+                    if let php_ast::ast::ClassMemberKind::Method(method) = &member.kind {
+                        let Some(body) = &method.body else { continue };
+                        let mut sa = crate::stmt::StatementsAnalyzer::new(
+                            self.db,
+                            self.file.clone(),
+                            self.source,
+                            self.source_map,
+                            self.issues,
+                            self.symbols,
+                            self.php_version,
+                            self.inference_only,
+                        );
+                        let mut method_ctx = crate::context::Context::for_function(
+                            &[],
+                            None,
+                            std::sync::Arc::from([]),
+                            None,
+                            None,
+                            None,
+                            ctx.strict_types,
+                            false,
+                        );
+                        sa.analyze_stmts(body, &mut method_ctx);
+                    }
+                }
+                Union::single(Atomic::TObject)
+            }
 
             // --- Property access -------------------------------------------
             ExprKind::PropertyAccess(pa) => self.analyze_property_access(pa, expr.span, ctx),
