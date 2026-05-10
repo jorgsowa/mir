@@ -14,21 +14,80 @@ impl<'a> StatementsAnalyzer<'a> {
                 let _ = ea.analyze(default, ctx);
             }
         }
-        let params: Vec<mir_codebase::FnParam> = decl
-            .params
-            .iter()
-            .map(|p| mir_codebase::FnParam {
-                name: Arc::from(p.name.to_string().trim_start_matches('$')),
-                ty: None,
-                has_default: p.default.is_some(),
-                is_variadic: p.variadic,
-                is_byref: p.by_ref,
-                is_optional: p.default.is_some() || p.variadic,
-            })
-            .collect();
+
+        // Look up the function in the database to get resolved parameter types
+        let fn_name = decl.name.to_string();
+        let (params, return_ty) = if let Some(ns) = self.db.file_namespace(&self.file) {
+            let fqn = format!("{}\\{}", ns, fn_name);
+            if let Some(node) = self
+                .db
+                .lookup_function_node(&fqn)
+                .filter(|n| n.active(self.db))
+            {
+                (
+                    node.params(self.db).to_vec(),
+                    node.return_type(self.db).map(|t| (*t).clone()),
+                )
+            } else {
+                // Try global namespace
+                if let Some(node) = self
+                    .db
+                    .lookup_function_node(&fn_name)
+                    .filter(|n| n.active(self.db))
+                {
+                    (
+                        node.params(self.db).to_vec(),
+                        node.return_type(self.db).map(|t| (*t).clone()),
+                    )
+                } else {
+                    // Fallback to AST if not found in database
+                    let ast_params: Vec<mir_codebase::FnParam> = decl
+                        .params
+                        .iter()
+                        .map(|p| mir_codebase::FnParam {
+                            name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                            ty: None,
+                            has_default: p.default.is_some(),
+                            is_variadic: p.variadic,
+                            is_byref: p.by_ref,
+                            is_optional: p.default.is_some() || p.variadic,
+                        })
+                        .collect();
+                    (ast_params, None)
+                }
+            }
+        } else {
+            // No namespace
+            if let Some(node) = self
+                .db
+                .lookup_function_node(&fn_name)
+                .filter(|n| n.active(self.db))
+            {
+                (
+                    node.params(self.db).to_vec(),
+                    node.return_type(self.db).map(|t| (*t).clone()),
+                )
+            } else {
+                // Fallback to AST if not found in database
+                let ast_params: Vec<mir_codebase::FnParam> = decl
+                    .params
+                    .iter()
+                    .map(|p| mir_codebase::FnParam {
+                        name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                        ty: None,
+                        has_default: p.default.is_some(),
+                        is_variadic: p.variadic,
+                        is_byref: p.by_ref,
+                        is_optional: p.default.is_some() || p.variadic,
+                    })
+                    .collect();
+                (ast_params, None)
+            }
+        };
+
         let mut fn_ctx = Context::for_function(
             &params,
-            None,
+            return_ty,
             Arc::from([]),
             None,
             None,

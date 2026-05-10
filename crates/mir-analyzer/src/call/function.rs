@@ -16,6 +16,7 @@ use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 use super::args::{
     check_args, expr_can_be_passed_by_reference, spread_element_type, CheckArgsParams,
 };
+use super::callable::extract_callable_params;
 use super::CallAnalyzer;
 
 struct ResolvedFn {
@@ -67,6 +68,40 @@ impl CallAnalyzer {
                 for arg in call.args.iter() {
                     ea.analyze(&arg.value, ctx);
                 }
+
+                // Validate callable arity
+                if let Some(params) = extract_callable_params(&callee_ty, ea) {
+                    let required_count = params
+                        .iter()
+                        .filter(|p| !p.is_optional && !p.is_variadic)
+                        .count();
+                    let has_variadic = params.iter().any(|p| p.is_variadic);
+                    let max_params = params.len();
+                    let actual_count = call.args.len();
+
+                    if actual_count < required_count {
+                        ea.emit(
+                            IssueKind::TooFewArguments {
+                                fn_name: "callable".to_string(),
+                                expected: required_count,
+                                actual: actual_count,
+                            },
+                            Severity::Error,
+                            span,
+                        );
+                    } else if !has_variadic && actual_count > max_params {
+                        ea.emit(
+                            IssueKind::TooManyArguments {
+                                fn_name: "callable".to_string(),
+                                expected: max_params,
+                                actual: actual_count,
+                            },
+                            Severity::Error,
+                            span,
+                        );
+                    }
+                }
+
                 for atomic in &callee_ty.types {
                     match atomic {
                         Atomic::TClosure { return_type, .. } => return *return_type.clone(),
