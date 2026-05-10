@@ -11,4 +11,4 @@ getClassMissingClass
                         C::class => 5,
                     };
 ===expect===
-UndefinedClass@11:24: Class C does not exist
+UndefinedClass@8:24: Class C does not exist

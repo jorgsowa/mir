@@ -359,6 +359,22 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 }
             }
 
+            // Check if a string callable references an undefined class/method (e.g., "B::bar")
+            if param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TString)) {
+                if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+                    if let Some((class_name, _method_name)) = s.split_once("::") {
+                        let resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, class_name);
+                        if !crate::db::type_exists_via_db(ea.db, &resolved) {
+                            ea.emit(
+                                mir_issues::IssueKind::UndefinedClass { name: resolved },
+                                Severity::Error,
+                                arg_span,
+                            );
+                        }
+                    }
+                }
+            }
+
             if !param_ty.is_nullable()
                 && !param_ty.is_mixed()
                 && arg_ty.is_single()

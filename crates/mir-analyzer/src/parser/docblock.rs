@@ -993,7 +993,9 @@ fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     if is_inside_generics(s) {
         return Some(format!("@{tag} has unclosed generic type `{s}`"));
     }
-    if has_empty_generics(s) {
+    // Skip empty generics check for callable/closure types (e.g., `callable(): T`, `\Closure(): T`)
+    let is_callable_type = s.to_lowercase().contains("callable") || s.contains("Closure");
+    if !is_callable_type && has_empty_generics(s) {
         return Some(format!("@{tag} has empty generic type parameter in `{s}`"));
     }
     for part in split_union(s) {

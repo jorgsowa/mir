@@ -78,12 +78,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut result = Union::empty();
         for arm in m.arms.iter() {
             let mut arm_ctx = ctx.fork();
-            if let (Some(var), Some(conditions)) = (&subject_var, &arm.conditions) {
-                let mut arm_ty = Union::empty();
+            // Always analyze conditions to check for undefined classes and get types
+            let mut arm_ty = Union::empty();
+            if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
                     let cond_ty = self.analyze(cond, ctx);
                     arm_ty = Union::merge(&arm_ty, &cond_ty);
                 }
+            }
+            // Use type narrowing if the subject is a variable
+            if let Some(var) = &subject_var {
                 if !arm_ty.is_empty() && !arm_ty.is_mixed() {
                     let narrowed = subject_ty.intersect_with(&arm_ty);
                     if !narrowed.is_empty() {
@@ -91,6 +95,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
+            // Narrow the arm context based on the condition expressions
             if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
                     crate::narrowing::narrow_from_condition(
