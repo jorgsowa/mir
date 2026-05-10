@@ -22,6 +22,7 @@ use std::sync::{Arc, LazyLock};
 use mir_codebase::storage::StubSlice;
 use php_ast::ast::ExprKind;
 use php_ast::visitor::{walk_expr, walk_program, Visitor};
+use php_lexer::TokenKind;
 use rayon::prelude::*;
 
 use crate::db::MirDb;
@@ -117,39 +118,41 @@ pub(crate) fn stub_path_for_constant(name: &str) -> Option<&'static str> {
 /// paths needed to cover them.
 ///
 /// This is the core of the lazy-stub auto-discovery used by
-/// [`crate::AnalysisSession::ensure_stubs_for_source`]: we don't try to
-/// understand syntax (skip strings, distinguish methods from functions, etc.).
-/// Instead we treat the source as a sequence of identifier-like tokens, look
-/// each one up against the three sorted indexes, and collect the matching
-/// stub paths. False positives (e.g., `imagecreate` appearing inside a string
-/// literal) cost only one extra stub ingest — cheap and idempotent.
-///
-/// Tokens are `\\?[A-Za-z_]\w*(\\\w+)*` so that namespaced FQCNs like
-/// `Foo\Bar\Baz` resolve as a single token against [`STUB_CLASS_INDEX`].
+/// [`crate::AnalysisSession::ensure_stubs_for_source`]. Uses the PHP lexer
+/// to safely extract identifier tokens, avoiding manual byte-level scanning.
+/// False positives (e.g., `imagecreate` appearing inside a string literal)
+/// cost only one extra stub ingest — cheap and idempotent.
 pub(crate) fn collect_referenced_builtin_paths(source: &str) -> Vec<&'static str> {
-    use std::collections::HashSet;
+    use php_lexer::lex_all;
 
     let mut tokens: HashSet<&str> = HashSet::new();
-    let bytes = source.as_bytes();
+    let (lexed, _errors) = lex_all(source);
+
     let mut i = 0;
-    while i < bytes.len() {
-        let c = bytes[i];
-        let is_token_start = c.is_ascii_alphabetic() || c == b'_' || c == b'\\';
-        if !is_token_start {
-            i += 1;
-            continue;
-        }
-        let start = i;
-        while i < bytes.len() {
-            let b = bytes[i];
-            if b.is_ascii_alphanumeric() || b == b'_' || b == b'\\' {
-                i += 1;
+    while i < lexed.len() {
+        let token = &lexed[i];
+        if token.kind == TokenKind::Identifier {
+            let start = token.span.start as usize;
+            let end = token.span.end as usize;
+            if let Some(mut text) = source.get(start..end) {
+                // Handle namespaced identifiers: Foo\Bar\Baz
+                let mut j = i + 1;
+                while j + 1 < lexed.len()
+                    && lexed[j].kind == TokenKind::Backslash
+                    && lexed[j + 1].kind == TokenKind::Identifier
+                {
+                    j += 2;
+                    if let Some(part) = source.get(start..(lexed[j - 1].span.end as usize)) {
+                        text = part;
+                    }
+                }
+                tokens.insert(text);
+                i = j;
             } else {
-                break;
+                i += 1;
             }
-        }
-        if let Ok(token) = std::str::from_utf8(&bytes[start..i]) {
-            tokens.insert(token);
+        } else {
+            i += 1;
         }
     }
 

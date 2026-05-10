@@ -677,6 +677,7 @@ dependencies = [
  "mir-types",
  "parking_lot",
  "php-ast",
+ "php-lexer",
  "php-rs-parser",
  "quick-xml",
  "rayon",
