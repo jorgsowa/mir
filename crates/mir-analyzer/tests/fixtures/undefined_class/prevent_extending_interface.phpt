@@ -6,6 +6,4 @@ preventExtendingInterface
 
                     class Bar extends Foo {}
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@4:38: Class Foo does not exist

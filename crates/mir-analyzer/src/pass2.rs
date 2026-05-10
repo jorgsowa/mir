@@ -6,7 +6,8 @@ use parking_lot::Mutex;
 
 use crate::db::{resolve_name_via_db, FunctionNode, MirDatabase};
 use crate::diagnostics::{
-    check_name_class, check_type_hint_classes, emit_unused_params, emit_unused_variables,
+    check_expr_for_undefined_classes, check_name_class, check_type_hint_classes,
+    emit_unused_params, emit_unused_variables,
 };
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
@@ -457,6 +458,18 @@ impl<'a> Pass2Driver<'a> {
                     self.php_version,
                 );
             }
+            // Check parameter default values for undefined classes
+            if let Some(default_expr) = &param.default {
+                check_expr_for_undefined_classes(
+                    default_expr,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
+            }
         }
         if let Some(hint) = &decl.return_type {
             check_type_hint_classes(
@@ -579,7 +592,7 @@ impl<'a> Pass2Driver<'a> {
             .and_then(|node| node.parent(self.db));
 
         if let Some(parent) = &decl.extends {
-            check_name_class(
+            crate::diagnostics::check_name_class_for_extends(
                 parent,
                 self.db,
                 file,
@@ -845,7 +858,7 @@ impl<'a> Pass2Driver<'a> {
             .and_then(|node| node.parent(self.db));
 
         if let Some(parent) = &decl.extends {
-            check_name_class(
+            crate::diagnostics::check_name_class_for_extends(
                 parent,
                 self.db,
                 file,

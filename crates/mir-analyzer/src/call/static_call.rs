@@ -4,7 +4,7 @@ use php_ast::ast::{ExprKind, StaticDynMethodCallExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
-use mir_types::Union;
+use mir_types::{Atomic, Union};
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
@@ -25,6 +25,16 @@ fn extract_namespace(fqcn: &str) -> Option<&str> {
     }
 }
 
+fn is_valid_class_name_type(ty: &Union) -> bool {
+    // Class names must be strings or class-string types
+    ty.contains(|t| {
+        matches!(
+            t,
+            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_)
+        )
+    })
+}
+
 impl CallAnalyzer {
     pub fn analyze_static_method_call<'a, 'arena, 'src>(
         ea: &mut ExpressionAnalyzer<'a>,
@@ -41,7 +51,20 @@ impl CallAnalyzer {
             ExprKind::Identifier(name) => {
                 crate::db::resolve_name_via_db(ea.db, &ea.file, name.as_ref())
             }
-            _ => return Union::mixed(),
+            _ => {
+                let ty = ea.analyze(call.class, ctx);
+                // Check if the expression could evaluate to a valid class name
+                if !is_valid_class_name_type(&ty) {
+                    ea.emit(
+                        IssueKind::UndefinedClass {
+                            name: "<dynamic>".to_string(),
+                        },
+                        Severity::Error,
+                        call.class.span,
+                    );
+                }
+                return Union::mixed();
+            }
         };
 
         let fqcn = resolve_static_class(&fqcn, ctx);
@@ -62,6 +85,20 @@ impl CallAnalyzer {
 
         let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
         let method_name_lower = method_name.to_lowercase();
+
+        // Check if trying to call static method on an interface (not allowed)
+        if crate::db::type_exists_via_db(ea.db, &fqcn) {
+            if let Some(node) = ea.db.lookup_class_node(&fqcn) {
+                if node.is_interface(ea.db) {
+                    ea.emit(
+                        IssueKind::UndefinedClass { name: fqcn.clone() },
+                        Severity::Error,
+                        call.class.span,
+                    );
+                    return Union::mixed();
+                }
+            }
+        }
 
         let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower);
 
@@ -139,13 +176,13 @@ impl CallAnalyzer {
         } else if crate::db::type_exists_via_db(ea.db, &fqcn)
             && !crate::db::has_unknown_ancestor_via_db(ea.db, &fqcn)
         {
-            let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, &fqcn)
-                .map(|k| (k.is_interface, k.is_abstract))
-                .unwrap_or((false, false));
+            let is_abstract = crate::db::class_kind_via_db(ea.db, &fqcn)
+                .map(|k| k.is_abstract)
+                .unwrap_or(false);
             // Check for __callStatic in the full inheritance chain (not just direct methods)
             let has_callstatic_magic =
                 crate::db::lookup_method_in_chain(ea.db, &fqcn, "__callstatic").is_some();
-            if is_interface || is_abstract || has_callstatic_magic {
+            if is_abstract || has_callstatic_magic {
                 Union::mixed()
             } else {
                 ea.emit(

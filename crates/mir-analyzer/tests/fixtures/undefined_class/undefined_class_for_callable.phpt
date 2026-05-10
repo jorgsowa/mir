@@ -7,6 +7,5 @@ undefinedClassForCallable
                     }
                     new Foo(function() : void {});
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@3:52: Class UndefinedClass does not exist
+UnusedParam@3:52: Parameter $o is never used

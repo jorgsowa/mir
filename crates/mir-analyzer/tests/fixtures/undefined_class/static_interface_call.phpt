@@ -8,6 +8,4 @@ staticInterfaceCall
 
                     Foo::doFoo();
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@6:20: Class Foo does not exist

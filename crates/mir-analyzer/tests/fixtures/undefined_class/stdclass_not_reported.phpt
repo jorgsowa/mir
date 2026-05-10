@@ -6,5 +6,3 @@ function test(): void {
     new stdClass();
 }
 ===expect===
-===ignore===
-TODO

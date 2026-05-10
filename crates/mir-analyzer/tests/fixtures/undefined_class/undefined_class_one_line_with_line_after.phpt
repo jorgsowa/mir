@@ -12,6 +12,4 @@ undefinedClassOneLineWithLineAfter
                         }
                     }
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@8:32: Class C does not exist

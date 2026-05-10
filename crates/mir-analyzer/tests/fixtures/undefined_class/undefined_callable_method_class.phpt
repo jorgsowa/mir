@@ -12,6 +12,4 @@ undefinedCallableMethodClass
 
                     foo("B::bar");
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+UndefinedClass@13:16: Class B does not exist
