@@ -64,7 +64,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Test
+        shell: bash
         run: |
-          THREADS=$(getconf _NPROCESSORS_ONLN || nproc || sysctl -n hw.ncpu || echo 4)
+          THREADS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
           echo "Running tests with $THREADS threads"
           cargo test --workspace -- --test-threads=$THREADS
