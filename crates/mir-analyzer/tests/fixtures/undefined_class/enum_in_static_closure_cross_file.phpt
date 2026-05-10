@@ -15,5 +15,3 @@ function getCallback(): \Closure {
     return static fn() => Status::Active;
 }
 ===expect===
-===ignore===
-TODO

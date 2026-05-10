@@ -21,5 +21,3 @@ function test(): void {
     $h->bye();
 }
 ===expect===
-===ignore===
-TODO

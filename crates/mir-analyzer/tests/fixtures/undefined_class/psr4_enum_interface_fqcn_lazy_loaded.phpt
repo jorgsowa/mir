@@ -15,5 +15,3 @@ enum Status: string implements \App\HasLabel {
     public function label(): string { return $this->value; }
 }
 ===expect===
-===ignore===
-TODO

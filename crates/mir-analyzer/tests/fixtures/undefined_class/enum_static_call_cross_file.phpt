@@ -14,5 +14,3 @@ function getAll(): array {
     return Status::cases();
 }
 ===expect===
-===ignore===
-TODO

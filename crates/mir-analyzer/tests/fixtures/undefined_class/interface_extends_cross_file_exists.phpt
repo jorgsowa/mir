@@ -13,5 +13,3 @@ interface Collection extends Countable {
     public function isEmpty(): bool;
 }
 ===expect===
-===ignore===
-TODO
