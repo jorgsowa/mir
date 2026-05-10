@@ -76,10 +76,6 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut Context,
     ) {
         for stmt in stmts.iter() {
-            // @psalm-suppress / @suppress per-statement (call-site suppression)
-            let suppressions = self.extract_statement_suppressions(stmt.span);
-            let before = self.issues.issue_count();
-
             if ctx.diverges {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                 let (line_end, col_end) = if stmt.span.start < stmt.span.end {
@@ -103,9 +99,6 @@ impl<'a> StatementsAnalyzer<'a> {
                         crate::parser::span_text(self.source, stmt.span).unwrap_or_default(),
                     ),
                 );
-                if !suppressions.is_empty() {
-                    self.issues.suppress_range(before, &suppressions);
-                }
                 break;
             }
 
@@ -168,10 +161,6 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                 }
             }
-
-            if !suppressions.is_empty() {
-                self.issues.suppress_range(before, &suppressions);
-            }
         }
     }
 
@@ -180,6 +169,9 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt: &php_ast::ast::Stmt<'arena, 'src>,
         ctx: &mut Context,
     ) {
+        let suppressions = self.extract_statement_suppressions(stmt.span);
+        let before = self.issues.issue_count();
+
         // Extract @var annotation for this statement.
         let var_annotation = self.extract_var_annotation(stmt.span);
 
@@ -351,6 +343,10 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                 }
             }
+        }
+
+        if !suppressions.is_empty() {
+            self.issues.suppress_range(before, &suppressions);
         }
     }
 
