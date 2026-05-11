@@ -1,11 +1,10 @@
 use mir_types::{ArrayKey, Atomic, Union, Variance};
-/// Docblock parser — delegates to `php_rs_parser::phpdoc` for tag extraction,
-/// then converts `PhpDocTag`s into mir's `ParsedDocblock` with resolved types.
+/// Docblock parser — delegates to `phpdoc_parser` for tag extraction,
+/// then converts tags into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-
-use php_rs_parser::phpdoc::PhpDocTag;
+use phpdoc_parser::{body_text, parse as parse_phpdoc};
 
 // ---------------------------------------------------------------------------
 // DocblockParser
@@ -15,233 +14,271 @@ pub struct DocblockParser;
 
 impl DocblockParser {
     pub fn parse(text: &str) -> ParsedDocblock {
-        let doc = php_rs_parser::phpdoc::parse(text);
+        let doc = parse_phpdoc(text);
         let mut result = ParsedDocblock {
             description: extract_description(text),
             ..Default::default()
         };
 
         for tag in &doc.tags {
-            match tag {
-                PhpDocTag::Param {
-                    type_str: Some(ty_s),
-                    name: Some(n),
-                    ..
-                } => {
-                    if let Some(msg) = validate_type_str(ty_s, "param") {
-                        result.invalid_annotations.push(msg);
-                    }
-                    result.params.push((
-                        n.trim_start_matches('$').to_string(),
-                        parse_type_string(ty_s),
-                    ));
-                }
-                // @param with a type but no variable name — can happen when an unclosed generic
-                // swallows the rest of the tag body (e.g. `@param array< $x`).
-                PhpDocTag::Param {
-                    type_str: Some(ty_s),
-                    name: None,
-                    ..
-                } => {
-                    if let Some(msg) = validate_type_str(ty_s, "param") {
-                        result.invalid_annotations.push(msg);
-                    }
-                }
-                PhpDocTag::Return {
-                    type_str: Some(ty_s),
-                    ..
-                } => {
-                    if let Some(msg) = validate_type_str(ty_s, "return") {
-                        result.invalid_annotations.push(msg);
-                    }
-                    result.return_type = Some(parse_type_string(ty_s));
-                }
-                PhpDocTag::Var { type_str, name, .. } => {
-                    if let Some(ty_s) = type_str {
-                        if let Some(msg) = validate_type_str(ty_s, "var") {
+            match tag.name.as_str() {
+                "param" | "psalm-param" | "phpstan-param" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_s, name)) = parse_param_line(&body_str) {
+                            // Check if the parsed type is valid
+                            if is_inside_generics(&ty_s) {
+                                // For unclosed generics, report the full body for context
+                                if let Some(msg) = validate_type_str(&body_str, "param") {
+                                    result.invalid_annotations.push(msg);
+                                }
+                            } else if let Some(msg) = validate_type_str(&ty_s, "param") {
+                                // For other errors, report the parsed type
+                                result.invalid_annotations.push(msg);
+                            } else {
+                                result.params.push((
+                                    name.trim_start_matches('$').to_string(),
+                                    parse_type_string(&ty_s),
+                                ));
+                            }
+                        } else if let Some(msg) = validate_type_str(&body_str, "param") {
+                            // If parsing failed, validate the full body to provide better error context
                             result.invalid_annotations.push(msg);
                         }
-                        result.var_type = Some(parse_type_string(ty_s));
-                    }
-                    if let Some(n) = name {
-                        result.var_name = Some(n.trim_start_matches('$').to_string());
                     }
                 }
-                PhpDocTag::Throws {
-                    type_str: Some(ty_s),
-                    ..
-                } => {
-                    let class = ty_s.split_whitespace().next().unwrap_or("").to_string();
-                    if !class.is_empty() {
-                        result.throws.push(class);
+                "return" | "psalm-return" | "phpstan-return" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let ty_s = body_str.trim();
+                        if let Some(msg) = validate_type_str(ty_s, "return") {
+                            result.invalid_annotations.push(msg);
+                        }
+                        result.return_type = Some(parse_type_string(ty_s));
                     }
                 }
-                PhpDocTag::Deprecated { description } => {
+                "var" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_s, name)) = parse_param_line(&body_str) {
+                            if let Some(msg) = validate_type_str(&ty_s, "var") {
+                                result.invalid_annotations.push(msg);
+                            }
+                            result.var_type = Some(parse_type_string(&ty_s));
+                            result.var_name = Some(name.trim_start_matches('$').to_string());
+                        } else {
+                            let ty_s = body_str.trim();
+                            if let Some(msg) = validate_type_str(ty_s, "var") {
+                                result.invalid_annotations.push(msg);
+                            }
+                            result.var_type = Some(parse_type_string(ty_s));
+                        }
+                    }
+                }
+                "throws" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let class = body_str.split_whitespace().next().unwrap_or("").to_string();
+                        if !class.is_empty() {
+                            result.throws.push(class);
+                        }
+                    }
+                }
+                "deprecated" => {
                     result.is_deprecated = true;
-                    result.deprecated = Some(
-                        description
-                            .as_ref()
-                            .map(|d| d.to_string())
-                            .unwrap_or_default(),
-                    );
+                    result.deprecated = Some(body_text(&tag.body).unwrap_or_default().to_string());
                 }
-                PhpDocTag::Template { name, bound } => {
-                    if let Some(b) = bound {
-                        if let Some(msg) = validate_type_str(b, "template") {
-                            result.invalid_annotations.push(msg);
-                        }
-                    }
-                    result.templates.push((
-                        name.to_string(),
-                        bound.map(parse_type_string),
-                        Variance::Invariant,
-                    ));
-                }
-                PhpDocTag::TemplateCovariant { name, bound } => {
-                    if let Some(b) = bound {
-                        if let Some(msg) = validate_type_str(b, "template-covariant") {
-                            result.invalid_annotations.push(msg);
-                        }
-                    }
-                    result.templates.push((
-                        name.to_string(),
-                        bound.map(parse_type_string),
-                        Variance::Covariant,
-                    ));
-                }
-                PhpDocTag::TemplateContravariant { name, bound } => {
-                    if let Some(b) = bound {
-                        if let Some(msg) = validate_type_str(b, "template-contravariant") {
-                            result.invalid_annotations.push(msg);
-                        }
-                    }
-                    result.templates.push((
-                        name.to_string(),
-                        bound.map(parse_type_string),
-                        Variance::Contravariant,
-                    ));
-                }
-                PhpDocTag::Extends { type_str } => {
-                    result.extends = Some(parse_type_string(type_str));
-                }
-                PhpDocTag::Implements { type_str } => {
-                    result.implements.push(parse_type_string(type_str));
-                }
-                PhpDocTag::Assert {
-                    type_str: Some(ty_s),
-                    name: Some(n),
-                } => {
-                    result.assertions.push((
-                        n.trim_start_matches('$').to_string(),
-                        parse_type_string(ty_s),
-                    ));
-                }
-                PhpDocTag::Suppress { rules } => {
-                    for rule in rules.split([',', ' ']) {
-                        let rule = rule.trim().to_string();
-                        if !rule.is_empty() {
-                            result.suppressed_issues.push(rule);
-                        }
-                    }
-                }
-                PhpDocTag::See { reference } => result.see.push(reference.to_string()),
-                PhpDocTag::Link { url } => result.see.push(url.to_string()),
-                PhpDocTag::Mixin { class } => {
-                    // Strip generic parameters from mixin class name (e.g., "Foo<T>" → "Foo")
-                    let base_class = class.split('<').next().unwrap_or(class).to_string();
-                    result.mixins.push(base_class);
-                }
-                PhpDocTag::Property {
-                    type_str,
-                    name: Some(n),
-                    ..
-                } => result.properties.push(DocProperty {
-                    type_hint: type_str.unwrap_or("").to_string(),
-                    name: n.trim_start_matches('$').to_string(),
-                    read_only: false,
-                    write_only: false,
-                }),
-                PhpDocTag::PropertyRead {
-                    type_str,
-                    name: Some(n),
-                    ..
-                } => result.properties.push(DocProperty {
-                    type_hint: type_str.unwrap_or("").to_string(),
-                    name: n.trim_start_matches('$').to_string(),
-                    read_only: true,
-                    write_only: false,
-                }),
-                PhpDocTag::PropertyWrite {
-                    type_str,
-                    name: Some(n),
-                    ..
-                } => result.properties.push(DocProperty {
-                    type_hint: type_str.unwrap_or("").to_string(),
-                    name: n.trim_start_matches('$').to_string(),
-                    read_only: false,
-                    write_only: true,
-                }),
-                PhpDocTag::Method { signature } => {
-                    if let Some(m) = parse_method_line(signature) {
-                        result.methods.push(m);
-                    }
-                }
-                PhpDocTag::TypeAlias {
-                    name: Some(n),
-                    type_str,
-                } => result.type_aliases.push(DocTypeAlias {
-                    name: n.to_string(),
-                    type_expr: type_str.unwrap_or("").to_string(),
-                }),
-                PhpDocTag::ImportType { body } => {
-                    if let Some(import) = parse_import_type(body) {
-                        result.import_types.push(import);
-                    }
-                }
-                PhpDocTag::Since { version } if result.since.is_none() => {
-                    // `version` is the full tag body, e.g. `"5.2.4 PHP 5.2.4 introduced…"`.
-                    // Keep only the leading version token so `PhpVersion::from_str` can parse it.
-                    let v = version.split_whitespace().next().unwrap_or("");
-                    if !v.is_empty() {
-                        result.since = Some(v.to_string());
-                    }
-                }
-                PhpDocTag::Internal => result.is_internal = true,
-                PhpDocTag::Pure => result.is_pure = true,
-                PhpDocTag::Immutable => result.is_immutable = true,
-                PhpDocTag::Readonly => result.is_readonly = true,
-                PhpDocTag::Generic { tag, body } => match *tag {
-                    "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
-                    "api" | "psalm-api" => result.is_api = true,
-                    "removed" if result.removed.is_none() => {
-                        if let Some(b) = body {
-                            let v = b.split_whitespace().next().unwrap_or("");
-                            if !v.is_empty() {
-                                result.removed = Some(v.to_string());
+                "template" => {
+                    if let Some((name, bound)) =
+                        parse_template_line(tag.name.as_str(), body_text(&tag.body))
+                    {
+                        if let Some(b) = &bound {
+                            if let Some(msg) = validate_type_str(b, "template") {
+                                result.invalid_annotations.push(msg);
                             }
                         }
+                        result.templates.push((
+                            name,
+                            bound.map(|b| parse_type_string(&b)),
+                            Variance::Invariant,
+                        ));
                     }
-                    "psalm-assert" | "phpstan-assert" => {
-                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                }
+                "template-covariant" => {
+                    if let Some((name, bound)) =
+                        parse_template_line(tag.name.as_str(), body_text(&tag.body))
+                    {
+                        if let Some(b) = &bound {
+                            if let Some(msg) = validate_type_str(b, "template-covariant") {
+                                result.invalid_annotations.push(msg);
+                            }
+                        }
+                        result.templates.push((
+                            name,
+                            bound.map(|b| parse_type_string(&b)),
+                            Variance::Covariant,
+                        ));
+                    }
+                }
+                "template-contravariant" => {
+                    if let Some((name, bound)) =
+                        parse_template_line(tag.name.as_str(), body_text(&tag.body))
+                    {
+                        if let Some(b) = &bound {
+                            if let Some(msg) = validate_type_str(b, "template-contravariant") {
+                                result.invalid_annotations.push(msg);
+                            }
+                        }
+                        result.templates.push((
+                            name,
+                            bound.map(|b| parse_type_string(&b)),
+                            Variance::Contravariant,
+                        ));
+                    }
+                }
+                "extends" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        result.extends = Some(parse_type_string(body_str.trim()));
+                    }
+                }
+                "implements" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        result.implements.push(parse_type_string(body_str.trim()));
+                    }
+                }
+                "assert" | "psalm-assert" | "phpstan-assert" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.assertions.push((name, parse_type_string(&ty_str)));
                         }
                     }
-                    "psalm-assert-if-true" | "phpstan-assert-if-true" => {
-                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                }
+                "suppress" | "psalm-suppress" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        for rule in body_str.split([',', ' ']) {
+                            let rule = rule.trim().to_string();
+                            if !rule.is_empty() {
+                                result.suppressed_issues.push(rule);
+                            }
+                        }
+                    }
+                }
+                "see" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        result.see.push(body_str.to_string());
+                    }
+                }
+                "link" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        result.see.push(body_str.to_string());
+                    }
+                }
+                "mixin" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let base_class =
+                            body_str.split('<').next().unwrap_or(&body_str).to_string();
+                        result.mixins.push(base_class);
+                    }
+                }
+                "property" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
+                            result.properties.push(DocProperty {
+                                type_hint: ty_str,
+                                name: name.trim_start_matches('$').to_string(),
+                                read_only: false,
+                                write_only: false,
+                            });
+                        }
+                    }
+                }
+                "property-read" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
+                            result.properties.push(DocProperty {
+                                type_hint: ty_str,
+                                name: name.trim_start_matches('$').to_string(),
+                                read_only: true,
+                                write_only: false,
+                            });
+                        }
+                    }
+                }
+                "property-write" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
+                            result.properties.push(DocProperty {
+                                type_hint: ty_str,
+                                name: name.trim_start_matches('$').to_string(),
+                                read_only: false,
+                                write_only: true,
+                            });
+                        }
+                    }
+                }
+                "method" | "psalm-method" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some(m) = parse_method_line(&body_str) {
+                            result.methods.push(m);
+                        }
+                    }
+                }
+                "psalm-type" | "phpstan-type" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((name, type_expr)) = body_str.split_once('=') {
+                            result.type_aliases.push(DocTypeAlias {
+                                name: name.trim().to_string(),
+                                type_expr: type_expr.trim().to_string(),
+                            });
+                        }
+                    }
+                }
+                "psalm-import-type" | "phpstan-import-type" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some(import) = parse_import_type(&body_str) {
+                            result.import_types.push(import);
+                        }
+                    }
+                }
+                "since" if result.since.is_none() => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let v = body_str.split_whitespace().next().unwrap_or("");
+                        if !v.is_empty() {
+                            result.since = Some(v.to_string());
+                        }
+                    }
+                }
+                "removed" if result.removed.is_none() => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let v = body_str.split_whitespace().next().unwrap_or("");
+                        if !v.is_empty() {
+                            result.removed = Some(v.to_string());
+                        }
+                    }
+                }
+                "internal" => result.is_internal = true,
+                "pure" => result.is_pure = true,
+                "immutable" => result.is_immutable = true,
+                "readonly" => result.is_readonly = true,
+                "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
+                "api" | "psalm-api" => result.is_api = true,
+                "psalm-assert-if-true" | "phpstan-assert-if-true" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result
                                 .assertions_if_true
                                 .push((name, parse_type_string(&ty_str)));
                         }
                     }
-                    "psalm-assert-if-false" | "phpstan-assert-if-false" => {
-                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                }
+                "psalm-assert-if-false" | "phpstan-assert-if-false" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result
                                 .assertions_if_false
                                 .push((name, parse_type_string(&ty_str)));
                         }
                     }
-                    "psalm-property" => {
-                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                }
+                "psalm-property" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
                                 type_hint: ty_str,
                                 name,
@@ -250,8 +287,10 @@ impl DocblockParser {
                             });
                         }
                     }
-                    "psalm-property-read" => {
-                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                }
+                "psalm-property-read" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
                                 type_hint: ty_str,
                                 name,
@@ -260,8 +299,10 @@ impl DocblockParser {
                             });
                         }
                     }
-                    "psalm-property-write" => {
-                        if let Some((ty_str, name)) = body.as_deref().and_then(parse_param_line) {
+                }
+                "psalm-property-write" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
                                 type_hint: ty_str,
                                 name,
@@ -270,29 +311,33 @@ impl DocblockParser {
                             });
                         }
                     }
-                    "psalm-method" => {
-                        if let Some(method) = body.as_deref().and_then(parse_method_line) {
-                            result.methods.push(method);
+                }
+                "psalm-require-extends" | "phpstan-require-extends" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let cls = body_str
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                        if !cls.is_empty() {
+                            result.require_extends.push(cls);
                         }
                     }
-                    "psalm-require-extends" | "phpstan-require-extends" => {
-                        if let Some(b) = body {
-                            let cls = b.split_whitespace().next().unwrap_or("").trim().to_string();
-                            if !cls.is_empty() {
-                                result.require_extends.push(cls);
-                            }
+                }
+                "psalm-require-implements" | "phpstan-require-implements" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let cls = body_str
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                        if !cls.is_empty() {
+                            result.require_implements.push(cls);
                         }
                     }
-                    "psalm-require-implements" | "phpstan-require-implements" => {
-                        if let Some(b) = body {
-                            let cls = b.split_whitespace().next().unwrap_or("").trim().to_string();
-                            if !cls.is_empty() {
-                                result.require_implements.push(cls);
-                            }
-                        }
-                    }
-                    _ => {}
-                },
+                }
                 _ => {}
             }
         }
@@ -814,6 +859,16 @@ fn find_matching_paren(s: &str) -> Option<usize> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Parse template tag format: `T` or `T of Bound`
+fn parse_template_line(_tag_name: &str, body: Option<String>) -> Option<(String, Option<String>)> {
+    let body = body?;
+    if let Some((name, bound)) = body.split_once(" of ") {
+        Some((name.trim().to_string(), Some(bound.trim().to_string())))
+    } else {
+        Some((body.trim().to_string(), None))
+    }
+}
 
 /// Extract the description text (all prose before the first `@` tag) from a raw docblock.
 fn extract_description(text: &str) -> String {

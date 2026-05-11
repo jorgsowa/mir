@@ -15,6 +15,7 @@ mir-codebase = { workspace = true }
 php-ast       = { workspace = true }
 php-rs-parser = { workspace = true }
 php-lexer     = { workspace = true }
+phpdoc-parser = { workspace = true }
 bumpalo       = { workspace = true }
 indexmap      = { workspace = true }
 rayon         = { workspace = true }
