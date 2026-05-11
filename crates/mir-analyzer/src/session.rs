@@ -10,20 +10,17 @@
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file Pass 2 entry
 //! point that operates against a session.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use rayon::prelude::*;
-use salsa::Setter as _;
-
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
-use crate::db::{collect_file_definitions, FileDefinitions, MirDatabase, MirDb, SourceFile};
+use crate::db::{MirDatabase, MirDb};
 use crate::php_version::PhpVersion;
+use crate::shared_db::SharedDb;
 
 /// Long-lived analysis context. Owns the salsa database and tracks which
 /// stubs have been loaded.
@@ -32,17 +29,11 @@ use crate::php_version::PhpVersion;
 /// [`Self::ingest_file`], [`Self::invalidate_file`], and the crate-internal
 /// [`Self::with_db_mut`].
 pub struct AnalysisSession {
-    salsa: Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
+    /// Shared database management (salsa, file registry, stub tracking).
+    /// Extracted to allow code sharing with ProjectAnalyzer.
+    shared_db: Arc<SharedDb>,
     cache: Option<Arc<AnalysisCache>>,
     psr4: Option<Arc<Psr4Map>>,
-    /// Set of stub virtual paths that have already been ingested. Replaces an
-    /// older `AtomicBool stubs_loaded` flag — tracking individual paths lets
-    /// us lazy-load extension stubs on demand without re-ingesting essentials.
-    loaded_stubs: Mutex<HashSet<&'static str>>,
-    /// True once user stubs (configured via [`Self::with_user_stubs`]) have
-    /// been ingested. They are loaded together with the essential set on the
-    /// first call to a stubs-loading method.
-    user_stubs_loaded: AtomicBool,
     php_version: PhpVersion,
     user_stub_files: Vec<PathBuf>,
     user_stub_dirs: Vec<PathBuf>,
@@ -52,11 +43,9 @@ impl AnalysisSession {
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
         Self {
-            salsa: Mutex::new((MirDb::default(), HashMap::new())),
+            shared_db: Arc::new(SharedDb::new()),
             cache: None,
             psr4: None,
-            loaded_stubs: Mutex::new(HashSet::new()),
-            user_stubs_loaded: AtomicBool::new(false),
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
@@ -66,6 +55,12 @@ impl AnalysisSession {
     pub fn with_cache(mut self, cache: Arc<AnalysisCache>) -> Self {
         self.cache = Some(cache);
         self
+    }
+
+    /// Convenience: open a disk-backed cache at `cache_dir` and attach it.
+    /// Avoids forcing callers to wrap [`AnalysisCache`] in `Arc` themselves.
+    pub fn with_cache_dir(self, cache_dir: &std::path::Path) -> Self {
+        self.with_cache(Arc::new(AnalysisCache::open(cache_dir)))
     }
 
     pub fn with_psr4(mut self, map: Arc<Psr4Map>) -> Self {
@@ -92,9 +87,11 @@ impl AnalysisSession {
     }
 
     /// Load every PHP built-in stub plus any configured user stubs.
-    /// Idempotent. Equivalent to the legacy "load everything" behavior; use
-    /// [`Self::ensure_essential_stubs_loaded`] in incremental scenarios where
-    /// cold-start latency matters more than comprehensive stub coverage.
+    ///
+    /// **Deprecated**: prefer [`Self::ensure_all_stubs_loaded`] (explicit
+    /// "comprehensive") or [`Self::ensure_essential_stubs_loaded`] (fast
+    /// cold-start with auto-discovery on demand).
+    #[doc(hidden)]
     pub fn ensure_stubs_loaded(&self) {
         self.ensure_all_stubs_loaded();
     }
@@ -107,7 +104,8 @@ impl AnalysisSession {
     /// on demand via [`Self::ensure_stubs_for_symbol`] when user code
     /// references them. Idempotent — already-loaded stubs are skipped.
     pub fn ensure_essential_stubs_loaded(&self) {
-        self.ingest_stub_paths(crate::stubs::ESSENTIAL_STUB_PATHS);
+        self.shared_db
+            .ingest_stub_paths(crate::stubs::ESSENTIAL_STUB_PATHS, self.php_version);
         self.ensure_user_stubs_loaded();
     }
 
@@ -116,17 +114,21 @@ impl AnalysisSession {
     /// symbol coverage matters more than cold-start latency.
     pub fn ensure_all_stubs_loaded(&self) {
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
-        self.ingest_stub_paths(&paths);
+        self.shared_db.ingest_stub_paths(&paths, self.php_version);
         self.ensure_user_stubs_loaded();
     }
 
     /// Ensure the embedded stub that defines `name` (a function) is ingested.
     /// Returns `true` when a matching stub exists (whether or not it was
     /// already loaded), `false` when `name` isn't a known PHP built-in.
+    ///
+    /// Most callers should use [`Self::ensure_stubs_for_ast`] instead —
+    /// it auto-discovers needed stubs from a parsed file.
+    #[doc(hidden)]
     pub fn ensure_stub_for_function(&self, name: &str) -> bool {
         match crate::stubs::stub_path_for_function(name) {
             Some(path) => {
-                self.ingest_stub_paths(&[path]);
+                self.shared_db.ingest_stub_paths(&[path], self.php_version);
                 true
             }
             None => false,
@@ -136,10 +138,13 @@ impl AnalysisSession {
     /// Ensure the embedded stub that defines `fqcn` (a class / interface /
     /// trait / enum) is ingested. Case-insensitive lookup with optional
     /// leading backslash.
+    ///
+    /// Most callers should use [`Self::ensure_stubs_for_ast`] instead.
+    #[doc(hidden)]
     pub fn ensure_stub_for_class(&self, fqcn: &str) -> bool {
         match crate::stubs::stub_path_for_class(fqcn) {
             Some(path) => {
-                self.ingest_stub_paths(&[path]);
+                self.shared_db.ingest_stub_paths(&[path], self.php_version);
                 true
             }
             None => false,
@@ -147,10 +152,13 @@ impl AnalysisSession {
     }
 
     /// Ensure the embedded stub that defines `name` (a constant) is ingested.
+    ///
+    /// Most callers should use [`Self::ensure_stubs_for_ast`] instead.
+    #[doc(hidden)]
     pub fn ensure_stub_for_constant(&self, name: &str) -> bool {
         match crate::stubs::stub_path_for_constant(name) {
             Some(path) => {
-                self.ingest_stub_paths(&[path]);
+                self.shared_db.ingest_stub_paths(&[path], self.php_version);
                 true
             }
             None => false,
@@ -160,7 +168,7 @@ impl AnalysisSession {
     /// Number of distinct embedded stubs currently ingested into the session.
     /// Useful for diagnostics and bench reporting.
     pub fn loaded_stub_count(&self) -> usize {
-        self.loaded_stubs.lock().len()
+        self.shared_db.loaded_stubs.lock().len()
     }
 
     /// Auto-discover and ingest the embedded stubs needed to cover every
@@ -183,7 +191,7 @@ impl AnalysisSession {
         // have everything. Avoids a ~50-500µs source walk on every analyze
         // call in batch / warm-session scenarios.
         {
-            let loaded = self.loaded_stubs.lock();
+            let loaded = self.shared_db.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
                 return;
             }
@@ -192,7 +200,7 @@ impl AnalysisSession {
         if paths.is_empty() {
             return;
         }
-        self.ingest_stub_paths(&paths);
+        self.shared_db.ingest_stub_paths(&paths, self.php_version);
     }
 
     /// Discover and ingest stubs by walking the parsed AST of a PHP file.
@@ -206,7 +214,7 @@ impl AnalysisSession {
     /// Idempotent and skips the scan if all stubs are already loaded.
     pub fn ensure_stubs_for_ast(&self, program: &php_ast::ast::Program<'_, '_>) {
         {
-            let loaded = self.loaded_stubs.lock();
+            let loaded = self.shared_db.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
                 return;
             }
@@ -215,74 +223,31 @@ impl AnalysisSession {
         if paths.is_empty() {
             return;
         }
-        self.ingest_stub_paths(&paths);
-    }
-
-    /// Internal: parse + ingest each path in `paths` that hasn't already been
-    /// ingested. Holds the salsa write lock per file (brief), and the
-    /// `loaded_stubs` set lock briefly to record paths.
-    fn ingest_stub_paths(&self, paths: &[&'static str]) {
-        // Pick out the not-yet-loaded paths first to avoid redundant parsing.
-        let needed: Vec<&'static str> = {
-            let loaded = self.loaded_stubs.lock();
-            paths
-                .iter()
-                .copied()
-                .filter(|p| !loaded.contains(p))
-                .collect()
-        };
-        if needed.is_empty() {
-            return;
-        }
-
-        let php_version = self.php_version;
-        // Parse in parallel; ingest serially under the salsa write lock.
-        let slices: Vec<(&'static str, mir_codebase::storage::StubSlice)> = needed
-            .par_iter()
-            .filter_map(|&path| {
-                crate::stubs::stub_content_for_path(path).map(|content| {
-                    let slice =
-                        crate::stubs::stub_slice_from_source(path, content, Some(php_version));
-                    (path, slice)
-                })
-            })
-            .collect();
-
-        let mut guard = self.salsa.lock();
-        let mut loaded = self.loaded_stubs.lock();
-        for (path, slice) in slices {
-            if loaded.insert(path) {
-                guard.0.ingest_stub_slice(&slice);
-            }
-        }
+        self.shared_db.ingest_stub_paths(&paths, self.php_version);
     }
 
     fn ensure_user_stubs_loaded(&self) {
-        if self.user_stub_files.is_empty() && self.user_stub_dirs.is_empty() {
-            return;
-        }
-        let was_loaded = self.user_stubs_loaded.load(Ordering::Relaxed);
-        if was_loaded {
-            return;
-        }
-        let slices = crate::stubs::user_stub_slices(&self.user_stub_files, &self.user_stub_dirs);
-        let mut salsa = self.salsa.lock();
-        for slice in slices {
-            salsa.0.ingest_stub_slice(&slice);
-        }
-        self.user_stubs_loaded.store(true, Ordering::Relaxed);
+        self.shared_db
+            .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
     }
 
     /// Cheap clone of the salsa db for a read-only query. The lock is held
     /// only for the duration of the clone, so concurrent readers never
     /// serialize on each other or on writes for longer than the clone itself.
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without
+    /// notice. Public consumers should use the typed query methods
+    /// ([`Self::definition_of`], [`Self::hover`], etc.) instead.
+    #[doc(hidden)]
     pub fn snapshot_db(&self) -> MirDb {
-        let guard = self.salsa.lock();
-        guard.0.clone()
+        self.shared_db.snapshot_db()
     }
 
-    /// Run a closure with read access to a database snapshot. The snapshot is
-    /// taken under a brief lock, then the closure runs without holding it.
+    /// Run a closure with read access to a database snapshot.
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without
+    /// notice.
+    #[doc(hidden)]
     pub fn read<R>(&self, f: impl FnOnce(&dyn MirDatabase) -> R) -> R {
         let db = self.snapshot_db();
         f(&db)
@@ -298,37 +263,17 @@ impl AnalysisSession {
     /// locations are removed first so renames / deletions don't leave stale
     /// state in the codebase. (Without this, long-running sessions would
     /// accumulate dead reference-location entries indefinitely.)
-    pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) -> FileDefinitions {
+    pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
         self.ensure_stubs_loaded();
-        let file_defs = {
-            let mut guard = self.salsa.lock();
-            let (ref mut db, ref mut files) = *guard;
-            let salsa_file = match files.get(&file) {
-                Some(&sf) => {
-                    // Re-ingestion: drop old definitions + reference locations
-                    // before collecting fresh ones. Mirrors what
-                    // ProjectAnalyzer::re_analyze_file does.
-                    db.remove_file_definitions(file.as_ref());
-                    if sf.text(db).as_ref() != source.as_ref() {
-                        sf.set_text(db).to(source.clone());
-                    }
-                    sf
-                }
-                None => {
-                    let file = file.clone();
-                    let sf = SourceFile::new(db, file.clone(), source.clone());
-                    files.insert(file, sf);
-                    sf
-                }
-            };
-            collect_file_definitions(db, salsa_file)
-        };
         {
-            let mut guard = self.salsa.lock();
-            guard.0.ingest_stub_slice(&file_defs.slice);
+            let mut guard = self.shared_db.salsa.lock();
+            let (ref mut db, _) = *guard;
+            db.remove_file_definitions(file.as_ref());
         }
+        let _file_defs = self
+            .shared_db
+            .collect_and_ingest_file(file.clone(), source.as_ref());
         self.update_reverse_deps_for(&file);
-        file_defs
     }
 
     /// Drop a file's contribution to the session: codebase definitions,
@@ -342,7 +287,7 @@ impl AnalysisSession {
     /// remove the salsa input handle — call this for full cleanup.)
     pub fn invalidate_file(&self, file: &str) {
         {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             db.remove_file_definitions(file);
             files.remove(file);
@@ -356,7 +301,7 @@ impl AnalysisSession {
     /// Number of files currently tracked in this session's salsa input set.
     /// Stable across reads; useful for diagnostics and memory bounds checks.
     pub fn tracked_file_count(&self) -> usize {
-        let guard = self.salsa.lock();
+        let guard = self.shared_db.salsa.lock();
         guard.1.len()
     }
 
@@ -367,39 +312,163 @@ impl AnalysisSession {
     // owned snapshot — concurrent edits proceed without blocking.
     // -----------------------------------------------------------------------
 
-    /// Resolve `symbol` (a class FQCN or function FQN) to its declaration
-    /// location. Powers go-to-definition for top-level symbols. Returns
-    /// `None` if the symbol isn't known to the codebase or has no recorded
-    /// source span (e.g. some stub-only declarations).
-    pub fn definition_of(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
+    /// Resolve a top-level symbol (class or function) to its declaration
+    /// location. Powers go-to-definition.
+    ///
+    /// Returns:
+    /// - `Ok(Location)` — symbol found with a source location
+    /// - `Err(NotFound)` — no such symbol in the codebase
+    /// - `Err(NoSourceLocation)` — symbol exists but has no recorded span
+    ///   (e.g. some stub-only declarations)
+    pub fn definition_of(
+        &self,
+        symbol: &crate::Symbol,
+    ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
         let db = self.snapshot_db();
-        db.lookup_class_node(symbol)
-            .filter(|n| n.active(&db))
-            .and_then(|n| n.location(&db))
-            .or_else(|| {
-                db.lookup_function_node(symbol)
+        match symbol {
+            crate::Symbol::Class(fqcn) => {
+                let node = db
+                    .lookup_class_node(fqcn.as_ref())
                     .filter(|n| n.active(&db))
-                    .and_then(|n| n.location(&db))
-            })
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                node.location(&db)
+                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+            }
+            crate::Symbol::Function(fqn) => {
+                let node = db
+                    .lookup_function_node(fqn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                node.location(&db)
+                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+            }
+            crate::Symbol::Method { class, name }
+            | crate::Symbol::Property { class, name }
+            | crate::Symbol::ClassConstant { class, name } => {
+                crate::db::member_location_via_db(&db, class, name)
+                    .ok_or(crate::SymbolLookupError::NotFound)
+            }
+            crate::Symbol::GlobalConstant(_) => {
+                // Global constants don't currently store location info
+                Err(crate::SymbolLookupError::NoSourceLocation)
+            }
+        }
     }
 
-    /// Resolve a class member (method / property / class constant / enum case)
-    /// to its declaration location, walking the inheritance chain.
-    pub fn member_definition(
+    /// Hover information for a symbol: type, docstring, and definition location.
+    ///
+    /// Use [`crate::FileAnalysis::symbol_at`] to find the symbol at a cursor
+    /// position, then build a [`crate::Symbol`] from its `kind`. This method
+    /// assembles the displayable hover data.
+    ///
+    /// Returns `Err(NotFound)` if the symbol doesn't exist. May still return
+    /// `Ok` with `docstring: None` or `definition: None` if those specific
+    /// pieces aren't available.
+    pub fn hover(
         &self,
-        fqcn: &str,
-        member_name: &str,
-    ) -> Option<mir_codebase::storage::Location> {
+        symbol: &crate::Symbol,
+    ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
+        use mir_types::{Atomic, Union};
         let db = self.snapshot_db();
-        crate::db::member_location_via_db(&db, fqcn, member_name)
+        match symbol {
+            crate::Symbol::Function(fqn) => {
+                let node = db
+                    .lookup_function_node(fqn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                let ty = node
+                    .return_type(&db)
+                    .map(|t| (*t).clone())
+                    .unwrap_or_else(Union::mixed);
+                let docstring = node.docstring(&db).map(|s| s.to_string());
+                let definition = node.location(&db);
+                Ok(crate::HoverInfo {
+                    ty,
+                    docstring,
+                    definition,
+                })
+            }
+            crate::Symbol::Method { class, name } => {
+                let node = db
+                    .lookup_method_node(class.as_ref(), name.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                let ty = node
+                    .return_type(&db)
+                    .map(|t| (*t).clone())
+                    .unwrap_or_else(Union::mixed);
+                let docstring = node.docstring(&db).map(|s| s.to_string());
+                let definition = node.location(&db);
+                Ok(crate::HoverInfo {
+                    ty,
+                    docstring,
+                    definition,
+                })
+            }
+            crate::Symbol::Class(fqcn) => {
+                let node = db
+                    .lookup_class_node(fqcn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                let ty = Union::single(Atomic::TNamedObject {
+                    fqcn: fqcn.clone(),
+                    type_params: Vec::new(),
+                });
+                let definition = node.location(&db);
+                Ok(crate::HoverInfo {
+                    ty,
+                    docstring: None,
+                    definition,
+                })
+            }
+            crate::Symbol::Property { class, name } => {
+                let node = db
+                    .lookup_property_node(class.as_ref(), name.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                let ty = node.ty(&db).unwrap_or_else(Union::mixed);
+                let definition = node.location(&db);
+                Ok(crate::HoverInfo {
+                    ty,
+                    docstring: None,
+                    definition,
+                })
+            }
+            crate::Symbol::ClassConstant { class, name } => {
+                let node = db
+                    .lookup_class_constant_node(class.as_ref(), name.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                let ty = node.ty(&db);
+                let definition = node.location(&db);
+                Ok(crate::HoverInfo {
+                    ty,
+                    docstring: None,
+                    definition,
+                })
+            }
+            crate::Symbol::GlobalConstant(fqn) => {
+                let node = db
+                    .lookup_global_constant_node(fqn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                let ty = node.ty(&db);
+                Ok(crate::HoverInfo {
+                    ty,
+                    docstring: None,
+                    definition: None,
+                })
+            }
+        }
     }
 
     /// Every recorded reference to `symbol` with its source location as a Range.
-    /// Use [`crate::symbol::ResolvedSymbol::codebase_key`] to build the lookup key
-    /// from a `ResolvedSymbol` returned by [`crate::FileAnalysis::symbol_at`].
-    pub fn references_to(&self, symbol: &str) -> Vec<(Arc<str>, crate::Range)> {
+    /// Use [`crate::FileAnalysis::symbol_at`] to find the symbol at a cursor,
+    /// build a [`crate::Symbol`] from it, and pass it here.
+    pub fn references_to(&self, symbol: &crate::Symbol) -> Vec<(Arc<str>, crate::Range)> {
         let db = self.snapshot_db();
-        db.reference_locations(symbol)
+        let key = symbol.codebase_key();
+        db.reference_locations(&key)
             .into_iter()
             .map(|(file, line, col_start, col_end)| {
                 let range = crate::Range {
@@ -417,10 +486,11 @@ impl AnalysisSession {
             .collect()
     }
 
-    /// All declarations defined in `file` (classes, interfaces, traits, enums,
-    /// functions, constants). Powers outline / document-symbols views and any
-    /// other consumer that needs the file's top-level symbol set. Returns an
-    /// empty Vec if `file` hasn't been ingested.
+    /// All declarations defined in `file` as a **hierarchical tree**.
+    ///
+    /// Classes/interfaces/traits/enums are returned with their methods,
+    /// properties, and constants nested in `children`. Top-level functions
+    /// and constants are returned with empty `children`.
     pub fn document_symbols(&self, file: &str) -> Vec<crate::symbol::DocumentSymbol> {
         use crate::symbol::{DocumentSymbol, DocumentSymbolKind};
 
@@ -432,9 +502,9 @@ impl AnalysisSession {
                 if !class_node.active(&db) {
                     continue;
                 }
-                let kind = crate::db::class_kind_via_db(&db, symbol.as_ref())
+                let (kind, is_enum) = crate::db::class_kind_via_db(&db, symbol.as_ref())
                     .map(|k| {
-                        if k.is_interface {
+                        let kind = if k.is_interface {
                             DocumentSymbolKind::Interface
                         } else if k.is_trait {
                             DocumentSymbolKind::Trait
@@ -442,13 +512,57 @@ impl AnalysisSession {
                             DocumentSymbolKind::Enum
                         } else {
                             DocumentSymbolKind::Class
-                        }
+                        };
+                        (kind, k.is_enum)
                     })
-                    .unwrap_or(DocumentSymbolKind::Class);
+                    .unwrap_or((DocumentSymbolKind::Class, false));
+
+                // Build children: methods, properties, and class constants.
+                let mut children: Vec<DocumentSymbol> = Vec::new();
+                for m in db.class_own_methods(symbol.as_ref()) {
+                    if !m.active(&db) {
+                        continue;
+                    }
+                    children.push(DocumentSymbol {
+                        name: m.name(&db),
+                        kind: DocumentSymbolKind::Method,
+                        location: m.location(&db),
+                        children: Vec::new(),
+                    });
+                }
+                for p in db.class_own_properties(symbol.as_ref()) {
+                    if !p.active(&db) {
+                        continue;
+                    }
+                    children.push(DocumentSymbol {
+                        name: p.name(&db),
+                        kind: DocumentSymbolKind::Property,
+                        location: p.location(&db),
+                        children: Vec::new(),
+                    });
+                }
+                for c in db.class_own_constants(symbol.as_ref()) {
+                    if !c.active(&db) {
+                        continue;
+                    }
+                    let const_kind = if is_enum {
+                        DocumentSymbolKind::EnumCase
+                    } else {
+                        DocumentSymbolKind::Constant
+                    };
+                    children.push(DocumentSymbol {
+                        name: c.name(&db),
+                        kind: const_kind,
+                        location: c.location(&db),
+                        children: Vec::new(),
+                    });
+                }
+
                 out.push(DocumentSymbol {
                     name: symbol.clone(),
                     kind,
                     location: class_node.location(&db),
+                    children,
                 });
                 continue;
             }
@@ -460,6 +574,7 @@ impl AnalysisSession {
                     name: symbol.clone(),
                     kind: DocumentSymbolKind::Function,
                     location: fn_node.location(&db),
+                    children: Vec::new(),
                 });
                 continue;
             }
@@ -469,9 +584,69 @@ impl AnalysisSession {
                 name: symbol,
                 kind: DocumentSymbolKind::Constant,
                 location: None,
+                children: Vec::new(),
             });
         }
         out
+    }
+
+    /// Returns `true` if a function with `fqn` is registered and active in
+    /// the codebase. Case-insensitive lookup with optional leading backslash.
+    pub fn contains_function(&self, fqn: &str) -> bool {
+        let db = self.snapshot_db();
+        db.lookup_function_node(fqn).is_some_and(|n| n.active(&db))
+    }
+
+    /// Returns `true` if a class / interface / trait / enum with `fqcn` is
+    /// registered and active in the codebase.
+    pub fn contains_class(&self, fqcn: &str) -> bool {
+        let db = self.snapshot_db();
+        db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db))
+    }
+
+    /// Returns `true` if `class` has a method named `name` registered. Method
+    /// names are matched case-insensitively (PHP method dispatch semantics).
+    pub fn contains_method(&self, class: &str, name: &str) -> bool {
+        let db = self.snapshot_db();
+        let name_lower = name.to_ascii_lowercase();
+        db.lookup_method_node(class, &name_lower)
+            .is_some_and(|n| n.active(&db))
+    }
+
+    /// All class / interface / trait / enum FQCNs currently known to the
+    /// session, each paired with the file that defines them when available.
+    ///
+    /// Use this to build workspace-wide views (outline, fuzzy search, etc.).
+    /// Consumers implement their own search/match logic on top — the analyzer
+    /// only exposes the iterator.
+    pub fn all_classes(&self) -> Vec<(Arc<str>, Option<mir_codebase::storage::Location>)> {
+        let db = self.snapshot_db();
+        db.active_class_node_fqcns()
+            .into_iter()
+            .filter_map(|fqcn| {
+                let node = db.lookup_class_node(fqcn.as_ref())?;
+                if !node.active(&db) {
+                    return None;
+                }
+                Some((fqcn, node.location(&db)))
+            })
+            .collect()
+    }
+
+    /// All global function FQNs currently known to the session, each paired
+    /// with their declaration location when available.
+    pub fn all_functions(&self) -> Vec<(Arc<str>, Option<mir_codebase::storage::Location>)> {
+        let db = self.snapshot_db();
+        db.active_function_node_fqns()
+            .into_iter()
+            .filter_map(|fqn| {
+                let node = db.lookup_function_node(fqn.as_ref())?;
+                if !node.active(&db) {
+                    return None;
+                }
+                Some((fqn, node.location(&db)))
+            })
+            .collect()
     }
 
     /// Compute `file`'s outgoing dependency edges and update the cache's
@@ -504,8 +679,53 @@ impl AnalysisSession {
         let (functions, methods) =
             gather_inferred_types(self.snapshot_db(), files, self.php_version);
 
-        let mut guard = self.salsa.lock();
+        let mut guard = self.shared_db.salsa.lock();
         guard.0.commit_inferred_return_types(functions, methods);
+    }
+
+    /// File dependency graph: which files depend on which other files.
+    /// Used for incremental invalidation in LSP servers and build systems.
+    ///
+    /// Dependencies are computed from:
+    /// - Direct imports (use statements)
+    /// - Class inheritance (parent classes, interfaces, traits)
+    pub fn dependency_graph(&self) -> crate::DependencyGraph {
+        let db = self.snapshot_db();
+
+        // Get all files from the session's salsa database
+        let guard = self.shared_db.salsa.lock();
+        let all_files: Vec<String> = guard.1.keys().map(|f| f.as_ref().to_string()).collect();
+        drop(guard);
+
+        // Build forward dependency graph: file → [files it depends on]
+        let mut dependencies: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
+        for file in &all_files {
+            let deps = file_outgoing_dependencies(&db, file);
+            dependencies.insert(file.clone(), deps.into_iter().collect());
+        }
+
+        // Build reverse dependency graph: file → [files that depend on it]
+        let mut dependents: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
+        for (file, deps) in &dependencies {
+            for dep in deps {
+                dependents
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(file.clone());
+            }
+        }
+
+        // Sort for determinism
+        for deps in dependents.values_mut() {
+            deps.sort();
+        }
+
+        crate::DependencyGraph {
+            dependencies,
+            dependents,
+        }
     }
 }
 

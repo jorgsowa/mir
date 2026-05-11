@@ -47,6 +47,10 @@ pub trait MirDatabase: salsa::Database {
     /// registered.  Untracked iteration of a per-class HashMap.
     fn class_own_properties(&self, fqcn: &str) -> Vec<PropertyNode>;
 
+    /// Return all own class-constant nodes for `fqcn`. Empty if no class is
+    /// registered. Untracked iteration of a per-class HashMap.
+    fn class_own_constants(&self, fqcn: &str) -> Vec<ClassConstantNode>;
+
     /// Return all class-FQCNs currently registered as active `ClassNode`s,
     /// optionally filtered by kind.  Untracked snapshot — callers should
     /// treat the returned `Vec` as a one-shot view.

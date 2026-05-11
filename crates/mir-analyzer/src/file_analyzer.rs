@@ -96,17 +96,65 @@ pub struct BatchFileAnalyzer<'a> {
 }
 
 /// A pre-parsed file ready for batch analysis.
+///
+/// Use [`ParsedFile::new`] (unsafe) to construct. Fields are intentionally
+/// private — the raw pointer fields must satisfy a non-trivial safety contract
+/// enforced only by the constructor.
 pub struct ParsedFile {
-    pub file: Arc<str>,
-    pub source: Arc<str>,
-    pub program: *const Program<'static, 'static>,
-    pub source_map: *const SourceMap,
+    pub(crate) file: Arc<str>,
+    pub(crate) source: Arc<str>,
+    pub(crate) program: *const Program<'static, 'static>,
+    pub(crate) source_map: *const SourceMap,
+}
+
+impl ParsedFile {
+    /// File path this `ParsedFile` represents.
+    pub fn file(&self) -> &Arc<str> {
+        &self.file
+    }
+
+    /// Source text for this file.
+    pub fn source(&self) -> &Arc<str> {
+        &self.source
+    }
 }
 
 // SAFETY: ParsedFile contains pointers to owned AST and source_map that are kept
 // alive by the parser and owned by the caller. Analysis only reads these, never mutates.
 unsafe impl Send for ParsedFile {}
 unsafe impl Sync for ParsedFile {}
+
+impl ParsedFile {
+    /// Create a ParsedFile from a pre-parsed AST and source map.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    /// - `program` points to a valid `Program` that remains alive during the entire
+    ///   `BatchFileAnalyzer::analyze_batch` call
+    /// - `source_map` points to a valid `SourceMap` that remains alive during the entire
+    ///   `BatchFileAnalyzer::analyze_batch` call
+    /// - Both pointers came from the same `php_rs_parser::parse()` call and use the same
+    ///   bump allocator
+    ///
+    /// The typical usage pattern is to call `php_rs_parser::parse(&arena, source)` and
+    /// immediately pass the resulting `program` and `source_map` pointers (obtained via
+    /// `&parsed.program` and `&parsed.source_map`) to this function. The arena must be
+    /// kept alive until analysis completes.
+    pub unsafe fn new(
+        file: Arc<str>,
+        source: Arc<str>,
+        program: *const Program<'static, 'static>,
+        source_map: *const SourceMap,
+    ) -> Self {
+        Self {
+            file,
+            source,
+            program,
+            source_map,
+        }
+    }
+}
 
 impl<'a> BatchFileAnalyzer<'a> {
     pub fn new(session: &'a AnalysisSession) -> Self {

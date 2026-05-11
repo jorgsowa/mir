@@ -491,7 +491,7 @@ fn codebase_key_for_variable_is_none() {
     let sym = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::Variable(n) if n == "n"))
+        .find(|s| matches!(&s.kind, SymbolKind::Variable(n) if n.as_ref() == "n"))
         .expect("Variable(n) must be recorded for the $n read in return");
 
     assert!(

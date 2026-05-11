@@ -36,9 +36,17 @@ impl PartialEq for FileDefinitions {
 // properly aligned and initialized memory. We have exclusive write access
 // through the mutable pointer (Salsa guarantees this). The in-place update
 // is safe because we own both the old and new values.
+//
+// Optimization: Use PartialEq to skip downstream recomputation when definitions
+// haven't changed (e.g., no-op file saves in LSP). This is especially valuable
+// in incremental scenarios where many files are unchanged.
 unsafe impl salsa::Update for FileDefinitions {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        unsafe { *old_pointer = new_value };
+    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
+        let old = unsafe { &mut *old_ptr };
+        if *old == new_val {
+            return false; // Content unchanged; Salsa skips dependent queries
+        }
+        *old = new_val;
         true
     }
 }
@@ -160,6 +168,7 @@ pub struct FunctionNode {
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
     pub deprecated: Option<Arc<str>>,
+    pub docstring: Option<Arc<str>>,
     pub is_pure: bool,
     /// Source location of the declaration.  `None` for functions registered
     /// without a known origin (e.g. some legacy test fixtures).
@@ -192,6 +201,7 @@ pub struct MethodNode {
     pub assertions: Arc<[Assertion]>,
     pub throws: Arc<[Arc<str>]>,
     pub deprecated: Option<Arc<str>>,
+    pub docstring: Option<Arc<str>>,
     pub is_internal: bool,
     pub visibility: Visibility,
     pub is_static: bool,

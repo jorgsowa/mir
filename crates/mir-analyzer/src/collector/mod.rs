@@ -475,6 +475,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_internal: false,
                     is_pure: false,
                     location: location.clone(),
+                    docstring: None,
                 }),
             );
         }
@@ -789,6 +790,11 @@ impl<'a> DefinitionCollector<'a> {
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
             location: span.map(|s| self.location(s.start, s.end)),
+            docstring: if doc.description.trim().is_empty() {
+                None
+            } else {
+                Some(Arc::from(doc.description.as_str()))
+            },
         })
     }
 }

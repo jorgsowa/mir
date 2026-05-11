@@ -135,6 +135,13 @@ impl MirDatabase for MirDb {
             .unwrap_or_default()
     }
 
+    fn class_own_constants(&self, fqcn: &str) -> Vec<ClassConstantNode> {
+        self.class_constant_nodes
+            .get(fqcn)
+            .map(|m| m.values().copied().collect())
+            .unwrap_or_default()
+    }
+
     fn active_class_node_fqcns(&self) -> Vec<Arc<str>> {
         self.class_nodes
             .iter()
@@ -550,6 +557,7 @@ impl MirDb {
                 is_pure: false,
                 deprecated: None,
                 location: None,
+                docstring: None,
             };
             let already = |name: &str| {
                 en.own_methods
@@ -768,6 +776,7 @@ impl MirDb {
             node.set_throws(self)
                 .to(Arc::from(storage.throws.as_slice()));
             node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_docstring(self).to(storage.docstring.clone());
             node.set_is_pure(self).to(storage.is_pure);
             node.set_location(self).to(storage.location.clone());
             node
@@ -787,6 +796,7 @@ impl MirDb {
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
                 storage.deprecated.clone(),
+                storage.docstring.clone(),
                 storage.is_pure,
                 storage.location.clone(),
             );
@@ -904,6 +914,7 @@ impl MirDb {
             node.set_throws(self)
                 .to(Arc::from(storage.throws.as_slice()));
             node.set_deprecated(self).to(storage.deprecated.clone());
+            node.set_docstring(self).to(storage.docstring.clone());
             node.set_is_internal(self).to(storage.is_internal);
             node.set_visibility(self).to(storage.visibility);
             node.set_is_static(self).to(storage.is_static);
@@ -930,6 +941,7 @@ impl MirDb {
                 Arc::from(storage.assertions.as_slice()),
                 Arc::from(storage.throws.as_slice()),
                 storage.deprecated.clone(),
+                storage.docstring.clone(),
                 storage.is_internal,
                 storage.visibility,
                 storage.is_static,
