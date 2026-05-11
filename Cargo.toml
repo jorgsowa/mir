@@ -25,10 +25,11 @@ mir-codebase   = { path = "crates/mir-codebase",   version = "0.21.1" }
 mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.21.1" }
 
 # PHP parsing
-php-rs-parser = "0.10.0"
-php-ast       = "0.10.0"
-php-lexer     = "0.10.0"
-bumpalo       = { version = "3", features = ["collections"] }
+php-rs-parser   = "0.11.0"
+php-ast         = "0.11.0"
+php-lexer       = "0.11.0"
+phpdoc-parser   = "0.11.0"
+bumpalo         = { version = "3", features = ["collections"] }
 
 # Data structures
 indexmap = { version = "2", features = ["serde"] }
