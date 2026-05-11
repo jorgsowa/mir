@@ -32,6 +32,8 @@ impl ResolvedSymbol {
     /// - property access      : `"ClassName::propName"`
     /// - function call        : fully-qualified function name
     /// - class reference      : fully-qualified class name
+    ///
+    /// Prefer [`Self::to_symbol`] for type-safe access.
     pub fn codebase_key(&self) -> Option<String> {
         match &self.kind {
             SymbolKind::MethodCall { class, method } | SymbolKind::StaticCall { class, method } => {
@@ -43,15 +45,40 @@ impl ResolvedSymbol {
             SymbolKind::Variable(_) => None,
         }
     }
+
+    /// Convert this `ResolvedSymbol` to a typed [`crate::Symbol`] for use with
+    /// [`crate::AnalysisSession::definition_of`], [`crate::AnalysisSession::references_to`],
+    /// or [`crate::AnalysisSession::hover`].
+    ///
+    /// Returns `None` for kinds that don't map to a codebase-level symbol
+    /// (currently only `Variable` — local variables aren't tracked in the
+    /// codebase symbol table).
+    pub fn to_symbol(&self) -> Option<crate::Symbol> {
+        match &self.kind {
+            SymbolKind::MethodCall { class, method } | SymbolKind::StaticCall { class, method } => {
+                Some(crate::Symbol::method(class.clone(), method.as_ref()))
+            }
+            SymbolKind::PropertyAccess { class, property } => {
+                Some(crate::Symbol::property(class.clone(), property.clone()))
+            }
+            SymbolKind::FunctionCall(fqn) => Some(crate::Symbol::function(fqn.clone())),
+            SymbolKind::ClassReference(fqcn) => Some(crate::Symbol::class(fqcn.clone())),
+            SymbolKind::Variable(_) => None,
+        }
+    }
 }
 
 /// One declaration emitted by [`crate::AnalysisSession::document_symbols`].
 /// Tool-agnostic shape for outline / breadcrumb features; consumers map this
 /// onto whatever protocol-specific symbol type they need.
+///
+/// Forms a tree: classes/interfaces/traits/enums have `children` populated
+/// with their methods, properties, and constants. Top-level functions and
+/// constants have empty `children`.
 #[derive(Debug, Clone)]
 pub struct DocumentSymbol {
     /// FQCN for classes/interfaces/traits/enums; FQN for functions /
-    /// constants. Consumers typically display the unqualified last segment.
+    /// constants; short name for members nested inside a class.
     pub name: Arc<str>,
     /// Coarse kind suitable for icon / severity selection in outlines.
     pub kind: DocumentSymbolKind,
@@ -59,11 +86,14 @@ pub struct DocumentSymbol {
     /// columns). `None` only for synthetic stub-only definitions that don't
     /// have a recorded source span.
     pub location: Option<mir_codebase::storage::Location>,
+    /// For container symbols (Class, Interface, Trait, Enum), the nested
+    /// methods, properties, and constants declared on this type. Empty for
+    /// leaf kinds (Function, Constant, etc.).
+    pub children: Vec<DocumentSymbol>,
 }
 
-/// Coarse declaration kind used by [`DocumentSymbol`]. Six categories chosen
-/// so consumers can map cleanly onto outline-style symbol kinds in any
-/// protocol they target.
+/// Coarse declaration kind used by [`DocumentSymbol`]. Maps onto outline-style
+/// symbol kinds in any consumer protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentSymbolKind {
     Class,
@@ -71,14 +101,17 @@ pub enum DocumentSymbolKind {
     Trait,
     Enum,
     Function,
+    Method,
+    Property,
     Constant,
+    EnumCase,
 }
 
 /// The kind of symbol that was resolved.
 #[derive(Debug, Clone)]
 pub enum SymbolKind {
     /// A variable reference (`$foo`).
-    Variable(String),
+    Variable(Arc<str>),
     /// An instance method call (`$obj->method()`).
     MethodCall { class: Arc<str>, method: Arc<str> },
     /// A static method call (`Foo::method()`).

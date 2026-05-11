@@ -116,6 +116,12 @@ impl DefinitionCollector<'_> {
             })
             .collect();
 
+        let docstring = if doc.description.trim().is_empty() {
+            None
+        } else {
+            Some(Arc::from(doc.description.as_str()))
+        };
+
         let storage = FunctionStorage {
             fqn: fqn.clone().into(),
             short_name: short_name.into(),
@@ -128,6 +134,7 @@ impl DefinitionCollector<'_> {
             deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_pure: doc.is_pure,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
+            docstring,
         };
 
         self.slice.functions.push(storage);

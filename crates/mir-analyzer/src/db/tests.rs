@@ -152,6 +152,7 @@ mod tests {
             deprecated: None,
             is_pure: false,
             location: None,
+            docstring: None,
         };
         let node = db.upsert_function_node(&func_storage);
 
@@ -183,6 +184,7 @@ mod tests {
             is_pure: false,
             is_internal: false,
             location: None,
+            docstring: None,
         };
         let node = db.upsert_method_node(&method_storage);
 
@@ -388,6 +390,7 @@ mod tests {
             is_internal: false,
             is_pure: false,
             location: None,
+            docstring: None,
         };
         db.upsert_method_node(&storage)
     }
@@ -906,6 +909,7 @@ mod tests {
                 deprecated: None,
                 is_pure: false,
                 location: None,
+                docstring: None,
             };
             let node = db.upsert_function_node(&storage);
 
@@ -962,6 +966,7 @@ mod tests {
             deprecated: None,
             is_pure: false,
             location: None,
+            docstring: None,
         };
         let node = db.upsert_function_node(&storage);
 

@@ -4,7 +4,6 @@ mod common;
 
 use std::sync::Arc;
 
-use mir_analyzer::db::MirDatabase;
 use mir_analyzer::ProjectAnalyzer;
 
 use self::common::{create_temp_dir, write_file};
@@ -88,16 +87,12 @@ fn re_analyze_file_removes_old_definitions() {
     let _result2 = analyzer.re_analyze_file(&file_path_a, new_content_a);
 
     // Verify the old method bar() is gone and baz() exists
-    let guard = analyzer.salsa_db_for_test().lock();
-    let db = &guard.0;
     assert!(
-        db.lookup_method_node("Foo", "baz")
-            .is_some_and(|n| n.active(db)),
+        analyzer.contains_method("Foo", "baz"),
         "baz() should exist after re-analysis"
     );
     assert!(
-        !db.lookup_method_node("Foo", "bar")
-            .is_some_and(|n| n.active(db)),
+        !analyzer.contains_method("Foo", "bar"),
         "bar() should be removed after re-analysis"
     );
 }
@@ -186,6 +181,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
             deprecated: None,
             is_pure: false,
             location: None,
+            docstring: None,
         });
     }
 

@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer};
+use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer, Symbol};
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
@@ -405,7 +405,9 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
                         let s = Arc::clone(&session_outer);
                         handles.push(thread::spawn(move || {
                             for _ in 0..READS_PER_THREAD {
-                                std::hint::black_box(s.definition_of(target_class));
+                                let _ = std::hint::black_box(
+                                    s.definition_of(&Symbol::class(target_class)),
+                                );
                             }
                         }));
                     }

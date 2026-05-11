@@ -93,8 +93,10 @@ fn ensure_stubs_loaded_is_idempotent() {
     session.ensure_stubs_loaded();
 
     // After loading, a built-in like strlen() should be known.
-    let known = session.read(|db| db.lookup_function_node("strlen").is_some());
-    assert!(known, "strlen() must be loaded after ensure_stubs_loaded");
+    assert!(
+        session.contains_function("strlen"),
+        "strlen() must be loaded after ensure_stubs_loaded"
+    );
 }
 
 /// Essential-only loading covers Core / standard / SPL / date but skips
@@ -122,8 +124,10 @@ fn essential_stubs_loaded_count_is_smaller_than_full_set() {
 
     // Both must cover universally-used built-ins.
     for name in ["strlen", "array_map", "count"] {
-        let has = essential.read(|db| db.lookup_function_node(name).is_some());
-        assert!(has, "essentials must define {name}()");
+        assert!(
+            essential.contains_function(name),
+            "essentials must define {name}()"
+        );
     }
 }
 
@@ -137,9 +141,8 @@ fn ensure_stub_for_function_lazy_loads_extension() {
     let baseline = session.loaded_stub_count();
 
     // gd is not part of the essentials.
-    let imagecreate_known = session.read(|db| db.lookup_function_node("imagecreate").is_some());
     assert!(
-        !imagecreate_known,
+        !session.contains_function("imagecreate"),
         "imagecreate() must not be loaded after essentials-only init"
     );
 
@@ -152,9 +155,8 @@ fn ensure_stub_for_function_lazy_loads_extension() {
         "ensure_stub_for_function must ingest at least one new stub"
     );
 
-    let imagecreate_now_known = session.read(|db| db.lookup_function_node("imagecreate").is_some());
     assert!(
-        imagecreate_now_known,
+        session.contains_function("imagecreate"),
         "imagecreate() must be loaded after ensure_stub_for_function"
     );
 }
@@ -239,14 +241,14 @@ function build(): Greeter { return new Greeter(); }
 
     // Resolve "Greeter" by name — caller doesn't need to know its position.
     let loc = session
-        .definition_of("Greeter")
+        .definition_of(&mir_analyzer::Symbol::class("Greeter"))
         .expect("Greeter must resolve");
     assert_eq!(loc.file.as_ref(), file.as_ref());
     assert!(loc.line >= 1, "expected a real source line; got {loc:?}");
 
     // Member resolution.
-    let greet_loc = session.member_definition("Greeter", "greet");
-    assert!(greet_loc.is_some(), "Greeter::greet() must resolve");
+    let greet_loc = session.definition_of(&mir_analyzer::Symbol::method("Greeter", "greet"));
+    assert!(greet_loc.is_ok(), "Greeter::greet() must resolve");
 
     // Sanity: at least one ClassReference symbol got recorded so symbol_at
     // is wired through the pipeline.
@@ -305,7 +307,7 @@ function caller(): string { return helper(); }
     let _ =
         FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
 
-    let refs = session.references_to("helper");
+    let refs = session.references_to(&mir_analyzer::Symbol::function("helper"));
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "helper() must have at least one reference recorded in {file}; got {refs:?}"
@@ -439,16 +441,15 @@ fn ensure_stub_for_unknown_symbol_returns_false() {
     );
 }
 
-/// `snapshot_db()` must return a usable clone after Pass 1 ingest.
+/// Ingested definitions must be observable via the public query API.
 #[test]
-fn snapshot_db_observes_ingested_definitions() {
+fn ingested_definitions_are_observable() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(Arc::from("<test>"), Arc::from("<?php\nclass Foo {}\n"));
 
-    let class_known = session.read(|db| db.lookup_class_node("Foo").is_some());
     assert!(
-        class_known,
-        "snapshot_db() must observe definitions ingested via ingest_file"
+        session.contains_class("Foo"),
+        "ingest_file definitions must be observable via the public API"
     );
 }
 
@@ -526,11 +527,9 @@ fn invalidate_file_releases_all_per_file_state() {
         1,
         "salsa input handle for Child must be released after invalidate"
     );
-    let child_active =
-        session.read(|db| db.lookup_class_node("Child").is_some_and(|n| n.active(db)));
     assert!(
-        !child_active,
-        "Child class node must be inactive after invalidate"
+        !session.contains_class("Child"),
+        "Child class must be inactive after invalidate"
     );
 
     // Re-evict from Base to confirm Child is no longer a dependent of Base
@@ -564,11 +563,9 @@ function caller_v1() { foo(); }
         FileAnalyzer::new(&session).analyze(file.clone(), v1, &parsed.program, &parsed.source_map);
     }
 
-    let foo_refs_v1 = session.read(|db| db.reference_locations("foo"));
+    let foo_refs_v1 = session.references_to(&mir_analyzer::Symbol::function("foo"));
     assert!(
-        foo_refs_v1
-            .iter()
-            .any(|(f, _, _, _)| f.as_ref() == file.as_ref()),
+        foo_refs_v1.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "v1 must record a foo() call from {file}; got {foo_refs_v1:?}"
     );
 
@@ -585,16 +582,14 @@ function caller_v2() { bar(); }
         FileAnalyzer::new(&session).analyze(file.clone(), v2, &parsed.program, &parsed.source_map);
     }
 
-    let foo_refs_v2 = session.read(|db| db.reference_locations("foo"));
+    let foo_refs_v2 = session.references_to(&mir_analyzer::Symbol::function("foo"));
     assert!(
-        !foo_refs_v2.iter().any(|(f, _, _, _)| f.as_ref() == file.as_ref()),
+        !foo_refs_v2.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "after re-ingest without foo(), no foo-reference should remain from {file}; got {foo_refs_v2:?}"
     );
-    let bar_refs_v2 = session.read(|db| db.reference_locations("bar"));
+    let bar_refs_v2 = session.references_to(&mir_analyzer::Symbol::function("bar"));
     assert!(
-        bar_refs_v2
-            .iter()
-            .any(|(f, _, _, _)| f.as_ref() == file.as_ref()),
+        bar_refs_v2.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "after re-ingest with bar(), bar-reference must be present in {file}; got {bar_refs_v2:?}"
     );
 }

@@ -311,6 +311,10 @@ pub struct MethodStorage {
     pub is_internal: bool,
     pub is_pure: bool,
     pub location: Option<Location>,
+    /// Plain-text description from the docblock (text before `@tag` lines).
+    /// Used for hover info.
+    #[serde(default)]
+    pub docstring: Option<Arc<str>>,
 }
 
 impl MethodStorage {
@@ -493,6 +497,10 @@ pub struct FunctionStorage {
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
     pub location: Option<Location>,
+    /// Plain-text description from the docblock (text before `@tag` lines).
+    /// Used for hover info.
+    #[serde(default)]
+    pub docstring: Option<Arc<str>>,
 }
 
 impl FunctionStorage {

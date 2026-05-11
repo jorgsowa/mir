@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::helpers::extract_simple_var;
 use super::ExpressionAnalyzer;
 use crate::context::Context;
@@ -49,7 +51,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
         self.record_symbol(
             expr.span,
-            SymbolKind::Variable(name_str.to_string()),
+            SymbolKind::Variable(Arc::from(name_str)),
             ty.clone(),
         );
         ty

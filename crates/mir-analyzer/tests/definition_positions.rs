@@ -1,17 +1,16 @@
 // Integration tests for definition position lookups (mir#78).
 //
 // After analysis, the codebase should store definition locations for all
-// top-level symbols and class members, and the get_symbol_location /
-// get_member_location APIs should return them.
+// top-level symbols and class members, accessible via the typed Symbol API.
 
 mod common;
 
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{ProjectAnalyzer, Symbol, SymbolLookupError};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
 
 #[test]
-fn get_symbol_location_finds_class() {
+fn definition_of_finds_class() {
     let dir = create_temp_dir("test");
     let file = write_file(&dir, "Foo.php", "<?php\nclass Foo {}\n");
     let file_str = path_to_str(&file).to_string();
@@ -19,14 +18,14 @@ fn get_symbol_location_finds_class() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.symbol_location("Foo");
-    assert!(loc.is_some(), "should find location for class Foo");
-    let loc = loc.unwrap();
+    let loc = analyzer
+        .definition_of(&Symbol::class("Foo"))
+        .expect("should find location for class Foo");
     assert_eq!(loc.file.as_ref(), file_str.as_str());
 }
 
 #[test]
-fn get_symbol_location_finds_function() {
+fn definition_of_finds_function() {
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -37,12 +36,14 @@ fn get_symbol_location_finds_function() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.symbol_location("my_func");
-    assert!(loc.is_some(), "should find location for function my_func");
+    assert!(
+        analyzer.definition_of(&Symbol::function("my_func")).is_ok(),
+        "should find location for function my_func"
+    );
 }
 
 #[test]
-fn get_symbol_location_finds_interface() {
+fn definition_of_finds_interface() {
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -53,12 +54,14 @@ fn get_symbol_location_finds_interface() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.symbol_location("Renderable");
-    assert!(loc.is_some(), "should find location for interface");
+    assert!(
+        analyzer.definition_of(&Symbol::class("Renderable")).is_ok(),
+        "should find location for interface"
+    );
 }
 
 #[test]
-fn get_member_location_finds_method() {
+fn definition_of_finds_method() {
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -69,12 +72,16 @@ fn get_member_location_finds_method() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.member_location("Bar", "baz");
-    assert!(loc.is_some(), "should find location for method Bar::baz");
+    assert!(
+        analyzer
+            .definition_of(&Symbol::method("Bar", "baz"))
+            .is_ok(),
+        "should find location for method Bar::baz"
+    );
 }
 
 #[test]
-fn get_member_location_finds_property() {
+fn definition_of_finds_property() {
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -85,16 +92,27 @@ fn get_member_location_finds_property() {
     let analyzer = ProjectAnalyzer::new();
     analyzer.analyze(&[file]);
 
-    let loc = analyzer.member_location("Qux", "name");
     assert!(
-        loc.is_some(),
+        analyzer
+            .definition_of(&Symbol::property("Qux", "name"))
+            .is_ok(),
         "should find location for property Qux::$name"
     );
 }
 
 #[test]
-fn get_symbol_location_returns_none_for_unknown() {
+fn definition_of_returns_not_found_for_unknown() {
     let analyzer = ProjectAnalyzer::new();
-    assert!(analyzer.symbol_location("NonExistent").is_none());
-    assert!(analyzer.member_location("NonExistent", "foo").is_none());
+    assert_eq!(
+        analyzer
+            .definition_of(&Symbol::class("NonExistent"))
+            .unwrap_err(),
+        SymbolLookupError::NotFound
+    );
+    assert_eq!(
+        analyzer
+            .definition_of(&Symbol::method("NonExistent", "foo"))
+            .unwrap_err(),
+        SymbolLookupError::NotFound
+    );
 }

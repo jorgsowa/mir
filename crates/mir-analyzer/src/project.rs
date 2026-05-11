@@ -16,21 +16,36 @@ use crate::db::{
 };
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
+use crate::shared_db::SharedDb;
 use mir_issues::Issue;
 use mir_types::Union;
 use salsa::Setter as _;
 
 pub(crate) use crate::pass2::merge_return_types;
 
+/// Batch-oriented analyzer: file discovery, parsing, and analysis.
+///
+/// ProjectAnalyzer is the primary entry point for analyzing a project as a whole.
+/// It orchestrates parallel file discovery and parsing, using the same core
+/// analysis engine as [`AnalysisSession`] (salsa database and Pass 2 driver).
+///
+/// **Unified Design:** ProjectAnalyzer and `AnalysisSession` now share the same
+/// database management via [`SharedDb`]. ProjectAnalyzer is the batch API
+/// (all files at once), while `AnalysisSession` is the incremental API (file-by-file).
+/// Both use `Pass2Driver`, the same definition collection logic, and identical
+/// database operations, eliminating code duplication.
+///
+/// [`AnalysisSession`]: crate::session::AnalysisSession
 pub struct ProjectAnalyzer {
+    /// Shared database management (salsa, file registry, stub tracking).
+    /// Extracted to allow code sharing with AnalysisSession.
+    shared_db: Arc<SharedDb>,
     /// Optional cache — when `Some`, Pass 2 results are read/written per file.
     cache: Option<AnalysisCache>,
     /// Called once after each file completes Pass 2 (used for progress reporting).
     pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
     /// PSR-4 autoloader mapping from composer.json, if available.
     pub psr4: Option<Arc<crate::composer::Psr4Map>>,
-    /// Whether stubs have already been loaded (to avoid double-loading).
-    stubs_loaded: std::sync::atomic::AtomicBool,
     /// When true, run dead code detection at the end of analysis.
     pub find_dead_code: bool,
     /// Target PHP language version. `None` means "not configured"; resolved to
@@ -40,10 +55,6 @@ pub struct ProjectAnalyzer {
     pub stub_files: Vec<PathBuf>,
     /// Additional stub directories to walk and parse before analysis (absolute paths).
     pub stub_dirs: Vec<PathBuf>,
-    /// Salsa database for incremental Pass-1 memoization.
-    /// `MirDb` is `Send` but `!Sync` (thread-local query state); `Mutex`
-    /// provides the `Sync` bound rayon requires without needing `T: Sync`.
-    salsa: Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
 }
 
 struct ParsedProjectFile {
@@ -101,30 +112,28 @@ unsafe impl Sync for ParsedProjectFile {}
 impl ProjectAnalyzer {
     pub fn new() -> Self {
         Self {
+            shared_db: Arc::new(SharedDb::new()),
             cache: None,
             on_file_done: None,
             psr4: None,
-            stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
     /// Create a `ProjectAnalyzer` with a disk-backed cache stored under `cache_dir`.
     pub fn with_cache(cache_dir: &Path) -> Self {
         Self {
+            shared_db: Arc::new(SharedDb::new()),
             cache: Some(AnalysisCache::open(cache_dir)),
             on_file_done: None,
             psr4: None,
-            stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: Mutex::new((MirDb::default(), HashMap::new())),
         }
     }
 
@@ -142,22 +151,57 @@ impl ProjectAnalyzer {
         let map = crate::composer::Psr4Map::from_composer(root)?;
         let psr4 = Arc::new(map.clone());
         let analyzer = Self {
+            shared_db: Arc::new(SharedDb::new()),
             cache: None,
             on_file_done: None,
             psr4: Some(psr4),
-            stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             find_dead_code: false,
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
-            salsa: Mutex::new((MirDb::default(), HashMap::new())),
         };
         Ok((analyzer, map))
     }
 
-    /// Set the target PHP version.
+    /// Builder method: set the target PHP version.
     pub fn with_php_version(mut self, version: PhpVersion) -> Self {
         self.php_version = Some(version);
+        self
+    }
+
+    /// Builder method: enable dead-code detection at the end of analysis.
+    pub fn with_dead_code(mut self, enabled: bool) -> Self {
+        self.find_dead_code = enabled;
+        self
+    }
+
+    /// Builder method: set a progress callback invoked once per analyzed file.
+    pub fn with_progress_callback(mut self, callback: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.on_file_done = Some(callback);
+        self
+    }
+
+    /// Builder method: add user stub files.
+    pub fn with_stub_files(mut self, files: Vec<PathBuf>) -> Self {
+        self.stub_files = files;
+        self
+    }
+
+    /// Builder method: add user stub directories.
+    pub fn with_stub_dirs(mut self, dirs: Vec<PathBuf>) -> Self {
+        self.stub_dirs = dirs;
+        self
+    }
+
+    /// Builder method: configure a disk-backed cache at the given directory.
+    pub fn with_cache_dir(mut self, cache_dir: &Path) -> Self {
+        self.cache = Some(AnalysisCache::open(cache_dir));
+        self
+    }
+
+    /// Builder method: attach a PSR-4 autoloader map.
+    pub fn with_psr4(mut self, map: Arc<crate::composer::Psr4Map>) -> Self {
+        self.psr4 = Some(map);
         self
     }
 
@@ -172,25 +216,49 @@ impl ProjectAnalyzer {
         crate::db::type_exists_via_db(&db, fqcn)
     }
 
+    /// Returns `true` if a function with `fqn` is registered and active.
+    pub fn contains_function(&self, fqn: &str) -> bool {
+        let db = self.snapshot_db();
+        db.lookup_function_node(fqn).is_some_and(|n| n.active(&db))
+    }
+
+    /// Returns `true` if a class / interface / trait / enum is registered.
+    pub fn contains_class(&self, fqcn: &str) -> bool {
+        let db = self.snapshot_db();
+        db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db))
+    }
+
+    /// Returns `true` if `class` has a method named `name` (case-insensitive).
+    pub fn contains_method(&self, class: &str, name: &str) -> bool {
+        let db = self.snapshot_db();
+        let name_lower = name.to_ascii_lowercase();
+        db.lookup_method_node(class, &name_lower)
+            .is_some_and(|n| n.active(&db))
+    }
+
     /// Acquire a cheap clone of the salsa db for a read-only query.
     /// The lock is held only for the duration of the clone, so concurrent
     /// readers never serialize on each other or on writes longer than the
     /// clone itself.
     fn snapshot_db(&self) -> MirDb {
-        let guard = self.salsa.lock();
-        guard.0.clone()
+        self.shared_db.snapshot_db()
     }
 
     /// Internal: expose the salsa Mutex for unit tests that need a `&dyn MirDatabase`.
     #[doc(hidden)]
-    pub fn salsa_db_for_test(&self) -> &Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)> {
-        &self.salsa
+    pub fn salsa_db_for_test(
+        &self,
+    ) -> &parking_lot::Mutex<(
+        MirDb,
+        std::collections::HashMap<Arc<str>, crate::db::SourceFile>,
+    )> {
+        &self.shared_db.salsa
     }
 
-    /// Look up the source location of a class member (method, property, or
-    /// class constant / enum case) by walking the inheritance chain through
-    /// the salsa db.  Returns `None` if no member with that name exists, or
-    /// if the member has no recorded location.
+    /// Legacy: look up the source location of a class member by name.
+    ///
+    /// Prefer [`Self::definition_of`] with [`crate::Symbol::method`] etc.
+    #[doc(hidden)]
     pub fn member_location(
         &self,
         fqcn: &str,
@@ -200,6 +268,10 @@ impl ProjectAnalyzer {
         crate::db::member_location_via_db(&db, fqcn, member_name)
     }
 
+    /// Legacy: look up a top-level symbol location.
+    ///
+    /// Prefer [`Self::definition_of`] with [`crate::Symbol`].
+    #[doc(hidden)]
     pub fn symbol_location(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
         let db = self.snapshot_db();
         db.lookup_class_node(symbol)
@@ -212,63 +284,92 @@ impl ProjectAnalyzer {
             })
     }
 
+    /// Legacy: raw reference locations as `(file, line, col_start, col_end)`.
+    ///
+    /// Prefer [`Self::references_to`] which returns `(Arc<str>, Range)` pairs
+    /// and takes a strongly-typed [`crate::Symbol`].
+    #[doc(hidden)]
     pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
         let db = self.snapshot_db();
         db.reference_locations(symbol)
+    }
+
+    /// Resolve a symbol to its declaration location.
+    ///
+    /// Mirrors [`crate::AnalysisSession::definition_of`].
+    pub fn definition_of(
+        &self,
+        symbol: &crate::Symbol,
+    ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
+        let db = self.snapshot_db();
+        match symbol {
+            crate::Symbol::Class(fqcn) => {
+                let node = db
+                    .lookup_class_node(fqcn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                node.location(&db)
+                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+            }
+            crate::Symbol::Function(fqn) => {
+                let node = db
+                    .lookup_function_node(fqn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                node.location(&db)
+                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+            }
+            crate::Symbol::Method { class, name }
+            | crate::Symbol::Property { class, name }
+            | crate::Symbol::ClassConstant { class, name } => {
+                crate::db::member_location_via_db(&db, class, name)
+                    .ok_or(crate::SymbolLookupError::NotFound)
+            }
+            crate::Symbol::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
+        }
+    }
+
+    /// All recorded references to a symbol, as `(file, range)` pairs.
+    ///
+    /// Mirrors [`crate::AnalysisSession::references_to`].
+    pub fn references_to(&self, symbol: &crate::Symbol) -> Vec<(Arc<str>, crate::Range)> {
+        let db = self.snapshot_db();
+        let key = symbol.codebase_key();
+        db.reference_locations(&key)
+            .into_iter()
+            .map(|(file, line, col_start, col_end)| {
+                let range = crate::Range {
+                    start: crate::Position {
+                        line,
+                        column: col_start as u32,
+                    },
+                    end: crate::Position {
+                        line,
+                        column: col_end as u32,
+                    },
+                };
+                (file, range)
+            })
+            .collect()
     }
 
     /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
     /// Stubs are filtered against the configured target PHP version (or
     /// `PhpVersion::LATEST` if none was set).
     pub fn load_stubs(&self) {
-        if !self
-            .stubs_loaded
-            .swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
-            let php_version = self.resolved_php_version();
+        let php_version = self.resolved_php_version();
 
-            // Parallelize built-in stub parsing.
-            let builtin_slices = crate::stubs::builtin_stub_slices_for_version(php_version);
+        // Load all built-in stubs for the configured PHP version
+        let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
+        self.shared_db.ingest_stub_paths(&paths, php_version);
 
-            // Parallelize user stub parsing (parallelization in user_stub_slices()).
-            let user_slices = crate::stubs::user_stub_slices(&self.stub_files, &self.stub_dirs);
-
-            // Lock once and ingest all slices together.
-            let mut guard = self.salsa.lock();
-            for slice in builtin_slices {
-                guard.0.ingest_stub_slice(&slice);
-            }
-            for slice in user_slices {
-                guard.0.ingest_stub_slice(&slice);
-            }
-        }
+        // Load user-configured stubs
+        self.shared_db
+            .ingest_user_stubs(&self.stub_files, &self.stub_dirs);
     }
 
     fn collect_and_ingest_source(&self, file: Arc<str>, src: &str) -> FileDefinitions {
-        let file_defs = {
-            let mut guard = self.salsa.lock();
-            let (ref mut db, ref mut files) = *guard;
-            let salsa_file = match files.get(&file) {
-                Some(&sf) => {
-                    if sf.text(db).as_ref() != src {
-                        sf.set_text(db).to(Arc::from(src));
-                    }
-                    sf
-                }
-                None => {
-                    let sf = SourceFile::new(db, file.clone(), Arc::from(src));
-                    files.insert(file.clone(), sf);
-                    sf
-                }
-            };
-            collect_file_definitions(db, salsa_file)
-        };
-
-        {
-            let mut guard = self.salsa.lock();
-            guard.0.ingest_stub_slice(&file_defs.slice);
-        }
-        file_defs
+        self.shared_db.collect_and_ingest_file(file, src)
     }
 
     /// Run the full analysis pipeline on a set of file paths.
@@ -318,7 +419,7 @@ impl ProjectAnalyzer {
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             for parsed in &parsed_files {
                 match files.get(parsed.file.as_ref()) {
@@ -378,7 +479,7 @@ impl ProjectAnalyzer {
         let mut files_needing_inference: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
         {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, _) = *guard;
             for defs in file_defs {
                 for issue in defs.issues.iter() {
@@ -406,7 +507,7 @@ impl ProjectAnalyzer {
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let db_snapshot = {
-                let guard = self.salsa.lock();
+                let guard = self.shared_db.salsa.lock();
                 guard.0.clone()
             };
             let rev = build_reverse_deps(&db_snapshot);
@@ -422,7 +523,7 @@ impl ProjectAnalyzer {
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
             let class_db = {
-                let guard = self.salsa.lock();
+                let guard = self.shared_db.salsa.lock();
                 guard.0.clone()
             };
             let class_issues =
@@ -435,7 +536,7 @@ impl ProjectAnalyzer {
         // rayon worker gets its own clone (Salsa databases are `Send` but
         // `!Sync`; cloning shares the underlying memoization storage).
         let db_priming = {
-            let guard = self.salsa.lock();
+            let guard = self.shared_db.salsa.lock();
             guard.0.clone()
         };
 
@@ -459,12 +560,12 @@ impl ProjectAnalyzer {
             run_inference_sweep(db_priming, filtered_parsed, self.resolved_php_version());
 
         {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             guard.0.commit_inferred_return_types(functions, methods);
         }
 
         let db_main = {
-            let guard = self.salsa.lock();
+            let guard = self.shared_db.salsa.lock();
             guard.0.clone()
         };
 
@@ -537,7 +638,7 @@ impl ProjectAnalyzer {
         // ---- Compact the reference index ------------------------------------
         // ---- Dead-code detection (M18) --------------------------------------
         if self.find_dead_code {
-            let salsa = self.salsa.lock();
+            let salsa = self.shared_db.salsa.lock();
             let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa.0).analyze();
             drop(salsa);
             all_issues.extend(dead_code_issues);
@@ -570,7 +671,7 @@ impl ProjectAnalyzer {
             // Drive the inheritance scan from already-ingested `ClassNode`s.
             let mut inheritance_candidates = Vec::new();
             let import_candidates = {
-                let guard = self.salsa.lock();
+                let guard = self.shared_db.salsa.lock();
                 let db = &guard.0;
                 for fqcn in db.active_class_node_fqcns() {
                     let Some(node) = db.lookup_class_node(&fqcn) else {
@@ -718,7 +819,7 @@ impl ProjectAnalyzer {
 
             let (inferred_fns, inferred_methods) = crate::session::gather_inferred_types(
                 {
-                    let guard = self.salsa.lock();
+                    let guard = self.shared_db.salsa.lock();
                     guard.0.clone()
                 },
                 &sweep,
@@ -726,14 +827,14 @@ impl ProjectAnalyzer {
             );
 
             {
-                let mut guard_db = self.salsa.lock();
+                let mut guard_db = self.shared_db.salsa.lock();
                 guard_db
                     .0
                     .commit_inferred_return_types(inferred_fns, inferred_methods);
             }
 
             let db_full = {
-                let guard = self.salsa.lock();
+                let guard = self.shared_db.salsa.lock();
                 guard.0.clone()
             };
 
@@ -772,7 +873,7 @@ impl ProjectAnalyzer {
             let h = hash_content(new_content);
             if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
-                let guard = self.salsa.lock();
+                let guard = self.shared_db.salsa.lock();
                 guard.0.replay_reference_locations(file, &ref_locs);
                 return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
@@ -781,14 +882,14 @@ impl ProjectAnalyzer {
         let file: Arc<str> = Arc::from(file_path);
 
         {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, _) = *guard;
             db.remove_file_definitions(file_path);
         }
 
         // --- Salsa-backed Pass 1: memoized parse + definition collection ------
         let file_defs = {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             let salsa_file = match files.get(&file) {
                 Some(&sf) => {
@@ -809,7 +910,7 @@ impl ProjectAnalyzer {
         // --- S2 + Pass 2: hold the Salsa lock for ClassNode upserts and body
         // analysis so the db reference is live during Pass 2 (S5).
         let symbols = {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, _) = *guard;
 
             db.ingest_stub_slice(&file_defs.slice);
@@ -850,7 +951,7 @@ impl ProjectAnalyzer {
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
-            let guard = self.salsa.lock();
+            let guard = self.shared_db.salsa.lock();
             let ref_locs = extract_reference_locations(&guard.0, &file);
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
@@ -925,7 +1026,7 @@ impl ProjectAnalyzer {
             .collect();
 
         let source_files: Vec<SourceFile> = {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.shared_db.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
             file_data
                 .iter()
@@ -947,7 +1048,7 @@ impl ProjectAnalyzer {
         };
 
         let db_pass1 = {
-            let guard = self.salsa.lock();
+            let guard = self.shared_db.salsa.lock();
             guard.0.clone()
         };
 
@@ -958,7 +1059,7 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        let mut guard = self.salsa.lock();
+        let mut guard = self.shared_db.salsa.lock();
         let (ref mut db, _) = *guard;
         for defs in file_defs {
             db.ingest_stub_slice(&defs.slice);
@@ -1201,6 +1302,31 @@ impl AnalysisResult {
                 .push(issue);
         }
         map
+    }
+
+    /// Count issues by severity. Returned as `(severity, count)` pairs sorted
+    /// by severity (Info, Warning, Error).
+    pub fn count_by_severity(&self) -> Vec<(mir_issues::Severity, usize)> {
+        let mut counts: std::collections::BTreeMap<mir_issues::Severity, usize> =
+            std::collections::BTreeMap::new();
+        for issue in &self.issues {
+            *counts.entry(issue.severity).or_insert(0) += 1;
+        }
+        counts.into_iter().collect()
+    }
+
+    /// Total number of issues across all severities and files.
+    pub fn total_issue_count(&self) -> usize {
+        self.issues.len()
+    }
+
+    /// Iterator of issues matching `predicate`. Useful for filtering by
+    /// severity, kind, or file without materializing intermediate vectors.
+    pub fn filter_issues<'a, F>(&'a self, predicate: F) -> impl Iterator<Item = &'a Issue>
+    where
+        F: Fn(&Issue) -> bool + 'a,
+    {
+        self.issues.iter().filter(move |i| predicate(i))
     }
 
     /// Return the innermost resolved symbol whose span contains `byte_offset`
