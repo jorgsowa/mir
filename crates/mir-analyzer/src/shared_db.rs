@@ -16,7 +16,7 @@ use parking_lot::Mutex;
 use rayon::prelude::*;
 use salsa::Setter as _;
 
-use crate::db::{collect_file_definitions, MirDb, SourceFile};
+use crate::db::{MirDb, SourceFile};
 use crate::php_version::PhpVersion;
 
 /// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
@@ -115,33 +115,74 @@ impl SharedDb {
 
     /// Collect definitions from a file and ingest its stub slice.
     /// Used by both ProjectAnalyzer and AnalysisSession during file ingestion.
+    ///
+    /// **Lock discipline:** parsing and definition collection happen *outside*
+    /// the salsa write lock — they don't need the db beyond reading the source
+    /// text we already have in hand. Only the salsa input update and the slice
+    /// ingestion happen under the lock. This lets concurrent readers (e.g. an
+    /// LSP serving hover requests on a snapshot) proceed in parallel with the
+    /// expensive parse step.
     pub fn collect_and_ingest_file(
         &self,
         file: Arc<str>,
         source: &str,
     ) -> crate::db::FileDefinitions {
-        let file_defs = {
+        use mir_issues::Issue;
+
+        // ---- Phase 1: parse + collect outside the lock ---------------------
+        let arena = crate::arena::create_parse_arena(source.len());
+        let parsed = php_rs_parser::parse(&arena, source);
+
+        let mut all_issues: Vec<Issue> = parsed
+            .errors
+            .iter()
+            .map(|err| {
+                Issue::new(
+                    mir_issues::IssueKind::ParseError {
+                        message: err.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line: 1,
+                        line_end: 1,
+                        col_start: 0,
+                        col_end: 0,
+                    },
+                )
+            })
+            .collect();
+
+        let collector = crate::collector::DefinitionCollector::new_for_slice(
+            file.clone(),
+            source,
+            &parsed.source_map,
+        );
+        let (slice, collector_issues) = collector.collect_slice(&parsed.program);
+        all_issues.extend(collector_issues);
+
+        let file_defs = crate::db::FileDefinitions {
+            slice: Arc::new(slice),
+            issues: Arc::new(all_issues),
+        };
+
+        // ---- Phase 2: register the salsa input + ingest under the lock -----
+        // We hold the lock only for the two cheap writes; the expensive parse
+        // and AST walk above ran lock-free.
+        {
             let mut guard = self.salsa.lock();
             let (ref mut db, ref mut files) = *guard;
-            let salsa_file = match files.get(&file) {
+            match files.get(&file) {
                 Some(&sf) => {
                     if sf.text(db).as_ref() != source {
                         sf.set_text(db).to(Arc::from(source));
                     }
-                    sf
                 }
                 None => {
                     let sf = SourceFile::new(db, file.clone(), Arc::from(source));
                     files.insert(file.clone(), sf);
-                    sf
                 }
-            };
-            collect_file_definitions(db, salsa_file)
-        };
-
-        {
-            let mut guard = self.salsa.lock();
-            guard.0.ingest_stub_slice(&file_defs.slice);
+            }
+            db.ingest_stub_slice(&file_defs.slice);
         }
 
         file_defs
