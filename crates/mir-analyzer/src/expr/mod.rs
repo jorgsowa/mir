@@ -25,6 +25,7 @@ mod objects;
 mod unary;
 mod variables;
 
+#[allow(unused_imports)]
 pub use helpers::{extract_destructure_vars, extract_simple_var, infer_arithmetic};
 
 // ---------------------------------------------------------------------------

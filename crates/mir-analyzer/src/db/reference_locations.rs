@@ -59,6 +59,7 @@ pub struct RefLoc {
 /// `analyze_file::accumulated::<RefLocAccumulator>(db, …)`.
 #[salsa::accumulator]
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct RefLocAccumulator(pub RefLoc);
 
 /// Salsa tracked-query input for `analyze_file`.  Carries the analysis

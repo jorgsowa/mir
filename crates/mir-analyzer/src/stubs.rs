@@ -254,7 +254,8 @@ pub fn stub_files() -> &'static [(&'static str, &'static str)] {
 /// Default-version entry point retained for callers (CLI, benches, tests) that
 /// don't track a target PHP version. Equivalent to
 /// [`load_stubs_for_version`] with `PhpVersion::LATEST`.
-pub fn load_stubs(db: &mut MirDb) {
+#[allow(dead_code)]
+pub(crate) fn load_stubs(db: &mut MirDb) {
     load_stubs_for_version(db, PhpVersion::LATEST);
 }
 
@@ -262,20 +263,21 @@ pub fn load_stubs(db: &mut MirDb) {
 /// the target, or whose `@removed` is at or before the target, are skipped —
 /// so multiple declarations of the same name (e.g. `each` on PHP 7 vs.
 /// PHP 8) gated by `@since`/`@removed` collapse to the one matching variant.
-pub fn load_stubs_for_version(db: &mut MirDb, php_version: PhpVersion) {
+#[allow(dead_code)]
+pub(crate) fn load_stubs_for_version(db: &mut MirDb, php_version: PhpVersion) {
     for slice in builtin_stub_slices_for_version(php_version) {
         db.ingest_stub_slice(&slice);
     }
 }
 
-pub fn builtin_stub_slices_for_version(php_version: PhpVersion) -> Vec<StubSlice> {
+pub(crate) fn builtin_stub_slices_for_version(php_version: PhpVersion) -> Vec<StubSlice> {
     STUB_FILES
         .par_iter()
         .map(|(filename, content)| stub_slice_from_source(filename, content, Some(php_version)))
         .collect()
 }
 
-pub fn user_stub_slices(files: &[PathBuf], dirs: &[PathBuf]) -> Vec<StubSlice> {
+pub(crate) fn user_stub_slices(files: &[PathBuf], dirs: &[PathBuf]) -> Vec<StubSlice> {
     let mut all_paths: Vec<PathBuf> = files.to_vec();
     for dir in dirs {
         collect_stub_dir_paths(dir, &mut all_paths);
@@ -287,7 +289,7 @@ pub fn user_stub_slices(files: &[PathBuf], dirs: &[PathBuf]) -> Vec<StubSlice> {
         .collect()
 }
 
-pub fn stub_slice_from_source(
+pub(crate) fn stub_slice_from_source(
     filename: &str,
     content: &str,
     php_version: Option<PhpVersion>,
@@ -343,7 +345,8 @@ fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
 ///
 /// Called after built-in stubs are loaded so user definitions can override or
 /// supplement built-ins (e.g. framework-specific classes, IDE helpers).
-pub fn load_user_stubs(db: &mut MirDb, files: &[PathBuf], dirs: &[PathBuf]) {
+#[allow(dead_code)]
+pub(crate) fn load_user_stubs(db: &mut MirDb, files: &[PathBuf], dirs: &[PathBuf]) {
     for slice in user_stub_slices(files, dirs) {
         db.ingest_stub_slice(&slice);
     }

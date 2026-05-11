@@ -95,6 +95,7 @@ pub trait MirDatabase: salsa::Database {
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
 pub use self::ancestors::*;
+#[allow(unused_imports)]
 pub use self::mirdb::{ClassNodeFields, MirDb};
 pub use self::nodes::*;
 pub use self::queries::*;

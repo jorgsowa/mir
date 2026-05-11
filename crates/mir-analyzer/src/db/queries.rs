@@ -39,10 +39,12 @@ pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
 }
 
+#[allow(dead_code)]
 pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
     db.lookup_function_node(fqn).is_some_and(|n| n.active(db))
 }
 
+#[allow(dead_code)]
 pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
     db.lookup_global_constant_node(fqn)
         .is_some_and(|n| n.active(db))
@@ -381,6 +383,7 @@ fn trait_provides_method_node(
 /// Existence-only sibling of [`trait_provides_method`].  Returns true iff the
 /// trait or any sub-trait declares a method named `method_lower` (abstract
 /// counts).  Cycle-safe via `visited`.
+#[allow(dead_code)]
 fn trait_declares_method(
     db: &dyn MirDatabase,
     trait_fqcn: &str,
@@ -410,6 +413,7 @@ fn trait_declares_method(
     false
 }
 
+#[allow(dead_code)]
 pub fn method_exists_via_db(db: &dyn MirDatabase, fqcn: &str, method_name: &str) -> bool {
     let lower = method_name.to_lowercase();
     let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
