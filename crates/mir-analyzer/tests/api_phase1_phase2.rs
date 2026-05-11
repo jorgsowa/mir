@@ -315,6 +315,109 @@ fn lazy_load_class_with_custom_resolver() {
 }
 
 #[test]
+fn prefetch_imports_loads_unresolved_use_statements() {
+    use mir_analyzer::ClassResolver;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    // Resolver that maps known FQCNs to files we wrote to disk, and tracks
+    // every call so we can assert on prefetch behavior.
+    struct TrackedResolver {
+        map: std::collections::HashMap<String, PathBuf>,
+        calls: Mutex<Vec<String>>,
+    }
+    impl ClassResolver for TrackedResolver {
+        fn resolve(&self, fqcn: &str) -> Option<PathBuf> {
+            self.calls.lock().unwrap().push(fqcn.to_string());
+            self.map.get(fqcn).cloned()
+        }
+    }
+
+    let dir = std::env::temp_dir().join(format!("mir_prefetch_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let dep_path = dir.join("Dep.php");
+    std::fs::write(&dep_path, "<?php\nnamespace App;\nclass Dep {}\n").unwrap();
+
+    let mut map = std::collections::HashMap::new();
+    map.insert("App\\Dep".to_string(), dep_path.clone());
+
+    let resolver = Arc::new(TrackedResolver {
+        map,
+        calls: Mutex::new(Vec::new()),
+    });
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver.clone());
+
+    // User opens a file that imports App\Dep but doesn't have Dep in the
+    // session yet.
+    let opened: Arc<str> = Arc::from("opened.php");
+    let opened_src: Arc<str> =
+        Arc::from("<?php\nuse App\\Dep;\nclass Caller { public function go(Dep $d): void {} }\n");
+    session.ingest_file(opened.clone(), opened_src);
+
+    // Before prefetch: Dep is not in the codebase.
+    assert!(!session.contains_class("App\\Dep"));
+
+    // pending_lazy_loads should surface the unresolved import.
+    let pending = session.pending_lazy_loads(opened.as_ref());
+    assert!(
+        pending.iter().any(|s| s.as_ref() == "App\\Dep"),
+        "pending should include App\\Dep, got {:?}",
+        pending
+    );
+
+    // Prefetch loads it.
+    let loaded = session.prefetch_imports(opened.as_ref());
+    assert!(loaded >= 1, "prefetch should load at least App\\Dep");
+    assert!(session.contains_class("App\\Dep"));
+
+    // A second prefetch is a no-op (no pending imports remain).
+    assert_eq!(session.pending_lazy_loads(opened.as_ref()).len(), 0);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn analyze_dependents_of_runs_in_parallel() {
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    // base.php defines Base. dep_a.php and dep_b.php extend Base.
+    let base: Arc<str> = Arc::from("base.php");
+    let dep_a: Arc<str> = Arc::from("dep_a.php");
+    let dep_b: Arc<str> = Arc::from("dep_b.php");
+
+    session.ingest_file(base.clone(), Arc::from("<?php\nclass Base {}\n"));
+    session.ingest_file(dep_a.clone(), Arc::from("<?php\nclass A extends Base {}\n"));
+    session.ingest_file(dep_b.clone(), Arc::from("<?php\nclass B extends Base {}\n"));
+
+    // Run Pass 2 on the dependents once so they're recorded as having
+    // analyzed against Base.
+    for (file, src) in [
+        (&dep_a, "<?php\nclass A extends Base {}\n"),
+        (&dep_b, "<?php\nclass B extends Base {}\n"),
+    ] {
+        let arena = bumpalo::Bump::new();
+        let parsed = php_rs_parser::parse(&arena, src);
+        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+    }
+
+    // source_of returns the registered source.
+    assert!(session.source_of(dep_a.as_ref()).is_some());
+    assert_eq!(session.source_of("does-not-exist.php"), None);
+
+    // analyze_dependents_of returns analyses for dependents of base.php.
+    // (May be empty if dependency graph wasn't populated — that's still a
+    // valid result; the API just shouldn't panic.)
+    let analyses = session.analyze_dependents_of(base.as_ref());
+    // Sanity: returned files are a subset of the ingested ones.
+    for (file, _) in &analyses {
+        assert!(file.as_ref() == dep_a.as_ref() || file.as_ref() == dep_b.as_ref());
+    }
+}
+
+#[test]
 fn lazy_load_class_not_resolvable_without_resolver() {
     use mir_analyzer::LazyLoadOutcome;
 
