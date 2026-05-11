@@ -394,13 +394,27 @@ impl AnalysisSession {
         crate::db::member_location_via_db(&db, fqcn, member_name)
     }
 
-    /// Every recorded reference to `symbol` (as `(file, line, col_start,
-    /// col_end)`). Use [`crate::symbol::ResolvedSymbol::codebase_key`] to
-    /// build the lookup key from a `ResolvedSymbol` returned by
-    /// [`crate::FileAnalysis::symbol_at`].
-    pub fn references_to(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
+    /// Every recorded reference to `symbol` with its source location as a Range.
+    /// Use [`crate::symbol::ResolvedSymbol::codebase_key`] to build the lookup key
+    /// from a `ResolvedSymbol` returned by [`crate::FileAnalysis::symbol_at`].
+    pub fn references_to(&self, symbol: &str) -> Vec<(Arc<str>, crate::Range)> {
         let db = self.snapshot_db();
         db.reference_locations(symbol)
+            .into_iter()
+            .map(|(file, line, col_start, col_end)| {
+                let range = crate::Range {
+                    start: crate::Position {
+                        line,
+                        column: col_start as u32,
+                    },
+                    end: crate::Position {
+                        line,
+                        column: col_end as u32,
+                    },
+                };
+                (file, range)
+            })
+            .collect()
     }
 
     /// All declarations defined in `file` (classes, interfaces, traits, enums,

@@ -1,26 +1,27 @@
-pub mod arena;
+pub(crate) mod arena;
 pub mod cache;
-pub mod call;
-pub mod class;
-pub mod collector;
-pub mod context;
+pub(crate) mod call;
+pub(crate) mod class;
+pub(crate) mod collector;
+pub(crate) mod context;
 pub mod db;
-pub mod dead_code;
-pub mod diagnostics;
-pub mod expr;
+pub(crate) mod dead_code;
+pub(crate) mod diagnostics;
+pub(crate) mod expr;
 pub mod file_analyzer;
-pub mod generic;
-pub mod narrowing;
+pub(crate) mod generic;
+pub(crate) mod narrowing;
 pub mod parser;
-pub mod pass2;
+pub(crate) mod pass2;
 pub mod php_version;
 pub mod project;
 pub mod session;
-pub mod stmt;
+pub(crate) mod stmt;
 pub mod stubs;
-pub mod taint;
+pub(crate) mod taint;
+pub(crate) mod type_env;
 
-pub use file_analyzer::{FileAnalysis, FileAnalyzer};
+pub use file_analyzer::{BatchFileAnalyzer, FileAnalysis, FileAnalyzer, ParsedFile};
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};
@@ -28,9 +29,23 @@ pub use project::{AnalysisResult, ProjectAnalyzer};
 pub use session::AnalysisSession;
 pub use stubs::{is_builtin_function, stub_files, StubVfs};
 
+/// A position in source code: 1-based line, 0-based codepoint column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Position {
+    pub line: u32,
+    pub column: u32,
+}
+
+/// A range in source code: start and end positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
 pub mod symbol;
-pub mod type_env;
 pub use mir_issues::{Issue, IssueKind, Location, Severity};
+pub use mir_types::Union as Type;
 
 /// Convert a parser [`php_ast::Span`] (byte-offset range) into a
 /// [`mir_codebase::storage::Location`] (file path + 1-based line range +
@@ -62,9 +77,10 @@ pub fn location_from_span(
     }
 }
 pub use symbol::{DocumentSymbol, DocumentSymbolKind, ResolvedSymbol, SymbolKind};
-pub use type_env::{ScopeId, TypeEnv};
 
 pub mod composer;
-pub use composer::Psr4Map;
+pub use composer::{ComposerError, Psr4Map};
+pub use type_env::ScopeId;
 
+#[doc(hidden)]
 pub mod test_utils;

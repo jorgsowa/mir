@@ -1,5 +1,5 @@
 pub mod docblock;
-pub mod type_from_hint;
+pub(crate) mod type_from_hint;
 
 use std::sync::Arc;
 
@@ -14,8 +14,9 @@ pub use type_from_hint::type_from_hint;
 // ParseError
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 #[derive(Debug, Error)]
-pub enum ParseError {
+pub(crate) enum ParseError {
     #[error("PHP parse error in {file}: {message}")]
     SyntaxError { file: Arc<str>, message: String },
 }
@@ -24,22 +25,25 @@ pub enum ParseError {
 // ParsedFile — result of parsing a single PHP file
 // ---------------------------------------------------------------------------
 
-pub struct ParsedFile<'arena, 'src> {
-    pub program: php_ast::ast::Program<'arena, 'src>,
-    pub errors: Vec<ParseError>,
-    pub file: Arc<str>,
+#[allow(dead_code)]
+pub(crate) struct ParsedFile<'arena, 'src> {
+    pub(crate) program: php_ast::ast::Program<'arena, 'src>,
+    pub(crate) errors: Vec<ParseError>,
+    pub(crate) file: Arc<str>,
 }
 
 // ---------------------------------------------------------------------------
 // FileParser
 // ---------------------------------------------------------------------------
 
-pub struct FileParser {
+#[allow(dead_code)]
+pub(crate) struct FileParser {
     ctx: ParserContext,
 }
 
 impl FileParser {
-    pub fn new() -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn new() -> Self {
         Self {
             ctx: ParserContext::new(),
         }
@@ -48,7 +52,8 @@ impl FileParser {
     /// Parse a PHP source string, reusing the internal arena (O(1) reset).
     /// The returned `ParsedFile` borrows from both `self` and `src`.
     /// The previous `ParsedFile` must be dropped before calling `parse` again.
-    pub fn parse<'arena, 'src>(
+    #[allow(dead_code)]
+    pub(crate) fn parse<'arena, 'src>(
         &'arena mut self,
         src: &'src str,
         file: Arc<str>,
@@ -82,7 +87,7 @@ impl Default for FileParser {
 // ---------------------------------------------------------------------------
 
 /// Extract the exact source text covered by a span.
-pub fn span_text(src: &str, span: Span) -> Option<String> {
+pub(crate) fn span_text(src: &str, span: Span) -> Option<String> {
     if span.start >= span.end {
         return None;
     }
@@ -94,7 +99,8 @@ pub fn span_text(src: &str, span: Span) -> Option<String> {
 }
 
 /// Extract the source line containing a span.
-pub fn span_snippet(src: &str, span: Span) -> String {
+#[allow(dead_code)]
+pub(crate) fn span_snippet(src: &str, span: Span) -> String {
     let offset = span.start as usize;
     let line_start = src[..offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
     let line_end = src[offset..]
@@ -115,7 +121,7 @@ pub fn span_snippet(src: &str, span: Span) -> String {
 /// `readonly`) between the docblock and the declaration are skipped — the
 /// php-rs-parser places `span.start` at the `class`/`interface`/`trait`
 /// keyword, after any modifiers.
-pub fn find_preceding_docblock(source: &str, offset: u32) -> Option<String> {
+pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<String> {
     let offset = (offset as usize).min(source.len());
     if offset == 0 {
         return None;
@@ -149,6 +155,6 @@ pub fn find_preceding_docblock(source: &str, offset: u32) -> Option<String> {
 // Name resolution helper — join Name parts to a string
 // ---------------------------------------------------------------------------
 
-pub fn name_to_string(name: &php_ast::ast::Name<'_, '_>) -> String {
+pub(crate) fn name_to_string(name: &php_ast::ast::Name<'_, '_>) -> String {
     name.to_string_repr().into_owned()
 }

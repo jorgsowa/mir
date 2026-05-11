@@ -214,7 +214,7 @@ fn main() {
         // Apply --cache-dir if specified (skip when --no-cache is set)
         if let Some(cache_dir) = &cli.cache_dir {
             if !cli.no_cache {
-                analyzer.cache = Some(mir_analyzer::cache::AnalysisCache::open(cache_dir));
+                analyzer.set_cache_dir(cache_dir);
             }
         }
 
@@ -564,7 +564,7 @@ fn run_output(
     cli: &Cli,
     config: &Config,
     files: &[PathBuf],
-    result: mir_analyzer::project::AnalysisResult,
+    result: mir_analyzer::AnalysisResult,
     baseline: Option<(PathBuf, Baseline)>,
     elapsed: std::time::Duration,
 ) {

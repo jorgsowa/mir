@@ -307,7 +307,7 @@ function caller(): string { return helper(); }
 
     let refs = session.references_to("helper");
     assert!(
-        refs.iter().any(|(f, _, _, _)| f.as_ref() == file.as_ref()),
+        refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "helper() must have at least one reference recorded in {file}; got {refs:?}"
     );
 }

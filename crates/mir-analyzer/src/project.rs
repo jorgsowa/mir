@@ -20,11 +20,11 @@ use mir_issues::Issue;
 use mir_types::Union;
 use salsa::Setter as _;
 
-pub use crate::pass2::merge_return_types;
+pub(crate) use crate::pass2::merge_return_types;
 
 pub struct ProjectAnalyzer {
     /// Optional cache — when `Some`, Pass 2 results are read/written per file.
-    pub cache: Option<AnalysisCache>,
+    cache: Option<AnalysisCache>,
     /// Called once after each file completes Pass 2 (used for progress reporting).
     pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
     /// PSR-4 autoloader mapping from composer.json, if available.
@@ -126,6 +126,11 @@ impl ProjectAnalyzer {
             stub_dirs: Vec::new(),
             salsa: Mutex::new((MirDb::default(), HashMap::new())),
         }
+    }
+
+    /// Enable the disk-backed cache for an already-constructed analyzer.
+    pub fn set_cache_dir(&mut self, cache_dir: &Path) {
+        self.cache = Some(AnalysisCache::open(cache_dir));
     }
 
     /// Create a `ProjectAnalyzer` from a project root containing `composer.json`.
@@ -1136,6 +1141,7 @@ fn extract_reference_locations(
 
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
+    #[doc(hidden)]
     pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
     /// Per-expression resolved symbols from Pass 2, sorted by file path.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
