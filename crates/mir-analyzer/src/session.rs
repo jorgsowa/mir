@@ -733,6 +733,133 @@ impl AnalysisSession {
         loaded
     }
 
+    /// Retrieve the source text the session has registered for `file`, if
+    /// any. Returns `None` when the file has never been ingested. Used by
+    /// the parallel re-analysis path to re-feed dependents to Pass 2 without
+    /// the caller having to track sources independently.
+    pub fn source_of(&self, file: &str) -> Option<Arc<str>> {
+        let guard = self.shared_db.salsa.lock();
+        let (ref db, ref files) = *guard;
+        let sf = files.get(file)?;
+        Some(sf.text(db))
+    }
+
+    /// Re-analyze every transitive dependent of `file` in parallel.
+    ///
+    /// When the user saves a file that other files depend on (e.g. editing
+    /// a base class, an interface, or a trait), those dependents may have
+    /// new diagnostics. This method computes them in parallel using rayon
+    /// and returns the per-file analysis results so the LSP server can
+    /// publish updated diagnostics in one batch.
+    ///
+    /// Source text for dependents is retrieved from the session's salsa
+    /// inputs (set by previous `ingest_file` calls) — the caller doesn't
+    /// need to track or re-read files. Files for which the session has no
+    /// source are silently skipped (returns the analyzable subset).
+    ///
+    /// Does not run inference sweeps. For full-fidelity cross-file inferred
+    /// return types, follow up with [`Self::run_inference_sweep`] over the
+    /// affected file set.
+    pub fn analyze_dependents_of(&self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
+        use rayon::prelude::*;
+
+        // Phase 1: compute dependents + gather their sources outside the
+        // analysis loop so each worker has everything it needs.
+        let dependents = self.dependency_graph().transitive_dependents(file);
+        if dependents.is_empty() {
+            return Vec::new();
+        }
+        let with_source: Vec<(Arc<str>, Arc<str>)> = dependents
+            .into_iter()
+            .filter_map(|path| {
+                let arc_path: Arc<str> = Arc::from(path.as_str());
+                let src = self.source_of(&path)?;
+                Some((arc_path, src))
+            })
+            .collect();
+        if with_source.is_empty() {
+            return Vec::new();
+        }
+
+        // Phase 2: parallel parse + analyze. Each rayon worker gets its own
+        // database snapshot via FileAnalyzer; writes are isolated to the
+        // session's canonical db (none happen here since we only run Pass 2).
+        with_source
+            .into_par_iter()
+            .map(|(file, source)| {
+                let arena = crate::arena::create_parse_arena(source.len());
+                let parsed = php_rs_parser::parse(&arena, source.as_ref());
+                let analyzer = crate::FileAnalyzer::new(self);
+                let analysis = analyzer.analyze(
+                    file.clone(),
+                    source.as_ref(),
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                (file, analysis)
+            })
+            .collect()
+    }
+
+    /// FQCNs that `file` imports via `use` statements but that aren't yet
+    /// loaded in the session.
+    ///
+    /// Designed as the input to background prefetching: after the LSP server
+    /// ingests an open buffer, it can call this and lazy-load the returned
+    /// FQCNs on a worker thread so the user's first Cmd+Click into vendor
+    /// code doesn't pay the file-read+parse cost.
+    ///
+    /// Returns an empty Vec if the file hasn't been ingested or has no
+    /// unresolved imports.
+    pub fn pending_lazy_loads(&self, file: &str) -> Vec<Arc<str>> {
+        let db = self.snapshot_db();
+        let imports = db.file_imports(file);
+        if imports.is_empty() {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for fqcn in imports.values() {
+            // Cheap check: skip imports already in the codebase.
+            if db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db)) {
+                continue;
+            }
+            // Only worth queueing if the resolver could in principle find it.
+            if let Some(resolver) = &self.resolver {
+                if resolver.resolve(fqcn).is_some() {
+                    out.push(Arc::from(fqcn.as_str()));
+                }
+            }
+        }
+        out
+    }
+
+    /// Convenience: synchronously lazy-load every import of `file` that
+    /// isn't already in the codebase. Returns the number successfully loaded.
+    ///
+    /// For non-blocking prefetch, call this from a worker thread:
+    ///
+    /// ```ignore
+    /// let s = session.clone();  // AnalysisSession is wrapped in Arc by callers
+    /// std::thread::spawn(move || {
+    ///     s.prefetch_imports(&file_path);
+    /// });
+    /// ```
+    ///
+    /// Internally walks the inheritance chain of each loaded class to a
+    /// shallow depth so member access on imported types type-checks without
+    /// the user paying the cost on their first navigation.
+    pub fn prefetch_imports(&self, file: &str) -> usize {
+        let pending = self.pending_lazy_loads(file);
+        let mut loaded = 0;
+        for fqcn in pending {
+            // Use the transitive walker with a small depth so we pick up
+            // parent classes / interfaces needed for member resolution, but
+            // don't recursively pull in the entire vendor tree.
+            loaded += self.lazy_load_class_transitive(&fqcn, 2);
+        }
+        loaded
+    }
+
     /// All class / interface / trait / enum FQCNs currently known to the
     /// session, each paired with the file that defines them when available.
     ///
