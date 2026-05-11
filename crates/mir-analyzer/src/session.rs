@@ -33,7 +33,16 @@ pub struct AnalysisSession {
     /// Extracted to allow code sharing with ProjectAnalyzer.
     shared_db: Arc<SharedDb>,
     cache: Option<Arc<AnalysisCache>>,
+    /// PSR-4 / Composer autoload map. Retained alongside `resolver` so the
+    /// `psr4()` accessor can still return a typed `Psr4Map` for callers that
+    /// need Composer-specific data (project_files / vendor_files / etc.).
     psr4: Option<Arc<Psr4Map>>,
+    /// Generic class resolver used for on-demand lazy loading. When `psr4`
+    /// is set via [`Self::with_psr4`], this is populated with the same map
+    /// re-typed as `dyn ClassResolver`. Consumers can also supply their own
+    /// resolver via [`Self::with_class_resolver`] without going through
+    /// Composer.
+    resolver: Option<Arc<dyn crate::ClassResolver>>,
     php_version: PhpVersion,
     user_stub_files: Vec<PathBuf>,
     user_stub_dirs: Vec<PathBuf>,
@@ -46,6 +55,7 @@ impl AnalysisSession {
             shared_db: Arc::new(SharedDb::new()),
             cache: None,
             psr4: None,
+            resolver: None,
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
@@ -63,8 +73,21 @@ impl AnalysisSession {
         self.with_cache(Arc::new(AnalysisCache::open(cache_dir)))
     }
 
+    /// Attach a Composer autoload map (PSR-4, PSR-0, classmap, files).
+    /// Sets the same map as the active [`crate::ClassResolver`] so
+    /// [`Self::lazy_load_class`] works out of the box.
     pub fn with_psr4(mut self, map: Arc<Psr4Map>) -> Self {
+        let resolver: Arc<dyn crate::ClassResolver> = map.clone();
         self.psr4 = Some(map);
+        self.resolver = Some(resolver);
+        self
+    }
+
+    /// Attach a generic class resolver for projects that don't use Composer
+    /// (WordPress, Drupal, custom autoloaders, workspace-walk indexes).
+    /// Replaces any previously-set Composer-backed resolver.
+    pub fn with_class_resolver(mut self, resolver: Arc<dyn crate::ClassResolver>) -> Self {
+        self.resolver = Some(resolver);
         self
     }
 
@@ -611,6 +634,103 @@ impl AnalysisSession {
         let name_lower = name.to_ascii_lowercase();
         db.lookup_method_node(class, &name_lower)
             .is_some_and(|n| n.active(&db))
+    }
+
+    /// Try to resolve `fqcn` via PSR-4 and ingest the mapped file, returning
+    /// a detailed outcome distinguishing "already there" from "freshly loaded".
+    pub fn lazy_load_class_with_outcome(&self, fqcn: &str) -> crate::LazyLoadOutcome {
+        if self.contains_class(fqcn) {
+            return crate::LazyLoadOutcome::AlreadyLoaded;
+        }
+        if self.lazy_load_class(fqcn) {
+            crate::LazyLoadOutcome::Loaded
+        } else {
+            crate::LazyLoadOutcome::NotResolvable
+        }
+    }
+
+    /// Try to resolve `fqcn` via the configured [`crate::ClassResolver`] and
+    /// ingest the mapped file.
+    ///
+    /// This is the LSP-friendly lazy-load entry point: the analyzer never
+    /// touches `vendor/` on its own, but consumers can ask it to resolve
+    /// individual symbols on demand. Designed to be called when a diagnostic
+    /// would otherwise report `UndefinedClass`.
+    ///
+    /// Returns `true` if either the class is already known or a matching
+    /// file was found and successfully ingested. Returns `false` if:
+    /// - No resolver is configured (neither `with_psr4` nor `with_class_resolver` called),
+    /// - The resolver can't map `fqcn` to a file,
+    /// - The file can't be read, or
+    /// - The file parsed but did not define `fqcn`.
+    pub fn lazy_load_class(&self, fqcn: &str) -> bool {
+        if self.contains_class(fqcn) {
+            return true;
+        }
+        let Some(resolver) = &self.resolver else {
+            return false;
+        };
+        let Some(path) = resolver.resolve(fqcn) else {
+            return false;
+        };
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            return false;
+        };
+        let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+        self.ingest_file(file, Arc::from(src));
+        self.contains_class(fqcn)
+    }
+
+    /// Lazy-load every class transitively reachable from `fqcn` via parent /
+    /// interface / trait edges. Useful when the consumer needs not just the
+    /// requested class but enough of its inheritance chain to type-check
+    /// member access.
+    ///
+    /// Walks at most `max_depth` levels (default in batch analysis is 10).
+    /// Returns the number of classes successfully loaded (not counting
+    /// `fqcn` itself if it was already present).
+    pub fn lazy_load_class_transitive(&self, fqcn: &str, max_depth: usize) -> usize {
+        if self.resolver.is_none() {
+            return 0;
+        }
+        let mut loaded = 0;
+        let mut frontier: Vec<String> = vec![fqcn.to_string()];
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for _ in 0..max_depth {
+            if frontier.is_empty() {
+                break;
+            }
+            let mut next: Vec<String> = Vec::new();
+            for name in frontier.drain(..) {
+                if !visited.insert(name.clone()) {
+                    continue;
+                }
+                let was_present = self.contains_class(&name);
+                let resolved = self.lazy_load_class(&name);
+                if resolved && !was_present {
+                    loaded += 1;
+                    // Walk the new class's parent / interfaces / traits.
+                    let db = self.snapshot_db();
+                    if let Some(node) = db.lookup_class_node(&name) {
+                        if let Some(parent) = node.parent(&db) {
+                            next.push(parent.to_string());
+                        }
+                        for iface in node.interfaces(&db).iter() {
+                            next.push(iface.to_string());
+                        }
+                        for tr in node.traits(&db).iter() {
+                            next.push(tr.to_string());
+                        }
+                        for ext in node.extends(&db).iter() {
+                            next.push(ext.to_string());
+                        }
+                    }
+                }
+            }
+            frontier = next;
+        }
+        loaded
     }
 
     /// All class / interface / trait / enum FQCNs currently known to the

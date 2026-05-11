@@ -77,11 +77,20 @@ impl SharedDb {
 
         let mut guard = self.salsa.lock();
         let mut loaded = self.loaded_stubs.lock();
-        for (path, slice) in slices {
-            if loaded.insert(path) {
-                guard.0.ingest_stub_slice(&slice);
-            }
-        }
+        // Filter again under the lock to avoid double-ingestion races, then
+        // bulk-ingest so the Arc::make_mut clones amortize over the batch
+        // instead of paying per slice.
+        let to_ingest: Vec<&mir_codebase::storage::StubSlice> = slices
+            .iter()
+            .filter_map(|(path, slice)| {
+                if loaded.insert(*path) {
+                    Some(slice)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        guard.0.ingest_stub_slices(to_ingest.iter().copied());
     }
 
     /// Ingest user stub slices from configured files and directories.
@@ -99,9 +108,7 @@ impl SharedDb {
 
         let slices = crate::stubs::user_stub_slices(files, dirs);
         let mut guard = self.salsa.lock();
-        for slice in slices {
-            guard.0.ingest_stub_slice(&slice);
-        }
+        guard.0.ingest_stub_slices(slices.iter());
         self.user_stubs_loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }

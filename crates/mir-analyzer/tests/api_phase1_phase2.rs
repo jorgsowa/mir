@@ -274,6 +274,56 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
 }
 
 #[test]
+fn lazy_load_class_with_custom_resolver() {
+    use mir_analyzer::{ClassResolver, LazyLoadOutcome};
+    use std::path::PathBuf;
+
+    // Custom resolver that maps any FQCN to a temp file we write.
+    struct TmpResolver {
+        path: PathBuf,
+    }
+    impl ClassResolver for TmpResolver {
+        fn resolve(&self, _fqcn: &str) -> Option<PathBuf> {
+            Some(self.path.clone())
+        }
+    }
+
+    let dir = std::env::temp_dir().join(format!("mir_lazy_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file_path = dir.join("Resolved.php");
+    std::fs::write(&file_path, "<?php\nclass ResolvedByCustom {}\n").unwrap();
+
+    let resolver: Arc<dyn ClassResolver> = Arc::new(TmpResolver {
+        path: file_path.clone(),
+    });
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver);
+
+    // Class is not yet known
+    assert!(!session.contains_class("ResolvedByCustom"));
+
+    // First call: should load via resolver
+    let outcome = session.lazy_load_class_with_outcome("ResolvedByCustom");
+    assert_eq!(outcome, LazyLoadOutcome::Loaded);
+    assert!(session.contains_class("ResolvedByCustom"));
+
+    // Second call: already loaded
+    let outcome = session.lazy_load_class_with_outcome("ResolvedByCustom");
+    assert_eq!(outcome, LazyLoadOutcome::AlreadyLoaded);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn lazy_load_class_not_resolvable_without_resolver() {
+    use mir_analyzer::LazyLoadOutcome;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let outcome = session.lazy_load_class_with_outcome("Some\\Unknown\\Class");
+    assert_eq!(outcome, LazyLoadOutcome::NotResolvable);
+}
+
+#[test]
 fn all_classes_and_all_functions_workspace_iteration() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(

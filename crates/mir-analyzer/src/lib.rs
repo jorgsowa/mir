@@ -170,6 +170,39 @@ pub enum SymbolLookupError {
     NoSourceLocation,
 }
 
+/// Result of a lazy-load attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LazyLoadOutcome {
+    /// The symbol was already present in the session; no work performed.
+    AlreadyLoaded,
+    /// The symbol was resolved by the configured [`ClassResolver`] and the
+    /// defining file was ingested.
+    Loaded,
+    /// No resolver is configured, the resolver could not map the FQCN to a
+    /// file, or the resolved file could not be read / did not define the
+    /// requested symbol.
+    NotResolvable,
+}
+
+/// Pluggable strategy for mapping a fully-qualified class name to the file
+/// that should define it. The analyzer never touches `vendor/` or the
+/// filesystem on its own — it asks a `ClassResolver` when a symbol is needed.
+///
+/// `mir_analyzer::Psr4Map` is the built-in implementation for Composer-based
+/// projects. Consumers with non-Composer conventions (WordPress, Drupal, a
+/// custom autoloader, a workspace-walk index) supply their own.
+pub trait ClassResolver: Send + Sync {
+    /// Resolve `fqcn` to the file that defines it. Returning `None` causes
+    /// the analyzer to fall back to emitting `UndefinedClass`.
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf>;
+}
+
+impl ClassResolver for composer::Psr4Map {
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+        composer::Psr4Map::resolve(self, fqcn)
+    }
+}
+
 impl std::fmt::Display for SymbolLookupError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
