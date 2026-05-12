@@ -48,11 +48,11 @@ impl DocblockParser {
                 }
                 "return" | "psalm-return" | "phpstan-return" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        let ty_s = body_str.trim();
-                        if let Some(msg) = validate_type_str(ty_s, "return") {
+                        let ty_s = extract_return_type(&body_str);
+                        if let Some(msg) = validate_type_str(&ty_s, "return") {
                             result.invalid_annotations.push(msg);
                         }
-                        result.return_type = Some(parse_type_string(ty_s));
+                        result.return_type = Some(parse_type_string(&ty_s));
                     }
                 }
                 "var" => {
@@ -921,13 +921,68 @@ fn parse_import_type(body: &str) -> Option<DocImportType> {
 
 fn parse_param_line(s: &str) -> Option<(String, String)> {
     // Formats: `Type $name`, `Type $name description`
-    let mut parts = s.splitn(3, char::is_whitespace);
-    let ty = parts.next()?.trim().to_string();
-    let name = parts.next()?.trim().trim_start_matches('$').to_string();
-    if ty.is_empty() || name.is_empty() {
-        return None;
+    // Types can contain spaces (e.g., `array<string, int>`), so we need to find the variable name.
+    // The variable name is the `$identifier` that comes after whitespace (not part of type syntax).
+
+    // Strategy: find the last sequence of whitespace followed by `$identifier`
+    // This handles both simple types and types with generics/spaces.
+    let mut best_split: Option<(String, String)> = None;
+
+    for (i, ch) in s.char_indices() {
+        if ch.is_whitespace() {
+            // Found whitespace; check what comes after it
+            let after = &s[i..].trim_start();
+            if after.starts_with('$') {
+                // Found a `$` after whitespace
+                let mut var_parts = after.split(char::is_whitespace);
+                if let Some(name_with_dollar) = var_parts.next() {
+                    let name = name_with_dollar.trim_start_matches('$').to_string();
+                    if !name.is_empty() {
+                        let type_part = s[..i].trim().to_string();
+                        if !type_part.is_empty() {
+                            // Keep this as a candidate; if there are more, the last one wins
+                            best_split = Some((type_part, name));
+                        }
+                    }
+                }
+            }
+        }
     }
-    Some((ty, name))
+
+    best_split
+}
+
+fn extract_return_type(s: &str) -> String {
+    // Extract just the type portion from a @return tag body.
+    // Format: `Type [description...]`
+    // Types can contain generics <>, unions |, intersections &, but descriptions are
+    // separated by whitespace after the type token.
+    // Example: `bool true if var is of type string` -> `bool`
+    // Example: `array<string, int> an associative array` -> `array<string, int>`
+
+    let mut depth: i32 = 0;
+    let mut current_token = String::new();
+
+    for ch in s.chars() {
+        match ch {
+            '<' | '(' | '{' => {
+                depth += 1;
+                current_token.push(ch);
+            }
+            '>' | ')' | '}' => {
+                depth = (depth - 1).max(0);
+                current_token.push(ch);
+            }
+            _ if ch.is_whitespace() && depth == 0 => {
+                break;
+            }
+            _ => {
+                current_token.push(ch);
+            }
+        }
+    }
+
+    current_token.trim().to_string()
 }
 
 fn split_union(s: &str) -> Vec<String> {
