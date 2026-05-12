@@ -860,10 +860,10 @@ fn find_matching_paren(s: &str) -> Option<usize> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Parse template tag format: `T` or `T of Bound`
+/// Parse template tag format: `T`, `T of Bound`, or `T as Bound`
 fn parse_template_line(_tag_name: &str, body: Option<String>) -> Option<(String, Option<String>)> {
     let body = body?;
-    if let Some((name, bound)) = body.split_once(" of ") {
+    if let Some((name, bound)) = body.split_once(" of ").or_else(|| body.split_once(" as ")) {
         Some((name.trim().to_string(), Some(bound.trim().to_string())))
     } else {
         Some((body.trim().to_string(), None))
@@ -959,6 +959,7 @@ fn extract_return_type(s: &str) -> String {
     // separated by whitespace after the type token.
     // Example: `bool true if var is of type string` -> `bool`
     // Example: `array<string, int> an associative array` -> `array<string, int>`
+    // Example: `\Closure(): T description` -> `\Closure(): T`
 
     let mut depth: i32 = 0;
     let mut current_token = String::new();
@@ -979,6 +980,18 @@ fn extract_return_type(s: &str) -> String {
             _ => {
                 current_token.push(ch);
             }
+        }
+    }
+
+    // Callable return type syntax: `\Closure(): T` — the token ends with ':'
+    // because the space between ':' and 'T' caused an early stop. Append the
+    // return-type token that follows.
+    if current_token.ends_with(':') {
+        let offset = current_token.len();
+        let rest = s[offset..].trim_start();
+        if !rest.is_empty() {
+            let ret_type = extract_return_type(rest);
+            current_token.push_str(&ret_type);
         }
     }
 
