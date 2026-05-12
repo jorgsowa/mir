@@ -509,6 +509,25 @@ impl AnalysisSession {
             .collect()
     }
 
+    /// Class-level issues (inheritance violations, abstract-method gaps, override
+    /// incompatibilities) for the given set of files.
+    ///
+    /// These checks are cross-file by nature and are not emitted by
+    /// [`crate::FileAnalyzer::analyze`]. Call this after ingesting or
+    /// re-analyzing a file and its dependents to get the full diagnostic picture.
+    ///
+    /// Circular-inheritance checks always run against the full workspace graph
+    /// regardless of the `files` filter — a cycle is a workspace-wide problem.
+    pub fn class_issues_for(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
+        let db = self.snapshot_db();
+        let file_set: HashSet<Arc<str>> = files.iter().cloned().collect();
+        let file_data: Vec<(Arc<str>, Arc<str>)> = files
+            .iter()
+            .filter_map(|f| Some((f.clone(), self.source_of(f)?)))
+            .collect();
+        crate::class::ClassAnalyzer::with_files(&db, file_set, &file_data).analyze_all()
+    }
+
     /// All declarations defined in `file` as a **hierarchical tree**.
     ///
     /// Classes/interfaces/traits/enums are returned with their methods,
