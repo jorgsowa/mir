@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-05-12
+
+### Added
+
+- `AnalysisSession::class_issues_for()`: exposes cross-file class diagnostics (abstract-method gaps, override violations, circular inheritance) so LSP consumers can retrieve the complete diagnostic picture alongside `analyze_dependents_of()` without accessing `ClassAnalyzer` directly.
+
+## [0.21.2] - 2026-05-12
+
+### Fixed
+
+- `@template T as Bound` syntax now parsed correctly (previously only `@template T of Bound` was recognized), enabling proper type narrowing for templates declared with the `as` keyword.
+- Callable/closure return types in `@return` annotations (e.g., `@return \Closure(): T`) now correctly capture the return type after the colon, fixing false `MixedMethodCall` diagnostics when template parameters were used as closure return types.
+
 ## [0.21.1] - 2026-05-09
 
 ### Fixed
