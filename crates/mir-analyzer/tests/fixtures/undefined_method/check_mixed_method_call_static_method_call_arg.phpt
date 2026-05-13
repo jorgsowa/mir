@@ -9,6 +9,5 @@ checkMixedMethodCallStaticMethodCallArg
                         $a->bar(B::bat());
                     }
 ===expect===
-UndefinedMethod
-===ignore===
-TODO
+MixedMethodCall@6:24: Method bar() called on mixed type
+UndefinedMethod@6:32: Method B::bat() does not exist

@@ -19,6 +19,4 @@ returnsTypedClosureWithBadCall
                         };
                     }
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidReturnType@15:28: Return type 'A' is not compatible with declared 'int'

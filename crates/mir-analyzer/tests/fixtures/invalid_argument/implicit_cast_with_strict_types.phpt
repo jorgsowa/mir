@@ -13,6 +13,5 @@ implicitCastWithStrictTypes
                     function fooFoo(string $b): void {}
                     fooFoo(new A());
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+UnusedParam@10:36: Parameter $b is never used
+InvalidArgument@11:27: Argument $b of fooFoo() expects 'string', got 'A'

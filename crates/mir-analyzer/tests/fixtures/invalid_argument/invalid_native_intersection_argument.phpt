@@ -17,6 +17,4 @@ invalidNativeIntersectionArgument
                     test(new C());
                 
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@14:25: Argument $in of test() expects 'A&B', got 'C'

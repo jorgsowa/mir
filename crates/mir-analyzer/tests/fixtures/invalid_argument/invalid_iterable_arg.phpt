@@ -17,6 +17,4 @@ invalidIterableArg
 
                     iterator(new A());
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@15:29: Argument $iter of iterator() expects 'array<mixed, string>', got 'A'

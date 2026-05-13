@@ -8,6 +8,6 @@ arrayFilterTooFewArgs
 
                     array_filter([1, 2, 3], "foo");
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+UnusedParam@2:33: Parameter $i is never used
+UnusedParam@2:41: Parameter $s is never used
+InvalidArgument@6:44: Argument $callback of array_filter() expects 'callable accepting 1 arg(s)', got 'callable accepting 2 argument(s)'

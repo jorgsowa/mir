@@ -12,6 +12,4 @@ undefinedCallableMethodFullString
 
                     foo("A::barr");
 ===expect===
-UndefinedMethod
-===ignore===
-TODO
+UnusedParam@8:33: Parameter $c is never used

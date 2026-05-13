@@ -15,6 +15,4 @@ unionAnnotationInvalidArg
 
                     $b = $child->setBool("hello", 5);
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@13:50: Argument $bar of setBool() expects 'string|bool', got '5'

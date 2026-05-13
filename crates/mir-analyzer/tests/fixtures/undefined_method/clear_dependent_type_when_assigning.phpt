@@ -21,6 +21,4 @@ clearDependentTypeWhenAssigning
                         }
                     }
 ===expect===
-UndefinedMethod
-===ignore===
-TODO
+UndefinedMethod@17:32: Method B::bar() does not exist

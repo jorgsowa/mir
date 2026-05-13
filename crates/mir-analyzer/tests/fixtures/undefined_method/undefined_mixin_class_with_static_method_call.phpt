@@ -7,6 +7,4 @@ undefinedMixinClassWithStaticMethodCall
 
                     A::foo();
 ===expect===
-UndefinedMethod
-===ignore===
-TODO
+UndefinedMethod@5:20: Method A::foo() does not exist
