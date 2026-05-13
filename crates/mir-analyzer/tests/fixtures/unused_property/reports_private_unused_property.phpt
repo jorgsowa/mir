@@ -8,4 +8,4 @@ class Foo {
     private string $name = 'bar';
 }
 ===expect===
-UnusedProperty@1:0: Private property Foo::$name is never read
+UnusedProperty@3:4: Private property Foo::$name is never read

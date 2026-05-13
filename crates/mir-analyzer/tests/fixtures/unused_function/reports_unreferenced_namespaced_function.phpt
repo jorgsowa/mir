@@ -8,4 +8,4 @@ namespace App;
 
 function helper(): void {}
 ===expect===
-UnusedFunction@1:0: Function helper() is never called
+UnusedFunction@4:0: Function helper() is never called
