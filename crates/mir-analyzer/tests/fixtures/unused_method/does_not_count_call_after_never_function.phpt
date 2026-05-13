@@ -19,4 +19,4 @@ class Foo {
 ===expect===
 MissingThrowsDocblock@3:4: Exception RuntimeException is thrown but not declared in @throws
 UnreachableCode@9:8: Unreachable code detected
-UnusedMethod@1:0: Private method Foo::helper() is never called
+UnusedMethod@12:4: Private method Foo::helper() is never called

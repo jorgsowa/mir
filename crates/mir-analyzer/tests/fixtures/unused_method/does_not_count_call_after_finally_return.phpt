@@ -18,5 +18,5 @@ class Foo {
     private function helper(): void {}
 }
 ===expect===
-UnusedMethod@1:0: Private method Foo::helper() is never called
+UnusedMethod@13:4: Private method Foo::helper() is never called
 UnreachableCode@10:8: Unreachable code detected

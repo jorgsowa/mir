@@ -11,4 +11,4 @@ function helper(): void {}
 // 'helper' resolves as \helper (global), NOT \App\helper
 call_user_func('helper');
 ===expect===
-UnusedFunction@1:0: Function helper() is never called
+UnusedFunction@4:0: Function helper() is never called

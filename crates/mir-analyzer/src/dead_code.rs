@@ -79,19 +79,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     .db
                     .has_reference(&format!("{}::{}", fqcn_str, name.to_lowercase()))
                 {
-                    let (file, line) = location_from_storage(&method.location(self.db));
+                    let location = location_from_storage(&method.location(self.db));
                     issues.push(Issue::new(
                         IssueKind::UnusedMethod {
                             class: fqcn_str.to_string(),
                             method: name.to_string(),
                         },
-                        Location {
-                            file,
-                            line,
-                            line_end: line,
-                            col_start: 0,
-                            col_end: 0,
-                        },
+                        location,
                     ));
                 }
             }
@@ -108,19 +102,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     .db
                     .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
                 {
-                    let (file, line) = location_from_storage(&prop.location(self.db));
+                    let location = location_from_storage(&prop.location(self.db));
                     issues.push(Issue::new(
                         IssueKind::UnusedProperty {
                             class: fqcn_str.to_string(),
                             property: name.to_string(),
                         },
-                        Location {
-                            file,
-                            line,
-                            line_end: line,
-                            col_start: 0,
-                            col_end: 0,
-                        },
+                        location,
                     ));
                 }
             }
@@ -144,18 +132,12 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
             }
             if !self.db.has_reference(fqn.as_ref()) {
-                let (file, line) = location_from_storage(&location);
+                let location = location_from_storage(&location);
                 issues.push(Issue::new(
                     IssueKind::UnusedFunction {
                         name: node.short_name(self.db).to_string(),
                     },
-                    Location {
-                        file,
-                        line,
-                        line_end: line,
-                        col_start: 0,
-                        col_end: 0,
-                    },
+                    location,
                 ));
             }
         }
@@ -169,12 +151,22 @@ impl<'a> DeadCodeAnalyzer<'a> {
     }
 }
 
-fn location_from_storage(
-    loc: &Option<mir_codebase::storage::Location>,
-) -> (std::sync::Arc<str>, u32) {
+fn location_from_storage(loc: &Option<mir_codebase::storage::Location>) -> Location {
     match loc {
-        Some(l) => (l.file.clone(), 1), // byte offset → line mapping not available here
-        None => (std::sync::Arc::from("<unknown>"), 1),
+        Some(l) => Location {
+            file: l.file.clone(),
+            line: l.line,
+            line_end: l.line_end,
+            col_start: l.col_start,
+            col_end: l.col_end,
+        },
+        None => Location {
+            file: std::sync::Arc::from("<unknown>"),
+            line: 1,
+            line_end: 1,
+            col_start: 0,
+            col_end: 0,
+        },
     }
 }
 
