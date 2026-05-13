@@ -412,13 +412,12 @@ fn extract_named_files(region: &str, path: &str) -> Vec<(String, String)> {
 
 fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
     let parts: Vec<&str> = line.splitn(2, ": ").collect();
-    assert_eq!(
-        parts.len(),
-        2,
-        "fixture {path}: invalid expect line {line:?} — expected \"KindName@line:col: message\" (location is required)"
-    );
+    let (kind_part, message) = match parts.len() {
+        2 => (parts[0], parts[1].trim().to_string()),
+        1 => (parts[0], String::new()),
+        _ => panic!("fixture {path}: invalid expect line {line:?}"),
+    };
 
-    let kind_part = parts[0];
     let (kind_name, line_col) = if let Some(at_pos) = kind_part.find('@') {
         (
             kind_part[..at_pos].trim().to_string(),
@@ -448,7 +447,7 @@ fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
     ExpectedIssue {
         file: None,
         kind_name,
-        message: parts[1].trim().to_string(),
+        message,
         line: line_num,
         col_start,
     }
@@ -456,13 +455,18 @@ fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
 
 fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
     let parts: Vec<&str> = line.splitn(3, ": ").collect();
-    assert_eq!(
-        parts.len(),
-        3,
-        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName@line:col: message\" (location is required)"
+    assert!(
+        parts.len() >= 2,
+        "fixture {path}: invalid multi-file expect line {line:?} — expected \"FileName.php: KindName[@line:col][ : message]\""
     );
 
     let kind_part = parts[1];
+    let message = if parts.len() >= 3 {
+        parts[2].trim().to_string()
+    } else {
+        String::new()
+    };
+
     let (kind_name, line_col) = if let Some(at_pos) = kind_part.find('@') {
         (
             kind_part[..at_pos].trim().to_string(),
@@ -492,7 +496,7 @@ fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
     ExpectedIssue {
         file: Some(parts[0].trim().to_string()),
         kind_name,
-        message: parts[2].trim().to_string(),
+        message,
         line: line_num,
         col_start,
     }
