@@ -15,6 +15,4 @@ annotationInvalidArg
 
                     $child->setString("five");
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@13:38: Argument $integer of setString() expects 'int', got '"five"'

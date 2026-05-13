@@ -24,6 +24,5 @@ assertThisType
                         $t->isFoo();
                     }
 ===expect===
-UndefinedMethod
-===ignore===
-TODO
+MissingThrowsDocblock@8:32: Exception Exception is thrown but not declared in @throws
+UndefinedMethod@20:24: Method Type::bar() does not exist

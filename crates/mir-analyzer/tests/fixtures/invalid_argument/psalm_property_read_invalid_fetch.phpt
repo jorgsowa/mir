@@ -17,6 +17,4 @@ psalmPropertyReadInvalidFetch
                     $a = new A();
                     echo count($a->foo);
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@15:31: Argument $value of count() expects 'array<mixed, mixed>|Countable', got 'string'

@@ -10,6 +10,5 @@ invalidArgumentFalseTrueExpected
 
                     foo(false);
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+UnusedParam@6:33: Parameter $arg is never used
+InvalidArgument@8:24: Argument $arg of foo() expects 'true|string', got 'false'

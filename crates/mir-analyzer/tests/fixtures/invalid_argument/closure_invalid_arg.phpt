@@ -7,6 +7,5 @@ closureInvalidArg
 
                     takesClosure(5);
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+UnusedParam@3:42: Parameter $c is never used
+InvalidArgument@5:33: Argument $c of takesClosure() expects 'Closure(int): string', got '5'

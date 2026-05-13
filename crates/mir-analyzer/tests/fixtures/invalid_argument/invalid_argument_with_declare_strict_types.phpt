@@ -5,6 +5,5 @@ invalidArgumentWithDeclareStrictTypes
                     function fooFoo(int $a): void {}
                     fooFoo("string");
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+UnusedParam@2:36: Parameter $a is never used
+InvalidArgument@3:27: Argument $a of fooFoo() expects 'int', got '"string"'

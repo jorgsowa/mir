@@ -28,6 +28,5 @@ assertInstanceOfMultipleInterfaces
                         $a->foo1();
                     }
 ===expect===
-UndefinedMethod
-===ignore===
-TODO
+MissingThrowsDocblock@18:28: Exception Exception is thrown but not declared in @throws
+UndefinedMethod@25:24: Method A::foo1() does not exist
