@@ -7,5 +7,3 @@ interface Runnable {
 }
 abstract class AbstractTask implements Runnable {}
 ===expect===
-===ignore===
-TODO

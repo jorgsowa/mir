@@ -17,5 +17,3 @@ function classify(int $x): string {
     return $label;
 }
 ===expect===
-===ignore===
-TODO

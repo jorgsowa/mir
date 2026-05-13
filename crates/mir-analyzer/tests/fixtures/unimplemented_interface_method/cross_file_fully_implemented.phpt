@@ -13,5 +13,3 @@ class ConsoleLogger implements Logger {
     public function error(string $msg): void { echo $msg; }
 }
 ===expect===
-===ignore===
-TODO

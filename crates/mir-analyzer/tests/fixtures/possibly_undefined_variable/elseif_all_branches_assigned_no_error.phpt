@@ -15,5 +15,3 @@ function foo(int $x): string {
     return $result;
 }
 ===expect===
-===ignore===
-TODO

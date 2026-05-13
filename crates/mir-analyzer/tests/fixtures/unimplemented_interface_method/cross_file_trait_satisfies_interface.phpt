@@ -16,5 +16,3 @@ class Worker implements Runnable {
     use RunsTrait;
 }
 ===expect===
-===ignore===
-TODO

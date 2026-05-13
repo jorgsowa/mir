@@ -9,5 +9,3 @@ class Impl implements Serializable {
     public function fooBar(): void {}
 }
 ===expect===
-===ignore===
-TODO

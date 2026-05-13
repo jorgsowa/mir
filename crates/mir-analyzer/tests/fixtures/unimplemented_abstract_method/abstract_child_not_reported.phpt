@@ -7,5 +7,3 @@ abstract class Base {
 }
 abstract class StillAbstract extends Base {}
 ===expect===
-===ignore===
-TODO

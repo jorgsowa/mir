@@ -9,5 +9,3 @@ class Complete extends Base {
     public function doWork(): void {}
 }
 ===expect===
-===ignore===
-TODO
