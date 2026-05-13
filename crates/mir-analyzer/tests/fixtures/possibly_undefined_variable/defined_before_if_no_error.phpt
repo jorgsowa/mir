@@ -8,5 +8,3 @@ function foo(bool $c): string {
     return $r;
 }
 ===expect===
-===ignore===
-TODO
