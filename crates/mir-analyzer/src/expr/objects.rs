@@ -154,6 +154,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                         n.class.span,
                     );
                 }
+                // Check abstract for known TClassString
+                for atom in ty.types.iter() {
+                    if let Atomic::TClassString(Some(fqcn)) = atom {
+                        if let Some(node) = self
+                            .db
+                            .lookup_class_node(fqcn.as_ref())
+                            .filter(|n| n.active(self.db))
+                        {
+                            if node.is_abstract(self.db) {
+                                self.emit(
+                                    IssueKind::AbstractInstantiation {
+                                        class: fqcn.to_string(),
+                                    },
+                                    Severity::Error,
+                                    n.class.span,
+                                );
+                            }
+                        }
+                    }
+                }
                 Union::single(Atomic::TObject)
             }
         };

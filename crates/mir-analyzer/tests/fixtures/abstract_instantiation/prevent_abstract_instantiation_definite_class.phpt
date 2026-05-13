@@ -10,6 +10,4 @@ preventAbstractInstantiationDefiniteClass
                         }
                     }
 ===expect===
-AbstractInstantiation
-===ignore===
-TODO
+AbstractInstantiation@6:32: Cannot instantiate abstract class A

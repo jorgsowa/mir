@@ -2,6 +2,8 @@
 ///
 /// Given a condition expression and a branch direction (true/false), this
 /// module updates the `Context` to narrow variable types accordingly.
+use std::sync::Arc;
+
 use php_ast::ast::{AssignOp, BinaryOp, ExprKind, UnaryPrefixOp};
 
 use mir_codebase::storage::AssertionKind;
@@ -124,6 +126,24 @@ pub fn narrow_from_condition<'arena, 'src>(
                             &case_name,
                             effective_true,
                         );
+                    }
+                }
+            }
+            // `$x === SomeClass::class`
+            else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(var_name) = extract_var_name(b.left) {
+                    if let Some(fqcn) =
+                        extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
+                    {
+                        narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                    }
+                }
+            } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(var_name) = extract_var_name(b.right) {
+                    if let Some(fqcn) =
+                        extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
+                    {
+                        narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
                     }
                 }
             }
@@ -674,6 +694,16 @@ fn narrow_var_to_literal_enum_case(
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
+fn narrow_var_to_class_string(ctx: &mut Context, name: &str, fqcn: &str, is_class: bool) {
+    let current = ctx.get_var(name);
+    let narrowed = if is_class {
+        Union::single(Atomic::TClassString(Some(Arc::from(fqcn))))
+    } else {
+        current.filter(|t| !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn))
+    };
+    set_narrowed(ctx, name, &current, narrowed, true);
+}
+
 fn extract_var_name<'a, 'arena, 'src>(
     expr: &'a php_ast::ast::Expr<'arena, 'src>,
 ) -> Option<String> {
@@ -713,6 +743,19 @@ fn extract_enum_case<'arena, 'src>(
         }
     }
     None
+}
+
+fn extract_class_const_fqcn<'arena, 'src>(
+    cca: &php_ast::ast::StaticAccessExpr<'arena, 'src>,
+    self_fqcn: Option<&str>,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<String> {
+    if cca.member.name_str() != Some("class") {
+        return None;
+    }
+    let short = extract_class_name(cca.class, self_fqcn)?;
+    Some(crate::db::resolve_name_via_db(db, file, &short))
 }
 
 // ---------------------------------------------------------------------------
