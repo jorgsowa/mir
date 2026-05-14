@@ -14,8 +14,6 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
-
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
 use crate::db::{MirDatabase, MirDb};
@@ -927,24 +925,13 @@ impl AnalysisSession {
     /// Pass 2 inference-only mode on a cloned db (parallel via rayon), then
     /// commits the collected inferred return types to the canonical db.
     ///
-    /// Call this on idle / save / explicit user request, **not** on every
-    /// keystroke — [`crate::FileAnalyzer::analyze`] deliberately skips
-    /// inference sweep on the hot path. Files whose source contains parse
-    /// errors are silently skipped.
-    pub fn run_inference_sweep(&self, files: &[(Arc<str>, Arc<str>)]) {
-        self.ensure_stubs_loaded();
-
-        // The priming db lives only inside `gather_inferred_types`. After it
-        // returns, all rayon-clone references to the salsa storage are dropped
-        // — required so that the subsequent `commit_inferred_return_types`
-        // call (which calls salsa's `cancel_others`) doesn't deadlock waiting
-        // for outstanding db references.
-        let (functions, methods) =
-            gather_inferred_types(self.snapshot_db(), files, self.php_version);
-
-        let mut guard = self.shared_db.salsa.lock();
-        guard.commit_inferred_return_types(functions, methods);
-    }
+    /// No-op kept for API compatibility.
+    ///
+    /// Inference is now lazy via the Salsa-tracked `infer_file_return_types`
+    /// query (PR4).  [`crate::FileAnalyzer::analyze`] computes inferred return
+    /// types on-demand through Salsa without a separate priming sweep.
+    #[allow(unused_variables)]
+    pub fn run_inference_sweep(&self, files: &[(Arc<str>, Arc<str>)]) {}
 
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
@@ -994,69 +981,6 @@ impl AnalysisSession {
             dependents,
         }
     }
-}
-
-/// Drive Pass 2 inference-only mode in parallel across `files`, accumulating
-/// inferred function and method return types. The `db_priming` MirDb is
-/// consumed (cloned per spawned task and dropped on return), so the caller's
-/// canonical db can subsequently take exclusive access without deadlock.
-///
-/// Crate-internal so [`crate::project::ProjectAnalyzer`] can use the same
-/// deadlock-safe helper for its lazy-load reanalysis sweep.
-#[allow(clippy::type_complexity)]
-pub(crate) fn gather_inferred_types(
-    db_priming: MirDb,
-    files: &[(Arc<str>, Arc<str>)],
-    php_version: PhpVersion,
-) -> (
-    Vec<(Arc<str>, mir_types::Union)>,
-    Vec<(Arc<str>, Arc<str>, mir_types::Union)>,
-) {
-    use crate::pass2::Pass2Driver;
-    use mir_types::Union;
-
-    type Functions = Vec<(Arc<str>, Union)>;
-    type Methods = Vec<(Arc<str>, Arc<str>, Union)>;
-    let functions: Arc<Mutex<Functions>> = Arc::new(Mutex::new(Vec::new()));
-    let methods: Arc<Mutex<Methods>> = Arc::new(Mutex::new(Vec::new()));
-
-    rayon::in_place_scope(|s| {
-        for (file, source) in files {
-            let db = db_priming.clone();
-            let functions = Arc::clone(&functions);
-            let methods = Arc::clone(&methods);
-            let file = file.clone();
-            let source = source.clone();
-
-            s.spawn(move |_| {
-                let arena = crate::arena::create_parse_arena(source.len());
-                let parsed = php_rs_parser::parse(&arena, source.as_ref());
-                if !parsed.errors.is_empty() {
-                    return;
-                }
-                let driver = Pass2Driver::new_inference_only(&db as &dyn MirDatabase, php_version);
-                driver.analyze_bodies(&parsed.program, file, source.as_ref(), &parsed.source_map);
-                let inferred = driver.take_inferred_types();
-                {
-                    let mut f = functions.lock();
-                    f.extend(inferred.functions);
-                }
-                {
-                    let mut m = methods.lock();
-                    m.extend(inferred.methods);
-                }
-            });
-        }
-    });
-
-    let functions = Arc::try_unwrap(functions)
-        .map(|m| m.into_inner())
-        .unwrap_or_else(|arc| arc.lock().clone());
-    let methods = Arc::try_unwrap(methods)
-        .map(|m| m.into_inner())
-        .unwrap_or_else(|arc| arc.lock().clone());
-
-    (functions, methods)
 }
 
 /// Compute the set of files `file` depends on: defining files of its imports,

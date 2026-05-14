@@ -3,6 +3,7 @@ use std::sync::Arc;
 use mir_codebase::storage::{Location, TemplateParam};
 use mir_issues::Issue;
 use mir_types::Union;
+use rustc_hash::FxHashMap;
 
 use super::*;
 
@@ -662,6 +663,129 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
     collect_file_definitions_uncached(db, file)
 }
 
+// S4 Step 3a: File-level inferred-type batch query
+//
+// `infer_file_return_types` runs an inference-only Pass 2 over one file and
+// returns all inferred return types as maps.  It is the single source of
+// truth that `inferred_function_return_type` / `inferred_method_return_type`
+// delegate to, replacing the double-pass orchestration in `project.rs`.
+//
+// Design: Approach A (no recursive call back into the per-function queries).
+// Cross-file PHP call graphs commonly have A→B→A cycles, so recursive
+// delegation would degrade whole connected components to `mixed`.  Instead:
+// each file's inference runs independently, reading *committed* return types
+// (or `mixed` fallback) for external symbols.
+
+type MethodInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Union>>;
+
+/// Inferred return types for all functions and methods in a single file,
+/// collected by a single inference-only Pass 2 run.
+#[derive(Clone, Debug)]
+pub struct InferredFileTypes {
+    /// FQN → inferred return type for top-level functions declared in the file.
+    pub functions: Arc<FxHashMap<Arc<str>, Arc<Union>>>,
+    /// (FQCN, method_name_lower) → inferred return type for methods in the file.
+    pub methods: Arc<MethodInferMap>,
+}
+
+impl InferredFileTypes {
+    pub fn empty() -> Self {
+        Self {
+            functions: Arc::new(FxHashMap::default()),
+            methods: Arc::new(MethodInferMap::default()),
+        }
+    }
+}
+
+impl PartialEq for InferredFileTypes {
+    fn eq(&self, other: &Self) -> bool {
+        if Arc::ptr_eq(&self.functions, &other.functions)
+            && Arc::ptr_eq(&self.methods, &other.methods)
+        {
+            return true;
+        }
+        if self.functions.len() != other.functions.len()
+            || self.methods.len() != other.methods.len()
+        {
+            return false;
+        }
+        for (k, v) in self.functions.iter() {
+            if other.functions.get(k).is_none_or(|ov| *ov != *v) {
+                return false;
+            }
+        }
+        for (k, v) in self.methods.iter() {
+            if other.methods.get(k).is_none_or(|ov| *ov != *v) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+unsafe impl salsa::Update for InferredFileTypes {
+    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
+        let old = unsafe { &mut *old_ptr };
+        if *old == new_val {
+            return false;
+        }
+        *old = new_val;
+        true
+    }
+}
+
+/// Run inference-only Pass 2 over `file` and return all inferred return types.
+///
+/// Salsa tracks the dependency on `file.text`, so this query is automatically
+/// invalidated when the file changes and re-used when it hasn't.
+///
+/// **No cycle risk:** This query reads external symbols via their `FunctionNode`
+/// / `MethodNode` INPUT fields (`inferred_return_type`) rather than calling back
+/// into `inferred_function_return_type` / `inferred_method_return_type`.
+/// PHP call cycles are common; recursive delegation would degrade whole
+/// connected components to `mixed` on the first fixpoint iteration.
+#[salsa::tracked]
+pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
+    use std::str::FromStr as _;
+    let path = file.path(db);
+    let text = file.text(db);
+    let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
+        .unwrap_or(crate::php_version::PhpVersion::LATEST);
+
+    let arena = crate::arena::create_parse_arena(text.len());
+    let parsed = php_rs_parser::parse(&arena, text.as_ref());
+
+    if !parsed.errors.is_empty() {
+        return InferredFileTypes::empty();
+    }
+
+    let driver = crate::pass2::Pass2Driver::new_inference_only(db, php_version);
+    driver.analyze_bodies(&parsed.program, path, text.as_ref(), &parsed.source_map);
+    let inferred = driver.take_inferred_types();
+
+    let mut functions: FxHashMap<Arc<str>, Arc<Union>> =
+        FxHashMap::with_capacity_and_hasher(inferred.functions.len(), Default::default());
+    for (fqn, ty) in inferred.functions {
+        functions.insert(fqn, Arc::new(ty));
+    }
+
+    let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Union>> =
+        FxHashMap::with_capacity_and_hasher(inferred.methods.len(), Default::default());
+    for (fqcn, name, ty) in inferred.methods {
+        let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
+            name
+        } else {
+            Arc::from(name.to_lowercase().as_str())
+        };
+        methods.insert((fqcn, name_lower), Arc::new(ty));
+    }
+
+    InferredFileTypes {
+        functions: Arc::new(functions),
+        methods: Arc::new(methods),
+    }
+}
+
 // S4 Step 3: Lazy inferred-type queries
 //
 // These tracked queries compute inferred return types on-demand during Pass 2.
@@ -674,34 +798,51 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 //    inferred type is never computed (Salsa skips the query)
 
 /// Lazily computes the inferred return type for a function.
-/// Called on-demand during Pass 2 analysis when we encounter a call to this function.
-/// Results are cached by Salsa; re-analysis of dependent files that don't call this
-/// function re-uses the cached inferred type.
 ///
-/// **Current behavior (S4 PR3):** Reads from the already-committed `inferred_return_type`
-/// field on `FunctionNode`. Double-pass orchestration (Pass 2a inference + commit) still
-/// happens in `project.rs::analyze()`.
+/// Delegates to `infer_file_return_types` for user-defined functions (those
+/// with a known defining file).  Falls back to the pre-committed
+/// `inferred_return_type` field for stub functions (no file, e.g. PHP built-ins)
+/// and to `mixed` when no type has been inferred at all.
 ///
-/// **Future (S4 PR4):** Will compute types on-demand by extracting the function body
-/// from source and running inference-only Pass 2, eliminating the double-pass.
+/// Salsa caches this query keyed on the `FunctionNode` input; callers in Pass 2
+/// share the cached result across all files that call the same function.
 #[salsa::tracked]
 pub fn inferred_function_return_type(db: &dyn MirDatabase, node: FunctionNode) -> Arc<Union> {
-    // For now, read the already-committed inferred type from the FunctionNode input.
-    // This is set via commit_inferred_return_types() after Pass 2a completes.
+    let fqn = node.fqn(db);
+    if let Some(file_path) = db.symbol_defining_file(fqn.as_ref()) {
+        if let Some(sf) = db.lookup_source_file(file_path.as_ref()) {
+            let types = infer_file_return_types(db, sf);
+            if let Some(ty) = types.functions.get(fqn.as_ref()) {
+                return ty.clone();
+            }
+        }
+    }
     node.inferred_return_type(db)
         .unwrap_or_else(|| Arc::new(Union::mixed()))
 }
 
 /// Lazily computes the inferred return type for a method.
 ///
-/// **Current behavior (S4 PR3):** Reads from the already-committed `inferred_return_type`
-/// field on `MethodNode`.
-///
-/// **Future (S4 PR4):** Will compute types on-demand by extracting the method body
-/// from source and running inference-only Pass 2.
+/// Delegates to `infer_file_return_types` for user-defined methods (those whose
+/// owning class has a known defining file).  Falls back to the pre-committed
+/// `inferred_return_type` field for stub methods and to `mixed` as last resort.
 #[salsa::tracked]
 pub fn inferred_method_return_type(db: &dyn MirDatabase, node: MethodNode) -> Arc<Union> {
-    // For now, read the already-committed inferred type from the MethodNode input.
+    let fqcn = node.fqcn(db);
+    let name = node.name(db);
+    let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
+        name
+    } else {
+        Arc::from(name.to_lowercase().as_str())
+    };
+    if let Some(file_path) = db.symbol_defining_file(fqcn.as_ref()) {
+        if let Some(sf) = db.lookup_source_file(file_path.as_ref()) {
+            let types = infer_file_return_types(db, sf);
+            if let Some(ty) = types.methods.get(&(fqcn, name_lower)) {
+                return ty.clone();
+            }
+        }
+    }
     node.inferred_return_type(db)
         .unwrap_or_else(|| Arc::new(Union::mixed()))
 }
