@@ -329,6 +329,39 @@ impl Union {
         self.filter(|t| t.is_callable() || matches!(t, Atomic::TMixed))
     }
 
+    /// Narrow as if `is_scalar($x)` is true (int | string | float | bool).
+    pub fn narrow_to_scalar(&self) -> Union {
+        self.filter(|t| {
+            matches!(
+                t,
+                Atomic::TString
+                    | Atomic::TLiteralString(..)
+                    | Atomic::TNumericString
+                    | Atomic::TInt
+                    | Atomic::TLiteralInt(..)
+                    | Atomic::TFloat
+                    | Atomic::TLiteralFloat(..)
+                    | Atomic::TBool
+                    | Atomic::TTrue
+                    | Atomic::TFalse
+                    | Atomic::TScalar
+                    | Atomic::TMixed
+            )
+        })
+    }
+
+    /// Narrow as if `is_iterable($x)` is true (array | Traversable).
+    /// For simplicity, this narrows to arrays or objects (can't easily verify interfaces).
+    pub fn narrow_to_iterable(&self) -> Union {
+        self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
+    }
+
+    /// Narrow as if `is_countable($x)` is true (array | Countable).
+    /// For simplicity, this narrows to arrays or objects (can't easily verify Countable interface).
+    pub fn narrow_to_countable(&self) -> Union {
+        self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
+    }
+
     // --- Merge (branch join) ------------------------------------------------
 
     /// Merge two unions at a branch join point (e.g. after if/else).

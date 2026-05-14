@@ -14,5 +14,3 @@ function foo(string|int|null $x): void {
     }
 }
 ===expect===
-===ignore===
-TODO

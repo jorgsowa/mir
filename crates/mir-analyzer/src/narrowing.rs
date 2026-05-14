@@ -239,6 +239,23 @@ pub fn narrow_from_condition<'arena, 'src>(
             }
         }
 
+        // empty($x)
+        ExprKind::Empty(var_expr) => {
+            if let Some(var_name) = extract_var_name(var_expr) {
+                let current = ctx.get_var(&var_name);
+                let narrowed = if is_true {
+                    // empty($x) is true: x is falsy
+                    current.narrow_to_falsy()
+                } else {
+                    // empty($x) is false: x is truthy
+                    current.narrow_to_truthy()
+                };
+                if !narrowed.is_empty() {
+                    ctx.set_var(&var_name, narrowed);
+                }
+            }
+        }
+
         // ($x = expr) / ($x ??= expr) used as a condition
         // The assignment has already been evaluated (ctx holds the post-assignment type).
         // Narrow the target variable based on the truthiness of the expression result.
@@ -601,6 +618,42 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
                 current.narrow_to_callable()
             } else {
                 current.filter(|t| !t.is_callable())
+            }
+        }
+        "is_scalar" => {
+            if is_true {
+                current.narrow_to_scalar()
+            } else {
+                current.filter(|t| {
+                    !matches!(
+                        t,
+                        Atomic::TString
+                            | Atomic::TLiteralString(..)
+                            | Atomic::TNumericString
+                            | Atomic::TInt
+                            | Atomic::TLiteralInt(..)
+                            | Atomic::TFloat
+                            | Atomic::TLiteralFloat(..)
+                            | Atomic::TBool
+                            | Atomic::TTrue
+                            | Atomic::TFalse
+                            | Atomic::TScalar
+                    )
+                })
+            }
+        }
+        "is_iterable" => {
+            if is_true {
+                current.narrow_to_iterable()
+            } else {
+                current.filter(|t| !t.is_array() && !t.is_object())
+            }
+        }
+        "is_countable" => {
+            if is_true {
+                current.narrow_to_countable()
+            } else {
+                current.filter(|t| !t.is_array() && !t.is_object())
             }
         }
         "is_numeric" => {
