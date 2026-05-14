@@ -653,9 +653,11 @@ impl ProjectAnalyzer {
         all_issues: &mut Vec<Issue>,
     ) {
         use std::collections::HashSet;
+        use std::sync::Arc;
 
         let max_depth = 10;
         let mut loaded: HashSet<String> = HashSet::new();
+        let mut scanned: HashSet<Arc<str>> = HashSet::new();
 
         for _ in 0..max_depth {
             let mut to_load: Vec<(String, PathBuf)> = Vec::new();
@@ -668,15 +670,20 @@ impl ProjectAnalyzer {
                 }
             };
 
-            // Drive the inheritance scan from already-ingested `ClassNode`s.
+            // Collect inheritance and import candidates. Only scan classes that
+            // haven't been scanned yet (optimization: avoid redundant full scans).
             let mut inheritance_candidates = Vec::new();
             let import_candidates = {
                 let guard = self.shared_db.salsa.lock();
                 let db = &guard.0;
                 for fqcn in db.active_class_node_fqcns() {
+                    if scanned.contains(fqcn.as_ref()) {
+                        continue;
+                    }
                     let Some(node) = db.lookup_class_node(&fqcn) else {
                         continue;
                     };
+                    scanned.insert(fqcn.clone());
                     if node.is_interface(db) {
                         for parent in node.extends(db).iter() {
                             inheritance_candidates.push(parent.to_string());
