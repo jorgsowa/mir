@@ -32,15 +32,7 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    // Inside the inference-only pass, reading via the tracked query would
-    // create a cycle (infer_file_return_types → Pass2 → inferred_function_return_type
-    // → infer_file_return_types).  Read the pre-committed INPUT field instead,
-    // which is safe because inference-only passes don't need cross-file types.
-    let inferred = if ea.inference_only {
-        node.inferred_return_type(db)
-    } else {
-        Some(crate::db::inferred_function_return_type(db, node))
-    };
+    let inferred = node.inferred_return_type(db);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)

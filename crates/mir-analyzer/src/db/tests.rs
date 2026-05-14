@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::{
-    ConstantStorage, FunctionStorage, MethodStorage, PropertyStorage, TemplateParam, Visibility,
+    ConstantStorage, MethodStorage, PropertyStorage, TemplateParam, Visibility,
 };
 
 // Import everything from parent module (mod.rs re-exports)
@@ -133,64 +133,6 @@ mod tests {
         assert!(issues
             .iter()
             .any(|acc| matches!(acc.0.kind, mir_issues::IssueKind::UndefinedClass { .. })));
-    }
-
-    #[test]
-    fn inferred_function_return_type_query_defined() {
-        let mut db = MirDb::default();
-
-        // Create a simple function via FunctionStorage
-        let func_storage = FunctionStorage {
-            fqn: Arc::from("test_fn"),
-            short_name: Arc::from("test_fn"),
-            params: Arc::from([]),
-            return_type: None,
-            inferred_return_type: Some(Union::int()),
-            template_params: Vec::new(),
-            assertions: Vec::new(),
-            throws: Vec::new(),
-            deprecated: None,
-            is_pure: false,
-            location: None,
-            docstring: None,
-        };
-        let node = db.upsert_function_node(&func_storage);
-
-        // Query should return the inferred type
-        let inferred = inferred_function_return_type(&db, node);
-        assert_eq!(inferred.as_ref(), &Union::int());
-    }
-
-    #[test]
-    fn inferred_method_return_type_query_defined() {
-        let mut db = MirDb::default();
-
-        // Create a simple method via MethodStorage
-        let method_storage = MethodStorage {
-            fqcn: Arc::from("TestClass"),
-            name: Arc::from("testMethod"),
-            params: Arc::from([]),
-            return_type: None,
-            inferred_return_type: Some(Union::string()),
-            template_params: Vec::new(),
-            assertions: Vec::new(),
-            throws: Vec::new(),
-            deprecated: None,
-            visibility: Visibility::Public,
-            is_static: false,
-            is_abstract: false,
-            is_final: false,
-            is_constructor: false,
-            is_pure: false,
-            is_internal: false,
-            location: None,
-            docstring: None,
-        };
-        let node = db.upsert_method_node(&method_storage);
-
-        // Query should return the inferred type
-        let inferred = inferred_method_return_type(&db, node);
-        assert_eq!(inferred.as_ref(), &Union::string());
     }
 
     #[test]

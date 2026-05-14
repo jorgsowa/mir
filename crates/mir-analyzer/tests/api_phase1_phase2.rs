@@ -448,3 +448,86 @@ fn all_classes_and_all_functions_workspace_iteration() {
     let fn_names: Vec<&str> = functions.iter().map(|(f, _)| f.as_ref()).collect();
     assert!(fn_names.contains(&"gamma"));
 }
+
+// Regression: bare FQN references without a `use` statement must be tracked in
+// the dependency graph so that `analyze_dependents_of` re-analyzes the referencing
+// file when the definition changes.  Currently not implemented — these tests document
+// the missing behaviour and should be un-ignored once the bug is fixed.
+
+#[test]
+#[ignore = "bug: bare FQN references not tracked in dependency graph (no `use` statement)"]
+fn analyze_dependents_of_tracks_bare_fqn_new() {
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let service: Arc<str> = Arc::from("service.php");
+    let consumer: Arc<str> = Arc::from("consumer.php");
+
+    session.ingest_file(
+        service.clone(),
+        Arc::from("<?php\nclass Service { public function run(): void {} }\n"),
+    );
+    session.ingest_file(
+        consumer.clone(),
+        Arc::from("<?php\nfunction consume(): void { $s = new \\Service(); $s->run(); }\n"),
+    );
+
+    let consumer_src = "<?php\nfunction consume(): void { $s = new \\Service(); $s->run(); }\n";
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, consumer_src);
+    FileAnalyzer::new(&session).analyze(
+        consumer.clone(),
+        consumer_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let analyses = session.analyze_dependents_of(service.as_ref());
+    let dependent_files: Vec<&str> = analyses.iter().map(|(f, _)| f.as_ref()).collect();
+    assert!(
+        dependent_files.contains(&consumer.as_ref()),
+        "consumer.php references Service via bare FQN but was not returned by \
+         analyze_dependents_of — dependency graph is missing FQN reference edges"
+    );
+}
+
+#[test]
+#[ignore = "bug: bare FQN references not tracked in dependency graph (no `use` statement)"]
+fn analyze_dependents_of_tracks_bare_fqn_static_call() {
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let helper: Arc<str> = Arc::from("helper.php");
+    let caller: Arc<str> = Arc::from("caller.php");
+
+    session.ingest_file(
+        helper.clone(),
+        Arc::from("<?php\nclass Helper { public static function go(): void {} }\n"),
+    );
+    session.ingest_file(
+        caller.clone(),
+        Arc::from("<?php\nfunction call_it(): void { \\Helper::go(); }\n"),
+    );
+
+    let caller_src = "<?php\nfunction call_it(): void { \\Helper::go(); }\n";
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, caller_src);
+    FileAnalyzer::new(&session).analyze(
+        caller.clone(),
+        caller_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let analyses = session.analyze_dependents_of(helper.as_ref());
+    let dependent_files: Vec<&str> = analyses.iter().map(|(f, _)| f.as_ref()).collect();
+    assert!(
+        dependent_files.contains(&caller.as_ref()),
+        "caller.php references Helper via bare FQN static call but was not returned by \
+         analyze_dependents_of — dependency graph is missing FQN reference edges"
+    );
+}

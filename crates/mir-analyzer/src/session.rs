@@ -921,17 +921,39 @@ impl AnalysisSession {
         cache.update_reverse_deps_for_file(file, &targets);
     }
 
-    /// Cross-file inference sweep. For each `(file, source)` pair, runs the
-    /// Pass 2 inference-only mode on a cloned db (parallel via rayon), then
-    /// commits the collected inferred return types to the canonical db.
+    /// Cross-file inference sweep. For each `(file, source)` pair, calls the
+    /// Salsa-tracked `infer_file_return_types` query in parallel, then commits
+    /// the collected inferred return types to INPUT fields.
     ///
-    /// No-op kept for API compatibility.
-    ///
-    /// Inference is now lazy via the Salsa-tracked `infer_file_return_types`
-    /// query (PR4).  [`crate::FileAnalyzer::analyze`] computes inferred return
-    /// types on-demand through Salsa without a separate priming sweep.
-    #[allow(unused_variables)]
-    pub fn run_inference_sweep(&self, files: &[(Arc<str>, Arc<str>)]) {}
+    /// Files must already be ingested via [`Self::ingest_file`] before calling
+    /// this method. Subsequent [`FileAnalyzer::analyze`] calls read the committed
+    /// INPUT fields via O(1) lookups with no lock contention.
+    pub fn run_inference_sweep(&self, files: &[(Arc<str>, Arc<str>)]) {
+        use rayon::prelude::*;
+        let db_priming = self.snapshot_db();
+        let inferred_results: Vec<crate::db::InferredFileTypes> = files
+            .par_iter()
+            .map_with(db_priming, |db, (path, _src)| {
+                if let Some(sf) = db.lookup_source_file(path) {
+                    crate::db::infer_file_return_types(db, sf)
+                } else {
+                    crate::db::InferredFileTypes::empty()
+                }
+            })
+            .collect();
+        let mut functions = Vec::new();
+        let mut methods = Vec::new();
+        for result in inferred_results {
+            for (fqn, ty) in result.functions.iter() {
+                functions.push((fqn.clone(), (**ty).clone()));
+            }
+            for ((fqcn, name), ty) in result.methods.iter() {
+                methods.push((fqcn.clone(), name.clone(), (**ty).clone()));
+            }
+        }
+        let mut guard = self.shared_db.salsa.lock();
+        guard.commit_inferred_return_types(functions, methods);
+    }
 
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
