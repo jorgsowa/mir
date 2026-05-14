@@ -168,7 +168,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     // find it and produce no issues.
     {
         let mut guard = analyzer.salsa_db_for_test().lock();
-        let db = &mut guard.0;
+        let db = &mut *guard;
         db.upsert_function_node(&mir_codebase::FunctionStorage {
             fqn: Arc::from("ghost_fn"),
             short_name: Arc::from("ghost_fn"),

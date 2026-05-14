@@ -95,6 +95,9 @@ pub trait MirDatabase: salsa::Database {
 
     /// Clear reference locations for a file before re-analysis.
     fn clear_file_references(&self, file: &str);
+
+    /// Return the Salsa SourceFile handle registered for `path`, if any.
+    fn lookup_source_file(&self, path: &str) -> Option<SourceFile>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.

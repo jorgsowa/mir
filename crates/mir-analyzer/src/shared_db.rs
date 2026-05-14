@@ -8,22 +8,21 @@
 //! By extracting these into a single place, both APIs benefit from the same code
 //! paths and behavior, eliminating duplication and reducing maintenance burden.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use salsa::Setter as _;
 
-use crate::db::{MirDb, SourceFile};
+use crate::db::MirDb;
 use crate::php_version::PhpVersion;
 
 /// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
 /// AnalysisSession, providing a common point for their database operations.
 pub struct SharedDb {
-    /// Salsa database and registered source files.
-    pub salsa: Mutex<(MirDb, HashMap<Arc<str>, SourceFile>)>,
+    /// Salsa database (source file handles live inside MirDb.source_files).
+    pub salsa: Mutex<MirDb>,
     /// Stubs that have been ingested (for idempotency).
     pub loaded_stubs: Mutex<HashSet<&'static str>>,
     /// Whether user stubs have been ingested.
@@ -33,7 +32,7 @@ pub struct SharedDb {
 impl SharedDb {
     pub fn new() -> Self {
         Self {
-            salsa: Mutex::new((MirDb::default(), HashMap::new())),
+            salsa: Mutex::new(MirDb::default()),
             loaded_stubs: Mutex::new(HashSet::new()),
             user_stubs_loaded: std::sync::atomic::AtomicBool::new(false),
         }
@@ -43,7 +42,7 @@ impl SharedDb {
     /// The lock is held only for the duration of the clone.
     pub fn snapshot_db(&self) -> MirDb {
         let guard = self.salsa.lock();
-        guard.0.clone()
+        guard.clone()
     }
 
     /// Ingest multiple stub paths in parallel then serially under the lock.
@@ -90,7 +89,7 @@ impl SharedDb {
                 }
             })
             .collect();
-        guard.0.ingest_stub_slices(to_ingest.iter().copied());
+        guard.ingest_stub_slices(to_ingest.iter().copied());
     }
 
     /// Ingest user stub slices from configured files and directories.
@@ -108,7 +107,7 @@ impl SharedDb {
 
         let slices = crate::stubs::user_stub_slices(files, dirs);
         let mut guard = self.salsa.lock();
-        guard.0.ingest_stub_slices(slices.iter());
+        guard.ingest_stub_slices(slices.iter());
         self.user_stubs_loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
@@ -170,19 +169,8 @@ impl SharedDb {
         // and AST walk above ran lock-free.
         {
             let mut guard = self.salsa.lock();
-            let (ref mut db, ref mut files) = *guard;
-            match files.get(&file) {
-                Some(&sf) => {
-                    if sf.text(db).as_ref() != source {
-                        sf.set_text(db).to(Arc::from(source));
-                    }
-                }
-                None => {
-                    let sf = SourceFile::new(db, file.clone(), Arc::from(source));
-                    files.insert(file.clone(), sf);
-                }
-            }
-            db.ingest_stub_slice(&file_defs.slice);
+            guard.upsert_source_file(file.clone(), Arc::from(source));
+            guard.ingest_stub_slice(&file_defs.slice);
         }
 
         file_defs
