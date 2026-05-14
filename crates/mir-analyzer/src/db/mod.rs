@@ -96,6 +96,10 @@ pub trait MirDatabase: salsa::Database {
     /// Clear reference locations for a file before re-analysis.
     fn clear_file_references(&self, file: &str);
 
+    /// Return all `(file, symbol_key)` pairs recorded across every file.
+    /// Used to build the dependency graph from bare-FQN references.
+    fn all_reference_location_pairs(&self) -> Vec<(Arc<str>, Arc<str>)>;
+
     /// Return the Salsa SourceFile handle registered for `path`, if any.
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile>;
 }

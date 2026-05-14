@@ -544,6 +544,11 @@ impl ProjectAnalyzer {
                     });
                 }
             });
+            // Drop db_priming before committing: commit_inferred_return_types calls
+            // salsa setters which go through cancel_others, which waits until the
+            // storage strong-count drops to 1. db_priming is a sibling clone that
+            // keeps the count at 2, causing a deadlock if it outlives the commit.
+            drop(db_priming);
             let functions = std::sync::Arc::try_unwrap(functions)
                 .map(|m| m.into_inner().unwrap())
                 .unwrap_or_default();
@@ -1068,6 +1073,17 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         for tr in node.traits(db).iter() {
             add_edge(tr.as_ref(), &file);
         }
+    }
+
+    // Also wire in bare-FQN references from Pass 2 (new \Foo(), \Foo::method(), \foo())
+    // that do not appear in use-import statements.
+    for (ref_file, symbol_key) in db.all_reference_location_pairs() {
+        let file_str = ref_file.as_ref().to_string();
+        let lookup: &str = match symbol_key.split_once("::") {
+            Some((class, _)) => class,
+            None => &symbol_key,
+        };
+        add_edge(lookup, &file_str);
     }
 
     reverse

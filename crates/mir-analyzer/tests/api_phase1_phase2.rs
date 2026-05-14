@@ -455,7 +455,6 @@ fn all_classes_and_all_functions_workspace_iteration() {
 // the missing behaviour and should be un-ignored once the bug is fixed.
 
 #[test]
-#[ignore = "bug: bare FQN references not tracked in dependency graph (no `use` statement)"]
 fn analyze_dependents_of_tracks_bare_fqn_new() {
     use mir_analyzer::FileAnalyzer;
 
@@ -494,7 +493,6 @@ fn analyze_dependents_of_tracks_bare_fqn_new() {
 }
 
 #[test]
-#[ignore = "bug: bare FQN references not tracked in dependency graph (no `use` statement)"]
 fn analyze_dependents_of_tracks_bare_fqn_static_call() {
     use mir_analyzer::FileAnalyzer;
 

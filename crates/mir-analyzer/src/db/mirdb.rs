@@ -257,6 +257,17 @@ impl MirDatabase for MirDb {
         }
     }
 
+    fn all_reference_location_pairs(&self) -> Vec<(Arc<str>, Arc<str>)> {
+        let refs = self.reference_locations.lock();
+        let mut pairs = Vec::new();
+        for (symbol, locs) in refs.iter() {
+            for (file, _, _, _) in locs {
+                pairs.push((file.clone(), symbol.clone()));
+            }
+        }
+        pairs
+    }
+
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
         self.source_files.get(path).copied()
     }
