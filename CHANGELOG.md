@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-05-14
+
+### Added
+
+- Type narrowing for `get_class($obj) === 'ClassName'` comparisons, enabling precise type refinement when class identity is verified.
+- `is_resource()` type guard for completeness in the type narrowing system.
+- Parallel Salsa pre-sweep inference pass in batch path, replacing sequential Pass 2 driver with direct rayon-based inference for improved throughput.
+- Type narrowing for `$var === SomeClass::class` comparisons, refining object types when matched against class constants.
+
+### Fixed
+
+- Bare-FQN references (e.g., `new \Service()`, `\Helper::go()`) now correctly wired into the incremental dependency graph so `analyze_dependents_of()` returns files referencing classes via unqualified absolute paths.
+
+### Changed
+
+- Refactored database module structure: `source_files` map moved from SharedDb tuple into MirDb for clearer ownership.
+- Lazy-load optimization: avoid redundant full scans of class inheritance chains when loading missing classes.
+
 ## [0.22.0] - 2026-05-12
 
 ### Added
