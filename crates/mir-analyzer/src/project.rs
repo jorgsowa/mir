@@ -499,9 +499,42 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
-        // Inferred return types are now computed lazily via the Salsa-tracked
-        // `infer_file_return_types` query (PR4) — no priming sweep needed.
+        // ---- Inference pre-sweep: prime inferred return types via Salsa ------
+        // Call `infer_file_return_types` (a Salsa-tracked query) in parallel for
+        // every file.  Salsa memoizes each result keyed on `file.text`; unchanged
+        // files get a free cache hit on subsequent runs.  Commit all inferred
+        // types to Salsa INPUT fields so the full Pass 2 reads them via O(1)
+        // field accesses instead of tracked-query lookups.
+        {
+            let db_priming = {
+                let guard = self.shared_db.salsa.lock();
+                guard.clone()
+            };
+            let inferred_results: Vec<crate::db::InferredFileTypes> = parsed_files
+                .par_iter()
+                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
+                .map_with(db_priming, |db, parsed| {
+                    if let Some(sf) = db.lookup_source_file(&parsed.file) {
+                        crate::db::infer_file_return_types(db, sf)
+                    } else {
+                        crate::db::InferredFileTypes::empty()
+                    }
+                })
+                .collect();
+            let mut functions = Vec::new();
+            let mut methods = Vec::new();
+            for result in inferred_results {
+                for (fqn, ty) in result.functions.iter() {
+                    functions.push((fqn.clone(), (**ty).clone()));
+                }
+                for ((fqcn, name), ty) in result.methods.iter() {
+                    methods.push((fqcn.clone(), name.clone(), (**ty).clone()));
+                }
+            }
+            let mut guard = self.shared_db.salsa.lock();
+            guard.commit_inferred_return_types(functions, methods);
+        }
+
         let db_main = {
             let guard = self.shared_db.salsa.lock();
             guard.clone()
