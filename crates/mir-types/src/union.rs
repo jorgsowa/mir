@@ -362,6 +362,14 @@ impl Union {
         self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
     }
 
+    /// Narrow as if `is_resource($x)` is true.
+    /// Note: No TResource atomic type exists in the type system; this is a no-op.
+    /// Resources are declining in modern PHP and not actively tracked.
+    pub fn narrow_to_resource(&self) -> Union {
+        // No resource type in the system; just return mixed (allows any type)
+        self.filter(|t| matches!(t, Atomic::TMixed))
+    }
+
     // --- Merge (branch join) ------------------------------------------------
 
     /// Merge two unions at a branch join point (e.g. after if/else).
