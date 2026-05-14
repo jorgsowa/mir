@@ -3,8 +3,6 @@ use std::mem::ManuallyDrop;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use parking_lot::Mutex;
-
 use rayon::prelude::*;
 
 use std::collections::{HashMap, HashSet};
@@ -18,7 +16,6 @@ use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 use mir_issues::Issue;
-use mir_types::Union;
 
 pub(crate) use crate::pass2::merge_return_types;
 
@@ -458,19 +455,12 @@ impl ProjectAnalyzer {
 
         let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
-        let mut files_needing_inference: std::collections::HashSet<Arc<str>> =
-            std::collections::HashSet::new();
         {
             let mut guard = self.shared_db.salsa.lock();
             for defs in file_defs {
                 for issue in defs.issues.iter() {
                     if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. }) {
                         files_with_parse_errors.insert(issue.location.file.clone());
-                    }
-                }
-                if stub_slice_needs_inference(&defs.slice) {
-                    if let Some(file) = defs.slice.file.as_ref() {
-                        files_needing_inference.insert(file.clone());
                     }
                 }
                 guard.ingest_stub_slice(&defs.slice);
@@ -496,10 +486,6 @@ impl ProjectAnalyzer {
         }
 
         // ---- Class-level checks (M11) ----------------------------------------
-        // `class_db` is scoped tightly: it must be dropped before the priming
-        // sweep's `commit_inferred_return_types` call below, otherwise the
-        // setter's `Storage::cancel_others` blocks waiting for this clone's
-        // Arc to drop (strong-count==1 invariant).
         let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
@@ -513,38 +499,9 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- S5-PR10b: clone the salsa db once per parallel sweep so each
-        // rayon worker gets its own clone (Salsa databases are `Send` but
-        // `!Sync`; cloning shares the underlying memoization storage).
-        let db_priming = {
-            let guard = self.shared_db.salsa.lock();
-            guard.clone()
-        };
-
-        // ---- Pass 2 priming: populate inferred_return_type for all functions  --
-        // Run a first inference-only sweep so that cross-file inferred return
-        // types are available before the issue-emitting pass below (G6).
-        //
-        // Inferred types are collected into a thread-safe buffer during the
-        // parallel sweep and committed to the Salsa db serially after the sweep
-        // returns. Using `rayon::in_place_scope` ensures all worker threads and
-        // their thread-local Salsa state drop before we commit to the canonical db.
-        let filtered_parsed: Vec<_> = parsed_files
-            .par_iter()
-            .filter(|parsed| {
-                !files_with_parse_errors.contains(&parsed.file)
-                    && files_needing_inference.contains(&parsed.file)
-            })
-            .collect();
-
-        let (functions, methods) =
-            run_inference_sweep(db_priming, filtered_parsed, self.resolved_php_version());
-
-        {
-            let mut guard = self.shared_db.salsa.lock();
-            guard.commit_inferred_return_types(functions, methods);
-        }
-
+        // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
+        // Inferred return types are now computed lazily via the Salsa-tracked
+        // `infer_file_return_types` query (PR4) — no priming sweep needed.
         let db_main = {
             let guard = self.shared_db.salsa.lock();
             guard.clone()
@@ -784,41 +741,6 @@ impl ProjectAnalyzer {
             all_issues.retain(|i| !files_to_reanalyze.contains(&i.location.file));
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
-            // Two-phase reanalysis to avoid the salsa `cancel_others` deadlock:
-            //
-            // Phase 1: parallel inference-only Pass 2 on a cloned db. The
-            //   priming clone is consumed by `gather_inferred_types`, so all
-            //   per-thread db handles are dropped before we touch the canonical
-            //   db.
-            // Phase 1.5: single-threaded commit of the inferred return types.
-            // Phase 2: parallel full Pass 2 emits the actual issues + symbols.
-            //
-            // The previous in-line per-file commit (commit while a `db` clone
-            // was still alive in `map_with`) deadlocked salsa: `cancel_others`
-            // waits for outstanding storage references and the local clone is
-            // exactly one such reference.
-            let sweep: Vec<(Arc<str>, Arc<str>)> = file_data
-                .iter()
-                .filter(|(f, _)| {
-                    !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
-                })
-                .cloned()
-                .collect();
-
-            let (inferred_fns, inferred_methods) = crate::session::gather_inferred_types(
-                {
-                    let guard = self.shared_db.salsa.lock();
-                    guard.clone()
-                },
-                &sweep,
-                self.resolved_php_version(),
-            );
-
-            {
-                let mut guard_db = self.shared_db.salsa.lock();
-                guard_db.commit_inferred_return_types(inferred_fns, inferred_methods);
-            }
-
             let db_full = {
                 let guard = self.shared_db.salsa.lock();
                 guard.clone()
@@ -896,17 +818,6 @@ impl ProjectAnalyzer {
 
             if parsed.errors.is_empty() {
                 let db_ref: &dyn MirDatabase = &*guard;
-                let driver = Pass2Driver::new_inference_only(db_ref, self.resolved_php_version());
-                driver.analyze_bodies(
-                    &parsed.program,
-                    file.clone(),
-                    new_content,
-                    &parsed.source_map,
-                );
-                let inferred = driver.take_inferred_types();
-                guard.commit_inferred_return_types(inferred.functions, inferred.methods);
-
-                let db_ref: &dyn MirDatabase = &*guard;
                 let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,
@@ -956,11 +867,6 @@ impl ProjectAnalyzer {
         let mut all_symbols = Vec::new();
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse(&arena, source);
-
-        let driver = Pass2Driver::new_inference_only(&db, analyzer.resolved_php_version());
-        driver.analyze_bodies(&result.program, file.clone(), source, &result.source_map);
-        let inferred = driver.take_inferred_types();
-        db.commit_inferred_return_types(inferred.functions, inferred.methods);
 
         let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
@@ -1033,79 +939,6 @@ impl Default for ProjectAnalyzer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// Helper: Inference sweep with rayon::in_place_scope
-
-#[allow(clippy::type_complexity)]
-fn run_inference_sweep(
-    db_priming: MirDb,
-    parsed_files: Vec<&ParsedProjectFile>,
-    php_version: PhpVersion,
-) -> (Vec<(Arc<str>, Union)>, Vec<(Arc<str>, Arc<str>, Union)>) {
-    let functions = Arc::new(Mutex::new(Vec::new()));
-    let methods = Arc::new(Mutex::new(Vec::new()));
-
-    rayon::in_place_scope(|s| {
-        for parsed in parsed_files {
-            let db = db_priming.clone();
-            let functions = Arc::clone(&functions);
-            let methods = Arc::clone(&methods);
-
-            s.spawn(move |_| {
-                let driver = Pass2Driver::new_inference_only(&db as &dyn MirDatabase, php_version);
-                let parse_result = parsed.parsed();
-                driver.analyze_bodies(
-                    &parse_result.program,
-                    parsed.file.clone(),
-                    parsed.source(),
-                    &parse_result.source_map,
-                );
-
-                let inferred = driver.take_inferred_types();
-                {
-                    let mut funcs = functions.lock();
-                    funcs.extend(inferred.functions);
-                }
-                {
-                    let mut meths = methods.lock();
-                    meths.extend(inferred.methods);
-                }
-            });
-        }
-    });
-
-    let functions = Arc::try_unwrap(functions)
-        .map(|mutex| mutex.into_inner())
-        .unwrap_or_else(|arc| arc.lock().clone());
-    let methods = Arc::try_unwrap(methods)
-        .map(|mutex| mutex.into_inner())
-        .unwrap_or_else(|arc| arc.lock().clone());
-
-    (functions, methods)
-}
-
-fn stub_slice_needs_inference(slice: &mir_codebase::storage::StubSlice) -> bool {
-    slice
-        .functions
-        .iter()
-        .any(|func| func.return_type.is_none())
-        || slice.classes.iter().any(|class| {
-            class
-                .own_methods
-                .values()
-                .any(|method| !method.is_abstract && method.return_type.is_none())
-        })
-        || slice.traits.iter().any(|tr| {
-            tr.own_methods
-                .values()
-                .any(|method| !method.is_abstract && method.return_type.is_none())
-        })
-        || slice.enums.iter().any(|en| {
-            en.own_methods
-                .values()
-                .any(|method| !method.is_abstract && method.return_type.is_none())
-        })
 }
 
 pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {

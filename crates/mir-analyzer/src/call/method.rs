@@ -51,11 +51,14 @@ pub(super) fn resolve_method_from_db(
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
-    // `inferred_return_type` is published on `MethodNode` by the priming
-    // sweep's serial commit phase; see `MirDb::commit_inferred_return_types`.
-    // Every analyzer entry path runs a priming sweep + commit before the
-    // issue-emitting pass, so the read-side codebase fallback is gone.
-    let inferred = node.inferred_return_type(db);
+    // Inside the inference-only pass, reading via the tracked query would
+    // create a cycle (infer_file_return_types → Pass2 → inferred_method_return_type
+    // → infer_file_return_types).  Read the pre-committed INPUT field instead.
+    let inferred = if ea.inference_only {
+        node.inferred_return_type(db)
+    } else {
+        Some(crate::db::inferred_method_return_type(db, node))
+    };
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)

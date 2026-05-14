@@ -105,7 +105,15 @@ pub use self::ancestors::*;
 #[allow(unused_imports)]
 pub use self::mirdb::{ClassNodeFields, MirDb};
 pub use self::nodes::*;
-pub use self::queries::*;
+pub use self::queries::{
+    class_constant_exists_in_chain, class_kind_via_db, class_template_params_via_db,
+    collect_file_definitions, collect_file_definitions_uncached, constant_exists_via_db,
+    extends_or_implements_via_db, function_exists_via_db, has_unknown_ancestor_via_db,
+    infer_file_return_types, inferred_function_return_type, inferred_method_return_type,
+    inherited_template_bindings_via_db, lookup_method_in_chain, lookup_property_in_chain,
+    member_location_via_db, method_exists_via_db, method_is_concretely_implemented,
+    resolve_name_via_db, type_exists_via_db, ClassKind, InferredFileTypes,
+};
 pub use self::reference_locations::*;
 
 // Sub-modules
