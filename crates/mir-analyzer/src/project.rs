@@ -499,38 +499,57 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- Inference pre-sweep: prime inferred return types via Salsa ------
-        // Call `infer_file_return_types` (a Salsa-tracked query) in parallel for
-        // every file.  Salsa memoizes each result keyed on `file.text`; unchanged
-        // files get a free cache hit on subsequent runs.  Commit all inferred
-        // types to Salsa INPUT fields so the full Pass 2 reads them via O(1)
-        // field accesses instead of tracked-query lookups.
+        // ---- Inference pre-sweep: prime inferred return types ----------------
+        // Run an inference-only Pass 2 over each file in parallel using direct
+        // rayon (no Salsa tracked-query overhead per file), collect the results,
+        // then commit them to Salsa INPUT fields.  The full Pass 2 then reads
+        // those fields via O(1) accesses with no lock contention.
+        //
+        // We use `Pass2Driver::new_inference_only` directly rather than the
+        // Salsa-tracked `infer_file_return_types` query so that the batch path
+        // avoids per-file Salsa lock acquisition and memo-table overhead on every
+        // cold start.  `infer_file_return_types` is reserved for the incremental
+        // LSP path (AnalysisSession) where Salsa cache hits across edits matter.
         {
             let db_priming = {
                 let guard = self.shared_db.salsa.lock();
                 guard.clone()
             };
-            let inferred_results: Vec<crate::db::InferredFileTypes> = parsed_files
-                .par_iter()
-                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
-                .map_with(db_priming, |db, parsed| {
-                    if let Some(sf) = db.lookup_source_file(&parsed.file) {
-                        crate::db::infer_file_return_types(db, sf)
-                    } else {
-                        crate::db::InferredFileTypes::empty()
+            let php_version = self.resolved_php_version();
+            let functions = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            let methods = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            rayon::in_place_scope(|s| {
+                for parsed in &parsed_files {
+                    if files_with_parse_errors.contains(&parsed.file) {
+                        continue;
                     }
-                })
-                .collect();
-            let mut functions = Vec::new();
-            let mut methods = Vec::new();
-            for result in inferred_results {
-                for (fqn, ty) in result.functions.iter() {
-                    functions.push((fqn.clone(), (**ty).clone()));
+                    let db = db_priming.clone();
+                    let functions = std::sync::Arc::clone(&functions);
+                    let methods = std::sync::Arc::clone(&methods);
+                    s.spawn(move |_| {
+                        let driver = Pass2Driver::new_inference_only(
+                            &db as &dyn crate::db::MirDatabase,
+                            php_version,
+                        );
+                        let parse_result = parsed.parsed();
+                        driver.analyze_bodies(
+                            &parse_result.program,
+                            parsed.file.clone(),
+                            parsed.source(),
+                            &parse_result.source_map,
+                        );
+                        let inferred = driver.take_inferred_types();
+                        functions.lock().unwrap().extend(inferred.functions);
+                        methods.lock().unwrap().extend(inferred.methods);
+                    });
                 }
-                for ((fqcn, name), ty) in result.methods.iter() {
-                    methods.push((fqcn.clone(), name.clone(), (**ty).clone()));
-                }
-            }
+            });
+            let functions = std::sync::Arc::try_unwrap(functions)
+                .map(|m| m.into_inner().unwrap())
+                .unwrap_or_default();
+            let methods = std::sync::Arc::try_unwrap(methods)
+                .map(|m| m.into_inner().unwrap())
+                .unwrap_or_default();
             let mut guard = self.shared_db.salsa.lock();
             guard.commit_inferred_return_types(functions, methods);
         }
