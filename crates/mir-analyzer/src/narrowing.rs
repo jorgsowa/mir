@@ -79,14 +79,22 @@ pub fn narrow_from_condition<'arena, 'src>(
                     narrow_var_bool(ctx, &name, false, effective_true);
                 }
             }
-            // `$x === 'literal'`
-            else if let ExprKind::String(s) = &b.right.kind {
-                if let Some(name) = extract_var_name(b.left) {
-                    narrow_var_literal_string(ctx, &name, s, effective_true);
+            // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
+            else if let ExprKind::String(class_name_str) = &b.right.kind {
+                if let Some(obj_var_name) = extract_get_class_arg(b.left) {
+                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str);
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                } else if let Some(name) = extract_var_name(b.left) {
+                    // `$x === 'literal'`
+                    narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
                 }
-            } else if let ExprKind::String(s) = &b.left.kind {
-                if let Some(name) = extract_var_name(b.right) {
-                    narrow_var_literal_string(ctx, &name, s, effective_true);
+            } else if let ExprKind::String(class_name_str) = &b.left.kind {
+                if let Some(obj_var_name) = extract_get_class_arg(b.right) {
+                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str);
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                } else if let Some(name) = extract_var_name(b.right) {
+                    // `$x === 'literal'`
+                    narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
                 }
             }
             // `$x === 42`
@@ -765,6 +773,22 @@ fn narrow_var_to_class_string(ctx: &mut Context, name: &str, fqcn: &str, is_clas
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
+fn narrow_var_to_specific_class(ctx: &mut Context, name: &str, fqcn: &str, is_exact_class: bool) {
+    let current = ctx.get_var(name);
+    let narrowed = if is_exact_class {
+        Union::single(Atomic::TNamedObject {
+            fqcn: fqcn.into(),
+            type_params: vec![],
+        })
+    } else {
+        current.filter(|t| match t {
+            Atomic::TNamedObject { fqcn: obj_fqcn, .. } => obj_fqcn.as_ref() != fqcn,
+            _ => true,
+        })
+    };
+    set_narrowed(ctx, name, &current, narrowed, true);
+}
+
 fn extract_var_name<'a, 'arena, 'src>(
     expr: &'a php_ast::ast::Expr<'arena, 'src>,
 ) -> Option<String> {
@@ -817,6 +841,19 @@ fn extract_class_const_fqcn<'arena, 'src>(
     }
     let short = extract_class_name(cca.class, self_fqcn)?;
     Some(crate::db::resolve_name_via_db(db, file, &short))
+}
+
+fn extract_get_class_arg<'arena, 'src>(expr: &php_ast::ast::Expr<'arena, 'src>) -> Option<String> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name.eq_ignore_ascii_case("get_class") {
+                if let Some(arg) = call.args.first() {
+                    return extract_var_name(&arg.value);
+                }
+            }
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------
