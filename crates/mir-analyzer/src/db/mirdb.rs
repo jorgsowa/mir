@@ -66,6 +66,8 @@ pub struct MirDb {
     symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
     /// Public symbol key → reference locations.
     reference_locations: ReferenceLocations,
+    /// File path → Salsa SourceFile input handle.
+    source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
 }
 
 #[salsa::db]
@@ -254,6 +256,10 @@ impl MirDatabase for MirDb {
             locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
         }
     }
+
+    fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
+        self.source_files.get(path).copied()
+    }
 }
 
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
@@ -322,6 +328,36 @@ impl ClassNodeFields {
 }
 
 impl MirDb {
+    /// Create a new or update an existing Salsa SourceFile input for `path`.
+    /// Returns the stable handle that callers should retain for tracked queries.
+    pub fn upsert_source_file(&mut self, path: Arc<str>, text: Arc<str>) -> SourceFile {
+        use salsa::Setter as _;
+        if let Some(&sf) = self.source_files.get(&path) {
+            if sf.text(self) != text {
+                sf.set_text(self).to(text);
+            }
+            return sf;
+        }
+        let sf = SourceFile::new(self, path.clone(), text);
+        Arc::make_mut(&mut self.source_files).insert(path, sf);
+        sf
+    }
+
+    /// Remove the Salsa SourceFile handle for `path` from the registry.
+    pub fn remove_source_file(&mut self, path: &str) {
+        Arc::make_mut(&mut self.source_files).remove(path);
+    }
+
+    /// Number of source files currently registered.
+    pub fn source_file_count(&self) -> usize {
+        self.source_files.len()
+    }
+
+    /// All registered source file paths.
+    pub fn source_file_paths(&self) -> Vec<Arc<str>> {
+        self.source_files.keys().cloned().collect()
+    }
+
     pub fn remove_file_definitions(&mut self, file: &str) {
         let symbols = self.symbols_defined_in_file(file);
         for symbol in &symbols {

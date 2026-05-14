@@ -290,8 +290,7 @@ impl AnalysisSession {
         self.ensure_stubs_loaded();
         {
             let mut guard = self.shared_db.salsa.lock();
-            let (ref mut db, _) = *guard;
-            db.remove_file_definitions(file.as_ref());
+            guard.remove_file_definitions(file.as_ref());
         }
         let _file_defs = self
             .shared_db
@@ -311,9 +310,8 @@ impl AnalysisSession {
     pub fn invalidate_file(&self, file: &str) {
         {
             let mut guard = self.shared_db.salsa.lock();
-            let (ref mut db, ref mut files) = *guard;
-            db.remove_file_definitions(file);
-            files.remove(file);
+            guard.remove_file_definitions(file);
+            guard.remove_source_file(file);
         }
         if let Some(cache) = &self.cache {
             cache.update_reverse_deps_for_file(file, &HashSet::new());
@@ -325,7 +323,7 @@ impl AnalysisSession {
     /// Stable across reads; useful for diagnostics and memory bounds checks.
     pub fn tracked_file_count(&self) -> usize {
         let guard = self.shared_db.salsa.lock();
-        guard.1.len()
+        guard.source_file_count()
     }
 
     // -----------------------------------------------------------------------
@@ -758,9 +756,8 @@ impl AnalysisSession {
     /// the caller having to track sources independently.
     pub fn source_of(&self, file: &str) -> Option<Arc<str>> {
         let guard = self.shared_db.salsa.lock();
-        let (ref db, ref files) = *guard;
-        let sf = files.get(file)?;
-        Some(sf.text(db))
+        let sf = guard.lookup_source_file(file)?;
+        Some(sf.text(&*guard))
     }
 
     /// Re-analyze every transitive dependent of `file` in parallel.
@@ -946,7 +943,7 @@ impl AnalysisSession {
             gather_inferred_types(self.snapshot_db(), files, self.php_version);
 
         let mut guard = self.shared_db.salsa.lock();
-        guard.0.commit_inferred_return_types(functions, methods);
+        guard.commit_inferred_return_types(functions, methods);
     }
 
     /// File dependency graph: which files depend on which other files.
@@ -960,7 +957,11 @@ impl AnalysisSession {
 
         // Get all files from the session's salsa database
         let guard = self.shared_db.salsa.lock();
-        let all_files: Vec<String> = guard.1.keys().map(|f| f.as_ref().to_string()).collect();
+        let all_files: Vec<String> = guard
+            .source_file_paths()
+            .iter()
+            .map(|f| f.as_ref().to_string())
+            .collect();
         drop(guard);
 
         // Build forward dependency graph: file → [files it depends on]
