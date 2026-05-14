@@ -656,6 +656,14 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
                 current.filter(|t| !t.is_array() && !t.is_object())
             }
         }
+        "is_resource" => {
+            if is_true {
+                current.narrow_to_resource()
+            } else {
+                // Exclude nothing (no resource type exists); return unchanged
+                current.clone()
+            }
+        }
         "is_numeric" => {
             if is_true {
                 current.filter(|t| {
