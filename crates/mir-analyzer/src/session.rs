@@ -1040,5 +1040,15 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
         }
     }
 
+    // Also track bare-FQN references recorded during Pass 2 (new \Foo(), \Foo::method(),
+    // \foo()) that do not appear in use-import statements.
+    for (symbol_key, _, _, _) in db.extract_file_reference_locations(file) {
+        let lookup: &str = match symbol_key.split_once("::") {
+            Some((class, _)) => class,
+            None => &symbol_key,
+        };
+        add_target(lookup);
+    }
+
     targets
 }
