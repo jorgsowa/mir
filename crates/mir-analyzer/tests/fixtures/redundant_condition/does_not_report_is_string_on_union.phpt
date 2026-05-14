@@ -6,5 +6,3 @@ function f(string|int $x): void {
     if (is_string($x)) {}
 }
 ===expect===
-===ignore===
-TODO
