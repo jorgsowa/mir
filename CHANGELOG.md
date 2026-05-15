@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bumped all transitive crates within their compatible semver ranges (`cargo update`), including the `php-rs-parser` / `php-ast` / `php-lexer` / `phpdoc-parser` stack from `0.12.0` → `0.12.1`.
 - Bumped `quick-xml` `0.39` → `0.40` in `mir-analyzer`.
-- Replaced `postcard` with `bincode v2` (`serde` feature) for the `StubSliceCache` on-disk format. `postcard` pulled `heapless` which transitively depended on the unmaintained `atomic-polyfill` crate (RUSTSEC-2023-0089), which `cargo deny` rejects. `bincode v2` provides the same transparent serde compatibility, has no advisory exposure, and measured slightly faster on the warm-cache hot path (Laravel `−35%` wall on warm vendor collection vs. `−30%` previously).
+- Replaced `postcard` with `bincode 1.3.3` for the `StubSliceCache` on-disk format. `postcard` pulled `heapless` → `atomic-polyfill` (RUSTSEC-2023-0089); `bincode v2` was tried next but is itself flagged unmaintained (RUSTSEC-2025-0141). `bincode 1.3.3` carries no advisory and is explicitly called "complete" by its authors. Cache on-disk format version bumped to 2 so existing v2-encoded entries are treated as misses.
 
 ## [0.25.0] - 2026-05-15
 
