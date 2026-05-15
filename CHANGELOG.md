@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-05-15
+
+### Performance
+
+- O(1) parameter deduplication: replaced linear Vec scan with FxHashMap for ~20% faster stub ingestion on large vendor sets. Deduplication now runs in parallel within rayon Pass 1 instead of serializing the collector.
+- RwLock-based atomic counter writes for Salsa db updates, reducing lock contention during batch analysis and improving 12-thread scaling.
+- `file_references` forward index added to `MirDb`: `dependency_graph()` cost reduced from O(S×R) to O(E) (files × edges), eliminating full-table scans during incremental re-analysis.
+- In-memory always-on reverse dependency map (`structural_dependents_of`) for O(D) BFS over structural dependencies (imports, class hierarchy, type hints) without requiring disk cache.
+
+### Fixed
+
+- Reference location recording now complete at all five previously-missing call sites: `instanceof`, `catch`, `::class`, `::CONST`, and type-hint declarations. Files referencing a class only via these constructs are now correctly visible to the incremental dependency graph and `analyze_dependents_of()`.
+
 ## [0.23.0] - 2026-05-14
 
 ### Added
