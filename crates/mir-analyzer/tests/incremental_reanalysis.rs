@@ -167,7 +167,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     // Insert ghost_fn() into the salsa db so a slow-path re-analysis would
     // find it and produce no issues.
     {
-        let mut guard = analyzer.salsa_db_for_test().lock();
+        let mut guard = analyzer.salsa_db_for_test();
         let db = &mut *guard;
         db.upsert_function_node(&mir_codebase::FunctionStorage {
             fqn: Arc::from("ghost_fn"),

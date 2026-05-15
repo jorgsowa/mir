@@ -52,6 +52,9 @@ impl DefinitionCollector<'_> {
             .collect();
 
         let mut params = Vec::new();
+        let mut local_scalar = 0usize;
+        let mut local_complex = 0usize;
+        let mut local_defaults = 0usize;
         for p in decl.params.iter() {
             let ty = doc
                 .get_param_type(&p.name.to_string())
@@ -69,17 +72,16 @@ impl DefinitionCollector<'_> {
                 .or_else(|| {
                     self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None)))
                 });
-            // Profiling: track scalar vs complex param types
             if let Some(ty_ref) = &ty {
                 if super::is_simple_scalar(ty_ref) {
-                    super::SCALAR_PARAM_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    local_scalar += 1;
                 } else {
-                    super::COMPLEX_PARAM_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    local_complex += 1;
                 }
             }
             let has_default = p.default.is_some();
             if has_default {
-                super::PARAM_WITH_DEFAULT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                local_defaults += 1;
             }
 
             params.push(FnParam {
@@ -90,6 +92,17 @@ impl DefinitionCollector<'_> {
                 is_byref: p.by_ref,
                 is_optional: has_default || p.variadic,
             });
+        }
+        if local_scalar > 0 {
+            super::SCALAR_PARAM_COUNT.fetch_add(local_scalar, std::sync::atomic::Ordering::Relaxed);
+        }
+        if local_complex > 0 {
+            super::COMPLEX_PARAM_COUNT
+                .fetch_add(local_complex, std::sync::atomic::Ordering::Relaxed);
+        }
+        if local_defaults > 0 {
+            super::PARAM_WITH_DEFAULT
+                .fetch_add(local_defaults, std::sync::atomic::Ordering::Relaxed);
         }
 
         let return_type = match (doc.return_type.clone(), decl.return_type.as_ref()) {
