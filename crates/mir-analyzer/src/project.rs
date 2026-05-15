@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::cache::{hash_content, AnalysisCache};
 use crate::db::{
     collect_file_definitions, collect_file_definitions_uncached, FileDefinitions, MirDatabase,
-    MirDb, SourceFile,
+    MirDb, RefLoc, SourceFile,
 };
 use crate::pass2::{InferredTypes, Pass2Driver};
 use crate::php_version::PhpVersion;
@@ -568,50 +568,72 @@ impl ProjectAnalyzer {
         };
 
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
-        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = parsed_files
-            .par_iter()
-            .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
-            .map_with(db_main, |db, parsed| {
-                let driver =
-                    Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
-                let result = if let Some(cache) = &self.cache {
-                    let h = hash_content(parsed.source());
-                    if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
-                        db.replay_reference_locations(parsed.file.clone(), &ref_locs);
-                        (cached_issues, Vec::new())
+        // Each worker db clone has its own `pending_ref_locs` buffer (custom
+        // Clone returns empty).  Workers push reference locations there instead
+        // of into the shared Arc<Mutex<...>> maps, eliminating cross-thread
+        // contention.  After collect() we commit all batches serially in a
+        // single lock acquisition per map.
+        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =
+            parsed_files
+                .par_iter()
+                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
+                .map_with(db_main, |db, parsed| {
+                    let driver =
+                        Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
+                    let (issues, symbols) = if let Some(cache) = &self.cache {
+                        let h = hash_content(parsed.source());
+                        if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
+                            db.replay_reference_locations(parsed.file.clone(), &ref_locs);
+                            (cached_issues, Vec::new())
+                        } else {
+                            let parse_result = parsed.parsed();
+                            let (issues, symbols) = driver.analyze_bodies(
+                                &parse_result.program,
+                                parsed.file.clone(),
+                                parsed.source(),
+                                &parse_result.source_map,
+                            );
+                            let pending = db.take_pending_ref_locs();
+                            let cache_locs = pending
+                                .iter()
+                                .map(|r| (r.symbol_key.to_string(), r.line, r.col_start, r.col_end))
+                                .collect();
+                            cache.put(&parsed.file, h, issues.clone(), cache_locs);
+                            if let Some(cb) = &self.on_file_done {
+                                cb();
+                            }
+                            return (issues, symbols, pending);
+                        }
                     } else {
                         let parse_result = parsed.parsed();
-                        let (issues, symbols) = driver.analyze_bodies(
+                        driver.analyze_bodies(
                             &parse_result.program,
                             parsed.file.clone(),
                             parsed.source(),
                             &parse_result.source_map,
-                        );
-                        let ref_locs = extract_reference_locations(&*db, &parsed.file);
-                        cache.put(&parsed.file, h, issues.clone(), ref_locs);
-                        (issues, symbols)
+                        )
+                    };
+                    let pending = db.take_pending_ref_locs();
+                    if let Some(cb) = &self.on_file_done {
+                        cb();
                     }
-                } else {
-                    let parse_result = parsed.parsed();
-                    driver.analyze_bodies(
-                        &parse_result.program,
-                        parsed.file.clone(),
-                        parsed.source(),
-                        &parse_result.source_map,
-                    )
-                };
-                if let Some(cb) = &self.on_file_done {
-                    cb();
-                }
-                result
-            })
-            .collect();
+                    (issues, symbols, pending)
+                })
+                .collect();
 
         let _t_pass2 = _t0.elapsed();
+
+        // Serial commit: one lock acquisition per map for all files combined.
+        let mut all_ref_locs: Vec<RefLoc> = Vec::new();
         let mut all_symbols = Vec::new();
-        for (issues, symbols) in pass2_results {
+        for (issues, symbols, ref_locs) in pass2_results {
             all_issues.extend(issues);
             all_symbols.extend(symbols);
+            all_ref_locs.extend(ref_locs);
+        }
+        {
+            let guard = self.shared_db.salsa.read();
+            guard.commit_reference_locations_batch(all_ref_locs);
         }
 
         // ---- Post-Pass-2 lazy loading: FQCNs used without `use` imports ------
@@ -821,23 +843,37 @@ impl ProjectAnalyzer {
                 (**guard).clone()
             };
 
-            let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
-                .par_iter()
-                .filter(|(f, _)| {
-                    !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
-                })
-                .map_with(db_full, |db, (file, src)| {
-                    let driver =
-                        Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
-                    let arena = crate::arena::create_parse_arena(src.len());
-                    let parsed = php_rs_parser::parse(&arena, src);
-                    driver.analyze_bodies(&parsed.program, file.clone(), src, &parsed.source_map)
-                })
-                .collect();
+            let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =
+                file_data
+                    .par_iter()
+                    .filter(|(f, _)| {
+                        !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
+                    })
+                    .map_with(db_full, |db, (file, src)| {
+                        let driver =
+                            Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
+                        let arena = crate::arena::create_parse_arena(src.len());
+                        let parsed = php_rs_parser::parse(&arena, src);
+                        let (issues, symbols) = driver.analyze_bodies(
+                            &parsed.program,
+                            file.clone(),
+                            src,
+                            &parsed.source_map,
+                        );
+                        let pending = db.take_pending_ref_locs();
+                        (issues, symbols, pending)
+                    })
+                    .collect();
 
-            for (issues, symbols) in reanalysis {
+            let mut reanalysis_ref_locs: Vec<RefLoc> = Vec::new();
+            for (issues, symbols, ref_locs) in reanalysis {
                 all_issues.extend(issues);
                 all_symbols.extend(symbols);
+                reanalysis_ref_locs.extend(ref_locs);
+            }
+            {
+                let guard = self.shared_db.salsa.read();
+                guard.commit_reference_locations_batch(reanalysis_ref_locs);
             }
         }
     }
@@ -858,6 +894,7 @@ impl ProjectAnalyzer {
                 let file: Arc<str> = Arc::from(file_path);
                 let guard = self.shared_db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
+                guard.commit_pending_to_maps();
                 return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
         }
@@ -901,6 +938,7 @@ impl ProjectAnalyzer {
                     &parsed.source_map,
                 );
                 all_issues.extend(body_issues);
+                guard.commit_pending_to_maps();
                 symbols
             } else {
                 Vec::new()

@@ -1,33 +1,25 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use mir_analyzer::ProjectAnalyzer;
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
 use std::time::Duration;
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
-// Counting allocator — per-thread accumulators, global flush on stats read
-//
-// Threads accumulate alloc/dealloc deltas in thread-local Cells (zero
-// contention). Globals are only written when flushing for stats output, so
-// the hot path (alloc/dealloc during benchmarks) has no shared-atomic
-// cache-line bouncing regardless of thread count.
+// Counting allocator — global atomics updated on every alloc/dealloc.
+// All three counters are correct across all threads (main + rayon pool).
 // ---------------------------------------------------------------------------
 
 struct CountingAllocator;
 
-// Thread-local accumulators — never shared, never contended.
-thread_local! {
-    static TL_LIVE:  Cell<i64>   = const { Cell::new(0) };
-    static TL_TOTAL: Cell<usize> = const { Cell::new(0) };
-    static TL_PEAK:  Cell<usize> = const { Cell::new(0) };
-}
-
-// Globals written only during flush (single-threaded stats path).
+// All three counters are global atomics updated on every alloc/dealloc so
+// numbers are correct across all threads (main + rayon pool).
+// G_LIVE  — current net live bytes (delta from last reset)
+// G_PEAK  — max G_LIVE since last reset
+// G_TOTAL — cumulative bytes allocated since last reset
 static G_LIVE: AtomicI64 = AtomicI64::new(0);
-static G_PEAK: AtomicUsize = AtomicUsize::new(0);
+static G_PEAK: AtomicI64 = AtomicI64::new(0);
 static G_TOTAL: AtomicUsize = AtomicUsize::new(0);
 
 unsafe impl GlobalAlloc for CountingAllocator {
@@ -35,52 +27,29 @@ unsafe impl GlobalAlloc for CountingAllocator {
         let ptr = System.alloc(layout);
         if !ptr.is_null() {
             let sz = layout.size();
-            TL_LIVE.with(|c| c.set(c.get() + sz as i64));
-            TL_TOTAL.with(|c| c.set(c.get() + sz));
-            TL_PEAK.with(|c| {
-                let live = TL_LIVE.with(Cell::get) as usize;
-                if live > c.get() {
-                    c.set(live);
-                }
-            });
+            G_TOTAL.fetch_add(sz, Relaxed);
+            let new_live = G_LIVE.fetch_add(sz as i64, Relaxed) + sz as i64;
+            G_PEAK.fetch_max(new_live, Relaxed);
         }
         ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         System.dealloc(ptr, layout);
-        TL_LIVE.with(|c| c.set(c.get() - layout.size() as i64));
+        G_LIVE.fetch_sub(layout.size() as i64, Relaxed);
     }
 }
 
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-/// Flush thread-local counters into the global aggregates and zero them.
-/// Call this on every thread that participated before reading globals.
-fn flush_thread_counters() {
-    let live = TL_LIVE.with(Cell::get);
-    let total = TL_TOTAL.with(Cell::get);
-    let peak = TL_PEAK.with(Cell::get);
-    G_LIVE.fetch_add(live, Relaxed);
-    G_TOTAL.fetch_add(total, Relaxed);
-    G_PEAK.fetch_max(peak, Relaxed);
-    TL_LIVE.with(|c| c.set(0));
-    TL_TOTAL.with(|c| c.set(0));
-    TL_PEAK.with(|c| c.set(0));
-}
-
 fn reset_alloc_counters() {
     G_LIVE.store(0, Relaxed);
     G_PEAK.store(0, Relaxed);
     G_TOTAL.store(0, Relaxed);
-    TL_LIVE.with(|c| c.set(0));
-    TL_TOTAL.with(|c| c.set(0));
-    TL_PEAK.with(|c| c.set(0));
 }
 
 fn print_alloc_stats(label: &str) {
-    flush_thread_counters();
     let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
     let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!(
@@ -89,7 +58,6 @@ fn print_alloc_stats(label: &str) {
 }
 
 fn checkpoint_alloc(label: &str) {
-    flush_thread_counters();
     let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
     let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!("    [checkpoint] {label:40} peak {peak:7.1} MiB, total {total:7.1} MiB");

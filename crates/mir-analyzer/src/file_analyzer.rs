@@ -83,6 +83,8 @@ impl<'a> FileAnalyzer<'a> {
         let db = self.session.snapshot_db();
         let driver = Pass2Driver::new(&db, self.session.php_version());
         let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
+        self.session
+            .commit_ref_locs_batch(db.take_pending_ref_locs());
         FileAnalysis { issues, symbols }
     }
 }
@@ -186,7 +188,7 @@ impl<'a> BatchFileAnalyzer<'a> {
         // Second pass: analyze files in parallel.
         // Each rayon worker gets its own database clone (Salsa is Send but !Sync).
         let db = self.session.snapshot_db();
-        files
+        let results: Vec<(Arc<str>, FileAnalysis, Vec<crate::db::RefLoc>)> = files
             .into_par_iter()
             .map_with(db, |db, file| {
                 // SAFETY: Caller guarantees pointer validity.
@@ -195,9 +197,18 @@ impl<'a> BatchFileAnalyzer<'a> {
                 let driver = Pass2Driver::new(db as &dyn MirDatabase, self.session.php_version());
                 let (issues, symbols) =
                     driver.analyze_bodies(program, file.file.clone(), &file.source, source_map);
+                let pending = db.take_pending_ref_locs();
                 let analysis = FileAnalysis { issues, symbols };
-                (file.file, analysis)
+                (file.file, analysis, pending)
             })
-            .collect()
+            .collect();
+        let mut all_ref_locs = Vec::new();
+        let mut out = Vec::with_capacity(results.len());
+        for (file, analysis, ref_locs) in results {
+            all_ref_locs.extend(ref_locs);
+            out.push((file, analysis));
+        }
+        self.session.commit_ref_locs_batch(all_ref_locs);
+        out
     }
 }

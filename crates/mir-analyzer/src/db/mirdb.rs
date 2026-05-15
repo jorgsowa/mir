@@ -28,6 +28,24 @@ type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16,
 /// Kept in sync with `reference_locations` for O(degree) lookups.
 type FileReferences = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 
+/// Per-clone staging buffer for reference locations recorded during a parallel
+/// Pass 2 worker.  `record_reference_location` pushes here instead of directly
+/// into the shared `Arc<Mutex<...>>` maps, eliminating cross-thread contention.
+/// After the parallel phase the owner calls `take_pending_ref_locs` and commits
+/// the batch serially via `commit_reference_locations_batch`.
+///
+/// The custom `Clone` impl returns a *new empty buffer* so that each `MirDb`
+/// worker clone starts fresh — we do NOT propagate one clone's pending entries
+/// to another worker.
+#[derive(Default)]
+struct PendingRefLocs(Mutex<Vec<super::reference_locations::RefLoc>>);
+
+impl Clone for PendingRefLocs {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
 #[salsa::db]
 #[derive(Default, Clone)]
 pub struct MirDb {
@@ -72,6 +90,9 @@ pub struct MirDb {
     /// Forward index: file → set of symbol keys it references. Kept in sync
     /// with `reference_locations` to provide O(degree) dep-graph lookups.
     file_references: FileReferences,
+    /// Per-clone staging area for reference locations.  Workers push here
+    /// during parallel analysis; the orchestrator drains and commits serially.
+    pending_ref_locs: PendingRefLocs,
     /// File path → Salsa SourceFile input handle.
     source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
 }
@@ -213,20 +234,7 @@ impl MirDatabase for MirDb {
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
-        // Clone before moving into reference_locations so we can also update
-        // the forward index without borrowing after move.
-        let symbol_key = loc.symbol_key.clone();
-        let file = loc.file.clone();
-        {
-            let mut file_refs = self.file_references.lock();
-            file_refs.entry(file).or_default().insert(symbol_key);
-        }
-        let mut refs = self.reference_locations.lock();
-        let entry = refs.entry(loc.symbol_key).or_default();
-        let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
-        if !entry.iter().any(|existing| existing == &tuple) {
-            entry.push(tuple);
-        }
+        self.pending_ref_locs.0.lock().push(loc);
     }
 
     fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]) {
@@ -369,6 +377,46 @@ impl ClassNodeFields {
 }
 
 impl MirDb {
+    /// Drain pending reference locations from this db clone's staging buffer.
+    ///
+    /// Call after a parallel Pass 2 closure completes, then pass the returned
+    /// `Vec` to [`Self::commit_reference_locations_batch`] on the shared db.
+    pub fn take_pending_ref_locs(&self) -> Vec<RefLoc> {
+        std::mem::take(&mut *self.pending_ref_locs.0.lock())
+    }
+
+    /// Commit a batch of reference locations into the shared maps in one lock
+    /// acquisition per map.  Must be called serially after all parallel workers
+    /// have dropped their db clones and returned their pending buffers.
+    pub fn commit_reference_locations_batch(&self, locs: Vec<RefLoc>) {
+        if locs.is_empty() {
+            return;
+        }
+        let mut refs = self.reference_locations.lock();
+        let mut file_refs = self.file_references.lock();
+        for loc in locs {
+            file_refs
+                .entry(loc.file.clone())
+                .or_default()
+                .insert(loc.symbol_key.clone());
+            let entry = refs.entry(loc.symbol_key).or_default();
+            let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
+            if !entry.iter().any(|e| e == &tuple) {
+                entry.push(tuple);
+            }
+        }
+    }
+
+    /// Drain this db's pending buffer and commit it directly to the shared maps.
+    ///
+    /// Use on serial paths (e.g. `re_analyze_file`) where the db is not a
+    /// worker clone: pending locations accumulate in the shared db itself and
+    /// must be flushed before callers read the reference maps.
+    pub fn commit_pending_to_maps(&self) {
+        let locs = std::mem::take(&mut *self.pending_ref_locs.0.lock());
+        self.commit_reference_locations_batch(locs);
+    }
+
     /// Create a new or update an existing Salsa SourceFile input for `path`.
     /// Returns the stable handle that callers should retain for tracked queries.
     pub fn upsert_source_file(&mut self, path: Arc<str>, text: Arc<str>) -> SourceFile {
