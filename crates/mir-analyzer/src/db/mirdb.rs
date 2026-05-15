@@ -24,6 +24,9 @@ use super::*;
 /// **not** supported because `salsa::Database: Send` (not `Sync`).
 type MemberRegistry<V> = Arc<FxHashMap<Arc<str>, FxHashMap<Arc<str>, V>>>;
 type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
+/// Forward index: file path → set of symbol keys that file references.
+/// Kept in sync with `reference_locations` for O(degree) lookups.
+type FileReferences = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 
 #[salsa::db]
 #[derive(Default, Clone)]
@@ -66,6 +69,9 @@ pub struct MirDb {
     symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
     /// Public symbol key → reference locations.
     reference_locations: ReferenceLocations,
+    /// Forward index: file → set of symbol keys it references. Kept in sync
+    /// with `reference_locations` to provide O(degree) dep-graph lookups.
+    file_references: FileReferences,
     /// File path → Salsa SourceFile input handle.
     source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
 }
@@ -207,6 +213,14 @@ impl MirDatabase for MirDb {
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
+        // Clone before moving into reference_locations so we can also update
+        // the forward index without borrowing after move.
+        let symbol_key = loc.symbol_key.clone();
+        let file = loc.file.clone();
+        {
+            let mut file_refs = self.file_references.lock();
+            file_refs.entry(file).or_default().insert(symbol_key);
+        }
         let mut refs = self.reference_locations.lock();
         let entry = refs.entry(loc.symbol_key).or_default();
         let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
@@ -251,9 +265,17 @@ impl MirDatabase for MirDb {
     }
 
     fn clear_file_references(&self, file: &str) {
+        // Drain the forward index first to learn which symbols this file referenced,
+        // then remove only those entries — O(degree) instead of O(S×R).
+        let symbol_keys = {
+            let mut file_refs = self.file_references.lock();
+            file_refs.remove(file).unwrap_or_default()
+        };
         let mut refs = self.reference_locations.lock();
-        for locs in refs.values_mut() {
-            locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
+        for key in &symbol_keys {
+            if let Some(locs) = refs.get_mut(key) {
+                locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
+            }
         }
     }
 
@@ -266,6 +288,14 @@ impl MirDatabase for MirDb {
             }
         }
         pairs
+    }
+
+    fn file_referenced_symbols(&self, file: &str) -> Vec<Arc<str>> {
+        let file_refs = self.file_references.lock();
+        file_refs
+            .get(file)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
     }
 
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {

@@ -100,6 +100,11 @@ pub trait MirDatabase: salsa::Database {
     /// Used to build the dependency graph from bare-FQN references.
     fn all_reference_location_pairs(&self) -> Vec<(Arc<str>, Arc<str>)>;
 
+    /// Return all symbol keys referenced by `file`. O(degree) via the
+    /// file→symbols forward index; use this instead of scanning
+    /// `extract_file_reference_locations` for dependency-graph lookups.
+    fn file_referenced_symbols(&self, file: &str) -> Vec<Arc<str>>;
+
     /// Return the Salsa SourceFile handle registered for `path`, if any.
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile>;
 }
