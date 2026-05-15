@@ -7,12 +7,18 @@
 //! (~10 k files) is dominated by parse+collect (≈800 ms) vs. ingest (≈45 ms),
 //! so the cache addresses the dominant cost.
 //!
+//! Format choice (bincode v2): postcard was the original pick but it pulls
+//! `heapless` -> the unmaintained `atomic-polyfill` (RUSTSEC-2023-0089),
+//! which `cargo-deny` rejects. bincode v2 with the `serde` feature has the
+//! same transparent serde compatibility, encodes faster on the hot path,
+//! and has no advisory exposure.
+//!
 //! Layout: `<cache_dir>/stubs/<hh>/<full_hash>.bin` where `<hh>` is the first
 //! two hex chars of the path hash. Sharding keeps any single directory below
 //! ~40 entries even for large monorepos.
 //!
 //! Format: a fixed-size [`Header`] (magic + version fields + content hash)
-//! followed by a postcard-encoded [`StubSlice`]. Any header mismatch is
+//! followed by a bincode-encoded [`StubSlice`]. Any header mismatch is
 //! treated as a miss so cache files survive across mir upgrades without
 //! risking type-layout corruption.
 //!
@@ -108,7 +114,9 @@ impl StubSliceCache {
         }
         let entry_path = self.shard_path(path);
         let bytes = std::fs::read(&entry_path).ok()?;
-        let (header, rest) = postcard::take_from_bytes::<Header>(&bytes).ok()?;
+        let cfg = bincode::config::standard();
+        let (header, consumed) =
+            bincode::serde::decode_from_slice::<Header, _>(&bytes, cfg).ok()?;
         if header.magic != MAGIC
             || header.format_version != FORMAT_VERSION
             || header.mir_version != mir_version_hash()
@@ -118,8 +126,8 @@ impl StubSliceCache {
             self.misses.fetch_add(1, Ordering::Relaxed);
             return None;
         }
-        match postcard::from_bytes::<StubSlice>(rest) {
-            Ok(mut slice) => {
+        match bincode::serde::decode_from_slice::<StubSlice, _>(&bytes[consumed..], cfg) {
+            Ok((mut slice, _)) => {
                 // Restore the caller's path; cached paths are not trusted.
                 slice.file = Some(std::sync::Arc::from(path));
                 self.hits.fetch_add(1, Ordering::Relaxed);
@@ -158,7 +166,8 @@ impl StubSliceCache {
 
         // Serialize header + body into a single buffer so we issue exactly
         // one write syscall.
-        let buf = match postcard::to_allocvec(&header) {
+        let cfg = bincode::config::standard();
+        let mut buf = match bincode::serde::encode_to_vec(&header, cfg) {
             Ok(b) => b,
             Err(_) => return,
         };
@@ -166,10 +175,10 @@ impl StubSliceCache {
         let mut slice_for_disk = slice.clone();
         slice_for_disk.file = None;
         // `is_deduped` is #[serde(skip)] so it does not need stripping.
-        let buf = match postcard::to_extend(&slice_for_disk, buf) {
-            Ok(b) => b,
+        match bincode::serde::encode_to_vec(&slice_for_disk, cfg) {
+            Ok(body) => buf.extend_from_slice(&body),
             Err(_) => return,
-        };
+        }
 
         // Tempfile in the same directory so the rename is atomic on every
         // POSIX filesystem (cross-mount renames would degrade to copy).
