@@ -376,6 +376,22 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut catch_ctx = catch_base.clone();
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
+                if !self.inference_only {
+                    let raw = parser::name_to_string(catch_ty);
+                    let resolved = db::resolve_name_via_db(self.db, &self.file, &raw);
+                    if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                        let span = catch_ty.span();
+                        let (line, col_start) = self.offset_to_line_col(span.start);
+                        let (_, col_end) = self.offset_to_line_col(span.end);
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(resolved.as_str()),
+                            file: self.file.clone(),
+                            line,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        });
+                    }
+                }
             }
             if let Some(var) = catch.var {
                 let exc_ty = if catch.types.is_empty() {

@@ -1045,6 +1045,17 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         }
     }
 
+    let extract_named_objects = |union: &mir_types::Union| {
+        union
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
     for fqcn in db.active_class_node_fqcns() {
         // Only true classes contribute class-direction edges in this loop.
         // Interface / trait / enum edges are not currently emitted here —
@@ -1072,6 +1083,61 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         }
         for tr in node.traits(db).iter() {
             add_edge(tr.as_ref(), &file);
+        }
+
+        // Add types from properties
+        for prop in db.class_own_properties(fqcn.as_ref()).iter() {
+            if let Some(ty) = prop.ty(db) {
+                for named in extract_named_objects(&ty) {
+                    add_edge(named.as_ref(), &file);
+                }
+            }
+        }
+
+        // Add types from methods
+        for method in db.class_own_methods(fqcn.as_ref()).iter() {
+            // Parameter types
+            for param in method.params(db).iter() {
+                if let Some(ty) = &param.ty {
+                    for named in extract_named_objects(ty.as_ref()) {
+                        add_edge(named.as_ref(), &file);
+                    }
+                }
+            }
+            // Return type
+            if let Some(rt) = method.return_type(db) {
+                for named in extract_named_objects(rt.as_ref()) {
+                    add_edge(named.as_ref(), &file);
+                }
+            }
+        }
+    }
+
+    // Add types from global functions
+    for fqn in db.active_function_node_fqns() {
+        let Some(node) = db.lookup_function_node(fqn.as_ref()) else {
+            continue;
+        };
+        let Some(file) = db
+            .symbol_defining_file(fqn.as_ref())
+            .map(|f| f.as_ref().to_string())
+        else {
+            continue;
+        };
+
+        // Parameter types
+        for param in node.params(db).iter() {
+            if let Some(ty) = &param.ty {
+                for named in extract_named_objects(ty.as_ref()) {
+                    add_edge(named.as_ref(), &file);
+                }
+            }
+        }
+        // Return type
+        if let Some(rt) = node.return_type(db) {
+            for named in extract_named_objects(rt.as_ref()) {
+                add_edge(named.as_ref(), &file);
+            }
         }
     }
 

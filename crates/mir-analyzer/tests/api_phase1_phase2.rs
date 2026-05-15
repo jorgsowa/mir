@@ -529,3 +529,47 @@ fn analyze_dependents_of_tracks_bare_fqn_static_call() {
          analyze_dependents_of — dependency graph is missing FQN reference edges"
     );
 }
+
+#[test]
+fn dependency_graph_includes_unused_param_type_hint() {
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let service: Arc<str> = Arc::from("service.php");
+    let consumer: Arc<str> = Arc::from("consumer.php");
+
+    // Define Service in service.php (namespace Vendor)
+    session.ingest_file(
+        service.clone(),
+        Arc::from("<?php\nnamespace Vendor\nclass Service { }\n"),
+    );
+
+    // Use Service in param type hint WITHOUT use statement and WITHOUT using the param
+    session.ingest_file(
+        consumer.clone(),
+        Arc::from("<?php\nnamespace Vendor\nfunction consume(Service $s) { }\n"),
+    );
+
+    // Analyze the consumer file to trigger Pass 2
+    let consumer_src = "<?php\nnamespace Vendor\nfunction consume(Service $s) { }\n";
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, consumer_src);
+    FileAnalyzer::new(&session).analyze(
+        consumer.clone(),
+        consumer_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    // Check if consumer is considered a dependent of service
+    let dependents = session
+        .dependency_graph()
+        .transitive_dependents(service.as_ref());
+    assert!(
+        dependents.contains(&consumer.to_string()),
+        "consumer.php should depend on service.php due to type hint in parameter, \
+         even though the parameter is unused and there's no use statement"
+    );
+}

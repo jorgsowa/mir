@@ -464,3 +464,184 @@ fn nullsafe_method_call_records_reference_location() {
         "span should cover only 'run' (3 bytes), got col_start={col_start} col_end={col_end}"
     );
 }
+
+#[test]
+fn instanceof_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "instanceof_ref.php",
+        "<?php\nclass Widget {}\nfunction check(mixed $v): bool { return $v instanceof Widget; }\n",
+    );
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    assert!(
+        !analyzer.reference_locations("Widget").is_empty(),
+        "instanceof Widget should record a reference to Widget"
+    );
+}
+
+#[test]
+fn catch_type_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "catch_ref.php",
+        "<?php\nclass AppEx extends \\Exception {}\nfunction run(): void { try {} catch (AppEx $e) { echo $e->getMessage(); } }\n",
+    );
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    assert!(
+        !analyzer.reference_locations("AppEx").is_empty(),
+        "catch (AppEx $e) should record a reference to AppEx"
+    );
+}
+
+#[test]
+fn multi_type_catch_records_all_class_references() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "multi_catch_ref.php",
+        "<?php\nclass ErrA extends \\Exception {}\nclass ErrB extends \\Exception {}\nfunction run(): void { try {} catch (ErrA | ErrB $e) { echo $e->getMessage(); } }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs_a: Vec<_> = analyzer
+        .reference_locations("ErrA")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+    let locs_b: Vec<_> = analyzer
+        .reference_locations("ErrB")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs_a.is_empty(),
+        "catch (ErrA | ErrB $e) should record a reference to ErrA"
+    );
+    assert!(
+        !locs_b.is_empty(),
+        "catch (ErrA | ErrB $e) should record a reference to ErrB"
+    );
+}
+
+#[test]
+fn class_const_syntax_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "classconst_ref.php",
+        "<?php\nclass Router {}\nfunction getClass(): string { return Router::class; }\n",
+    );
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    assert!(
+        !analyzer.reference_locations("Router").is_empty(),
+        "Router::class should record a reference to Router"
+    );
+}
+
+#[test]
+fn static_const_access_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "static_const_ref.php",
+        "<?php\nclass Config { const VERSION = '1.0'; }\nfunction ver(): string { return Config::VERSION; }\n",
+    );
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    assert!(
+        !analyzer.reference_locations("Config").is_empty(),
+        "Config::VERSION should record a reference to Config"
+    );
+}
+
+#[test]
+fn function_param_type_hint_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "param_hint_ref.php",
+        "<?php\nclass Service {}\nfunction process(Service $svc): void { echo get_class($svc); }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("Service")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "function param type hint Service $svc should record a reference to Service"
+    );
+}
+
+#[test]
+fn return_type_hint_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "return_hint_ref.php",
+        "<?php\nclass Repo {}\nfunction make(): Repo { return new Repo(); }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("Repo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "return type hint Repo should record a reference to Repo"
+    );
+}
+
+#[test]
+fn property_type_hint_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "prop_hint_ref.php",
+        "<?php\nclass Logger {}\nclass App { public Logger $logger; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = ProjectAnalyzer::new();
+    analyzer.analyze(std::slice::from_ref(&file));
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("Logger")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "property type hint Logger should record a reference to Logger"
+    );
+}
