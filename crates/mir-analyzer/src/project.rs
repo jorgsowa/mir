@@ -15,6 +15,7 @@ use crate::db::{
 use crate::pass2::{InferredTypes, Pass2Driver};
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
+use crate::stub_cache::{hash_source, prepare_for_ingest};
 use mir_issues::Issue;
 
 pub(crate) use crate::pass2::merge_return_types;
@@ -122,7 +123,7 @@ impl ProjectAnalyzer {
     /// Create a `ProjectAnalyzer` with a disk-backed cache stored under `cache_dir`.
     pub fn with_cache(cache_dir: &Path) -> Self {
         Self {
-            shared_db: Arc::new(SharedDb::new()),
+            shared_db: Arc::new(SharedDb::new().with_cache_dir(cache_dir)),
             cache: Some(AnalysisCache::open(cache_dir)),
             on_file_done: None,
             psr4: None,
@@ -135,6 +136,16 @@ impl ProjectAnalyzer {
 
     /// Enable the disk-backed cache for an already-constructed analyzer.
     pub fn set_cache_dir(&mut self, cache_dir: &Path) {
+        // Rebuild SharedDb to attach the Pass-1 stub cache. Must be called
+        // before any file is ingested — a previously-populated SharedDb's
+        // state would be silently discarded here, which is almost certainly
+        // a caller bug rather than the intended behavior.
+        debug_assert_eq!(
+            self.shared_db.source_file_count(),
+            0,
+            "ProjectAnalyzer::set_cache_dir must be called before any file is ingested"
+        );
+        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(cache_dir));
         self.cache = Some(AnalysisCache::open(cache_dir));
     }
 
@@ -191,6 +202,12 @@ impl ProjectAnalyzer {
 
     /// Builder method: configure a disk-backed cache at the given directory.
     pub fn with_cache_dir(mut self, cache_dir: &Path) -> Self {
+        debug_assert_eq!(
+            self.shared_db.source_file_count(),
+            0,
+            "ProjectAnalyzer::with_cache_dir must be called before any file is ingested"
+        );
+        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(cache_dir));
         self.cache = Some(AnalysisCache::open(cache_dir));
         self
     }
@@ -205,6 +222,17 @@ impl ProjectAnalyzer {
     /// when none has been set.
     fn resolved_php_version(&self) -> PhpVersion {
         self.php_version.unwrap_or(PhpVersion::LATEST)
+    }
+
+    /// Cumulative hit / miss counts on the persistent Pass-1 cache attached
+    /// to this analyzer. `(0, 0)` when no cache is configured. Used by
+    /// integration tests and benchmarks to assert the cache actually fires.
+    #[doc(hidden)]
+    pub fn stub_cache_stats(&self) -> (u64, u64) {
+        match self.shared_db.stub_cache.as_deref() {
+            Some(c) => (c.hits(), c.misses()),
+            None => (0, 0),
+        }
     }
 
     fn type_exists(&self, fqcn: &str) -> bool {
@@ -361,7 +389,8 @@ impl ProjectAnalyzer {
     }
 
     fn collect_and_ingest_source(&self, file: Arc<str>, src: &str) -> FileDefinitions {
-        self.shared_db.collect_and_ingest_file(file, src)
+        self.shared_db
+            .collect_and_ingest_file(file, src, self.resolved_php_version())
     }
 
     /// Run the full analysis pipeline on a set of file paths.
@@ -1005,54 +1034,103 @@ impl ProjectAnalyzer {
 
     /// Pass 1 only: collect type definitions from `paths` into the codebase without
     /// analyzing method bodies or emitting issues. Used to load vendor types.
+    ///
+    /// When [`Self::with_cache`] is enabled, per-file [`StubSlice`] results from
+    /// previous runs are reused on a content-hash match, eliminating the
+    /// parse + definition-collection step (which is ~95% of vendor wall-time
+    /// on Laravel). Cache misses run the normal pipeline and write back so
+    /// subsequent runs hit.
+    ///
+    /// [`StubSlice`]: mir_codebase::storage::StubSlice
     pub fn collect_types_only(&self, paths: &[PathBuf]) {
         let _timing = std::env::var("MIR_TIMING").is_ok();
         let _t0 = std::time::Instant::now();
 
-        let file_data: Vec<(Arc<str>, Arc<str>)> = paths
+        let php_v = self.resolved_php_version().cache_byte();
+
+        // ---- Phase 1: read + try cache, in parallel ------------------------
+        // Each entry carries either a ready-to-ingest cached slice, or the
+        // source text + hash for the miss path that runs Pass 1.
+        struct FileEntry {
+            file: Arc<str>,
+            src: Arc<str>,
+            hash: [u8; 32],
+            cached: Option<mir_codebase::storage::StubSlice>,
+        }
+        let entries: Vec<FileEntry> = paths
             .par_iter()
             .filter_map(|path| {
                 let src = std::fs::read_to_string(path).ok()?;
-                Some((
-                    Arc::from(path.to_string_lossy().as_ref()),
-                    Arc::<str>::from(src),
-                ))
+                let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+                let src: Arc<str> = Arc::from(src);
+                let hash = hash_source(&src);
+                let cached = self.shared_db.stub_cache.as_ref().and_then(|c| {
+                    let mut slice = c.get(&file, &hash, php_v)?;
+                    // Re-run dedup outside the serial ingest section so commit
+                    // 3018a1d's parallel-dedup win is preserved on cache hits.
+                    prepare_for_ingest(&mut slice);
+                    Some(slice)
+                });
+                Some(FileEntry {
+                    file,
+                    src,
+                    hash,
+                    cached,
+                })
             })
             .collect();
         let _t_read = _t0.elapsed();
 
+        // ---- Phase 2: register all SourceFile inputs in salsa --------------
+        // Lazy-load (e.g. UndefinedClass → vendor file) may later query any of
+        // these as a salsa input, so we register both hits and misses.
         let source_files: Vec<SourceFile> = {
             let mut guard = self.shared_db.salsa.write();
-            file_data
+            entries
                 .iter()
-                .map(|(file, src)| guard.upsert_source_file(file.clone(), src.clone()))
+                .map(|e| guard.upsert_source_file(e.file.clone(), e.src.clone()))
                 .collect()
         };
         let _t_reg = _t0.elapsed();
 
+        // ---- Phase 3: Pass 1 for misses, cache write-back, in parallel -----
         let db_pass1 = {
             let guard = self.shared_db.salsa.read();
             (**guard).clone()
         };
-
-        let file_defs: Vec<FileDefinitions> = source_files
-            .par_iter()
-            .map_with(db_pass1, |db, salsa_file| {
-                collect_file_definitions_uncached(&*db, *salsa_file)
+        let stub_cache = self.shared_db.stub_cache.clone();
+        // `into_par_iter` so cached slices can be moved (not cloned) into the
+        // result vec. Cloning 10k StubSlices on warm vendor would burn most
+        // of the churn-reduction win the cache exists to produce.
+        let prepared: Vec<mir_codebase::storage::StubSlice> = entries
+            .into_par_iter()
+            .zip(source_files.into_par_iter())
+            .map_with(db_pass1, |db, (mut entry, salsa_file)| {
+                if let Some(slice) = entry.cached.take() {
+                    return slice;
+                }
+                let defs = collect_file_definitions_uncached(&*db, salsa_file);
+                let slice = Arc::unwrap_or_clone(defs.slice);
+                if let Some(cache) = stub_cache.as_ref() {
+                    cache.put(&entry.file, &entry.hash, php_v, &slice);
+                }
+                slice
             })
             .collect();
         let _t_collect = _t0.elapsed();
 
+        // ---- Phase 4: serial ingest under the write lock -------------------
         let mut guard = self.shared_db.salsa.write();
-        for defs in file_defs {
-            guard.ingest_stub_slice(&defs.slice);
+        for slice in &prepared {
+            guard.ingest_stub_slice(slice);
         }
         drop(guard);
         let _t_ingest = _t0.elapsed();
 
         if _timing {
+            let (hits, misses) = self.stub_cache_stats();
             eprintln!(
-                "[vendor] read={:.0}ms reg={:.0}ms collect={:.0}ms ingest={:.0}ms total={:.0}ms",
+                "[vendor] read={:.0}ms reg={:.0}ms collect={:.0}ms ingest={:.0}ms total={:.0}ms (cache hits={hits} misses={misses})",
                 _t_read.as_secs_f64() * 1000.0,
                 (_t_reg - _t_read).as_secs_f64() * 1000.0,
                 (_t_collect - _t_reg).as_secs_f64() * 1000.0,

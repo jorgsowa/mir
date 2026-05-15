@@ -79,15 +79,43 @@ impl AnalysisSession {
         }
     }
 
+    /// Attach a pre-built [`AnalysisCache`] (the Pass-2 issue cache) and
+    /// open a sibling Pass-1 [`StubSlice`] cache under the same root, so
+    /// callers using this builder get the same speedup as `with_cache_dir`.
+    ///
+    /// Rebuilds the shared database to attach the Pass-1 cache — call
+    /// **before** any file is ingested. A debug assertion catches misuse.
+    ///
+    /// [`StubSlice`]: mir_codebase::storage::StubSlice
     pub fn with_cache(mut self, cache: Arc<AnalysisCache>) -> Self {
+        debug_assert_eq!(
+            self.shared_db.source_file_count(),
+            0,
+            "AnalysisSession::with_cache must be called before any file is ingested"
+        );
+        let dir = cache.cache_dir().to_path_buf();
+        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(&dir));
         self.cache = Some(cache);
         self
     }
 
     /// Convenience: open a disk-backed cache at `cache_dir` and attach it.
-    /// Avoids forcing callers to wrap [`AnalysisCache`] in `Arc` themselves.
-    pub fn with_cache_dir(self, cache_dir: &std::path::Path) -> Self {
-        self.with_cache(Arc::new(AnalysisCache::open(cache_dir)))
+    ///
+    /// Attaches both the Pass-2 issue cache ([`AnalysisCache`]) and the
+    /// Pass-1 [`StubSlice`] cache to the shared database. Builds a fresh
+    /// [`SharedDb`] internally — call **before** any file is ingested. A
+    /// debug assertion catches misuse.
+    ///
+    /// [`StubSlice`]: mir_codebase::storage::StubSlice
+    pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
+        debug_assert_eq!(
+            self.shared_db.source_file_count(),
+            0,
+            "AnalysisSession::with_cache_dir must be called before any file is ingested"
+        );
+        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(cache_dir));
+        self.cache = Some(Arc::new(AnalysisCache::open(cache_dir)));
+        self
     }
 
     /// Attach a Composer autoload map (PSR-4, PSR-0, classmap, files).
@@ -328,9 +356,9 @@ impl AnalysisSession {
             let mut guard = self.shared_db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
         }
-        let _file_defs = self
-            .shared_db
-            .collect_and_ingest_file(file.clone(), source.as_ref());
+        let _file_defs =
+            self.shared_db
+                .collect_and_ingest_file(file.clone(), source.as_ref(), self.php_version);
 
         // Snapshot symbols after ingesting — O(symbols_in_file).
         let new_symbols: HashSet<Arc<str>> = {

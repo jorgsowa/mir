@@ -430,6 +430,77 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
     std::fs::write(&edit_path, &original).unwrap();
 }
 
+/// LSP-shaped cold-start: how long does a fresh `AnalysisSession::with_cache_dir`
+/// take to ingest all vendor files when the persistent Pass-1 cache is warm
+/// from a previous session?
+///
+/// Each iteration:
+/// 1. Builds a fresh `AnalysisSession::with_cache_dir(persisted_dir)`.
+/// 2. Loads essential stubs.
+/// 3. Calls `ingest_file` for every vendor file (the real path LSP servers
+///    take when warming up).
+///
+/// The first iteration populates the cache; subsequent iterations measure
+/// the LSP cold-start the user feels every time they restart their editor.
+fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+    let (vendor_files, _project_files) = split_vendor_project(&root);
+    let cache_dir = TempDir::new().unwrap();
+
+    eprintln!("\n=== LSP COLD-START via AnalysisSession::with_cache_dir ===\n");
+    eprintln!(
+        "  {} vendor files; persistent cache dir = {}\n",
+        vendor_files.len(),
+        cache_dir.path().display()
+    );
+
+    // Read all vendor sources up front so the timed loop measures only
+    // session work — not filesystem I/O variance.
+    let sources: Vec<(Arc<str>, Arc<str>)> = vendor_files
+        .iter()
+        .filter_map(|p| {
+            let src = std::fs::read_to_string(p).ok()?;
+            Some((
+                Arc::from(p.to_string_lossy().as_ref()),
+                Arc::from(src.as_str()),
+            ))
+        })
+        .collect();
+
+    let measure = |label: &str| -> Duration {
+        let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+        session.ensure_essential_stubs_loaded();
+        let start = std::time::Instant::now();
+        for (file, src) in &sources {
+            session.ingest_file(file.clone(), src.clone());
+        }
+        let elapsed = start.elapsed();
+        eprintln!(
+            "  {label:<14} ingest_file × {} = {:>7.0} ms",
+            sources.len(),
+            elapsed.as_secs_f64() * 1000.0
+        );
+        elapsed
+    };
+
+    let cold = measure("COLD");
+    let warm = measure("WARM");
+
+    let saved_pct = if cold.as_secs_f64() > 0.0 {
+        (1.0 - warm.as_secs_f64() / cold.as_secs_f64()) * 100.0
+    } else {
+        0.0
+    };
+    eprintln!(
+        "\n  Δ wall {:>+7.0} ms  ({:>+5.1}%)\n",
+        warm.as_secs_f64() * 1000.0 - cold.as_secs_f64() * 1000.0,
+        -saved_pct,
+    );
+}
+
 criterion_group!(
     benches,
     bench_single_file_edit,
@@ -437,5 +508,6 @@ criterion_group!(
     bench_read_query_latency,
     bench_stub_loading,
     bench_concurrent_read_under_edits,
+    bench_lsp_cold_start_warm_cache,
 );
 criterion_main!(benches);
