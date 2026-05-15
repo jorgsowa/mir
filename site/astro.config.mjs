@@ -1,18 +1,35 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import sitemap from '@astrojs/sitemap';
+
+const SITE = 'https://jorgsowa.github.io';
+const BASE = '/mir';
+const OG_IMAGE = `${SITE}${BASE}/og-cover.png`;
 
 export default defineConfig({
-  site: 'https://jorgsowa.github.io',
-  base: '/mir',
+  site: SITE,
+  base: BASE,
   integrations: [
+    sitemap(),
     starlight({
       customCss: ['./src/styles/custom.css'],
       title: 'mir',
       description: 'A fast, incremental PHP static analyzer written in Rust.',
       logo: {
-        src: './src/assets/logo.png',
-        replacesTitle: false,
+        light: './src/assets/logo-light.svg',
+        dark: './src/assets/logo-dark.svg',
+        replacesTitle: true,
       },
+      head: [
+        { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
+        { tag: 'meta', attrs: { property: 'og:site_name', content: 'mir' } },
+        { tag: 'meta', attrs: { property: 'og:image', content: OG_IMAGE } },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+        { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: OG_IMAGE } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#1a1a2e' } },
+      ],
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/jorgsowa/mir' },
       ],
@@ -37,22 +54,23 @@ export default defineConfig({
               label: 'Issues',
               items: [
                 { label: 'Overview', link: '/reference/issues/' },
-                { label: 'Undefined', autogenerate: { directory: 'reference/issues/undefined' } },
-                { label: 'Nullability', autogenerate: { directory: 'reference/issues/nullability' } },
-                { label: 'Type Mismatches', autogenerate: { directory: 'reference/issues/type-mismatches' } },
-                { label: 'Array', autogenerate: { directory: 'reference/issues/array' } },
-                { label: 'Redundancy', autogenerate: { directory: 'reference/issues/redundancy' } },
-                { label: 'Dead Code', autogenerate: { directory: 'reference/issues/dead-code' } },
-                { label: 'Inheritance', autogenerate: { directory: 'reference/issues/inheritance' } },
-                { label: 'Security', autogenerate: { directory: 'reference/issues/security' } },
-                { label: 'Generics', autogenerate: { directory: 'reference/issues/generics' } },
-                { label: 'Other', autogenerate: { directory: 'reference/issues/other' } },
+                { label: 'Undefined',       items: [{ autogenerate: { directory: 'reference/issues/undefined' } }] },
+                { label: 'Nullability',     items: [{ autogenerate: { directory: 'reference/issues/nullability' } }] },
+                { label: 'Type Mismatches', items: [{ autogenerate: { directory: 'reference/issues/type-mismatches' } }] },
+                { label: 'Array',           items: [{ autogenerate: { directory: 'reference/issues/array' } }] },
+                { label: 'Redundancy',      items: [{ autogenerate: { directory: 'reference/issues/redundancy' } }] },
+                { label: 'Dead Code',       items: [{ autogenerate: { directory: 'reference/issues/dead-code' } }] },
+                { label: 'Inheritance',     items: [{ autogenerate: { directory: 'reference/issues/inheritance' } }] },
+                { label: 'Security',        items: [{ autogenerate: { directory: 'reference/issues/security' } }] },
+                { label: 'Generics',        items: [{ autogenerate: { directory: 'reference/issues/generics' } }] },
+                { label: 'Other',           items: [{ autogenerate: { directory: 'reference/issues/other' } }] },
               ],
             },
             { label: 'Docblock Annotations', link: '/reference/docblock/' },
             { label: 'Architecture', link: '/reference/architecture/' },
           ],
         },
+        { label: 'Changelog', link: '/changelog/' },
       ],
     }),
   ],
