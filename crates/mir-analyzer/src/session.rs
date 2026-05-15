@@ -18,7 +18,7 @@ use parking_lot::RwLock;
 
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
-use crate::db::{MirDatabase, MirDb};
+use crate::db::{MirDatabase, MirDb, RefLoc};
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 
@@ -270,6 +270,18 @@ impl AnalysisSession {
     #[doc(hidden)]
     pub fn snapshot_db(&self) -> MirDb {
         self.shared_db.snapshot_db()
+    }
+
+    /// Commit a batch of reference locations from a db snapshot into the
+    /// session's shared maps.  Called by [`crate::FileAnalyzer`] and
+    /// [`crate::BatchFileAnalyzer`] after parallel Pass 2 to flush the pending
+    /// buffers that accumulate in worker db clones.
+    pub(crate) fn commit_ref_locs_batch(&self, locs: Vec<RefLoc>) {
+        if locs.is_empty() {
+            return;
+        }
+        let guard = self.shared_db.salsa.read();
+        guard.commit_reference_locations_batch(locs);
     }
 
     /// Run a closure with read access to a database snapshot.
