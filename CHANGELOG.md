@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-05-15
+
+### Performance
+
+- Pass 2 reference-location recording now uses per-worker staging buffers (`PendingRefLocs`) instead of writing directly to shared `Arc<Mutex<...>>` maps. Workers accumulate locations in an isolated `parking_lot::Mutex<Vec<RefLoc>>` and a single serial commit drains them with one lock acquisition per map. Pass 2 wall-clock variance reduced from 28–240 ms (8×) to 43–56 ms (±25%) on 12 threads.
+
+### Fixed
+
+- `analyze_dependents_of()` now returns the correct dependent set after a symbol is deleted or renamed. Previously, files referencing a now-gone symbol were silently dropped because `dependency_graph()` routed edges through `symbol_defining_file()`, which returns `None` for deleted symbols. Three coordinated fixes: a `file_to_defined_symbols` forward index for O(1) definition lookup on removal; a `symbol_referencers` reverse index that survives symbol deletion; and a `stale_defined_symbols` accumulator in `AnalysisSession` that feeds deleted symbols' referencers back into the BFS.
+
 ## [0.24.0] - 2026-05-15
 
 ### Performance
