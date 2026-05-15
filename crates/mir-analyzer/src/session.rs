@@ -14,6 +14,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
 use crate::db::{MirDatabase, MirDb};
@@ -44,6 +46,11 @@ pub struct AnalysisSession {
     php_version: PhpVersion,
     user_stub_files: Vec<PathBuf>,
     user_stub_dirs: Vec<PathBuf>,
+    /// In-memory reverse dependency map: target_file → set of files that
+    /// depend on it. Always maintained (not gated on disk cache presence),
+    /// enabling `analyze_dependents_of` and `dependency_graph()` without a
+    /// disk cache. Updated in `ingest_file` and `invalidate_file`.
+    reverse_dep_map: Arc<RwLock<HashMap<String, HashSet<String>>>>,
 }
 
 impl AnalysisSession {
@@ -57,6 +64,7 @@ impl AnalysisSession {
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
+            reverse_dep_map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -311,6 +319,8 @@ impl AnalysisSession {
             guard.remove_file_definitions(file);
             guard.remove_source_file(file);
         }
+        // Remove this file's outgoing deps from the in-memory reverse dep map.
+        self.update_in_memory_reverse_deps(file, &HashSet::new());
         if let Some(cache) = &self.cache {
             cache.update_reverse_deps_for_file(file, &HashSet::new());
             cache.evict_with_dependents(&[file.to_string()]);
@@ -910,15 +920,66 @@ impl AnalysisSession {
             .collect()
     }
 
-    /// Compute `file`'s outgoing dependency edges and sync the disk cache's
-    /// reverse-dep graph. No-op if no cache is configured.
+    /// Compute `file`'s outgoing dependency edges and update both the in-memory
+    /// reverse-dep map (always) and the disk cache's reverse-dep graph (if configured).
     fn update_reverse_deps_for(&self, file: &str) {
-        let Some(cache) = self.cache.as_deref() else {
-            return;
-        };
         let db = self.snapshot_db();
         let targets = file_outgoing_dependencies(&db, file);
-        cache.update_reverse_deps_for_file(file, &targets);
+
+        // Always update the in-memory map.
+        self.update_in_memory_reverse_deps(file, &targets);
+
+        // Also persist to disk cache if configured.
+        if let Some(cache) = self.cache.as_deref() {
+            cache.update_reverse_deps_for_file(file, &targets);
+        }
+    }
+
+    /// Update the in-memory reverse dependency map for `file` with `new_targets`.
+    /// Removes `file` from all existing entries, then adds it as a dependent of
+    /// each target in `new_targets` (excluding self-edges).
+    fn update_in_memory_reverse_deps(&self, file: &str, new_targets: &HashSet<String>) {
+        let mut map = self.reverse_dep_map.write();
+        for dependents in map.values_mut() {
+            dependents.remove(file);
+        }
+        map.retain(|_, dependents| !dependents.is_empty());
+        for target in new_targets {
+            if target != file {
+                map.entry(target.clone())
+                    .or_default()
+                    .insert(file.to_string());
+            }
+        }
+    }
+
+    /// BFS transitive dependents of `file` using the in-memory reverse dep map.
+    ///
+    /// O(D) where D is the number of transitive dependents — faster than
+    /// [`Self::dependency_graph().transitive_dependents()`] which rebuilds the
+    /// full graph on every call. Only covers Pass 1 structural dependencies
+    /// (imports, class hierarchy, type hints); does not include bare FQN body
+    /// references recorded during Pass 2. For full fidelity, use
+    /// `dependency_graph().transitive_dependents()` after Pass 2 is complete.
+    pub fn structural_dependents_of(&self, file: &str) -> Vec<String> {
+        let map = self.reverse_dep_map.read();
+        let mut visited: HashSet<String> = HashSet::new();
+        let mut queue = vec![file.to_string()];
+        let mut result = Vec::new();
+        while let Some(current) = queue.pop() {
+            if !visited.insert(current.clone()) {
+                continue;
+            }
+            if let Some(deps) = map.get(&current) {
+                for dep in deps {
+                    if !visited.contains(dep) {
+                        queue.push(dep.clone());
+                        result.push(dep.clone());
+                    }
+                }
+            }
+        }
+        result
     }
 
     /// Cross-file inference sweep. For each `(file, source)` pair, calls the
@@ -955,6 +1016,9 @@ impl AnalysisSession {
         guard.commit_inferred_return_types(functions, methods);
     }
 
+    /// File dependency graph: which files depend on which other files.
+    /// Used for incremental invalidation in LSP servers and build systems.
+    ///
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
     ///

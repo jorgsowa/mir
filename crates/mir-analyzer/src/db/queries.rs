@@ -649,8 +649,9 @@ pub fn collect_file_definitions_uncached(
 
     let collector =
         crate::collector::DefinitionCollector::new_for_slice(path, &text, &parsed.source_map);
-    let (slice, collector_issues) = collector.collect_slice(&parsed.program);
+    let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
     all_issues.extend(collector_issues);
+    mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
     FileDefinitions {
         slice: Arc::new(slice),

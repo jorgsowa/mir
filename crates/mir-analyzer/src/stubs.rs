@@ -303,7 +303,8 @@ pub(crate) fn stub_slice_from_source(
         Some(version) => collector.with_php_version(version),
         None => collector,
     };
-    let (slice, _) = collector.collect_slice(&result.program);
+    let (mut slice, _) = collector.collect_slice(&result.program);
+    mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
     slice
 }
 

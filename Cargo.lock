@@ -696,6 +696,7 @@ version = "0.23.0"
 dependencies = [
  "indexmap",
  "mir-types",
+ "rustc-hash",
  "serde",
 ]
 
