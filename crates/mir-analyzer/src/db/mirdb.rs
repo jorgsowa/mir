@@ -27,6 +27,15 @@ type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16,
 /// Forward index: file path → set of symbol keys that file references.
 /// Kept in sync with `reference_locations` for O(degree) lookups.
 type FileReferences = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
+/// Reverse reference index: symbol key → set of files that reference it.
+/// Transpose of `FileReferences`; maintained in lockstep so deletions can
+/// find referencing files in O(1) even after the symbol's defining file entry
+/// has been removed from `symbol_to_file`.
+type SymbolReferencers = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
+/// Forward index: file path → set of symbol FQNs it defines.
+/// Maintained in lockstep with `symbol_to_file` so `remove_file_definitions`
+/// can find a file's symbols in O(symbols_in_file) instead of O(total_symbols).
+type FileDefinedSymbols = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 
 /// Per-clone staging buffer for reference locations recorded during a parallel
 /// Pass 2 worker.  `record_reference_location` pushes here instead of directly
@@ -85,11 +94,18 @@ pub struct MirDb {
     global_vars: Arc<FxHashMap<Arc<str>, Union>>,
     /// Symbol FQN → defining file.
     symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
+    /// Forward index: file → set of symbol FQNs it defines.
+    /// Maintained in lockstep with `symbol_to_file` so `remove_file_definitions`
+    /// can find a file's symbols in O(symbols_in_file) instead of O(total_symbols).
+    file_to_defined_symbols: FileDefinedSymbols,
     /// Public symbol key → reference locations.
     reference_locations: ReferenceLocations,
     /// Forward index: file → set of symbol keys it references. Kept in sync
     /// with `reference_locations` to provide O(degree) dep-graph lookups.
     file_references: FileReferences,
+    /// Reverse reference index: symbol key → set of files that reference it.
+    /// Maintained in lockstep with `file_references`.
+    symbol_referencers: SymbolReferencers,
     /// Per-clone staging area for reference locations.  Workers push here
     /// during parallel analysis; the orchestrator drains and commits serially.
     pending_ref_locs: PendingRefLocs,
@@ -221,16 +237,27 @@ impl MirDatabase for MirDb {
     }
 
     fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>> {
-        self.symbol_to_file
-            .iter()
-            .filter_map(|(sym, defining_file)| {
-                if defining_file.as_ref() == file {
-                    Some(sym.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+        self.file_to_defined_symbols
+            .lock()
+            .get(file)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    fn file_defined_symbols(&self, file: &str) -> HashSet<Arc<str>> {
+        self.file_to_defined_symbols
+            .lock()
+            .get(file)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
+        self.symbol_referencers
+            .lock()
+            .get(symbol_key)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
@@ -280,9 +307,19 @@ impl MirDatabase for MirDb {
             file_refs.remove(file).unwrap_or_default()
         };
         let mut refs = self.reference_locations.lock();
+        let mut sym_refs = self.symbol_referencers.lock();
         for key in &symbol_keys {
             if let Some(locs) = refs.get_mut(key) {
                 locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
+            }
+            let empty = if let Some(referencers) = sym_refs.get_mut(key) {
+                referencers.remove(file);
+                referencers.is_empty()
+            } else {
+                false
+            };
+            if empty {
+                sym_refs.remove(key);
             }
         }
     }
@@ -394,11 +431,16 @@ impl MirDb {
         }
         let mut refs = self.reference_locations.lock();
         let mut file_refs = self.file_references.lock();
+        let mut sym_refs = self.symbol_referencers.lock();
         for loc in locs {
             file_refs
                 .entry(loc.file.clone())
                 .or_default()
                 .insert(loc.symbol_key.clone());
+            sym_refs
+                .entry(loc.symbol_key.clone())
+                .or_default()
+                .insert(loc.file.clone());
             let entry = refs.entry(loc.symbol_key).or_default();
             let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
             if !entry.iter().any(|e| e == &tuple) {
@@ -447,9 +489,25 @@ impl MirDb {
         self.source_files.keys().cloned().collect()
     }
 
+    /// Insert `symbol` into both `symbol_to_file` and the `file_to_defined_symbols`
+    /// forward index. All definition-registration sites must use this helper.
+    fn register_symbol(&mut self, symbol: Arc<str>, file: Arc<str>) {
+        Arc::make_mut(&mut self.symbol_to_file).insert(symbol.clone(), file.clone());
+        self.file_to_defined_symbols
+            .lock()
+            .entry(file)
+            .or_default()
+            .insert(symbol);
+    }
+
     pub fn remove_file_definitions(&mut self, file: &str) {
-        let symbols = self.symbols_defined_in_file(file);
-        for symbol in &symbols {
+        // O(1) forward-index lookup instead of O(total_symbols) scan.
+        let symbol_set: HashSet<Arc<str>> = self
+            .file_to_defined_symbols
+            .lock()
+            .remove(file)
+            .unwrap_or_default();
+        for symbol in &symbol_set {
             self.deactivate_class_node(symbol);
             self.deactivate_function_node(symbol);
             self.deactivate_class_methods(symbol);
@@ -457,10 +515,12 @@ impl MirDb {
             self.deactivate_class_constants(symbol);
             self.deactivate_global_constant_node(symbol);
         }
-        let symbol_set: HashSet<Arc<str>> = symbols.into_iter().collect();
-        Arc::make_mut(&mut self.symbol_to_file).retain(|sym, defining_file| {
-            defining_file.as_ref() != file && !symbol_set.contains(sym)
-        });
+        {
+            let s2f = Arc::make_mut(&mut self.symbol_to_file);
+            for sym in &symbol_set {
+                s2f.remove(sym.as_ref());
+            }
+        }
         Arc::make_mut(&mut self.file_namespaces).retain(|path, _| path.as_ref() != file);
         Arc::make_mut(&mut self.file_imports).retain(|path, _| path.as_ref() != file);
         Arc::make_mut(&mut self.global_vars).retain(|name, _| !symbol_set.contains(name));
@@ -544,8 +604,7 @@ impl MirDb {
             }
             for (name, _) in &slice.global_vars {
                 let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
-                Arc::make_mut(&mut self.symbol_to_file)
-                    .insert(Arc::from(global_name), file.clone());
+                self.register_symbol(Arc::from(global_name), file.clone());
             }
         }
         for (name, ty) in &slice.global_vars {
@@ -556,7 +615,7 @@ impl MirDb {
         let slice_file = slice.file.clone();
         for cls in &slice.classes {
             if let Some(file) = &slice_file {
-                Arc::make_mut(&mut self.symbol_to_file).insert(cls.fqcn.clone(), file.clone());
+                self.register_symbol(cls.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
                 is_abstract: cls.is_abstract,
@@ -610,7 +669,7 @@ impl MirDb {
 
         for iface in &slice.interfaces {
             if let Some(file) = &slice_file {
-                Arc::make_mut(&mut self.symbol_to_file).insert(iface.fqcn.clone(), file.clone());
+                self.register_symbol(iface.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
                 extends: Arc::from(iface.extends.as_ref()),
@@ -638,7 +697,7 @@ impl MirDb {
 
         for tr in &slice.traits {
             if let Some(file) = &slice_file {
-                Arc::make_mut(&mut self.symbol_to_file).insert(tr.fqcn.clone(), file.clone());
+                self.register_symbol(tr.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
                 traits: Arc::from(tr.traits.as_ref()),
@@ -676,7 +735,7 @@ impl MirDb {
 
         for en in &slice.enums {
             if let Some(file) = &slice_file {
-                Arc::make_mut(&mut self.symbol_to_file).insert(en.fqcn.clone(), file.clone());
+                self.register_symbol(en.fqcn.clone(), file.clone());
             }
             self.upsert_class_node(ClassNodeFields {
                 interfaces: Arc::from(en.interfaces.as_ref()),
@@ -759,7 +818,7 @@ impl MirDb {
 
         for func in &slice.functions {
             if let Some(file) = &slice_file {
-                Arc::make_mut(&mut self.symbol_to_file).insert(func.fqn.clone(), file.clone());
+                self.register_symbol(func.fqn.clone(), file.clone());
             }
             self.upsert_function_node(func);
         }
