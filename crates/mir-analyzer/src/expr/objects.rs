@@ -287,16 +287,26 @@ impl<'a> ExpressionAnalyzer<'a> {
         if cca.member.name_str() == Some("class") {
             let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
-                if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                    && !crate::db::type_exists_via_db(self.db, &resolved)
-                {
-                    self.emit(
-                        IssueKind::UndefinedClass {
-                            name: resolved.clone(),
-                        },
-                        Severity::Error,
-                        cca.class.span,
-                    );
+                if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                    if !crate::db::type_exists_via_db(self.db, &resolved) {
+                        self.emit(
+                            IssueKind::UndefinedClass {
+                                name: resolved.clone(),
+                            },
+                            Severity::Error,
+                            cca.class.span,
+                        );
+                    }
+                    if !self.inference_only {
+                        let (line, col_start, col_end) = self.span_to_ref_loc(cca.class.span);
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(resolved.as_str()),
+                            file: self.file.clone(),
+                            line,
+                            col_start,
+                            col_end,
+                        });
+                    }
                 }
                 Some(Arc::from(resolved.as_str()))
             } else {
@@ -328,6 +338,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 cca.class.span,
             );
             return Union::mixed();
+        }
+
+        if !self.inference_only {
+            let (line, col_start, col_end) = self.span_to_ref_loc(cca.class.span);
+            self.db.record_reference_location(crate::db::RefLoc {
+                symbol_key: Arc::from(fqcn.as_str()),
+                file: self.file.clone(),
+                line,
+                col_start,
+                col_end,
+            });
         }
 
         let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);

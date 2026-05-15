@@ -106,6 +106,47 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
     }
 }
 
+/// Collect all resolved Named class FQCNs referenced in a type hint, regardless
+/// of whether those classes exist. Used to record dependency edges even for
+/// classes that are defined (not just missing ones).
+pub(crate) fn collect_type_hint_class_refs<'arena, 'src>(
+    hint: &php_ast::ast::TypeHint<'arena, 'src>,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+) -> Vec<(Arc<str>, php_ast::Span)> {
+    let mut out = Vec::new();
+    collect_type_hint_class_refs_inner(hint, db, file, &mut out);
+    out
+}
+
+fn collect_type_hint_class_refs_inner<'arena, 'src>(
+    hint: &php_ast::ast::TypeHint<'arena, 'src>,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    out: &mut Vec<(Arc<str>, php_ast::Span)>,
+) {
+    use php_ast::ast::TypeHintKind;
+    match &hint.kind {
+        TypeHintKind::Named(name) => {
+            let name_str = crate::parser::name_to_string(name);
+            if is_pseudo_type(&name_str) {
+                return;
+            }
+            let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
+            out.push((Arc::from(resolved.as_str()), hint.span));
+        }
+        TypeHintKind::Nullable(inner) => {
+            collect_type_hint_class_refs_inner(inner, db, file, out);
+        }
+        TypeHintKind::Union(parts) | TypeHintKind::Intersection(parts) => {
+            for part in parts.iter() {
+                collect_type_hint_class_refs_inner(part, db, file, out);
+            }
+        }
+        TypeHintKind::Keyword(_, _) => {}
+    }
+}
+
 pub(crate) fn check_name_class(
     name: &php_ast::ast::Name<'_, '_>,
     db: &dyn MirDatabase,

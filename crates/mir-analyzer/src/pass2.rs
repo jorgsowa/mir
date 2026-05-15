@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use crate::db::{resolve_name_via_db, FunctionNode, MirDatabase};
 use crate::diagnostics::{
     check_expr_for_undefined_classes, check_name_class, check_type_hint_classes,
-    emit_unused_params, emit_unused_variables,
+    collect_type_hint_class_refs, emit_unused_params, emit_unused_variables,
 };
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
@@ -120,6 +120,40 @@ impl<'a> Pass2Driver<'a> {
             types
                 .methods
                 .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
+        }
+    }
+
+    fn check_and_record_type_hint_classes<'arena, 'src>(
+        &self,
+        hint: &php_ast::ast::TypeHint<'arena, 'src>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        check_type_hint_classes(
+            hint,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.php_version,
+        );
+        if !self.inference_only {
+            for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
+                let (line, col_start) =
+                    crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                let (_, col_end) =
+                    crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+                self.db.record_reference_location(crate::db::RefLoc {
+                    symbol_key: fqcn,
+                    file: file.clone(),
+                    line,
+                    col_start,
+                    col_end: col_end.max(col_start + 1),
+                });
+            }
         }
     }
 
@@ -448,15 +482,7 @@ impl<'a> Pass2Driver<'a> {
         let body = &decl.body;
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
             // Check parameter default values for undefined classes
             if let Some(default_expr) = &param.default {
@@ -472,15 +498,7 @@ impl<'a> Pass2Driver<'a> {
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(
-                hint,
-                self.db,
-                file,
-                source,
-                source_map,
-                all_issues,
-                self.php_version,
-            );
+            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
         }
         use crate::context::Context;
         use crate::stmt::StatementsAnalyzer;
@@ -617,14 +635,8 @@ impl<'a> Pass2Driver<'a> {
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
                 continue;
@@ -635,27 +647,13 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -735,27 +733,11 @@ impl<'a> Pass2Driver<'a> {
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
         }
         if let Some(hint) = &decl.return_type {
-            check_type_hint_classes(
-                hint,
-                self.db,
-                file,
-                source,
-                source_map,
-                all_issues,
-                self.php_version,
-            );
+            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
         }
 
         let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
@@ -883,14 +865,8 @@ impl<'a> Pass2Driver<'a> {
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
                 continue;
@@ -901,27 +877,13 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -1081,14 +1043,8 @@ impl<'a> Pass2Driver<'a> {
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
                 continue;
@@ -1099,27 +1055,13 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -1196,14 +1138,8 @@ impl<'a> Pass2Driver<'a> {
         for member in decl.members.iter() {
             if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
                 continue;
@@ -1214,27 +1150,13 @@ impl<'a> Pass2Driver<'a> {
 
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
 
             let Some(body) = &method.body else { continue };
@@ -1321,27 +1243,13 @@ impl<'a> Pass2Driver<'a> {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
         }
     }
@@ -1372,27 +1280,13 @@ impl<'a> Pass2Driver<'a> {
             };
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
-                    check_type_hint_classes(
-                        hint,
-                        self.db,
-                        file,
-                        source,
-                        source_map,
-                        all_issues,
-                        self.php_version,
+                    self.check_and_record_type_hint_classes(
+                        hint, file, source, source_map, all_issues,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                check_type_hint_classes(
-                    hint,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
         }
     }

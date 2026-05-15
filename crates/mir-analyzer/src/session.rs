@@ -1020,6 +1020,17 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
         }
     };
 
+    let extract_named_objects = |union: &mir_types::Union| {
+        union
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
     let imports = db.file_imports(file);
     for fqcn in imports.values() {
         add_target(fqcn);
@@ -1037,6 +1048,62 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
         }
         for tr in node.traits(db).iter() {
             add_target(tr.as_ref());
+        }
+
+        // Add types from properties
+        for prop in db.class_own_properties(fqcn.as_ref()).iter() {
+            if let Some(ty) = prop.ty(db) {
+                for named in extract_named_objects(&ty) {
+                    add_target(named.as_ref());
+                }
+            }
+        }
+
+        // Add types from methods
+        for method in db.class_own_methods(fqcn.as_ref()).iter() {
+            // Parameter types
+            for param in method.params(db).iter() {
+                if let Some(ty) = &param.ty {
+                    for named in extract_named_objects(ty.as_ref()) {
+                        add_target(named.as_ref());
+                    }
+                }
+            }
+            // Return type
+            if let Some(rt) = method.return_type(db) {
+                for named in extract_named_objects(rt.as_ref()) {
+                    add_target(named.as_ref());
+                }
+            }
+        }
+    }
+
+    // Add types from global functions
+    for fqn in db.active_function_node_fqns() {
+        let Some(node) = db.lookup_function_node(fqn.as_ref()) else {
+            continue;
+        };
+        if let Some(file_of_fn) = db.symbol_defining_file(fqn.as_ref()) {
+            if file_of_fn.as_ref() != file {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        // Parameter types
+        for param in node.params(db).iter() {
+            if let Some(ty) = &param.ty {
+                for named in extract_named_objects(ty.as_ref()) {
+                    add_target(named.as_ref());
+                }
+            }
+        }
+        // Return type
+        if let Some(rt) = node.return_type(db) {
+            for named in extract_named_objects(rt.as_ref()) {
+                add_target(named.as_ref());
+            }
         }
     }
 

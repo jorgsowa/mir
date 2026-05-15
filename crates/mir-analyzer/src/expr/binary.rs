@@ -49,14 +49,24 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let ExprKind::Identifier(name) = &b.right.kind {
                 let resolved = crate::db::resolve_name_via_db(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
-                if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                    && !crate::db::type_exists_via_db(self.db, &fqcn)
-                {
-                    self.emit(
-                        IssueKind::UndefinedClass { name: resolved },
-                        Severity::Error,
-                        b.right.span,
-                    );
+                if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                    if !crate::db::type_exists_via_db(self.db, &fqcn) {
+                        self.emit(
+                            IssueKind::UndefinedClass { name: resolved },
+                            Severity::Error,
+                            b.right.span,
+                        );
+                    }
+                    if !self.inference_only {
+                        let (line, col_start, col_end) = self.span_to_ref_loc(b.right.span);
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: fqcn,
+                            file: self.file.clone(),
+                            line,
+                            col_start,
+                            col_end,
+                        });
+                    }
                 }
             }
             return Union::single(Atomic::TBool);
