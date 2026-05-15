@@ -194,8 +194,9 @@ impl SharedDb {
             source,
             &parsed.source_map,
         );
-        let (slice, collector_issues) = collector.collect_slice(&parsed.program);
+        let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
         all_issues.extend(collector_issues);
+        mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
         let file_defs = crate::db::FileDefinitions {
             slice: Arc::new(slice),

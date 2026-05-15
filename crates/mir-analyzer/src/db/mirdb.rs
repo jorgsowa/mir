@@ -448,39 +448,41 @@ impl MirDb {
     pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
         use std::collections::HashSet;
 
-        // Deduplicate param lists to save memory (many methods share identical
-        // signatures). This reduces cold-start memory usage by ~100-150 MiB
-        // when analyzing vendor code. But the dedup requires owning a clone of
-        // the slice, which is pure overhead for small per-keystroke LSP
-        // ingests (1-2 methods). Skip the dedup + clone for small slices.
-        let total_methods: usize = slice
-            .classes
-            .iter()
-            .map(|c| c.own_methods.len())
-            .sum::<usize>()
-            + slice
-                .interfaces
-                .iter()
-                .map(|i| i.own_methods.len())
-                .sum::<usize>()
-            + slice
-                .traits
-                .iter()
-                .map(|t| t.own_methods.len())
-                .sum::<usize>()
-            + slice
-                .enums
-                .iter()
-                .map(|e| e.own_methods.len())
-                .sum::<usize>()
-            + slice.functions.len();
-
+        // Deduplicate param lists to save memory. Skip the clone+dedup when the
+        // slice was already deduped in the parallel pass (is_deduped == true) or
+        // for small slices where the overhead isn't worth it.
         let owned_slice;
-        let slice: &StubSlice = if total_methods >= 8 {
-            let mut s = slice.clone();
-            mir_codebase::storage::deduplicate_params_in_slice(&mut s);
-            owned_slice = s;
-            &owned_slice
+        let slice: &StubSlice = if !slice.is_deduped {
+            let total_methods: usize = slice
+                .classes
+                .iter()
+                .map(|c| c.own_methods.len())
+                .sum::<usize>()
+                + slice
+                    .interfaces
+                    .iter()
+                    .map(|i| i.own_methods.len())
+                    .sum::<usize>()
+                + slice
+                    .traits
+                    .iter()
+                    .map(|t| t.own_methods.len())
+                    .sum::<usize>()
+                + slice
+                    .enums
+                    .iter()
+                    .map(|e| e.own_methods.len())
+                    .sum::<usize>()
+                + slice.functions.len();
+
+            if total_methods >= 8 {
+                let mut s = slice.clone();
+                mir_codebase::storage::deduplicate_params_in_slice(&mut s);
+                owned_slice = s;
+                &owned_slice
+            } else {
+                slice
+            }
         } else {
             slice
         };

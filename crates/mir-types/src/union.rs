@@ -12,7 +12,7 @@ pub type AtomicVec = SmallVec<[Atomic; 2]>;
 // Union — the primary type carrier
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Union {
     pub types: AtomicVec,
     /// The variable holding this type may not be initialized at this point.

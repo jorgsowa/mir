@@ -124,7 +124,7 @@ impl std::fmt::Display for Visibility {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateParam {
     pub name: Arc<str>,
     pub bound: Option<Union>,
@@ -133,7 +133,7 @@ pub struct TemplateParam {
     pub variance: mir_types::Variance,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FnParam {
     pub name: Arc<str>,
     /// Parameter type. Stored as `Option<Arc<Union>>` to enable deduplication of
@@ -159,13 +159,10 @@ impl std::hash::Hash for FnParam {
         self.is_variadic.hash(state);
         self.is_byref.hash(state);
         self.is_optional.hash(state);
-        if let Some(ty) = &self.ty {
-            // Hash the Arc pointer address. Since interned types reuse Arc allocations,
-            // parameters with the same type will have the same pointer.
-            (Arc::as_ptr(ty) as usize).hash(state);
-        } else {
-            0u8.hash(state);
-        }
+        // Hash the type value (not the Arc pointer) so that two FnParams with
+        // equal types (PartialEq) always produce the same hash, even when they
+        // are backed by different Arc allocations.
+        self.ty.as_deref().hash(state);
     }
 }
 
@@ -548,19 +545,25 @@ pub struct StubSlice {
     /// `file_imports` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
     pub imports: std::collections::HashMap<String, String>,
+    /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
+    /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.
+    #[serde(skip)]
+    pub is_deduped: bool,
 }
 
 // ---------------------------------------------------------------------------
 // Param list deduplication
 // ---------------------------------------------------------------------------
 
+use rustc_hash::FxHashMap;
 use std::sync::Mutex;
+
+type ParamCache = Mutex<FxHashMap<Vec<FnParam>, Arc<[FnParam]>>>;
 
 /// Global cache of canonical Arc<[FnParam]> instances for deduplication.
 /// Shared across all StubSlices to deduplicate vendor code with millions of
 /// methods that often have identical parameter lists.
-static PARAM_DEDUP_CACHE: std::sync::OnceLock<Mutex<Vec<Arc<[FnParam]>>>> =
-    std::sync::OnceLock::new();
+static PARAM_DEDUP_CACHE: std::sync::OnceLock<ParamCache> = std::sync::OnceLock::new();
 
 /// Deduplicate parameter lists across all methods and functions in a StubSlice.
 /// Many PHP framework methods share identical parameter lists (e.g., thousands
@@ -570,21 +573,15 @@ static PARAM_DEDUP_CACHE: std::sync::OnceLock<Mutex<Vec<Arc<[FnParam]>>>> =
 ///
 /// Expected memory savings: 100–150 MiB on cold start (vendor collection).
 pub fn deduplicate_params_in_slice(slice: &mut StubSlice) {
-    let cache = PARAM_DEDUP_CACHE.get_or_init(|| Mutex::new(Vec::new()));
+    let cache: &ParamCache = PARAM_DEDUP_CACHE.get_or_init(|| Mutex::new(FxHashMap::default()));
     let mut canonical_params = cache.lock().unwrap();
 
-    // Helper to find or insert a param list in the global cache
     let mut deduplicate = |params: &mut Arc<[FnParam]>| {
-        // Check if this param list already exists in our global cache
-        for existing in canonical_params.iter() {
-            if existing.as_ref() == params.as_ref() {
-                // Found a match, replace with the cached Arc
-                *params = existing.clone();
-                return;
-            }
+        if let Some(existing) = canonical_params.get(params.as_ref()) {
+            *params = existing.clone();
+        } else {
+            canonical_params.insert(params.as_ref().to_vec(), params.clone());
         }
-        // Not found, add this as a new canonical param list
-        canonical_params.push(params.clone());
     };
 
     // Deduplicate method params in all classes
@@ -619,4 +616,5 @@ pub fn deduplicate_params_in_slice(slice: &mut StubSlice) {
     for func in &mut slice.functions {
         deduplicate(&mut func.params);
     }
+    slice.is_deduped = true;
 }

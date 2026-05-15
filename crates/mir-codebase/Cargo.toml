@@ -9,6 +9,7 @@ repository.workspace = true
 homepage.workspace   = true
 
 [dependencies]
-mir-types = { workspace = true }
-indexmap  = { workspace = true }
-serde     = { workspace = true }
+mir-types    = { workspace = true }
+indexmap     = { workspace = true }
+rustc-hash   = { workspace = true }
+serde        = { workspace = true }

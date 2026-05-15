@@ -1,67 +1,97 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use mir_analyzer::ProjectAnalyzer;
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
 use std::time::Duration;
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
-// Counting allocator
+// Counting allocator — per-thread accumulators, global flush on stats read
 //
-// Tracks peak live bytes and total bytes allocated since the last
-// `reset_alloc_counters()` call. Thread-safe via atomics.
-//
-// Pre-existing allocations freed after a reset drive LIVE_BYTES negative,
-// which is intentional: PEAK_BYTES only updates while live > 0, so it
-// reflects only allocations that occurred after the reset point.
+// Threads accumulate alloc/dealloc deltas in thread-local Cells (zero
+// contention). Globals are only written when flushing for stats output, so
+// the hot path (alloc/dealloc during benchmarks) has no shared-atomic
+// cache-line bouncing regardless of thread count.
 // ---------------------------------------------------------------------------
 
 struct CountingAllocator;
 
-static LIVE_BYTES: AtomicI64 = AtomicI64::new(0);
-static PEAK_BYTES: AtomicUsize = AtomicUsize::new(0);
-static TOTAL_BYTES: AtomicUsize = AtomicUsize::new(0);
+// Thread-local accumulators — never shared, never contended.
+thread_local! {
+    static TL_LIVE:  Cell<i64>   = const { Cell::new(0) };
+    static TL_TOTAL: Cell<usize> = const { Cell::new(0) };
+    static TL_PEAK:  Cell<usize> = const { Cell::new(0) };
+}
+
+// Globals written only during flush (single-threaded stats path).
+static G_LIVE: AtomicI64 = AtomicI64::new(0);
+static G_PEAK: AtomicUsize = AtomicUsize::new(0);
+static G_TOTAL: AtomicUsize = AtomicUsize::new(0);
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ptr = System.alloc(layout);
         if !ptr.is_null() {
-            let live = LIVE_BYTES.fetch_add(layout.size() as i64, Relaxed) + layout.size() as i64;
-            if live > 0 {
-                PEAK_BYTES.fetch_max(live as usize, Relaxed);
-            }
-            TOTAL_BYTES.fetch_add(layout.size(), Relaxed);
+            let sz = layout.size();
+            TL_LIVE.with(|c| c.set(c.get() + sz as i64));
+            TL_TOTAL.with(|c| c.set(c.get() + sz));
+            TL_PEAK.with(|c| {
+                let live = TL_LIVE.with(Cell::get) as usize;
+                if live > c.get() {
+                    c.set(live);
+                }
+            });
         }
         ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         System.dealloc(ptr, layout);
-        LIVE_BYTES.fetch_sub(layout.size() as i64, Relaxed);
+        TL_LIVE.with(|c| c.set(c.get() - layout.size() as i64));
     }
 }
 
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
+/// Flush thread-local counters into the global aggregates and zero them.
+/// Call this on every thread that participated before reading globals.
+fn flush_thread_counters() {
+    let live = TL_LIVE.with(Cell::get);
+    let total = TL_TOTAL.with(Cell::get);
+    let peak = TL_PEAK.with(Cell::get);
+    G_LIVE.fetch_add(live, Relaxed);
+    G_TOTAL.fetch_add(total, Relaxed);
+    G_PEAK.fetch_max(peak, Relaxed);
+    TL_LIVE.with(|c| c.set(0));
+    TL_TOTAL.with(|c| c.set(0));
+    TL_PEAK.with(|c| c.set(0));
+}
+
 fn reset_alloc_counters() {
-    LIVE_BYTES.store(0, Relaxed);
-    PEAK_BYTES.store(0, Relaxed);
-    TOTAL_BYTES.store(0, Relaxed);
+    G_LIVE.store(0, Relaxed);
+    G_PEAK.store(0, Relaxed);
+    G_TOTAL.store(0, Relaxed);
+    TL_LIVE.with(|c| c.set(0));
+    TL_TOTAL.with(|c| c.set(0));
+    TL_PEAK.with(|c| c.set(0));
 }
 
 fn print_alloc_stats(label: &str) {
-    let peak = PEAK_BYTES.load(Relaxed) as f64 / 1_048_576.0;
-    let total = TOTAL_BYTES.load(Relaxed) as f64 / 1_048_576.0;
+    flush_thread_counters();
+    let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
+    let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!(
         "  [memory] {label}: peak live {peak:.1} MiB, total allocated {total:.1} MiB  (one cold run)"
     );
 }
 
 fn checkpoint_alloc(label: &str) {
-    let peak = PEAK_BYTES.load(Relaxed) as f64 / 1_048_576.0;
-    let total = TOTAL_BYTES.load(Relaxed) as f64 / 1_048_576.0;
+    flush_thread_counters();
+    let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
+    let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!("    [checkpoint] {label:40} peak {peak:7.1} MiB, total {total:7.1} MiB");
 }
 

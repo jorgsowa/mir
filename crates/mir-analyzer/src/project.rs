@@ -12,7 +12,7 @@ use crate::db::{
     collect_file_definitions, collect_file_definitions_uncached, FileDefinitions, MirDatabase,
     MirDb, SourceFile,
 };
-use crate::pass2::Pass2Driver;
+use crate::pass2::{InferredTypes, Pass2Driver};
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 use mir_issues::Issue;
@@ -367,9 +367,11 @@ impl ProjectAnalyzer {
     /// Run the full analysis pipeline on a set of file paths.
     pub fn analyze(&self, paths: &[PathBuf]) -> AnalysisResult {
         let mut all_issues = Vec::new();
+        let _t0 = std::time::Instant::now();
 
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
         self.load_stubs();
+        let _t_stubs = _t0.elapsed();
 
         // ---- Pass 1: read files in parallel ----------------------------------
         let parsed_files: Vec<ParsedProjectFile> = paths
@@ -385,6 +387,7 @@ impl ProjectAnalyzer {
                 }
             })
             .collect();
+        let _t_read = _t0.elapsed();
 
         let file_data: Vec<(Arc<str>, Arc<str>)> = parsed_files
             .iter()
@@ -416,6 +419,7 @@ impl ProjectAnalyzer {
                 guard.upsert_source_file(parsed.file.clone(), parsed.source.clone());
             }
         }
+        let _t_salsa_reg = _t0.elapsed();
 
         // ---- Pass 1: definition collection from the already-parsed AST -------
         let file_defs: Vec<FileDefinitions> = parsed_files
@@ -445,14 +449,16 @@ impl ProjectAnalyzer {
                     parsed.source(),
                     &parse_result.source_map,
                 );
-                let (slice, collector_issues) = collector.collect_slice(&parse_result.program);
+                let (mut slice, collector_issues) = collector.collect_slice(&parse_result.program);
                 all_issues.extend(collector_issues);
+                mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
                 FileDefinitions {
                     slice: Arc::new(slice),
                     issues: Arc::new(all_issues),
                 }
             })
             .collect();
+        let _t_pass1 = _t0.elapsed();
 
         let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
@@ -468,6 +474,7 @@ impl ProjectAnalyzer {
                 all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
         }
+        let _t_ingest = _t0.elapsed();
 
         // ---- Lazy-load unknown classes via PSR-4 (issue #50) ----------------
         if let Some(psr4) = &self.psr4 {
@@ -511,54 +518,49 @@ impl ProjectAnalyzer {
         // avoids per-file Salsa lock acquisition and memo-table overhead on every
         // cold start.  `infer_file_return_types` is reserved for the incremental
         // LSP path (AnalysisSession) where Salsa cache hits across edits matter.
+        //
+        // `map_with` clones `db_priming` once per rayon worker thread (not once
+        // per file as the old `in_place_scope` loop did). For N files on T threads
+        // this reduces clones from N to T.  Results are returned by value and
+        // flattened after `collect()`, replacing the Arc<Mutex<Vec>> accumulator.
+        // All per-thread db clones are dropped when `collect()` returns, so
+        // `commit_inferred_return_types` (which calls Salsa setters that wait for
+        // strong_count == 1) cannot deadlock.
         {
             let db_priming = {
                 let guard = self.shared_db.salsa.read();
                 (**guard).clone()
             };
             let php_version = self.resolved_php_version();
-            let functions = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-            let methods = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-            rayon::in_place_scope(|s| {
-                for parsed in &parsed_files {
-                    if files_with_parse_errors.contains(&parsed.file) {
-                        continue;
-                    }
-                    let db = db_priming.clone();
-                    let functions = std::sync::Arc::clone(&functions);
-                    let methods = std::sync::Arc::clone(&methods);
-                    s.spawn(move |_| {
-                        let driver = Pass2Driver::new_inference_only(
-                            &db as &dyn crate::db::MirDatabase,
-                            php_version,
-                        );
-                        let parse_result = parsed.parsed();
-                        driver.analyze_bodies(
-                            &parse_result.program,
-                            parsed.file.clone(),
-                            parsed.source(),
-                            &parse_result.source_map,
-                        );
-                        let inferred = driver.take_inferred_types();
-                        functions.lock().unwrap().extend(inferred.functions);
-                        methods.lock().unwrap().extend(inferred.methods);
-                    });
-                }
-            });
-            // Drop db_priming before committing: commit_inferred_return_types calls
-            // salsa setters which go through cancel_others, which waits until the
-            // storage strong-count drops to 1. db_priming is a sibling clone that
-            // keeps the count at 2, causing a deadlock if it outlives the commit.
-            drop(db_priming);
-            let functions = std::sync::Arc::try_unwrap(functions)
-                .map(|m| m.into_inner().unwrap())
-                .unwrap_or_default();
-            let methods = std::sync::Arc::try_unwrap(methods)
-                .map(|m| m.into_inner().unwrap())
-                .unwrap_or_default();
+            let all_inferred: Vec<InferredTypes> = parsed_files
+                .par_iter()
+                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
+                .map_with(db_priming, |db, parsed| {
+                    let driver = Pass2Driver::new_inference_only(
+                        db as &dyn crate::db::MirDatabase,
+                        php_version,
+                    );
+                    let parse_result = parsed.parsed();
+                    driver.analyze_bodies(
+                        &parse_result.program,
+                        parsed.file.clone(),
+                        parsed.source(),
+                        &parse_result.source_map,
+                    );
+                    driver.take_inferred_types()
+                })
+                .collect();
+            // db_priming is consumed by map_with; per-thread clones dropped by collect().
+            let mut functions = Vec::new();
+            let mut methods = Vec::new();
+            for inferred in all_inferred {
+                functions.extend(inferred.functions);
+                methods.extend(inferred.methods);
+            }
             let mut guard = self.shared_db.salsa.write();
             guard.commit_inferred_return_types(functions, methods);
         }
+        let _t_presweep = _t0.elapsed();
 
         let db_main = {
             let guard = self.shared_db.salsa.read();
@@ -605,6 +607,7 @@ impl ProjectAnalyzer {
             })
             .collect();
 
+        let _t_pass2 = _t0.elapsed();
         let mut all_symbols = Vec::new();
         for (issues, symbols) in pass2_results {
             all_issues.extend(issues);
@@ -637,6 +640,21 @@ impl ProjectAnalyzer {
             let salsa = self.snapshot_db();
             let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa).analyze();
             all_issues.extend(dead_code_issues);
+        }
+
+        let _t_total = _t0.elapsed();
+        if std::env::var("MIR_TIMING").is_ok() {
+            eprintln!(
+                "[timing] stubs={:.0}ms read={:.0}ms salsa_reg={:.0}ms pass1={:.0}ms ingest={:.0}ms presweep={:.0}ms pass2={:.0}ms total={:.0}ms",
+                _t_stubs.as_secs_f64() * 1000.0,
+                (_t_read - _t_stubs).as_secs_f64() * 1000.0,
+                (_t_salsa_reg - _t_read).as_secs_f64() * 1000.0,
+                (_t_pass1 - _t_salsa_reg).as_secs_f64() * 1000.0,
+                (_t_ingest - _t_pass1).as_secs_f64() * 1000.0,
+                (_t_presweep - _t_ingest).as_secs_f64() * 1000.0,
+                (_t_pass2 - _t_presweep).as_secs_f64() * 1000.0,
+                _t_total.as_secs_f64() * 1000.0,
+            );
         }
 
         AnalysisResult::build(all_issues, std::collections::HashMap::new(), all_symbols)
@@ -950,6 +968,9 @@ impl ProjectAnalyzer {
     /// Pass 1 only: collect type definitions from `paths` into the codebase without
     /// analyzing method bodies or emitting issues. Used to load vendor types.
     pub fn collect_types_only(&self, paths: &[PathBuf]) {
+        let _timing = std::env::var("MIR_TIMING").is_ok();
+        let _t0 = std::time::Instant::now();
+
         let file_data: Vec<(Arc<str>, Arc<str>)> = paths
             .par_iter()
             .filter_map(|path| {
@@ -960,6 +981,7 @@ impl ProjectAnalyzer {
                 ))
             })
             .collect();
+        let _t_read = _t0.elapsed();
 
         let source_files: Vec<SourceFile> = {
             let mut guard = self.shared_db.salsa.write();
@@ -968,6 +990,7 @@ impl ProjectAnalyzer {
                 .map(|(file, src)| guard.upsert_source_file(file.clone(), src.clone()))
                 .collect()
         };
+        let _t_reg = _t0.elapsed();
 
         let db_pass1 = {
             let guard = self.shared_db.salsa.read();
@@ -980,12 +1003,25 @@ impl ProjectAnalyzer {
                 collect_file_definitions_uncached(&*db, *salsa_file)
             })
             .collect();
+        let _t_collect = _t0.elapsed();
 
         let mut guard = self.shared_db.salsa.write();
         for defs in file_defs {
             guard.ingest_stub_slice(&defs.slice);
         }
         drop(guard);
+        let _t_ingest = _t0.elapsed();
+
+        if _timing {
+            eprintln!(
+                "[vendor] read={:.0}ms reg={:.0}ms collect={:.0}ms ingest={:.0}ms total={:.0}ms",
+                _t_read.as_secs_f64() * 1000.0,
+                (_t_reg - _t_read).as_secs_f64() * 1000.0,
+                (_t_collect - _t_reg).as_secs_f64() * 1000.0,
+                (_t_ingest - _t_collect).as_secs_f64() * 1000.0,
+                _t_ingest.as_secs_f64() * 1000.0,
+            );
+        }
 
         // Print profiling statistics for the collection phase.
         crate::collector::print_collector_stats();

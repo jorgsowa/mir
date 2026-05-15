@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -9,7 +10,7 @@ use crate::Union;
 // FnParam — used inside callable/closure atomics
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FnParam {
     pub name: Arc<str>,
     /// Parameter type stored as SimpleType for compact representation.
@@ -41,7 +42,7 @@ pub enum Variance {
 // TemplateParam — `@template T` / `@template T of Bound`
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TemplateParam {
     pub name: Arc<str>,
     pub bound: Option<Union>,
@@ -58,7 +59,25 @@ pub enum ArrayKey {
     Int(i64),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+impl PartialOrd for ArrayKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ArrayKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (ArrayKey::Int(a), ArrayKey::Int(b)) => a.cmp(b),
+            (ArrayKey::String(a), ArrayKey::String(b)) => a.cmp(b),
+            // Int < String
+            (ArrayKey::Int(_), ArrayKey::String(_)) => std::cmp::Ordering::Less,
+            (ArrayKey::String(_), ArrayKey::Int(_)) => std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KeyedProperty {
     pub ty: Union,
     pub optional: bool,
@@ -68,7 +87,7 @@ pub struct KeyedProperty {
 // Atomic — every distinct PHP type variant
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Atomic {
     // --- Scalars ---
     /// `string`
@@ -375,6 +394,224 @@ impl Atomic {
             Atomic::TTraitString => "trait-string",
             Atomic::TLiteralEnumCase { .. } => "enum-case",
             Atomic::TIntersection { .. } => "intersection",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hash impls
+// ---------------------------------------------------------------------------
+
+impl Hash for FnParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.ty.hash(state);
+        self.default.hash(state);
+        self.is_variadic.hash(state);
+        self.is_byref.hash(state);
+        self.is_optional.hash(state);
+    }
+}
+
+/// Discriminant tags for `Atomic` used in the manual `Hash` impl below.
+#[allow(non_camel_case_types, clippy::enum_variant_names)]
+#[repr(u8)]
+enum AtomicTag {
+    TString = 0,
+    TLiteralString,
+    TClassString,
+    TNonEmptyString,
+    TNumericString,
+    TInt,
+    TLiteralInt,
+    TIntRange,
+    TPositiveInt,
+    TNegativeInt,
+    TNonNegativeInt,
+    TFloat,
+    TLiteralFloat,
+    TBool,
+    TTrue,
+    TFalse,
+    TNull,
+    TVoid,
+    TNever,
+    TMixed,
+    TScalar,
+    TNumeric,
+    TObject,
+    TNamedObject,
+    TStaticObject,
+    TSelf,
+    TParent,
+    TCallable,
+    TClosure,
+    TArray,
+    TList,
+    TNonEmptyArray,
+    TNonEmptyList,
+    TKeyedArray,
+    TTemplateParam,
+    TConditional,
+    TInterfaceString,
+    TEnumString,
+    TTraitString,
+    TLiteralEnumCase,
+    TIntersection,
+}
+
+impl Hash for Atomic {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        use AtomicTag as T;
+        match self {
+            // --- tag-only variants ---
+            Atomic::TString => (T::TString as u8).hash(state),
+            Atomic::TNonEmptyString => (T::TNonEmptyString as u8).hash(state),
+            Atomic::TNumericString => (T::TNumericString as u8).hash(state),
+            Atomic::TInt => (T::TInt as u8).hash(state),
+            Atomic::TPositiveInt => (T::TPositiveInt as u8).hash(state),
+            Atomic::TNegativeInt => (T::TNegativeInt as u8).hash(state),
+            Atomic::TNonNegativeInt => (T::TNonNegativeInt as u8).hash(state),
+            Atomic::TFloat => (T::TFloat as u8).hash(state),
+            Atomic::TBool => (T::TBool as u8).hash(state),
+            Atomic::TTrue => (T::TTrue as u8).hash(state),
+            Atomic::TFalse => (T::TFalse as u8).hash(state),
+            Atomic::TNull => (T::TNull as u8).hash(state),
+            Atomic::TVoid => (T::TVoid as u8).hash(state),
+            Atomic::TNever => (T::TNever as u8).hash(state),
+            Atomic::TMixed => (T::TMixed as u8).hash(state),
+            Atomic::TScalar => (T::TScalar as u8).hash(state),
+            Atomic::TNumeric => (T::TNumeric as u8).hash(state),
+            Atomic::TObject => (T::TObject as u8).hash(state),
+            Atomic::TInterfaceString => (T::TInterfaceString as u8).hash(state),
+            Atomic::TEnumString => (T::TEnumString as u8).hash(state),
+            Atomic::TTraitString => (T::TTraitString as u8).hash(state),
+
+            // --- variants with fields ---
+            Atomic::TLiteralString(s) => {
+                (T::TLiteralString as u8).hash(state);
+                s.hash(state);
+            }
+            Atomic::TClassString(opt) => {
+                (T::TClassString as u8).hash(state);
+                opt.hash(state);
+            }
+            Atomic::TLiteralInt(n) => {
+                (T::TLiteralInt as u8).hash(state);
+                n.hash(state);
+            }
+            Atomic::TIntRange { min, max } => {
+                (T::TIntRange as u8).hash(state);
+                min.hash(state);
+                max.hash(state);
+            }
+            Atomic::TLiteralFloat(int_bits, frac_bits) => {
+                (T::TLiteralFloat as u8).hash(state);
+                int_bits.hash(state);
+                frac_bits.hash(state);
+            }
+            Atomic::TNamedObject { fqcn, type_params } => {
+                (T::TNamedObject as u8).hash(state);
+                fqcn.hash(state);
+                type_params.hash(state);
+            }
+            Atomic::TStaticObject { fqcn } => {
+                (T::TStaticObject as u8).hash(state);
+                fqcn.hash(state);
+            }
+            Atomic::TSelf { fqcn } => {
+                (T::TSelf as u8).hash(state);
+                fqcn.hash(state);
+            }
+            Atomic::TParent { fqcn } => {
+                (T::TParent as u8).hash(state);
+                fqcn.hash(state);
+            }
+            Atomic::TCallable {
+                params,
+                return_type,
+            } => {
+                (T::TCallable as u8).hash(state);
+                params.hash(state);
+                return_type.hash(state);
+            }
+            Atomic::TClosure {
+                params,
+                return_type,
+                this_type,
+            } => {
+                (T::TClosure as u8).hash(state);
+                params.hash(state);
+                return_type.hash(state);
+                this_type.hash(state);
+            }
+            Atomic::TArray { key, value } => {
+                (T::TArray as u8).hash(state);
+                key.hash(state);
+                value.hash(state);
+            }
+            Atomic::TList { value } => {
+                (T::TList as u8).hash(state);
+                value.hash(state);
+            }
+            Atomic::TNonEmptyArray { key, value } => {
+                (T::TNonEmptyArray as u8).hash(state);
+                key.hash(state);
+                value.hash(state);
+            }
+            Atomic::TNonEmptyList { value } => {
+                (T::TNonEmptyList as u8).hash(state);
+                value.hash(state);
+            }
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                (T::TKeyedArray as u8).hash(state);
+                // Sort by key before hashing so the hash is order-independent,
+                // consistent with PartialEq which uses IndexMap value equality.
+                let mut pairs: Vec<_> = properties.iter().collect();
+                pairs.sort_by_key(|(a, _)| *a);
+                for (k, v) in pairs {
+                    k.hash(state);
+                    v.hash(state);
+                }
+                is_open.hash(state);
+                is_list.hash(state);
+            }
+            Atomic::TTemplateParam {
+                name,
+                as_type,
+                defining_entity,
+            } => {
+                (T::TTemplateParam as u8).hash(state);
+                name.hash(state);
+                as_type.hash(state);
+                defining_entity.hash(state);
+            }
+            Atomic::TConditional {
+                subject,
+                if_true,
+                if_false,
+            } => {
+                (T::TConditional as u8).hash(state);
+                subject.hash(state);
+                if_true.hash(state);
+                if_false.hash(state);
+            }
+            Atomic::TLiteralEnumCase {
+                enum_fqcn,
+                case_name,
+            } => {
+                (T::TLiteralEnumCase as u8).hash(state);
+                enum_fqcn.hash(state);
+                case_name.hash(state);
+            }
+            Atomic::TIntersection { parts } => {
+                (T::TIntersection as u8).hash(state);
+                parts.hash(state);
+            }
         }
     }
 }
