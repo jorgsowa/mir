@@ -14,14 +14,103 @@ const commit = (() => {
 const PHP_VERSIONS = ['8.1', '8.2', '8.3', '8.4', '8.5'];
 const DEFAULT_PHP = '8.5';
 
-const DEFAULT_CODE = `<?php
+const EXAMPLES = {
+  'type-mismatch': {
+    label: 'Type mismatch',
+    code: `<?php
 
 function add(int $a, int $b): int {
     return $a + $b;
 }
 
 $result = add("not a number", 42);
-`;
+`,
+  },
+  'undefined-method': {
+    label: 'Undefined method',
+    code: `<?php
+
+class User {
+    public function getEmail(): string { return ''; }
+}
+
+$user = new User();
+echo $user->getName();
+`,
+  },
+  'nullability': {
+    label: 'Null method call',
+    code: `<?php
+
+function findUser(int $id): ?User {
+    return $id > 0 ? new User() : null;
+}
+
+class User {
+    public function name(): string { return ''; }
+}
+
+$user = findUser(0);
+echo $user->name();
+`,
+  },
+  'array-access': {
+    label: 'Array access',
+    code: `<?php
+
+/** @return array<string, int> */
+function counts(): array {
+    return ['a' => 1, 'b' => 2];
+}
+
+$c = counts();
+echo $c['missing'] + 1;
+`,
+  },
+  'dead-code': {
+    label: 'Dead code',
+    code: `<?php
+
+function greet(string $name): string {
+    return "Hello, $name";
+    echo 'never runs';
+}
+
+function helper(): void {
+    $unused = 42;
+}
+`,
+  },
+  'taint': {
+    label: 'Taint (SQL)',
+    code: `<?php
+
+function query(string $sql): void {}
+
+$id = $_GET['id'];
+query("SELECT * FROM users WHERE id = $id");
+`,
+  },
+  'generics': {
+    label: 'Generics',
+    code: `<?php
+
+/**
+ * @template T
+ * @param T $value
+ * @return T
+ */
+function identity($value) {
+    return $value;
+}
+
+/** @var int $n */
+$n = identity("not an int");
+`,
+  },
+};
+
+const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
 ---
 
 <StarlightPage
@@ -34,14 +123,22 @@ $result = add("not a number", 42);
   <div
     class="playground not-content"
     data-base={import.meta.env.BASE_URL.replace(/\/$/, '')}
+    data-examples={JSON.stringify(EXAMPLES)}
   >
     <div class="pg-toolbar">
-      <select id="pg-version" class="pg-select">
+      <select id="pg-example" class="pg-select" aria-label="Example">
+        <option value="" disabled selected>Examples…</option>
+        {Object.entries(EXAMPLES).map(([k, v]) => (
+          <option value={k}>{v.label}</option>
+        ))}
+      </select>
+      <select id="pg-version" class="pg-select" aria-label="PHP version">
         {PHP_VERSIONS.map(v => (
           <option value={v} selected={v === DEFAULT_PHP}>{`PHP ${v}`}</option>
         ))}
       </select>
       <button id="pg-btn" class="pg-btn" disabled>Loading…</button>
+      <button id="pg-share" class="pg-btn pg-btn--ghost" type="button" title="Copy shareable link">Share</button>
       <span id="pg-status" class="pg-status"></span>
       <span class="pg-meta">mir&nbsp;v{version}&nbsp;·&nbsp;{commit}</span>
     </div>
@@ -68,21 +165,64 @@ $result = add("not a number", 42);
 </StarlightPage>
 
 <script is:inline>
-  const root    = document.querySelector('.playground');
-  const BASE    = root.dataset.base;
-  const WASM_JS = `${BASE}/wasm/mir_wasm.js`;
+  const root      = document.querySelector('.playground');
+  const BASE      = root.dataset.base;
+  const WASM_JS   = `${BASE}/wasm/mir_wasm.js`;
+  const EXAMPLES  = JSON.parse(root.dataset.examples);
 
-  const btn     = document.getElementById('pg-btn');
-  const input   = document.getElementById('pg-input');
-  const sel     = document.getElementById('pg-version');
-  const gutter  = document.getElementById('pg-gutter');
-  const diag    = document.getElementById('pg-diag');
-  const status  = document.getElementById('pg-status');
+  const btn       = document.getElementById('pg-btn');
+  const shareBtn  = document.getElementById('pg-share');
+  const input     = document.getElementById('pg-input');
+  const sel       = document.getElementById('pg-version');
+  const exSel     = document.getElementById('pg-example');
+  const gutter    = document.getElementById('pg-gutter');
+  const diag      = document.getElementById('pg-diag');
+  const status    = document.getElementById('pg-status');
 
   let playground = null;
   let debounce   = null;
 
-  // Line numbers
+  // ── URL share encoding (UTF-8 → base64url) ────────────────────────────────
+  function encodeCode(s) {
+    return btoa(unescape(encodeURIComponent(s)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function decodeCode(s) {
+    try {
+      const pad = '='.repeat((4 - s.length % 4) % 4);
+      const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + pad;
+      return decodeURIComponent(escape(atob(b64)));
+    } catch { return null; }
+  }
+
+  function readHash() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const code = h.get('code');
+    const php  = h.get('php');
+    if (code) {
+      const decoded = decodeCode(code);
+      if (decoded != null) input.value = decoded;
+    }
+    if (php && [...sel.options].some(o => o.value === php)) sel.value = php;
+  }
+  readHash();
+
+  shareBtn.addEventListener('click', async () => {
+    const url = new URL(location.href);
+    url.hash = `code=${encodeCode(input.value)}&php=${encodeURIComponent(sel.value)}`;
+    const href = url.toString();
+    history.replaceState(null, '', href);
+    try {
+      await navigator.clipboard.writeText(href);
+      const prev = shareBtn.textContent;
+      shareBtn.textContent = 'Copied';
+      setTimeout(() => { shareBtn.textContent = prev; }, 1200);
+    } catch {
+      // Clipboard blocked — URL is at least in the address bar now.
+    }
+  });
+
+  // ── Line numbers ──────────────────────────────────────────────────────────
   function updateGutter() {
     const n = input.value.split('\n').length;
     gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
@@ -90,7 +230,17 @@ $result = add("not a number", 42);
   input.addEventListener('input', updateGutter);
   updateGutter();
 
-  // WASM
+  // ── Examples ──────────────────────────────────────────────────────────────
+  exSel.addEventListener('change', () => {
+    const ex = EXAMPLES[exSel.value];
+    if (!ex) return;
+    input.value = ex.code;
+    updateGutter();
+    runAnalysis();
+    exSel.selectedIndex = 0;
+  });
+
+  // ── WASM ──────────────────────────────────────────────────────────────────
   async function loadWasm() {
     try {
       const mod = await import(WASM_JS);
@@ -109,11 +259,10 @@ $result = add("not a number", 42);
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Overlay highlight
+  // ── Overlay highlight ─────────────────────────────────────────────────────
   const overlay    = document.getElementById('pg-overlay');
   const underline  = document.getElementById('pg-underline');
 
-  // Measure monospace char width once (re-measure if font changes)
   let charW = null;
   function getCharWidth() {
     if (charW) return charW;
@@ -150,19 +299,29 @@ $result = add("not a number", 42);
     positionUnderline();
   });
 
-  diag.addEventListener('mouseover', e => {
-    const card = e.target.closest('.pg-issue');
-    if (!card) return;
+  function paintFromCard(card) {
     const sev = card.classList.contains('pg-issue--error') ? 'error'
               : card.classList.contains('pg-issue--warning') ? 'warning' : 'info';
-    underline._issue = { line: +card.dataset.line, lineEnd: +card.dataset.lineEnd,
-                         colStart: +card.dataset.colStart, colEnd: +card.dataset.colEnd, sev };
-    // Scroll textarea to bring the line into view
+    underline._issue = {
+      line: +card.dataset.line, lineEnd: +card.dataset.lineEnd,
+      colStart: +card.dataset.colStart, colEnd: +card.dataset.colEnd, sev,
+    };
+    positionUnderline();
+  }
+
+  // Hover: paint underline only (no scroll). Click: also scroll the textarea.
+  diag.addEventListener('mouseover', e => {
+    const card = e.target.closest('.pg-issue');
+    if (card) paintFromCard(card);
+  });
+  diag.addEventListener('click', e => {
+    const card = e.target.closest('.pg-issue');
+    if (!card) return;
+    paintFromCard(card);
     const lineH = parseFloat(getComputedStyle(input).lineHeight) || 22;
     input.scrollTop = Math.max(0, (+card.dataset.line - 1) * lineH - input.clientHeight / 3);
-    positionUnderline();
+    input.focus();
   });
-
   diag.addEventListener('mouseleave', () => {
     underline._issue = null;
     underline.style.display = 'none';

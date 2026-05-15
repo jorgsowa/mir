@@ -1,3 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 32" fill="none">
-  <text x="0" y="24" font-family="monospace" font-size="24" font-weight="bold" fill="#1a1a2e">mir</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 28" fill="none">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&amp;display=swap');
+    text {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+      font-weight: 700;
+      font-size: 24px;
+      letter-spacing: -0.04em;
+      fill: #1a1a2e;
+    }
+  </style>
+  <text x="0" y="22">mir</text>
 </svg>

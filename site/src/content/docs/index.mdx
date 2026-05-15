@@ -1,36 +1,89 @@
 ---
 title: mir
 description: A fast, incremental PHP static analyzer written in Rust.
+template: splash
 head:
   - tag: title
     content: mir | Fast PHP Static Analyzer
+hero:
+  tagline: A fast, incremental PHP static analyzer written in Rust — inspired by Psalm.
+  image:
+    file: ../../assets/logo.png
+  actions:
+    - text: Get Started
+      link: /mir/guides/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Try the Playground
+      link: /mir/playground/
+      icon: external
+    - text: View on GitHub
+      link: https://github.com/jorgsowa/mir
+      icon: external
+      variant: minimal
 ---
 
-import { Image } from 'astro:assets';
-import logo from '../../assets/logo.png';
+import { Card, CardGrid, LinkCard, Aside, Code, Tabs, TabItem } from '@astrojs/starlight/components';
 
-<p align="center">
-  <Image src={logo} alt="mir logo" width={300} />
-</p>
-
-A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](https://psalm.dev).
-
-:::caution[Experimental]
-Not yet production-ready. APIs and output formats may change between releases.
-:::
+<Aside type="caution" title="Experimental">
+Not yet production-ready. APIs, issue codes, and output formats may change between releases — expect false positives and rough edges.
+</Aside>
 
 ## Install
 
-```bash
-composer require --dev miropen/mir-php
-vendor/bin/mir src/
+<Tabs syncKey="install">
+  <TabItem label="Composer" icon="seti:php">
+    ```bash
+    composer require --dev miropen/mir-php
+    vendor/bin/mir src/
+    ```
+  </TabItem>
+  <TabItem label="Cargo" icon="seti:rust">
+    ```bash
+    cargo install mir-php
+    mir src/
+    ```
+  </TabItem>
+  <TabItem label="From source" icon="seti:shell">
+    ```bash
+    git clone https://github.com/jorgsowa/mir.git
+    cd mir && cargo build --release
+    ./target/release/mir src/
+    ```
+  </TabItem>
+</Tabs>
+
+## What mir reports
+
+```text title="$ mir src/"
+src/Controller/UserController.php:42:5  UndefinedMethod    Method User::getName() does not exist
+src/Service/Mailer.php:17:12            InvalidArgument   Argument 1 of sendMessage expects string, int provided
+src/Domain/Order.php:88:9               NullMethodCall    Cannot call method on possibly null value
+src/Http/Search.php:23:14               TaintedSql        Tainted data from $_GET flows into SQL sink
+
+4 errors in 312 files · 0.42s
 ```
 
-Types · calls · dead code · taint · generics — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) across 33 PHP extensions.
-Compatible with [Psalm](https://psalm.dev) baselines and docblock annotations.
+## Browse by category
 
-## Next steps
+<CardGrid>
+  <LinkCard title="Undefined" href="/mir/reference/issues/undefined/undefined-variable/" description="Missing variables, functions, methods, classes, properties, constants." />
+  <LinkCard title="Nullability" href="/mir/reference/issues/nullability/null-argument/" description="Null arguments, dereferences, returns; possibly-null variants." />
+  <LinkCard title="Type mismatches" href="/mir/reference/issues/type-mismatches/invalid-return-type/" description="Arguments, return types, casts, operands, by-reference passing." />
+  <LinkCard title="Array" href="/mir/reference/issues/array/invalid-array-offset/" description="Invalid offsets and access on possibly-missing keys." />
+  <LinkCard title="Redundancy" href="/mir/reference/issues/redundancy/redundant-condition/" description="Conditions that can't fail, casts and annotations that do nothing." />
+  <LinkCard title="Dead code" href="/mir/reference/issues/dead-code/unused-variable/" description="Unused variables, parameters, methods, properties, functions; unreachable code." />
+  <LinkCard title="Inheritance" href="/mir/reference/issues/inheritance/unimplemented-abstract-method/" description="Abstract / interface compliance, signature and visibility mismatches, final violations." />
+  <LinkCard title="Security" href="/mir/reference/issues/security/tainted-html/" description="Taint analysis from `$_GET` / `$_POST` to HTML, SQL, and shell sinks." />
+  <LinkCard title="Generics" href="/mir/reference/issues/generics/invalid-template-param/" description="`@template` parameter constraint and substitution checks." />
+  <LinkCard title="Other" href="/mir/reference/issues/other/deprecated-method/" description="Deprecations, internal access, throws, readonly, parse and docblock errors." />
+</CardGrid>
 
-- [Getting Started](/mir/guides/getting-started/)
-- [CLI Reference](/mir/reference/cli/)
-- [Issue Kinds](/mir/reference/issues/)
+## Get going
+
+<CardGrid>
+  <LinkCard title="Getting Started" href="/mir/guides/getting-started/" description="Install, run your first analysis, understand the output." />
+  <LinkCard title="Configuration" href="/mir/guides/configuration/" description="`mir.xml`, error levels, issue handlers, baselines." />
+  <LinkCard title="CLI Reference" href="/mir/reference/cli/" description="Every flag, output format, exit code." />
+  <LinkCard title="Architecture" href="/mir/reference/architecture/" description="How mir is built: Salsa, passes, caching." />
+</CardGrid>
