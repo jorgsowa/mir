@@ -64,6 +64,10 @@ pub struct SharedDb {
     pub loaded_stubs: Mutex<HashSet<&'static str>>,
     /// Whether user stubs have been ingested.
     pub user_stubs_loaded: std::sync::atomic::AtomicBool,
+    /// Optional Pass-1 disk cache. When `Some`, `collect_and_ingest_file`
+    /// (the per-file LSP path) consults the cache before parsing and writes
+    /// back on misses. Wired in by [`Self::with_cache_dir`].
+    pub(crate) stub_cache: Option<Arc<crate::stub_cache::StubSliceCache>>,
 }
 
 impl SharedDb {
@@ -72,7 +76,25 @@ impl SharedDb {
             salsa: RwLock::new(MirDbRw(MirDb::default())),
             loaded_stubs: Mutex::new(HashSet::new()),
             user_stubs_loaded: std::sync::atomic::AtomicBool::new(false),
+            stub_cache: None,
         }
+    }
+
+    /// Attach a persistent Pass-1 cache stored under `cache_dir`. Future
+    /// calls to [`Self::collect_and_ingest_file`] will consult the cache
+    /// before parsing and write back on misses. The target PHP version is
+    /// passed per call so the same cache directory remains usable across
+    /// version changes (entries from other versions become misses).
+    pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
+        self.stub_cache = Some(Arc::new(crate::stub_cache::StubSliceCache::open(cache_dir)));
+        self
+    }
+
+    /// Number of [`crate::db::SourceFile`] inputs registered in salsa.
+    /// Used by upstream cache-attach guards to detect "wire the cache
+    /// before ingesting" violations.
+    pub fn source_file_count(&self) -> usize {
+        self.salsa.read().source_file_count()
     }
 
     /// Acquire a cheap clone of the salsa db for read-only queries.
@@ -163,8 +185,37 @@ impl SharedDb {
         &self,
         file: Arc<str>,
         source: &str,
+        php_version: PhpVersion,
     ) -> crate::db::FileDefinitions {
         use mir_issues::Issue;
+
+        let php_v = php_version.cache_byte();
+
+        // ---- Phase 0: cache lookup before parsing --------------------------
+        // On a hit, we avoid the arena alloc, parse, and definition-collection
+        // walk entirely — the dominant cost on cold sessions. Parse-error
+        // issues aren't cached (they're reported through Pass 2 anyway for
+        // project files), so a hit returns an empty issues list.
+        let cache_hit = self
+            .stub_cache
+            .as_ref()
+            .map(|c| (c, crate::stub_cache::hash_source(source)))
+            .and_then(|(cache, hash)| {
+                let mut slice = cache.get(&file, &hash, php_v)?;
+                crate::stub_cache::prepare_for_ingest(&mut slice);
+                Some((slice, hash))
+            });
+
+        if let Some((slice, _hash)) = cache_hit {
+            let file_defs = crate::db::FileDefinitions {
+                slice: Arc::new(slice),
+                issues: Arc::new(Vec::new()),
+            };
+            let mut guard = self.salsa.write();
+            guard.upsert_source_file(file.clone(), Arc::from(source));
+            guard.ingest_stub_slice(&file_defs.slice);
+            return file_defs;
+        }
 
         // ---- Phase 1: parse + collect outside the lock ---------------------
         let arena = crate::arena::create_parse_arena(source.len());
@@ -197,6 +248,16 @@ impl SharedDb {
         let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
         all_issues.extend(collector_issues);
         mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
+
+        // Write to the cache on miss. Only files without parse errors are
+        // cached — a parse error means the slice is partial/empty and
+        // re-running the parser next time is the right behavior.
+        if all_issues.is_empty() {
+            if let Some(cache) = &self.stub_cache {
+                let hash = crate::stub_cache::hash_source(source);
+                cache.put(&file, &hash, php_v, &slice);
+            }
+        }
 
         let file_defs = crate::db::FileDefinitions {
             slice: Arc::new(slice),

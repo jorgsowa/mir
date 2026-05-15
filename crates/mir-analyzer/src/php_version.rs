@@ -28,6 +28,14 @@ impl PhpVersion {
         self.minor
     }
 
+    /// Encode the version into the single byte the [`crate::stub_cache`]
+    /// header carries. Layout: `(major << 4) | (minor & 0x0F)`. PHP minor
+    /// versions stay well below 16 so they fit unambiguously in the low
+    /// nibble.
+    pub const fn cache_byte(self) -> u8 {
+        (self.major << 4) | (self.minor & 0x0F)
+    }
+
     /// Return `true` if a stub symbol annotated with `@since`/`@removed` is
     /// available at this target version.
     ///

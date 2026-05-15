@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Performance
+
+- Persistent Pass-1 cache (`StubSliceCache`): when a cache directory is configured (`ProjectAnalyzer::with_cache`, `AnalysisSession::with_cache_dir`, or `--cache-dir`), each file's `StubSlice` is stashed in `<cache_dir>/stubs/<hh>/<full_hash>.bin` using a content-hash key, a postcard binary encoding, and atomic tempfile-and-rename writes. On a warm cache, files skip parse and definition collection (≈95% of the per-file cost on Laravel) and the cached slice is ingested directly. Cache header is version-gated by `CARGO_PKG_VERSION`, the on-disk format version, and the target PHP version, so cached data is automatically invalidated across mir or PHP-version upgrades.
+- Both the batch path (`ProjectAnalyzer::collect_types_only`, exercised by the CLI for vendor warmup) and the per-file LSP path (`AnalysisSession::ingest_file` via `SharedDb::collect_and_ingest_file`) consult the cache. Measured on `laravel/framework v11.44.7` (10,188 vendor files, M-series Mac), independently verified hit counters (`10,185 hits / 0 misses` on warm, the 3-file delta is files mir skips for parse errors and is excluded from caching):
+  - Vendor batch collection: cold 2,381 ms / 2,799 MiB churn → warm 1,658 ms / 525 MiB churn (−30% wall, −81% churn). Repeated runs land in a −30% to −46% wall-time band depending on the OS page-cache state of the underlying vendor tree.
+  - LSP-style serial `ingest_file` storm via `AnalysisSession`: cold 5,476 ms → warm 3,720 ms (−32% wall). The serial path is bottlenecked by Salsa write-lock + ingest cost the cache doesn't address.
+- Cache misses (or files with parse / collector errors) skip the write-back so future runs re-parse them; cache hits restore the file path field from the lookup argument so the on-disk encoding never carries a machine-specific absolute path.
+- `ProjectAnalyzer::{with_cache_dir,set_cache_dir}` and `AnalysisSession::{with_cache,with_cache_dir}` now `debug_assert` they are called before any file is ingested — late attachment would silently reset the shared database and discard prior Pass-1 work.
+
 ## [0.25.0] - 2026-05-15
 
 ### Performance

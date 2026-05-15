@@ -25,6 +25,7 @@ blake3        = { workspace = true }
 rustc-hash    = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
+postcard      = { workspace = true }
 quick-xml     = "0.39"
 salsa         = { workspace = true }
 

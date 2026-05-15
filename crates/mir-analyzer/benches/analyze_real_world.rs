@@ -565,6 +565,83 @@ fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
     eprintln!();
 }
 
+/// Vendor collection cold vs. warm: a persistent on-disk cache is populated
+/// on the first run, and the second run reads back `StubSlice` data instead
+/// of re-parsing 10 k vendor files. This is the metric users feel on every
+/// repeated CLI invocation (`mir`, `mir --watch`, CI re-runs).
+///
+/// The cache directory persists across both runs in a single TempDir. Both
+/// timings and memory checkpoints are printed.
+fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+    let vendor_files = ProjectAnalyzer::discover_files(&root.join("vendor"));
+    let cache_dir = tempfile::tempdir().unwrap();
+
+    eprintln!("\n=== VENDOR COLLECTION: COLD vs WARM (persistent StubSlice cache) ===\n");
+    eprintln!(
+        "  {} vendor files; cache dir = {}\n",
+        vendor_files.len(),
+        cache_dir.path().display()
+    );
+
+    // Cold run: cache is empty → every file parses + collects + writes back.
+    reset_alloc_counters();
+    let cold_start = std::time::Instant::now();
+    {
+        let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
+        analyzer.load_stubs();
+        analyzer.collect_types_only(&vendor_files);
+    }
+    let cold = cold_start.elapsed();
+    let cold_peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
+    let cold_total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    eprintln!(
+        "  COLD  wall {:>7.0} ms  peak {:>6.1} MiB  churn {:>7.1} MiB",
+        cold.as_secs_f64() * 1000.0,
+        cold_peak,
+        cold_total,
+    );
+
+    // Warm run: identical content → every cache lookup hits.
+    reset_alloc_counters();
+    let warm_start = std::time::Instant::now();
+    let (hits, misses) = {
+        let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
+        analyzer.load_stubs();
+        analyzer.collect_types_only(&vendor_files);
+        analyzer.stub_cache_stats()
+    };
+    let warm = warm_start.elapsed();
+    let warm_peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
+    let warm_total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    eprintln!(
+        "  WARM  wall {:>7.0} ms  peak {:>6.1} MiB  churn {:>7.1} MiB  (cache hits={hits} misses={misses})",
+        warm.as_secs_f64() * 1000.0,
+        warm_peak,
+        warm_total,
+    );
+    assert!(
+        hits > 0,
+        "warm vendor collection must observe cache hits; saw {hits}/{misses}"
+    );
+
+    let saved_ms = cold.as_secs_f64() * 1000.0 - warm.as_secs_f64() * 1000.0;
+    let saved_churn = cold_total - warm_total;
+    let saved_pct = if cold.as_secs_f64() > 0.0 {
+        (1.0 - warm.as_secs_f64() / cold.as_secs_f64()) * 100.0
+    } else {
+        0.0
+    };
+    eprintln!(
+        "\n  Δ wall  {:>+7.0} ms  ({:>+5.1}%)\n  Δ churn {:>+7.1} MiB",
+        -saved_ms, -saved_pct, -saved_churn,
+    );
+    eprintln!();
+}
+
 criterion_group!(
     benches,
     bench_full_analysis,
@@ -573,6 +650,7 @@ criterion_group!(
     bench_vendor_collection,
     bench_vendor_collection_detailed,
     bench_full_analysis_detailed,
-    bench_vendor_collection_phase_breakdown
+    bench_vendor_collection_phase_breakdown,
+    bench_vendor_collection_cache_cold_vs_warm,
 );
 criterion_main!(benches);

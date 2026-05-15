@@ -92,6 +92,13 @@ impl AnalysisCache {
         Self::open(&project_root.join(".mir-cache"))
     }
 
+    /// Directory the cache was opened from. Useful for callers that want to
+    /// open a sibling cache (e.g. the Pass-1 `StubSliceCache`) under the
+    /// same root.
+    pub fn cache_dir(&self) -> &Path {
+        &self.cache_dir
+    }
+
     /// Return cached issues and reference locations for `file_path` if its
     /// `content_hash` matches. Returns `None` if there is no entry or the file
     /// has changed. The second element of the tuple is the list of
