@@ -10,7 +10,7 @@
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file Pass 2 entry
 //! point that operates against a session.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -910,8 +910,8 @@ impl AnalysisSession {
             .collect()
     }
 
-    /// Compute `file`'s outgoing dependency edges and update the cache's
-    /// reverse-dep graph in place. No-op if no cache is configured.
+    /// Compute `file`'s outgoing dependency edges and sync the disk cache's
+    /// reverse-dep graph. No-op if no cache is configured.
     fn update_reverse_deps_for(&self, file: &str) {
         let Some(cache) = self.cache.as_deref() else {
             return;
@@ -958,42 +958,53 @@ impl AnalysisSession {
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
     ///
-    /// Dependencies are computed from:
-    /// - Direct imports (use statements)
-    /// - Class inheritance (parent classes, interfaces, traits)
+    /// O(edges) — iterates the `file_references` forward index (file → symbol
+    /// keys it references) which is always current, then resolves each symbol
+    /// to its defining file via O(1) lookup.  Total cost is O(E) where E is the
+    /// number of (file, symbol) reference edges, vs. the old O(F × S × R) scan.
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
         let db = self.snapshot_db();
 
-        // Get all files from the session's salsa database
-        let guard = self.shared_db.salsa.lock();
-        let all_files: Vec<String> = guard
-            .source_file_paths()
-            .iter()
-            .map(|f| f.as_ref().to_string())
-            .collect();
-        drop(guard);
+        let all_files: Vec<String> = {
+            let guard = self.shared_db.salsa.lock();
+            guard
+                .source_file_paths()
+                .iter()
+                .map(|f| f.as_ref().to_string())
+                .collect()
+        };
 
-        // Build forward dependency graph: file → [files it depends on]
-        let mut dependencies: std::collections::HashMap<String, Vec<String>> =
-            std::collections::HashMap::new();
+        let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
+        let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
+
         for file in &all_files {
-            let deps = file_outgoing_dependencies(&db, file);
-            dependencies.insert(file.clone(), deps.into_iter().collect());
-        }
-
-        // Build reverse dependency graph: file → [files that depend on it]
-        let mut dependents: std::collections::HashMap<String, Vec<String>> =
-            std::collections::HashMap::new();
-        for (file, deps) in &dependencies {
-            for dep in deps {
+            // O(degree(file)) — forward index lookup, no full-table scan.
+            let symbol_keys = db.file_referenced_symbols(file);
+            let mut file_deps: HashSet<String> = HashSet::new();
+            for symbol_key in &symbol_keys {
+                let lookup: &str = match symbol_key.split_once("::") {
+                    Some((class, _)) => class,
+                    None => symbol_key.as_ref(),
+                };
+                if let Some(def_file) = db.symbol_defining_file(lookup) {
+                    let def = def_file.as_ref().to_string();
+                    if &def != file {
+                        file_deps.insert(def);
+                    }
+                }
+            }
+            for dep in &file_deps {
                 dependents
                     .entry(dep.clone())
                     .or_default()
                     .push(file.clone());
+                dependencies
+                    .entry(file.clone())
+                    .or_default()
+                    .push(dep.clone());
             }
         }
 
-        // Sort for determinism
         for deps in dependents.values_mut() {
             deps.sort();
         }
@@ -1109,7 +1120,7 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 
     // Also track bare-FQN references recorded during Pass 2 (new \Foo(), \Foo::method(),
     // \foo()) that do not appear in use-import statements.
-    for (symbol_key, _, _, _) in db.extract_file_reference_locations(file) {
+    for symbol_key in db.file_referenced_symbols(file) {
         let lookup: &str = match symbol_key.split_once("::") {
             Some((class, _)) => class,
             None => &symbol_key,
