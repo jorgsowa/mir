@@ -240,10 +240,11 @@ impl ProjectAnalyzer {
         self.shared_db.snapshot_db()
     }
 
-    /// Internal: expose the salsa Mutex for unit tests that need a `&dyn MirDatabase`.
+    /// Internal: expose the salsa db for unit tests that need a `&dyn MirDatabase`.
     #[doc(hidden)]
-    pub fn salsa_db_for_test(&self) -> &parking_lot::Mutex<MirDb> {
-        &self.shared_db.salsa
+    pub fn salsa_db_for_test(&self) -> parking_lot::MappedRwLockWriteGuard<'_, MirDb> {
+        let guard = self.shared_db.salsa.write();
+        parking_lot::RwLockWriteGuard::map(guard, |rw| &mut **rw)
     }
 
     /// Legacy: look up the source location of a class member by name.
@@ -410,7 +411,7 @@ impl ProjectAnalyzer {
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             for parsed in &parsed_files {
                 guard.upsert_source_file(parsed.file.clone(), parsed.source.clone());
             }
@@ -456,7 +457,7 @@ impl ProjectAnalyzer {
         let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
         {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             for defs in file_defs {
                 for issue in defs.issues.iter() {
                     if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. }) {
@@ -478,8 +479,8 @@ impl ProjectAnalyzer {
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let db_snapshot = {
-                let guard = self.shared_db.salsa.lock();
-                guard.clone()
+                let guard = self.shared_db.salsa.read();
+                (**guard).clone()
             };
             let rev = build_reverse_deps(&db_snapshot);
             cache.set_reverse_deps(rev);
@@ -490,8 +491,8 @@ impl ProjectAnalyzer {
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
             let class_db = {
-                let guard = self.shared_db.salsa.lock();
-                guard.clone()
+                let guard = self.shared_db.salsa.read();
+                (**guard).clone()
             };
             let class_issues =
                 crate::class::ClassAnalyzer::with_files(&class_db, analyzed_file_set, &file_data)
@@ -512,8 +513,8 @@ impl ProjectAnalyzer {
         // LSP path (AnalysisSession) where Salsa cache hits across edits matter.
         {
             let db_priming = {
-                let guard = self.shared_db.salsa.lock();
-                guard.clone()
+                let guard = self.shared_db.salsa.read();
+                (**guard).clone()
             };
             let php_version = self.resolved_php_version();
             let functions = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -555,13 +556,13 @@ impl ProjectAnalyzer {
             let methods = std::sync::Arc::try_unwrap(methods)
                 .map(|m| m.into_inner().unwrap())
                 .unwrap_or_default();
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             guard.commit_inferred_return_types(functions, methods);
         }
 
         let db_main = {
-            let guard = self.shared_db.salsa.lock();
-            guard.clone()
+            let guard = self.shared_db.salsa.read();
+            (**guard).clone()
         };
 
         // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
@@ -633,9 +634,8 @@ impl ProjectAnalyzer {
         // ---- Compact the reference index ------------------------------------
         // ---- Dead-code detection (M18) --------------------------------------
         if self.find_dead_code {
-            let salsa = self.shared_db.salsa.lock();
-            let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&*salsa).analyze();
-            drop(salsa);
+            let salsa = self.snapshot_db();
+            let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa).analyze();
             all_issues.extend(dead_code_issues);
         }
 
@@ -669,8 +669,8 @@ impl ProjectAnalyzer {
             // haven't been scanned yet (optimization: avoid redundant full scans).
             let mut inheritance_candidates = Vec::new();
             let import_candidates = {
-                let guard = self.shared_db.salsa.lock();
-                let db = &*guard;
+                let db_owned = self.snapshot_db();
+                let db = &db_owned;
                 for fqcn in db.active_class_node_fqcns() {
                     if scanned.contains(fqcn.as_ref()) {
                         continue;
@@ -799,8 +799,8 @@ impl ProjectAnalyzer {
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
             let db_full = {
-                let guard = self.shared_db.salsa.lock();
-                guard.clone()
+                let guard = self.shared_db.salsa.read();
+                (**guard).clone()
             };
 
             let reanalysis: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>)> = file_data
@@ -838,7 +838,7 @@ impl ProjectAnalyzer {
             let h = hash_content(new_content);
             if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
-                let guard = self.shared_db.salsa.lock();
+                let guard = self.shared_db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
                 return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
@@ -847,15 +847,15 @@ impl ProjectAnalyzer {
         let file: Arc<str> = Arc::from(file_path);
 
         {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             guard.remove_file_definitions(file_path);
         }
 
         // --- Salsa-backed Pass 1: memoized parse + definition collection ------
         let file_defs = {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             let salsa_file = guard.upsert_source_file(file.clone(), Arc::from(new_content));
-            collect_file_definitions(&*guard, salsa_file)
+            collect_file_definitions(&**guard, salsa_file)
         };
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
@@ -863,7 +863,7 @@ impl ProjectAnalyzer {
         // --- S2 + Pass 2: hold the Salsa lock for ClassNode upserts and body
         // analysis so the db reference is live during Pass 2 (S5).
         let symbols = {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
 
             guard.ingest_stub_slice(&file_defs.slice);
 
@@ -874,7 +874,7 @@ impl ProjectAnalyzer {
             let parsed = php_rs_parser::parse(&arena, new_content);
 
             if parsed.errors.is_empty() {
-                let db_ref: &dyn MirDatabase = &*guard;
+                let db_ref: &dyn MirDatabase = &**guard;
                 let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,
@@ -892,8 +892,8 @@ impl ProjectAnalyzer {
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
-            let guard = self.shared_db.salsa.lock();
-            let ref_locs = extract_reference_locations(&*guard, &file);
+            let db = self.snapshot_db();
+            let ref_locs = extract_reference_locations(&db, &file);
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
 
@@ -962,7 +962,7 @@ impl ProjectAnalyzer {
             .collect();
 
         let source_files: Vec<SourceFile> = {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             file_data
                 .iter()
                 .map(|(file, src)| guard.upsert_source_file(file.clone(), src.clone()))
@@ -970,8 +970,8 @@ impl ProjectAnalyzer {
         };
 
         let db_pass1 = {
-            let guard = self.shared_db.salsa.lock();
-            guard.clone()
+            let guard = self.shared_db.salsa.read();
+            (**guard).clone()
         };
 
         let file_defs: Vec<FileDefinitions> = source_files
@@ -981,7 +981,7 @@ impl ProjectAnalyzer {
             })
             .collect();
 
-        let mut guard = self.shared_db.salsa.lock();
+        let mut guard = self.shared_db.salsa.write();
         for defs in file_defs {
             guard.ingest_stub_slice(&defs.slice);
         }

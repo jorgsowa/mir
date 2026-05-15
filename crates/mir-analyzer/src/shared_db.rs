@@ -12,17 +12,54 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 
 use crate::db::MirDb;
 use crate::php_version::PhpVersion;
 
+/// Newtype that allows `RwLock<MirDbRw>` in `SharedDb`.
+///
+/// SAFETY: Under the *read* lock only these operations are performed on the
+/// shared `&MirDb`:
+///
+///   1. `clone()` — increments `Arc` refcounts; allocates a fresh `ZalsaLocal`
+///      for the clone without touching the original `ZalsaLocal`.
+///   2. `source_file_count()` — reads `self.source_files.len()`, a plain
+///      `HashMap` field, no Salsa involvement.
+///   3. `replay_reference_locations()` — writes into `Mutex<HashMap<_>>` fields
+///      (`file_references`, `reference_locations`), no `ZalsaLocal` access.
+///
+/// None of these touch the `RefCell<QueryStack>` inside `ZalsaLocal`, so
+/// concurrent read-lock holders are data-race-free. Under the *write* lock
+/// access is exclusive, so there is no aliasing.
+///
+/// Callers MUST NOT call Salsa input-field getters (e.g. `node.text(db)`,
+/// `node.is_interface(db)`) on a shared `&MirDbRw` under the read lock —
+/// those write to `ZalsaLocal`. Use `snapshot_db()` for all other reads.
+pub(crate) struct MirDbRw(MirDb);
+
+unsafe impl Sync for MirDbRw {}
+
+impl std::ops::Deref for MirDbRw {
+    type Target = MirDb;
+    fn deref(&self) -> &MirDb {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for MirDbRw {
+    fn deref_mut(&mut self) -> &mut MirDb {
+        &mut self.0
+    }
+}
+
 /// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
 /// AnalysisSession, providing a common point for their database operations.
 pub struct SharedDb {
     /// Salsa database (source file handles live inside MirDb.source_files).
-    pub salsa: Mutex<MirDb>,
+    /// RwLock: multiple concurrent snapshot_db() reads; exclusive for writes.
+    pub salsa: RwLock<MirDbRw>,
     /// Stubs that have been ingested (for idempotency).
     pub loaded_stubs: Mutex<HashSet<&'static str>>,
     /// Whether user stubs have been ingested.
@@ -32,17 +69,18 @@ pub struct SharedDb {
 impl SharedDb {
     pub fn new() -> Self {
         Self {
-            salsa: Mutex::new(MirDb::default()),
+            salsa: RwLock::new(MirDbRw(MirDb::default())),
             loaded_stubs: Mutex::new(HashSet::new()),
             user_stubs_loaded: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
     /// Acquire a cheap clone of the salsa db for read-only queries.
-    /// The lock is held only for the duration of the clone.
+    /// Multiple callers may snapshot concurrently; the read lock is held
+    /// only for the duration of the clone.
     pub fn snapshot_db(&self) -> MirDb {
-        let guard = self.salsa.lock();
-        guard.clone()
+        let guard = self.salsa.read();
+        (**guard).clone()
     }
 
     /// Ingest multiple stub paths in parallel then serially under the lock.
@@ -74,7 +112,7 @@ impl SharedDb {
             })
             .collect();
 
-        let mut guard = self.salsa.lock();
+        let mut guard = self.salsa.write();
         let mut loaded = self.loaded_stubs.lock();
         // Filter again under the lock to avoid double-ingestion races, then
         // bulk-ingest so the Arc::make_mut clones amortize over the batch
@@ -106,7 +144,7 @@ impl SharedDb {
         }
 
         let slices = crate::stubs::user_stub_slices(files, dirs);
-        let mut guard = self.salsa.lock();
+        let mut guard = self.salsa.write();
         guard.ingest_stub_slices(slices.iter());
         self.user_stubs_loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -164,11 +202,10 @@ impl SharedDb {
             issues: Arc::new(all_issues),
         };
 
-        // ---- Phase 2: register the salsa input + ingest under the lock -----
-        // We hold the lock only for the two cheap writes; the expensive parse
-        // and AST walk above ran lock-free.
+        // ---- Phase 2: register the salsa input + ingest under the write lock --
+        // The expensive parse and AST walk above ran lock-free.
         {
-            let mut guard = self.salsa.lock();
+            let mut guard = self.salsa.write();
             guard.upsert_source_file(file.clone(), Arc::from(source));
             guard.ingest_stub_slice(&file_defs.slice);
         }

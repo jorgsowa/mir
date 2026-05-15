@@ -702,6 +702,9 @@ impl<'a> DefinitionCollector<'a> {
         }
 
         let mut params = Vec::new();
+        let mut local_scalar = 0usize;
+        let mut local_complex = 0usize;
+        let mut local_defaults = 0usize;
         for p in m.params.iter() {
             let ty = doc
                 .get_param_type(&p.name.to_string())
@@ -718,17 +721,16 @@ impl<'a> DefinitionCollector<'a> {
                             .map(|h| type_from_hint(h, Some(class_fqcn))),
                     )
                 });
-            // Profiling: track scalar vs complex param types
             if let Some(ty_ref) = &ty {
                 if is_simple_scalar(ty_ref) {
-                    SCALAR_PARAM_COUNT.fetch_add(1, Relaxed);
+                    local_scalar += 1;
                 } else {
-                    COMPLEX_PARAM_COUNT.fetch_add(1, Relaxed);
+                    local_complex += 1;
                 }
             }
             let has_default = p.default.is_some();
             if has_default {
-                PARAM_WITH_DEFAULT.fetch_add(1, Relaxed);
+                local_defaults += 1;
             }
 
             params.push(FnParam {
@@ -739,6 +741,15 @@ impl<'a> DefinitionCollector<'a> {
                 is_byref: p.by_ref,
                 is_optional: has_default || p.variadic,
             });
+        }
+        if local_scalar > 0 {
+            SCALAR_PARAM_COUNT.fetch_add(local_scalar, Relaxed);
+        }
+        if local_complex > 0 {
+            COMPLEX_PARAM_COUNT.fetch_add(local_complex, Relaxed);
+        }
+        if local_defaults > 0 {
+            PARAM_WITH_DEFAULT.fetch_add(local_defaults, Relaxed);
         }
 
         let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {

@@ -287,7 +287,7 @@ impl AnalysisSession {
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
         self.ensure_stubs_loaded();
         {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
         }
         let _file_defs = self
@@ -307,7 +307,7 @@ impl AnalysisSession {
     /// remove the salsa input handle — call this for full cleanup.)
     pub fn invalidate_file(&self, file: &str) {
         {
-            let mut guard = self.shared_db.salsa.lock();
+            let mut guard = self.shared_db.salsa.write();
             guard.remove_file_definitions(file);
             guard.remove_source_file(file);
         }
@@ -320,7 +320,7 @@ impl AnalysisSession {
     /// Number of files currently tracked in this session's salsa input set.
     /// Stable across reads; useful for diagnostics and memory bounds checks.
     pub fn tracked_file_count(&self) -> usize {
-        let guard = self.shared_db.salsa.lock();
+        let guard = self.shared_db.salsa.read();
         guard.source_file_count()
     }
 
@@ -753,9 +753,9 @@ impl AnalysisSession {
     /// the parallel re-analysis path to re-feed dependents to Pass 2 without
     /// the caller having to track sources independently.
     pub fn source_of(&self, file: &str) -> Option<Arc<str>> {
-        let guard = self.shared_db.salsa.lock();
-        let sf = guard.lookup_source_file(file)?;
-        Some(sf.text(&*guard))
+        let db = self.snapshot_db();
+        let sf = db.lookup_source_file(file)?;
+        Some(sf.text(&db))
     }
 
     /// Re-analyze every transitive dependent of `file` in parallel.
@@ -951,7 +951,7 @@ impl AnalysisSession {
                 methods.push((fqcn.clone(), name.clone(), (**ty).clone()));
             }
         }
-        let mut guard = self.shared_db.salsa.lock();
+        let mut guard = self.shared_db.salsa.write();
         guard.commit_inferred_return_types(functions, methods);
     }
 
@@ -965,14 +965,11 @@ impl AnalysisSession {
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
         let db = self.snapshot_db();
 
-        let all_files: Vec<String> = {
-            let guard = self.shared_db.salsa.lock();
-            guard
-                .source_file_paths()
-                .iter()
-                .map(|f| f.as_ref().to_string())
-                .collect()
-        };
+        let all_files: Vec<String> = db
+            .source_file_paths()
+            .iter()
+            .map(|f| f.as_ref().to_string())
+            .collect();
 
         let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
         let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
