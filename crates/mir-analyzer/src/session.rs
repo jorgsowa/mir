@@ -51,6 +51,16 @@ pub struct AnalysisSession {
     /// enabling `analyze_dependents_of` and `dependency_graph()` without a
     /// disk cache. Updated in `ingest_file` and `invalidate_file`.
     reverse_dep_map: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+    /// Tracks symbols that were previously defined in a file but have since
+    /// been removed (deleted or renamed). When `ingest_file` detects that
+    /// a symbol disappears, it records it here so `dependency_graph()` can
+    /// still produce edges to files that reference the now-gone symbol.
+    ///
+    /// Keyed by the file that used to define the symbols. Symbols are removed
+    /// from the set when re-added to the same file on a subsequent ingest.
+    /// The set may contain symbols with no current referencers; those are
+    /// harmless — the `symbol_referencers_of` lookup returns empty.
+    stale_defined_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
 }
 
 impl AnalysisSession {
@@ -65,6 +75,7 @@ impl AnalysisSession {
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
             reverse_dep_map: Arc::new(RwLock::new(HashMap::new())),
+            stale_defined_symbols: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -306,6 +317,13 @@ impl AnalysisSession {
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
         self.ensure_stubs_loaded();
+
+        // Snapshot symbols defined before clearing — O(symbols_in_file) with forward index.
+        let old_symbols: HashSet<Arc<str>> = {
+            let guard = self.shared_db.salsa.read();
+            guard.file_defined_symbols(file.as_ref())
+        };
+
         {
             let mut guard = self.shared_db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
@@ -313,6 +331,31 @@ impl AnalysisSession {
         let _file_defs = self
             .shared_db
             .collect_and_ingest_file(file.clone(), source.as_ref());
+
+        // Snapshot symbols after ingesting — O(symbols_in_file).
+        let new_symbols: HashSet<Arc<str>> = {
+            let guard = self.shared_db.salsa.read();
+            guard.file_defined_symbols(file.as_ref())
+        };
+
+        // Symbols removed from this file must be tracked so dependency_graph()
+        // can still produce edges to files referencing the now-gone symbols.
+        let deleted: Vec<Arc<str>> = old_symbols.difference(&new_symbols).cloned().collect();
+        let re_added: Vec<Arc<str>> = new_symbols.difference(&old_symbols).cloned().collect();
+        if !deleted.is_empty() || !re_added.is_empty() {
+            let mut stale = self.stale_defined_symbols.write();
+            let entry = stale.entry(file.as_ref().to_string()).or_default();
+            for sym in deleted {
+                entry.insert(sym);
+            }
+            for sym in &re_added {
+                entry.remove(sym);
+            }
+            if entry.is_empty() {
+                stale.remove(file.as_ref());
+            }
+        }
+
         self.update_reverse_deps_for(&file);
     }
 
@@ -333,6 +376,8 @@ impl AnalysisSession {
         }
         // Remove this file's outgoing deps from the in-memory reverse dep map.
         self.update_in_memory_reverse_deps(file, &HashSet::new());
+        // Clear stale symbol tracking for this file — it's fully gone.
+        self.stale_defined_symbols.write().remove(file);
         if let Some(cache) = &self.cache {
             cache.update_reverse_deps_for_file(file, &HashSet::new());
             cache.evict_with_dependents(&[file.to_string()]);
@@ -1078,8 +1123,73 @@ impl AnalysisSession {
             }
         }
 
+        // Merge Pass 1 structural deps from the incremental reverse_dep_map.
+        // dependency_graph() above only captures Pass 2 bare-FQN references;
+        // the reverse_dep_map covers imports, class hierarchy (extends/implements/use),
+        // and type-hint-only references that never appear in file_referenced_symbols.
+        // Together they give a complete picture without requiring Pass 2 on every file.
+        {
+            let rev = self.reverse_dep_map.read();
+            for (target, dep_set) in rev.iter() {
+                for dep in dep_set {
+                    if dep != target {
+                        dependents
+                            .entry(target.clone())
+                            .or_default()
+                            .push(dep.clone());
+                        dependencies
+                            .entry(dep.clone())
+                            .or_default()
+                            .push(target.clone());
+                    }
+                }
+            }
+        }
+
         for deps in dependents.values_mut() {
             deps.sort();
+            deps.dedup();
+        }
+        for deps in dependencies.values_mut() {
+            deps.sort();
+            deps.dedup();
+        }
+
+        // Augment with stale dependents: files referencing symbols that were
+        // deleted from their defining file. These edges disappear from the
+        // symbol_defining_file lookup but the referencing file still needs
+        // re-analysis to surface the now-broken reference.
+        {
+            let stale = self.stale_defined_symbols.read();
+            if !stale.is_empty() {
+                for (file, deleted_syms) in stale.iter() {
+                    for sym in deleted_syms {
+                        let lookup: &str = match sym.split_once("::") {
+                            Some((class, _)) => class,
+                            None => sym.as_ref(),
+                        };
+                        for referencing_file in db.symbol_referencers_of(lookup) {
+                            let ref_file = referencing_file.as_ref().to_string();
+                            if &ref_file != file {
+                                dependents
+                                    .entry(file.clone())
+                                    .or_default()
+                                    .push(ref_file.clone());
+                                dependencies.entry(ref_file).or_default().push(file.clone());
+                            }
+                        }
+                    }
+                }
+                // Re-sort and dedup since we may have added entries.
+                for deps in dependents.values_mut() {
+                    deps.sort();
+                    deps.dedup();
+                }
+                for deps in dependencies.values_mut() {
+                    deps.sort();
+                    deps.dedup();
+                }
+            }
         }
 
         crate::DependencyGraph {

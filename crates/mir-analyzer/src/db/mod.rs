@@ -78,6 +78,16 @@ pub trait MirDatabase: salsa::Database {
     /// Return all symbols whose defining file is `file`.
     fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>>;
 
+    /// Return the set of symbol FQNs currently defined in `file`.
+    /// O(1) via the forward index; use instead of `symbols_defined_in_file`
+    /// when a `HashSet` is more convenient.
+    fn file_defined_symbols(&self, file: &str) -> std::collections::HashSet<Arc<str>>;
+
+    /// Return all files that reference `symbol_key`.
+    /// O(1) via the `symbol_referencers` reverse index; valid even after
+    /// the symbol has been removed from its defining file.
+    fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>>;
+
     /// Record a reference-location entry.
     fn record_reference_location(&self, loc: RefLoc);
 

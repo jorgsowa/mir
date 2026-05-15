@@ -573,3 +573,220 @@ fn dependency_graph_includes_unused_param_type_hint() {
          even though the parameter is unused and there's no use statement"
     );
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Mutation tests: analyze_dependents_of after definition is removed / renamed.
+//
+// The correctness gap: when class Foo is deleted from A.php, files referencing
+// \Foo were dropped from the dependent set because symbol_defining_file("Foo")
+// returned None. The fix maintains a stale_defined_symbols map + a
+// symbol_referencers reverse index so the edges survive the deletion.
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Helper: run Pass 2 on `src` under `file` path in `session`.
+fn analyze_file(session: &AnalysisSession, file: Arc<str>, src: &str) {
+    use mir_analyzer::FileAnalyzer;
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, src);
+    FileAnalyzer::new(session).analyze(file, src, &parsed.program, &parsed.source_map);
+}
+
+/// Return the set of file paths returned by analyze_dependents_of.
+fn dependent_files(session: &AnalysisSession, file: &str) -> std::collections::HashSet<String> {
+    session
+        .analyze_dependents_of(file)
+        .into_iter()
+        .map(|(f, _)| f.to_string())
+        .collect()
+}
+
+#[test]
+fn analyze_dependents_of_after_definition_deleted() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let foo: Arc<str> = Arc::from("Foo.php");
+    let bar: Arc<str> = Arc::from("Bar.php");
+
+    // Establish: Foo.php defines class Foo, Bar.php references it.
+    session.ingest_file(foo.clone(), Arc::from("<?php\nclass Foo {}\n"));
+    session.ingest_file(
+        bar.clone(),
+        Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
+    );
+    let bar_src = "<?php\nfunction f(\\Foo $x): void {}\n";
+    analyze_file(&session, bar.clone(), bar_src);
+
+    // Precondition: Bar.php is a dependent before the mutation.
+    let before = dependent_files(&session, foo.as_ref());
+    assert!(
+        before.contains(bar.as_ref()),
+        "precondition: Bar.php must be a dependent before deletion; got {:?}",
+        before
+    );
+
+    // Mutate: remove class Foo from Foo.php.
+    session.ingest_file(foo.clone(), Arc::from("<?php\n// class Foo removed\n"));
+
+    // Assert: Bar.php still appears — it has a broken reference that needs re-analysis.
+    let after = dependent_files(&session, foo.as_ref());
+    assert!(
+        after.contains(bar.as_ref()),
+        "Bar.php references \\Foo which was deleted from Foo.php — \
+         it must still appear in analyze_dependents_of so the broken reference is surfaced; \
+         got {:?}",
+        after
+    );
+}
+
+#[test]
+fn analyze_dependents_of_after_definition_renamed() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let foo: Arc<str> = Arc::from("Foo.php");
+    let bar: Arc<str> = Arc::from("Bar.php");
+
+    session.ingest_file(foo.clone(), Arc::from("<?php\nclass Foo {}\n"));
+    session.ingest_file(
+        bar.clone(),
+        Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
+    );
+    analyze_file(
+        &session,
+        bar.clone(),
+        "<?php\nfunction f(\\Foo $x): void {}\n",
+    );
+
+    // Rename: class Foo → class Renamed in the same file.
+    session.ingest_file(foo.clone(), Arc::from("<?php\nclass Renamed {}\n"));
+
+    let after = dependent_files(&session, foo.as_ref());
+    assert!(
+        after.contains(bar.as_ref()),
+        "Bar.php references \\Foo which was renamed to \\Renamed in Foo.php — \
+         Bar.php must still appear in analyze_dependents_of; got {:?}",
+        after
+    );
+}
+
+#[test]
+fn analyze_dependents_of_after_definition_moved() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let a: Arc<str> = Arc::from("A.php");
+    let b: Arc<str> = Arc::from("B.php");
+    let consumer: Arc<str> = Arc::from("Consumer.php");
+
+    // class Foo initially in A.php.
+    session.ingest_file(a.clone(), Arc::from("<?php\nclass Foo {}\n"));
+    session.ingest_file(b.clone(), Arc::from("<?php\n// empty\n"));
+    session.ingest_file(
+        consumer.clone(),
+        Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
+    );
+    analyze_file(
+        &session,
+        consumer.clone(),
+        "<?php\nfunction f(\\Foo $x): void {}\n",
+    );
+
+    // Move: remove Foo from A.php, add it to B.php.
+    session.ingest_file(a.clone(), Arc::from("<?php\n// Foo moved to B.php\n"));
+    session.ingest_file(b.clone(), Arc::from("<?php\nclass Foo {}\n"));
+
+    // Consumer.php references \Foo — it must appear as a dependent of A.php
+    // (broken reference) AND of B.php (resolved reference).
+    let a_deps = dependent_files(&session, a.as_ref());
+    assert!(
+        a_deps.contains(consumer.as_ref()),
+        "Consumer.php must appear as dependent of A.php after Foo is moved out; got {:?}",
+        a_deps
+    );
+    let b_deps = dependent_files(&session, b.as_ref());
+    assert!(
+        b_deps.contains(consumer.as_ref()),
+        "Consumer.php must appear as dependent of B.php after Foo is moved in; got {:?}",
+        b_deps
+    );
+}
+
+#[test]
+fn analyze_dependents_of_after_definition_readded() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let foo: Arc<str> = Arc::from("Foo.php");
+    let bar: Arc<str> = Arc::from("Bar.php");
+
+    session.ingest_file(foo.clone(), Arc::from("<?php\nclass Foo {}\n"));
+    session.ingest_file(
+        bar.clone(),
+        Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
+    );
+    analyze_file(
+        &session,
+        bar.clone(),
+        "<?php\nfunction f(\\Foo $x): void {}\n",
+    );
+
+    // Delete Foo.
+    session.ingest_file(foo.clone(), Arc::from("<?php\n// deleted\n"));
+
+    // Re-add Foo. The stale entry should be cleared and the normal dep graph
+    // edge restored — Bar.php is still a dependent via the current edge.
+    session.ingest_file(foo.clone(), Arc::from("<?php\nclass Foo {}\n"));
+
+    let after = dependent_files(&session, foo.as_ref());
+    assert!(
+        after.contains(bar.as_ref()),
+        "Bar.php must be a dependent of Foo.php after Foo is re-added; got {:?}",
+        after
+    );
+}
+
+#[test]
+fn analyze_dependents_of_transitive_after_delete() {
+    // A.php defines Foo. B.php references Foo (direct dependent).
+    // C.php structurally depends on B.php (e.g. extends a class from B.php).
+    // After Foo is deleted from A.php:
+    //   - B.php must appear (direct stale dependent)
+    //   - C.php must appear (transitive via structural dep on B)
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_essential_stubs_loaded();
+
+    let a: Arc<str> = Arc::from("A.php");
+    let b: Arc<str> = Arc::from("B.php");
+    let c: Arc<str> = Arc::from("C.php");
+
+    session.ingest_file(a.clone(), Arc::from("<?php\nclass Foo {}\n"));
+    session.ingest_file(
+        b.clone(),
+        Arc::from("<?php\nclass Bar { public function f(\\Foo $x): void {} }\n"),
+    );
+    session.ingest_file(c.clone(), Arc::from("<?php\nclass Baz extends \\Bar {}\n"));
+
+    // Pass 2 on both B and C so their reference edges land in file_referenced_symbols.
+    analyze_file(
+        &session,
+        b.clone(),
+        "<?php\nclass Bar { public function f(\\Foo $x): void {} }\n",
+    );
+    analyze_file(&session, c.clone(), "<?php\nclass Baz extends \\Bar {}\n");
+
+    // Delete Foo from A.php.
+    session.ingest_file(a.clone(), Arc::from("<?php\n// Foo deleted\n"));
+
+    let after = dependent_files(&session, a.as_ref());
+    assert!(
+        after.contains(b.as_ref()),
+        "B.php (direct referencer of deleted Foo) must appear; got {:?}",
+        after
+    );
+    assert!(
+        after.contains(c.as_ref()),
+        "C.php (transitively depends on B.php) must appear; got {:?}",
+        after
+    );
+}
