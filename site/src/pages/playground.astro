@@ -126,17 +126,23 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     data-examples={JSON.stringify(EXAMPLES)}
   >
     <div class="pg-toolbar">
-      <select id="pg-example" class="pg-select" aria-label="Example">
-        <option value="" disabled selected>Examples…</option>
-        {Object.entries(EXAMPLES).map(([k, v]) => (
-          <option value={k}>{v.label}</option>
-        ))}
-      </select>
-      <select id="pg-version" class="pg-select" aria-label="PHP version">
-        {PHP_VERSIONS.map(v => (
-          <option value={v} selected={v === DEFAULT_PHP}>{`PHP ${v}`}</option>
-        ))}
-      </select>
+      <div class="pg-select-wrap">
+        <select id="pg-example" class="pg-select" aria-label="Example">
+          <option value="" disabled selected>Examples…</option>
+          {Object.entries(EXAMPLES).map(([k, v]) => (
+            <option value={k}>{v.label}</option>
+          ))}
+        </select>
+        <span class="pg-select-btn" aria-hidden="true">▾</span>
+      </div>
+      <div class="pg-select-wrap">
+        <select id="pg-version" class="pg-select" aria-label="PHP version">
+          {PHP_VERSIONS.map(v => (
+            <option value={v} selected={v === DEFAULT_PHP}>{`PHP ${v}`}</option>
+          ))}
+        </select>
+        <span class="pg-select-btn" aria-hidden="true">▾</span>
+      </div>
       <button id="pg-btn" class="pg-btn" disabled>Loading…</button>
       <button id="pg-share" class="pg-btn pg-btn--ghost" type="button" title="Copy shareable link">Share</button>
       <span id="pg-status" class="pg-status"></span>
