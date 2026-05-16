@@ -99,6 +99,11 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
 }
 
+h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 /* ── Heading wrappers (Starlight renders h + anchor as siblings in .sl-heading-wrapper) ── */
 .sl-markdown-content .sl-heading-wrapper {
   display: flex !important;
@@ -504,6 +509,7 @@ nav.sidebar-pane a {
    underlined active tab) so titled code blocks and Tabs read as one family. */
 .expressive-code .frame {
   border: 1px solid rgba(200, 168, 75, 0.16) !important;
+  border-top: none !important;
   border-radius: 2px !important;
   background: #050810 !important;
   overflow: hidden;
@@ -516,16 +522,17 @@ nav.sidebar-pane a {
   box-shadow: 0 0 18px rgba(200, 168, 75, 0.05);
 }
 
-/* Instrument-panel top accent — gold gradient sits ONLY above the active
-   tab / title (the "active" segment), not across the whole frame. Pairs with
-   the gold underline (inset box-shadow) already on those elements. */
-.tab [role='tab'][aria-selected='true'],
-.expressive-code .frame .title {
-  position: relative;
+/* When a code frame is nested inside a Tabs panel, the outer <starlight-tabs>
+   owns the hover affordance — suppress the inner frame's hover so only the
+   outer border lights up. */
+starlight-tabs .expressive-code .frame:hover {
+  border-color: rgba(200, 168, 75, 0.16) !important;
+  box-shadow: none;
 }
 
-.tab [role='tab'][aria-selected='true']::before,
-.expressive-code .frame .title::before {
+/* Instrument-panel top accent — gold gradient across the top edge of every
+   code frame, matching .sl-link-card and .pagination-links a. */
+.expressive-code .frame::before {
   content: '';
   position: absolute;
   inset-block-start: 0;
@@ -533,15 +540,34 @@ nav.sidebar-pane a {
   height: 1px;
   background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
   pointer-events: none;
+  z-index: 1;
+}
+
+/* Suppress the inner-frame gradient inside Tabs — the outer <starlight-tabs>
+   owns the panel signature there. */
+starlight-tabs .expressive-code .frame::before {
+  display: none;
 }
 
 .expressive-code .frame.has-title:not(.is-terminal) .header,
 .expressive-code .frame.is-terminal .header {
   background: #0e0e1a !important;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.1) !important;
   border: none !important;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.1) !important;
   padding: 0 !important;
+  position: relative;
+}
+
+/* Bottom-edge gradient on title bar — same hue as the top accent but
+   dimmer, so the title visually separates from the code without a hard line. */
+.expressive-code .frame.has-title:not(.is-terminal) .header::after,
+.expressive-code .frame.is-terminal .header::after {
+  content: '';
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.22) 0%, transparent 65%);
+  pointer-events: none;
 }
 
 /* Title rendered as a single "active tab": matches .tab [aria-selected='true'] */
@@ -559,7 +585,6 @@ nav.sidebar-pane a {
   margin: 0 !important;
   border: none !important;
   border-radius: 0 !important;
-  box-shadow: inset 0 -1px 0 var(--mir-gold) !important;
   text-shadow: 0 0 10px rgba(200, 168, 75, 0.35) !important;
 }
 
@@ -573,7 +598,9 @@ nav.sidebar-pane a {
 .expressive-code pre,
 .expressive-code code {
   background: #050810 !important;
-  color: var(--mir-phosphor) !important;
+}
+.expressive-code pre > code {
+  color: #f0ecd8;
 }
 
 /* ── Asides ──────────────────────────────────────────────────────────── */
@@ -650,6 +677,17 @@ starlight-tabs:hover {
   box-shadow: 0 0 18px rgba(200, 168, 75, 0.05);
 }
 
+starlight-tabs::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Inner wrapper is borderless — the parent provides the frame */
 .tablist-wrapper {
   border: none;
@@ -663,13 +701,26 @@ starlight-tabs:hover {
    reads as one instrument panel. */
 [role='tablist'] {
   background: #0e0e1a;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.1);
+  border-bottom: none;
+  position: relative;
   gap: 0;
   padding: 0;
   margin: 0;
   display: flex;
   align-items: stretch;
   list-style: none;
+}
+
+/* Tab strip bottom edge — matches the title-bar ::after so titled code blocks
+   and Tabs share the same dim gradient separator. */
+[role='tablist']::after {
+  content: '';
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.22) 0%, transparent 65%);
+  pointer-events: none;
 }
 
 .tab {
@@ -718,7 +769,7 @@ starlight-tabs:hover {
   color: var(--mir-gold);
   font-weight: 500;
   background: #050810;
-  box-shadow: inset 0 -1px 0 var(--mir-gold);
+  box-shadow: inset 0 -1px 0 rgba(200, 168, 75, 0.28);
   text-shadow: 0 0 10px rgba(200, 168, 75, 0.35);
 }
 
@@ -750,7 +801,7 @@ starlight-tabs [role='tabpanel'] pre:not(:where(.not-content *))::before {
 /* Expressive-Code frames inside tabs: drop the border and hide the empty
    figcaption header — otherwise an empty gray bar stacks under the tab strip. */
 starlight-tabs [role='tabpanel'] .expressive-code .frame {
-  border: none;
+  border: none !important;
   border-radius: 0;
 }
 
