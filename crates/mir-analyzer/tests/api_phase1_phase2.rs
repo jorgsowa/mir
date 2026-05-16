@@ -164,14 +164,15 @@ fn project_analyzer_builder_pattern() {
     use mir_analyzer::ProjectAnalyzer;
 
     // The builder pattern is chainable
-    let _analyzer = ProjectAnalyzer::new()
-        .with_php_version(PhpVersion::LATEST)
-        .with_dead_code(true);
+    let _analyzer = ProjectAnalyzer::new().with_php_version(PhpVersion::LATEST);
 
-    // Old mutable-field style still works for backward compat
+    // Dead-code reporting is opted in by clearing the dead-code names
+    // from the unified suppression set — there is no special boolean.
     let mut legacy = ProjectAnalyzer::new();
     legacy.php_version = Some(PhpVersion::LATEST);
-    legacy.find_dead_code = true;
+    for kind in mir_analyzer::project::dead_code_issue_kinds() {
+        legacy.suppressed_issue_kinds.remove(*kind);
+    }
 }
 
 #[test]

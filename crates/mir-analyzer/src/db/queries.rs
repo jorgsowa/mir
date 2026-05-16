@@ -812,3 +812,13 @@ pub(crate) fn collect_accumulated_issues(
 
     all_issues
 }
+
+/// Return `true` if `fqcn` descends from `RuntimeException` or
+/// `LogicException`, which by PHP convention are "unchecked" exceptions —
+/// programmer errors that callers are not expected to document or recover
+/// from.  The analyzer suppresses [`MissingThrowsDocblock`] diagnostics for
+/// these by default to avoid drowning real signal in @throws noise.
+pub fn is_unchecked_exception_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    extends_or_implements_via_db(db, fqcn, "RuntimeException")
+        || extends_or_implements_via_db(db, fqcn, "LogicException")
+}

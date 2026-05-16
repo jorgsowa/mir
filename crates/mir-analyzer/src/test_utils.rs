@@ -27,7 +27,7 @@
 //! ```text
 //! ===config===
 //! php_version=8.1
-//! find_dead_code=true
+//! suppress=MissingThrowsDocblock,UnusedFunction
 //! stub_file=stubs/helpers.php
 //! stub_dir=stubs
 //! ===file===
@@ -90,10 +90,15 @@
 //! - A fixture with no file section at all fails immediately.
 //! - `===config===` must appear **at most once** per fixture.
 //! - Every key in `===config===` must be a recognised key (`php_version`,
-//!   `find_dead_code`); unknown keys fail the test.
+//!   `suppress`, `stub_file`, `stub_dir`); unknown keys fail the test.
 //! - `php_version` is parsed via [`PhpVersion::from_str`] (same parser as the
 //!   real CLI config); invalid values fail the test.
-//! - `find_dead_code` accepts only the literals `true` or `false`.
+//! - `suppress` accepts a comma-separated list of [`IssueKind`] names and
+//!   **replaces** the analyzer's default suppression set. When the key is
+//!   omitted the runner auto-fills the dead-code group unless the
+//!   fixture's `===expect===` references one of those kinds, so dead-code
+//!   fixtures need no boilerplate and ordinary fixtures don't get unsolicited
+//!   `UnusedFunction` noise from their bare top-level functions.
 //! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
 //! - `===description===` must appear **at most once** and before any file section.
 //! - `===ignore===` must appear **at most once** and before any file section.
@@ -125,7 +130,12 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 #[derive(Default)]
 struct FixtureConfig {
     php_version: Option<PhpVersion>,
-    find_dead_code: bool,
+    /// Explicit replacement for the analyzer's default suppression set.
+    /// Set from the `suppress=Foo,Bar` config key. When unset, the
+    /// analyzer's default suppressions (currently the dead-code group)
+    /// apply unchanged. `suppress=` with an empty value clears the set
+    /// entirely — that's how a fixture opts in to dead-code reporting.
+    suppressed_issue_kinds: Option<std::collections::HashSet<String>>,
     /// Paths (relative to temp dir) to pass as `analyzer.stub_files`.
     stub_files: Vec<String>,
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.
@@ -359,14 +369,14 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                 });
                 config.php_version = Some(v);
             }
-            "find_dead_code" => {
-                config.find_dead_code = match value.trim() {
-                    "true" => true,
-                    "false" => false,
-                    other => panic!(
-                        "fixture {path}: find_dead_code must be `true` or `false`, got {other:?}"
-                    ),
-                };
+            "suppress" => {
+                let set = config.suppressed_issue_kinds.get_or_insert_with(Default::default);
+                for name in value.split(',') {
+                    let trimmed = name.trim();
+                    if !trimmed.is_empty() {
+                        set.insert(trimmed.to_string());
+                    }
+                }
             }
             "stub_file" => {
                 config.stub_files.push(value.trim().to_string());
@@ -375,7 +385,7 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
                 config.stub_dirs.push(value.trim().to_string());
             }
             other => panic!(
-                "fixture {path}: unknown config key {other:?} — valid keys: php_version, find_dead_code, stub_file, stub_dir"
+                "fixture {path}: unknown config key {other:?} — valid keys: php_version, suppress, stub_file, stub_dir"
             ),
         }
     }
@@ -523,7 +533,24 @@ pub fn run_fixture(path: &str) {
     let content = std::fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("failed to read fixture {path}: {e}"));
 
-    let fixture = parse_phpt(&content, path);
+    let mut fixture = parse_phpt(&content, path);
+    // Auto-suppression: fixtures that don't expect any dead-code diagnostic
+    // get the dead-code group silently suppressed, so authors don't have to
+    // sprinkle boilerplate `suppress=` lines on every fixture whose example
+    // code happens to declare an uncalled global function. Fixtures that
+    // explicitly set `suppress=...` keep their replacement semantics; this
+    // only fills in the default.
+    if fixture.config.suppressed_issue_kinds.is_none() {
+        let dead = crate::project::dead_code_issue_kinds();
+        let expects_dead_code = fixture
+            .expected
+            .iter()
+            .any(|e| dead.contains(&e.kind_name.as_str()));
+        if !expects_dead_code {
+            fixture.config.suppressed_issue_kinds =
+                Some(dead.iter().map(|s| (*s).to_string()).collect());
+        }
+    }
     let file_refs: Vec<(&str, &str)> = fixture
         .files
         .iter()
@@ -565,7 +592,9 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     let tmp_dir_str = tmp_dir.to_string_lossy().into_owned();
 
     let mut analyzer = ProjectAnalyzer::new();
-    analyzer.find_dead_code = config.find_dead_code;
+    if let Some(explicit) = &config.suppressed_issue_kinds {
+        analyzer.suppressed_issue_kinds = explicit.clone();
+    }
     if let Some(version) = config.php_version {
         analyzer = analyzer.with_php_version(version);
     }
@@ -614,6 +643,12 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
             .collect()
     };
 
+    // Re-borrow the analyzer's effective suppression set so the stub-side
+    // filter below knows whether the dead-code pass actually ran.
+    let dead_code_enabled = crate::project::dead_code_issue_kinds()
+        .iter()
+        .any(|k| !analyzer.suppressed_issue_kinds.contains(*k));
+
     let result = analyzer.analyze(&explicit_paths);
     std::fs::remove_dir_all(&tmp_dir).ok();
 
@@ -621,11 +656,11 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
         .issues
         .into_iter()
         .filter(|i| !i.suppressed)
-        // When dead-code analysis is enabled the analyzer walks the entire
+        // When dead-code analysis runs, the analyzer walks the entire
         // codebase including stubs. Filter to issues from the temp directory
         // only so stub-side false positives don't pollute fixture output.
         .filter(|i| {
-            !config.find_dead_code || i.location.file.as_ref().starts_with(tmp_dir_str.as_str())
+            !dead_code_enabled || i.location.file.as_ref().starts_with(tmp_dir_str.as_str())
         })
         .collect()
 }
@@ -898,7 +933,7 @@ mod parser_validation {
     #[test]
     #[should_panic(expected = "===config=== must appear at most once")]
     fn duplicate_config_section() {
-        p("===config===\nfind_dead_code=false\n===config===\nfind_dead_code=true\n===file===\n<?php\n===expect===\n");
+        p("===config===\nsuppress=Foo\n===config===\nsuppress=Bar\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]
@@ -914,20 +949,14 @@ mod parser_validation {
     }
 
     #[test]
-    #[should_panic(expected = "find_dead_code must be `true` or `false`")]
-    fn invalid_find_dead_code_value() {
-        p("===config===\nfind_dead_code=maybe\n===file===\n<?php\n===expect===\n");
-    }
-
-    #[test]
     #[should_panic(expected = "===config=== must appear before the first ===file===")]
     fn config_after_file_marker() {
-        p("===file===\n<?php\n===config===\nfind_dead_code=true\n===expect===\n");
+        p("===file===\n<?php\n===config===\nsuppress=Foo\n===expect===\n");
     }
 
     #[test]
     fn valid_config_is_accepted() {
-        p("===config===\nphp_version=8.1\nfind_dead_code=true\n===file===\n<?php\n===expect===\n");
+        p("===config===\nphp_version=8.1\nsuppress=Foo,Bar\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]

@@ -218,7 +218,11 @@ fn main() {
             }
         }
 
-        analyzer.find_dead_code = cli.find_dead_code;
+        if !cli.find_dead_code {
+            for kind in mir_analyzer::project::dead_code_issue_kinds() {
+                analyzer.suppressed_issue_kinds.insert((*kind).to_string());
+            }
+        }
 
         if let Some(raw) = &config.php_version {
             match raw.parse::<PhpVersion>() {
@@ -431,7 +435,11 @@ fn main() {
         }
     }
 
-    analyzer.find_dead_code = cli.find_dead_code;
+    if !cli.find_dead_code {
+        for kind in mir_analyzer::project::dead_code_issue_kinds() {
+            analyzer.suppressed_issue_kinds.insert((*kind).to_string());
+        }
+    }
     apply_stub_config(&mut analyzer, &config, &config_base);
 
     // Load type stubs first (needed before collect_types_only)

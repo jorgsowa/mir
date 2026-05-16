@@ -1,7 +1,5 @@
 ===description===
 reports private unused method
-===config===
-find_dead_code=true
 ===file===
 <?php
 class Foo {

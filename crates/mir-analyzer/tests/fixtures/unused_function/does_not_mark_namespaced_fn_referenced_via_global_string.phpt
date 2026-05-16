@@ -1,7 +1,5 @@
 ===description===
 does not mark namespaced fn referenced via global string
-===config===
-find_dead_code=true
 ===file===
 <?php
 namespace App;

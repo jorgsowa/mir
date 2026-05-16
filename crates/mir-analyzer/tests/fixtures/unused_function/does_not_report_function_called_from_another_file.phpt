@@ -1,7 +1,5 @@
 ===description===
 does not report function called from another file
-===config===
-find_dead_code=true
 ===file:helpers.php===
 <?php
 function helper(): void {}

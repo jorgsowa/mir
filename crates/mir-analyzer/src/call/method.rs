@@ -422,8 +422,13 @@ fn resolve_method_return<'a, 'arena, 'src>(
             }
         }
 
-        // Check inter-procedural throws: if callee declares @throws, check if caller covers them
+        // Check inter-procedural throws: if callee declares @throws, check if caller covers them.
+        // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
+        // PHP convention — see [`is_unchecked_exception_via_db`].
         for callee_throw in resolved.throws.iter() {
+            if crate::db::is_unchecked_exception_via_db(ea.db, callee_throw.as_ref()) {
+                continue;
+            }
             if !ctx.fn_declared_throws.iter().any(|declared| {
                 declared.as_ref() == callee_throw.as_ref()
                     || crate::db::extends_or_implements_via_db(

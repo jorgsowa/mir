@@ -1,7 +1,5 @@
 ===description===
 does not report function called via call user func with fqn
-===config===
-find_dead_code=true
 ===file===
 <?php
 namespace App;

@@ -20,6 +20,16 @@ use mir_issues::Issue;
 
 pub(crate) use crate::pass2::merge_return_types;
 
+/// Issue kinds emitted by [`crate::dead_code::DeadCodeAnalyzer`].
+///
+/// The dead-code pass is just an error group — these names participate in
+/// `suppressed_issue_kinds` like any other [`IssueKind`]. If every kind
+/// listed here is suppressed, the dead-code pass is skipped entirely (it
+/// has nothing to contribute).
+pub fn dead_code_issue_kinds() -> &'static [&'static str] {
+    &["UnusedMethod", "UnusedProperty", "UnusedFunction"]
+}
+
 /// Batch-oriented analyzer: file discovery, parsing, and analysis.
 ///
 /// ProjectAnalyzer is the primary entry point for analyzing a project as a whole.
@@ -43,8 +53,16 @@ pub struct ProjectAnalyzer {
     pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
     /// PSR-4 autoloader mapping from composer.json, if available.
     pub psr4: Option<Arc<crate::composer::Psr4Map>>,
-    /// When true, run dead code detection at the end of analysis.
-    pub find_dead_code: bool,
+    /// Names of `IssueKind` variants to drop from the final result, e.g.
+    /// `["MissingThrowsDocblock", "UnusedMethod"]`. Applied as a final
+    /// post-filter on every `analyze()` return path, so analyzer internals
+    /// don't need to know which diagnostics the consumer cares about.
+    ///
+    /// Defaults to an empty set — nothing is suppressed unless the
+    /// consumer (CLI, test fixture, programmatic caller) adds names. The
+    /// dead-code pass is skipped automatically when every
+    /// [`dead_code_issue_kinds`] entry is in this set.
+    pub suppressed_issue_kinds: std::collections::HashSet<String>,
     /// Target PHP language version. `None` means "not configured"; resolved to
     /// `PhpVersion::LATEST` when passed down to `StatementsAnalyzer`.
     pub php_version: Option<PhpVersion>,
@@ -113,7 +131,7 @@ impl ProjectAnalyzer {
             cache: None,
             on_file_done: None,
             psr4: None,
-            find_dead_code: false,
+            suppressed_issue_kinds: std::collections::HashSet::new(),
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
@@ -127,7 +145,7 @@ impl ProjectAnalyzer {
             cache: Some(AnalysisCache::open(cache_dir)),
             on_file_done: None,
             psr4: None,
-            find_dead_code: false,
+            suppressed_issue_kinds: std::collections::HashSet::new(),
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
@@ -162,7 +180,7 @@ impl ProjectAnalyzer {
             cache: None,
             on_file_done: None,
             psr4: Some(psr4),
-            find_dead_code: false,
+            suppressed_issue_kinds: std::collections::HashSet::new(),
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
@@ -176,10 +194,12 @@ impl ProjectAnalyzer {
         self
     }
 
-    /// Builder method: enable dead-code detection at the end of analysis.
-    pub fn with_dead_code(mut self, enabled: bool) -> Self {
-        self.find_dead_code = enabled;
-        self
+    /// True iff at least one [`IssueKind`] emitted by the dead-code pass is
+    /// not currently suppressed, so it's worth running.
+    fn should_run_dead_code(&self) -> bool {
+        dead_code_issue_kinds()
+            .iter()
+            .any(|k| !self.suppressed_issue_kinds.contains(*k))
     }
 
     /// Builder method: set a progress callback invoked once per analyzed file.
@@ -198,6 +218,16 @@ impl ProjectAnalyzer {
     pub fn with_stub_dirs(mut self, dirs: Vec<PathBuf>) -> Self {
         self.stub_dirs = dirs;
         self
+    }
+
+    /// Drop issues whose [`IssueKind::name()`] is listed in
+    /// [`Self::suppressed_issue_kinds`]. Centralized post-filter so analyzer
+    /// internals never need to know what the consumer cares about.
+    fn apply_issue_suppressions(&self, issues: &mut Vec<mir_issues::Issue>) {
+        if self.suppressed_issue_kinds.is_empty() {
+            return;
+        }
+        issues.retain(|i| !self.suppressed_issue_kinds.contains(i.kind.name()));
     }
 
     /// Builder method: configure a disk-backed cache at the given directory.
@@ -687,7 +717,7 @@ impl ProjectAnalyzer {
 
         // ---- Compact the reference index ------------------------------------
         // ---- Dead-code detection (M18) --------------------------------------
-        if self.find_dead_code {
+        if self.should_run_dead_code() {
             let salsa = self.snapshot_db();
             let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa).analyze();
             all_issues.extend(dead_code_issues);
@@ -708,6 +738,7 @@ impl ProjectAnalyzer {
             );
         }
 
+        self.apply_issue_suppressions(&mut all_issues);
         AnalysisResult::build(all_issues, std::collections::HashMap::new(), all_symbols)
     }
 
@@ -919,11 +950,12 @@ impl ProjectAnalyzer {
         // Fast path: content unchanged and cache has a valid entry — skip full re-analysis.
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
-            if let Some((issues, ref_locs)) = cache.get(file_path, &h) {
+            if let Some((mut issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
                 let guard = self.shared_db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
                 guard.commit_pending_to_maps();
+                self.apply_issue_suppressions(&mut issues);
                 return AnalysisResult::build(issues, HashMap::new(), Vec::new());
             }
         }
@@ -982,6 +1014,7 @@ impl ProjectAnalyzer {
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
 
+        self.apply_issue_suppressions(&mut all_issues);
         AnalysisResult::build(all_issues, HashMap::new(), symbols)
     }
 
@@ -1003,6 +1036,7 @@ impl ProjectAnalyzer {
             .iter()
             .any(|issue| matches!(issue.kind, mir_issues::IssueKind::ParseError { .. }))
         {
+            analyzer.apply_issue_suppressions(&mut all_issues);
             return AnalysisResult::build(all_issues, std::collections::HashMap::new(), Vec::new());
         }
         let mut type_envs = std::collections::HashMap::new();
@@ -1019,6 +1053,7 @@ impl ProjectAnalyzer {
             &mut type_envs,
             &mut all_symbols,
         ));
+        analyzer.apply_issue_suppressions(&mut all_issues);
         AnalysisResult::build(all_issues, type_envs, all_symbols)
     }
 
