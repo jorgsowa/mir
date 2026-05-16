@@ -16,8 +16,7 @@ export default defineConfig({
       title: 'mir',
       description: 'A fast, incremental PHP static analyzer written in Rust.',
       logo: {
-        light: './src/assets/logo-light.svg',
-        dark: './src/assets/logo-dark.svg',
+        src: './src/assets/logo-hero.png',
         replacesTitle: true,
       },
       head: [
@@ -28,7 +27,7 @@ export default defineConfig({
         { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
         { tag: 'meta', attrs: { name: 'twitter:image', content: OG_IMAGE } },
-        { tag: 'meta', attrs: { name: 'theme-color', content: '#1a1a2e' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#faf6f2' } },
       ],
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/jorgsowa/mir' },

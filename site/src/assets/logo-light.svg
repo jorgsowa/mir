@@ -1,13 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 28" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" fill="none">
+  <!-- Circle (sun/moon) -->
+  <path d="M40 4 A22 22 0 0 1 40 48 A22 22 0 0 1 40 4Z" fill="none"/>
+  <path d="M18 26 A22 22 0 0 1 62 26Z" fill="#C4A882"/>
+  <!-- Mountains -->
+  <polygon points="24,26 33,12 40,20 47,11 56,26" fill="#C4A882"/>
+  <!-- Star (4-point) -->
+  <path d="M40 10 L41.2 13.5 L44.5 13.5 L41.8 15.7 L42.8 19.2 L40 17.2 L37.2 19.2 L38.2 15.7 L35.5 13.5 L38.8 13.5 Z" fill="white"/>
+  <!-- Water ripples -->
+  <ellipse cx="40" cy="29" rx="17" ry="1.5" fill="#C4A882" opacity="0.7"/>
+  <ellipse cx="40" cy="32" rx="12" ry="1.2" fill="#C4A882" opacity="0.5"/>
+  <ellipse cx="40" cy="35" rx="7" ry="1" fill="#C4A882" opacity="0.35"/>
+  <circle cx="40" cy="38" r="1" fill="#C4A882" opacity="0.25"/>
+  <!-- Wordmark -->
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&amp;display=swap');
-    text {
-      font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
-      font-weight: 700;
-      font-size: 24px;
-      letter-spacing: -0.04em;
-      fill: #1a1a2e;
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;display=swap');
+    .mir-wordmark {
+      font-family: 'Instrument Serif', 'Times New Roman', serif;
+      font-weight: 400;
+      font-size: 28px;
+      fill: #5c4a32;
+      letter-spacing: -0.02em;
     }
   </style>
-  <text x="0" y="22">mir</text>
+  <text x="72" y="35" class="mir-wordmark">mir</text>
 </svg>
