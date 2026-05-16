@@ -166,17 +166,20 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
             IssueAccumulator(issue).accumulate(db);
         }
 
-        // Emit reference locations via accumulator
-        let ref_locs = db.extract_file_reference_locations(&path);
-        for (symbol_key, line, col_start, col_end) in ref_locs {
-            let ref_loc = RefLoc {
-                symbol_key,
-                file: path.clone(),
-                line,
-                col_start,
-                col_end,
-            };
-            RefLocAccumulator(ref_loc).accumulate(db);
+        // Drain reference locations that Pass 2 staged in this db's pending
+        // buffer and emit each via the accumulator. The shared
+        // reference_locations map is intentionally NOT mutated from inside
+        // the tracked query — consumers (`collect_accumulated_issues`,
+        // future S5-B FileAnalyzer migration) decide when to commit after
+        // reading accumulator output.
+        //
+        // Per-expression resolved symbols are NOT routed through an
+        // accumulator: a typical file resolves thousands of expressions and
+        // retaining them in the salsa cache balloons memory (~50 KiB/file
+        // measured on Laravel). Consumers that need symbols call
+        // `Pass2Driver` directly via `FileAnalyzer`.
+        for loc in db.take_pending_ref_locs() {
+            RefLocAccumulator(loc).accumulate(db);
         }
     }
 }

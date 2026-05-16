@@ -15,7 +15,9 @@
 //! for keystroke-frequency re-analysis. Run `analyze_real_world` for
 //! full-fidelity diagnostic benchmarks.
 
+use std::alloc::{GlobalAlloc, Layout, System};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,6 +25,45 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
 use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer, Symbol};
 use tempfile::TempDir;
+
+// Counting allocator — global atomics updated on every alloc/dealloc.
+struct CountingAllocator;
+static G_LIVE: AtomicI64 = AtomicI64::new(0);
+static G_PEAK: AtomicI64 = AtomicI64::new(0);
+static G_TOTAL: AtomicUsize = AtomicUsize::new(0);
+
+unsafe impl GlobalAlloc for CountingAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let ptr = System.alloc(layout);
+        if !ptr.is_null() {
+            let sz = layout.size();
+            G_TOTAL.fetch_add(sz, Relaxed);
+            let new_live = G_LIVE.fetch_add(sz as i64, Relaxed) + sz as i64;
+            G_PEAK.fetch_max(new_live, Relaxed);
+        }
+        ptr
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        System.dealloc(ptr, layout);
+        G_LIVE.fetch_sub(layout.size() as i64, Relaxed);
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: CountingAllocator = CountingAllocator;
+
+fn reset_alloc_counters() {
+    G_LIVE.store(0, Relaxed);
+    G_PEAK.store(0, Relaxed);
+    G_TOTAL.store(0, Relaxed);
+}
+
+fn snapshot_alloc() -> (f64, f64, f64) {
+    let live = G_LIVE.load(Relaxed) as f64 / 1_048_576.0;
+    let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
+    let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    (live, peak, total)
+}
 
 // ---------------------------------------------------------------------------
 // Fixture helpers (mirrored from analyze_real_world.rs)
@@ -501,10 +542,152 @@ fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
     );
 }
 
+/// Cache-hit reanalysis: call `FileAnalyzer::analyze` repeatedly on the
+/// *same* unchanged source text. This is the scenario the salsa-tracked
+/// `analyze_file` query is supposed to make near-free: text input is
+/// identical, so salsa must return cached accumulator output without
+/// re-running Pass 2.
+///
+/// A regression here (vs prior versions where every call ran Pass 2) means
+/// the caching wiring is broken; an improvement means S5-B paid off.
+fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+    let (vendor_files, project_files) = split_vendor_project(&root);
+    let target = root.join("src/Illuminate/Auth/Events/Login.php");
+    if !target.exists() {
+        eprintln!("Skipping: target Login.php not found");
+        return;
+    }
+    let target_str = target.to_string_lossy().to_string();
+    let original = std::fs::read_to_string(&target).unwrap();
+
+    let cache: TempDir = tempfile::tempdir().unwrap();
+    let session = warm_session(&cache, &vendor_files, &project_files);
+    let target_arc: Arc<str> = Arc::from(target_str.as_str());
+    let source_arc: Arc<str> = Arc::from(original.as_str());
+
+    // Prime the salsa cache + ingest once so the first iteration is also a
+    // cache hit (matches steady-state LSP behaviour where the file has
+    // already been analyzed at least once).
+    session.ingest_file(target_arc.clone(), source_arc.clone());
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, source_arc.as_ref());
+    let _ = FileAnalyzer::new(&session).analyze(
+        target_arc.clone(),
+        source_arc.as_ref(),
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let mut group = c.benchmark_group("file_analyzer_cache_hit");
+    group.sample_size(50);
+    group.measurement_time(Duration::from_secs(10));
+
+    group.bench_function("login_php_unchanged", |b| {
+        b.iter(|| {
+            // Caller-side parse is part of the actual FileAnalyzer API
+            // contract, so measure it as part of the iteration body.
+            let arena = bumpalo::Bump::new();
+            let parsed = php_rs_parser::parse(&arena, source_arc.as_ref());
+            FileAnalyzer::new(&session).analyze(
+                target_arc.clone(),
+                source_arc.as_ref(),
+                &parsed.program,
+                &parsed.source_map,
+            )
+        });
+    });
+
+    group.finish();
+}
+
+/// Memory probe (not a Criterion bench — uses `eprintln!` for output).
+///
+/// Warms a session over the full project + vendor, snapshots allocator
+/// state, then runs `FileAnalyzer::analyze` once on every project file so
+/// the salsa cache fills with accumulator entries (IssueAccumulator,
+/// RefLocAccumulator, SymbolAccumulator). Reports the live-bytes delta
+/// retained by the cache + the total bytes allocated during the loop.
+///
+/// Comparing this number with-and-without S5-B is the only signal for
+/// "did the accumulator-based cache balloon memory?"
+fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+    let (vendor_files, project_files) = split_vendor_project(&root);
+    let cache: TempDir = tempfile::tempdir().unwrap();
+    let session = warm_session(&cache, &vendor_files, &project_files);
+
+    // Pre-load all project sources to remove I/O variance from the timed loop.
+    let sources: Vec<(Arc<str>, Arc<str>)> = project_files
+        .iter()
+        .filter_map(|p| {
+            let src = std::fs::read_to_string(p).ok()?;
+            Some((
+                Arc::from(p.to_string_lossy().as_ref()),
+                Arc::from(src.as_str()),
+            ))
+        })
+        .collect();
+
+    eprintln!(
+        "\n=== FileAnalyzer MEMORY PROBE ({} project files) ===",
+        sources.len()
+    );
+
+    // Snapshot live bytes after warmup, before the FileAnalyzer loop.
+    // (Total allocated is reset so we measure only the loop's churn.)
+    let (live_before, _, _) = snapshot_alloc();
+    reset_alloc_counters();
+    G_LIVE.store((live_before * 1_048_576.0) as i64, Relaxed);
+    G_PEAK.store((live_before * 1_048_576.0) as i64, Relaxed);
+
+    let start = std::time::Instant::now();
+    let mut analyzed = 0usize;
+    for (file, source) in &sources {
+        let arena = bumpalo::Bump::new();
+        let parsed = php_rs_parser::parse(&arena, source.as_ref());
+        if !parsed.errors.is_empty() {
+            continue;
+        }
+        let _ = FileAnalyzer::new(&session).analyze(
+            file.clone(),
+            source.as_ref(),
+            &parsed.program,
+            &parsed.source_map,
+        );
+        analyzed += 1;
+    }
+    let elapsed = start.elapsed();
+    let (live_after, peak_after, total_after) = snapshot_alloc();
+
+    let retained_delta = live_after - live_before;
+    eprintln!(
+        "  analyzed {} files in {:.0} ms",
+        analyzed,
+        elapsed.as_secs_f64() * 1000.0
+    );
+    eprintln!(
+        "  live bytes:    before {:>7.1} MiB → after {:>7.1} MiB    (retained Δ: {:>+7.1} MiB)",
+        live_before, live_after, retained_delta
+    );
+    eprintln!(
+        "  peak live:     {:>7.1} MiB    total allocated during loop: {:>7.1} MiB\n",
+        peak_after, total_after
+    );
+}
+
 criterion_group!(
     benches,
     bench_single_file_edit,
     bench_high_fanout_edit,
+    bench_file_analyzer_cache_hit,
+    bench_file_analyzer_memory_probe,
     bench_read_query_latency,
     bench_stub_loading,
     bench_concurrent_read_under_edits,
