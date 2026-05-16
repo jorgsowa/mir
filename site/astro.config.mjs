@@ -20,6 +20,8 @@ export default defineConfig({
         replacesTitle: true,
       },
       head: [
+        { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
+        { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' } },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
         { tag: 'meta', attrs: { property: 'og:site_name', content: 'mir' } },
         { tag: 'meta', attrs: { property: 'og:image', content: OG_IMAGE } },
@@ -27,7 +29,7 @@ export default defineConfig({
         { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
         { tag: 'meta', attrs: { name: 'twitter:image', content: OG_IMAGE } },
-        { tag: 'meta', attrs: { name: 'theme-color', content: '#faf6f2' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#080c14' } },
       ],
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/jorgsowa/mir' },

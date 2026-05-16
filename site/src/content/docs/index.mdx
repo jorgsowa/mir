@@ -5,25 +5,22 @@ template: splash
 head:
   - tag: title
     content: mir | Fast PHP Static Analyzer
-hero:
-  tagline: A fast, incremental PHP static analyzer written in Rust — inspired by Psalm.
-  image:
-    file: ../../assets/logo-hero.png
-  actions:
-    - text: Get Started
-      link: /mir/guides/getting-started/
-      icon: right-arrow
-      variant: primary
-    - text: Try the Playground
-      link: /mir/playground/
-      icon: external
-    - text: View on GitHub
-      link: https://github.com/jorgsowa/mir
-      icon: external
-      variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard, Aside, Code, Tabs, TabItem } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import heroLogo from '../../assets/logo-hero.png';
+
+<div class="mir-hero">
+  <img src={heroLogo.src} alt="mir" class="mir-hero-logo" />
+  <h1 class="mir-hero-title">MIR</h1>
+  <p class="mir-hero-sub">Static Analysis System</p>
+  <p class="mir-hero-tagline">Precision. Structure. Signal.<span class="mir-cursor"> █</span></p>
+  <div class="mir-hero-actions">
+    <a href="/mir/guides/getting-started/" class="mir-btn mir-btn--primary">Get Started</a>
+    <a href="/mir/playground/" class="mir-btn mir-btn--secondary">Try Playground</a>
+    <a href="https://github.com/jorgsowa/mir" class="mir-btn mir-btn--ghost">GitHub</a>
+  </div>
+</div>
 
 <Aside type="caution" title="Experimental">
 Not yet production-ready. APIs, issue codes, and output formats may change between releases — expect false positives and rough edges.
@@ -55,14 +52,26 @@ Not yet production-ready. APIs, issue codes, and output formats may change betwe
 
 ## What mir reports
 
-```text title="$ mir src/"
-src/Controller/UserController.php:42:5  UndefinedMethod    Method User::getName() does not exist
+```text title="$ mir analyze src/"
+src/Controller/UserController.php:42:5  UndefinedMethod   Method User::getName() does not exist
 src/Service/Mailer.php:17:12            InvalidArgument   Argument 1 of sendMessage expects string, int provided
-src/Domain/Order.php:88:9               NullMethodCall    Cannot call method on possibly null value
-src/Http/Search.php:23:14               TaintedSql        Tainted data from $_GET flows into SQL sink
+src/Domain/Order.php:88:9              NullMethodCall     Cannot call method on possibly null value
+src/Http/Search.php:23:14              TaintedSql         Tainted data from $_GET flows into SQL sink
 
 4 errors in 312 files · 0.42s
 ```
+
+## System Principles
+
+<div class="mir-principles">
+  <div class="mir-principles-header">System Principles</div>
+  <ul>
+    <li>deterministic</li>
+    <li>transparent</li>
+    <li>composable</li>
+    <li>fast</li>
+  </ul>
+</div>
 
 ## Browse by category
 
