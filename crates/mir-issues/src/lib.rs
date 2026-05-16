@@ -435,6 +435,145 @@ impl IssueKind {
         }
     }
 
+    /// Stable error code (e.g. `"MIR0005"`).
+    ///
+    /// Codes are assigned in bands by category and are part of the public API:
+    /// once a code ships, it must never be reused for a different issue kind.
+    /// New variants take the next free slot in their band; obsolete variants
+    /// retire their code (the slot stays burnt). Bands have headroom for growth.
+    ///
+    /// Bands:
+    ///
+    /// | Range         | Category                        |
+    /// |---------------|---------------------------------|
+    /// | 0001 – 0099   | Undefined symbols               |
+    /// | 0100 – 0199   | Nullability                     |
+    /// | 0200 – 0299   | Type mismatches                 |
+    /// | 0300 – 0399   | Array / offset                  |
+    /// | 0400 – 0499   | Redundancy                      |
+    /// | 0500 – 0599   | Dead code                       |
+    /// | 0600 – 0699   | Readonly                        |
+    /// | 0700 – 0799   | Inheritance                     |
+    /// | 0800 – 0899   | Security (taint)                |
+    /// | 0900 – 0999   | Generics                        |
+    /// | 1000 – 1099   | Deprecation / internal          |
+    /// | 1100 – 1199   | Missing types / docblocks       |
+    /// | 1200 – 1299   | Mixed                           |
+    /// | 1300 – 1399   | Trait                           |
+    /// | 1400 – 1499   | Parse                           |
+    /// | 1500 – 1599   | Other                           |
+    pub fn code(&self) -> &'static str {
+        match self {
+            // Undefined (0001-0099)
+            IssueKind::InvalidScope { .. } => "MIR0001",
+            IssueKind::UndefinedVariable { .. } => "MIR0002",
+            IssueKind::UndefinedFunction { .. } => "MIR0003",
+            IssueKind::UndefinedMethod { .. } => "MIR0004",
+            IssueKind::UndefinedClass { .. } => "MIR0005",
+            IssueKind::UndefinedProperty { .. } => "MIR0006",
+            IssueKind::UndefinedConstant { .. } => "MIR0007",
+            IssueKind::PossiblyUndefinedVariable { .. } => "MIR0008",
+
+            // Nullability (0100-0199)
+            IssueKind::NullArgument { .. } => "MIR0100",
+            IssueKind::NullPropertyFetch { .. } => "MIR0101",
+            IssueKind::NullMethodCall { .. } => "MIR0102",
+            IssueKind::NullArrayAccess => "MIR0103",
+            IssueKind::PossiblyNullArgument { .. } => "MIR0104",
+            IssueKind::PossiblyInvalidArgument { .. } => "MIR0105",
+            IssueKind::PossiblyNullPropertyFetch { .. } => "MIR0106",
+            IssueKind::PossiblyNullMethodCall { .. } => "MIR0107",
+            IssueKind::PossiblyNullArrayAccess => "MIR0108",
+            IssueKind::NullableReturnStatement { .. } => "MIR0109",
+
+            // Type mismatches (0200-0299)
+            IssueKind::InvalidReturnType { .. } => "MIR0200",
+            IssueKind::InvalidArgument { .. } => "MIR0201",
+            IssueKind::TooFewArguments { .. } => "MIR0202",
+            IssueKind::TooManyArguments { .. } => "MIR0203",
+            IssueKind::InvalidNamedArgument { .. } => "MIR0204",
+            IssueKind::InvalidPassByReference { .. } => "MIR0205",
+            IssueKind::InvalidPropertyAssignment { .. } => "MIR0206",
+            IssueKind::InvalidCast { .. } => "MIR0207",
+            IssueKind::InvalidOperand { .. } => "MIR0208",
+            IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
+            IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
+
+            // Array / offset (0300-0399)
+            IssueKind::InvalidArrayOffset { .. } => "MIR0300",
+            IssueKind::NonExistentArrayOffset { .. } => "MIR0301",
+            IssueKind::PossiblyInvalidArrayOffset { .. } => "MIR0302",
+
+            // Redundancy (0400-0499)
+            IssueKind::RedundantCondition { .. } => "MIR0400",
+            IssueKind::RedundantCast { .. } => "MIR0401",
+            IssueKind::UnnecessaryVarAnnotation { .. } => "MIR0402",
+            IssueKind::TypeDoesNotContainType { .. } => "MIR0403",
+
+            // Dead code (0500-0599)
+            IssueKind::UnusedVariable { .. } => "MIR0500",
+            IssueKind::UnusedParam { .. } => "MIR0501",
+            IssueKind::UnreachableCode => "MIR0502",
+            IssueKind::UnusedMethod { .. } => "MIR0503",
+            IssueKind::UnusedProperty { .. } => "MIR0504",
+            IssueKind::UnusedFunction { .. } => "MIR0505",
+
+            // Readonly (0600-0699)
+            IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
+
+            // Inheritance (0700-0799)
+            IssueKind::UnimplementedAbstractMethod { .. } => "MIR0700",
+            IssueKind::UnimplementedInterfaceMethod { .. } => "MIR0701",
+            IssueKind::MethodSignatureMismatch { .. } => "MIR0702",
+            IssueKind::OverriddenMethodAccess { .. } => "MIR0703",
+            IssueKind::FinalClassExtended { .. } => "MIR0704",
+            IssueKind::FinalMethodOverridden { .. } => "MIR0705",
+            IssueKind::AbstractInstantiation { .. } => "MIR0706",
+            IssueKind::CircularInheritance { .. } => "MIR0707",
+
+            // Security / taint (0800-0899)
+            IssueKind::TaintedInput { .. } => "MIR0800",
+            IssueKind::TaintedHtml => "MIR0801",
+            IssueKind::TaintedSql => "MIR0802",
+            IssueKind::TaintedShell => "MIR0803",
+
+            // Generics (0900-0999)
+            IssueKind::InvalidTemplateParam { .. } => "MIR0900",
+            IssueKind::ShadowedTemplateParam { .. } => "MIR0901",
+
+            // Deprecation / internal (1000-1099)
+            IssueKind::DeprecatedCall { .. } => "MIR1000",
+            IssueKind::DeprecatedMethodCall { .. } => "MIR1001",
+            IssueKind::DeprecatedMethod { .. } => "MIR1002",
+            IssueKind::DeprecatedClass { .. } => "MIR1003",
+            IssueKind::InternalMethod { .. } => "MIR1004",
+
+            // Missing types / docblocks (1100-1199)
+            IssueKind::MissingReturnType { .. } => "MIR1100",
+            IssueKind::MissingParamType { .. } => "MIR1101",
+            IssueKind::MissingThrowsDocblock { .. } => "MIR1102",
+            IssueKind::InvalidDocblock { .. } => "MIR1103",
+
+            // Mixed (1200-1299)
+            IssueKind::MixedArgument { .. } => "MIR1200",
+            IssueKind::MixedAssignment { .. } => "MIR1201",
+            IssueKind::MixedMethodCall { .. } => "MIR1202",
+            IssueKind::MixedPropertyFetch { .. } => "MIR1203",
+            IssueKind::MixedClone => "MIR1204",
+
+            // Trait (1300-1399)
+            IssueKind::InvalidTraitUse { .. } => "MIR1300",
+
+            // Parse (1400-1499)
+            IssueKind::ParseError { .. } => "MIR1400",
+
+            // Other (1500-1599)
+            IssueKind::InvalidThrow { .. } => "MIR1500",
+            IssueKind::ImplicitToStringCast { .. } => "MIR1501",
+            IssueKind::ImplicitFloatToIntCast { .. } => "MIR1502",
+        }
+    }
+
     /// Identifier name used in config and `@psalm-suppress` / `@suppress` annotations.
     pub fn name(&self) -> &'static str {
         match self {
@@ -852,9 +991,10 @@ impl fmt::Display for Issue {
         };
         write!(
             f,
-            "{} {} {}: {}",
+            "{} {}[{}] {}: {}",
             self.location.bright_black(),
             sev,
+            self.kind.code().bright_black(),
             self.kind.name().bold(),
             self.kind.message()
         )
@@ -942,5 +1082,301 @@ impl IssueBuffer {
             .iter()
             .filter(|i| !i.suppressed && i.severity == Severity::Warning)
             .count()
+    }
+}
+
+#[cfg(test)]
+mod code_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// Returns one instance of every `IssueKind` variant.
+    ///
+    /// Updating `IssueKind` without updating this list will compile (it's a
+    /// regular `Vec`), but `codes_cover_every_variant` will catch the omission
+    /// — the test below asserts the count matches the exhaustive `code()` arm.
+    fn one_of_each() -> Vec<IssueKind> {
+        let s = || String::new();
+        vec![
+            IssueKind::InvalidScope { in_class: false },
+            IssueKind::UndefinedVariable { name: s() },
+            IssueKind::UndefinedFunction { name: s() },
+            IssueKind::UndefinedMethod {
+                class: s(),
+                method: s(),
+            },
+            IssueKind::UndefinedClass { name: s() },
+            IssueKind::UndefinedProperty {
+                class: s(),
+                property: s(),
+            },
+            IssueKind::UndefinedConstant { name: s() },
+            IssueKind::PossiblyUndefinedVariable { name: s() },
+            IssueKind::NullArgument {
+                param: s(),
+                fn_name: s(),
+            },
+            IssueKind::NullPropertyFetch { property: s() },
+            IssueKind::NullMethodCall { method: s() },
+            IssueKind::NullArrayAccess,
+            IssueKind::PossiblyNullArgument {
+                param: s(),
+                fn_name: s(),
+            },
+            IssueKind::PossiblyInvalidArgument {
+                param: s(),
+                fn_name: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::PossiblyNullPropertyFetch { property: s() },
+            IssueKind::PossiblyNullMethodCall { method: s() },
+            IssueKind::PossiblyNullArrayAccess,
+            IssueKind::NullableReturnStatement {
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::InvalidReturnType {
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::InvalidArgument {
+                param: s(),
+                fn_name: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::TooFewArguments {
+                fn_name: s(),
+                expected: 0,
+                actual: 0,
+            },
+            IssueKind::TooManyArguments {
+                fn_name: s(),
+                expected: 0,
+                actual: 0,
+            },
+            IssueKind::InvalidNamedArgument {
+                fn_name: s(),
+                name: s(),
+            },
+            IssueKind::InvalidPassByReference {
+                fn_name: s(),
+                param: s(),
+            },
+            IssueKind::InvalidPropertyAssignment {
+                property: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::InvalidCast { from: s(), to: s() },
+            IssueKind::InvalidOperand {
+                op: s(),
+                left: s(),
+                right: s(),
+            },
+            IssueKind::MismatchingDocblockReturnType {
+                declared: s(),
+                inferred: s(),
+            },
+            IssueKind::MismatchingDocblockParamType {
+                param: s(),
+                declared: s(),
+                inferred: s(),
+            },
+            IssueKind::InvalidArrayOffset {
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::NonExistentArrayOffset { key: s() },
+            IssueKind::PossiblyInvalidArrayOffset {
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::RedundantCondition { ty: s() },
+            IssueKind::RedundantCast { from: s(), to: s() },
+            IssueKind::UnnecessaryVarAnnotation { var: s() },
+            IssueKind::TypeDoesNotContainType {
+                left: s(),
+                right: s(),
+            },
+            IssueKind::UnusedVariable { name: s() },
+            IssueKind::UnusedParam { name: s() },
+            IssueKind::UnreachableCode,
+            IssueKind::UnusedMethod {
+                class: s(),
+                method: s(),
+            },
+            IssueKind::UnusedProperty {
+                class: s(),
+                property: s(),
+            },
+            IssueKind::UnusedFunction { name: s() },
+            IssueKind::ReadonlyPropertyAssignment {
+                class: s(),
+                property: s(),
+            },
+            IssueKind::UnimplementedAbstractMethod {
+                class: s(),
+                method: s(),
+            },
+            IssueKind::UnimplementedInterfaceMethod {
+                class: s(),
+                interface: s(),
+                method: s(),
+            },
+            IssueKind::MethodSignatureMismatch {
+                class: s(),
+                method: s(),
+                detail: s(),
+            },
+            IssueKind::OverriddenMethodAccess {
+                class: s(),
+                method: s(),
+            },
+            IssueKind::FinalClassExtended {
+                parent: s(),
+                child: s(),
+            },
+            IssueKind::FinalMethodOverridden {
+                class: s(),
+                method: s(),
+                parent: s(),
+            },
+            IssueKind::AbstractInstantiation { class: s() },
+            IssueKind::CircularInheritance { class: s() },
+            IssueKind::TaintedInput { sink: s() },
+            IssueKind::TaintedHtml,
+            IssueKind::TaintedSql,
+            IssueKind::TaintedShell,
+            IssueKind::InvalidTemplateParam {
+                name: s(),
+                expected_bound: s(),
+                actual: s(),
+            },
+            IssueKind::ShadowedTemplateParam { name: s() },
+            IssueKind::DeprecatedCall {
+                name: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedMethodCall {
+                class: s(),
+                method: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedMethod {
+                class: s(),
+                method: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedClass {
+                name: s(),
+                message: None,
+            },
+            IssueKind::InternalMethod {
+                class: s(),
+                method: s(),
+            },
+            IssueKind::MissingReturnType { fn_name: s() },
+            IssueKind::MissingParamType {
+                fn_name: s(),
+                param: s(),
+            },
+            IssueKind::MissingThrowsDocblock { class: s() },
+            IssueKind::InvalidDocblock { message: s() },
+            IssueKind::MixedArgument {
+                param: s(),
+                fn_name: s(),
+            },
+            IssueKind::MixedAssignment { var: s() },
+            IssueKind::MixedMethodCall { method: s() },
+            IssueKind::MixedPropertyFetch { property: s() },
+            IssueKind::MixedClone,
+            IssueKind::InvalidTraitUse {
+                trait_name: s(),
+                reason: s(),
+            },
+            IssueKind::ParseError { message: s() },
+            IssueKind::InvalidThrow { ty: s() },
+            IssueKind::ImplicitToStringCast { class: s() },
+            IssueKind::ImplicitFloatToIntCast { from: s() },
+        ]
+    }
+
+    #[test]
+    fn codes_have_expected_shape() {
+        for kind in one_of_each() {
+            let code = kind.code();
+            assert!(
+                code.len() == 7
+                    && code.starts_with("MIR")
+                    && code[3..].chars().all(|c| c.is_ascii_digit()),
+                "code {code:?} for {} does not match MIR####",
+                kind.name(),
+            );
+        }
+    }
+
+    #[test]
+    fn codes_are_unique() {
+        let kinds = one_of_each();
+        let mut seen: HashSet<&'static str> = HashSet::new();
+        for kind in &kinds {
+            assert!(
+                seen.insert(kind.code()),
+                "duplicate code {} (variant {})",
+                kind.code(),
+                kind.name(),
+            );
+        }
+    }
+
+    #[test]
+    fn display_includes_code() {
+        let issue = Issue::new(
+            IssueKind::UndefinedClass {
+                name: "Foo".to_string(),
+            },
+            Location {
+                file: Arc::from("src/x.php"),
+                line: 1,
+                line_end: 1,
+                col_start: 0,
+                col_end: 3,
+            },
+        );
+        // Strip ANSI escape sequences so the assertion isn't dependent on
+        // owo-colors' tty detection.
+        let raw = format!("{issue}");
+        let stripped: String = {
+            let mut out = String::new();
+            let mut chars = raw.chars();
+            while let Some(c) = chars.next() {
+                if c == '\u{1b}' {
+                    for c2 in chars.by_ref() {
+                        if c2 == 'm' {
+                            break;
+                        }
+                    }
+                } else {
+                    out.push(c);
+                }
+            }
+            out
+        };
+        assert!(
+            stripped.contains("error[MIR0005] UndefinedClass:"),
+            "Display output missing code/name segment: {stripped:?}",
+        );
+    }
+
+    /// Guards against forgetting to add a new variant to `one_of_each()`.
+    /// If you add a variant, add it to `one_of_each()` *and* bump this count.
+    #[test]
+    fn one_of_each_has_every_variant() {
+        // 76 = current variant count. If this assertion fires after you added
+        // a new variant, also add it to `one_of_each()` so the uniqueness
+        // and shape tests cover it.
+        assert_eq!(one_of_each().len(), 76);
     }
 }
