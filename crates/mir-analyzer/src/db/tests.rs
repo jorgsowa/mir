@@ -109,6 +109,55 @@ mod tests {
         assert!(refs.is_empty());
     }
 
+    /// Regression: `analyze_file` previously called
+    /// `db.extract_file_reference_locations(&path)` to populate
+    /// `RefLocAccumulator`. That helper reads from the *committed*
+    /// `reference_locations` map, but Pass 2 stages writes in the per-clone
+    /// `pending_ref_locs` buffer and the tracked query has no chance to
+    /// commit them before extracting — so the accumulator always came back
+    /// empty even when Pass 2 emitted real references. The fix drains the
+    /// pending buffer instead. This test would have failed against the
+    /// pre-fix stub.
+    #[test]
+    fn analyze_file_emits_ref_locs_for_pass2_references() {
+        let mut db = MirDb::default();
+        for slice in crate::stubs::builtin_stub_slices_for_version(crate::PhpVersion::LATEST) {
+            db.ingest_stub_slice(&slice);
+        }
+
+        // Register a callee so Pass 2 records a real reference at the call
+        // site. Without an actual callee node the reference recorder is a
+        // no-op.
+        let defs_src: Arc<str> = Arc::from(
+            "<?php function helper(): string { return 'a'; } function caller(): string { return helper(); }",
+        );
+        let defs_path: Arc<str> = Arc::from("/tmp/ref_emit.php");
+        let defs_file = SourceFile::new(&db, defs_path.clone(), defs_src);
+        let file_defs = collect_file_definitions(&db, defs_file);
+        db.ingest_stub_slice(&file_defs.slice);
+
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        analyze_file(&db, defs_file, input);
+        let ref_locs: Vec<&RefLocAccumulator> = analyze_file::accumulated(&db, defs_file, input);
+
+        assert!(
+            !ref_locs.is_empty(),
+            "expected RefLocAccumulator to carry at least one reference for \
+             the helper() call site; got empty (the pre-fix bug)"
+        );
+        assert!(
+            ref_locs.iter().all(|acc| acc.0.file == defs_path),
+            "every emitted RefLoc should be scoped to this file; got {ref_locs:?}"
+        );
+        assert!(
+            ref_locs
+                .iter()
+                .any(|acc| acc.0.symbol_key.as_ref().contains("helper")),
+            "expected at least one RefLoc whose symbol key references `helper`; \
+             got {ref_locs:?}"
+        );
+    }
+
     #[test]
     fn analyze_file_calls_pass2_for_undefined_class() {
         let mut db = MirDb::default();

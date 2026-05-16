@@ -91,6 +91,14 @@ pub trait MirDatabase: salsa::Database {
     /// Record a reference-location entry.
     fn record_reference_location(&self, loc: RefLoc);
 
+    /// Drain pending reference locations staged on this db handle.
+    ///
+    /// Pass 2 routes each `record_reference_location` call through a
+    /// per-clone staging buffer; consumers (rayon orchestrators, the
+    /// `analyze_file` tracked query) drain via this trait method so the
+    /// underlying `MirDb` doesn't need to be named.
+    fn take_pending_ref_locs(&self) -> Vec<RefLoc>;
+
     /// Replay reference locations for one file from cache.
     fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]);
 

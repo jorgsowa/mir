@@ -264,6 +264,10 @@ impl MirDatabase for MirDb {
         self.pending_ref_locs.0.lock().push(loc);
     }
 
+    fn take_pending_ref_locs(&self) -> Vec<RefLoc> {
+        std::mem::take(&mut *self.pending_ref_locs.0.lock())
+    }
+
     fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]) {
         for (symbol, line, col_start, col_end) in locs {
             self.record_reference_location(RefLoc {
@@ -414,14 +418,6 @@ impl ClassNodeFields {
 }
 
 impl MirDb {
-    /// Drain pending reference locations from this db clone's staging buffer.
-    ///
-    /// Call after a parallel Pass 2 closure completes, then pass the returned
-    /// `Vec` to [`Self::commit_reference_locations_batch`] on the shared db.
-    pub fn take_pending_ref_locs(&self) -> Vec<RefLoc> {
-        std::mem::take(&mut *self.pending_ref_locs.0.lock())
-    }
-
     /// Commit a batch of reference locations into the shared maps in one lock
     /// acquisition per map.  Must be called serially after all parallel workers
     /// have dropped their db clones and returned their pending buffers.
