@@ -524,76 +524,102 @@ nav.sidebar-pane a {
 /* ── Tabs ────────────────────────────────────────────────────────────── */
 
 /* Unified container: the outer <starlight-tabs> element wraps both
-   the tab strip AND the tab panels, so we use it as our single bordered frame. */
+   the tab strip AND the tab panels, so we use it as our single bordered frame —
+   like the terminal "title bar + body" used elsewhere on the page. */
 starlight-tabs {
   display: block;
-  border: 1px solid rgba(200, 168, 75, 0.18);
+  border: 1px solid rgba(200, 168, 75, 0.15);
   border-radius: 2px;
   overflow: hidden;
   background: #050810;
   position: relative;
 }
 
-/* 80s instrument-panel top accent */
-starlight-tabs::before {
-  content: '';
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Inner wrapper is now borderless — the parent provides the frame */
+/* Inner wrapper is borderless — the parent provides the frame */
 .tablist-wrapper {
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow-x: auto;
 }
 
+/* Tab strip matches the terminal-header bg used on code blocks
+   (.expressive-code .frame .header / pre::before) so the whole component
+   reads as one instrument panel. */
 [role='tablist'] {
-  background: #0a0a16;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.14);
+  background: #0e0e1a;
+  border-bottom: 1px solid rgba(200, 168, 75, 0.1);
   gap: 0;
-  padding: 0 0.5rem;
+  padding: 0;
   margin: 0;
   display: flex;
   align-items: stretch;
+  list-style: none;
+}
+
+.tab {
+  display: flex;
 }
 
 .tab > [role='tab'] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.78rem;
-  letter-spacing: 0.09em;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 400;
-  color: var(--sl-color-gray-3);
-  padding: 0.625rem 1rem;
+  color: var(--mir-text-dim);
+  padding: 0.55rem 1rem;
   border-radius: 0;
   background: transparent;
-  /* override Starlight's box-shadow underline */
-  box-shadow: 0 2px 0 transparent;
-  transition: color 0.15s, box-shadow 0.15s, text-shadow 0.15s;
+  text-decoration: none;
+  /* override Starlight's default box-shadow underline */
+  box-shadow: inset 0 -1px 0 transparent;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s, text-shadow 0.15s;
+}
+
+/* Tab icons: lock size so SVG width/height attrs can't fight the font scale */
+.tab > [role='tab'] svg {
+  --sl-icon-size: 0.85rem;
+  width: var(--sl-icon-size);
+  height: var(--sl-icon-size);
+  opacity: 0.55;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.tab [role='tab']:hover:not([aria-selected='true']) {
+  color: var(--mir-text);
+  background: rgba(200, 168, 75, 0.04);
+}
+
+.tab [role='tab']:hover svg {
+  opacity: 0.85;
 }
 
 .tab [role='tab'][aria-selected='true'] {
   color: var(--mir-gold);
-  font-weight: 600;
-  box-shadow: 0 2px 0 var(--mir-gold);
-  text-shadow: 0 0 12px rgba(200, 168, 75, 0.45);
+  font-weight: 500;
+  background: #050810;
+  box-shadow: inset 0 -1px 0 var(--mir-gold);
+  text-shadow: 0 0 10px rgba(200, 168, 75, 0.35);
 }
 
+.tab [role='tab'][aria-selected='true'] svg {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px rgba(200, 168, 75, 0.4));
+}
+
+/* Terminal-tabstrip brackets on the active tab, à la tmux/screen */
 .tab [role='tab'][aria-selected='true']::before {
-  content: '▸ ';
-  opacity: 0.65;
+  content: '[';
+  opacity: 0.55;
 }
-
-.tab [role='tab']:hover:not([aria-selected='true']) {
-  color: var(--sl-color-white);
-  background: rgba(255, 255, 255, 0.025);
-  box-shadow: 0 2px 0 rgba(200, 168, 75, 0.22);
+.tab [role='tab'][aria-selected='true']::after {
+  content: ']';
+  opacity: 0.55;
 }
 
 /* Tab panels are siblings of .tablist-wrapper inside <starlight-tabs>.
@@ -604,7 +630,7 @@ starlight-tabs > [role='tabpanel'] {
 }
 
 /* Code blocks inside a tab panel: no double border, no terminal-dots header
-   (the tab strip already serves as the header). */
+   (the tab strip already serves as the title bar). */
 starlight-tabs [role='tabpanel'] pre:not(:where(.not-content *)) {
   border: none;
   border-radius: 0;
@@ -616,14 +642,15 @@ starlight-tabs [role='tabpanel'] pre:not(:where(.not-content *))::before {
   display: none;
 }
 
-/* Same for Expressive-Code frames */
+/* Expressive-Code frames inside tabs: drop the border and hide the empty
+   figcaption header — otherwise an empty gray bar stacks under the tab strip. */
 starlight-tabs [role='tabpanel'] .expressive-code .frame {
   border: none;
   border-radius: 0;
 }
 
 starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
-  border-top: none;
+  display: none;
 }
 
 /* ── Tables ──────────────────────────────────────────────────────────── */
