@@ -1,5 +1,6 @@
 ---
 title: InvalidThrow
+code: MIR1500
 description: A value that does not implement Throwable is thrown.
 sidebar:
   order: 4

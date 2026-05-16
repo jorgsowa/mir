@@ -1,5 +1,6 @@
 ---
 title: UndefinedConstant
+code: MIR0007
 description: A reference is made to a constant that has not been defined.
 sidebar:
   order: 7

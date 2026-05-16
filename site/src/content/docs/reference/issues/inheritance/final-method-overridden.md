@@ -1,5 +1,6 @@
 ---
 title: FinalMethodOverridden
+code: MIR0705
 description: A subclass overrides a method declared as final in the parent.
 sidebar:
   order: 6

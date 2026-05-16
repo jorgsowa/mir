@@ -1,5 +1,6 @@
 ---
 title: InvalidNamedArgument
+code: MIR0204
 description: A named argument does not correspond to any parameter of the callable.
 sidebar:
   order: 5

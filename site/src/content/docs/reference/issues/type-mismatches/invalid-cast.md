@@ -1,5 +1,6 @@
 ---
 title: InvalidCast
+code: MIR0207
 description: An explicit cast can never succeed for the given type.
 sidebar:
   order: 8

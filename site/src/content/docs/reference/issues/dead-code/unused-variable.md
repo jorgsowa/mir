@@ -1,5 +1,6 @@
 ---
 title: UnusedVariable
+code: MIR0500
 description: A variable is assigned but never read.
 sidebar:
   order: 1

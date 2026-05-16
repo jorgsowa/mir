@@ -1,5 +1,6 @@
 ---
 title: InvalidPropertyAssignment
+code: MIR0206
 description: A value assigned to a property is incompatible with the property's declared type.
 sidebar:
   order: 7

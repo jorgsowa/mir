@@ -1,5 +1,6 @@
 ---
 title: NullArrayAccess
+code: MIR0103
 description: Array access is performed on a value that is possibly null.
 sidebar:
   order: 4

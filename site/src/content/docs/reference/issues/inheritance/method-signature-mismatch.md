@@ -1,5 +1,6 @@
 ---
 title: MethodSignatureMismatch
+code: MIR0702
 description: An overriding method has a signature incompatible with the parent's.
 sidebar:
   order: 3

@@ -1,5 +1,6 @@
 ---
 title: UndefinedVariable
+code: MIR0002
 description: A variable is used before it has been assigned.
 sidebar:
   order: 1

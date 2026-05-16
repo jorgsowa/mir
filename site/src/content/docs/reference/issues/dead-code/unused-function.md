@@ -1,5 +1,6 @@
 ---
 title: UnusedFunction
+code: MIR0505
 description: A function is defined but never called.
 sidebar:
   order: 5

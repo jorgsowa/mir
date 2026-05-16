@@ -1,5 +1,6 @@
 ---
 title: ParseError
+code: MIR1400
 description: A PHP file could not be parsed.
 sidebar:
   order: 7

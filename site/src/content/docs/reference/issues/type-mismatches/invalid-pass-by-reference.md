@@ -1,5 +1,6 @@
 ---
 title: InvalidPassByReference
+code: MIR0205
 description: A by-reference parameter receives an expression that cannot be referenced.
 sidebar:
   order: 6

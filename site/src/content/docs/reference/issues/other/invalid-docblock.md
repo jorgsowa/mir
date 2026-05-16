@@ -1,5 +1,6 @@
 ---
 title: InvalidDocblock
+code: MIR1103
 description: A docblock contains a malformed or unrecognised annotation.
 sidebar:
   order: 8

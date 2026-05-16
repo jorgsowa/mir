@@ -1,5 +1,6 @@
 ---
 title: DeprecatedClass
+code: MIR1003
 description: A class marked @deprecated is being instantiated.
 sidebar:
   order: 2

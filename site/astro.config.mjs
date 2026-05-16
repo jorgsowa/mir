@@ -12,6 +12,9 @@ export default defineConfig({
   integrations: [
     sitemap(),
     starlight({
+      components: {
+        PageTitle: './src/components/PageTitle.astro',
+      },
       customCss: ['./src/styles/custom.css'],
       title: 'mir',
       description: 'A fast, incremental PHP static analyzer written in Rust.',
@@ -55,6 +58,7 @@ export default defineConfig({
               label: 'Issues',
               items: [
                 { label: 'Overview', link: '/reference/issues/' },
+                { label: 'Error codes', link: '/reference/issues/codes/' },
                 { label: 'Undefined',       items: [{ autogenerate: { directory: 'reference/issues/undefined' } }] },
                 { label: 'Nullability',     items: [{ autogenerate: { directory: 'reference/issues/nullability' } }] },
                 { label: 'Type Mismatches', items: [{ autogenerate: { directory: 'reference/issues/type-mismatches' } }] },

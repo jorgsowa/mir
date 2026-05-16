@@ -1,5 +1,6 @@
 ---
 title: NullMethodCall
+code: MIR0102
 description: A method is called on a value that is possibly null.
 sidebar:
   order: 3

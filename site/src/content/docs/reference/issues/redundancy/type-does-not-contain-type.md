@@ -1,5 +1,6 @@
 ---
 title: TypeDoesNotContainType
+code: MIR0403
 description: A type check can never be true because the type does not include the tested type.
 sidebar:
   order: 4

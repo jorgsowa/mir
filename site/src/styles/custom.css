@@ -94,16 +94,50 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
 }
 
+/* ── Heading wrappers (Starlight renders h + anchor as siblings in .sl-heading-wrapper) ── */
+.sl-markdown-content .sl-heading-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+}
+
+/* h2 wrapper: carries the border-bottom so it spans the full row */
+.sl-markdown-content .sl-heading-wrapper.level-h2 {
+  padding-block-end: 0.5rem;
+  border-bottom: 1px solid rgba(200, 168, 75, 0.18);
+  margin-block-start: 2.5rem;
+}
+
+/* Reset the inline display Starlight forces on the heading element inside wrapper */
+.sl-markdown-content .sl-heading-wrapper > :first-child {
+  display: block !important;
+  padding-inline-end: 0 !important;
+}
+
+/* Anchor link: sits as a flex sibling after the heading text */
+.sl-markdown-content .sl-anchor-link {
+  margin-inline-start: 0 !important;
+  flex-shrink: 0 !important;
+  color: rgba(200, 168, 75, 0.45) !important;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--mir-gold) !important;
+  opacity: 1 !important;
+}
+
 .sl-markdown-content h2:not(:where(.not-content *)) {
   font-size: 0.82rem;
   font-weight: 500;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--sl-color-white);
-  padding-block-end: 0.5rem;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.18);
   text-shadow: 0 0 12px rgba(200, 168, 75, 0.18);
-  margin-block-start: 2.5rem;
+  /* border-bottom and margin moved to .sl-heading-wrapper.level-h2 */
+  border-bottom: none;
+  padding-block-end: 0;
+  margin-block-start: 0;
 }
 
 .sl-markdown-content h3:not(:where(.not-content *)) {
@@ -398,17 +432,17 @@ nav.sidebar-pane a {
 
 /* Terminal title bar */
 .sl-markdown-content pre:not(:where(.not-content *))::before {
-  content: '● ● ●';
+  content: '▪  ▪  ▪';
   position: absolute;
   inset-block-start: 0;
   inset-inline: 0;
-  padding: 0.35rem 0.75rem;
+  padding: 0.4rem 0.875rem;
   background: #0e0e1a;
   border-bottom: 1px solid rgba(200, 168, 75, 0.1);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.58rem;
-  color: rgba(200, 168, 75, 0.22);
-  letter-spacing: 0.18em;
+  font-size: 0.68rem;
+  color: rgba(200, 168, 75, 0.35);
+  letter-spacing: 0.2em;
   line-height: 1.6;
 }
 
@@ -440,9 +474,10 @@ nav.sidebar-pane a {
 
 .expressive-code .frame .title {
   font-family: 'IBM Plex Mono', monospace !important;
-  font-size: 0.68rem !important;
-  letter-spacing: 0.08em !important;
-  color: rgba(200, 168, 75, 0.55) !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.06em !important;
+  color: var(--mir-gold) !important;
+  text-shadow: 0 0 10px rgba(200, 168, 75, 0.3) !important;
 }
 
 .expressive-code pre,
@@ -487,36 +522,108 @@ nav.sidebar-pane a {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────── */
+
+/* Unified container: the outer <starlight-tabs> element wraps both
+   the tab strip AND the tab panels, so we use it as our single bordered frame. */
+starlight-tabs {
+  display: block;
+  border: 1px solid rgba(200, 168, 75, 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+  background: #050810;
+  position: relative;
+}
+
+/* 80s instrument-panel top accent */
+starlight-tabs::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Inner wrapper is now borderless — the parent provides the frame */
+.tablist-wrapper {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 [role='tablist'] {
-  border-bottom: 1px solid rgba(200, 168, 75, 0.16) !important;
-  gap: 0.125rem;
+  background: #0a0a16;
+  border-bottom: 1px solid rgba(200, 168, 75, 0.14);
+  gap: 0;
+  padding: 0 0.5rem;
+  margin: 0;
+  display: flex;
+  align-items: stretch;
 }
 
 .tab > [role='tab'] {
-  font-family: 'IBM Plex Mono', monospace !important;
-  font-size: 0.67rem !important;
-  letter-spacing: 0.1em !important;
-  text-transform: uppercase !important;
-  color: var(--sl-color-gray-3) !important;
-  padding: 0.3rem 1rem !important;
-  border: 1px solid transparent !important;
-  border-bottom: none !important;
-  border-radius: 2px 2px 0 0 !important;
-  box-shadow: none !important;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--sl-color-gray-3);
+  padding: 0.625rem 1rem;
+  border-radius: 0;
+  background: transparent;
+  /* override Starlight's box-shadow underline */
+  box-shadow: 0 2px 0 transparent;
+  transition: color 0.15s, box-shadow 0.15s, text-shadow 0.15s;
 }
 
 .tab [role='tab'][aria-selected='true'] {
-  color: var(--mir-gold) !important;
-  background: rgba(200, 168, 75, 0.07) !important;
-  border-color: rgba(200, 168, 75, 0.22) !important;
-  font-weight: 500 !important;
-  box-shadow: none !important;
+  color: var(--mir-gold);
+  font-weight: 600;
+  box-shadow: 0 2px 0 var(--mir-gold);
+  text-shadow: 0 0 12px rgba(200, 168, 75, 0.45);
+}
+
+.tab [role='tab'][aria-selected='true']::before {
+  content: '▸ ';
+  opacity: 0.65;
 }
 
 .tab [role='tab']:hover:not([aria-selected='true']) {
-  color: var(--sl-color-white) !important;
-  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--sl-color-white);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: 0 2px 0 rgba(200, 168, 75, 0.22);
+}
+
+/* Tab panels are siblings of .tablist-wrapper inside <starlight-tabs>.
+   Kill the default 1rem gap and let the code block fill the frame. */
+starlight-tabs > [role='tabpanel'] {
+  margin: 0;
+  padding: 0;
+}
+
+/* Code blocks inside a tab panel: no double border, no terminal-dots header
+   (the tab strip already serves as the header). */
+starlight-tabs [role='tabpanel'] pre:not(:where(.not-content *)) {
+  border: none;
+  border-radius: 0;
+  padding-block-start: 1rem;
+  margin: 0;
+}
+
+starlight-tabs [role='tabpanel'] pre:not(:where(.not-content *))::before {
+  display: none;
+}
+
+/* Same for Expressive-Code frames */
+starlight-tabs [role='tabpanel'] .expressive-code .frame {
+  border: none;
+  border-radius: 0;
+}
+
+starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
+  border-top: none;
 }
 
 /* ── Tables ──────────────────────────────────────────────────────────── */
@@ -939,4 +1046,22 @@ nav.sidebar-pane a {
   font-family: 'IBM Plex Mono', monospace;
   color: var(--sl-color-gray-3);
   padding-inline-start: 1rem;
+}
+
+/* MIR error-code badge — rendered above the page title via the PageTitle
+ * component override (src/components/PageTitle.astro). Driven by the
+ * `code: MIR####` frontmatter field. */
+.mir-code-badge {
+  display: inline-block;
+  margin: 0 0 0.5rem 0;
+  padding: 0.15rem 0.55rem;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-accent-high);
+  background: var(--sl-color-accent-low);
+  border: 1px solid color-mix(in srgb, var(--sl-color-accent) 35%, transparent);
+  border-radius: 0.25rem;
+  line-height: 1.4;
 }

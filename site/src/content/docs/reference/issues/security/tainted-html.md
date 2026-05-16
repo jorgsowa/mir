@@ -1,5 +1,6 @@
 ---
 title: TaintedHtml
+code: MIR0801
 description: User-controlled input reaches an HTML output sink without sanitization.
 sidebar:
   order: 1

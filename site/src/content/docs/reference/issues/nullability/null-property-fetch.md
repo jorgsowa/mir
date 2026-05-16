@@ -1,5 +1,6 @@
 ---
 title: NullPropertyFetch
+code: MIR0101
 description: A property is accessed on a value that is possibly null.
 sidebar:
   order: 2

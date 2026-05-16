@@ -1,5 +1,6 @@
 ---
 title: MissingThrowsDocblock
+code: MIR1102
 description: A function throws an exception that is not declared in its @throws docblock.
 sidebar:
   order: 5

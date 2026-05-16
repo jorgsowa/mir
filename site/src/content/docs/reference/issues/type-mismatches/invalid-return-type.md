@@ -1,5 +1,6 @@
 ---
 title: InvalidReturnType
+code: MIR0200
 description: The returned value does not match the declared return type.
 sidebar:
   order: 1

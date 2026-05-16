@@ -7,7 +7,11 @@ sidebar:
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-All 72 issue types mir can emit, grouped by category. Select a category to drill into individual issues.
+All 76 issue types mir can emit, grouped by category. Each issue has a stable
+`MIR####` code that appears in CLI output and JSON/SARIF — see
+[Error codes](./codes/) for the full numeric index.
+
+Select a category to drill into individual issues.
 
 <CardGrid>
   <LinkCard
@@ -18,17 +22,17 @@ All 72 issue types mir can emit, grouped by category. Select a category to drill
   <LinkCard
     title="Nullability"
     href="./nullability/null-argument/"
-    description="NullArgument · NullPropertyFetch · NullMethodCall · NullArrayAccess · PossiblyNull* · NullableReturnStatement"
+    description="NullArgument · NullPropertyFetch · NullMethodCall · NullArrayAccess · PossiblyNull* · PossiblyInvalidArgument · NullableReturnStatement"
   />
   <LinkCard
     title="Type Mismatches"
     href="./type-mismatches/invalid-return-type/"
-    description="InvalidReturnType · InvalidArgument · TooFewArguments · TooManyArguments · InvalidNamedArgument · InvalidPassByReference · InvalidPropertyAssignment · InvalidCast · InvalidOperand · MismatchingDocblockReturnType"
+    description="InvalidReturnType · InvalidArgument · TooFewArguments · TooManyArguments · InvalidNamedArgument · InvalidPassByReference · InvalidPropertyAssignment · InvalidCast · InvalidOperand · MismatchingDocblock(Return|Param)Type"
   />
   <LinkCard
     title="Array"
     href="./array/invalid-array-offset/"
-    description="InvalidArrayOffset · NonExistentArrayOffset · PossiblyInvalidArrayOffset · PossiblyInvalidArrayAccess"
+    description="InvalidArrayOffset · NonExistentArrayOffset · PossiblyInvalidArrayOffset"
   />
   <LinkCard
     title="Redundancy"
@@ -43,21 +47,21 @@ All 72 issue types mir can emit, grouped by category. Select a category to drill
   <LinkCard
     title="Inheritance"
     href="./inheritance/unimplemented-abstract-method/"
-    description="UnimplementedAbstractMethod · UnimplementedInterfaceMethod · MethodSignatureMismatch · OverriddenMethodAccess · FinalClassExtended · FinalMethodOverridden"
+    description="UnimplementedAbstractMethod · UnimplementedInterfaceMethod · MethodSignatureMismatch · OverriddenMethodAccess · FinalClassExtended · FinalMethodOverridden · AbstractInstantiation · CircularInheritance"
   />
   <LinkCard
     title="Security"
     href="./security/tainted-html/"
-    description="TaintedHtml · TaintedSql · TaintedShell"
+    description="TaintedInput · TaintedHtml · TaintedSql · TaintedShell"
   />
   <LinkCard
     title="Generics"
     href="./generics/invalid-template-param/"
-    description="InvalidTemplateParam"
+    description="InvalidTemplateParam · ShadowedTemplateParam"
   />
   <LinkCard
     title="Other"
     href="./other/deprecated-method/"
-    description="DeprecatedMethod · DeprecatedClass · InternalMethod · InvalidThrow · MissingThrowsDocblock · ReadonlyPropertyAssignment · ParseError · InvalidDocblock"
+    description="Deprecated* · InternalMethod · Missing(Return|Param)Type · Mixed* · InvalidThrow · MissingThrowsDocblock · ReadonlyPropertyAssignment · ParseError · InvalidDocblock · InvalidTraitUse · Implicit*Cast"
   />
 </CardGrid>

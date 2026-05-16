@@ -1,5 +1,6 @@
 ---
 title: TaintedSql
+code: MIR0802
 description: User-controlled input reaches a SQL sink without parameterization.
 sidebar:
   order: 2
