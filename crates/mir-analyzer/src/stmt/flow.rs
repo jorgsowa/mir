@@ -171,14 +171,16 @@ impl<'a> StatementsAnalyzer<'a> {
                         } else {
                             fqcn.as_ref()
                         };
-                        if !ctx.fn_declared_throws.iter().any(|declared| {
-                            declared.as_ref() == thrown_fqcn
-                                || crate::db::extends_or_implements_via_db(
-                                    self.db,
-                                    thrown_fqcn,
-                                    declared.as_ref(),
-                                )
-                        }) {
+                        if !crate::db::is_unchecked_exception_via_db(self.db, thrown_fqcn)
+                            && !ctx.fn_declared_throws.iter().any(|declared| {
+                                declared.as_ref() == thrown_fqcn
+                                    || crate::db::extends_or_implements_via_db(
+                                        self.db,
+                                        thrown_fqcn,
+                                        declared.as_ref(),
+                                    )
+                            })
+                        {
                             let (line, line_end, col_start, col_end) =
                                 self.span_to_location(stmt_span);
                             self.issues.add(mir_issues::Issue::new(
@@ -233,14 +235,16 @@ impl<'a> StatementsAnalyzer<'a> {
                         } else {
                             fqcn.as_ref()
                         };
-                        if !ctx.fn_declared_throws.iter().any(|declared| {
-                            declared.as_ref() == thrown_fqcn
-                                || crate::db::extends_or_implements_via_db(
-                                    self.db,
-                                    thrown_fqcn,
-                                    declared.as_ref(),
-                                )
-                        }) {
+                        if !crate::db::is_unchecked_exception_via_db(self.db, thrown_fqcn)
+                            && !ctx.fn_declared_throws.iter().any(|declared| {
+                                declared.as_ref() == thrown_fqcn
+                                    || crate::db::extends_or_implements_via_db(
+                                        self.db,
+                                        thrown_fqcn,
+                                        declared.as_ref(),
+                                    )
+                            })
+                        {
                             let (line, line_end, col_start, col_end) =
                                 self.span_to_location(stmt_span);
                             self.issues.add(mir_issues::Issue::new(

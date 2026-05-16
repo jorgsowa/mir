@@ -1,7 +1,5 @@
 ===description===
 does not count read after throw expression
-===config===
-find_dead_code=true
 ===file===
 <?php
 class Foo {

@@ -1,7 +1,5 @@
 ===description===
 does not count call after switch break
-===config===
-find_dead_code=true
 ===file===
 <?php
 class Foo {

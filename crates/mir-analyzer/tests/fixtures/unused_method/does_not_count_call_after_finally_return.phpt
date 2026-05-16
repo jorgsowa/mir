@@ -1,7 +1,5 @@
 ===description===
 does not count call after finally return
-===config===
-find_dead_code=true
 ===file===
 <?php
 class Foo {

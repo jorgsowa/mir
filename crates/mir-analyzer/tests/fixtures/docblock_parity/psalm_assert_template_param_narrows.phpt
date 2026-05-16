@@ -19,5 +19,4 @@ function test(?Bar $x): void {
     $x->missing();
 }
 ===expect===
-MissingThrowsDocblock@8:27: Exception RuntimeException is thrown but not declared in @throws
 UndefinedMethod@16:4: Method Bar::missing() does not exist

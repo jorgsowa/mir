@@ -73,8 +73,13 @@ fn unrelated_file_cache_entry_survives() {
         "<?php\nfunction helper(): void {}\n",
     );
 
-    // First run — populate cache for both files.
-    let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
+    // First run — populate cache for both files. Suppress the dead-code
+    // group so the bare `helper()` function in Unrelated.php doesn't
+    // surface as `UnusedFunction` in the assertions below.
+    let mut analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
+    for kind in mir_analyzer::project::dead_code_issue_kinds() {
+        analyzer.suppressed_issue_kinds.insert((*kind).to_string());
+    }
     analyzer.analyze(&[base.clone(), unrelated.clone()]);
 
     // Modify only Base.
@@ -87,7 +92,10 @@ fn unrelated_file_cache_entry_survives() {
     // Second run — Unrelated.php did not change and has no dependency on Base.
     // Its cache entry should survive (we cannot observe this directly from the
     // public API, but we verify no issues are raised for it and the run succeeds).
-    let analyzer2 = ProjectAnalyzer::with_cache(cache_dir.path());
+    let mut analyzer2 = ProjectAnalyzer::with_cache(cache_dir.path());
+    for kind in mir_analyzer::project::dead_code_issue_kinds() {
+        analyzer2.suppressed_issue_kinds.insert((*kind).to_string());
+    }
     let result = analyzer2.analyze(&[base.clone(), unrelated.clone()]);
 
     let unrelated_str = unrelated.to_string_lossy();

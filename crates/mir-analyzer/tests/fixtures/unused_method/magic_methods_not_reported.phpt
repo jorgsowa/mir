@@ -1,7 +1,5 @@
 ===description===
 magic methods not reported
-===config===
-find_dead_code=true
 ===file===
 <?php
 class Magic {

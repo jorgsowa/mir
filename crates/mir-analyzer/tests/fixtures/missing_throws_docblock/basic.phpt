@@ -1,9 +1,9 @@
 ===description===
-function throws without @throws
+function throws without @throws (checked exception)
 ===file===
 <?php
 function riskyOperation(): void {
-    throw new \RuntimeException('fail');
+    throw new \Exception('fail');
 }
 ===expect===
-MissingThrowsDocblock@3:4: Exception RuntimeException is thrown but not declared in @throws
+MissingThrowsDocblock@3:4: Exception Exception is thrown but not declared in @throws

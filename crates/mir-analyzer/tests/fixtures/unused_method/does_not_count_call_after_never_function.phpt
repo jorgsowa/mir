@@ -1,7 +1,5 @@
 ===description===
 does not count call after never function
-===config===
-find_dead_code=true
 ===file===
 <?php
 function stop(): never {
@@ -17,6 +15,5 @@ class Foo {
     private function helper(): void {}
 }
 ===expect===
-MissingThrowsDocblock@3:4: Exception RuntimeException is thrown but not declared in @throws
 UnreachableCode@9:8: Unreachable code detected
 UnusedMethod@12:4: Private method Foo::helper() is never called

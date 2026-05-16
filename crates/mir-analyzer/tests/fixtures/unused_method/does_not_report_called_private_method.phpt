@@ -1,7 +1,5 @@
 ===description===
 does not report called private method
-===config===
-find_dead_code=true
 ===file===
 <?php
 class Foo {

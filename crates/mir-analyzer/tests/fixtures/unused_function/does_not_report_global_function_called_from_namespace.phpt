@@ -1,7 +1,5 @@
 ===description===
 does not report global function called from namespace
-===config===
-find_dead_code=true
 ===file===
 <?php
 function helper(): void {}

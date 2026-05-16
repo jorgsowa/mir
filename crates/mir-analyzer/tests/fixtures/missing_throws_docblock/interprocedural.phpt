@@ -3,14 +3,14 @@ function calls function that declares @throws without declaring it itself
 ===file===
 <?php
 /**
- * @throws \RuntimeException
+ * @throws \Exception
  */
 function riskyOperation(): void {
-    throw new \RuntimeException('fail');
+    throw new \Exception('fail');
 }
 
 function callerNoThrows(): void {
     riskyOperation();
 }
 ===expect===
-MissingThrowsDocblock@10:4: Exception RuntimeException is thrown but not declared in @throws
+MissingThrowsDocblock@10:4: Exception Exception is thrown but not declared in @throws

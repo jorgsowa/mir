@@ -28,5 +28,4 @@ function test(): void {
     $w->unwrap()->get()->undefinedMethod();
 }
 ===expect===
-MissingThrowsDocblock@19:38: Exception RuntimeException is thrown but not declared in @throws
 UndefinedMethod@25:4: Method Item::undefinedMethod() does not exist
