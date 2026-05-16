@@ -1,5 +1,6 @@
 ---
 title: ReadonlyPropertyAssignment
+code: MIR0600
 description: A readonly property is assigned after the constructor.
 sidebar:
   order: 6

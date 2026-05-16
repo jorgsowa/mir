@@ -1,5 +1,6 @@
 ---
 title: UnimplementedAbstractMethod
+code: MIR0700
 description: A concrete class does not implement an abstract method from its parent.
 sidebar:
   order: 1

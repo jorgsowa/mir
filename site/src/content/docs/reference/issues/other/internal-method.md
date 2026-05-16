@@ -1,5 +1,6 @@
 ---
 title: InternalMethod
+code: MIR1004
 description: A method marked @internal is called from outside its package.
 sidebar:
   order: 3

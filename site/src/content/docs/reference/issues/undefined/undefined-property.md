@@ -1,5 +1,6 @@
 ---
 title: UndefinedProperty
+code: MIR0006
 description: A property is accessed that is not declared on the class.
 sidebar:
   order: 6

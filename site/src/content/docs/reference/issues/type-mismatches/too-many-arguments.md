@@ -1,5 +1,6 @@
 ---
 title: TooManyArguments
+code: MIR0203
 description: A call provides more arguments than the function accepts.
 sidebar:
   order: 4

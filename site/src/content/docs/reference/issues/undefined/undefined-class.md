@@ -1,5 +1,6 @@
 ---
 title: UndefinedClass
+code: MIR0005
 description: A reference is made to a class, interface, or trait that does not exist.
 sidebar:
   order: 5

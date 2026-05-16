@@ -1,5 +1,6 @@
 ---
 title: MismatchingDocblockReturnType
+code: MIR0209
 description: The @return docblock type conflicts with the native return type hint.
 sidebar:
   order: 10

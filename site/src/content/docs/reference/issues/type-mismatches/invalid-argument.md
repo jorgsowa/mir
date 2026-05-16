@@ -1,5 +1,6 @@
 ---
 title: InvalidArgument
+code: MIR0201
 description: An argument's type does not match the parameter's declared type.
 sidebar:
   order: 2

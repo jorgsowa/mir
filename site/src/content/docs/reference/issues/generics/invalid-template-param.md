@@ -1,5 +1,6 @@
 ---
 title: InvalidTemplateParam
+code: MIR0900
 description: A template argument violates the declared bounds of the type parameter.
 sidebar:
   order: 1

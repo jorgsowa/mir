@@ -1,0 +1,9 @@
+---
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+
+const { entry } = Astro.locals.starlightRoute;
+const code = (entry.data as { code?: string }).code;
+---
+
+{code && <p class="mir-code-badge" aria-label={`Error code ${code}`}>{code}</p>}
+<Default><slot /></Default>

@@ -1,5 +1,6 @@
 ---
 title: NullableReturnStatement
+code: MIR0109
 description: A nullable value is returned from a function with a non-nullable return type.
 sidebar:
   order: 5

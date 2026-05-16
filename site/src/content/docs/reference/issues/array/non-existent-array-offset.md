@@ -1,5 +1,6 @@
 ---
 title: NonExistentArrayOffset
+code: MIR0301
 description: An array is accessed with a key that is known not to exist.
 sidebar:
   order: 2

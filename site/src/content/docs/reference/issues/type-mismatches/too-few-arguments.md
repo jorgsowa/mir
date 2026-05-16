@@ -1,5 +1,6 @@
 ---
 title: TooFewArguments
+code: MIR0202
 description: A call provides fewer arguments than the function requires.
 sidebar:
   order: 3

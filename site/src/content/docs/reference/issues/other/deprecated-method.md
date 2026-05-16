@@ -1,5 +1,6 @@
 ---
 title: DeprecatedMethod
+code: MIR1002
 description: A method marked @deprecated is being called.
 sidebar:
   order: 1
