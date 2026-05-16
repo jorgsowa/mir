@@ -33,6 +33,11 @@
   --sl-color-hairline-light:   #111120;
   --sl-color-hairline-shade:   #080c14;
 
+  /* Tell the UA to render native form chrome (select popups, scrollbars,
+     date pickers, etc.) in dark mode. Without this, macOS Safari/Chrome
+     paint a light popup over the page regardless of CSS option styling. */
+  color-scheme: dark;
+
   /* Fonts */
   --sl-font:      'IBM Plex Mono', ui-monospace, monospace;
   --sl-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -122,6 +127,17 @@ h1, h2, h3, h4, h5, h6 {
   transition: opacity 0.15s, color 0.15s;
 }
 
+/* Anchor icon size is derived from the heading-wrapper font-size via
+   --sl-anchor-icon-size (default 0.8275em). Because we shrink h2/h3/h4 below
+   Starlight's defaults, scale the icon against the actual heading font-size. */
+.sl-markdown-content .sl-heading-wrapper.level-h2 { font-size: 0.82rem; }
+.sl-markdown-content .sl-heading-wrapper.level-h3 { font-size: 0.72rem; }
+.sl-markdown-content .sl-heading-wrapper.level-h4 { font-size: 0.68rem; }
+
+main:has(.mir-hero) .sl-markdown-content .sl-heading-wrapper.level-h2 {
+  font-size: 0.9rem;
+}
+
 .sl-markdown-content .sl-anchor-link:hover {
   color: var(--mir-gold) !important;
   opacity: 1 !important;
@@ -159,6 +175,28 @@ h1, h2, h3, h4, h5, h6 {
 /* ── Splash page: hide auto page-title (custom hero already shows it) ── */
 main:has(.mir-hero) > div:first-child {
   display: none;
+}
+
+/* ── Splash page: unified section-heading treatment ──────────────────── */
+/* All H2s on the splash page share an identical leading marker + size so
+   "Install", "What mir reports", "System Principles", "Browse by category",
+   and "Get going" read as one consistent header family. */
+main:has(.mir-hero) .sl-markdown-content h2:not(:where(.not-content *)) {
+  font-size: 0.9rem;
+  letter-spacing: 0.14em;
+  color: var(--mir-gold);
+  text-shadow: 0 0 14px rgba(200, 168, 75, 0.22);
+}
+
+main:has(.mir-hero) .sl-markdown-content h2:not(:where(.not-content *))::before {
+  content: '// ';
+  color: rgba(200, 168, 75, 0.45);
+  margin-inline-end: 0.15em;
+}
+
+main:has(.mir-hero) .sl-markdown-content .sl-heading-wrapper.level-h2 {
+  border-bottom-color: rgba(200, 168, 75, 0.22);
+  margin-block-start: 3rem;
 }
 
 /* ── Nav header ──────────────────────────────────────────────────────── */
@@ -461,23 +499,75 @@ nav.sidebar-pane a {
   margin-block: -0.1em;
 }
 
-/* Expressive Code (fenced blocks with filename titles) */
+/* Expressive Code (fenced blocks with filename titles)
+   Title bar styled to match Starlight Tabs (#0e0e1a strip with a gold-
+   underlined active tab) so titled code blocks and Tabs read as one family. */
 .expressive-code .frame {
+  border: 1px solid rgba(200, 168, 75, 0.16) !important;
   border-radius: 2px !important;
-  border-color: rgba(200, 168, 75, 0.15) !important;
+  background: #050810 !important;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.expressive-code .frame .header {
-  background: #0e0e1a !important;
-  border-bottom-color: rgba(200, 168, 75, 0.1) !important;
+.expressive-code .frame:hover {
+  border-color: rgba(200, 168, 75, 0.28) !important;
+  box-shadow: 0 0 18px rgba(200, 168, 75, 0.05);
 }
 
+/* Instrument-panel top accent — gold gradient sits ONLY above the active
+   tab / title (the "active" segment), not across the whole frame. Pairs with
+   the gold underline (inset box-shadow) already on those elements. */
+.tab [role='tab'][aria-selected='true'],
 .expressive-code .frame .title {
+  position: relative;
+}
+
+.tab [role='tab'][aria-selected='true']::before,
+.expressive-code .frame .title::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.expressive-code .frame.has-title:not(.is-terminal) .header,
+.expressive-code .frame.is-terminal .header {
+  background: #0e0e1a !important;
+  border-bottom: 1px solid rgba(200, 168, 75, 0.1) !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(200, 168, 75, 0.1) !important;
+  padding: 0 !important;
+}
+
+/* Title rendered as a single "active tab": matches .tab [aria-selected='true'] */
+.expressive-code .frame .title {
+  display: inline-flex !important;
+  align-items: center !important;
   font-family: 'IBM Plex Mono', monospace !important;
-  font-size: 0.78rem !important;
-  letter-spacing: 0.06em !important;
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
   color: var(--mir-gold) !important;
-  text-shadow: 0 0 10px rgba(200, 168, 75, 0.3) !important;
+  background: #050810 !important;
+  padding: 0.55rem 1rem !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: inset 0 -1px 0 var(--mir-gold) !important;
+  text-shadow: 0 0 10px rgba(200, 168, 75, 0.35) !important;
+}
+
+/* Terminal-frame variants (the ▪ ▪ ▪ "traffic light" dots) — hide them
+   so titled blocks match the cleaner Tabs strip. */
+.expressive-code .frame.is-terminal .header::before,
+.expressive-code .frame.is-terminal .header::after {
+  display: none !important;
 }
 
 .expressive-code pre,
@@ -489,8 +579,27 @@ nav.sidebar-pane a {
 /* ── Asides ──────────────────────────────────────────────────────────── */
 .starlight-aside {
   border-radius: 2px;
+  border: 1px solid rgba(200, 168, 75, 0.16);
   border-inline-start-width: 3px;
   padding: 0.875rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Instrument-panel top bar — matches .sl-link-card */
+.starlight-aside::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline-start: 3px;
+  inset-inline-end: -1px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--sl-color-asides-border, var(--mir-gold)) 0%,
+    color-mix(in srgb, var(--sl-color-asides-border, var(--mir-gold)) 45%, transparent) 35%,
+    transparent 80%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .starlight-aside--caution {
@@ -528,11 +637,17 @@ nav.sidebar-pane a {
    like the terminal "title bar + body" used elsewhere on the page. */
 starlight-tabs {
   display: block;
-  border: 1px solid rgba(200, 168, 75, 0.15);
+  border: 1px solid rgba(200, 168, 75, 0.16);
   border-radius: 2px;
   overflow: hidden;
   background: #050810;
   position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+starlight-tabs:hover {
+  border-color: rgba(200, 168, 75, 0.28);
+  box-shadow: 0 0 18px rgba(200, 168, 75, 0.05);
 }
 
 /* Inner wrapper is borderless — the parent provides the frame */
@@ -610,16 +725,6 @@ starlight-tabs {
 .tab [role='tab'][aria-selected='true'] svg {
   opacity: 1;
   filter: drop-shadow(0 0 4px rgba(200, 168, 75, 0.4));
-}
-
-/* Terminal-tabstrip brackets on the active tab, à la tmux/screen */
-.tab [role='tab'][aria-selected='true']::before {
-  content: '[';
-  opacity: 0.55;
-}
-.tab [role='tab'][aria-selected='true']::after {
-  content: ']';
-  opacity: 0.55;
 }
 
 /* Tab panels are siblings of .tablist-wrapper inside <starlight-tabs>.
@@ -739,69 +844,59 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
 }
 
 /* ── Pagination ──────────────────────────────────────────────────────── */
+/* Same instrument-panel signature as .sl-link-card: thin gold border,
+   panel background, subtle gold gradient strip at the top edge. */
 .pagination-links a {
   font-family: 'IBM Plex Mono', monospace !important;
-  font-size: 0.67rem !important;
+  font-size: 0.6rem !important;
   letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
   border-radius: 2px !important;
-  border-color: rgba(200, 168, 75, 0.18) !important;
-  background: transparent !important;
-  transition: border-color 0.2s, color 0.2s;
-}
-
-.pagination-links a:hover {
-  border-color: rgba(200, 168, 75, 0.4) !important;
-  color: var(--mir-gold) !important;
-}
-
-/* ── SYSTEM PRINCIPLES block ─────────────────────────────────────────── */
-.mir-principles {
-  font-family: 'IBM Plex Mono', monospace;
-  border: 1px solid rgba(200, 168, 75, 0.18);
-  border-radius: 2px;
-  background: var(--mir-panel);
-  padding: 1.25rem 1.5rem;
-  max-width: 26rem;
+  border: 1px solid rgba(200, 168, 75, 0.16) !important;
+  background: var(--mir-panel) !important;
+  box-shadow: none !important;
   position: relative;
   overflow: hidden;
+  padding: 0.55rem 0.75rem !important;
+  gap: 0.15rem !important;
+  transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
-.mir-principles::before {
+.pagination-links a svg {
+  width: 0.85rem !important;
+  height: 0.85rem !important;
+}
+
+.pagination-links a::before {
   content: '';
   position: absolute;
   inset-block-start: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.45) 0%, transparent 65%);
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 1;
 }
 
-.mir-principles-header {
-  font-family: var(--mir-font-display);
-  font-size: 0.56rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--mir-gold);
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.14);
+/* Mirror the gradient on the "Next" link so the accent flows toward the
+   direction of travel (right-aligned card → strip fades right-to-left). */
+.pagination-links a[rel='next']::before {
+  background: linear-gradient(270deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
 }
 
-.mir-principles ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.pagination-links a:hover {
+  border-color: rgba(200, 168, 75, 0.38) !important;
+  background: #121224 !important;
+  color: var(--mir-gold) !important;
+  box-shadow: 0 0 18px rgba(200, 168, 75, 0.06) !important;
 }
 
-.mir-principles li {
-  color: var(--mir-phosphor);
-  font-size: 0.875rem;
-  line-height: 2;
-}
-
-.mir-principles li::before {
-  content: '- ';
-  color: rgba(143, 192, 80, 0.38);
+.pagination-links a .link-title {
+  color: var(--mir-gold) !important;
+  font-family: var(--mir-font-display) !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.08em !important;
+  line-height: 1.3 !important;
 }
 
 /* ── Playground ──────────────────────────────────────────────────────── */
@@ -829,6 +924,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   padding: 0.4375rem 0.875rem;
   font-size: 0.78rem;
   font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
   line-height: 1.2;
   border-radius: 2px 0 0 2px;
   border: 1px solid rgba(200, 168, 75, 0.22);
@@ -837,6 +933,34 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   color: var(--sl-color-white);
   cursor: pointer;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+
+/* Open dropdown list — browsers expose limited control over the popup,
+   but option bg/color land in Chromium and Firefox. */
+.pg-select option {
+  background-color: var(--mir-panel-raised);
+  color: var(--sl-color-white);
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 0.4rem 0.75rem;
+}
+
+.pg-select option:checked,
+.pg-select option:hover {
+  background-color: var(--mir-gold-dim);
+  color: var(--mir-gold);
+}
+
+.pg-select option:disabled {
+  color: var(--sl-color-gray-4);
+  font-style: italic;
+}
+
+/* Closed state: focus-visible ring matches the playground editor's focus. */
+.pg-select:focus-visible {
+  border-color: var(--mir-gold);
+  color: var(--mir-gold);
+  box-shadow: 0 0 0 2px rgba(200, 168, 75, 0.1);
 }
 
 .pg-select:focus-visible ~ .pg-select-btn,
@@ -858,7 +982,13 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   line-height: 1;
   pointer-events: none;
   user-select: none;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.pg-select-wrap:focus-within .pg-select-btn {
+  transform: translateY(1px);
+  color: var(--mir-gold);
+  border-color: var(--mir-gold);
 }
 
 .pg-select-wrap:hover .pg-select-btn {
@@ -929,6 +1059,22 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   overflow: hidden;
   background: #050810 !important;
   transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+/* Instrument-panel top bar — matches .sl-link-card */
+.pg-editor::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline: -1px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--mir-gold) 0%,
+    rgba(200, 168, 75, 0.55) 35%,
+    transparent 80%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .pg-editor:focus-within {
