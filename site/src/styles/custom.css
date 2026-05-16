@@ -122,6 +122,11 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--sl-color-gray-2);
 }
 
+/* ── Splash page: hide auto page-title (custom hero already shows it) ── */
+main:has(.mir-hero) > div:first-child {
+  display: none;
+}
+
 /* ── Nav header ──────────────────────────────────────────────────────── */
 header {
   border-bottom: 1px solid rgba(200, 168, 75, 0.12) !important;
@@ -138,7 +143,7 @@ header .site-title img {
 header nav a,
 .site-title span {
   font-family: var(--mir-font-display);
-  font-size: 0.65rem;
+  font-size: 1rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -193,14 +198,14 @@ nav.sidebar-pane a {
 /* ── Hero section ────────────────────────────────────────────────────── */
 .mir-hero {
   text-align: center;
-  padding: 5rem 2rem 6rem;
+  padding: 3rem 2rem 3.5rem;
   position: relative;
 }
 
 .mir-hero-logo {
-  width: 140px;
+  width: 90px;
   height: auto;
-  margin: 0 auto 2rem;
+  margin: 0 auto 1.25rem;
   display: block;
   filter: drop-shadow(0 0 8px rgba(200, 168, 75, 0.45))
           drop-shadow(0 0 24px rgba(200, 168, 75, 0.18));
@@ -211,14 +216,14 @@ nav.sidebar-pane a {
 
 .mir-hero-title {
   font-family: var(--mir-font-display) !important;
-  font-size: clamp(3rem, 12vw, 7rem);
+  font-size: clamp(2rem, 8vw, 4.5rem);
   font-weight: 700;
   letter-spacing: 0.22em;
   color: var(--sl-color-white);
   text-shadow:
     0 0 24px rgba(200, 168, 75, 0.28),
     0 0 60px rgba(200, 168, 75, 0.1);
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.4rem;
   line-height: 1;
   text-transform: uppercase;
   border-bottom: none !important;
@@ -234,16 +239,16 @@ nav.sidebar-pane a {
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: rgba(200, 168, 75, 0.6);
-  margin: 0 0 1.5rem;
+  margin: 0 0 1rem;
   opacity: 0;
   animation: mir-rise 800ms cubic-bezier(0.2, 0.7, 0.1, 1) 380ms forwards;
 }
 
 .mir-hero-tagline {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: clamp(0.875rem, 1.8vw, 1rem);
+  font-size: clamp(0.8rem, 1.6vw, 0.9rem);
   color: var(--sl-color-gray-2);
-  margin: 0 0 2.5rem;
+  margin: 0 0 1.75rem;
   letter-spacing: 0.04em;
   opacity: 0;
   animation: mir-rise 800ms cubic-bezier(0.2, 0.7, 0.1, 1) 510ms forwards;

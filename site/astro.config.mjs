@@ -17,7 +17,7 @@ export default defineConfig({
       description: 'A fast, incremental PHP static analyzer written in Rust.',
       logo: {
         src: './src/assets/logo-hero.png',
-        replacesTitle: true,
+        replacesTitle: false,
       },
       head: [
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
