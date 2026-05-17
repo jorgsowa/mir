@@ -3,6 +3,7 @@ title: TaintedHtml
 code: MIR0801
 description: User-controlled input reaches an HTML output sink without sanitization.
 sidebar:
+  hidden: true
   order: 1
 ---
 

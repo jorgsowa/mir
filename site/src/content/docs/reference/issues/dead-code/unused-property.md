@@ -3,6 +3,7 @@ title: UnusedProperty
 code: MIR0504
 description: A private property is never read within the class.
 sidebar:
+  hidden: true
   order: 4
 ---
 

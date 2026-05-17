@@ -3,6 +3,7 @@ title: PossiblyNullArgument
 code: MIR0104
 description: "An argument is possibly `null` but the parameter type doesn't admit `null`."
 sidebar:
+  hidden: true
   order: 104
 ---
 

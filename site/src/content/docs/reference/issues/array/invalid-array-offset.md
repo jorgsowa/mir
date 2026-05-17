@@ -3,6 +3,7 @@ title: InvalidArrayOffset
 code: MIR0300
 description: An array is accessed with a key of the wrong type.
 sidebar:
+  hidden: true
   order: 1
 ---
 

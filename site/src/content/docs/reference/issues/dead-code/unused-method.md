@@ -3,6 +3,7 @@ title: UnusedMethod
 code: MIR0503
 description: A private method is never called within the class.
 sidebar:
+  hidden: true
   order: 3
 ---
 

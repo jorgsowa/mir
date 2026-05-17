@@ -380,6 +380,7 @@ mod tests {
             deprecated: None,
             is_internal: false,
             is_pure: false,
+            is_virtual: false,
             location: None,
             docstring: None,
         };

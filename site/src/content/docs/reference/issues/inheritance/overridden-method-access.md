@@ -3,6 +3,7 @@ title: OverriddenMethodAccess
 code: MIR0703
 description: An overriding method reduces the visibility of the parent method.
 sidebar:
+  hidden: true
   order: 4
 ---
 

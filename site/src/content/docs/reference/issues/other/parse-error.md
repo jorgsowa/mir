@@ -3,6 +3,7 @@ title: ParseError
 code: MIR1400
 description: A PHP file could not be parsed.
 sidebar:
+  hidden: true
   order: 7
 ---
 

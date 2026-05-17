@@ -3,6 +3,7 @@ title: NullArgument
 code: MIR0100
 description: null is passed to a parameter that does not accept null.
 sidebar:
+  hidden: true
   order: 1
 ---
 

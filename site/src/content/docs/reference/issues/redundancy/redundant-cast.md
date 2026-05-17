@@ -3,6 +3,7 @@ title: RedundantCast
 code: MIR0401
 description: A value is cast to a type it already has.
 sidebar:
+  hidden: true
   order: 2
 ---
 

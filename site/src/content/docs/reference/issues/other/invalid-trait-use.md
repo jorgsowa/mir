@@ -3,6 +3,7 @@ title: InvalidTraitUse
 code: MIR1300
 description: A trait is used in a way that violates its declared constraints.
 sidebar:
+  hidden: true
   order: 1300
 ---
 

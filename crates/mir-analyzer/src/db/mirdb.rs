@@ -769,6 +769,7 @@ impl MirDb {
                 assertions: vec![],
                 throws: vec![],
                 is_final: false,
+                is_virtual: false,
                 is_internal: false,
                 is_pure: false,
                 deprecated: None,
@@ -1143,6 +1144,7 @@ impl MirDb {
                 && node.is_constructor(self) == storage.is_constructor
                 && node.is_pure(self) == storage.is_pure
                 && node.is_internal(self) == storage.is_internal
+                && node.is_virtual(self) == storage.is_virtual
                 && node.deprecated(self) == storage.deprecated
                 && node.return_type(self).as_deref() == storage.return_type.as_deref()
                 && node.location(self) == storage.location
@@ -1171,6 +1173,7 @@ impl MirDb {
             node.set_is_final(self).to(storage.is_final);
             node.set_is_constructor(self).to(storage.is_constructor);
             node.set_is_pure(self).to(storage.is_pure);
+            node.set_is_virtual(self).to(storage.is_virtual);
             node.set_location(self).to(storage.location.clone());
             node
         } else {
@@ -1198,6 +1201,7 @@ impl MirDb {
                 storage.is_final,
                 storage.is_constructor,
                 storage.is_pure,
+                storage.is_virtual,
                 storage.location.clone(),
             );
             Arc::make_mut(&mut self.method_nodes)

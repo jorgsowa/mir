@@ -3,6 +3,7 @@ title: PossiblyInvalidArrayOffset
 code: MIR0302
 description: An array is accessed with a key that might not exist.
 sidebar:
+  hidden: true
   order: 3
 ---
 

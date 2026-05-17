@@ -3,6 +3,7 @@ title: FinalClassExtended
 code: MIR0704
 description: A class extends a class declared as final.
 sidebar:
+  hidden: true
   order: 5
 ---
 

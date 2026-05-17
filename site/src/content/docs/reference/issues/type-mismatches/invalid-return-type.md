@@ -3,6 +3,7 @@ title: InvalidReturnType
 code: MIR0200
 description: The returned value does not match the declared return type.
 sidebar:
+  hidden: true
   order: 1
 ---
 

@@ -3,6 +3,7 @@ title: UnusedVariable
 code: MIR0500
 description: A variable is assigned but never read.
 sidebar:
+  hidden: true
   order: 1
 ---
 

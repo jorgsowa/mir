@@ -3,6 +3,7 @@ title: UnusedFunction
 code: MIR0505
 description: A function is defined but never called.
 sidebar:
+  hidden: true
   order: 5
 ---
 
