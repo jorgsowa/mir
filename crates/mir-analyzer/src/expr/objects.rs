@@ -283,6 +283,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         cca: &StaticAccessExpr<'arena, 'src>,
         expr_span: php_ast::Span,
+        ctx: &Context,
     ) -> Union {
         if cca.member.name_str() == Some("class") {
             let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
@@ -323,10 +324,50 @@ impl<'a> ExpressionAnalyzer<'a> {
         let fqcn = match &cca.class.kind {
             ExprKind::Identifier(id) => {
                 let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
-                if matches!(resolved.as_str(), "self" | "static" | "parent") {
-                    return Union::mixed();
+                match resolved.as_str() {
+                    "self" | "static" => {
+                        let Some(self_fqcn) = &ctx.self_fqcn else {
+                            return Union::mixed();
+                        };
+                        let exists = crate::db::class_constant_exists_in_chain(
+                            self.db,
+                            self_fqcn,
+                            &const_name,
+                        );
+                        if !exists && !crate::db::has_unknown_ancestor_via_db(self.db, self_fqcn) {
+                            self.emit(
+                                IssueKind::UndefinedConstant {
+                                    name: format!("{self_fqcn}::{const_name}"),
+                                },
+                                Severity::Error,
+                                expr_span,
+                            );
+                        }
+                        return Union::mixed();
+                    }
+                    "parent" => {
+                        let Some(parent_fqcn) = &ctx.parent_fqcn else {
+                            return Union::mixed();
+                        };
+                        let exists = crate::db::class_constant_exists_in_chain(
+                            self.db,
+                            parent_fqcn,
+                            &const_name,
+                        );
+                        if !exists && !crate::db::has_unknown_ancestor_via_db(self.db, parent_fqcn)
+                        {
+                            self.emit(
+                                IssueKind::UndefinedConstant {
+                                    name: format!("{parent_fqcn}::{const_name}"),
+                                },
+                                Severity::Error,
+                                expr_span,
+                            );
+                        }
+                        return Union::mixed();
+                    }
+                    _ => resolved,
                 }
-                resolved
             }
             _ => return Union::mixed(),
         };
