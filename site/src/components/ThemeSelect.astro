@@ -1,0 +1,202 @@
+---
+const dark  = Astro.locals.t('themeSelect.dark');
+const light = Astro.locals.t('themeSelect.light');
+const auto  = Astro.locals.t('themeSelect.auto');
+const label = Astro.locals.t('themeSelect.accessibleLabel');
+---
+
+<starlight-theme-select>
+  <div class="ts-wrap">
+    <button
+      type="button"
+      class="ts-btn"
+      aria-label={label}
+      aria-haspopup="listbox"
+      aria-expanded="false"
+    >
+      <!-- icon — StarlightThemeProvider swaps child paths via svg.label-icon -->
+      <svg aria-hidden="true" class="ts-icon label-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/>
+      </svg>
+      <span class="ts-value">{auto}</span>
+      <svg aria-hidden="true" class="ts-caret" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/>
+      </svg>
+    </button>
+    <ul class="ts-list" role="listbox" aria-label={label} hidden>
+      <li class="ts-opt" role="option" data-value="dark">{dark}</li>
+      <li class="ts-opt" role="option" data-value="light">{light}</li>
+      <li class="ts-opt ts-opt--selected" role="option" data-value="auto" aria-selected="true">{auto}</li>
+    </ul>
+  </div>
+</starlight-theme-select>
+
+{/* Inlined to avoid FOUC */}
+<script is:inline>
+  StarlightThemeProvider.updatePickers();
+</script>
+
+<script>
+  type Theme = 'auto' | 'dark' | 'light';
+
+  const storageKey = 'starlight-theme';
+  const parseTheme = (t: unknown): Theme =>
+    t === 'auto' || t === 'dark' || t === 'light' ? t : 'auto';
+  const loadTheme = (): Theme =>
+    parseTheme(typeof localStorage !== 'undefined' && localStorage.getItem(storageKey));
+  const storeTheme = (t: Theme) => {
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem(storageKey, t === 'light' || t === 'dark' ? t : '');
+  };
+  const prefersDark = () => !matchMedia('(prefers-color-scheme: light)').matches;
+
+  function onThemeChange(theme: Theme) {
+    StarlightThemeProvider.updatePickers(theme);
+    document.documentElement.dataset.theme =
+      theme === 'auto' ? (prefersDark() ? 'dark' : 'light') : theme;
+    storeTheme(theme);
+    // Update all our custom pickers
+    document.querySelectorAll<HTMLElement>('starlight-theme-select .ts-btn').forEach((btn) => {
+      const list = btn.closest('.ts-wrap')?.querySelector('.ts-list');
+      if (!list) return;
+      list.querySelectorAll<HTMLElement>('[role="option"]').forEach((opt) => {
+        const selected = opt.dataset.value === theme;
+        opt.classList.toggle('ts-opt--selected', selected);
+        opt.setAttribute('aria-selected', String(selected));
+        if (selected) btn.querySelector('.ts-value')!.textContent = opt.textContent;
+      });
+    });
+  }
+
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (loadTheme() === 'auto') onThemeChange('auto');
+  });
+
+  class StarlightThemeSelect extends HTMLElement {
+    constructor() {
+      super();
+      const theme = loadTheme();
+      onThemeChange(theme);
+
+      const btn  = this.querySelector<HTMLButtonElement>('.ts-btn')!;
+      const list = this.querySelector<HTMLElement>('.ts-list')!;
+
+      const close = () => {
+        list.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+      };
+      const open = () => {
+        list.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+      };
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        list.hidden ? open() : close();
+      });
+
+      list.addEventListener('click', (e) => {
+        const opt = (e.target as HTMLElement).closest<HTMLElement>('[role="option"]');
+        if (!opt) return;
+        onThemeChange(parseTheme(opt.dataset.value));
+        close();
+      });
+
+      document.addEventListener('click', close);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') close();
+      });
+    }
+  }
+  customElements.define('starlight-theme-select', StarlightThemeSelect);
+</script>
+
+<style>
+  .ts-wrap {
+    position: relative;
+  }
+
+  .ts-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--mir-panel);
+    border: 1px solid var(--mir-gold-dim);
+    border-radius: 2px;
+    color: color-mix(in srgb, var(--mir-gold) 55%, transparent);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .ts-btn:hover {
+    border-color: color-mix(in srgb, var(--mir-gold) 40%, transparent);
+    color: var(--mir-gold);
+  }
+
+  .ts-btn[aria-expanded="true"] {
+    border-color: var(--mir-gold);
+    color: var(--mir-gold);
+    box-shadow: 0 0 0 2px var(--mir-gold-dim);
+  }
+
+  .ts-icon,
+  .ts-caret {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  .ts-caret {
+    opacity: 0.6;
+    transition: transform 0.15s;
+  }
+
+  .ts-btn[aria-expanded="true"] .ts-caret {
+    transform: rotate(180deg);
+    opacity: 1;
+  }
+
+  .ts-list {
+    position: absolute;
+    inset-block-start: calc(100% + 4px);
+    inset-inline-end: 0;
+    min-width: 100%;
+    background: var(--mir-panel);
+    border: 1px solid var(--mir-gold-dim);
+    border-radius: 2px;
+    list-style: none;
+    margin: 0;
+    padding: 3px;
+    z-index: 200;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .ts-list[hidden] {
+    display: none;
+  }
+
+  .ts-opt {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    padding: 0.35rem 0.65rem;
+    border-radius: 2px;
+    cursor: pointer;
+    color: color-mix(in srgb, var(--mir-gold) 55%, transparent);
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .ts-opt:hover {
+    background: var(--mir-gold-dim);
+    color: var(--mir-gold);
+  }
+
+  .ts-opt--selected {
+    color: var(--mir-gold);
+  }
+</style>
