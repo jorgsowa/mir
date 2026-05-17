@@ -55,13 +55,16 @@ final class Installer
         $binaryPath = $binDir . '/' . $binaryName;
         $markerPath = $binDir . '/' . self::VERSION_MARKER;
 
-        // Skip download if the marker file confirms we already have this
-        // exact version. The marker avoids executing the (potentially
-        // tampered) existing binary just to read its --version.
+        // Skip download if the marker confirms we already have this exact
+        // version for this platform. Including the target triple means a
+        // binary from a different OS (e.g. a darwin binary checked in from
+        // a macOS host) is always replaced when the installer runs on a
+        // different platform.
+        $expectedMarker = "{$version}\n{$target}";
         if (
             is_file($binaryPath)
             && is_file($markerPath)
-            && trim((string) @file_get_contents($markerPath)) === $version
+            && rtrim((string) @file_get_contents($markerPath)) === $expectedMarker
         ) {
             return;
         }
@@ -115,7 +118,7 @@ final class Installer
                 throw new \RuntimeException("mir: failed to install binary at {$binaryPath}");
             }
 
-            if (@file_put_contents($markerPath, $version . "\n") === false) {
+            if (@file_put_contents($markerPath, "{$version}\n{$target}\n") === false) {
                 $io->writeError('<warning>mir: failed to write version marker; binary will be re-downloaded next install.</warning>');
             }
         } finally {
@@ -174,13 +177,23 @@ final class Installer
             default => throw new \RuntimeException("unsupported architecture: {$machine}"),
         };
 
-        $target = match ([$os, $arch]) {
-            ['linux', 'x86_64'] => 'x86_64-unknown-linux-gnu',
-            ['linux', 'aarch64'] => 'aarch64-unknown-linux-gnu',
-            ['darwin', 'x86_64'] => 'x86_64-apple-darwin',
-            ['darwin', 'aarch64'] => 'aarch64-apple-darwin',
-            ['windows', 'x86_64'] => 'x86_64-pc-windows-msvc',
-            default => throw new \RuntimeException("no prebuilt binary for {$os}-{$arch}"),
+        $libc = 'gnu';
+        if ($os === 'linux') {
+            $ldd = (string) @shell_exec('ldd --version 2>&1');
+            if (str_contains($ldd, 'musl')) {
+                $libc = 'musl';
+            }
+        }
+
+        $target = match ([$os, $arch, $libc]) {
+            ['linux', 'x86_64', 'gnu'] => 'x86_64-unknown-linux-gnu',
+            ['linux', 'x86_64', 'musl'] => 'x86_64-unknown-linux-musl',
+            ['linux', 'aarch64', 'gnu'] => 'aarch64-unknown-linux-gnu',
+            ['linux', 'aarch64', 'musl'] => 'aarch64-unknown-linux-musl',
+            ['darwin', 'x86_64', 'gnu'] => 'x86_64-apple-darwin',
+            ['darwin', 'aarch64', 'gnu'] => 'aarch64-apple-darwin',
+            ['windows', 'x86_64', 'gnu'] => 'x86_64-pc-windows-msvc',
+            default => throw new \RuntimeException("no prebuilt binary for {$os}-{$arch}-{$libc}"),
         };
 
         return [$os, $target];

@@ -2,3 +2,7 @@
 /book
 crates/mir-analyzer/benches/fixtures/
 site/public/wasm/
+
+# Composer
+/vendor/
+/composer.lock
