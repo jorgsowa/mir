@@ -70,6 +70,11 @@
   --hl-num:     #b88048;
   --hl-op:      #a08838;
   --hl-punct:   rgba(180, 152, 80, 0.45);
+
+  /* Playground button + sidebar label tokens (dark) */
+  --group-label-color:  color-mix(in srgb, var(--mir-gold) 38%, transparent);
+  --pg-btn-color:       #080c14;
+  --pg-btn-hover-color: var(--mir-gold);
 }
 
 /* ── Light palette — warm parchment ─────────────────────────────────── */
@@ -132,6 +137,11 @@
   --hl-num:     #965010;
   --hl-op:      #7a5c18;
   --hl-punct:   rgba(122, 92, 24, 0.45);
+
+  /* Playground button + sidebar label tokens (light) */
+  --group-label-color:  color-mix(in srgb, var(--mir-gold) 75%, transparent);
+  --pg-btn-color:       var(--sl-color-bg);
+  --pg-btn-hover-color: var(--sl-color-accent-high);
 
   --sl-nav-pad-y: 0.25rem;
 }
@@ -299,7 +309,7 @@ nav.sidebar-pane a {
   font-size: 0.56rem;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(200, 168, 75, 0.38);
+  color: var(--group-label-color);
 }
 
 /* Right sidebar (table of contents) */
@@ -1069,7 +1079,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   background: var(--mir-panel);
   border: 1px solid var(--mir-gold-dim);
   border-radius: 2px;
-  color: color-mix(in srgb, var(--mir-gold) 55%, transparent);
+  color: color-mix(in srgb, var(--mir-gold) 70%, transparent);
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
@@ -1128,7 +1138,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   padding: 0.35rem 0.65rem;
   border-radius: 2px;
   cursor: pointer;
-  color: color-mix(in srgb, var(--mir-gold) 55%, transparent);
+  color: color-mix(in srgb, var(--mir-gold) 70%, transparent);
   white-space: nowrap;
   transition: background 0.1s, color 0.1s;
 }
@@ -1154,7 +1164,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   border-radius: 2px;
   border: 1px solid var(--mir-gold);
   background: var(--mir-gold);
-  color: #080c14;
+  color: var(--pg-btn-color);
   cursor: pointer;
   outline-offset: 0.25rem;
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
@@ -1164,13 +1174,13 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
 
 .pg-btn:not(:disabled):hover {
   background: transparent;
-  color: var(--mir-gold);
+  color: var(--pg-btn-hover-color);
   box-shadow: 0 0 10px rgba(200, 168, 75, 0.22);
 }
 
 .pg-btn--ghost {
   background: transparent;
-  color: var(--sl-color-gray-3);
+  color: var(--sl-color-gray-2);
   border-color: rgba(200, 168, 75, 0.2);
 }
 
