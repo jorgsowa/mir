@@ -18,15 +18,14 @@ impl DefinitionCollector<'_> {
             short_name.clone()
         };
 
-        let doc = decl
+        let doc =
+            self.parse_docblock_from_node_or_preceding(decl.doc_comment.as_ref(), stmt_span.start);
+        let doc_span = decl
             .doc_comment
             .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
-            .unwrap_or_default();
-
-        if let Some(c) = decl.doc_comment.as_ref() {
-            self.emit_docblock_issues(&doc, c.span.start);
-        }
+            .map(|c| c.span.start)
+            .unwrap_or(stmt_span.start);
+        self.emit_docblock_issues(&doc, doc_span);
 
         if !self.version_allows(&doc) {
             return;

@@ -614,10 +614,31 @@ pub fn parse_type_string(s: &str) -> Union {
                 .map(|c| c.is_alphanumeric() || c == '\\' || c == '_')
                 .unwrap_or(false) =>
         {
+            // Integer literal: `1`, `-42`, `0` etc.
+            if let Ok(n) = s.parse::<i64>() {
+                return Union::single(Atomic::TLiteralInt(n));
+            }
             Union::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(s).into(),
                 type_params: vec![],
             })
+        }
+
+        // Negative integer literal: `-1`, `-42` — starts with `-`, not caught by alphanumeric check
+        _ if s.starts_with('-') && s.len() > 1 && s[1..].chars().all(|c| c.is_ascii_digit()) => {
+            if let Ok(n) = s.parse::<i64>() {
+                Union::single(Atomic::TLiteralInt(n))
+            } else {
+                Union::mixed()
+            }
+        }
+
+        // String literal: `'foo'` or `"bar"`
+        _ if (s.starts_with('\'') && s.ends_with('\''))
+            || (s.starts_with('"') && s.ends_with('"')) =>
+        {
+            let inner = &s[1..s.len() - 1];
+            Union::single(Atomic::TLiteralString(Arc::from(inner)))
         }
 
         _ => Union::mixed(),
