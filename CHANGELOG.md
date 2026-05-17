@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0] - 2026-05-17
+
+### Added
+
+- Composer plugin type: `composer require jorgsowa/mir` now triggers the binary download automatically without requiring manual script wiring. The `composer.json` type field is set to `composer-plugin`, and a `Plugin` class registers the install/update event handler.
+
+### Fixed
+
+- Composer installer now embeds the target triple in the version marker, preventing a binary installed on one platform (e.g. macOS) from being reused on a different one (e.g. Linux in Docker). The shim error message for `proc_open` failures now mentions a possible architecture mismatch.
+- Broken relative links in the error codes reference table (`./` → `../`) that caused 404s when navigating from the codes page to individual issue pages.
+- Documentation corrections for `ImplicitToStringCast`, `InvalidCast`, `UndefinedClass`, `InvalidScope`, `DeprecatedMethod`, and `DeprecatedMethodCall` issue pages. Added missing `UndefinedTrait` (MIR0009) documentation page.
+
 ## [0.27.0] - 2026-05-17
 
 ### Added
