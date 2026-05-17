@@ -199,6 +199,15 @@ impl Union {
                 .retain(|t| !matches!(t, Atomic::TTrue | Atomic::TFalse));
         }
 
+        // TNever is the bottom type: T | never = T.
+        if matches!(atomic, Atomic::TNever) {
+            if !self.types.is_empty() {
+                return;
+            }
+        } else {
+            self.types.retain(|t| !matches!(t, Atomic::TNever));
+        }
+
         self.types.push(atomic);
     }
 
@@ -403,9 +412,8 @@ impl Union {
                 }
             }
         }
-        // If nothing matched, fall back to other (conservative)
         if result.is_empty() {
-            other.clone()
+            Union::never()
         } else {
             result
         }
