@@ -6,7 +6,7 @@ const SITE = 'https://jorgsowa.github.io';
 const BASE = '/mir';
 const OG_IMAGE = `${SITE}${BASE}/og-cover.png`;
 
-// Palette aligned with src/styles/custom.css (--mir-* tokens).
+// Palettes aligned with src/styles/custom.css (--mir-* tokens).
 const MIR_PALETTE = {
   bg:        '#050810',
   panel:     '#0e0e1a',
@@ -20,8 +20,21 @@ const MIR_PALETTE = {
   amber:     '#ff9858',
 };
 
-// Custom Shiki/Expressive Code theme that uses the mir CRT palette so
-// code samples (PHP, JSON, shell, …) share tokens with the surrounding UI.
+const MIR_LIGHT_PALETTE = {
+  bg:        '#f0e8d8',
+  panel:     '#e8dcc8',
+  text:      '#2c2018',
+  textDim:   '#a89060',
+  gold:      '#7a5c18',
+  goldBright:'#5a4010',
+  string:    '#7a4820',
+  magenta:   '#8b1a2a',
+  cyan:      '#0a6080',
+  amber:     '#965010',
+};
+
+// Custom Shiki/Expressive Code themes — dark and light — so code samples
+// (PHP, JSON, shell, …) share tokens with the surrounding UI in both modes.
 const mirTheme = {
   name: 'mir-crt',
   type: 'dark',
@@ -95,6 +108,79 @@ const mirTheme = {
   ],
 };
 
+const mirLightTheme = {
+  name: 'mir-crt-light',
+  type: 'light',
+  colors: {
+    'editor.background':             MIR_LIGHT_PALETTE.bg,
+    'editor.foreground':             MIR_LIGHT_PALETTE.text,
+    'editorLineNumber.foreground':   MIR_LIGHT_PALETTE.textDim,
+    'editor.selectionBackground':    '#e0d4b8',
+    'editorIndentGuide.background':  '#d8ccb0',
+    'terminal.ansiBlack':            MIR_LIGHT_PALETTE.panel,
+    'terminal.ansiRed':              MIR_LIGHT_PALETTE.magenta,
+    'terminal.ansiGreen':            MIR_LIGHT_PALETTE.goldBright,
+    'terminal.ansiYellow':           MIR_LIGHT_PALETTE.gold,
+    'terminal.ansiBlue':             MIR_LIGHT_PALETTE.cyan,
+    'terminal.ansiMagenta':          MIR_LIGHT_PALETTE.magenta,
+    'terminal.ansiCyan':             MIR_LIGHT_PALETTE.cyan,
+    'terminal.ansiWhite':            MIR_LIGHT_PALETTE.text,
+  },
+  tokenColors: [
+    { scope: ['comment', 'punctuation.definition.comment', 'string.comment'],
+      settings: { foreground: '#4a7030', fontStyle: '' } },
+    { scope: ['keyword', 'storage', 'storage.type', 'storage.modifier',
+              'keyword.control', 'keyword.operator.new', 'keyword.operator.expression',
+              'keyword.other'],
+      settings: { foreground: MIR_LIGHT_PALETTE.gold } },
+    { scope: ['string', 'string.quoted', 'string.template',
+              'punctuation.definition.string'],
+      settings: { foreground: MIR_LIGHT_PALETTE.string } },
+    { scope: ['constant.character.escape', 'constant.other.placeholder'],
+      settings: { foreground: MIR_LIGHT_PALETTE.amber } },
+    { scope: ['constant.numeric', 'constant.language',
+              'constant.language.boolean', 'constant.language.null'],
+      settings: { foreground: MIR_LIGHT_PALETTE.amber } },
+    { scope: ['entity.name.function', 'support.function',
+              'meta.function-call entity.name.function',
+              'meta.function-call support.function'],
+      settings: { foreground: MIR_LIGHT_PALETTE.goldBright } },
+    { scope: ['entity.name.class', 'entity.name.type', 'entity.other.inherited-class',
+              'support.class', 'support.type', 'meta.type.name'],
+      settings: { foreground: MIR_LIGHT_PALETTE.cyan } },
+    { scope: ['variable', 'meta.variable', 'variable.other',
+              'variable.other.php', 'variable.other.readwrite',
+              'punctuation.definition.variable'],
+      settings: { foreground: MIR_LIGHT_PALETTE.text } },
+    { scope: ['variable.parameter', 'meta.function.parameters variable'],
+      settings: { foreground: MIR_LIGHT_PALETTE.text } },
+    { scope: ['variable.language', 'variable.language.this', 'variable.language.self'],
+      settings: { foreground: MIR_LIGHT_PALETTE.magenta, fontStyle: 'italic' } },
+    { scope: ['entity.name.tag', 'meta.tag'],
+      settings: { foreground: MIR_LIGHT_PALETTE.gold } },
+    { scope: ['entity.other.attribute-name', 'meta.attribute'],
+      settings: { foreground: MIR_LIGHT_PALETTE.goldBright } },
+    { scope: ['punctuation', 'meta.brace', 'meta.bracket', 'meta.delimiter',
+              'punctuation.separator', 'punctuation.terminator',
+              'punctuation.section'],
+      settings: { foreground: MIR_LIGHT_PALETTE.textDim } },
+    { scope: ['keyword.operator', 'keyword.operator.assignment',
+              'keyword.operator.arithmetic', 'keyword.operator.comparison',
+              'keyword.operator.logical'],
+      settings: { foreground: MIR_LIGHT_PALETTE.gold } },
+    { scope: ['meta.tag.metadata.doc', 'comment.block.documentation',
+              'storage.type.class.phpdoc', 'keyword.other.phpdoc',
+              'entity.name.tag.phpdoc'],
+      settings: { foreground: MIR_LIGHT_PALETTE.textDim, fontStyle: '' } },
+    { scope: ['markup.heading'], settings: { foreground: MIR_LIGHT_PALETTE.gold, fontStyle: 'bold' } },
+    { scope: ['markup.inserted'], settings: { foreground: MIR_LIGHT_PALETTE.amber } },
+    { scope: ['markup.deleted'],  settings: { foreground: MIR_LIGHT_PALETTE.magenta } },
+    { scope: ['markup.changed'],  settings: { foreground: MIR_LIGHT_PALETTE.amber } },
+    { scope: ['invalid', 'invalid.illegal'],
+      settings: { foreground: MIR_LIGHT_PALETTE.magenta } },
+  ],
+};
+
 export default defineConfig({
   site: SITE,
   base: BASE,
@@ -107,23 +193,15 @@ export default defineConfig({
       },
       customCss: ['./src/styles/custom.css'],
       expressiveCode: {
-        themes: [mirTheme],
-        useStarlightDarkModeSwitch: false,
+        themes: [mirTheme, mirLightTheme],
+        useStarlightDarkModeSwitch: true,
         styleOverrides: {
           borderRadius: '2px',
-          borderColor: 'rgba(200, 168, 75, 0.16)',
           codeFontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace",
           codeFontSize: '0.85rem',
-          codeBackground: '#050810',
           frames: {
             shadowColor: 'transparent',
-            editorActiveTabBackground: '#0e0e1a',
             editorActiveTabIndicatorTopColor: 'transparent',
-            editorActiveTabIndicatorBottomColor: '#c8a84b',
-            editorTabBarBackground: '#0e0e1a',
-            terminalBackground: '#050810',
-            terminalTitlebarBackground: '#0e0e1a',
-            terminalTitlebarBorderBottomColor: 'rgba(200, 168, 75, 0.16)',
           },
         },
       },

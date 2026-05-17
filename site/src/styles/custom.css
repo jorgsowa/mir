@@ -1424,6 +1424,20 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   --sl-color-bg-nav:   #ede4d4;
 }
 
+/* Copy button: light parchment background needs warm-gold tones */
+[data-theme='light'] .expressive-code .copy button {
+  color: var(--mir-text-dim);
+  background: color-mix(in srgb, var(--mir-gold) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 18%, transparent);
+  border-radius: 2px;
+}
+
+[data-theme='light'] .expressive-code .copy button:hover {
+  color: var(--mir-gold);
+  background: color-mix(in srgb, var(--mir-gold) 12%, transparent);
+  border-color: color-mix(in srgb, var(--mir-gold) 35%, transparent);
+}
+
 [data-theme='light'] .pg-editor {
   background: var(--mir-code-bg) !important;
 }
