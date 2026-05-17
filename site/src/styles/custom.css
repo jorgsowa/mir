@@ -7,11 +7,10 @@
 /* ── Google Fonts ────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
-/* ── Palette ─────────────────────────────────────────────────────────── */
+/* ── Dark palette (default) ──────────────────────────────────────────── */
 :root,
-[data-theme='light'],
 [data-theme='dark'] {
-  /* Starlight overrides — all mapped to gold-on-dark */
+  /* Starlight overrides */
   --sl-color-accent-low:       #2a1e0a;
   --sl-color-accent:           #c8a84b;
   --sl-color-accent-high:      #e8d090;
@@ -33,9 +32,6 @@
   --sl-color-hairline-light:   #111120;
   --sl-color-hairline-shade:   #080c14;
 
-  /* Tell the UA to render native form chrome (select popups, scrollbars,
-     date pickers, etc.) in dark mode. Without this, macOS Safari/Chrome
-     paint a light popup over the page regardless of CSS option styling. */
   color-scheme: dark;
 
   /* Fonts */
@@ -47,12 +43,63 @@
   --mir-gold-bright: #e8c860;
   --mir-gold-dim:    rgba(200, 168, 75, 0.18);
   --mir-gold-glow:   rgba(200, 168, 75, 0.22);
-  --mir-phosphor:    #8fc050;   /* code / terminal output only */
-  --mir-magenta:     #c46070;   /* errors / danger only */
+  --mir-phosphor:    #8fc050;
+  --mir-magenta:     #c46070;
   --mir-text:        #e8e4d0;
   --mir-text-dim:    #78756a;
   --mir-panel:       #0e0e1a;
   --mir-panel-raised:#131325;
+  --mir-code-bg:     #050810;
+  --mir-gutter-bg:   #0a0a16;
+
+  --mir-font-display: 'Orbitron', 'Courier New', monospace;
+
+  --sl-nav-pad-y: 0.25rem;
+}
+
+/* ── Light palette — warm parchment CRT ──────────────────────────────── */
+[data-theme='light'] {
+  /* Starlight overrides */
+  --sl-color-accent-low:       #f0e0a0;
+  --sl-color-accent:           #7a5c18;
+  --sl-color-accent-high:      #4a3808;
+  --sl-color-white:            #1e1810;
+  --sl-color-gray-1:           #2a2418;
+  --sl-color-gray-2:           #3d3626;
+  --sl-color-gray-3:           #685e48;
+  --sl-color-gray-4:           #a89878;
+  --sl-color-gray-5:           #d4c8a8;
+  --sl-color-gray-6:           #e8ddc8;
+  --sl-color-gray-7:           #f0e8d4;
+  --sl-color-black:            #f5ede0;
+  --sl-color-bg:               #f5ede0;
+  --sl-color-bg-nav:           #ede4d4;
+  --sl-color-bg-sidebar:       #f2e8d8;
+  --sl-color-bg-inline-code:   #e8dcc8;
+  --sl-color-text-accent:      #7a5c18;
+  --sl-color-hairline:         rgba(122, 92, 24, 0.18);
+  --sl-color-hairline-light:   rgba(122, 92, 24, 0.12);
+  --sl-color-hairline-shade:   #f5ede0;
+
+  color-scheme: light;
+
+  /* Fonts (same) */
+  --sl-font:      'IBM Plex Mono', ui-monospace, monospace;
+  --sl-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Design tokens */
+  --mir-gold:        #7a5c18;
+  --mir-gold-bright: #5a4010;
+  --mir-gold-dim:    rgba(122, 92, 24, 0.14);
+  --mir-gold-glow:   rgba(122, 92, 24, 0.18);
+  --mir-phosphor:    #2d6800;
+  --mir-magenta:     #8b1a2a;
+  --mir-text:        #1e1810;
+  --mir-text-dim:    #685e48;
+  --mir-panel:       #ede4d4;
+  --mir-panel-raised:#e5dcc8;
+  --mir-code-bg:     #f0e8d8;
+  --mir-gutter-bg:   #e8e0cc;
 
   --mir-font-display: 'Orbitron', 'Courier New', monospace;
 
@@ -217,6 +264,11 @@ header .site-title img {
   filter: drop-shadow(0 0 5px rgba(200, 168, 75, 0.4));
 }
 
+[data-theme='light'] header .site-title img {
+  content: url('/mir/logo-hero-light.png');
+  filter: drop-shadow(0 0 4px rgba(122, 92, 24, 0.3));
+}
+
 header nav a,
 .site-title span {
   font-family: var(--mir-font-display);
@@ -288,6 +340,12 @@ nav.sidebar-pane a {
           drop-shadow(0 0 24px rgba(200, 168, 75, 0.18));
   opacity: 0;
   animation: mir-rise 800ms cubic-bezier(0.2, 0.7, 0.1, 1) 100ms forwards;
+}
+
+[data-theme='light'] .mir-hero-logo {
+  content: url('/mir/logo-hero-light.png');
+  filter: drop-shadow(0 0 6px rgba(122, 92, 24, 0.3))
+          drop-shadow(0 0 18px rgba(122, 92, 24, 0.12));
 }
 
 
@@ -509,7 +567,6 @@ nav.sidebar-pane a {
    underlined active tab) so titled code blocks and Tabs read as one family. */
 .expressive-code .frame {
   border: 1px solid rgba(200, 168, 75, 0.16) !important;
-  border-top: none !important;
   border-radius: 2px !important;
   background: #050810 !important;
   overflow: hidden;
@@ -555,10 +612,27 @@ starlight-tabs .expressive-code .frame::before {
   border: none !important;
   padding: 0 !important;
   position: relative;
+  height: 2.5rem;
 }
 
-/* Bottom-edge gradient on title bar — same hue as the top accent but
-   dimmer, so the title visually separates from the code without a hard line. */
+/* Top-edge gradient on title bar — matches the gold accent on .sl-link-card
+   so titled code frames carry the same instrument-panel signature. Painted on
+   the header itself (not .frame::before) because the opaque header background
+   would otherwise cover a frame-level pseudo-element at the top edge. */
+.expressive-code .frame.has-title:not(.is-terminal) .header::before,
+.expressive-code .frame.is-terminal .header::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Bottom-edge gradient on title bar — matches tablist::after so both sections
+   read identically (0.5 full-width gradient + 0.28 active-indicator on top). */
 .expressive-code .frame.has-title:not(.is-terminal) .header::after,
 .expressive-code .frame.is-terminal .header::after {
   content: '';
@@ -566,7 +640,7 @@ starlight-tabs .expressive-code .frame::before {
   inset-block-end: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.22) 0%, transparent 65%);
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -574,6 +648,7 @@ starlight-tabs .expressive-code .frame::before {
 .expressive-code .frame .title {
   display: inline-flex !important;
   align-items: center !important;
+  height: 100% !important;
   font-family: 'IBM Plex Mono', monospace !important;
   font-size: 0.72rem !important;
   font-weight: 500 !important;
@@ -585,6 +660,7 @@ starlight-tabs .expressive-code .frame::before {
   margin: 0 !important;
   border: none !important;
   border-radius: 0 !important;
+  box-shadow: inset 0 -1px 0 rgba(200, 168, 75, 0.28) !important;
   text-shadow: 0 0 10px rgba(200, 168, 75, 0.35) !important;
 }
 
@@ -709,17 +785,17 @@ starlight-tabs::before {
   display: flex;
   align-items: stretch;
   list-style: none;
+  height: 2.5rem;
 }
 
-/* Tab strip bottom edge — matches the title-bar ::after so titled code blocks
-   and Tabs share the same dim gradient separator. */
+/* Tab strip bottom edge — same gold gradient as .sl-link-card top accent. */
 [role='tablist']::after {
   content: '';
   position: absolute;
   inset-block-end: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.22) 0%, transparent 65%);
+  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -1271,6 +1347,86 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   color: var(--sl-color-gray-3);
   padding-inline-start: 1rem;
 }
+
+
+/* ── Light-mode overrides for hard-coded dark backgrounds ────────────── */
+/* These exist because many rules use literal hex values instead of variables.
+   Each selector here targets the same element as the dark-mode rule above. */
+[data-theme='light'] {
+  /* Override literal dark page/nav/panel backgrounds */
+  --sl-color-bg-nav:   #ede4d4;
+}
+
+[data-theme='light'] .sl-markdown-content pre:not(:where(.not-content *)),
+[data-theme='light'] .expressive-code pre,
+[data-theme='light'] .expressive-code code,
+[data-theme='light'] .expressive-code .frame {
+  background: var(--mir-code-bg) !important;
+}
+
+[data-theme='light'] .sl-markdown-content pre:not(:where(.not-content *))::before,
+[data-theme='light'] .expressive-code .frame.has-title:not(.is-terminal) .header,
+[data-theme='light'] .expressive-code .frame.is-terminal .header,
+[data-theme='light'] [role='tablist'] {
+  background: var(--mir-panel) !important;
+}
+
+[data-theme='light'] .expressive-code .frame .title {
+  background: var(--mir-code-bg) !important;
+  color: var(--mir-gold) !important;
+}
+
+[data-theme='light'] starlight-tabs {
+  background: var(--mir-code-bg);
+}
+
+[data-theme='light'] .tab > [role='tab'][aria-selected='true'] {
+  background: var(--mir-code-bg);
+}
+
+[data-theme='light'] .pg-editor {
+  background: var(--mir-code-bg) !important;
+}
+
+[data-theme='light'] .pg-gutter {
+  background: var(--mir-gutter-bg);
+}
+
+[data-theme='light'] .pg-input {
+  color: var(--mir-phosphor);
+}
+
+[data-theme='light'] .pg-issue {
+  background: var(--mir-panel);
+}
+
+[data-theme='light'] .pg-issue:hover {
+  background: var(--mir-panel-raised);
+}
+
+[data-theme='light'] .sl-link-card,
+[data-theme='light'] .pagination-links a {
+  background: var(--mir-panel) !important;
+}
+
+[data-theme='light'] .sl-link-card:hover {
+  background: var(--mir-panel-raised) !important;
+}
+
+[data-theme='light'] .pagination-links a:hover {
+  background: var(--mir-panel-raised) !important;
+}
+
+[data-theme='light'] .starlight-aside {
+  background: var(--mir-panel);
+}
+
+[data-theme='light'] .starlight-aside--caution { background: rgba(122, 92, 24, 0.06); }
+[data-theme='light'] .starlight-aside--note    { background: rgba(30, 24, 16, 0.04); }
+[data-theme='light'] .starlight-aside--tip     { background: rgba(45, 104, 0, 0.05); }
+[data-theme='light'] .starlight-aside--danger  { background: rgba(139, 26, 42, 0.05); }
+
+[data-theme='light'] .mir-btn--primary { color: #f5ede0; }
 
 /* MIR error-code badge — rendered above the page title via the PageTitle
  * component override (src/components/PageTitle.astro). Driven by the
