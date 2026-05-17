@@ -167,6 +167,11 @@ h1, h2, h3, h4, h5, h6 {
 h1 {
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: var(--sl-color-white);
+}
+
+[data-theme='light'] h1 {
+  color: var(--sl-color-accent);
 }
 
 /* ── Heading wrappers (Starlight renders h + anchor as siblings in .sl-heading-wrapper) ── */
@@ -179,7 +184,7 @@ h1 {
 /* h2 wrapper: carries the border-bottom so it spans the full row */
 .sl-markdown-content .sl-heading-wrapper.level-h2 {
   padding-block-end: 0.5rem;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.18);
+  border-bottom: 1px solid var(--sl-color-hairline);
   margin-block-start: 2.5rem;
 }
 
@@ -193,7 +198,7 @@ h1 {
 .sl-markdown-content .sl-anchor-link {
   margin-inline-start: 0 !important;
   flex-shrink: 0 !important;
-  color: rgba(200, 168, 75, 0.45) !important;
+  color: color-mix(in srgb, var(--mir-gold) 45%, transparent) !important;
   transition: opacity 0.15s, color 0.15s;
 }
 
@@ -257,13 +262,13 @@ main:has(.mir-hero) .sl-markdown-content h2:not(:where(.not-content *)) {
 }
 
 main:has(.mir-hero) .sl-markdown-content .sl-heading-wrapper.level-h2 {
-  border-bottom-color: rgba(200, 168, 75, 0.22);
+  border-bottom-color: color-mix(in srgb, var(--mir-gold) 22%, transparent);
   margin-block-start: 3rem;
 }
 
 /* ── Nav header ──────────────────────────────────────────────────────── */
 header {
-  border-bottom: 1px solid rgba(200, 168, 75, 0.12) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--mir-gold) 12%, transparent) !important;
   box-shadow: none !important;
 }
 
@@ -1322,9 +1327,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   width: 100%;
   min-height: 240px;
   padding: 1rem;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font: 0.875rem/1.6 'IBM Plex Mono', ui-monospace, monospace;
   color: transparent;
   caret-color: var(--hl-default);
   background: transparent;
@@ -1341,7 +1344,13 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
 }
 
 .pg-input::selection {
-  color: var(--hl-default);
+  background: rgba(200, 168, 75, 0.32);
+  color: #e8e4d0;
+}
+
+[data-theme='light'] .pg-input::selection {
+  background: rgba(60, 40, 10, 0.35);
+  color: #f5ede0;
 }
 
 .pg-diag {
