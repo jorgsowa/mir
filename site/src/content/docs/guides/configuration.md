@@ -28,7 +28,7 @@ You can also point to a config file explicitly with `-c`.
 
   <issueHandlers>
     <UndefinedVariable errorLevel="suppress" />
-    <PossiblyNullReference errorLevel="warning" />
+    <PossiblyNullMethodCall errorLevel="warning" />
   </issueHandlers>
 
   <phpVersion>8.2</phpVersion>
@@ -45,7 +45,7 @@ You can also point to a config file explicitly with `-c`.
 | `<projectFiles>` | Source directories to analyze. |
 | `<ignoreFiles>` | Directories or files to exclude (e.g. `vendor/`). |
 | `<issueHandlers>` | Per-issue-kind severity overrides (see below). |
-| `<phpVersion>` | Target PHP version string, e.g. `8.2`. |
+| `<phpVersion>` | Target PHP version string, e.g. `8.2`. Supported range: `7.4`–`8.5`. |
 | `<findUnusedCode>` | Enable dead-code detection (`true`/`false`). Default: `false`. |
 | `<findUnusedVariables>` | Enable unused-variable checking (`true`/`false`). Default: `false`. |
 
@@ -149,7 +149,10 @@ mir --error-level 1 src/
 
 ### Target a specific PHP version
 
+Supported range is `7.4`–`8.5`. Stub symbols are filtered by `@since`/`@removed` tags automatically.
+
 ```bash
+mir --php-version 7.4 src/
 mir --php-version 8.1 src/
 ```
 

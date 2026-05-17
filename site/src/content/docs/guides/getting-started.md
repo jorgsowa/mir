@@ -67,11 +67,14 @@ mir will recursively scan all `.php` files under the given paths and print any i
 
 ### Targeting a PHP version
 
-If your project targets a specific PHP version, pass `--php-version`:
+mir supports PHP 7.4–8.5. If your project targets a specific version, pass `--php-version`:
 
 ```bash
 mir --php-version 8.2 src/
+mir --php-version 7.4 src/
 ```
+
+Version-aware stub filtering is applied automatically — symbols introduced or removed in a given PHP release are included or excluded accordingly.
 
 ### Parallel analysis
 
