@@ -3,6 +3,7 @@ title: AbstractInstantiation
 code: MIR0706
 description: "An abstract class is being instantiated with `new`."
 sidebar:
+  hidden: true
   order: 706
 ---
 

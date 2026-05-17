@@ -3,6 +3,7 @@ title: ImplicitToStringCast
 code: MIR1501
 description: "An object with `__toString` is implicitly coerced to a string (e.g. in string concatenation)."
 sidebar:
+  hidden: true
   order: 1501
 ---
 

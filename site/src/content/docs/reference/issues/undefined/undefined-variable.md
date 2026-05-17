@@ -3,6 +3,7 @@ title: UndefinedVariable
 code: MIR0002
 description: A variable is used before it has been assigned.
 sidebar:
+  hidden: true
   order: 1
 ---
 

@@ -3,6 +3,7 @@ title: DeprecatedMethodCall
 code: MIR1001
 description: "A method marked `@deprecated` is called on an instance."
 sidebar:
+  hidden: true
   order: 1001
 ---
 

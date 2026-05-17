@@ -3,6 +3,7 @@ title: CircularInheritance
 code: MIR0707
 description: "A class participates in a circular `extends`/`implements`/`use` chain."
 sidebar:
+  hidden: true
   order: 707
 ---
 

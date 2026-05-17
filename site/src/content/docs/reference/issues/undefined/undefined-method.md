@@ -3,6 +3,7 @@ title: UndefinedMethod
 code: MIR0004
 description: A method is called on a type that does not declare that method.
 sidebar:
+  hidden: true
   order: 4
 ---
 

@@ -3,6 +3,7 @@ title: PossiblyNullPropertyFetch
 code: MIR0106
 description: "A property is fetched from a value that may be `null`."
 sidebar:
+  hidden: true
   order: 106
 ---
 

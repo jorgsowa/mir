@@ -3,6 +3,7 @@ title: UndefinedFunction
 code: MIR0003
 description: A call targets a function that does not exist in the codebase or stubs.
 sidebar:
+  hidden: true
   order: 3
 ---
 

@@ -3,6 +3,7 @@ title: UnusedParam
 code: MIR0501
 description: A function parameter is never referenced in the function body.
 sidebar:
+  hidden: true
   order: 2
 ---
 

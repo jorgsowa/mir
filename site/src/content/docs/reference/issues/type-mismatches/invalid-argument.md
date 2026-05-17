@@ -3,6 +3,7 @@ title: InvalidArgument
 code: MIR0201
 description: An argument's type does not match the parameter's declared type.
 sidebar:
+  hidden: true
   order: 2
 ---
 

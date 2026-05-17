@@ -3,6 +3,7 @@ title: TaintedInput
 code: MIR0800
 description: Tainted user input flows to a sensitive sink (generic taint sink).
 sidebar:
+  hidden: true
   order: 800
 ---
 

@@ -3,6 +3,7 @@ title: UnimplementedInterfaceMethod
 code: MIR0701
 description: A class does not implement a method required by an interface it declares.
 sidebar:
+  hidden: true
   order: 2
 ---
 

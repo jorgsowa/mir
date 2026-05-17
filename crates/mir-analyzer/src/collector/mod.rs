@@ -476,6 +476,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_pure: false,
                     location: location.clone(),
                     docstring: None,
+                    is_virtual: true,
                 }),
             );
         }
@@ -800,6 +801,7 @@ impl<'a> DefinitionCollector<'a> {
             deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
+            is_virtual: false,
             location: span.map(|s| self.location(s.start, s.end)),
             docstring: if doc.description.trim().is_empty() {
                 None

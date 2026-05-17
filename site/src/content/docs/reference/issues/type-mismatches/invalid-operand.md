@@ -3,6 +3,7 @@ title: InvalidOperand
 code: MIR0208
 description: An operator is applied to incompatible types.
 sidebar:
+  hidden: true
   order: 9
 ---
 

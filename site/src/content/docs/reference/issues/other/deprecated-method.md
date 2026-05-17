@@ -3,6 +3,7 @@ title: DeprecatedMethod
 code: MIR1002
 description: A method marked @deprecated is being called.
 sidebar:
+  hidden: true
   order: 1
 ---
 

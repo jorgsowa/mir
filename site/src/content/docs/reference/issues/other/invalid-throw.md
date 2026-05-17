@@ -3,6 +3,7 @@ title: InvalidThrow
 code: MIR1500
 description: A value that does not implement Throwable is thrown.
 sidebar:
+  hidden: true
   order: 4
 ---
 

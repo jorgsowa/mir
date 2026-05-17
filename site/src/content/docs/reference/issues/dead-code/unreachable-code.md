@@ -3,6 +3,7 @@ title: UnreachableCode
 code: MIR0502
 description: Code appears after an unconditional return, throw, or exit.
 sidebar:
+  hidden: true
   order: 6
 ---
 

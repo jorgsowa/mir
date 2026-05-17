@@ -3,6 +3,7 @@ title: UndefinedProperty
 code: MIR0006
 description: A property is accessed that is not declared on the class.
 sidebar:
+  hidden: true
   order: 6
 ---
 

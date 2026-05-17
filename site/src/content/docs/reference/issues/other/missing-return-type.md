@@ -3,6 +3,7 @@ title: MissingReturnType
 code: MIR1100
 description: A function or method has no declared return type hint.
 sidebar:
+  hidden: true
   order: 1100
 ---
 

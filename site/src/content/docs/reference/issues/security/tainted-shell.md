@@ -3,6 +3,7 @@ title: TaintedShell
 code: MIR0803
 description: User-controlled input reaches a shell execution sink without escaping.
 sidebar:
+  hidden: true
   order: 3
 ---
 

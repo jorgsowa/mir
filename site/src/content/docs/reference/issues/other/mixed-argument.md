@@ -3,6 +3,7 @@ title: MixedArgument
 code: MIR1200
 description: "An argument with type `mixed` is passed to a parameter with a more specific type."
 sidebar:
+  hidden: true
   order: 1200
 ---
 

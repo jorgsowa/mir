@@ -3,6 +3,7 @@ title: RedundantCondition
 code: MIR0400
 description: A condition is always true or always false based on the known types.
 sidebar:
+  hidden: true
   order: 1
 ---
 

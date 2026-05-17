@@ -3,6 +3,7 @@ title: PossiblyUndefinedVariable
 code: MIR0008
 description: A variable is only assigned in some branches and may be unset on other paths.
 sidebar:
+  hidden: true
   order: 2
 ---
 
