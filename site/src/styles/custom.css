@@ -1034,7 +1034,8 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.4rem 0.6rem;
+  height: 2rem;
+  padding: 0 0.6rem;
   background: var(--mir-panel);
   border: 1px solid var(--mir-gold-dim);
   border-radius: 2px;
@@ -1112,13 +1113,14 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
 }
 
 .pg-btn {
-  padding: 0.4375rem 1.125rem;
+  height: 2rem;
+  padding: 0 1.125rem;
   font-size: 0.68rem;
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 1;
   border-radius: 2px;
   border: 1px solid var(--mir-gold);
   background: var(--mir-gold);
