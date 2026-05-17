@@ -7,8 +7,9 @@ class Foo {}
 <?php
 namespace App\Service;
 require_once __DIR__ . '/Foo.php';
-use Foo;
 function run(): void {
-    new Foo();
+    new \Foo();
 }
 ===expect===
+
+

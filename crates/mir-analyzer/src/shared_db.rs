@@ -221,23 +221,12 @@ impl SharedDb {
         let arena = crate::arena::create_parse_arena(source.len());
         let parsed = php_rs_parser::parse(&arena, source);
 
+        let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+
         let mut all_issues: Vec<Issue> = parsed
             .errors
             .iter()
-            .map(|err| {
-                Issue::new(
-                    mir_issues::IssueKind::ParseError {
-                        message: err.to_string(),
-                    },
-                    mir_issues::Location {
-                        file: file.clone(),
-                        line: 1,
-                        line_end: 1,
-                        col_start: 0,
-                        col_end: 0,
-                    },
-                )
-            })
+            .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed.source_map))
             .collect();
 
         let collector = crate::collector::DefinitionCollector::new_for_slice(
@@ -246,13 +235,14 @@ impl SharedDb {
             &parsed.source_map,
         );
         let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
+        let has_collector_issues = !collector_issues.is_empty();
         all_issues.extend(collector_issues);
         mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
-        // Write to the cache on miss. Only files without parse errors are
-        // cached — a parse error means the slice is partial/empty and
-        // re-running the parser next time is the right behavior.
-        if all_issues.is_empty() {
+        // Write to the cache on miss. Only files without hard parse errors are
+        // cached — a hard error may leave the slice partial. ForbiddenWarning
+        // diagnostics produce a complete AST and are safe to cache.
+        if !has_hard_parse_errors && !has_collector_issues {
             if let Some(cache) = &self.stub_cache {
                 let hash = crate::stub_cache::hash_source(source);
                 cache.put(&file, &hash, php_v, &slice);

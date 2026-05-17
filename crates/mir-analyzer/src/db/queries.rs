@@ -631,20 +631,7 @@ pub fn collect_file_definitions_uncached(
     let mut all_issues: Vec<Issue> = parsed
         .errors
         .iter()
-        .map(|err| {
-            Issue::new(
-                mir_issues::IssueKind::ParseError {
-                    message: err.to_string(),
-                },
-                mir_issues::Location {
-                    file: path.clone(),
-                    line: 1,
-                    line_end: 1,
-                    col_start: 0,
-                    col_end: 0,
-                },
-            )
-        })
+        .map(|err| crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map))
         .collect();
 
     let collector =
@@ -754,7 +741,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     let arena = crate::arena::create_parse_arena(text.len());
     let parsed = php_rs_parser::parse(&arena, text.as_ref());
 
-    if !parsed.errors.is_empty() {
+    if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
         return InferredFileTypes::empty();
     }
 

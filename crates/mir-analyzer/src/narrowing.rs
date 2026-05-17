@@ -173,28 +173,13 @@ pub fn narrow_from_condition<'arena, 'src>(
         }
 
         // $x instanceof ClassName
-        // Also handles `!$x instanceof ClassName` which the parser produces as
-        // `(!$x) instanceof ClassName` due to PHP operator precedence. The developer
-        // intent is always `!($x instanceof ClassName)`, so we flip is_true.
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-            // Unwrap `(!$x)` on the left side — treat as negated instanceof
-            let (lhs, extra_negation) = match &b.left.kind {
-                ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => (u.operand, true),
-                ExprKind::Parenthesized(inner) => match &inner.kind {
-                    ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
-                        (u.operand, true)
-                    }
-                    _ => (b.left, false),
-                },
-                _ => (b.left, false),
-            };
-            let effective_is_true = if extra_negation { !is_true } else { is_true };
-            if let Some(var_name) = extract_var_name(lhs) {
+            if let Some(var_name) = extract_var_name(b.left) {
                 if let Some(raw_name) = extract_class_name(b.right, ctx.self_fqcn.as_deref()) {
                     // Resolve the short name to its FQCN using file imports
                     let class_name = crate::db::resolve_name_via_db(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
-                    let narrowed = if effective_is_true {
+                    let narrowed = if is_true {
                         narrow_instanceof_preserving_subtypes(
                             &current,
                             &class_name,
