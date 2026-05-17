@@ -56,6 +56,9 @@ jobs:
         run: npm run build
         working-directory: site
 
+      - name: Disable Jekyll
+        run: touch ./site/dist/.nojekyll
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
