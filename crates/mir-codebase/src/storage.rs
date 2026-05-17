@@ -312,6 +312,10 @@ pub struct MethodStorage {
     /// Used for hover info.
     #[serde(default)]
     pub docstring: Option<Arc<str>>,
+    /// True for methods added via `@method` docblock annotations. Virtual
+    /// methods must not be required as concrete interface implementations.
+    #[serde(default)]
+    pub is_virtual: bool,
 }
 
 impl MethodStorage {

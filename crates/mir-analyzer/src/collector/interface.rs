@@ -93,6 +93,17 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
+        let type_aliases = self.build_type_aliases(&iface_doc);
+        let mut dummy_properties = indexmap::IndexMap::new();
+        self.add_docblock_members(
+            &iface_doc,
+            &type_aliases,
+            &fqcn,
+            &mut own_methods,
+            &mut dummy_properties,
+            Some(self.location(stmt_span.start, stmt_span.end)),
+        );
+
         self.slice.interfaces.push(InterfaceStorage {
             fqcn: fqcn.into(),
             short_name: Arc::from(decl.name.to_string()),

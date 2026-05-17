@@ -145,6 +145,16 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
+        let type_aliases = self.build_type_aliases(&trait_doc);
+        self.add_docblock_members(
+            &trait_doc,
+            &type_aliases,
+            &fqcn,
+            &mut own_methods,
+            &mut own_properties,
+            Some(self.location(stmt_span.start, stmt_span.end)),
+        );
+
         let require_extends: Vec<Arc<str>> = trait_doc
             .require_extends
             .iter()
