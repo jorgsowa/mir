@@ -340,7 +340,12 @@ impl<'a> StatementsAnalyzer<'a> {
     ) {
         for sv in vars.iter() {
             let ty = Union::mixed(); // static vars are indeterminate on entry
-            ctx.set_var(sv.name.to_string().trim_start_matches('$'), ty);
+            let name = sv.name.to_string();
+            let name = name.trim_start_matches('$');
+            ctx.set_var(name, ty);
+            let (line, col_start) = self.offset_to_line_col(sv.span.start);
+            let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
+            ctx.record_var_location(name, line, col_start, line_end, col_end);
         }
     }
 
@@ -361,6 +366,10 @@ impl<'a> StatementsAnalyzer<'a> {
                     .global_var_type(var_name)
                     .unwrap_or_else(Union::mixed);
                 ctx.set_var(var_name, ty);
+                ctx.byref_param_names.insert(var_name.to_string());
+                let (line, col_start) = self.offset_to_line_col(var.span.start);
+                let (line_end, col_end) = self.offset_to_line_col(var.span.end);
+                ctx.record_var_location(var_name, line, col_start, line_end, col_end);
             }
         }
     }

@@ -195,6 +195,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     }),
                                 );
                                 ctx.assigned_vars.insert(name_str.to_string());
+                                let (line, col_start) = self.offset_to_line_col(base.span.start);
+                                let (line_end, col_end) = self.offset_to_line_col(base.span.end);
+                                ctx.record_var_location(
+                                    name_str, line, col_start, line_end, col_end,
+                                );
                             } else {
                                 let current = ctx.get_var(name_str);
                                 let updated = widen_array_with_value(&current, &ty);
