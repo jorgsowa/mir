@@ -11,6 +11,51 @@ pub use docblock::{DocblockParser, ParsedDocblock};
 pub use type_from_hint::type_from_hint;
 
 // ---------------------------------------------------------------------------
+// Parse-error → Issue conversion
+// ---------------------------------------------------------------------------
+
+/// Convert a parser diagnostic to a [`mir_issues::Issue`], using the source
+/// and source map to derive a precise location. `ForbiddenWarning` diagnostics
+/// become `Severity::Warning`; all other variants become `Severity::Error`.
+pub(crate) fn parse_error_to_issue(
+    err: &php_rs_parser::diagnostics::ParseError,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+) -> mir_issues::Issue {
+    let span = err.span();
+    let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+    let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+
+    let mut issue = mir_issues::Issue::new(
+        mir_issues::IssueKind::ParseError {
+            message: err.to_string(),
+        },
+        mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end,
+        },
+    );
+    if matches!(
+        err.severity(),
+        php_rs_parser::diagnostics::Severity::Warning
+    ) {
+        issue.severity = mir_issues::Severity::Warning;
+    }
+    issue
+}
+
+/// Returns `true` for parser diagnostics that should block semantic analysis.
+/// `ForbiddenWarning` diagnostics are non-fatal (PHP only warns) and leave the
+/// AST complete, so they do not block analysis.
+pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
+    matches!(err.severity(), php_rs_parser::diagnostics::Severity::Error)
+}
+
+// ---------------------------------------------------------------------------
 // ParseError
 // ---------------------------------------------------------------------------
 

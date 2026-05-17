@@ -12,5 +12,5 @@ undefinedCallableMethodClass
 
                     foo("B::bar");
 ===expect===
-UndefinedClass@10:24: Class B does not exist
 UnusedParam@8:33: Parameter $c is never used
+UndefinedClass@10:24: Class B does not exist

@@ -489,17 +489,11 @@ impl ProjectAnalyzer {
                     .errors
                     .iter()
                     .map(|err| {
-                        Issue::new(
-                            mir_issues::IssueKind::ParseError {
-                                message: err.to_string(),
-                            },
-                            mir_issues::Location {
-                                file: parsed.file.clone(),
-                                line: 1,
-                                line_end: 1,
-                                col_start: 0,
-                                col_end: 0,
-                            },
+                        crate::parser::parse_error_to_issue(
+                            err,
+                            &parsed.file,
+                            parsed.source(),
+                            &parse_result.source_map,
                         )
                     })
                     .collect();
@@ -525,7 +519,9 @@ impl ProjectAnalyzer {
             let mut guard = self.shared_db.salsa.write();
             for defs in file_defs {
                 for issue in defs.issues.iter() {
-                    if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. }) {
+                    if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
+                        && issue.severity == mir_issues::Severity::Error
+                    {
                         files_with_parse_errors.insert(issue.location.file.clone());
                     }
                 }
@@ -989,7 +985,8 @@ impl ProjectAnalyzer {
             let arena = bumpalo::Bump::new();
             let parsed = php_rs_parser::parse(&arena, new_content);
 
-            if parsed.errors.is_empty() {
+            let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+            if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
                 let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
                 let (body_issues, symbols) = driver.analyze_bodies(
@@ -1032,10 +1029,10 @@ impl ProjectAnalyzer {
         let file_defs = collect_file_definitions(&db, salsa_file);
         db.ingest_stub_slice(&file_defs.slice);
         let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
-        if all_issues
-            .iter()
-            .any(|issue| matches!(issue.kind, mir_issues::IssueKind::ParseError { .. }))
-        {
+        if all_issues.iter().any(|issue| {
+            matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
+                && issue.severity == mir_issues::Severity::Error
+        }) {
             analyzer.apply_issue_suppressions(&mut all_issues);
             return AnalysisResult::build(all_issues, std::collections::HashMap::new(), Vec::new());
         }

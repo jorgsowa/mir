@@ -131,25 +131,16 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
     let arena = crate::arena::create_parse_arena(text.len());
     let parsed = php_rs_parser::parse(&arena, &text);
 
-    // Emit parse errors
     for err in &parsed.errors {
-        let issue = Issue::new(
-            mir_issues::IssueKind::ParseError {
-                message: err.to_string(),
-            },
-            mir_issues::Location {
-                file: path.clone(),
-                line: 1,
-                line_end: 1,
-                col_start: 0,
-                col_end: 0,
-            },
-        );
+        let issue = crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map);
         IssueAccumulator(issue).accumulate(db);
     }
 
-    // If no parse errors, run full analysis via Pass2Driver
-    if parsed.errors.is_empty() {
+    // Run full analysis unless there are hard parse errors. ForbiddenWarning
+    // diagnostics are non-fatal and leave the AST complete, so analysis can
+    // still proceed.
+    let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+    if !has_hard_parse_errors {
         use std::str::FromStr as _;
         let php_version =
             PhpVersion::from_str(input.php_version(db).as_ref()).unwrap_or(PhpVersion::LATEST);

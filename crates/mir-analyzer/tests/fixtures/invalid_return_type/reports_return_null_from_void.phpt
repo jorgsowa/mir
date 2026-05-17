@@ -6,4 +6,4 @@ function f(): void {
     return null;
 }
 ===expect===
-InvalidReturnType@3:4: Return type 'null' is not compatible with declared 'void'
+ParseError@3:4: Parse error: A void function must not return a value
