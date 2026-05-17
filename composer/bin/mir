@@ -19,7 +19,7 @@ if (!is_file($binary)) {
     fwrite(
         STDERR,
         "mir: prebuilt binary not found at {$binary}.\n"
-        . "Run `composer install` (or `composer update mir-analyzer/mir`) to fetch it.\n",
+        . "Run `composer install` to fetch it.\n",
     );
     exit(1);
 }
@@ -37,7 +37,14 @@ $descriptors = [
 
 $proc = proc_open($argv, $descriptors, $pipes);
 if (!is_resource($proc)) {
-    fwrite(STDERR, "mir: failed to launch {$binary}\n");
+    $os = PHP_OS_FAMILY;
+    $arch = php_uname('m');
+    fwrite(
+        STDERR,
+        "mir: failed to launch {$binary}.\n"
+        . "The binary may have been built for a different platform (current: {$os} {$arch}).\n"
+        . "Delete {$binary} and run `composer install` to re-download the correct binary.\n",
+    );
     exit(1);
 }
 
