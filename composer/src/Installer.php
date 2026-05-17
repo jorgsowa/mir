@@ -74,7 +74,7 @@ final class Installer
         $tag = "v{$version}";
         $base = sprintf('https://github.com/%s/releases/download/%s', self::REPO, $tag);
         $archiveUrl = "{$base}/{$archiveName}";
-        $checksumUrl = "{$archiveUrl}.sha256";
+        $checksumUrl = "{$base}/mir-{$target}.sha256";
 
         $io->write("<info>mir: downloading {$archiveName} for {$tag}...</info>");
 
@@ -82,7 +82,7 @@ final class Installer
             throw new \RuntimeException("mir: failed to create {$binDir}");
         }
 
-        $tmpArchive = self::tempPath('mir-archive-');
+        $tmpArchive = self::tempPath('mir-archive-', $isWindows ? '.zip' : '.tar.gz');
         $tmpExtractDir = self::makeTempDir();
         try {
             self::download($archiveUrl, $tmpArchive);
@@ -408,13 +408,23 @@ final class Installer
         }
     }
 
-    private static function tempPath(string $prefix): string
+    private static function tempPath(string $prefix, string $suffix = ''): string
     {
-        $path = tempnam(sys_get_temp_dir(), $prefix);
-        if ($path === false) {
-            throw new \RuntimeException('mir: failed to create temporary file');
+        if ($suffix === '') {
+            $path = tempnam(sys_get_temp_dir(), $prefix);
+            if ($path === false) {
+                throw new \RuntimeException('mir: failed to create temporary file');
+            }
+            return $path;
         }
-        return $path;
+        $base = sys_get_temp_dir();
+        for ($i = 0; $i < 8; $i++) {
+            $candidate = $base . DIRECTORY_SEPARATOR . $prefix . bin2hex(random_bytes(8)) . $suffix;
+            if (@touch($candidate)) {
+                return $candidate;
+            }
+        }
+        throw new \RuntimeException('mir: failed to create temporary file');
     }
 
     private static function makeTempDir(): string
