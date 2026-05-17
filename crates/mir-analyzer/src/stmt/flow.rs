@@ -27,8 +27,13 @@ impl<'a> StatementsAnalyzer<'a> {
             // use the annotated type for the return-type compatibility check.
             // `@var Type $name` with a variable name narrows the variable (handled in
             // analyze_stmts loop), not the return type.
-            let check_ty = if let Some((None, var_ty)) = self.extract_var_annotation(stmt_span) {
-                var_ty
+            let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
+            let check_ty = if let Some(ann) = self.extract_var_annotation_from(doc.as_deref()) {
+                if ann.name.is_none() {
+                    ann.ty
+                } else {
+                    ret_ty.clone()
+                }
             } else {
                 ret_ty.clone()
             };

@@ -25,6 +25,44 @@ use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
 
 // ---------------------------------------------------------------------------
+// VarAnnotation
+// ---------------------------------------------------------------------------
+
+/// Parsed `@var` annotation from a docblock preceding a statement.
+struct VarAnnotation {
+    /// `None` when no `$varname` was given — annotation applies to the statement's LHS.
+    name: Option<String>,
+    ty: mir_types::Union,
+}
+
+/// Apply post-narrow: after `$x = expr()`, if the preceding `@var` names `$x`,
+/// override the inferred type with the annotated one.
+fn apply_post_narrow<'arena, 'src>(
+    stmt: &php_ast::ast::Stmt<'arena, 'src>,
+    annotation: &VarAnnotation,
+    ctx: &mut Context,
+) {
+    let Some(ref var_name) = annotation.name else {
+        return;
+    };
+    let php_ast::ast::StmtKind::Expression(e) = &stmt.kind else {
+        return;
+    };
+    let php_ast::ast::ExprKind::Assign(a) = &e.kind else {
+        return;
+    };
+    if !matches!(&a.op, php_ast::ast::AssignOp::Assign) {
+        return;
+    }
+    let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind else {
+        return;
+    };
+    if lhs_name.trim_start_matches('$') == var_name.as_str() {
+        ctx.set_var(var_name.as_str(), annotation.ty.clone());
+    }
+}
+
+// ---------------------------------------------------------------------------
 // StatementsAnalyzer
 // ---------------------------------------------------------------------------
 
@@ -102,65 +140,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 break;
             }
 
-            // Extract @var annotation for this statement.
-            let var_annotation = self.extract_var_annotation(stmt.span);
-
-            // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
-            // Special cases: before `return` or before `foreach ... as $valvar` (value override).
-            if let Some((Some(ref var_name), ref var_ty)) = var_annotation {
-                ctx.set_var(var_name.as_str(), var_ty.clone());
-            }
-
             self.analyze_stmt(stmt, ctx);
-
-            // Post-narrow: `@var Type $varname` before `$varname = expr()` overrides
-            // the inferred type with the annotated type. Only applies when the assignment
-            // target IS the annotated variable.
-            if let Some((Some(ref var_name), ref var_ty)) = var_annotation {
-                if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
-                    if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
-                        if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
-                            if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
-                                let lhs = lhs_name.trim_start_matches('$');
-                                if lhs == var_name.as_str() {
-                                    ctx.set_var(var_name.as_str(), var_ty.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Additional fallback: If this is an assignment and no var_annotation was found,
-            // try to extract one directly from the docblock as a fallback
-            // This handles cases where the initial extract_var_annotation might have issues
-            if var_annotation.is_none() {
-                if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
-                    if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
-                        if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
-                            if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
-                                let lhs = lhs_name.trim_start_matches('$').to_string();
-                                // Try to extract var annotation directly
-                                if let Some(doc) = crate::parser::find_preceding_docblock(
-                                    self.source,
-                                    stmt.span.start,
-                                ) {
-                                    let parsed = crate::parser::DocblockParser::parse(&doc);
-                                    if let Some(var_type) = parsed.var_type {
-                                        // Check if this annotation is for the variable we're assigning to
-                                        if let Some(var_name) = parsed.var_name {
-                                            if var_name == lhs {
-                                                let resolved = crate::stmt::return_type::resolve_union_for_file(var_type, self.db, &self.file);
-                                                ctx.set_var(&lhs, resolved);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -169,15 +149,17 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt: &php_ast::ast::Stmt<'arena, 'src>,
         ctx: &mut Context,
     ) {
-        let suppressions = self.extract_statement_suppressions(stmt.span);
+        let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
+        let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
 
-        // Extract @var annotation for this statement.
-        let var_annotation = self.extract_var_annotation(stmt.span);
+        let var_annotation = self.extract_var_annotation_from(doc.as_deref());
 
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
-        if let Some((Some(ref var_name), ref var_ty)) = var_annotation {
-            ctx.set_var(var_name.as_str(), var_ty.clone());
+        if let Some(ref ann) = var_annotation {
+            if let Some(ref name) = ann.name {
+                ctx.set_var(name.as_str(), ann.ty.clone());
+            }
         }
 
         match &stmt.kind {
@@ -297,52 +279,9 @@ impl<'a> StatementsAnalyzer<'a> {
             StmtKind::Error => {}
         }
 
-        // Post-narrow: `@var Type $varname` before `$varname = expr()` overrides
-        // the inferred type with the annotated type. Only applies when the assignment
-        // target IS the annotated variable.
-        if let Some((Some(ref var_name), ref var_ty)) = var_annotation {
-            if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
-                if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
-                    if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
-                        if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
-                            let lhs = lhs_name.trim_start_matches('$');
-                            if lhs == var_name.as_str() {
-                                ctx.set_var(var_name.as_str(), var_ty.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Additional fallback: If this is an assignment and no var_annotation was found,
-        // try to extract one directly from the docblock as a fallback
-        if var_annotation.is_none() {
-            if let php_ast::ast::StmtKind::Expression(e) = &stmt.kind {
-                if let php_ast::ast::ExprKind::Assign(a) = &e.kind {
-                    if matches!(&a.op, php_ast::ast::AssignOp::Assign) {
-                        if let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind {
-                            let lhs = lhs_name.trim_start_matches('$').to_string();
-                            if let Some(doc) =
-                                crate::parser::find_preceding_docblock(self.source, stmt.span.start)
-                            {
-                                let parsed = crate::parser::DocblockParser::parse(&doc);
-                                if let Some(var_type) = parsed.var_type {
-                                    if let Some(var_name) = parsed.var_name {
-                                        if var_name == lhs {
-                                            let resolved =
-                                                crate::stmt::return_type::resolve_union_for_file(
-                                                    var_type, self.db, &self.file,
-                                                );
-                                            ctx.set_var(&lhs, resolved);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        // Post-narrow: after `$x = expr()`, override the inferred type if annotated.
+        if let Some(ref ann) = var_annotation {
+            apply_post_narrow(stmt, ann, ctx);
         }
 
         if !suppressions.is_empty() {
@@ -431,10 +370,9 @@ impl<'a> StatementsAnalyzer<'a> {
     // @psalm-suppress / @suppress per-statement
     // -----------------------------------------------------------------------
 
-    /// Extract suppression names from the `@psalm-suppress` / `@suppress`
-    /// annotation in the docblock immediately preceding `span`.
-    fn extract_statement_suppressions(&self, span: php_ast::Span) -> Vec<String> {
-        let Some(doc) = crate::parser::find_preceding_docblock(self.source, span.start) else {
+    /// Extract suppression names from a parsed docblock string.
+    fn extract_suppressions_from(&self, doc: Option<&str>) -> Vec<String> {
+        let Some(doc) = doc else {
             return vec![];
         };
         let mut suppressions = Vec::new();
@@ -454,18 +392,15 @@ impl<'a> StatementsAnalyzer<'a> {
         suppressions
     }
 
-    /// Extract `@var Type [$varname]` from the docblock immediately preceding `span`.
-    /// Returns `(optional_var_name, resolved_type)` if an annotation exists.
-    /// The type is resolved through the codebase's file-level imports/namespace.
-    fn extract_var_annotation(
-        &self,
-        span: php_ast::Span,
-    ) -> Option<(Option<String>, mir_types::Union)> {
-        let doc = crate::parser::find_preceding_docblock(self.source, span.start)?;
-        let parsed = crate::parser::DocblockParser::parse(&doc);
+    /// Extract a `@var` annotation from a parsed docblock string.
+    /// The type is resolved through the file's imports/namespace.
+    fn extract_var_annotation_from(&self, doc: Option<&str>) -> Option<VarAnnotation> {
+        let parsed = crate::parser::DocblockParser::parse(doc?);
         let ty = parsed.var_type?;
-        let resolved = resolve_union_for_file(ty, self.db, &self.file);
-        Some((parsed.var_name, resolved))
+        Some(VarAnnotation {
+            name: parsed.var_name,
+            ty: resolve_union_for_file(ty, self.db, &self.file),
+        })
     }
 
     // -----------------------------------------------------------------------
