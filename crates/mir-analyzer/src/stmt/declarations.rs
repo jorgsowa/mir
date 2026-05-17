@@ -125,14 +125,19 @@ impl<'a> StatementsAnalyzer<'a> {
             .lookup_class_node(fqcn.as_ref())
             .and_then(|node| node.parent(self.db));
 
+        let mut param_default_ctx = ctx.clone();
+        param_default_ctx.self_fqcn = Some(fqcn.clone());
+        param_default_ctx.parent_fqcn = parent_fqcn.clone();
+        param_default_ctx.static_fqcn = Some(fqcn.clone());
+
         for member in decl.members.iter() {
             let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
             for p in method.params.iter() {
                 if let Some(default) = &p.default {
-                    let mut ea = self.expr_analyzer(ctx);
-                    let _ = ea.analyze(default, ctx);
+                    let mut ea = self.expr_analyzer(&param_default_ctx);
+                    let _ = ea.analyze(default, &mut param_default_ctx);
                 }
             }
             let Some(body) = &method.body else { continue };

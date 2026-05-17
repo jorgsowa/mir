@@ -293,7 +293,7 @@ impl<'a> StatementsAnalyzer<'a> {
     // Helper: create a short-lived ExpressionAnalyzer borrowing our fields
     // -----------------------------------------------------------------------
 
-    fn expr_analyzer<'b>(&'b mut self, _ctx: &Context) -> ExpressionAnalyzer<'b>
+    pub(crate) fn expr_analyzer<'b>(&'b mut self, _ctx: &Context) -> ExpressionAnalyzer<'b>
     where
         'a: 'b,
     {

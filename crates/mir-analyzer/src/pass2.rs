@@ -656,6 +656,32 @@ impl<'a> Pass2Driver<'a> {
                 self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
 
+            if method.params.iter().any(|p| p.default.is_some()) {
+                let mut buf = IssueBuffer::new();
+                let mut sa = StatementsAnalyzer::new(
+                    self.db,
+                    file.clone(),
+                    source,
+                    source_map,
+                    &mut buf,
+                    all_symbols,
+                    self.php_version,
+                    self.inference_only,
+                );
+                let mut default_ctx = Context::new();
+                default_ctx.self_fqcn = Some(Arc::from(fqcn));
+                default_ctx.parent_fqcn = parent_fqcn.clone();
+                default_ctx.static_fqcn = Some(Arc::from(fqcn));
+                for p in method.params.iter() {
+                    if let Some(default) = &p.default {
+                        let mut ea = sa.expr_analyzer(&default_ctx);
+                        let _ = ea.analyze(default, &mut default_ctx);
+                    }
+                }
+                drop(sa);
+                all_issues.extend(buf.into_issues());
+            }
+
             let Some(body) = &method.body else { continue };
 
             let (params, return_ty, template_params, declared_throws) =
@@ -884,6 +910,32 @@ impl<'a> Pass2Driver<'a> {
             }
             if let Some(hint) = &method.return_type {
                 self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            }
+
+            if method.params.iter().any(|p| p.default.is_some()) {
+                let mut buf = IssueBuffer::new();
+                let mut sa = StatementsAnalyzer::new(
+                    self.db,
+                    file.clone(),
+                    source,
+                    source_map,
+                    &mut buf,
+                    all_symbols,
+                    self.php_version,
+                    self.inference_only,
+                );
+                let mut default_ctx = Context::new();
+                default_ctx.self_fqcn = Some(Arc::from(fqcn));
+                default_ctx.parent_fqcn = parent_fqcn.clone();
+                default_ctx.static_fqcn = Some(Arc::from(fqcn));
+                for p in method.params.iter() {
+                    if let Some(default) = &p.default {
+                        let mut ea = sa.expr_analyzer(&default_ctx);
+                        let _ = ea.analyze(default, &mut default_ctx);
+                    }
+                }
+                drop(sa);
+                all_issues.extend(buf.into_issues());
             }
 
             let Some(body) = &method.body else { continue };

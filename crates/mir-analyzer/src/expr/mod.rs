@@ -213,7 +213,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::StaticPropertyAccess(spa) => self.analyze_static_property_access(spa),
 
-            ExprKind::ClassConstAccess(cca) => self.analyze_class_const_access(cca, expr.span),
+            ExprKind::ClassConstAccess(cca) => self.analyze_class_const_access(cca, expr.span, ctx),
 
             ExprKind::ClassConstAccessDynamic { .. } => Union::mixed(),
             ExprKind::StaticPropertyAccessDynamic { .. } => Union::mixed(),
