@@ -187,6 +187,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   const input     = document.getElementById('pg-input');
   const highlight = document.getElementById('pg-highlight');
   const gutter    = document.getElementById('pg-gutter');
+  const editor    = document.querySelector('.pg-editor');
   const diag      = document.getElementById('pg-diag');
   const status    = document.getElementById('pg-status');
 
@@ -382,13 +383,20 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     }
   });
 
-  // ── Line numbers ──────────────────────────────────────────────────────────
+  // ── Line numbers + textarea height ───────────────────────────────────────
   function updateGutter() {
     const n = input.value.split('\n').length;
     gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
   }
-  input.addEventListener('input', updateGutter);
+
+  function updateInputHeight() {
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+  }
+
+  input.addEventListener('input', () => { updateGutter(); updateInputHeight(); });
   updateGutter();
+  updateInputHeight();
 
   // ── Custom dropdowns ──────────────────────────────────────────────────────
   function setupDrop(dropBtn, dropList) {
@@ -420,6 +428,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     exBtn.querySelector('.pg-drop-val').textContent = 'Examples…';
     closeEx();
     updateGutter();
+    updateInputHeight();
     updateHighlight();
     runAnalysis();
   });
@@ -472,16 +481,14 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     const left  = padLeft + colStart * cw - input.scrollLeft;
     const width = Math.max(cw * 2, (endCol - colStart) * cw);
 
-    const colors = { error: 'var(--sl-color-red)', warning: 'var(--sl-color-orange)', info: 'var(--sl-color-blue)' };
+    const colors = { error: 'var(--mir-error)', warning: 'var(--mir-warning)', info: 'var(--mir-gold)' };
     underline.style.cssText = `display:block; top:${top}px; left:${left}px; width:${width}px; border-color:${colors[sev] ?? colors.error};`;
     overlay.scrollTop  = input.scrollTop;
     overlay.scrollLeft = input.scrollLeft;
   }
 
   input.addEventListener('scroll', () => {
-    gutter.scrollTop      = input.scrollTop;
-    highlight.scrollTop   = input.scrollTop;
-    highlight.scrollLeft  = input.scrollLeft;
+    highlight.scrollLeft = input.scrollLeft;
     positionUnderline();
   });
 
@@ -505,7 +512,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     if (!card) return;
     paintFromCard(card);
     const lineH = parseFloat(getComputedStyle(input).lineHeight) || 22;
-    input.scrollTop = Math.max(0, (+card.dataset.line - 1) * lineH - input.clientHeight / 3);
+    editor.scrollTop = Math.max(0, (+card.dataset.line - 1) * lineH - editor.clientHeight / 3);
     input.focus();
   });
   diag.addEventListener('mouseleave', () => {
