@@ -49,7 +49,7 @@ issues keep their code.
 | MIR0006  | UndefinedProperty             | [undefined/undefined-property](../undefined/undefined-property/) |
 | MIR0007  | UndefinedConstant             | [undefined/undefined-constant](../undefined/undefined-constant/) |
 | MIR0008  | PossiblyUndefinedVariable     | [undefined/possibly-undefined-variable](../undefined/possibly-undefined-variable/) |
-| MIR0009  | UndefinedTrait                | [undefined/undefined-class](../undefined/undefined-class/) |
+| MIR0009  | UndefinedTrait                | [undefined/undefined-trait](../undefined/undefined-trait/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](../nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](../nullability/null-property-fetch/) |
 | MIR0102  | NullMethodCall                | [nullability/null-method-call](../nullability/null-method-call/) |

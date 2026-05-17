@@ -1,13 +1,13 @@
 ---
 title: UndefinedClass
 code: MIR0005
-description: A reference is made to a class, interface, or trait that does not exist.
+description: A reference is made to a class or interface that does not exist.
 sidebar:
   hidden: true
   order: 5
 ---
 
-A reference is made to a class, interface, or trait that does not exist.
+A reference is made to a class or interface that does not exist.
 
 ## Example
 

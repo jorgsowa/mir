@@ -9,7 +9,7 @@ All issue types mir can emit, grouped by category.
 
 | Kind | Description |
 |------|-------------|
-| `InvalidScope` | Use of `$this`, `self`, `parent`, or `static` outside a valid scope |
+| `InvalidScope` | Use of `$this` outside a class or inside a static method |
 | `UndefinedVariable` | Variable used before assignment |
 | `PossiblyUndefinedVariable` | Variable only assigned in some branches |
 | `UndefinedFunction` | Call to a function not found in codebase or stubs |
@@ -45,7 +45,7 @@ All issue types mir can emit, grouped by category.
 | `InvalidNamedArgument` | Named argument does not match a callable parameter |
 | `InvalidPassByReference` | By-reference parameter receives a non-referenceable expression |
 | `InvalidPropertyAssignment` | Assigned value incompatible with property type |
-| `InvalidCast` | Explicit cast that can never succeed |
+| `InvalidCast` | Cast from an array or object to a scalar type that always produces a meaningless result |
 | `InvalidOperand` | Operator applied to incompatible types |
 | `MismatchingDocblockReturnType` | Docblock return type conflicts with native type hint |
 | `MismatchingDocblockParamType` | Docblock param type conflicts with native type hint |
@@ -118,7 +118,7 @@ All issue types mir can emit, grouped by category.
 | `InternalMethod` | Call to an `@internal` method from outside its package |
 | `InvalidThrow` | `throw` of a non-`Throwable` value |
 | `MissingThrowsDocblock` | Thrown exception not declared in `@throws` |
-| `ImplicitToStringCast` | Object implicitly cast to `string` without a `__toString` method |
+| `ImplicitToStringCast` | Object implicitly cast to `string` without a `__toString` method or `Stringable` interface |
 | `ImplicitFloatToIntCast` | `float` implicitly narrowed to `int` with possible data loss |
 | `MissingReturnType` | Function or method has no declared return type |
 | `MissingParamType` | Parameter has no declared type |
