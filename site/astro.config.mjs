@@ -42,7 +42,7 @@ const mirTheme = {
   },
   tokenColors: [
     { scope: ['comment', 'punctuation.definition.comment', 'string.comment'],
-      settings: { foreground: MIR_PALETTE.textDim, fontStyle: 'italic' } },
+      settings: { foreground: MIR_PALETTE.textDim, fontStyle: '' } },
     { scope: ['keyword', 'storage', 'storage.type', 'storage.modifier',
               'keyword.control', 'keyword.operator.new', 'keyword.operator.expression',
               'keyword.other'],
@@ -85,7 +85,7 @@ const mirTheme = {
     { scope: ['meta.tag.metadata.doc', 'comment.block.documentation',
               'storage.type.class.phpdoc', 'keyword.other.phpdoc',
               'entity.name.tag.phpdoc'],
-      settings: { foreground: MIR_PALETTE.textDim, fontStyle: 'italic' } },
+      settings: { foreground: MIR_PALETTE.textDim, fontStyle: '' } },
     { scope: ['markup.heading'], settings: { foreground: MIR_PALETTE.gold, fontStyle: 'bold' } },
     { scope: ['markup.inserted'], settings: { foreground: MIR_PALETTE.amber } },
     { scope: ['markup.deleted'],  settings: { foreground: MIR_PALETTE.magenta } },

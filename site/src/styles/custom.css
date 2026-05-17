@@ -287,11 +287,12 @@ nav.sidebar-pane a {
   transition: color 0.15s;
 }
 
-.sidebar-content a[aria-current='page'] {
-  color: var(--mir-gold);
-  background: rgba(200, 168, 75, 0.06);
-  border-inline-start: 2px solid var(--mir-gold);
-  padding-inline-start: calc(0.75rem - 2px);
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus,
+.sidebar-content a[aria-current='page']:active {
+  color: var(--sl-color-white) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
   font-weight: 500;
 }
 
@@ -317,6 +318,10 @@ nav.sidebar-pane a {
   font-size: 0.73rem;
   letter-spacing: 0.01em;
   color: var(--sl-color-gray-3);
+}
+
+.right-sidebar a:hover {
+  color: var(--sl-color-white);
 }
 
 .right-sidebar a[aria-current='true'],
@@ -607,7 +612,7 @@ starlight-tabs .expressive-code .frame::before {
 }
 
 .expressive-code .frame.has-title:not(.is-terminal) .header,
-.expressive-code .frame.is-terminal .header {
+.expressive-code .frame.is-terminal.has-title .header {
   background: #0e0e1a !important;
   border: none !important;
   padding: 0 !important;
@@ -620,7 +625,7 @@ starlight-tabs .expressive-code .frame::before {
    the header itself (not .frame::before) because the opaque header background
    would otherwise cover a frame-level pseudo-element at the top edge. */
 .expressive-code .frame.has-title:not(.is-terminal) .header::before,
-.expressive-code .frame.is-terminal .header::before {
+.expressive-code .frame.is-terminal.has-title .header::before {
   content: '';
   position: absolute;
   inset-block-start: 0;
@@ -634,7 +639,7 @@ starlight-tabs .expressive-code .frame::before {
 /* Bottom-edge gradient on title bar — matches tablist::after so both sections
    read identically (0.5 full-width gradient + 0.28 active-indicator on top). */
 .expressive-code .frame.has-title:not(.is-terminal) .header::after,
-.expressive-code .frame.is-terminal .header::after {
+.expressive-code .frame.is-terminal.has-title .header::after {
   content: '';
   position: absolute;
   inset-block-end: 0;
@@ -664,10 +669,21 @@ starlight-tabs .expressive-code .frame::before {
   text-shadow: 0 0 10px rgba(200, 168, 75, 0.35) !important;
 }
 
+/* Terminal frames with no title: hide the header entirely (the square EC renders). */
+.expressive-code .frame.is-terminal:not(.has-title) .header {
+  display: none !important;
+}
+
+/* Reset --button-spacing whenever the EC header is hidden so the copy button
+   stays in the top-right corner of the code area, not offset by the header height. */
+.expressive-code .frame.is-terminal:not(.has-title) {
+  --button-spacing: 0.4rem;
+}
+
 /* Terminal-frame variants (the ▪ ▪ ▪ "traffic light" dots) — hide them
    so titled blocks match the cleaner Tabs strip. */
-.expressive-code .frame.is-terminal .header::before,
-.expressive-code .frame.is-terminal .header::after {
+.expressive-code .frame.is-terminal.has-title .header::before,
+.expressive-code .frame.is-terminal.has-title .header::after {
   display: none !important;
 }
 
@@ -677,6 +693,22 @@ starlight-tabs .expressive-code .frame::before {
 }
 .expressive-code pre > code {
   color: #f0ecd8;
+}
+
+/* Force uniform font-family and upright style across all tokens */
+.expressive-code code span {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
+  font-style: normal !important;
+}
+
+/* EC owns the frame border — suppress the generic pre border and dots header
+   so code blocks don't show a second chrome strip above the code. */
+.expressive-code .frame pre:not(:where(.not-content *)) {
+  border: none !important;
+  padding-block-start: 1rem;
+}
+.expressive-code .frame pre:not(:where(.not-content *))::before {
+  display: none;
 }
 
 /* ── Asides ──────────────────────────────────────────────────────────── */
@@ -694,7 +726,7 @@ starlight-tabs .expressive-code .frame::before {
   content: '';
   position: absolute;
   inset-block-start: -1px;
-  inset-inline-start: 3px;
+  inset-inline-start: 0;
   inset-inline-end: -1px;
   height: 2px;
   background: linear-gradient(90deg,
@@ -885,6 +917,10 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   display: none;
 }
 
+starlight-tabs [role='tabpanel'] .expressive-code .frame {
+  --button-spacing: 0.4rem;
+}
+
 /* ── Tables ──────────────────────────────────────────────────────────── */
 .sl-markdown-content table:not(:where(.not-content *)) {
   font-family: 'IBM Plex Mono', monospace;
@@ -1040,91 +1076,89 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   flex-wrap: wrap;
 }
 
-.pg-select-wrap {
+.pg-drop {
   position: relative;
-  display: inline-flex;
-  align-items: stretch;
 }
 
-.pg-select {
-  appearance: none;
-  padding: 0.4375rem 0.875rem;
-  font-size: 0.78rem;
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-  border-radius: 2px 0 0 2px;
-  border: 1px solid rgba(200, 168, 75, 0.22);
-  border-inline-end: none;
-  background-color: var(--mir-panel);
-  color: var(--sl-color-white);
-  cursor: pointer;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
-}
-
-/* Open dropdown list — browsers expose limited control over the popup,
-   but option bg/color land in Chromium and Firefox. */
-.pg-select option {
-  background-color: var(--mir-panel-raised);
-  color: var(--sl-color-white);
-  font-family: 'IBM Plex Mono', monospace;
-  padding: 0.4rem 0.75rem;
-}
-
-.pg-select option:checked,
-.pg-select option:hover {
-  background-color: var(--mir-gold-dim);
-  color: var(--mir-gold);
-}
-
-.pg-select option:disabled {
-  color: var(--sl-color-gray-4);
-  font-style: italic;
-}
-
-/* Closed state: focus-visible ring matches the playground editor's focus. */
-.pg-select:focus-visible {
-  border-color: var(--mir-gold);
-  color: var(--mir-gold);
-  box-shadow: 0 0 0 2px rgba(200, 168, 75, 0.1);
-}
-
-.pg-select:focus-visible ~ .pg-select-btn,
-.pg-select:focus ~ .pg-select-btn {
-  border-color: var(--mir-gold);
-  color: var(--mir-gold);
-}
-
-.pg-select-btn {
+.pg-drop-btn {
   display: flex;
   align-items: center;
-  padding: 0 0.5rem;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
   background: var(--mir-panel);
-  border: 1px solid rgba(200, 168, 75, 0.22);
-  border-inline-start: 1px solid rgba(200, 168, 75, 0.12);
-  border-radius: 0 2px 2px 0;
-  color: rgba(200, 168, 75, 0.55);
-  font-size: 0.65rem;
-  line-height: 1;
-  pointer-events: none;
-  user-select: none;
-  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+  border: 1px solid var(--mir-gold-dim);
+  border-radius: 2px;
+  color: color-mix(in srgb, var(--mir-gold) 55%, transparent);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
 }
 
-.pg-select-wrap:focus-within .pg-select-btn {
-  transform: translateY(1px);
+.pg-drop-btn:hover {
+  border-color: color-mix(in srgb, var(--mir-gold) 40%, transparent);
   color: var(--mir-gold);
+}
+
+.pg-drop-btn[aria-expanded="true"] {
   border-color: var(--mir-gold);
-}
-
-.pg-select-wrap:hover .pg-select-btn {
   color: var(--mir-gold);
-  border-color: rgba(200, 168, 75, 0.4);
+  box-shadow: 0 0 0 2px var(--mir-gold-dim);
 }
 
-.pg-select-wrap:hover .pg-select {
-  border-color: rgba(200, 168, 75, 0.4);
+.pg-drop-caret {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.pg-drop-btn[aria-expanded="true"] .pg-drop-caret {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.pg-drop-list {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  min-width: 100%;
+  background: var(--mir-panel);
+  border: 1px solid var(--mir-gold-dim);
+  border-radius: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 3px;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.pg-drop-list[hidden] {
+  display: none;
+}
+
+.pg-drop-opt {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.65rem;
+  border-radius: 2px;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--mir-gold) 55%, transparent);
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+
+.pg-drop-opt:hover {
+  background: var(--mir-gold-dim);
+  color: var(--mir-gold);
+}
+
+.pg-drop-opt--selected {
+  color: var(--mir-gold);
 }
 
 .pg-btn {
@@ -1364,9 +1398,14 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
   background: var(--mir-code-bg) !important;
 }
 
+[data-theme='light'] .expressive-code pre > code,
+[data-theme='light'] .expressive-code code {
+  color: var(--mir-phosphor) !important;
+}
+
 [data-theme='light'] .sl-markdown-content pre:not(:where(.not-content *))::before,
 [data-theme='light'] .expressive-code .frame.has-title:not(.is-terminal) .header,
-[data-theme='light'] .expressive-code .frame.is-terminal .header,
+[data-theme='light'] .expressive-code .frame.is-terminal.has-title .header,
 [data-theme='light'] [role='tablist'] {
   background: var(--mir-panel) !important;
 }
@@ -1426,7 +1465,29 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame .header {
 [data-theme='light'] .starlight-aside--tip     { background: rgba(45, 104, 0, 0.05); }
 [data-theme='light'] .starlight-aside--danger  { background: rgba(139, 26, 42, 0.05); }
 
-[data-theme='light'] .mir-btn--primary { color: #f5ede0; }
+/* Primary: slightly lighter gold than the dark-mode default, cream text */
+[data-theme='light'] .mir-btn--primary {
+  background: #9a7230;
+  border-color: #9a7230;
+  color: #f5ede0;
+}
+[data-theme='light'] .mir-btn--primary:hover {
+  background: transparent;
+  color: #9a7230;
+  box-shadow: 0 0 14px rgba(154, 114, 48, 0.28);
+}
+
+/* Ghost: dark-mode border colours are near-invisible on parchment */
+[data-theme='light'] .mir-btn--ghost {
+  border-color: rgba(122, 92, 24, 0.3);
+  color: var(--mir-text-dim);
+}
+[data-theme='light'] .mir-btn--ghost:hover {
+  background: rgba(122, 92, 24, 0.06);
+  border-color: var(--mir-gold);
+  color: var(--sl-color-white);
+  box-shadow: 0 0 12px rgba(122, 92, 24, 0.12);
+}
 
 /* MIR error-code badge — rendered above the page title via the PageTitle
  * component override (src/components/PageTitle.astro). Driven by the

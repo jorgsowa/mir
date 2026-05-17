@@ -126,22 +126,27 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     data-examples={JSON.stringify(EXAMPLES)}
   >
     <div class="pg-toolbar">
-      <div class="pg-select-wrap">
-        <select id="pg-example" class="pg-select" aria-label="Example">
-          <option value="" disabled selected>Examples…</option>
+      <div class="pg-drop" id="pg-example-wrap">
+        <button type="button" class="pg-drop-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Example">
+          <span class="pg-drop-val">Examples…</span>
+          <svg aria-hidden="true" class="pg-drop-caret" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg>
+        </button>
+        <ul class="pg-drop-list" role="listbox" aria-label="Example" hidden>
           {Object.entries(EXAMPLES).map(([k, v]) => (
-            <option value={k}>{v.label}</option>
+            <li class="pg-drop-opt" role="option" data-value={k}>{v.label}</li>
           ))}
-        </select>
-        <span class="pg-select-btn" aria-hidden="true">▾</span>
+        </ul>
       </div>
-      <div class="pg-select-wrap">
-        <select id="pg-version" class="pg-select" aria-label="PHP version">
+      <div class="pg-drop" id="pg-version-wrap">
+        <button type="button" class="pg-drop-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="PHP version">
+          <span class="pg-drop-val">PHP {DEFAULT_PHP}</span>
+          <svg aria-hidden="true" class="pg-drop-caret" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg>
+        </button>
+        <ul class="pg-drop-list" role="listbox" aria-label="PHP version" hidden>
           {PHP_VERSIONS.map(v => (
-            <option value={v} selected={v === DEFAULT_PHP}>{`PHP ${v}`}</option>
+            <li class={`pg-drop-opt${v === DEFAULT_PHP ? ' pg-drop-opt--selected' : ''}`} role="option" data-value={v} aria-selected={v === DEFAULT_PHP ? 'true' : 'false'}>{`PHP ${v}`}</li>
           ))}
-        </select>
-        <span class="pg-select-btn" aria-hidden="true">▾</span>
+        </ul>
       </div>
       <button id="pg-btn" class="pg-btn" disabled>Loading…</button>
       <button id="pg-share" class="pg-btn pg-btn--ghost" type="button" title="Copy shareable link">Share</button>
@@ -179,11 +184,18 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   const btn       = document.getElementById('pg-btn');
   const shareBtn  = document.getElementById('pg-share');
   const input     = document.getElementById('pg-input');
-  const sel       = document.getElementById('pg-version');
-  const exSel     = document.getElementById('pg-example');
   const gutter    = document.getElementById('pg-gutter');
   const diag      = document.getElementById('pg-diag');
   const status    = document.getElementById('pg-status');
+
+  const verWrap  = document.getElementById('pg-version-wrap');
+  const verBtn   = verWrap.querySelector('.pg-drop-btn');
+  const verList  = verWrap.querySelector('.pg-drop-list');
+  const exWrap   = document.getElementById('pg-example-wrap');
+  const exBtn    = exWrap.querySelector('.pg-drop-btn');
+  const exList   = exWrap.querySelector('.pg-drop-list');
+
+  let pgVersion = verList.querySelector('.pg-drop-opt--selected')?.dataset.value ?? '8.5';
 
   let playground = null;
   let debounce   = null;
@@ -201,6 +213,16 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     } catch { return null; }
   }
 
+  function setVersion(v) {
+    pgVersion = v;
+    verBtn.querySelector('.pg-drop-val').textContent = `PHP ${v}`;
+    verList.querySelectorAll('[role="option"]').forEach(o => {
+      const s = o.dataset.value === v;
+      o.classList.toggle('pg-drop-opt--selected', s);
+      o.setAttribute('aria-selected', String(s));
+    });
+  }
+
   function readHash() {
     const h = new URLSearchParams(location.hash.slice(1));
     const code = h.get('code');
@@ -209,13 +231,15 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
       const decoded = decodeCode(code);
       if (decoded != null) input.value = decoded;
     }
-    if (php && [...sel.options].some(o => o.value === php)) sel.value = php;
+    if (php && [...verList.querySelectorAll('[role="option"]')].some(o => o.dataset.value === php)) {
+      setVersion(php);
+    }
   }
   readHash();
 
   shareBtn.addEventListener('click', async () => {
     const url = new URL(location.href);
-    url.hash = `code=${encodeCode(input.value)}&php=${encodeURIComponent(sel.value)}`;
+    url.hash = `code=${encodeCode(input.value)}&php=${encodeURIComponent(pgVersion)}`;
     const href = url.toString();
     history.replaceState(null, '', href);
     try {
@@ -236,14 +260,37 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   input.addEventListener('input', updateGutter);
   updateGutter();
 
+  // ── Custom dropdowns ──────────────────────────────────────────────────────
+  function setupDrop(dropBtn, dropList) {
+    const close = () => { dropList.hidden = true; dropBtn.setAttribute('aria-expanded', 'false'); };
+    const open  = () => { dropList.hidden = false; dropBtn.setAttribute('aria-expanded', 'true'); };
+    dropBtn.addEventListener('click', e => { e.stopPropagation(); dropList.hidden ? open() : close(); });
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    return close;
+  }
+  const closeVer = setupDrop(verBtn, verList);
+  const closeEx  = setupDrop(exBtn, exList);
+
+  verList.addEventListener('click', e => {
+    const opt = e.target.closest('[role="option"]');
+    if (!opt) return;
+    setVersion(opt.dataset.value);
+    closeVer();
+    runAnalysis();
+  });
+
   // ── Examples ──────────────────────────────────────────────────────────────
-  exSel.addEventListener('change', () => {
-    const ex = EXAMPLES[exSel.value];
+  exList.addEventListener('click', e => {
+    const opt = e.target.closest('[role="option"]');
+    if (!opt) return;
+    const ex = EXAMPLES[opt.dataset.value];
     if (!ex) return;
     input.value = ex.code;
+    exBtn.querySelector('.pg-drop-val').textContent = 'Examples…';
+    closeEx();
     updateGutter();
     runAnalysis();
-    exSel.selectedIndex = 0;
   });
 
   // ── WASM ──────────────────────────────────────────────────────────────────
@@ -356,7 +403,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   function runAnalysis() {
     if (!playground) return;
     try {
-      renderIssues(JSON.parse(playground.analyze(input.value, sel.value)));
+      renderIssues(JSON.parse(playground.analyze(input.value, pgVersion)));
     } catch (e) {
       diag.innerHTML = '<p class="pg-empty">Analysis error.</p>';
       console.error(e);
@@ -364,7 +411,6 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   }
 
   btn.addEventListener('click', runAnalysis);
-  sel.addEventListener('change', runAnalysis);
   input.addEventListener('input', () => {
     clearTimeout(debounce);
     debounce = setTimeout(runAnalysis, 400);
