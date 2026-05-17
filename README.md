@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="mir.png" width="200" alt="mir">
+<img src="site/src/assets/logo-hero.png" width="120" alt="mir">
 
 </div>
 
@@ -75,11 +75,6 @@ Full documentation is available at **[jorgsowa.github.io/mir](https://jorgsowa.g
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## What's next
-
-- Reduce `UndefinedMethod` / `InvalidArgument` false positives
-- Plugin system
 
 ## License
 
