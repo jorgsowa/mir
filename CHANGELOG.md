@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-05-17
+
+### Added
+
+- Stable `MIR####` error codes for every issue variant, organized into 16 category bands. Codes surface in `Display` output in rustc style: `error[MIR0005] UndefinedClass: ...`. The `name()` method is unchanged and remains the suppression and SARIF rule key.
+- `UndefinedTrait` (MIR0009) diagnostic: emitted when a `use` statement references a name that does not exist in the codebase.
+- `InvalidTraitUse` now also emitted when the used name resolves to a class, interface, or enum instead of a trait. Per-`use`-statement source locations are stored in `ClassStorage` and `ClassNode` so diagnostics point at the trait name in the `use` statement.
+- php-rs-parser 0.13.0: parse errors now carry precise source locations via `err.span()` instead of hardcoded line 1 col 0; `ForbiddenWarning` diagnostics emit at `Severity::Warning` and do not block semantic analysis.
+
+### Fixed
+
+- Literal integer (`1`, `42`, `-3`) and quoted-string (`'foo'`, `"bar"`) types in docblock annotations now parse as `TLiteralInt` / `TLiteralString` instead of `TNamedObject`, making `@return 2|3` and similar annotations work correctly.
+- `@return` / `@param` docblocks written on the line preceding a standalone function declaration (rather than attached as an AST `doc_comment`) are now applied, matching the existing behavior for class methods.
+- `@method` docblocks on traits, interfaces, and enums are now honored. Previously `add_docblock_members` was only called for classes, silently dropping virtual method declarations on other symbol kinds. `@method`-added methods carry `is_virtual: true` and are excluded from `UnimplementedInterfaceMethod` checks.
+- `UnusedVariable` now reports the correct source location for variables first assigned via array push (`$arr[] = value`), `static $var`, or `global $var` (previously fell back to line 1, col 0).
+- `global $var` assignments are now treated as externally observable side effects (matching by-reference parameter semantics), eliminating false-positive `UnusedVariable` diagnostics on global variable writes.
+- `Union::intersect_with` now returns `never()` when no types overlap between the subject and the arm condition, preventing false-positive method/property errors in match arm bodies. `Union::add_type` now absorbs `never` into non-empty unions (`T | never = T`).
+- Pending reference locations are now drained into `RefLocAccumulator` inside `analyze_file` (Salsa), fixing reference tracking in the incremental analysis path.
+
+### Changed
+
+- `MissingThrowsDocblock` is now suppressed by default for `RuntimeException` and `LogicException` descendants (PHP's "unchecked" exceptions). Both direct `throw` statements and transitive `@throws` propagation are filtered. The suppression list is configurable via the new `suppressed_issue_kinds` API.
+- `find_dead_code: bool` on `ProjectAnalyzer` replaced with `suppressed_issue_kinds: HashSet<String>` and a centralized `apply_issue_suppressions()` post-filter applied on every analysis path including the cache-hit path.
+- Removed the `instanceof` operator-precedence workaround from `narrowing.rs`; php-rs-parser 0.13.0 correctly parses `!$x instanceof C` as `!($x instanceof C)`.
+
+### Dependencies
+
+- Bumped php-rs-parser, php-ast, php-lexer, phpdoc-parser `0.12.1` → `0.13.0`.
+
 ## [0.26.0] - 2026-05-15
 
 ### Performance
