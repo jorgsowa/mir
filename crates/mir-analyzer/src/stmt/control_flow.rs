@@ -221,9 +221,10 @@ impl<'a> StatementsAnalyzer<'a> {
         let (key_ty, mut value_ty) = infer_foreach_types(&arr_ty);
 
         if let Some(vname) = extract_simple_var(&fe.value) {
-            if let Some((Some(ann_var), ann_ty)) = self.extract_var_annotation(stmt_span) {
-                if ann_var == vname {
-                    value_ty = ann_ty;
+            let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
+            if let Some(ann) = self.extract_var_annotation_from(doc.as_deref()) {
+                if ann.name.as_deref() == Some(vname.as_str()) {
+                    value_ty = ann.ty;
                 }
             }
         }
