@@ -89,6 +89,9 @@ pub struct ClassNode {
     /// Used traits (classes only).  Traits are added to the ancestor list but
     /// their own ancestors are not recursed into, matching PHP semantics.
     pub traits: Arc<[Arc<str>]>,
+    /// Per-`use` locations for each used trait, parallel to `traits`.
+    /// Empty for non-class nodes and for slices loaded from older caches.
+    pub trait_use_locations: Arc<[(Arc<str>, Location)]>,
     /// Directly extended interfaces (interfaces only).
     pub extends: Arc<[Arc<str>]>,
     /// Declared `@template` parameters from the class/interface/trait

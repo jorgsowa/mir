@@ -369,6 +369,7 @@ pub struct ClassNodeFields {
     pub parent: Option<Arc<str>>,
     pub interfaces: Arc<[Arc<str>]>,
     pub traits: Arc<[Arc<str>]>,
+    pub trait_use_locations: Arc<[(Arc<str>, Location)]>,
     pub extends: Arc<[Arc<str>]>,
     pub template_params: Arc<[TemplateParam]>,
     pub require_extends: Arc<[Arc<str>]>,
@@ -618,6 +619,7 @@ impl MirDb {
                 parent: cls.parent.clone(),
                 interfaces: Arc::from(cls.interfaces.as_ref()),
                 traits: Arc::from(cls.traits.as_ref()),
+                trait_use_locations: Arc::from(cls.trait_use_locations.as_ref()),
                 template_params: Arc::from(cls.template_params.as_ref()),
                 mixins: Arc::from(cls.mixins.as_ref()),
                 deprecated: cls.deprecated.clone(),
@@ -868,6 +870,7 @@ impl MirDb {
             parent,
             interfaces,
             traits,
+            trait_use_locations,
             extends,
             template_params,
             require_extends,
@@ -904,6 +907,7 @@ impl MirDb {
                 && node.parent(self) == parent
                 && *node.interfaces(self) == *interfaces
                 && *node.traits(self) == *traits
+                && *node.trait_use_locations(self) == *trait_use_locations
                 && *node.extends(self) == *extends
                 && *node.template_params(self) == *template_params
                 && *node.require_extends(self) == *require_extends
@@ -927,6 +931,7 @@ impl MirDb {
             node.set_parent(self).to(parent);
             node.set_interfaces(self).to(interfaces);
             node.set_traits(self).to(traits);
+            node.set_trait_use_locations(self).to(trait_use_locations);
             node.set_extends(self).to(extends);
             node.set_template_params(self).to(template_params);
             node.set_require_extends(self).to(require_extends);
@@ -953,6 +958,7 @@ impl MirDb {
                 parent,
                 interfaces,
                 traits,
+                trait_use_locations,
                 extends,
                 template_params,
                 require_extends,

@@ -2,12 +2,10 @@
 isInterfaceNoTrait
 ===file===
 <?php
-                    Interface B {}
+interface B {}
 
-                    class A {
-                        use B;
-                    }
+class A {
+    use B;
+}
 ===expect===
-UndefinedTrait
-===ignore===
-TODO
+InvalidTraitUse@5:8: Trait B used incorrectly: B is an interface, not a trait

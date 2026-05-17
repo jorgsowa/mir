@@ -380,6 +380,11 @@ pub struct ClassStorage {
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub location: Option<Location>,
+    /// Per-`use` statement locations for each used trait: `(fqcn, location)` in
+    /// declaration order, parallel to `traits`.  Absent from older serialized
+    /// slices; defaults to empty.
+    #[serde(default)]
+    pub trait_use_locations: Vec<(Arc<str>, Location)>,
     /// Type aliases declared on this class via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
     pub type_aliases: std::collections::HashMap<Arc<str>, Union>,

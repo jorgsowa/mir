@@ -34,6 +34,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_properties = indexmap::IndexMap::new();
         let mut own_constants = indexmap::IndexMap::new();
         let mut trait_uses: Vec<Arc<str>> = vec![];
+        let mut trait_use_locations: Vec<(Arc<str>, mir_codebase::storage::Location)> = vec![];
 
         let class_doc =
             self.parse_docblock_from_node_or_preceding(decl.doc_comment.as_ref(), stmt_span.start);
@@ -138,7 +139,10 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        trait_uses.push(self.resolve_name(&name_to_string(t)).into());
+                        let fqcn: Arc<str> = self.resolve_name(&name_to_string(t)).into();
+                        let loc = self.location(t.span().start, t.span().end);
+                        trait_use_locations.push((fqcn.clone(), loc));
+                        trait_uses.push(fqcn);
                     }
                 }
             }
@@ -205,6 +209,7 @@ impl<'a> DefinitionCollector<'a> {
             parent,
             interfaces,
             traits: trait_uses,
+            trait_use_locations,
             own_methods,
             own_properties,
             own_constants,

@@ -2,12 +2,10 @@
 isClassNoTrait
 ===file===
 <?php
-                    class B {}
+class B {}
 
-                    class A {
-                        use B;
-                    }
+class A {
+    use B;
+}
 ===expect===
-UndefinedTrait
-===ignore===
-TODO
+InvalidTraitUse@5:8: Trait B used incorrectly: B is a class, not a trait
