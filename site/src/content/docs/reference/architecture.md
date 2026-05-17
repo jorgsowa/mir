@@ -46,9 +46,9 @@ PHP built-in definitions (functions, classes, interfaces, constants) are loaded 
 
 ### Layer 1 — phpstorm-stubs (authoritative)
 
-PHP built-in definitions are sourced from [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs), vendored at `stubs/` in the repository root. At compile time, `build.rs` walks 33 selected PHP extension directories and embeds every `.php` stub file as a string literal via `include_str!()`. At startup, each embedded file is parsed through the normal PHP parser + definition collector, populating the codebase with PHP built-ins.
+PHP built-in definitions are sourced from [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs), vendored at `crates/mir-analyzer/phpstorm-stubs/` as a git submodule. Selected extensions are copied to `crates/mir-analyzer/stubs/`. At compile time, `build.rs` walks all 57 extension directories under `stubs/` and embeds every `.php` stub file as a string literal via `include_str!()`. At startup, each embedded file is parsed through the normal PHP parser + definition collector, populating the codebase with PHP built-ins.
 
-Extensions covered: `Core`, `standard`, `SPL`, `bcmath`, `ctype`, `curl`, `date`, `dom`, `fileinfo`, `filter`, `gmp`, `hash`, `iconv`, `intl`, `json`, `libxml`, `mbstring`, `mysqli`, `openssl`, `pcntl`, `pcre`, `PDO`, `posix`, `random`, `Reflection`, `session`, `SimpleXML`, `sodium`, `sockets`, `tokenizer`, `xml`, `zip`, `zlib`.
+Extensions covered: `apcu`, `bcmath`, `calendar`, `Core`, `ctype`, `curl`, `date`, `dom`, `exif`, `FFI`, `fileinfo`, `filter`, `ftp`, `gd`, `gettext`, `gmp`, `hash`, `iconv`, `intl`, `json`, `libxml`, `mbstring`, `mysqli`, `openssl`, `pcntl`, `pcre`, `PDO`, `pgsql`, `Phar`, `posix`, `random`, `readline`, `Reflection`, `session`, `shmop`, `SimpleXML`, `soap`, `sockets`, `sodium`, `SPL`, `SQLite`, `sqlite3`, `standard`, `sysvmsg`, `sysvsem`, `sysvshm`, `tidy`, `tokenizer`, `uuid`, `xml`, `xmlreader`, `xmlwriter`, `xsl`, `yaml`, `Zend OPcache`, `zip`, `zlib`.
 
 This provides 500+ functions, 100+ classes, 20+ interfaces, and 200+ constants.
 

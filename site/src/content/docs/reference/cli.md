@@ -23,7 +23,7 @@ Paths default to the current directory when omitted.
 | `-v, --verbose` | off | Print per-file issue counts |
 | `-q, --quiet` | off | Suppress all output; use exit code only |
 | `--no-progress` | off | Disable the progress bar |
-| `--php-version <X.Y>` | — | Target PHP version (e.g. `8.2`) |
+| `--php-version <X.Y>` | `8.5` | Target PHP version (e.g. `7.4`, `8.2`). Supported range: `7.4`–`8.5`. |
 | `-c, --config <FILE>` | auto | Config file (`mir.xml` / `psalm.xml` auto-discovered) |
 | `--baseline <FILE>` | off | Suppress issues listed in a baseline XML |
 | `--error-level <1-8>` | — | Override global error level (1 = errors only) |

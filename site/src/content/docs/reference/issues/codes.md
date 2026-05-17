@@ -6,7 +6,7 @@ sidebar:
 ---
 
 Every issue mir emits carries a stable identifier of the form `MIR####`.
-The code appears in CLI output, JSON/SARIF, and `--explain` output:
+The code appears in CLI output and JSON/SARIF output:
 
 ```
 src/x.php:12:4 error[MIR0005] UndefinedClass: Class Foo not found
@@ -49,6 +49,7 @@ issues keep their code.
 | MIR0006  | UndefinedProperty             | [undefined/undefined-property](./undefined/undefined-property/) |
 | MIR0007  | UndefinedConstant             | [undefined/undefined-constant](./undefined/undefined-constant/) |
 | MIR0008  | PossiblyUndefinedVariable     | [undefined/possibly-undefined-variable](./undefined/possibly-undefined-variable/) |
+| MIR0009  | UndefinedTrait                | [undefined/undefined-class](./undefined/undefined-class/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](./nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](./nullability/null-property-fetch/) |
 | MIR0102  | NullMethodCall                | [nullability/null-method-call](./nullability/null-method-call/) |
