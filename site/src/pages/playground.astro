@@ -157,6 +157,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     <div class="pg-editor">
       <pre id="pg-gutter" class="pg-gutter" aria-hidden="true">1</pre>
       <div class="pg-input-wrap">
+        <pre id="pg-highlight" class="pg-highlight" aria-hidden="true"></pre>
         <textarea
           id="pg-input"
           class="pg-input"
@@ -184,6 +185,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   const btn       = document.getElementById('pg-btn');
   const shareBtn  = document.getElementById('pg-share');
   const input     = document.getElementById('pg-input');
+  const highlight = document.getElementById('pg-highlight');
   const gutter    = document.getElementById('pg-gutter');
   const diag      = document.getElementById('pg-diag');
   const status    = document.getElementById('pg-status');
@@ -199,6 +201,134 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
 
   let playground = null;
   let debounce   = null;
+
+  // ── PHP syntax highlighting ───────────────────────────────────────────────
+  function highlightPhp(src) {
+    const KW = new Set([
+      'abstract','array','as','break','callable','case','catch','class','clone',
+      'const','continue','declare','default','do','echo','else','elseif','empty',
+      'enum','extends','final','finally','fn','for','foreach','function','goto',
+      'if','implements','include','include_once','instanceof','insteadof',
+      'interface','isset','list','match','namespace','new','print',
+      'private','protected','public','readonly','require','require_once','return',
+      'self','parent','static','switch','throw','trait','try','unset','use',
+      'var','while','yield',
+      // Scalar and return types
+      'int','float','string','bool','void','never','mixed','object','iterable',
+    ]);
+    const CONST = new Set(['null','NULL','true','TRUE','false','FALSE']);
+
+    const parts = [];
+    let i = 0;
+    let lastKw = '';
+
+    function tok(cls, text) {
+      if (cls) parts.push(`<span class="${cls}">${esc(text)}</span>`);
+      else parts.push(esc(text));
+    }
+
+    while (i < src.length) {
+      const rest = src.slice(i);
+      let m;
+
+      // PHP open/close tags
+      if ((m = /^<\?(?:php\b|=)?/i.exec(rest))) {
+        tok('hl-tag', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+      if ((m = /^\?>/.exec(rest))) {
+        tok('hl-tag', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+
+      // Block comments (including unclosed)
+      if (rest.startsWith('/*')) {
+        const end = rest.indexOf('*/');
+        const s = end === -1 ? rest : rest.slice(0, end + 2);
+        tok('hl-comment', s); i += s.length; continue;
+      }
+
+      // Line comments
+      if ((m = /^\/\/[^\n]*/.exec(rest)) || (m = /^#(?!\[)[^\n]*/.exec(rest))) {
+        tok('hl-comment', m[0]); i += m[0].length; continue;
+      }
+
+      // Strings — single quoted
+      if ((m = /^'(?:[^'\\]|\\.)*'/.exec(rest))) {
+        tok('hl-str', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+      // Strings — double quoted
+      if ((m = /^"(?:[^"\\]|\\.)*"/.exec(rest))) {
+        tok('hl-str', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+      // Unclosed strings (take to end of line)
+      if (rest[0] === "'" || rest[0] === '"') {
+        const nl = rest.indexOf('\n');
+        const s = nl === -1 ? rest : rest.slice(0, nl);
+        tok('hl-str', s); i += s.length; continue;
+      }
+
+      // Numbers
+      if ((m = /^(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)/.exec(rest))) {
+        tok('hl-num', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+
+      // $this (special variable)
+      if ((m = /^\$this\b/.exec(rest))) {
+        tok('hl-this', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+
+      // Variables
+      if ((m = /^\$[a-zA-Z_][a-zA-Z0-9_]*/.exec(rest))) {
+        tok('hl-var', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+
+      // Identifiers: keywords, constants, class names, function calls
+      if ((m = /^[a-zA-Z_\\][a-zA-Z0-9_\\]*/.exec(rest))) {
+        const word = m[0];
+        if (CONST.has(word)) {
+          tok('hl-const', word); lastKw = '';
+        } else if (KW.has(word)) {
+          tok('hl-kw', word); lastKw = word;
+        } else {
+          // Check if followed by '(' (skip optional spaces/tabs)
+          const after = rest.slice(word.length).replace(/^[ \t]*/, '');
+          if (after[0] === '(') {
+            tok('hl-fn', word);
+          } else if (lastKw === 'new' || lastKw === 'extends' || lastKw === 'instanceof' || /^[A-Z]/.test(word)) {
+            tok('hl-type', word);
+          } else {
+            tok('', word);
+          }
+          lastKw = '';
+        }
+        i += word.length; continue;
+      }
+
+      // Operators
+      if ((m = /^(?:->|=>|::|\?\?=|\?\?|===|!==|<=>|\+\+|--|\.\.\.|[+\-*\/%&|^~<>!=]=?|[?:@])/.exec(rest))) {
+        tok('hl-op', m[0]); i += m[0].length; lastKw = ''; continue;
+      }
+
+      // Punctuation
+      if (/^[{}[\]();,.]/.test(rest[0])) {
+        tok('hl-punct', rest[0]); i++; lastKw = ''; continue;
+      }
+
+      // Whitespace — preserve, don't clear lastKw so `new Foo` works across spaces
+      if ((m = /^\s+/.exec(rest))) {
+        parts.push(esc(m[0])); i += m[0].length; continue;
+      }
+
+      parts.push(esc(rest[0])); i++;
+    }
+
+    return parts.join('') + '\n';
+  }
+
+  function updateHighlight() {
+    highlight.innerHTML = highlightPhp(input.value);
+    highlight.scrollTop  = input.scrollTop;
+    highlight.scrollLeft = input.scrollLeft;
+  }
 
   // ── URL share encoding (UTF-8 → base64url) ────────────────────────────────
   function encodeCode(s) {
@@ -290,6 +420,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     exBtn.querySelector('.pg-drop-val').textContent = 'Examples…';
     closeEx();
     updateGutter();
+    updateHighlight();
     runAnalysis();
   });
 
@@ -348,7 +479,9 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   }
 
   input.addEventListener('scroll', () => {
-    gutter.scrollTop = input.scrollTop;
+    gutter.scrollTop      = input.scrollTop;
+    highlight.scrollTop   = input.scrollTop;
+    highlight.scrollLeft  = input.scrollLeft;
     positionUnderline();
   });
 
@@ -412,9 +545,11 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
 
   btn.addEventListener('click', runAnalysis);
   input.addEventListener('input', () => {
+    updateHighlight();
     clearTimeout(debounce);
     debounce = setTimeout(runAnalysis, 400);
   });
 
+  updateHighlight();
   loadWasm();
 </script>

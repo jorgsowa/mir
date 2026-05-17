@@ -55,6 +55,21 @@
   --mir-font-display: 'IBM Plex Sans', system-ui, sans-serif;
 
   --sl-nav-pad-y: 0.25rem;
+
+  /* Playground syntax token colours (dark) */
+  --hl-default: #b0a898;
+  --hl-tag:     #b86070;
+  --hl-kw:      #c8a84b;
+  --hl-const:   #b88048;
+  --hl-str:     #b89870;
+  --hl-comment: #706858;
+  --hl-var:     #b0b8c0;
+  --hl-this:    #b86070;
+  --hl-fn:      #c8a840;
+  --hl-type:    #6898b0;
+  --hl-num:     #b88048;
+  --hl-op:      #a08838;
+  --hl-punct:   rgba(180, 152, 80, 0.45);
 }
 
 /* ── Light palette — warm parchment ─────────────────────────────────── */
@@ -102,6 +117,21 @@
   --mir-gutter-bg:   #e8e0cc;
 
   --mir-font-display: 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* Playground syntax token colours (light) */
+  --hl-default: #2c2018;
+  --hl-tag:     #8b1a2a;
+  --hl-kw:      #7a5c18;
+  --hl-const:   #965010;
+  --hl-str:     #7a4820;
+  --hl-comment: #4a7030;
+  --hl-var:     #2c2018;
+  --hl-this:    #8b1a2a;
+  --hl-fn:      #5a4010;
+  --hl-type:    #0a6080;
+  --hl-num:     #965010;
+  --hl-op:      #7a5c18;
+  --hl-punct:   rgba(122, 92, 24, 0.45);
 
   --sl-nav-pad-y: 0.25rem;
 }
@@ -485,9 +515,9 @@ nav.sidebar-pane a {
 
 /* ── Code blocks ─────────────────────────────────────────────────────── */
 .sl-markdown-content pre:not(:where(.not-content *)) {
-  border: 1px solid rgba(200, 168, 75, 0.15);
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 15%, transparent);
   border-radius: 2px;
-  background: #050810;
+  background: var(--mir-code-bg);
   position: relative;
   padding-block-start: 2.4rem;
 }
@@ -499,20 +529,20 @@ nav.sidebar-pane a {
   inset-block-start: 0;
   inset-inline: 0;
   padding: 0.4rem 0.875rem;
-  background: #0e0e1a;
-  border-bottom: 1px solid rgba(200, 168, 75, 0.1);
+  background: var(--mir-panel);
+  border-bottom: 1px solid color-mix(in srgb, var(--mir-gold) 10%, transparent);
   line-height: 1.6;
 }
 
 .sl-markdown-content pre:not(:where(.not-content *)) code {
-  color: var(--mir-phosphor);
+  color: var(--mir-text);
   font-size: 0.82rem;
 }
 
 /* Inline code */
 .sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
-  background: rgba(200, 168, 75, 0.07);
-  border: 1px solid rgba(200, 168, 75, 0.16);
+  background: color-mix(in srgb, var(--mir-gold) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 16%, transparent);
   border-radius: 2px;
   color: var(--mir-gold);
   padding: 0.1em 0.35em;
@@ -523,24 +553,24 @@ nav.sidebar-pane a {
    Title bar styled to match Starlight Tabs (#0e0e1a strip with a gold-
    underlined active tab) so titled code blocks and Tabs read as one family. */
 .expressive-code .frame {
-  border: 1px solid rgba(200, 168, 75, 0.16) !important;
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 16%, transparent) !important;
   border-radius: 2px !important;
-  background: #050810 !important;
+  background: var(--mir-code-bg) !important;
   overflow: hidden;
   position: relative;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .expressive-code .frame:hover {
-  border-color: rgba(200, 168, 75, 0.28) !important;
-  box-shadow: 0 0 18px rgba(200, 168, 75, 0.05);
+  border-color: color-mix(in srgb, var(--mir-gold) 28%, transparent) !important;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--mir-gold) 5%, transparent);
 }
 
 /* When a code frame is nested inside a Tabs panel, the outer <starlight-tabs>
    owns the hover affordance — suppress the inner frame's hover so only the
    outer border lights up. */
 starlight-tabs .expressive-code .frame:hover {
-  border-color: rgba(200, 168, 75, 0.16) !important;
+  border-color: color-mix(in srgb, var(--mir-gold) 16%, transparent) !important;
   box-shadow: none;
 }
 
@@ -552,7 +582,7 @@ starlight-tabs .expressive-code .frame:hover {
   inset-block-start: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mir-gold) 50%, transparent) 0%, transparent 65%);
   pointer-events: none;
   z-index: 1;
 }
@@ -565,7 +595,7 @@ starlight-tabs .expressive-code .frame::before {
 
 .expressive-code .frame.has-title:not(.is-terminal) .header,
 .expressive-code .frame.is-terminal.has-title .header {
-  background: #0e0e1a !important;
+  background: var(--mir-panel) !important;
   border: none !important;
   padding: 0 !important;
   position: relative;
@@ -583,7 +613,7 @@ starlight-tabs .expressive-code .frame::before {
   inset-block-start: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mir-gold) 50%, transparent) 0%, transparent 65%);
   pointer-events: none;
   z-index: 1;
 }
@@ -597,7 +627,7 @@ starlight-tabs .expressive-code .frame::before {
   inset-block-end: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mir-gold) 50%, transparent) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -612,12 +642,12 @@ starlight-tabs .expressive-code .frame::before {
   letter-spacing: 0.05em !important;
   text-transform: uppercase !important;
   color: var(--mir-gold) !important;
-  background: #050810 !important;
+  background: var(--mir-code-bg) !important;
   padding: 0.55rem 1rem !important;
   margin: 0 !important;
   border: none !important;
   border-radius: 0 !important;
-  box-shadow: inset 0 -1px 0 rgba(200, 168, 75, 0.28) !important;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--mir-gold) 28%, transparent) !important;
 }
 
 /* Terminal frames with no title: hide the header entirely (the square EC renders). */
@@ -640,10 +670,10 @@ starlight-tabs .expressive-code .frame::before {
 
 .expressive-code pre,
 .expressive-code code {
-  background: #050810 !important;
+  background: var(--mir-code-bg) !important;
 }
 .expressive-code pre > code {
-  color: #f0ecd8;
+  color: var(--mir-text);
 }
 
 /* Force uniform font-family and upright style across all tokens */
@@ -665,7 +695,7 @@ starlight-tabs .expressive-code .frame::before {
 /* ── Asides ──────────────────────────────────────────────────────────── */
 .starlight-aside {
   border-radius: 2px;
-  border: 1px solid rgba(200, 168, 75, 0.16);
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 16%, transparent);
   border-inline-start-width: 3px;
   padding: 0.875rem 1rem;
   position: relative;
@@ -691,7 +721,7 @@ starlight-tabs .expressive-code .frame::before {
 .starlight-aside--caution {
   --sl-color-asides-border:      var(--mir-gold);
   --sl-color-asides-text-accent: var(--mir-gold);
-  background: rgba(200, 168, 75, 0.05);
+  background: color-mix(in srgb, var(--mir-gold) 5%, transparent);
 }
 .starlight-aside--note {
   --sl-color-asides-border:      var(--sl-color-white);
@@ -723,17 +753,17 @@ starlight-tabs .expressive-code .frame::before {
    like the terminal "title bar + body" used elsewhere on the page. */
 starlight-tabs {
   display: block;
-  border: 1px solid rgba(200, 168, 75, 0.16);
+  border: 1px solid color-mix(in srgb, var(--mir-gold) 16%, transparent);
   border-radius: 2px;
   overflow: hidden;
-  background: #050810;
+  background: var(--mir-code-bg);
   position: relative;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 starlight-tabs:hover {
-  border-color: rgba(200, 168, 75, 0.28);
-  box-shadow: 0 0 18px rgba(200, 168, 75, 0.05);
+  border-color: color-mix(in srgb, var(--mir-gold) 28%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--mir-gold) 5%, transparent);
 }
 
 starlight-tabs::before {
@@ -742,7 +772,7 @@ starlight-tabs::before {
   inset-block-start: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mir-gold) 50%, transparent) 0%, transparent 65%);
   pointer-events: none;
   z-index: 1;
 }
@@ -759,7 +789,7 @@ starlight-tabs::before {
    (.expressive-code .frame .header / pre::before) so the whole component
    reads as one instrument panel. */
 [role='tablist'] {
-  background: #0e0e1a;
+  background: var(--mir-panel);
   border-bottom: none;
   position: relative;
   gap: 0;
@@ -778,7 +808,7 @@ starlight-tabs::before {
   inset-block-end: 0;
   inset-inline: 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(200, 168, 75, 0.5) 0%, transparent 65%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mir-gold) 50%, transparent) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -817,7 +847,7 @@ starlight-tabs::before {
 
 .tab [role='tab']:hover:not([aria-selected='true']) {
   color: var(--mir-text);
-  background: rgba(200, 168, 75, 0.04);
+  background: color-mix(in srgb, var(--mir-gold) 4%, transparent);
 }
 
 .tab [role='tab']:hover svg {
@@ -827,13 +857,13 @@ starlight-tabs::before {
 .tab [role='tab'][aria-selected='true'] {
   color: var(--mir-gold);
   font-weight: 500;
-  background: #050810;
-  box-shadow: inset 0 -1px 0 rgba(200, 168, 75, 0.28);
+  background: var(--mir-code-bg);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--mir-gold) 28%, transparent);
 }
 
 .tab [role='tab'][aria-selected='true'] svg {
   opacity: 1;
-  filter: drop-shadow(0 0 4px rgba(200, 168, 75, 0.4));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--mir-gold) 40%, transparent));
 }
 
 /* Tab panels are siblings of .tablist-wrapper inside <starlight-tabs>.
@@ -1207,6 +1237,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
+  z-index: 2;
 }
 
 .pg-underline {
@@ -1222,7 +1253,7 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   font-size: 0.78rem;
   line-height: 1.6;
   text-align: right;
-  color: rgba(200, 168, 75, 0.22);
+  color: rgba(200, 168, 75, 0.5);
   background: #0a0a16;
   border-inline-end: 1px solid rgba(200, 168, 75, 0.1);
   user-select: none;
@@ -1233,6 +1264,40 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   white-space: pre;
 }
 
+/* Syntax-highlighted mirror layer behind the textarea */
+.pg-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 1rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--hl-default);
+  background: transparent;
+  white-space: pre;
+  overflow: hidden;
+  tab-size: 4;
+  word-break: keep-all;
+  pointer-events: none;
+  box-sizing: border-box;
+  z-index: 0;
+}
+
+/* Token colours — referenced via CSS vars so dark/light themes just swap values */
+.hl-tag     { color: var(--hl-tag); }
+.hl-kw      { color: var(--hl-kw); }
+.hl-const   { color: var(--hl-const); }
+.hl-str     { color: var(--hl-str); }
+.hl-comment { color: var(--hl-comment); font-style: italic; }
+.hl-var     { color: var(--hl-var); }
+.hl-this    { color: var(--hl-this); font-style: italic; }
+.hl-fn      { color: var(--hl-fn); }
+.hl-type    { color: var(--hl-type); }
+.hl-num     { color: var(--hl-num); }
+.hl-op      { color: var(--hl-op); }
+.hl-punct   { color: var(--hl-punct); }
+
 .pg-input {
   flex: 1;
   width: 100%;
@@ -1241,7 +1306,8 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.875rem;
   line-height: 1.6;
-  color: var(--mir-phosphor);
+  color: transparent;
+  caret-color: var(--hl-default);
   background: transparent;
   border: none;
   outline: none;
@@ -1249,6 +1315,13 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
   tab-size: 4;
   overflow-wrap: normal;
   overflow-x: auto;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+}
+
+.pg-input::selection {
+  color: var(--hl-default);
 }
 
 .pg-diag {
@@ -1335,44 +1408,10 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
 }
 
 
-/* ── Light-mode overrides for hard-coded dark backgrounds ────────────── */
-/* These exist because many rules use literal hex values instead of variables.
-   Each selector here targets the same element as the dark-mode rule above. */
+/* ── Light-mode overrides ────────────────────────────────────────────── */
 [data-theme='light'] {
   /* Override literal dark page/nav/panel backgrounds */
   --sl-color-bg-nav:   #ede4d4;
-}
-
-[data-theme='light'] .sl-markdown-content pre:not(:where(.not-content *)),
-[data-theme='light'] .expressive-code pre,
-[data-theme='light'] .expressive-code code,
-[data-theme='light'] .expressive-code .frame {
-  background: var(--mir-code-bg) !important;
-}
-
-[data-theme='light'] .expressive-code pre > code,
-[data-theme='light'] .expressive-code code {
-  color: var(--mir-phosphor) !important;
-}
-
-[data-theme='light'] .sl-markdown-content pre:not(:where(.not-content *))::before,
-[data-theme='light'] .expressive-code .frame.has-title:not(.is-terminal) .header,
-[data-theme='light'] .expressive-code .frame.is-terminal.has-title .header,
-[data-theme='light'] [role='tablist'] {
-  background: var(--mir-panel) !important;
-}
-
-[data-theme='light'] .expressive-code .frame .title {
-  background: var(--mir-code-bg) !important;
-  color: var(--mir-gold) !important;
-}
-
-[data-theme='light'] starlight-tabs {
-  background: var(--mir-code-bg);
-}
-
-[data-theme='light'] .tab > [role='tab'][aria-selected='true'] {
-  background: var(--mir-code-bg);
 }
 
 [data-theme='light'] .pg-editor {
@@ -1381,11 +1420,10 @@ starlight-tabs [role='tabpanel'] .expressive-code .frame {
 
 [data-theme='light'] .pg-gutter {
   background: var(--mir-gutter-bg);
+  color: rgba(122, 92, 24, 0.55);
 }
 
-[data-theme='light'] .pg-input {
-  color: var(--mir-phosphor);
-}
+
 
 [data-theme='light'] .pg-issue {
   background: var(--mir-panel);
