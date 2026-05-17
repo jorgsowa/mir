@@ -2,10 +2,8 @@
 undefinedTrait
 ===file===
 <?php
-                    class B {
-                        use A;
-                    }
+class B {
+    use A;
+}
 ===expect===
-UndefinedTrait
-===ignore===
-TODO
+UndefinedTrait@3:8: Trait A does not exist

@@ -955,21 +955,10 @@ impl<'a> Pass2Driver<'a> {
             return;
         };
         let trait_list = node.traits(self.db);
+        let trait_locs = node.trait_use_locations(self.db);
         let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, node).0;
 
         for trait_fqcn in trait_list.iter() {
-            let Some(trait_node) = self
-                .db
-                .lookup_class_node(trait_fqcn.as_ref())
-                .filter(|n| n.active(self.db))
-            else {
-                continue;
-            };
-            let req_ext = trait_node.require_extends(self.db);
-            let req_impl = trait_node.require_implements(self.db);
-            if req_ext.is_empty() && req_impl.is_empty() {
-                continue;
-            }
             // Derive short name from the FQCN's trailing segment.  Matches
             // what the collector stores in `TraitStorage::short_name`.
             let tr_short: Arc<str> = trait_fqcn
@@ -977,6 +966,64 @@ impl<'a> Pass2Driver<'a> {
                 .next()
                 .map(Arc::from)
                 .unwrap_or_else(|| trait_fqcn.clone());
+
+            let make_loc = || {
+                trait_locs
+                    .iter()
+                    .find(|(f, _)| f.as_ref() == trait_fqcn.as_ref())
+                    .map(|(_, loc)| mir_issues::Location {
+                        file: loc.file.clone(),
+                        line: loc.line,
+                        line_end: loc.line_end,
+                        col_start: loc.col_start,
+                        col_end: loc.col_end,
+                    })
+                    .unwrap_or_else(|| mir_issues::Location {
+                        file: file.clone(),
+                        line: 1,
+                        line_end: 1,
+                        col_start: 0,
+                        col_end: 0,
+                    })
+            };
+
+            let trait_node = match self.db.lookup_class_node(trait_fqcn.as_ref()) {
+                None => {
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedTrait {
+                            name: tr_short.to_string(),
+                        },
+                        make_loc(),
+                    ));
+                    continue;
+                }
+                Some(n) if !n.active(self.db) => continue,
+                Some(n) => n,
+            };
+
+            if !trait_node.is_trait(self.db) {
+                let (article, kind) = if trait_node.is_interface(self.db) {
+                    ("an", "interface")
+                } else if trait_node.is_enum(self.db) {
+                    ("an", "enum")
+                } else {
+                    ("a", "class")
+                };
+                all_issues.push(mir_issues::Issue::new(
+                    mir_issues::IssueKind::InvalidTraitUse {
+                        trait_name: tr_short.to_string(),
+                        reason: format!("{tr_short} is {article} {kind}, not a trait"),
+                    },
+                    make_loc(),
+                ));
+                continue;
+            }
+
+            let req_ext = trait_node.require_extends(self.db);
+            let req_impl = trait_node.require_implements(self.db);
+            if req_ext.is_empty() && req_impl.is_empty() {
+                continue;
+            }
 
             for req in req_ext.iter() {
                 let satisfies = fqcn == req.as_ref()
@@ -989,13 +1036,7 @@ impl<'a> Pass2Driver<'a> {
                                 "Class {fqcn} uses trait {tr_short} but does not extend {req}"
                             ),
                         },
-                        mir_issues::Location {
-                            file: file.clone(),
-                            line: 1,
-                            line_end: 1,
-                            col_start: 0,
-                            col_end: 0,
-                        },
+                        make_loc(),
                     ));
                 }
             }
@@ -1010,13 +1051,7 @@ impl<'a> Pass2Driver<'a> {
                                 "Class {fqcn} uses trait {tr_short} but does not implement {req}"
                             ),
                         },
-                        mir_issues::Location {
-                            file: file.clone(),
-                            line: 1,
-                            line_end: 1,
-                            col_start: 0,
-                            col_end: 0,
-                        },
+                        make_loc(),
                     ));
                 }
             }

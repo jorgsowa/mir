@@ -70,6 +70,9 @@ pub enum IssueKind {
     PossiblyUndefinedVariable {
         name: String,
     },
+    UndefinedTrait {
+        name: String,
+    },
 
     // --- Nullability --------------------------------------------------------
     NullArgument {
@@ -375,7 +378,8 @@ impl IssueKind {
             | IssueKind::TaintedSql
             | IssueKind::TaintedShell
             | IssueKind::CircularInheritance { .. }
-            | IssueKind::InvalidTraitUse { .. } => Severity::Error,
+            | IssueKind::InvalidTraitUse { .. }
+            | IssueKind::UndefinedTrait { .. } => Severity::Error,
 
             // Warnings (shown at default error level)
             IssueKind::NullArgument { .. }
@@ -473,6 +477,7 @@ impl IssueKind {
             IssueKind::UndefinedProperty { .. } => "MIR0006",
             IssueKind::UndefinedConstant { .. } => "MIR0007",
             IssueKind::PossiblyUndefinedVariable { .. } => "MIR0008",
+            IssueKind::UndefinedTrait { .. } => "MIR0009",
 
             // Nullability (0100-0199)
             IssueKind::NullArgument { .. } => "MIR0100",
@@ -585,6 +590,7 @@ impl IssueKind {
             IssueKind::UndefinedProperty { .. } => "UndefinedProperty",
             IssueKind::UndefinedConstant { .. } => "UndefinedConstant",
             IssueKind::PossiblyUndefinedVariable { .. } => "PossiblyUndefinedVariable",
+            IssueKind::UndefinedTrait { .. } => "UndefinedTrait",
             IssueKind::NullArgument { .. } => "NullArgument",
             IssueKind::NullPropertyFetch { .. } => "NullPropertyFetch",
             IssueKind::NullMethodCall { .. } => "NullMethodCall",
@@ -679,6 +685,7 @@ impl IssueKind {
             IssueKind::PossiblyUndefinedVariable { name } => {
                 format!("Variable ${name} might not be defined")
             }
+            IssueKind::UndefinedTrait { name } => format!("Trait {name} does not exist"),
 
             IssueKind::NullArgument { param, fn_name } => {
                 format!("Argument ${param} of {fn_name}() cannot be null")
