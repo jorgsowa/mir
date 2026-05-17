@@ -56,7 +56,7 @@ struct Cli {
     #[arg(long, value_name = "X.Y")]
     php_version: Option<String>,
 
-    /// Enable disk-backed result cache; specify the cache directory
+    /// Override the cache directory (default: platform cache dir / mir)
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
 
@@ -115,7 +115,8 @@ fn main() {
 
     // --clear-cache: delete the cache file and exit before doing anything else
     if cli.clear_cache {
-        if let Some(cache_dir) = &cli.cache_dir {
+        let cache_dir = cli.cache_dir.clone().or_else(default_cache_dir);
+        if let Some(cache_dir) = cache_dir {
             let cache_file = cache_dir.join("cache.json");
             if cache_file.exists() {
                 if let Err(e) = std::fs::remove_file(&cache_file) {
@@ -127,7 +128,7 @@ fn main() {
                 eprintln!("mir: cache cleared ({})", cache_dir.display());
             }
         } else {
-            eprintln!("mir: --clear-cache requires --cache-dir");
+            eprintln!("mir: --clear-cache requires --cache-dir (no platform cache dir found)");
             std::process::exit(2);
         }
         std::process::exit(0);
@@ -211,11 +212,13 @@ fn main() {
             }
         };
 
-        // Apply --cache-dir if specified (skip when --no-cache is set)
-        if let Some(cache_dir) = &cli.cache_dir {
-            if !cli.no_cache {
-                analyzer.set_cache_dir(cache_dir);
-            }
+        // Apply cache dir (explicit flag, then composer-root-local, then platform default)
+        if !cli.no_cache {
+            let cache_dir = cli
+                .cache_dir
+                .clone()
+                .unwrap_or_else(|| composer_root.join(".mir/cache"));
+            analyzer.set_cache_dir(&cache_dir);
         }
 
         if !cli.find_dead_code {
@@ -416,9 +419,9 @@ fn main() {
     }
 
     // Build analyzer (skip cache when --no-cache is set)
-    let mut analyzer = if let Some(cache_dir) = &cli.cache_dir {
-        if !cli.no_cache {
-            ProjectAnalyzer::with_cache(cache_dir)
+    let mut analyzer = if !cli.no_cache {
+        if let Some(cache_dir) = cli.cache_dir.clone().or_else(default_cache_dir) {
+            ProjectAnalyzer::with_cache(&cache_dir)
         } else {
             ProjectAnalyzer::new()
         }
@@ -517,6 +520,23 @@ fn apply_stub_config(
         } else {
             config_base.join(d)
         });
+    }
+}
+
+fn default_cache_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Caches/mir"))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("mir"))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        std::env::var_os("XDG_CACHE_HOME")
+            .map(|d| PathBuf::from(d).join("mir"))
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache/mir")))
     }
 }
 
