@@ -264,7 +264,7 @@ impl<'a> ClassAnalyzer<'a> {
             }
             let method_names: Vec<Arc<str>> = method_nodes
                 .into_iter()
-                .filter(|m| m.active(self.db))
+                .filter(|m| m.active(self.db) && !m.is_virtual(self.db))
                 .map(|m| m.name(self.db))
                 .collect();
 

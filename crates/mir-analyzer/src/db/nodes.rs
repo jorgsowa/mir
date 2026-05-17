@@ -212,6 +212,8 @@ pub struct MethodNode {
     pub is_final: bool,
     pub is_constructor: bool,
     pub is_pure: bool,
+    /// True for methods added via `@method` docblock annotations.
+    pub is_virtual: bool,
     /// Source location of the declaration.  `None` for synthesized methods
     /// (e.g. enum implicit `cases`/`from`/`tryFrom`).
     pub location: Option<Location>,

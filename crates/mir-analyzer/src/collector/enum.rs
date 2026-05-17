@@ -16,6 +16,12 @@ impl DefinitionCollector<'_> {
         let enum_name = decl.name.to_string();
         let fqcn = self.resolve_name(&enum_name);
 
+        let enum_doc = decl
+            .doc_comment
+            .as_ref()
+            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .unwrap_or_default();
+
         let scalar_type = decl
             .scalar_type
             .as_ref()
@@ -68,6 +74,17 @@ impl DefinitionCollector<'_> {
                 EnumMemberKind::TraitUse(_) => {}
             }
         }
+
+        let type_aliases = self.build_type_aliases(&enum_doc);
+        let mut dummy_properties = indexmap::IndexMap::new();
+        self.add_docblock_members(
+            &enum_doc,
+            &type_aliases,
+            &fqcn,
+            &mut own_methods,
+            &mut dummy_properties,
+            Some(self.location(stmt_span.start, stmt_span.end)),
+        );
 
         self.slice.enums.push(mir_codebase::EnumStorage {
             fqcn: fqcn.into(),
