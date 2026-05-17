@@ -7,15 +7,29 @@ sidebar:
   order: 1001
 ---
 
-A method marked `@deprecated` is called on an instance.
+A method marked `@deprecated` is called on an instance or via a static call.
 
 ## Example
 
 ```php
 <?php
-// TODO: minimal example that triggers DeprecatedMethodCall.
+class Api {
+    /** @deprecated Use newMethod() instead */
+    public function oldMethod(): void {}
+
+    public function newMethod(): void {}
+}
+
+$api = new Api();
+$api->oldMethod(); // deprecated call
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.
+Switch to the recommended replacement method.
+
+```php
+<?php
+$api = new Api();
+$api->newMethod();
+```
