@@ -140,29 +140,38 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
             }
             let Some(body) = &method.body else { continue };
-            let (params, return_ty) =
+            let pulled = crate::db::find_method_in_chain(
+                self.db,
+                crate::db::Fqcn::new(self.db, fqcn.clone()),
+                &method.name.to_string(),
+            );
+            let (params, return_ty) = if let Some((_, storage)) = pulled {
+                (
+                    storage.params.to_vec(),
+                    storage.return_type.as_deref().cloned(),
+                )
+            } else if let Some(n) =
                 crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), &method.name.to_string())
-                    .map(|n| {
-                        (
-                            n.params(self.db).to_vec(),
-                            n.return_type(self.db).map(|t| (*t).clone()),
-                        )
+            {
+                (
+                    n.params(self.db).to_vec(),
+                    n.return_type(self.db).map(|t| (*t).clone()),
+                )
+            } else {
+                let ast_params = method
+                    .params
+                    .iter()
+                    .map(|p| mir_codebase::FnParam {
+                        name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                        ty: None,
+                        has_default: p.default.is_some(),
+                        is_variadic: p.variadic,
+                        is_byref: p.by_ref,
+                        is_optional: p.default.is_some() || p.variadic,
                     })
-                    .unwrap_or_else(|| {
-                        let ast_params = method
-                            .params
-                            .iter()
-                            .map(|p| mir_codebase::FnParam {
-                                name: Arc::from(p.name.to_string().trim_start_matches('$')),
-                                ty: None,
-                                has_default: p.default.is_some(),
-                                is_variadic: p.variadic,
-                                is_byref: p.by_ref,
-                                is_optional: p.default.is_some() || p.variadic,
-                            })
-                            .collect();
-                        (ast_params, None)
-                    });
+                    .collect();
+                (ast_params, None)
+            };
             let is_ctor = method.name == "__construct";
             let mut method_ctx = Context::for_method(
                 &params,

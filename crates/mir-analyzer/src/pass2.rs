@@ -18,6 +18,43 @@ pub(crate) struct InferredTypes {
     pub(crate) methods: Vec<(Arc<str>, Arc<str>, Union)>,
 }
 
+/// Look up `(params, return_ty, template_params, throws)` for a method via
+/// the inheritance chain. Pull-path first (`find_method_in_chain`), push-path
+/// fallback (`lookup_method_in_chain`) for test fixtures using direct
+/// `upsert_class_node`. Empty defaults when nothing resolves.
+#[allow(clippy::type_complexity)]
+fn method_chain_signature(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    method_name: &str,
+) -> (
+    Vec<mir_codebase::storage::FnParam>,
+    Option<Union>,
+    Vec<mir_codebase::storage::TemplateParam>,
+    Arc<[Arc<str>]>,
+) {
+    let fqcn_arc: Arc<str> = Arc::from(fqcn);
+    if let Some((_, storage)) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::new(db, fqcn_arc), method_name)
+    {
+        return (
+            storage.params.to_vec(),
+            storage.return_type.as_deref().cloned(),
+            storage.template_params.clone(),
+            Arc::from(storage.throws.clone()),
+        );
+    }
+    if let Some(n) = crate::db::lookup_method_in_chain(db, fqcn, method_name) {
+        return (
+            n.params(db).to_vec(),
+            n.return_type(db).map(|t| (*t).clone()),
+            n.template_params(db).to_vec(),
+            n.throws(db),
+        );
+    }
+    (vec![], None, vec![], Arc::from([]))
+}
+
 /// Resolve a function declaration's `FunctionNode` via the salsa db,
 /// matching the pre-S5 fallback chain (qualified FQN → raw name →
 /// short-name scan).  `None` if no active node matches.
@@ -703,16 +740,7 @@ impl<'a> Pass2Driver<'a> {
             let Some(body) = &method.body else { continue };
 
             let (params, return_ty, template_params, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
-                    .map(|n| {
-                        (
-                            n.params(self.db).to_vec(),
-                            n.return_type(self.db).map(|t| (*t).clone()),
-                            n.template_params(self.db).to_vec(),
-                            n.throws(self.db),
-                        )
-                    })
-                    .unwrap_or((vec![], None, vec![], Arc::from([])));
+                method_chain_signature(self.db, fqcn, &method.name.to_string());
 
             let is_ctor = method.name == "__construct";
             let mut ctx = Context::for_method_with_templates(
@@ -958,16 +986,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
-                    .map(|n| {
-                        (
-                            n.params(self.db).to_vec(),
-                            n.return_type(self.db).map(|t| (*t).clone()),
-                            n.throws(self.db),
-                        )
-                    })
-                    .unwrap_or((vec![], None, Arc::from([])));
+            let (params, return_ty, _, declared_throws) =
+                method_chain_signature(self.db, fqcn, &method.name.to_string());
 
             let is_ctor = method.name == "__construct";
             let mut ctx = Context::for_method(
@@ -1173,16 +1193,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
-                    .map(|n| {
-                        (
-                            n.params(self.db).to_vec(),
-                            n.return_type(self.db).map(|t| (*t).clone()),
-                            n.throws(self.db),
-                        )
-                    })
-                    .unwrap_or((vec![], None, Arc::from([])));
+            let (params, return_ty, _, declared_throws) =
+                method_chain_signature(self.db, fqcn, &method.name.to_string());
 
             let is_ctor = method.name == "__construct";
             let mut ctx = Context::for_method(
@@ -1268,16 +1280,8 @@ impl<'a> Pass2Driver<'a> {
 
             let Some(body) = &method.body else { continue };
 
-            let (params, return_ty, declared_throws) =
-                crate::db::lookup_method_in_chain(self.db, fqcn, &method.name.to_string())
-                    .map(|n| {
-                        (
-                            n.params(self.db).to_vec(),
-                            n.return_type(self.db).map(|t| (*t).clone()),
-                            n.throws(self.db),
-                        )
-                    })
-                    .unwrap_or((vec![], None, Arc::from([])));
+            let (params, return_ty, _, declared_throws) =
+                method_chain_signature(self.db, fqcn, &method.name.to_string());
 
             let is_ctor = method.name == "__construct";
             let mut ctx = Context::for_method(
