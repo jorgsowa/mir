@@ -88,15 +88,22 @@ impl CallAnalyzer {
 
         // Check if trying to call static method on an interface (not allowed)
         if crate::db::type_exists_via_db(ea.db, &fqcn) {
-            if let Some(node) = ea.db.lookup_class_node(&fqcn) {
-                if node.is_interface(ea.db) {
-                    ea.emit(
-                        IssueKind::UndefinedClass { name: fqcn.clone() },
-                        Severity::Error,
-                        call.class.span,
-                    );
-                    return Union::mixed();
-                }
+            let here = crate::db::Fqcn::new(ea.db, fqcn_arc.clone());
+            let is_interface = crate::db::find_class_like(ea.db, here)
+                .map(|c| c.is_interface())
+                .or_else(|| {
+                    ea.db
+                        .lookup_class_node(&fqcn)
+                        .map(|n| n.is_interface(ea.db))
+                })
+                .unwrap_or(false);
+            if is_interface {
+                ea.emit(
+                    IssueKind::UndefinedClass { name: fqcn.clone() },
+                    Severity::Error,
+                    call.class.span,
+                );
+                return Union::mixed();
             }
         }
 
