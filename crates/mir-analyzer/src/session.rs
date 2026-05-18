@@ -608,6 +608,14 @@ impl AnalysisSession {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Class(fqcn) => {
+                // Phase 4: pull path first; push-path fallback.
+                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                if let Some(class) = crate::db::find_class_like(&db, here) {
+                    return class
+                        .location()
+                        .cloned()
+                        .ok_or(crate::SymbolLookupError::NoSourceLocation);
+                }
                 let node = db
                     .lookup_class_node(fqcn.as_ref())
                     .filter(|n| n.active(&db))
@@ -616,6 +624,13 @@ impl AnalysisSession {
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Function(fqn) => {
+                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                if let Some(f) = crate::db::find_function(&db, here) {
+                    return f
+                        .location
+                        .clone()
+                        .ok_or(crate::SymbolLookupError::NoSourceLocation);
+                }
                 let node = db
                     .lookup_function_node(fqn.as_ref())
                     .filter(|n| n.active(&db))
