@@ -18,7 +18,7 @@ use parking_lot::RwLock;
 
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
-use crate::db::{MirDatabase, MirDb, RefLoc};
+use crate::db::{ClassNode, FunctionNode, MirDatabase, MirDb, RefLoc};
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 
@@ -61,6 +61,17 @@ pub struct AnalysisSession {
     /// The set may contain symbols with no current referencers; those are
     /// harmless — the `symbol_referencers_of` lookup returns empty.
     stale_defined_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
+    /// Negative cache: FQCNs the resolver has already failed to map, so
+    /// repeated `lookup_class_or_load` calls in a hot path don't re-attempt
+    /// resolution every time. Cleared whenever a file is ingested or
+    /// invalidated — any source change may add the missing symbol.
+    unresolvable_fqcns: Arc<RwLock<HashSet<Arc<str>>>>,
+    /// Whether the consumer considers the codebase view complete. Defaults
+    /// to `true`; LSP-style consumers flip it to `false` during the workspace
+    /// scan and back to `true` once registration is done. While `false`,
+    /// [`crate::FileAnalyzer::analyze`] suppresses `UndefinedClass`
+    /// diagnostics. See [`Self::set_codebase_complete`].
+    codebase_complete: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AnalysisSession {
@@ -76,7 +87,37 @@ impl AnalysisSession {
             user_stub_dirs: Vec::new(),
             reverse_dep_map: Arc::new(RwLock::new(HashMap::new())),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::new())),
+            unresolvable_fqcns: Arc::new(RwLock::new(HashSet::new())),
+            // Default: assume the consumer has already populated whatever it
+            // wants the session to know (CLI batch tools, tests).  LSP-style
+            // consumers should explicitly call `set_codebase_complete(false)`
+            // before their workspace scan, then `(true)` once it finishes.
+            codebase_complete: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         }
+    }
+
+    /// Mark whether the session's view of the codebase is complete.
+    ///
+    /// Defaults to `true` (batch tools and tests are assumed to have already
+    /// populated everything they care about). LSP-style consumers should
+    /// set this to `false` at startup, populate the workspace via
+    /// [`Self::set_workspace_files`], then set it back to `true`.
+    ///
+    /// While `false`, [`crate::FileAnalyzer::analyze`] suppresses
+    /// `UndefinedClass` diagnostics for FQCNs the resolver cannot map —
+    /// they may yet resolve once more files are registered. After the flag
+    /// flips back to `true`, re-analyzing affected files publishes any
+    /// genuinely-missing symbols.
+    pub fn set_codebase_complete(&self, complete: bool) {
+        self.codebase_complete
+            .store(complete, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Whether the session's view of the codebase is currently considered
+    /// complete (see [`Self::set_codebase_complete`]). Defaults to `false`.
+    pub fn is_codebase_complete(&self) -> bool {
+        self.codebase_complete
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     /// Attach a pre-built [`AnalysisCache`] (the Pass-2 issue cache) and
@@ -385,6 +426,70 @@ impl AnalysisSession {
         }
 
         self.update_reverse_deps_for(&file);
+        // Only evict cache entries whose resolver-mapped path equals this
+        // file. FQCNs the resolver can't map (psr4 miss) stay cached — no
+        // ingest could change their fate. Avoids the per-keystroke storm
+        // where wholesale clearing forces every unresolved FQCN to re-hit
+        // the resolver on the next FileAnalyzer iteration.
+        self.evict_unresolvable_for_file(&file);
+    }
+
+    /// Register `source` as the text of `file` in the salsa input layer **without**
+    /// parsing or running Pass 1.
+    ///
+    /// This is the LSP-friendly bulk-population entry point: after a workspace
+    /// scan, callers can feed every discovered file's text to the session
+    /// cheaply (an Arc clone plus a HashMap insert per file). Symbol resolution
+    /// then happens on demand via [`Self::lookup_class_or_load`], which reads
+    /// the file from disk through the configured [`crate::ClassResolver`] and
+    /// runs Pass 1 lazily when a class FQCN actually needs to resolve.
+    ///
+    /// Contrast with [`Self::ingest_file`], which eagerly parses, runs Pass 1,
+    /// and populates the symbol index. Use `ingest_file` for files the user is
+    /// actively editing (where in-memory text diverges from disk); use
+    /// `set_file_text` for files known only through the workspace scan.
+    ///
+    /// Clears the negative cache: a previously-unresolvable FQCN may now
+    /// resolve if its defining file is among the newly-registered set.
+    pub fn set_file_text(&self, file: Arc<str>, source: Arc<str>) {
+        {
+            let mut guard = self.shared_db.salsa.write();
+            guard.upsert_source_file(file.clone(), source);
+        }
+        self.evict_unresolvable_for_file(&file);
+    }
+
+    /// Bulk variant of [`Self::set_file_text`]. Acquires the salsa write lock
+    /// once for the entire batch instead of once per file.
+    ///
+    /// The intended LSP scan loop is:
+    /// ```text
+    /// let files: Vec<_> = walk_workspace()
+    ///     .map(|path| (path, fs::read(&path).unwrap()))
+    ///     .collect();
+    /// session.set_workspace_files(files);
+    /// // session.codebase_complete = true; (Phase 3)
+    /// ```
+    /// After this call, every file's source text is known to salsa. No
+    /// parsing has happened yet — Pass 1 runs per file on the first
+    /// `lookup_class_or_load` that needs to consult it.
+    pub fn set_workspace_files<I>(&self, files: I)
+    where
+        I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
+    {
+        let registered_paths: Vec<Arc<str>> = {
+            let mut guard = self.shared_db.salsa.write();
+            files
+                .into_iter()
+                .map(|(file, source)| {
+                    guard.upsert_source_file(file.clone(), source);
+                    file
+                })
+                .collect()
+        };
+        if !registered_paths.is_empty() && self.resolver.is_some() {
+            self.evict_unresolvable_for_files(&registered_paths);
+        }
     }
 
     /// Drop a file's contribution to the session: codebase definitions,
@@ -410,6 +515,10 @@ impl AnalysisSession {
             cache.update_reverse_deps_for_file(file, &HashSet::new());
             cache.evict_with_dependents(&[file.to_string()]);
         }
+        // The file is gone; cache entries that previously mapped to it stay
+        // unresolvable until the file (or another with matching symbols) is
+        // ingested again. Selective evict mirrors the ingest path.
+        self.evict_unresolvable_for_file(file);
     }
 
     /// Number of files currently tracked in this session's salsa input set.
@@ -438,20 +547,19 @@ impl AnalysisSession {
         &self,
         symbol: &crate::Symbol,
     ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
-        let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                let node = db
-                    .lookup_class_node(fqcn.as_ref())
-                    .filter(|n| n.active(&db))
+                let node = self
+                    .lookup_class_or_load(fqcn.as_ref())
                     .ok_or(crate::SymbolLookupError::NotFound)?;
+                let db = self.snapshot_db();
                 node.location(&db)
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Function(fqn) => {
-                let node = db
-                    .lookup_function_node(fqn.as_ref())
-                    .filter(|n| n.active(&db))
+                let db = self.snapshot_db();
+                let node = self
+                    .lookup_function_or_load(fqn.as_ref())
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 node.location(&db)
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
@@ -459,6 +567,10 @@ impl AnalysisSession {
             crate::Symbol::Method { class, name }
             | crate::Symbol::Property { class, name }
             | crate::Symbol::ClassConstant { class, name } => {
+                // Ensure the owning class (and chain) is loaded before resolving
+                // inherited members. No-op if already indexed.
+                self.lookup_class_or_load_transitive(class.as_ref());
+                let db = self.snapshot_db();
                 crate::db::member_location_via_db(&db, class, name)
                     .ok_or(crate::SymbolLookupError::NotFound)
             }
@@ -483,6 +595,20 @@ impl AnalysisSession {
         symbol: &crate::Symbol,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
         use mir_types::{Atomic, Union};
+        // Trigger lazy loading for class-rooted symbols before snapshotting.
+        // No-op when the class is already known; ensures inherited member
+        // lookups have the chain present.
+        match symbol {
+            crate::Symbol::Class(fqcn) => {
+                self.lookup_class_or_load(fqcn.as_ref());
+            }
+            crate::Symbol::Method { class, .. }
+            | crate::Symbol::Property { class, .. }
+            | crate::Symbol::ClassConstant { class, .. } => {
+                self.lookup_class_or_load_transitive(class.as_ref());
+            }
+            _ => {}
+        }
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Function(fqn) => {
@@ -783,11 +909,21 @@ impl AnalysisSession {
         let Some(path) = resolver.resolve(fqcn) else {
             return false;
         };
-        let Ok(src) = std::fs::read_to_string(&path) else {
-            return false;
-        };
         let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
-        self.ingest_file(file, Arc::from(src));
+        // Prefer in-memory text from a prior `set_file_text` /
+        // `set_workspace_files` call; fall back to disk. This makes the LSP's
+        // unsaved-edit buffer authoritative over the on-disk content for the
+        // same path.
+        let src: Arc<str> = match self.source_of(&file) {
+            Some(text) => text,
+            None => {
+                let Ok(disk_src) = std::fs::read_to_string(&path) else {
+                    return false;
+                };
+                Arc::from(disk_src)
+            }
+        };
+        self.ingest_file(file, src);
         self.contains_class(fqcn)
     }
 
@@ -841,6 +977,96 @@ impl AnalysisSession {
             frontier = next;
         }
         loaded
+    }
+
+    /// Evict every negative-cache entry whose resolver-mapped path equals
+    /// `file`. FQCNs the resolver can't map are left alone — no source-text
+    /// change can make them resolvable.
+    fn evict_unresolvable_for_file(&self, file: &str) {
+        let Some(resolver) = self.resolver.clone() else {
+            return;
+        };
+        let mut cache = self.unresolvable_fqcns.write();
+        if cache.is_empty() {
+            return;
+        }
+        cache.retain(|fqcn| match resolver.resolve(fqcn) {
+            Some(p) => p.to_string_lossy().as_ref() != file,
+            None => true,
+        });
+    }
+
+    /// Bulk variant. One resolver call per cached FQCN, comparing against a
+    /// `HashSet` of registered paths. Cheaper than calling
+    /// `evict_unresolvable_for_file` once per file in tight loops.
+    fn evict_unresolvable_for_files(&self, files: &[Arc<str>]) {
+        let Some(resolver) = self.resolver.clone() else {
+            return;
+        };
+        let mut cache = self.unresolvable_fqcns.write();
+        if cache.is_empty() {
+            return;
+        }
+        let registered: HashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
+        cache.retain(|fqcn| match resolver.resolve(fqcn) {
+            Some(p) => !registered.contains(p.to_string_lossy().as_ref()),
+            None => true,
+        });
+    }
+
+    /// Resolve `fqcn` to its [`ClassNode`], lazy-loading via the configured
+    /// [`crate::ClassResolver`] if the index doesn't already contain it.
+    ///
+    /// This is the recommended entry point for callers (LSP, Pass 2 diagnostic
+    /// emission) that want "does this class exist anywhere in the workspace?"
+    /// semantics without enumerating dependencies upfront. The fast path is a
+    /// single DashMap lookup; the slow path runs only on miss and is itself
+    /// negative-cached so repeated lookups for genuinely-missing names don't
+    /// re-hit the resolver. The negative cache is invalidated on any
+    /// [`Self::ingest_file`] / [`Self::invalidate_file`] call.
+    ///
+    /// Returns `None` if the class is not registered AND the resolver can't
+    /// map `fqcn` to a readable file that defines it.
+    pub fn lookup_class_or_load(&self, fqcn: &str) -> Option<ClassNode> {
+        let db = self.snapshot_db();
+        if let Some(node) = db.lookup_class_node(fqcn) {
+            if node.active(&db) {
+                return Some(node);
+            }
+        }
+        if self.unresolvable_fqcns.read().contains(fqcn) {
+            return None;
+        }
+        if !self.lazy_load_class(fqcn) {
+            self.unresolvable_fqcns.write().insert(Arc::from(fqcn));
+            return None;
+        }
+        let db = self.snapshot_db();
+        db.lookup_class_node(fqcn).filter(|n| n.active(&db))
+    }
+
+    /// Like [`Self::lookup_class_or_load`] but additionally walks the
+    /// inheritance chain (parent + interfaces + traits) so subsequent
+    /// member-lookup queries on the returned node have the full chain loaded.
+    /// Useful where you immediately follow up with method / property /
+    /// constant resolution that must consider inherited members.
+    pub fn lookup_class_or_load_transitive(&self, fqcn: &str) -> Option<ClassNode> {
+        let node = self.lookup_class_or_load(fqcn)?;
+        // 10 mirrors the default depth used by analyze_dependents_of.
+        self.lazy_load_class_transitive(fqcn, 10);
+        Some(node)
+    }
+
+    /// Resolve `fqn` to its [`FunctionNode`] from the index.
+    ///
+    /// Currently has no resolver-driven slow path: PHP global functions are
+    /// not name-mapped to files by PSR-4. A future Phase 2 may add lazy
+    /// loading via `files`-autoload entries, but for now functions only
+    /// resolve if their defining file has been ingested. Returns `None`
+    /// otherwise.
+    pub fn lookup_function_or_load(&self, fqn: &str) -> Option<FunctionNode> {
+        let db = self.snapshot_db();
+        db.lookup_function_node(fqn).filter(|n| n.active(&db))
     }
 
     /// Retrieve the source text the session has registered for `file`, if
