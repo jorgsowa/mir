@@ -56,10 +56,12 @@ impl<'a> ClassAnalyzer<'a> {
     /// Ancestor chain for `fqcn` from the salsa db, or empty if the class
     /// isn't registered.
     fn ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        self.db
-            .lookup_class_node(fqcn)
-            .map(|node| class_ancestors(self.db, node).0)
-            .unwrap_or_default()
+        // Phase 4 H1: keyed by Fqcn now.
+        class_ancestors(
+            self.db,
+            crate::db::Fqcn::new(self.db, Arc::<str>::from(fqcn)),
+        )
+        .0
     }
 
     /// Run all class-level checks and return every discovered issue.

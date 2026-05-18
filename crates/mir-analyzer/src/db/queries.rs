@@ -163,7 +163,7 @@ pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
     };
-    class_ancestors(db, node)
+    class_ancestors(db, Fqcn::new(db, node.fqcn(db)))
         .0
         .iter()
         .any(|ancestor| !type_exists_via_db(db, ancestor))
@@ -198,7 +198,10 @@ pub fn method_is_concretely_implemented(
     }
     // 3. Ancestor chain (classes only — interfaces skipped, trait nodes here
     //    are owning-class trait references already handled by their own walk).
-    for ancestor in class_ancestors(db, self_node).0.iter() {
+    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
+        .0
+        .iter()
+    {
         let Some(anc_node) = db
             .lookup_class_node(ancestor.as_ref())
             .filter(|n| n.active(db))
@@ -311,7 +314,10 @@ fn lookup_method_in_chain_inner(
         }
     }
     // 4. Ancestor chain (parents, interfaces, traits — empty for enums).
-    for ancestor in class_ancestors(db, self_node).0.iter() {
+    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
+        .0
+        .iter()
+    {
         if let Some(node) = db
             .lookup_method_node(ancestor.as_ref(), lower)
             .filter(|n| n.active(db))
@@ -435,7 +441,10 @@ pub fn method_exists_via_db(db: &dyn MirDatabase, fqcn: &str, method_name: &str)
         }
     }
     // Ancestor chain (parents, interfaces, traits).
-    for ancestor in class_ancestors(db, self_node).0.iter() {
+    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
+        .0
+        .iter()
+    {
         if db
             .lookup_method_node(ancestor.as_ref(), &lower)
             .is_some_and(|m| m.active(db))
@@ -500,7 +509,10 @@ fn lookup_property_in_chain_inner(
     // 3. Ancestor chain (parents + interfaces + direct traits).  Each
     //    ancestor may itself have `@mixin` declarations that forward
     //    property access — recurse into those too.
-    for ancestor in class_ancestors(db, self_node).0.iter() {
+    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
+        .0
+        .iter()
+    {
         if let Some(node) = db
             .lookup_property_node(ancestor.as_ref(), prop_name)
             .filter(|n| n.active(db))
@@ -535,7 +547,10 @@ pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_na
     let Some(class_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
     };
-    for ancestor in class_ancestors(db, class_node).0.iter() {
+    for ancestor in class_ancestors(db, Fqcn::new(db, class_node.fqcn(db)))
+        .0
+        .iter()
+    {
         if db
             .lookup_class_constant_node(ancestor.as_ref(), const_name)
             .is_some_and(|n| n.active(db))
@@ -571,7 +586,10 @@ pub fn member_location_via_db(
         }
     }
     let class_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
-    for ancestor in class_ancestors(db, class_node).0.iter() {
+    for ancestor in class_ancestors(db, Fqcn::new(db, class_node.fqcn(db)))
+        .0
+        .iter()
+    {
         if let Some(node) = db
             .lookup_class_constant_node(ancestor.as_ref(), member_name)
             .filter(|n| n.active(db))
@@ -606,7 +624,7 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
         }
         return false;
     }
-    class_ancestors(db, node)
+    class_ancestors(db, Fqcn::new(db, node.fqcn(db)))
         .0
         .iter()
         .any(|p| p.as_ref() == ancestor)

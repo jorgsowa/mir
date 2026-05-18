@@ -209,7 +209,7 @@ mod tests {
     fn class_ancestors_empty_for_root_class() {
         let mut db = MirDb::default();
         let node = upsert_class(&mut db, "Foo", None, Arc::from([]), false);
-        let ancestors = class_ancestors(&db, node);
+        let ancestors = class_ancestors(&db, Fqcn::new(&db, node.fqcn(&db)));
         assert!(ancestors.0.is_empty(), "root class has no ancestors");
     }
 
@@ -224,7 +224,7 @@ mod tests {
             Arc::from([]),
             false,
         );
-        let ancestors = class_ancestors(&db, child);
+        let ancestors = class_ancestors(&db, Fqcn::new(&db, child.fqcn(&db)));
         assert_eq!(ancestors.0.len(), 1);
         assert_eq!(ancestors.0[0].as_ref(), "Base");
     }
@@ -247,7 +247,7 @@ mod tests {
             Arc::from([]),
             false,
         );
-        let ancestors = class_ancestors(&db, child);
+        let ancestors = class_ancestors(&db, Fqcn::new(&db, child.fqcn(&db)));
         assert_eq!(ancestors.0.len(), 2);
         assert_eq!(ancestors.0[0].as_ref(), "Parent");
         assert_eq!(ancestors.0[1].as_ref(), "GrandParent");
@@ -258,7 +258,7 @@ mod tests {
         let mut db = MirDb::default();
         // A extends A — not valid PHP, but we must not panic.
         let node_a = upsert_class(&mut db, "A", Some(Arc::from("A")), Arc::from([]), false);
-        let ancestors = class_ancestors(&db, node_a);
+        let ancestors = class_ancestors(&db, Fqcn::new(&db, node_a.fqcn(&db)));
         // Cycle recovery: empty list (A's ancestors exclude itself).
         assert!(ancestors.0.is_empty(), "cycle must yield empty ancestors");
     }
@@ -268,7 +268,7 @@ mod tests {
         let mut db = MirDb::default();
         let node = upsert_class(&mut db, "Foo", None, Arc::from([]), false);
         db.deactivate_class_node("Foo");
-        let ancestors = class_ancestors(&db, node);
+        let ancestors = class_ancestors(&db, Fqcn::new(&db, node.fqcn(&db)));
         assert!(ancestors.0.is_empty(), "inactive node must yield empty");
     }
 
@@ -278,13 +278,13 @@ mod tests {
         upsert_class(&mut db, "Base", None, Arc::from([]), false);
         let child = upsert_class(&mut db, "Child", None, Arc::from([]), false);
 
-        let before = class_ancestors(&db, child);
+        let before = class_ancestors(&db, Fqcn::new(&db, child.fqcn(&db)));
         assert!(before.0.is_empty());
 
         // Add Base as parent of Child.
         child.set_parent(&mut db).to(Some(Arc::from("Base")));
 
-        let after = class_ancestors(&db, child);
+        let after = class_ancestors(&db, Fqcn::new(&db, child.fqcn(&db)));
         assert_eq!(after.0.len(), 1);
         assert_eq!(after.0[0].as_ref(), "Base");
     }
@@ -300,7 +300,7 @@ mod tests {
             Arc::from([Arc::from("Countable")]),
             true,
         );
-        let ancestors = class_ancestors(&db, child_iface);
+        let ancestors = class_ancestors(&db, Fqcn::new(&db, child_iface.fqcn(&db)));
         assert_eq!(ancestors.0.len(), 1);
         assert_eq!(ancestors.0[0].as_ref(), "Countable");
     }
@@ -332,7 +332,7 @@ mod tests {
         );
         // Clones must also resolve ancestors through the same shared storage.
         let foo_node = cloned.lookup_class_node("Foo").expect("registered");
-        let ancestors = class_ancestors(&cloned, foo_node);
+        let ancestors = class_ancestors(&cloned, Fqcn::new(&cloned, foo_node.fqcn(&cloned)));
         assert!(ancestors.0.is_empty(), "Foo has no ancestors");
     }
 
