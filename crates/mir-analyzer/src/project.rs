@@ -735,6 +735,9 @@ impl ProjectAnalyzer {
         }
 
         self.apply_issue_suppressions(&mut all_issues);
+        if let Some(dump) = crate::metrics::dump() {
+            eprintln!("{dump}");
+        }
         AnalysisResult::build(all_issues, std::collections::HashMap::new(), all_symbols)
     }
 

@@ -698,17 +698,13 @@ fn file_analyzer_self_loads_psr4_classes_without_pre_enumeration() {
     );
 }
 
-/// Phase 3: when `codebase_complete` is `false`, `FileAnalyzer::analyze`
-/// suppresses `UndefinedClass` diagnostics — they may become resolvable
-/// once the workspace scan finishes. Flipping the flag to `true` and
-/// re-analyzing publishes any genuinely-missing symbols.
+/// Contract: the analyzer always reports `UndefinedClass` when it sees one;
+/// it has no concept of "workspace scan in progress". Filtering during a
+/// pending scan is the consumer's responsibility (LSPs decide what to
+/// publish; the analyzer reports the facts).
 #[test]
-fn file_analyzer_suppresses_undefined_class_during_workspace_scan() {
+fn file_analyzer_reports_undefined_class_unconditionally() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    // No PSR-4 resolver, no other files registered: NotDefined is genuinely
-    // missing. We're using this to drive the "scan in progress" UX, not to
-    // test resolver behaviour.
-    session.set_codebase_complete(false);
 
     let src = "<?php\nfunction probe(): void { new NotDefined(); }\n";
     let file: Arc<str> = Arc::from("<scan-test>");
@@ -717,37 +713,17 @@ fn file_analyzer_suppresses_undefined_class_during_workspace_scan() {
     let arena = bumpalo::Bump::new();
     let parsed = php_rs_parser::parse(&arena, src);
     let analyzer = FileAnalyzer::new(&session);
-    let result_during_scan =
-        analyzer.analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+    let result = analyzer.analyze(file, src, &parsed.program, &parsed.source_map);
 
-    let undefined_class_during_scan = result_during_scan
-        .issues
-        .iter()
-        .filter(|i| i.kind.name() == "UndefinedClass")
-        .count();
-    assert_eq!(
-        undefined_class_during_scan,
-        0,
-        "UndefinedClass must be suppressed while codebase_complete is false; got issues: {:?}",
-        result_during_scan
-            .issues
-            .iter()
-            .map(|i| i.kind.name())
-            .collect::<Vec<_>>()
-    );
-
-    // Once the consumer flips the flag, the deferred diagnostic publishes.
-    session.set_codebase_complete(true);
-    let result_after_scan = analyzer.analyze(file, src, &parsed.program, &parsed.source_map);
-    let undefined_class_after_scan = result_after_scan
+    let undefined = result
         .issues
         .iter()
         .filter(|i| i.kind.name() == "UndefinedClass")
         .count();
     assert!(
-        undefined_class_after_scan > 0,
-        "UndefinedClass must publish once codebase_complete is true; got issues: {:?}",
-        result_after_scan
+        undefined > 0,
+        "expected an UndefinedClass for NotDefined; got: {:?}",
+        result
             .issues
             .iter()
             .map(|i| i.kind.name())
