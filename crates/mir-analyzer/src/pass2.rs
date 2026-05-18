@@ -1008,7 +1008,9 @@ impl<'a> Pass2Driver<'a> {
         };
         let trait_list = node.traits(self.db);
         let trait_locs = node.trait_use_locations(self.db);
-        let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, node).0;
+        let class_all_parents: Vec<Arc<str>> =
+            crate::db::class_ancestors(self.db, crate::db::Fqcn::new(self.db, node.fqcn(self.db)))
+                .0;
 
         for trait_fqcn in trait_list.iter() {
             // Derive short name from the FQCN's trailing segment.  Matches
