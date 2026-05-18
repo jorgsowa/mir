@@ -80,33 +80,7 @@ pub(super) fn resolve_method_from_db(
         });
     }
 
-    // Push-path fallback (test fixtures).
-    let node = crate::db::lookup_method_in_chain(db, fqcn, method_name_lower)?;
-    let owner_fqcn = node.fqcn(db);
-    let name = node.name(db);
-    let name_lower = if name.chars().all(|c| !c.is_uppercase()) {
-        name.clone()
-    } else {
-        Arc::<str>::from(name.to_ascii_lowercase().as_str())
-    };
-    let inferred = crate::db::inferred_method_return_type(db, &owner_fqcn, &name_lower);
-    let return_ty_raw = node
-        .return_type(db)
-        .or(inferred)
-        .map(|t| (*t).clone())
-        .unwrap_or_else(Union::mixed);
-
-    Some(ResolvedMethod {
-        owner_fqcn,
-        name,
-        visibility: node.visibility(db),
-        deprecated: node.deprecated(db),
-        is_internal: node.is_internal(db),
-        params: node.params(db).to_vec(),
-        template_params: node.template_params(db).to_vec(),
-        return_ty_raw,
-        throws: node.throws(db),
-    })
+    None
 }
 
 impl CallAnalyzer {

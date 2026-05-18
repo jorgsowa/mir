@@ -128,11 +128,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::db::Fqcn::new(self.db, fqcn_arc),
                         "__construct",
                     )
-                    .map(|(_, s)| s.params.to_vec())
-                    .or_else(|| {
-                        crate::db::lookup_method_in_chain(self.db, &fqcn, "__construct")
-                            .map(|n| n.params(self.db).to_vec())
-                    });
+                    .map(|(_, s)| s.params.to_vec());
                     if let Some(ctor_params) = ctor_params {
                         crate::call::check_constructor_args(
                             self,
@@ -459,11 +455,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::db::Fqcn::new(self.db, fqcn_arc),
                         prop_name,
                     )
-                    .map(|(_, p)| p.ty.unwrap_or_else(Union::mixed))
-                    .or_else(|| {
-                        crate::db::lookup_property_in_chain(self.db, fqcn.as_ref(), prop_name)
-                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed))
-                    });
+                    .map(|(_, p)| p.ty.unwrap_or_else(Union::mixed));
                     if let Some(ty) = prop_found {
                         if !self.inference_only {
                             let (line, col_start, col_end) = self.span_to_ref_loc(span);

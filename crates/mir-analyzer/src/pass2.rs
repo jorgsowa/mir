@@ -19,9 +19,7 @@ pub(crate) struct InferredTypes {
 }
 
 /// Look up `(params, return_ty, template_params, throws)` for a method via
-/// the inheritance chain. Pull-path first (`find_method_in_chain`), push-path
-/// fallback (`lookup_method_in_chain`) for test fixtures using direct
-/// `upsert_class_node`. Empty defaults when nothing resolves.
+/// the inheritance chain. Empty defaults when nothing resolves.
 #[allow(clippy::type_complexity)]
 fn method_chain_signature(
     db: &dyn MirDatabase,
@@ -42,14 +40,6 @@ fn method_chain_signature(
             storage.return_type.as_deref().cloned(),
             storage.template_params.clone(),
             Arc::from(storage.throws.clone()),
-        );
-    }
-    if let Some(n) = crate::db::lookup_method_in_chain(db, fqcn, method_name) {
-        return (
-            n.params(db).to_vec(),
-            n.return_type(db).map(|t| (*t).clone()),
-            n.template_params(db).to_vec(),
-            n.throws(db),
         );
     }
     (vec![], None, vec![], Arc::from([]))
