@@ -90,11 +90,15 @@ impl<'a> FileAnalyzer<'a> {
         self.session.ensure_essential_stubs_loaded();
         self.session.ensure_stubs_for_ast(program);
 
-        // Pull-path Pass-2: `find_class_like` / `find_function` etc. lazy-load
-        // referenced files via the salsa query graph, so a single pass is
-        // sufficient. The post-Pass-2 lazy-load retry loop that previously
-        // ran here (push-path era, when symbol indexes could only be
-        // populated via `ingest_stub_slice` before a query) is gone.
+        // Pre-load any PSR-4-mapped classes referenced in this file's AST so
+        // their SourceFiles are registered before Pass-2 reads them via
+        // `find_class_like`. (Salsa tracked queries cannot mutate inputs
+        // mid-evaluation, so lazy-loading is staged here outside the query.)
+        self.session
+            .preload_psr4_classes_for_ast(program, file.as_ref());
+
+        // Pull-path Pass-2: `find_class_like` / `find_function` etc. consult
+        // the salsa query graph; a single pass is sufficient.
         self.run_pass2(file, source, program, source_map)
     }
 
