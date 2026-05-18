@@ -56,11 +56,19 @@ pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
 
 #[allow(dead_code)]
 pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
+    if crate::db::find_function(db, here).is_some() {
+        return true;
+    }
     db.lookup_function_node(fqn).is_some_and(|n| n.active(db))
 }
 
 #[allow(dead_code)]
 pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
+    if crate::db::find_global_constant(db, here).is_some() {
+        return true;
+    }
     db.lookup_global_constant_node(fqn)
         .is_some_and(|n| n.active(db))
 }
@@ -144,18 +152,23 @@ pub fn inherited_template_bindings_via_db(
         if !visited.insert(current.clone()) {
             break;
         }
-        let node = match db
-            .lookup_class_node(current.as_ref())
-            .filter(|n| n.active(db))
-        {
-            Some(n) => n,
-            None => break,
-        };
-        let parent = match node.parent(db) {
-            Some(p) => p,
-            None => break,
-        };
-        let extends_type_args = node.extends_type_args(db);
+        // Pull-first.
+        let pulled = crate::db::find_class_like(db, crate::db::Fqcn::new(db, current.clone()));
+        let (parent, extends_type_args): (Arc<str>, Vec<mir_types::Union>) =
+            if let Some(class) = pulled {
+                let Some(p) = class.parent().cloned() else {
+                    break;
+                };
+                (p, class.extends_type_args().to_vec())
+            } else if let Some(node) = db
+                .lookup_class_node(current.as_ref())
+                .filter(|n| n.active(db))
+            {
+                let Some(p) = node.parent(db) else { break };
+                (p, node.extends_type_args(db).to_vec())
+            } else {
+                break;
+            };
         if !extends_type_args.is_empty() {
             if let Some(parent_tps) = class_template_params_via_db(db, parent.as_ref()) {
                 for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
@@ -178,6 +191,14 @@ pub fn inherited_template_bindings_via_db(
 /// a class with no active `ClassNode` is one that genuinely doesn't
 /// exist — and an unknown class trivially has no known ancestors.
 pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let fqcn_arc: Arc<str> = Arc::from(fqcn);
+    let here = crate::db::Fqcn::new(db, fqcn_arc.clone());
+    if crate::db::find_class_like(db, here).is_some() {
+        return crate::db::class_ancestors_by_fqcn(db, here)
+            .iter()
+            .skip(1) // self
+            .any(|ancestor| !type_exists_via_db(db, ancestor));
+    }
     let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
     };
@@ -556,6 +577,12 @@ fn lookup_property_in_chain_inner(
 }
 
 pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
+    let fqcn_arc: Arc<str> = Arc::from(fqcn);
+    let here = crate::db::Fqcn::new(db, fqcn_arc);
+    if crate::db::find_class_constant_in_chain(db, here, const_name).is_some() {
+        return true;
+    }
+    // Push-fallback (tests using direct upsert_class_constant_node).
     if db
         .lookup_class_constant_node(fqcn, const_name)
         .is_some_and(|n| n.active(db))
@@ -584,6 +611,25 @@ pub fn member_location_via_db(
     fqcn: &str,
     member_name: &str,
 ) -> Option<Location> {
+    let fqcn_arc: Arc<str> = Arc::from(fqcn);
+    let here = crate::db::Fqcn::new(db, fqcn_arc);
+    // Pull-first.
+    if let Some((_, storage)) = crate::db::find_method_in_chain(db, here, member_name) {
+        if let Some(loc) = storage.location.clone() {
+            return Some(loc);
+        }
+    }
+    if let Some((_, storage)) = crate::db::find_property_in_chain(db, here, member_name) {
+        if let Some(loc) = storage.location {
+            return Some(loc);
+        }
+    }
+    if let Some((_, storage)) = crate::db::find_class_constant_in_chain(db, here, member_name) {
+        if let Some(loc) = storage.location {
+            return Some(loc);
+        }
+    }
+    // Push fallback (test fixtures).
     if let Some(node) = lookup_method_in_chain(db, fqcn, member_name) {
         if let Some(loc) = node.location(db) {
             return Some(loc);
@@ -594,7 +640,6 @@ pub fn member_location_via_db(
             return Some(loc);
         }
     }
-    // Class/interface/trait/enum constants and enum cases.
     if let Some(node) = db
         .lookup_class_constant_node(fqcn, member_name)
         .filter(|n| n.active(db))
@@ -624,13 +669,29 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
     if child == ancestor {
         return true;
     }
+    let child_arc: Arc<str> = Arc::from(child);
+    let here = crate::db::Fqcn::new(db, child_arc.clone());
+    if let Some(class) = crate::db::find_class_like(db, here) {
+        if class.is_enum() {
+            if class.interfaces().iter().any(|i| i.as_ref() == ancestor) {
+                return true;
+            }
+            if ancestor == "UnitEnum" || ancestor == "\\UnitEnum" {
+                return true;
+            }
+            if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && class.is_backed_enum() {
+                return true;
+            }
+            return false;
+        }
+        return crate::db::class_ancestors_by_fqcn(db, here)
+            .iter()
+            .any(|p| p.as_ref() == ancestor);
+    }
     let Some(node) = db.lookup_class_node(child).filter(|n| n.active(db)) else {
         return false;
     };
     if node.is_enum(db) {
-        // Enum semantics: only directly-declared interfaces participate
-        // (no transitive walk), plus the implicit UnitEnum / BackedEnum
-        // interfaces.
         if node.interfaces(db).iter().any(|i| i.as_ref() == ancestor) {
             return true;
         }
