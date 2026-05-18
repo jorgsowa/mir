@@ -213,6 +213,10 @@ pub fn method_is_concretely_implemented(
     fqcn: &str,
     method_name: &str,
 ) -> bool {
+    // Pull-first.
+    if crate::db::is_method_concretely_implemented_pull(db, fqcn, method_name) {
+        return true;
+    }
     let lower = method_name.to_lowercase();
     let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
         return false;
