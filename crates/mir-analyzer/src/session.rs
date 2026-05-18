@@ -154,7 +154,14 @@ impl AnalysisSession {
     /// Sets the same map as the active [`crate::ClassResolver`] so
     /// [`Self::lazy_load_class`] works out of the box.
     pub fn with_psr4(mut self, map: Arc<Psr4Map>) -> Self {
-        let resolver: Arc<dyn crate::ClassResolver> = map.clone();
+        let user_resolver: Arc<dyn crate::ClassResolver> = map.clone();
+        // Wrap with stub awareness so `find_class_like` / `resolve_fqcn_to_path`
+        // can map built-in PHP class FQCNs (`ArrayObject`, `Exception`, …)
+        // to their stub virtual paths. Unblocks Phase 4 Pass-2 migration.
+        let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::ChainedClassResolver::new(
+            user_resolver,
+            Arc::new(crate::StubClassResolver),
+        ));
         self.psr4 = Some(map);
         self.resolver = Some(resolver.clone());
         // Mirror into MirDb so salsa-tracked resolver queries
@@ -166,13 +173,18 @@ impl AnalysisSession {
 
     /// Attach a generic class resolver for projects that don't use Composer
     /// (WordPress, Drupal, custom autoloaders, workspace-walk indexes).
-    /// Replaces any previously-set Composer-backed resolver.
+    /// Replaces any previously-set Composer-backed resolver. Automatically
+    /// wrapped with stub awareness so PHP built-ins remain resolvable.
     pub fn with_class_resolver(mut self, resolver: Arc<dyn crate::ClassResolver>) -> Self {
+        let wrapped: Arc<dyn crate::ClassResolver> = Arc::new(crate::ChainedClassResolver::new(
+            resolver,
+            Arc::new(crate::StubClassResolver),
+        ));
         self.shared_db
             .salsa
             .write()
-            .set_resolver(Some(resolver.clone()));
-        self.resolver = Some(resolver);
+            .set_resolver(Some(wrapped.clone()));
+        self.resolver = Some(wrapped);
         self
     }
 

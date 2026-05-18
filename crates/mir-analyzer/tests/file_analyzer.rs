@@ -511,6 +511,12 @@ fn invalidate_file_releases_all_per_file_state() {
     let base: Arc<str> = Arc::from("/proj/Base.php");
     let child: Arc<str> = Arc::from("/proj/Child.php");
 
+    // Stubs are now registered as SourceFiles too (so the pull path can
+    // see PHP built-ins). Count the stub baseline up front and assert
+    // against the delta rather than absolute count.
+    session.ensure_stubs_loaded();
+    let stub_count = session.tracked_file_count();
+
     session.ingest_file(base.clone(), Arc::from("<?php\nclass Base {}\n"));
     session.ingest_file(
         child.clone(),
@@ -518,13 +524,13 @@ fn invalidate_file_releases_all_per_file_state() {
     );
     cache.put(base.as_ref(), "h1".to_string(), Vec::new(), Vec::new());
     cache.put(child.as_ref(), "h2".to_string(), Vec::new(), Vec::new());
-    assert_eq!(session.tracked_file_count(), 2);
+    assert_eq!(session.tracked_file_count(), stub_count + 2);
 
     session.invalidate_file(child.as_ref());
 
     assert_eq!(
         session.tracked_file_count(),
-        1,
+        stub_count + 1,
         "salsa input handle for Child must be released after invalidate"
     );
     assert!(

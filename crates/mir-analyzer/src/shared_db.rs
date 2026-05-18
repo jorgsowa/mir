@@ -139,16 +139,19 @@ impl SharedDb {
         // Filter again under the lock to avoid double-ingestion races, then
         // bulk-ingest so the Arc::make_mut clones amortize over the batch
         // instead of paying per slice.
-        let to_ingest: Vec<&mir_codebase::storage::StubSlice> = slices
-            .iter()
-            .filter_map(|(path, slice)| {
-                if loaded.insert(*path) {
-                    Some(slice)
-                } else {
-                    None
+        let mut to_ingest: Vec<&mir_codebase::storage::StubSlice> =
+            Vec::with_capacity(slices.len());
+        for (path, slice) in &slices {
+            if loaded.insert(*path) {
+                // Mirror as a SourceFile so the pull path (find_class_like)
+                // can resolve built-in PHP classes once a stub-aware
+                // resolver is installed on the session.
+                if let Some(content) = crate::stubs::stub_content_for_path(path) {
+                    guard.upsert_source_file(Arc::from(*path), Arc::from(content));
                 }
-            })
-            .collect();
+                to_ingest.push(slice);
+            }
+        }
         guard.ingest_stub_slices(to_ingest.iter().copied());
     }
 

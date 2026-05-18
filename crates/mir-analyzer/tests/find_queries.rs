@@ -151,6 +151,38 @@ fn find_returns_none_when_file_not_registered() {
     assert!(find_class_like(&db, fqcn).is_none());
 }
 
+/// The Phase-4 unblocker: with stub-aware resolver in place,
+/// `find_class_like` can locate built-in PHP classes by FQCN without any
+/// user-side setup. Pass-2 migration depends on this — Pass-2 references
+/// stub classes (Exception, ArrayObject, …) constantly.
+#[test]
+fn find_class_like_resolves_php_builtin_via_stub_resolver() {
+    use std::path::PathBuf;
+    struct EmptyResolver;
+    impl ClassResolver for EmptyResolver {
+        fn resolve(&self, _: &str) -> Option<PathBuf> {
+            None
+        }
+    }
+    // Empty user resolver + automatic stub-aware wrap from
+    // `with_class_resolver`. The stub resolver maps "ArrayObject" →
+    // its bundled stub path; `ensure_stubs_loaded` registers that path
+    // as a SourceFile so `find_class_like` finds it.
+    let session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(Arc::new(EmptyResolver));
+    session.ensure_stubs_loaded();
+
+    let db = session.snapshot_db();
+    let fqcn = Fqcn::new(&db, Arc::from("ArrayObject"));
+    let found = find_class_like(&db, fqcn);
+    assert!(
+        found.is_some(),
+        "stub-aware resolver + SourceFile registration must let \
+         find_class_like locate ArrayObject; got None"
+    );
+    assert!(matches!(found, Some(ClassLike::Class(_))));
+}
+
 #[test]
 fn find_returns_none_when_resolver_misses() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
