@@ -90,42 +90,12 @@ impl<'a> FileAnalyzer<'a> {
         self.session.ensure_essential_stubs_loaded();
         self.session.ensure_stubs_for_ast(program);
 
-        let mut analysis = self.run_pass2(file.clone(), source, program, source_map);
-
-        const MAX_LAZY_LOAD_ITERATIONS: usize = 3;
-        for _ in 0..MAX_LAZY_LOAD_ITERATIONS {
-            let unresolved: Vec<Arc<str>> = analysis
-                .issues
-                .iter()
-                .filter_map(|i| match &i.kind {
-                    mir_issues::IssueKind::UndefinedClass { name } => {
-                        Some(Arc::<str>::from(name.as_str()))
-                    }
-                    _ => None,
-                })
-                .collect();
-            if unresolved.is_empty() {
-                break;
-            }
-            let mut loaded_any = false;
-            for fqcn in &unresolved {
-                let resolved = self
-                    .session
-                    .lookup_class_or_load_transitive(fqcn.as_ref())
-                    .is_some();
-                crate::metrics::record_lazy_load_attempt(resolved);
-                if resolved {
-                    loaded_any = true;
-                }
-            }
-            if !loaded_any {
-                break;
-            }
-            crate::metrics::record_retry_iteration();
-            analysis = self.run_pass2(file.clone(), source, program, source_map);
-        }
-
-        analysis
+        // Pull-path Pass-2: `find_class_like` / `find_function` etc. lazy-load
+        // referenced files via the salsa query graph, so a single pass is
+        // sufficient. The post-Pass-2 lazy-load retry loop that previously
+        // ran here (push-path era, when symbol indexes could only be
+        // populated via `ingest_stub_slice` before a query) is gone.
+        self.run_pass2(file, source, program, source_map)
     }
 
     /// Inner Pass 2 invocation. Separate from `analyze` so the post-Pass-2
