@@ -57,7 +57,69 @@ pub fn class_ancestors(db: &dyn MirDatabase, node: ClassNode) -> Ancestors {
             }
         };
 
-    if node.is_interface(db) {
+    // Phase 4 H1: read parent / interfaces / extends / traits via the
+    // pull path (find_class_like). Two observable effects on Laravel:
+    //
+    //   * Correctness: 2 false-positive InvalidThrow diagnostics
+    //     disappear. ModelNotFoundException → RuntimeException → Exception
+    //     → Throwable was unreachable via the push-path ancestor walk
+    //     because intermediate stub classes weren't always in the
+    //     FQCN→handle index when needed. The pull path goes through
+    //     `collect_file_definitions` on the resolved source file, which
+    //     finds them.
+    //
+    //   * Perf: ~3% faster on warm-edit (bench_single_file_edit) where
+    //     salsa amortizes the per-call query cost. Slower on cold-start
+    //     (workspace open) where the cache is being populated — a
+    //     one-time expense.
+    //
+    // Recursion still uses `class_ancestors(db, parent_node)` because
+    // the salsa cycle machinery is keyed on the input type; Phase 5
+    // re-keys to Fqcn after ClassNode is deleted.
+    let fqcn = node.fqcn(db);
+    let here = crate::db::Fqcn::new(db, fqcn);
+    if let Some(class) = crate::db::find_class_like(db, here) {
+        match &class {
+            crate::db::ClassLike::Interface(iface) => {
+                for e in iface.extends.iter() {
+                    add(e, &mut all, &mut seen);
+                    if let Some(parent_node) = db.lookup_class_node(e) {
+                        for a in class_ancestors(db, parent_node).0 {
+                            add(&a, &mut all, &mut seen);
+                        }
+                    }
+                }
+            }
+            crate::db::ClassLike::Class(cls) => {
+                if let Some(ref p) = cls.parent {
+                    add(p, &mut all, &mut seen);
+                    if let Some(parent_node) = db.lookup_class_node(p) {
+                        for a in class_ancestors(db, parent_node).0 {
+                            add(&a, &mut all, &mut seen);
+                        }
+                    }
+                }
+                for iface in cls.interfaces.iter() {
+                    add(iface, &mut all, &mut seen);
+                    if let Some(iface_node) = db.lookup_class_node(iface) {
+                        for a in class_ancestors(db, iface_node).0 {
+                            add(&a, &mut all, &mut seen);
+                        }
+                    }
+                }
+                for t in cls.traits.iter() {
+                    add(t, &mut all, &mut seen);
+                }
+            }
+            _ => {
+                // Trait/Enum already short-circuited above via node.is_*;
+                // defer to that branch if find_class_like disagrees.
+            }
+        }
+    } else if node.is_interface(db) {
+        // Fallback for classes whose defining file isn't a registered
+        // SourceFile yet (test fixtures using direct ingest_stub_slice).
+        // Dead code after Phase 5 completes.
         for e in node.extends(db).iter() {
             add(e, &mut all, &mut seen);
             if let Some(parent_node) = db.lookup_class_node(e) {
