@@ -661,11 +661,22 @@ impl<'a> ClassAnalyzer<'a> {
     fn check_circular_class_inheritance(&self, issues: &mut Vec<Issue>) {
         let mut globally_done: HashSet<String> = HashSet::new();
 
-        let mut class_keys: Vec<Arc<str>> = self
-            .db
-            .active_class_node_fqcns()
+        // Phase 4: enumerate via workspace_classes (pull) + push fallback.
+        let pull_classes: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+            .iter()
+            .cloned()
+            .collect();
+        let push_classes: Vec<Arc<str>> = self.db.active_class_node_fqcns();
+        let mut seen: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
+        let mut class_keys: Vec<Arc<str>> = pull_classes
             .into_iter()
+            .chain(push_classes)
+            .filter(|f| seen.insert(f.clone()))
             .filter(|fqcn| {
+                let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                if let Some(c) = crate::db::find_class_like(self.db, here) {
+                    return c.is_class();
+                }
                 self.db
                     .lookup_class_node(fqcn.as_ref())
                     .map(|n| {
@@ -710,11 +721,16 @@ impl<'a> ClassAnalyzer<'a> {
                         .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
 
                     if let Some(offender) = offender {
-                        let location = self
-                            .db
-                            .lookup_class_node(offender.as_ref())
-                            .filter(|n| n.active(self.db))
-                            .and_then(|n| n.location(self.db));
+                        let here = crate::db::Fqcn::new(self.db, offender.clone());
+                        let location: Option<StorageLocation> =
+                            crate::db::find_class_like(self.db, here)
+                                .and_then(|c| c.location().cloned())
+                                .or_else(|| {
+                                    self.db
+                                        .lookup_class_node(offender.as_ref())
+                                        .filter(|n| n.active(self.db))
+                                        .and_then(|n| n.location(self.db))
+                                });
                         let loc = issue_location(
                             location.as_ref(),
                             offender,
@@ -742,11 +758,15 @@ impl<'a> ClassAnalyzer<'a> {
 
                 chain.push(current.clone());
 
-                let parent = self
-                    .db
-                    .lookup_class_node(current.as_ref())
-                    .filter(|n| n.active(self.db))
-                    .and_then(|n| n.parent(self.db));
+                let here = crate::db::Fqcn::new(self.db, current.clone());
+                let parent: Option<Arc<str>> = crate::db::find_class_like(self.db, here)
+                    .and_then(|c| c.parent().cloned())
+                    .or_else(|| {
+                        self.db
+                            .lookup_class_node(current.as_ref())
+                            .filter(|n| n.active(self.db))
+                            .and_then(|n| n.parent(self.db))
+                    });
 
                 match parent {
                     Some(p) => current = p,
