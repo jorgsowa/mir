@@ -69,7 +69,7 @@ impl<'a> StatementsAnalyzer<'a> {
         for atomic in &ty.types {
             if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
                 let fqcn_str = fqcn.as_ref();
-                if crate::db::lookup_method_in_chain(self.db, fqcn_str, "__toString").is_none()
+                if !crate::db::has_method_in_chain(self.db, fqcn_str, "__toString")
                     && !crate::db::extends_or_implements_via_db(self.db, fqcn_str, "Stringable")
                 {
                     let (line, col_start) = self.offset_to_line_col(span.start);

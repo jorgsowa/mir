@@ -462,8 +462,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         return ty;
                     }
                     if !crate::db::has_unknown_ancestor_via_db(self.db, fqcn.as_ref())
-                        && crate::db::lookup_method_in_chain(self.db, fqcn.as_ref(), "__get")
-                            .is_none()
+                        && !crate::db::has_method_in_chain(self.db, fqcn.as_ref(), "__get")
                     {
                         self.emit(
                             IssueKind::UndefinedProperty {

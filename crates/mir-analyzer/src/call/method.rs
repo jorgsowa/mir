@@ -469,7 +469,7 @@ fn resolve_method_return<'a, 'arena, 'src>(
             .map(|k| (k.is_interface, k.is_abstract))
             .unwrap_or((false, false));
         // Check for __call in the full inheritance chain (not just direct methods)
-        let has_call_magic = crate::db::lookup_method_in_chain(ea.db, fqcn, "__call").is_some();
+        let has_call_magic = crate::db::has_method_in_chain(ea.db, fqcn, "__call");
         if is_interface || is_abstract || has_call_magic {
             Union::mixed()
         } else {

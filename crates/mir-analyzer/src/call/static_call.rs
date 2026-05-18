@@ -187,8 +187,7 @@ impl CallAnalyzer {
                 .map(|k| k.is_abstract)
                 .unwrap_or(false);
             // Check for __callStatic in the full inheritance chain (not just direct methods)
-            let has_callstatic_magic =
-                crate::db::lookup_method_in_chain(ea.db, &fqcn, "__callstatic").is_some();
+            let has_callstatic_magic = crate::db::has_method_in_chain(ea.db, &fqcn, "__callstatic");
             if is_abstract || has_callstatic_magic {
                 Union::mixed()
             } else {
