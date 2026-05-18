@@ -305,8 +305,12 @@ fn apply_docblock_assertions<'arena, 'src>(
         .strip_prefix('\\')
         .map(|s| s.to_string())
         .unwrap_or_else(|| fn_name.to_string());
-    let fn_active =
-        |name: &str| -> bool { db.lookup_function_node(name).is_some_and(|n| n.active(db)) };
+    // Phase 4: function existence check uses pull-path first.
+    let fn_active = |name: &str| -> bool {
+        let here = crate::db::Fqcn::new(db, Arc::<str>::from(name));
+        crate::db::find_function(db, here).is_some()
+            || db.lookup_function_node(name).is_some_and(|n| n.active(db))
+    };
     let resolved_fn_name = {
         let qualified = crate::db::resolve_name_via_db(db, file, &fn_name);
         if fn_active(qualified.as_str()) {
