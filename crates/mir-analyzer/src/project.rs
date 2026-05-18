@@ -273,12 +273,21 @@ impl ProjectAnalyzer {
     /// Returns `true` if a function with `fqn` is registered and active.
     pub fn contains_function(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
+        // Phase 4: pull-first, push fallback.
+        let here = crate::db::Fqcn::new(&db, Arc::<str>::from(fqn));
+        if crate::db::find_function(&db, here).is_some() {
+            return true;
+        }
         db.lookup_function_node(fqn).is_some_and(|n| n.active(&db))
     }
 
     /// Returns `true` if a class / interface / trait / enum is registered.
     pub fn contains_class(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
+        let here = crate::db::Fqcn::new(&db, Arc::<str>::from(fqcn));
+        if crate::db::find_class_like(&db, here).is_some() {
+            return true;
+        }
         db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db))
     }
 
@@ -286,6 +295,10 @@ impl ProjectAnalyzer {
     pub fn contains_method(&self, class: &str, name: &str) -> bool {
         let db = self.snapshot_db();
         let name_lower = name.to_ascii_lowercase();
+        let here = crate::db::Fqcn::new(&db, Arc::<str>::from(class));
+        if crate::db::find_method_in_class(&db, here, &name_lower).is_some() {
+            return true;
+        }
         db.lookup_method_node(class, &name_lower)
             .is_some_and(|n| n.active(&db))
     }
