@@ -122,9 +122,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                     }
-                    let ctor_params =
+                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
+                    let ctor_params = crate::db::find_method_in_chain(
+                        self.db,
+                        crate::db::Fqcn::new(self.db, fqcn_arc),
+                        "__construct",
+                    )
+                    .map(|(_, s)| s.params.to_vec())
+                    .or_else(|| {
                         crate::db::lookup_method_in_chain(self.db, &fqcn, "__construct")
-                            .map(|n| n.params(self.db).to_vec());
+                            .map(|n| n.params(self.db).to_vec())
+                    });
                     if let Some(ctor_params) = ctor_params {
                         crate::call::check_constructor_args(
                             self,
@@ -445,9 +453,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
-                    let prop_found: Option<Union> =
+                    let fqcn_arc: Arc<str> = fqcn.clone();
+                    let prop_found: Option<Union> = crate::db::find_property_in_chain(
+                        self.db,
+                        crate::db::Fqcn::new(self.db, fqcn_arc),
+                        prop_name,
+                    )
+                    .map(|(_, p)| p.ty.unwrap_or_else(Union::mixed))
+                    .or_else(|| {
                         crate::db::lookup_property_in_chain(self.db, fqcn.as_ref(), prop_name)
-                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed));
+                            .map(|node| node.ty(self.db).unwrap_or_else(Union::mixed))
+                    });
                     if let Some(ty) = prop_found {
                         if !self.inference_only {
                             let (line, col_start, col_end) = self.span_to_ref_loc(span);
