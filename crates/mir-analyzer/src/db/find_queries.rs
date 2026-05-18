@@ -298,7 +298,7 @@ pub fn class_in_file<'db>(
     defs.slice
         .classes
         .iter()
-        .find(|c| c.fqcn.as_ref() == target.as_ref())
+        .find(|c| c.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
         .map(Arc::new)
 }
@@ -315,7 +315,7 @@ pub fn interface_in_file<'db>(
     defs.slice
         .interfaces
         .iter()
-        .find(|i| i.fqcn.as_ref() == target.as_ref())
+        .find(|i| i.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
         .map(Arc::new)
 }
@@ -332,7 +332,7 @@ pub fn trait_in_file<'db>(
     defs.slice
         .traits
         .iter()
-        .find(|t| t.fqcn.as_ref() == target.as_ref())
+        .find(|t| t.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
         .map(Arc::new)
 }
@@ -349,7 +349,7 @@ pub fn enum_in_file<'db>(
     defs.slice
         .enums
         .iter()
-        .find(|e| e.fqcn.as_ref() == target.as_ref())
+        .find(|e| e.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
         .map(Arc::new)
 }
@@ -366,7 +366,7 @@ pub fn function_in_file<'db>(
     defs.slice
         .functions
         .iter()
-        .find(|f| f.fqn.as_ref() == target.as_ref())
+        .find(|f| f.fqn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
         .map(Arc::new)
 }
@@ -518,10 +518,7 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
 /// a boolean. Phase 5 drops the push-fallback.
 pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool {
     let here = Fqcn::new(db, Arc::<str>::from(fqcn));
-    if find_method_in_chain(db, here, name).is_some() {
-        return true;
-    }
-    crate::db::lookup_method_in_chain(db, fqcn, name).is_some()
+    find_method_in_chain(db, here, name).is_some()
 }
 
 /// Walk the inheritance chain of `fqcn` and return the first method

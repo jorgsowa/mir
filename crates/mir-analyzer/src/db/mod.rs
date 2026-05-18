@@ -177,9 +177,8 @@ pub use self::queries::{
     collect_file_definitions, collect_file_definitions_uncached, constant_exists_via_db,
     extends_or_implements_via_db, function_exists_via_db, has_unknown_ancestor_via_db,
     infer_file_return_types, inherited_template_bindings_via_db, is_unchecked_exception_via_db,
-    lookup_method_in_chain, lookup_property_in_chain, member_location_via_db, method_exists_via_db,
-    method_is_concretely_implemented, resolve_name_via_db, type_exists_via_db, ClassKind,
-    InferredFileTypes,
+    member_location_via_db, method_is_concretely_implemented, resolve_name_via_db,
+    type_exists_via_db, ClassKind, InferredFileTypes,
 };
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};

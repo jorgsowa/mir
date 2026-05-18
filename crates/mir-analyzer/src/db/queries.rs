@@ -7,12 +7,7 @@ use rustc_hash::FxHashMap;
 
 use super::*;
 
-/// Snapshot of a class's discriminator + abstractness, read from a
-/// registered active `ClassNode`.
-///
-/// Returned by [`class_kind_via_db`] when an active node exists for the
-/// given FQCN — call sites can use this in place of the corresponding
-/// `Codebase` lookups.
+/// Snapshot of a class's discriminator + abstractness.
 #[derive(Debug, Clone, Copy)]
 pub struct ClassKind {
     pub is_interface: bool,
@@ -21,56 +16,32 @@ pub struct ClassKind {
     pub is_abstract: bool,
 }
 
-/// Read class kind/abstractness from an active `ClassNode`, if one is
-/// registered for `fqcn`.  Returns `None` for unregistered or inactive
-/// nodes.  All bundled and user types are mirrored into `ClassNode` by
-/// `MirDb::ingest_stub_slice`, so a `None` here means the type genuinely
-/// doesn't exist (or is inactive after a `deactivate_class_node` pass).
 pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
-    // Pull-first via ClassLike; push-fallback for tests with direct upsert.
     let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
-    if let Some(class) = crate::db::find_class_like(db, here) {
-        return Some(ClassKind {
-            is_interface: class.is_interface(),
-            is_trait: class.is_trait(),
-            is_enum: class.is_enum(),
-            is_abstract: class.is_abstract(),
-        });
-    }
-    let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
+    let class = crate::db::find_class_like(db, here)?;
     Some(ClassKind {
-        is_interface: node.is_interface(db),
-        is_trait: node.is_trait(db),
-        is_enum: node.is_enum(db),
-        is_abstract: node.is_abstract(db),
+        is_interface: class.is_interface(),
+        is_trait: class.is_trait(),
+        is_enum: class.is_enum(),
+        is_abstract: class.is_abstract(),
     })
 }
 
 pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
-    if crate::db::find_class_like(db, here).is_some() {
-        return true;
-    }
-    db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
+    crate::db::find_class_like(db, here).is_some()
 }
 
 #[allow(dead_code)]
 pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
-    if crate::db::find_function(db, here).is_some() {
-        return true;
-    }
-    db.lookup_function_node(fqn).is_some_and(|n| n.active(db))
+    crate::db::find_function(db, here).is_some()
 }
 
 #[allow(dead_code)]
 pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
-    if crate::db::find_global_constant(db, here).is_some() {
-        return true;
-    }
-    db.lookup_global_constant_node(fqn)
-        .is_some_and(|n| n.active(db))
+    crate::db::find_global_constant(db, here).is_some()
 }
 
 pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> String {
@@ -119,28 +90,18 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
     name.to_string()
 }
 
-/// Return the declared `@template` parameters for `fqcn` from an active
-/// `ClassNode`, if one is registered.  Returns `None` for unregistered
-/// or inactive nodes.  Authoritative after all collected slices have been
-/// fed through `ingest_stub_slice`.
 pub fn class_template_params_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
 ) -> Option<Arc<[TemplateParam]>> {
     let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
-    if let Some(class) = crate::db::find_class_like(db, here) {
-        return Some(Arc::from(class.template_params().to_vec()));
-    }
-    let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
-    Some(node.template_params(db))
+    let class = crate::db::find_class_like(db, here)?;
+    Some(Arc::from(class.template_params().to_vec()))
 }
 
 /// Walk the parent chain collecting template bindings from `@extends` type
-/// args.  Mirrors `Codebase::get_inherited_template_bindings`.
-///
-/// For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`, this
-/// returns `{ T → User }` where `T` is `BaseRepo`'s declared template
-/// parameter.  Cycle-safe via a visited set.
+/// args. For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`,
+/// returns `{ T → User }` where `T` is `BaseRepo`'s declared template parameter.
 pub fn inherited_template_bindings_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
@@ -152,23 +113,14 @@ pub fn inherited_template_bindings_via_db(
         if !visited.insert(current.clone()) {
             break;
         }
-        // Pull-first.
-        let pulled = crate::db::find_class_like(db, crate::db::Fqcn::new(db, current.clone()));
-        let (parent, extends_type_args): (Arc<str>, Vec<mir_types::Union>) =
-            if let Some(class) = pulled {
-                let Some(p) = class.parent().cloned() else {
-                    break;
-                };
-                (p, class.extends_type_args().to_vec())
-            } else if let Some(node) = db
-                .lookup_class_node(current.as_ref())
-                .filter(|n| n.active(db))
-            {
-                let Some(p) = node.parent(db) else { break };
-                (p, node.extends_type_args(db).to_vec())
-            } else {
-                break;
-            };
+        let Some(class) = crate::db::find_class_like(db, crate::db::Fqcn::new(db, current.clone()))
+        else {
+            break;
+        };
+        let Some(parent) = class.parent().cloned() else {
+            break;
+        };
+        let extends_type_args = class.extends_type_args();
         if !extends_type_args.is_empty() {
             if let Some(parent_tps) = class_template_params_via_db(db, parent.as_ref()) {
                 for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
@@ -183,28 +135,14 @@ pub fn inherited_template_bindings_via_db(
     bindings
 }
 
-/// Predicate: does `fqcn` have any registered ancestor that lacks a
-/// `ClassNode` in the db?
-///
-/// `ingest_stub_slice` mirrors bundled stubs, user stubs, and PSR-4
-/// lazy-loaded definitions into the db before any Pass 2 driver runs, so
-/// a class with no active `ClassNode` is one that genuinely doesn't
-/// exist — and an unknown class trivially has no known ancestors.
 pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    let fqcn_arc: Arc<str> = Arc::from(fqcn);
-    let here = crate::db::Fqcn::new(db, fqcn_arc.clone());
-    if crate::db::find_class_like(db, here).is_some() {
-        return crate::db::class_ancestors_by_fqcn(db, here)
-            .iter()
-            .skip(1) // self
-            .any(|ancestor| !type_exists_via_db(db, ancestor));
-    }
-    let Some(node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
+    if crate::db::find_class_like(db, here).is_none() {
         return false;
-    };
-    class_ancestors(db, Fqcn::new(db, node.fqcn(db)))
-        .0
+    }
+    crate::db::class_ancestors_by_fqcn(db, here)
         .iter()
+        .skip(1) // self
         .any(|ancestor| !type_exists_via_db(db, ancestor))
 }
 
@@ -213,401 +151,7 @@ pub fn method_is_concretely_implemented(
     fqcn: &str,
     method_name: &str,
 ) -> bool {
-    // Pull-first.
-    if crate::db::is_method_concretely_implemented_pull(db, fqcn, method_name) {
-        return true;
-    }
-    let lower = method_name.to_lowercase();
-    let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
-        return false;
-    };
-    // Interfaces don't supply implementations, regardless of how their methods
-    // are stored.
-    if self_node.is_interface(db) {
-        return false;
-    }
-    // 1. Direct own method.
-    if let Some(m) = db.lookup_method_node(fqcn, &lower).filter(|m| m.active(db)) {
-        if !m.is_abstract(db) {
-            return true;
-        }
-    }
-    // 2. Traits used directly by this class — walk transitively.
-    let mut visited_traits: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
-    for t in self_node.traits(db).iter() {
-        if trait_provides_method(db, t.as_ref(), &lower, &mut visited_traits) {
-            return true;
-        }
-    }
-    // 3. Ancestor chain (classes only — interfaces skipped, trait nodes here
-    //    are owning-class trait references already handled by their own walk).
-    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
-        .0
-        .iter()
-    {
-        let Some(anc_node) = db
-            .lookup_class_node(ancestor.as_ref())
-            .filter(|n| n.active(db))
-        else {
-            continue;
-        };
-        if anc_node.is_interface(db) {
-            continue;
-        }
-        // Ancestor's own method.
-        if !anc_node.is_trait(db) {
-            if let Some(m) = db
-                .lookup_method_node(ancestor.as_ref(), &lower)
-                .filter(|m| m.active(db))
-            {
-                if !m.is_abstract(db) {
-                    return true;
-                }
-            }
-        }
-        // Ancestor's used traits — walk transitively.  (For trait nodes in
-        // the ancestor list, this re-checks their own_methods + sub-traits.)
-        if anc_node.is_trait(db) {
-            if trait_provides_method(db, ancestor.as_ref(), &lower, &mut visited_traits) {
-                return true;
-            }
-        } else {
-            for t in anc_node.traits(db).iter() {
-                if trait_provides_method(db, t.as_ref(), &lower, &mut visited_traits) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-/// Helper for [`method_is_concretely_implemented`]: walk a trait's own methods
-/// and recursively its used traits.  Returns true iff any provides a
-/// non-abstract method named `method_lower`.  Cycle-safe via `visited`.
-fn trait_provides_method(
-    db: &dyn MirDatabase,
-    trait_fqcn: &str,
-    method_lower: &str,
-    visited: &mut rustc_hash::FxHashSet<String>,
-) -> bool {
-    if !visited.insert(trait_fqcn.to_string()) {
-        return false;
-    }
-    if let Some(m) = db
-        .lookup_method_node(trait_fqcn, method_lower)
-        .filter(|m| m.active(db))
-    {
-        if !m.is_abstract(db) {
-            return true;
-        }
-    }
-    let Some(node) = db.lookup_class_node(trait_fqcn).filter(|n| n.active(db)) else {
-        return false;
-    };
-    if !node.is_trait(db) {
-        return false;
-    }
-    for t in node.traits(db).iter() {
-        if trait_provides_method(db, t.as_ref(), method_lower, visited) {
-            return true;
-        }
-    }
-    false
-}
-
-pub fn lookup_method_in_chain(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-    method_name: &str,
-) -> Option<MethodNode> {
-    let mut visited_mixins: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
-    lookup_method_in_chain_inner(db, fqcn, &method_name.to_lowercase(), &mut visited_mixins)
-}
-
-fn lookup_method_in_chain_inner(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-    lower: &str,
-    visited_mixins: &mut rustc_hash::FxHashSet<String>,
-) -> Option<MethodNode> {
-    let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
-
-    // 1. Direct own method.
-    if let Some(node) = db.lookup_method_node(fqcn, lower).filter(|n| n.active(db)) {
-        return Some(node);
-    }
-    // 2. Docblock @mixin chains (delegated magic-method lookup) — recurse so
-    //    each mixin's own walk includes its own mixins, traits, ancestors.
-    //    Cycle-safe via `visited_mixins`.
-    for m in self_node.mixins(db).iter() {
-        if visited_mixins.insert(m.to_string()) {
-            if let Some(node) = lookup_method_in_chain_inner(db, m.as_ref(), lower, visited_mixins)
-            {
-                return Some(node);
-            }
-        }
-    }
-    // 3. Traits used directly — walk transitively (trait-of-traits is *not*
-    //    included in `class_ancestors`, by design — see that fn's comments).
-    let mut visited_traits: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
-    for t in self_node.traits(db).iter() {
-        if let Some(node) = trait_provides_method_node(db, t.as_ref(), lower, &mut visited_traits) {
-            return Some(node);
-        }
-    }
-    // 4. Ancestor chain (parents, interfaces, traits — empty for enums).
-    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
-        .0
-        .iter()
-    {
-        if let Some(node) = db
-            .lookup_method_node(ancestor.as_ref(), lower)
-            .filter(|n| n.active(db))
-        {
-            return Some(node);
-        }
-        if let Some(anc_node) = db
-            .lookup_class_node(ancestor.as_ref())
-            .filter(|n| n.active(db))
-        {
-            if anc_node.is_trait(db) {
-                if let Some(node) =
-                    trait_provides_method_node(db, ancestor.as_ref(), lower, &mut visited_traits)
-                {
-                    return Some(node);
-                }
-            } else {
-                for t in anc_node.traits(db).iter() {
-                    if let Some(node) =
-                        trait_provides_method_node(db, t.as_ref(), lower, &mut visited_traits)
-                    {
-                        return Some(node);
-                    }
-                }
-                for m in anc_node.mixins(db).iter() {
-                    if visited_mixins.insert(m.to_string()) {
-                        if let Some(node) =
-                            lookup_method_in_chain_inner(db, m.as_ref(), lower, visited_mixins)
-                        {
-                            return Some(node);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Node-returning sibling of [`trait_declares_method`] used by
-/// [`lookup_method_in_chain`].  Walks `trait_fqcn`'s own MethodNode then its
-/// used traits transitively.  Cycle-safe via `visited`.
-fn trait_provides_method_node(
-    db: &dyn MirDatabase,
-    trait_fqcn: &str,
-    method_lower: &str,
-    visited: &mut rustc_hash::FxHashSet<String>,
-) -> Option<MethodNode> {
-    if !visited.insert(trait_fqcn.to_string()) {
-        return None;
-    }
-    if let Some(node) = db
-        .lookup_method_node(trait_fqcn, method_lower)
-        .filter(|n| n.active(db))
-    {
-        return Some(node);
-    }
-    let node = db.lookup_class_node(trait_fqcn).filter(|n| n.active(db))?;
-    if !node.is_trait(db) {
-        return None;
-    }
-    for t in node.traits(db).iter() {
-        if let Some(found) = trait_provides_method_node(db, t.as_ref(), method_lower, visited) {
-            return Some(found);
-        }
-    }
-    None
-}
-
-/// Existence-only sibling of [`trait_provides_method`].  Returns true iff the
-/// trait or any sub-trait declares a method named `method_lower` (abstract
-/// counts).  Cycle-safe via `visited`.
-#[allow(dead_code)]
-fn trait_declares_method(
-    db: &dyn MirDatabase,
-    trait_fqcn: &str,
-    method_lower: &str,
-    visited: &mut rustc_hash::FxHashSet<String>,
-) -> bool {
-    if !visited.insert(trait_fqcn.to_string()) {
-        return false;
-    }
-    if db
-        .lookup_method_node(trait_fqcn, method_lower)
-        .is_some_and(|m| m.active(db))
-    {
-        return true;
-    }
-    let Some(node) = db.lookup_class_node(trait_fqcn).filter(|n| n.active(db)) else {
-        return false;
-    };
-    if !node.is_trait(db) {
-        return false;
-    }
-    for t in node.traits(db).iter() {
-        if trait_declares_method(db, t.as_ref(), method_lower, visited) {
-            return true;
-        }
-    }
-    false
-}
-
-#[allow(dead_code)]
-pub fn method_exists_via_db(db: &dyn MirDatabase, fqcn: &str, method_name: &str) -> bool {
-    let lower = method_name.to_lowercase();
-    let Some(self_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
-        return false;
-    };
-    // Direct own method.
-    if db
-        .lookup_method_node(fqcn, &lower)
-        .is_some_and(|m| m.active(db))
-    {
-        return true;
-    }
-    // Traits used directly — walk transitively.
-    let mut visited_traits: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
-    for t in self_node.traits(db).iter() {
-        if trait_declares_method(db, t.as_ref(), &lower, &mut visited_traits) {
-            return true;
-        }
-    }
-    // Ancestor chain (parents, interfaces, traits).
-    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
-        .0
-        .iter()
-    {
-        if db
-            .lookup_method_node(ancestor.as_ref(), &lower)
-            .is_some_and(|m| m.active(db))
-        {
-            return true;
-        }
-        if let Some(anc_node) = db
-            .lookup_class_node(ancestor.as_ref())
-            .filter(|n| n.active(db))
-        {
-            if anc_node.is_trait(db) {
-                if trait_declares_method(db, ancestor.as_ref(), &lower, &mut visited_traits) {
-                    return true;
-                }
-            } else {
-                for t in anc_node.traits(db).iter() {
-                    if trait_declares_method(db, t.as_ref(), &lower, &mut visited_traits) {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
-pub fn lookup_property_in_chain(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-    prop_name: &str,
-) -> Option<PropertyNode> {
-    let mut visited_mixins: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
-    lookup_property_in_chain_inner(db, fqcn, prop_name, &mut visited_mixins)
-}
-
-fn lookup_property_in_chain_inner(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-    prop_name: &str,
-    visited_mixins: &mut rustc_hash::FxHashSet<String>,
-) -> Option<PropertyNode> {
-    let self_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
-
-    // 1. Own property.
-    if let Some(node) = db
-        .lookup_property_node(fqcn, prop_name)
-        .filter(|n| n.active(db))
-    {
-        return Some(node);
-    }
-    // 2. Docblock @mixin chains — recurse so each mixin's own walk includes
-    //    its own mixins, traits, ancestors.  Cycle-safe via `visited_mixins`.
-    for m in self_node.mixins(db).iter() {
-        if visited_mixins.insert(m.to_string()) {
-            if let Some(node) =
-                lookup_property_in_chain_inner(db, m.as_ref(), prop_name, visited_mixins)
-            {
-                return Some(node);
-            }
-        }
-    }
-    // 3. Ancestor chain (parents + interfaces + direct traits).  Each
-    //    ancestor may itself have `@mixin` declarations that forward
-    //    property access — recurse into those too.
-    for ancestor in class_ancestors(db, Fqcn::new(db, self_node.fqcn(db)))
-        .0
-        .iter()
-    {
-        if let Some(node) = db
-            .lookup_property_node(ancestor.as_ref(), prop_name)
-            .filter(|n| n.active(db))
-        {
-            return Some(node);
-        }
-        if let Some(anc_node) = db
-            .lookup_class_node(ancestor.as_ref())
-            .filter(|n| n.active(db))
-        {
-            for m in anc_node.mixins(db).iter() {
-                if visited_mixins.insert(m.to_string()) {
-                    if let Some(node) =
-                        lookup_property_in_chain_inner(db, m.as_ref(), prop_name, visited_mixins)
-                    {
-                        return Some(node);
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
-    let fqcn_arc: Arc<str> = Arc::from(fqcn);
-    let here = crate::db::Fqcn::new(db, fqcn_arc);
-    if crate::db::find_class_constant_in_chain(db, here, const_name).is_some() {
-        return true;
-    }
-    // Push-fallback (tests using direct upsert_class_constant_node).
-    if db
-        .lookup_class_constant_node(fqcn, const_name)
-        .is_some_and(|n| n.active(db))
-    {
-        return true;
-    }
-    let Some(class_node) = db.lookup_class_node(fqcn).filter(|n| n.active(db)) else {
-        return false;
-    };
-    for ancestor in class_ancestors(db, Fqcn::new(db, class_node.fqcn(db)))
-        .0
-        .iter()
-    {
-        if db
-            .lookup_class_constant_node(ancestor.as_ref(), const_name)
-            .is_some_and(|n| n.active(db))
-        {
-            return true;
-        }
-    }
-    false
+    crate::db::is_method_concretely_implemented_pull(db, fqcn, method_name)
 }
 
 pub fn member_location_via_db(
@@ -615,9 +159,7 @@ pub fn member_location_via_db(
     fqcn: &str,
     member_name: &str,
 ) -> Option<Location> {
-    let fqcn_arc: Arc<str> = Arc::from(fqcn);
-    let here = crate::db::Fqcn::new(db, fqcn_arc);
-    // Pull-first.
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
     if let Some((_, storage)) = crate::db::find_method_in_chain(db, here, member_name) {
         if let Some(loc) = storage.location.clone() {
             return Some(loc);
@@ -633,82 +175,35 @@ pub fn member_location_via_db(
             return Some(loc);
         }
     }
-    // Push fallback (test fixtures).
-    if let Some(node) = lookup_method_in_chain(db, fqcn, member_name) {
-        if let Some(loc) = node.location(db) {
-            return Some(loc);
-        }
-    }
-    if let Some(node) = lookup_property_in_chain(db, fqcn, member_name) {
-        if let Some(loc) = node.location(db) {
-            return Some(loc);
-        }
-    }
-    if let Some(node) = db
-        .lookup_class_constant_node(fqcn, member_name)
-        .filter(|n| n.active(db))
-    {
-        if let Some(loc) = node.location(db) {
-            return Some(loc);
-        }
-    }
-    let class_node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
-    for ancestor in class_ancestors(db, Fqcn::new(db, class_node.fqcn(db)))
-        .0
-        .iter()
-    {
-        if let Some(node) = db
-            .lookup_class_constant_node(ancestor.as_ref(), member_name)
-            .filter(|n| n.active(db))
-        {
-            if let Some(loc) = node.location(db) {
-                return Some(loc);
-            }
-        }
-    }
     None
+}
+
+pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
+    crate::db::find_class_constant_in_chain(db, here, const_name).is_some()
 }
 
 pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
     if child == ancestor {
         return true;
     }
-    let child_arc: Arc<str> = Arc::from(child);
-    let here = crate::db::Fqcn::new(db, child_arc.clone());
-    if let Some(class) = crate::db::find_class_like(db, here) {
-        if class.is_enum() {
-            if class.interfaces().iter().any(|i| i.as_ref() == ancestor) {
-                return true;
-            }
-            if ancestor == "UnitEnum" || ancestor == "\\UnitEnum" {
-                return true;
-            }
-            if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && class.is_backed_enum() {
-                return true;
-            }
-            return false;
-        }
-        return crate::db::class_ancestors_by_fqcn(db, here)
-            .iter()
-            .any(|p| p.as_ref() == ancestor);
-    }
-    let Some(node) = db.lookup_class_node(child).filter(|n| n.active(db)) else {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(child));
+    let Some(class) = crate::db::find_class_like(db, here) else {
         return false;
     };
-    if node.is_enum(db) {
-        if node.interfaces(db).iter().any(|i| i.as_ref() == ancestor) {
+    if class.is_enum() {
+        if class.interfaces().iter().any(|i| i.as_ref() == ancestor) {
             return true;
         }
         if ancestor == "UnitEnum" || ancestor == "\\UnitEnum" {
             return true;
         }
-        if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && node.is_backed_enum(db) {
+        if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && class.is_backed_enum() {
             return true;
         }
         return false;
     }
-    class_ancestors(db, Fqcn::new(db, node.fqcn(db)))
-        .0
+    crate::db::class_ancestors_by_fqcn(db, here)
         .iter()
         .any(|p| p.as_ref() == ancestor)
 }
@@ -753,27 +248,12 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 }
 
 // File-level inferred-type Salsa query
-//
-// `infer_file_return_types` runs an inference-only Pass 2 over one file and
-// returns all inferred return types as maps.  The pre-sweep in `project.rs`
-// calls this in parallel for all files, then commits the results to Salsa
-// INPUT fields.  The full Pass 2 then reads those INPUT fields directly (O(1)
-// per call site, no lock contention at scale).
-//
-// Cross-file PHP call graphs commonly have A→B→A cycles.  This query reads
-// only *committed* INPUT fields for external symbols (never calls back into
-// another file's `infer_file_return_types`), so cycles degrade only to `mixed`
-// on the first fixpoint pass, not recursively.
 
 type MethodInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Union>>;
 
-/// Inferred return types for all functions and methods in a single file,
-/// collected by a single inference-only Pass 2 run.
 #[derive(Clone, Debug)]
 pub struct InferredFileTypes {
-    /// FQN → inferred return type for top-level functions declared in the file.
     pub functions: Arc<FxHashMap<Arc<str>, Arc<Union>>>,
-    /// (FQCN, method_name_lower) → inferred return type for methods in the file.
     pub methods: Arc<MethodInferMap>,
 }
 
@@ -823,14 +303,6 @@ unsafe impl salsa::Update for InferredFileTypes {
     }
 }
 
-/// Run inference-only Pass 2 over `file` and return all inferred return types.
-///
-/// Salsa tracks the dependency on `file.text`, so this query is automatically
-/// invalidated when the file changes and re-used when it hasn't.
-///
-/// Called in parallel by the pre-sweep in `project.rs` and `session.rs`.
-/// Results are committed to `FunctionNode`/`MethodNode` INPUT fields before
-/// the full Pass 2 runs, so the hot path pays only O(1) INPUT-field reads.
 #[salsa::tracked]
 pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
     use std::str::FromStr as _;
@@ -873,11 +345,6 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     }
 }
 
-// Helper: collect analysis results via tracked query accumulators
-
-/// Collects all accumulated issues from a set of files analyzed via the
-/// `analyze_file` tracked query. Used during batch analysis to read issues
-/// that were emitted during tracked-query evaluation.
 #[allow(dead_code)]
 pub(crate) fn collect_accumulated_issues(
     db: &dyn MirDatabase,
@@ -888,10 +355,7 @@ pub(crate) fn collect_accumulated_issues(
     let input = AnalyzeFileInput::new(db, Arc::from(php_version));
 
     for (_path, file) in files {
-        // Call the tracked query to trigger analysis + accumulation
         analyze_file(db, *file, input);
-
-        // Read back the accumulated issues for this file
         let accumulated: Vec<&IssueAccumulator> = analyze_file::accumulated(db, *file, input);
         for acc in accumulated {
             all_issues.push(acc.0.clone());
@@ -901,11 +365,6 @@ pub(crate) fn collect_accumulated_issues(
     all_issues
 }
 
-/// Return `true` if `fqcn` descends from `RuntimeException` or
-/// `LogicException`, which by PHP convention are "unchecked" exceptions —
-/// programmer errors that callers are not expected to document or recover
-/// from.  The analyzer suppresses [`MissingThrowsDocblock`] diagnostics for
-/// these by default to avoid drowning real signal in @throws noise.
 pub fn is_unchecked_exception_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     extends_or_implements_via_db(db, fqcn, "RuntimeException")
         || extends_or_implements_via_db(db, fqcn, "LogicException")
