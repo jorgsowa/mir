@@ -73,11 +73,35 @@ impl<'a> ExpressionAnalyzer<'a> {
                         n.class.span,
                     );
                 } else if type_exists {
-                    if let Some(node) = self
+                    let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                    if let Some(class) = crate::db::find_class_like(self.db, here) {
+                        if class.is_class() && class.is_abstract() {
+                            self.emit(
+                                IssueKind::AbstractInstantiation {
+                                    class: fqcn.to_string(),
+                                },
+                                Severity::Error,
+                                n.class.span,
+                            );
+                        }
+                        if let Some(msg) = class.deprecated() {
+                            self.emit(
+                                IssueKind::DeprecatedClass {
+                                    name: fqcn.to_string(),
+                                    message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                },
+                                Severity::Info,
+                                n.class.span,
+                            );
+                        }
+                    } else if let Some(node) = self
                         .db
                         .lookup_class_node(fqcn.as_ref())
                         .filter(|n| n.active(self.db))
                     {
+                        // Push-path fallback for classes not yet
+                        // reachable via the pull path (test fixtures
+                        // that ingest without registering SourceFile).
                         if node.is_abstract(self.db) {
                             self.emit(
                                 IssueKind::AbstractInstantiation {
@@ -157,20 +181,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Check abstract for known TClassString
                 for atom in ty.types.iter() {
                     if let Atomic::TClassString(Some(fqcn)) = atom {
-                        if let Some(node) = self
-                            .db
-                            .lookup_class_node(fqcn.as_ref())
-                            .filter(|n| n.active(self.db))
-                        {
-                            if node.is_abstract(self.db) {
-                                self.emit(
-                                    IssueKind::AbstractInstantiation {
-                                        class: fqcn.to_string(),
-                                    },
-                                    Severity::Error,
-                                    n.class.span,
-                                );
-                            }
+                        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                        let is_abstract_class = crate::db::find_class_like(self.db, here)
+                            .map(|c| c.is_class() && c.is_abstract())
+                            .or_else(|| {
+                                self.db
+                                    .lookup_class_node(fqcn.as_ref())
+                                    .filter(|n| n.active(self.db))
+                                    .map(|n| n.is_abstract(self.db))
+                            })
+                            .unwrap_or(false);
+                        if is_abstract_class {
+                            self.emit(
+                                IssueKind::AbstractInstantiation {
+                                    class: fqcn.to_string(),
+                                },
+                                Severity::Error,
+                                n.class.span,
+                            );
                         }
                     }
                 }
@@ -455,14 +483,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     match prop_name {
                         "name" => return Union::single(Atomic::TNonEmptyString),
                         "value" => {
-                            if let Some(node) = self
-                                .db
-                                .lookup_class_node(fqcn.as_ref())
-                                .filter(|n| n.active(self.db))
+                            let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                            if let Some(scalar_ty) = crate::db::find_class_like(self.db, here)
+                                .and_then(|c| c.enum_scalar_type().cloned())
+                                .or_else(|| {
+                                    self.db
+                                        .lookup_class_node(fqcn.as_ref())
+                                        .filter(|n| n.active(self.db))
+                                        .and_then(|n| n.enum_scalar_type(self.db))
+                                })
                             {
-                                if let Some(scalar_ty) = node.enum_scalar_type(self.db) {
-                                    return scalar_ty;
-                                }
+                                return scalar_ty;
                             }
                             self.emit(
                                 IssueKind::UndefinedProperty {
