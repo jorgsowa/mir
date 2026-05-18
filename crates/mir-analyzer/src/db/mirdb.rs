@@ -606,16 +606,44 @@ impl MirDb {
     /// This is the canonical post-Pass-1 ingestion path: each file's slice is
     /// fed in directly, so batch analysis does not need any intermediate
     /// mutable codebase store between Pass 1 and Pass 2.
-    pub fn ingest_stub_slice(&mut self, _slice: &StubSlice) {
-        // Phase 5: push-path indexes are no longer read. The body is retained
-        // below behind `if false {}` so the symbol type-checks; future cleanup
-        // removes it together with the FxHashMap registries it populates.
-        // The function itself stays callable so existing call sites
-        // (`SharedDb::collect_and_ingest_file`, project / stub bootstrap) keep
-        // compiling without further edits.
+    pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
+        // Phase 5: the FQCN→handle node registries are unused. Only the
+        // file metadata (`file_namespaces`, `file_imports`, `global_vars`)
+        // and the `symbol_to_file` index are kept; everything else has
+        // been short-circuited via the `false` branch below to leave the
+        // body type-checking until a follow-up rewrite.
+        if let Some(file) = &slice.file {
+            if let Some(namespace) = &slice.namespace {
+                Arc::make_mut(&mut self.file_namespaces).insert(file.clone(), namespace.clone());
+            }
+            if !slice.imports.is_empty() {
+                Arc::make_mut(&mut self.file_imports).insert(file.clone(), slice.imports.clone());
+            }
+            for (name, _) in &slice.global_vars {
+                let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
+                self.register_symbol(Arc::from(global_name), file.clone());
+            }
+            for cls in &slice.classes {
+                self.register_symbol(cls.fqcn.clone(), file.clone());
+            }
+            for iface in &slice.interfaces {
+                self.register_symbol(iface.fqcn.clone(), file.clone());
+            }
+            for tr in &slice.traits {
+                self.register_symbol(tr.fqcn.clone(), file.clone());
+            }
+            for en in &slice.enums {
+                self.register_symbol(en.fqcn.clone(), file.clone());
+            }
+            for func in &slice.functions {
+                self.register_symbol(func.fqn.clone(), file.clone());
+            }
+        }
+        for (name, ty) in &slice.global_vars {
+            let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
+            Arc::make_mut(&mut self.global_vars).insert(Arc::from(global_name), ty.clone());
+        }
         return;
-        #[allow(unreachable_code)]
-        let slice = _slice;
         #[allow(unreachable_code)]
         if false {
             use std::collections::HashSet;

@@ -346,6 +346,44 @@ impl AnalysisSession {
         self.shared_db.ingest_stub_paths(&paths, self.php_version);
     }
 
+    /// Scan a parsed AST for class references and lazy-load any that are
+    /// PSR-4-resolvable but not yet registered as `SourceFile` inputs. After
+    /// this call, `find_class_like(fqcn)` can pull-resolve the referenced
+    /// classes without needing a retry loop.
+    ///
+    /// The current implementation reuses [`crate::diagnostics::collect_referenced_class_fqcns`]
+    /// already used by the diagnostics pass. Missing classes are passed
+    /// through [`Self::lazy_load_class_transitive`] so their inheritance
+    /// chain is also primed (Pass-2 reads parents/interfaces while
+    /// resolving members).
+    pub fn preload_psr4_classes_for_ast(
+        &self,
+        program: &php_ast::ast::Program<'_, '_>,
+        file: &str,
+    ) {
+        if self.resolver.is_none() {
+            return;
+        }
+        let refs = collect_class_refs_from_ast(program);
+        if refs.is_empty() {
+            return;
+        }
+        // Resolve names against the file's namespace/imports up front, then
+        // drop the snapshot before lazy-loading (which mutates inputs).
+        let resolved: Vec<String> = {
+            let db = self.snapshot_db();
+            refs.into_iter()
+                .map(|raw| crate::db::resolve_name_via_db(&db, file, &raw))
+                .collect()
+        };
+        for fqcn in resolved {
+            if self.contains_class(&fqcn) {
+                continue;
+            }
+            let _ = self.lazy_load_class(&fqcn);
+        }
+    }
+
     fn ensure_user_stubs_loaded(&self) {
         self.shared_db
             .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
@@ -562,38 +600,22 @@ impl AnalysisSession {
         &self,
         symbol: &crate::Symbol,
     ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
+        // Trigger any necessary lazy-load mutations before snapshotting.
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                let node = self
-                    .lookup_class_or_load(fqcn.as_ref())
-                    .ok_or(crate::SymbolLookupError::NotFound)?;
-                let db = self.snapshot_db();
-                node.location(&db)
-                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+                let _ = self.lazy_load_class(fqcn.as_ref());
             }
             crate::Symbol::Function(fqn) => {
-                let db = self.snapshot_db();
-                let node = self
-                    .lookup_function_or_load(fqn.as_ref())
-                    .ok_or(crate::SymbolLookupError::NotFound)?;
-                node.location(&db)
-                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+                let _ = self.lazy_load_class(fqn.as_ref());
             }
-            crate::Symbol::Method { class, name }
-            | crate::Symbol::Property { class, name }
-            | crate::Symbol::ClassConstant { class, name } => {
-                // Ensure the owning class (and chain) is loaded before resolving
-                // inherited members. No-op if already indexed.
-                self.lookup_class_or_load_transitive(class.as_ref());
-                let db = self.snapshot_db();
-                crate::db::member_location_via_db(&db, class, name)
-                    .ok_or(crate::SymbolLookupError::NotFound)
+            crate::Symbol::Method { class, .. }
+            | crate::Symbol::Property { class, .. }
+            | crate::Symbol::ClassConstant { class, .. } => {
+                let _ = self.lazy_load_class(class.as_ref());
             }
-            crate::Symbol::GlobalConstant(_) => {
-                // Global constants don't currently store location info
-                Err(crate::SymbolLookupError::NoSourceLocation)
-            }
+            _ => {}
         }
+        self.definition_of_loaded(symbol)
     }
 
     /// Pure variant of [`Self::definition_of`]. Never invokes the
@@ -608,34 +630,20 @@ impl AnalysisSession {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                // Phase 4: pull path first; push-path fallback.
                 let here = crate::db::Fqcn::new(&db, fqcn.clone());
-                if let Some(class) = crate::db::find_class_like(&db, here) {
-                    return class
-                        .location()
-                        .cloned()
-                        .ok_or(crate::SymbolLookupError::NoSourceLocation);
-                }
-                let node = db
-                    .lookup_class_node(fqcn.as_ref())
-                    .filter(|n| n.active(&db))
+                let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                node.location(&db)
+                class
+                    .location()
+                    .cloned()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Function(fqn) => {
                 let here = crate::db::Fqcn::new(&db, fqn.clone());
-                if let Some(f) = crate::db::find_function(&db, here) {
-                    return f
-                        .location
-                        .clone()
-                        .ok_or(crate::SymbolLookupError::NoSourceLocation);
-                }
-                let node = db
-                    .lookup_function_node(fqn.as_ref())
-                    .filter(|n| n.active(&db))
+                let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                node.location(&db)
+                f.location
+                    .clone()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Method { class, name }
@@ -834,93 +842,117 @@ impl AnalysisSession {
         use crate::symbol::{DocumentSymbol, DocumentSymbolKind};
 
         let db = self.snapshot_db();
-        let mut out = Vec::new();
-        for symbol in db.symbols_defined_in_file(file) {
-            // Try class side first — covers Class / Interface / Trait / Enum.
-            if let Some(class_node) = db.lookup_class_node(symbol.as_ref()) {
-                if !class_node.active(&db) {
-                    continue;
-                }
-                let (kind, is_enum) = crate::db::class_kind_via_db(&db, symbol.as_ref())
-                    .map(|k| {
-                        let kind = if k.is_interface {
-                            DocumentSymbolKind::Interface
-                        } else if k.is_trait {
-                            DocumentSymbolKind::Trait
-                        } else if k.is_enum {
-                            DocumentSymbolKind::Enum
-                        } else {
-                            DocumentSymbolKind::Class
-                        };
-                        (kind, k.is_enum)
-                    })
-                    .unwrap_or((DocumentSymbolKind::Class, false));
+        let Some(sf) = db.lookup_source_file(file) else {
+            return Vec::new();
+        };
+        let defs = crate::db::collect_file_definitions(&db, sf);
+        let mut out: Vec<DocumentSymbol> = Vec::new();
 
-                // Build children: methods, properties, and class constants.
-                let mut children: Vec<DocumentSymbol> = Vec::new();
-                for m in db.class_own_methods(symbol.as_ref()) {
-                    if !m.active(&db) {
-                        continue;
-                    }
-                    children.push(DocumentSymbol {
-                        name: m.name(&db),
+        let class_children =
+            |methods: &indexmap::IndexMap<Arc<str>, Arc<mir_codebase::storage::MethodStorage>>,
+             props: Option<
+                &indexmap::IndexMap<Arc<str>, mir_codebase::storage::PropertyStorage>,
+            >,
+             consts: &indexmap::IndexMap<Arc<str>, mir_codebase::storage::ConstantStorage>,
+             is_enum: bool|
+             -> Vec<DocumentSymbol> {
+                let mut out: Vec<DocumentSymbol> = Vec::new();
+                for (_, m) in methods.iter() {
+                    out.push(DocumentSymbol {
+                        name: m.name.clone(),
                         kind: DocumentSymbolKind::Method,
-                        location: m.location(&db),
+                        location: m.location.clone(),
                         children: Vec::new(),
                     });
                 }
-                for p in db.class_own_properties(symbol.as_ref()) {
-                    if !p.active(&db) {
-                        continue;
+                if let Some(props) = props {
+                    for (_, p) in props.iter() {
+                        out.push(DocumentSymbol {
+                            name: p.name.clone(),
+                            kind: DocumentSymbolKind::Property,
+                            location: p.location.clone(),
+                            children: Vec::new(),
+                        });
                     }
-                    children.push(DocumentSymbol {
-                        name: p.name(&db),
-                        kind: DocumentSymbolKind::Property,
-                        location: p.location(&db),
-                        children: Vec::new(),
-                    });
                 }
-                for c in db.class_own_constants(symbol.as_ref()) {
-                    if !c.active(&db) {
-                        continue;
-                    }
-                    let const_kind = if is_enum {
-                        DocumentSymbolKind::EnumCase
-                    } else {
-                        DocumentSymbolKind::Constant
-                    };
-                    children.push(DocumentSymbol {
-                        name: c.name(&db),
+                let const_kind = if is_enum {
+                    DocumentSymbolKind::EnumCase
+                } else {
+                    DocumentSymbolKind::Constant
+                };
+                for (_, c) in consts.iter() {
+                    out.push(DocumentSymbol {
+                        name: c.name.clone(),
                         kind: const_kind,
-                        location: c.location(&db),
+                        location: c.location.clone(),
                         children: Vec::new(),
                     });
                 }
+                out
+            };
 
-                out.push(DocumentSymbol {
-                    name: symbol.clone(),
-                    kind,
-                    location: class_node.location(&db),
-                    children,
-                });
-                continue;
-            }
-            if let Some(fn_node) = db.lookup_function_node(symbol.as_ref()) {
-                if !fn_node.active(&db) {
-                    continue;
-                }
-                out.push(DocumentSymbol {
-                    name: symbol.clone(),
-                    kind: DocumentSymbolKind::Function,
-                    location: fn_node.location(&db),
+        for c in defs.slice.classes.iter() {
+            out.push(DocumentSymbol {
+                name: c.fqcn.clone(),
+                kind: DocumentSymbolKind::Class,
+                location: c.location.clone(),
+                children: class_children(
+                    &c.own_methods,
+                    Some(&c.own_properties),
+                    &c.own_constants,
+                    false,
+                ),
+            });
+        }
+        for i in defs.slice.interfaces.iter() {
+            out.push(DocumentSymbol {
+                name: i.fqcn.clone(),
+                kind: DocumentSymbolKind::Interface,
+                location: i.location.clone(),
+                children: class_children(&i.own_methods, None, &i.own_constants, false),
+            });
+        }
+        for t in defs.slice.traits.iter() {
+            out.push(DocumentSymbol {
+                name: t.fqcn.clone(),
+                kind: DocumentSymbolKind::Trait,
+                location: t.location.clone(),
+                children: class_children(
+                    &t.own_methods,
+                    Some(&t.own_properties),
+                    &t.own_constants,
+                    false,
+                ),
+            });
+        }
+        for e in defs.slice.enums.iter() {
+            let mut children = class_children(&e.own_methods, None, &e.own_constants, true);
+            for (_, case) in e.cases.iter() {
+                children.push(DocumentSymbol {
+                    name: case.name.clone(),
+                    kind: DocumentSymbolKind::EnumCase,
+                    location: case.location.clone(),
                     children: Vec::new(),
                 });
-                continue;
             }
-            // Constants and other top-level declarations: emit with no
-            // location info; consumers can still surface them in an outline.
             out.push(DocumentSymbol {
-                name: symbol,
+                name: e.fqcn.clone(),
+                kind: DocumentSymbolKind::Enum,
+                location: e.location.clone(),
+                children,
+            });
+        }
+        for f in defs.slice.functions.iter() {
+            out.push(DocumentSymbol {
+                name: f.fqn.clone(),
+                kind: DocumentSymbolKind::Function,
+                location: f.location.clone(),
+                children: Vec::new(),
+            });
+        }
+        for (name, _) in defs.slice.constants.iter() {
+            out.push(DocumentSymbol {
+                name: name.clone(),
                 kind: DocumentSymbolKind::Constant,
                 location: None,
                 children: Vec::new(),
@@ -933,23 +965,21 @@ impl AnalysisSession {
     /// the codebase. Case-insensitive lookup with optional leading backslash.
     pub fn contains_function(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
-        db.lookup_function_node(fqn).is_some_and(|n| n.active(&db))
+        crate::db::function_exists_via_db(&db, fqn)
     }
 
     /// Returns `true` if a class / interface / trait / enum with `fqcn` is
     /// registered and active in the codebase.
     pub fn contains_class(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
-        db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db))
+        crate::db::type_exists_via_db(&db, fqcn)
     }
 
     /// Returns `true` if `class` has a method named `name` registered. Method
     /// names are matched case-insensitively (PHP method dispatch semantics).
     pub fn contains_method(&self, class: &str, name: &str) -> bool {
         let db = self.snapshot_db();
-        let name_lower = name.to_ascii_lowercase();
-        db.lookup_method_node(class, &name_lower)
-            .is_some_and(|n| n.active(&db))
+        crate::db::has_method_in_chain(&db, class, name)
     }
 
     /// Try to resolve `fqcn` via PSR-4 and ingest the mapped file, returning
@@ -1575,73 +1605,78 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
         add_target(fqcn);
     }
 
-    for fqcn in db.symbols_defined_in_file(file) {
-        let Some(node) = db.lookup_class_node(fqcn.as_ref()) else {
-            continue;
-        };
-        if let Some(parent) = node.parent(db) {
-            add_target(parent.as_ref());
-        }
-        for iface in node.interfaces(db).iter() {
-            add_target(iface.as_ref());
-        }
-        for tr in node.traits(db).iter() {
-            add_target(tr.as_ref());
-        }
-
-        // Add types from properties
-        for prop in db.class_own_properties(fqcn.as_ref()).iter() {
-            if let Some(ty) = prop.ty(db) {
-                for named in extract_named_objects(&ty) {
-                    add_target(named.as_ref());
+    // Walk every class/interface/trait/enum/function defined in this file
+    // via the pull-path slice. Push-path lookup_*_node have been retired.
+    if let Some(sf) = db.lookup_source_file(file) {
+        let defs = crate::db::collect_file_definitions(db, sf);
+        for c in defs.slice.classes.iter() {
+            if let Some(p) = &c.parent {
+                add_target(p);
+            }
+            for iface in c.interfaces.iter() {
+                add_target(iface);
+            }
+            for tr in c.traits.iter() {
+                add_target(tr);
+            }
+            for prop in c.own_properties.values() {
+                if let Some(ty) = &prop.ty {
+                    for named in extract_named_objects(ty) {
+                        add_target(named.as_ref());
+                    }
+                }
+            }
+            for method in c.own_methods.values() {
+                for param in method.params.iter() {
+                    if let Some(ty) = &param.ty {
+                        for named in extract_named_objects(ty.as_ref()) {
+                            add_target(named.as_ref());
+                        }
+                    }
+                }
+                if let Some(rt) = method.return_type.as_deref() {
+                    for named in extract_named_objects(rt) {
+                        add_target(named.as_ref());
+                    }
                 }
             }
         }
-
-        // Add types from methods
-        for method in db.class_own_methods(fqcn.as_ref()).iter() {
-            // Parameter types
-            for param in method.params(db).iter() {
+        for i in defs.slice.interfaces.iter() {
+            for ext in i.extends.iter() {
+                add_target(ext);
+            }
+            for method in i.own_methods.values() {
+                for param in method.params.iter() {
+                    if let Some(ty) = &param.ty {
+                        for named in extract_named_objects(ty.as_ref()) {
+                            add_target(named.as_ref());
+                        }
+                    }
+                }
+                if let Some(rt) = method.return_type.as_deref() {
+                    for named in extract_named_objects(rt) {
+                        add_target(named.as_ref());
+                    }
+                }
+            }
+        }
+        for t in defs.slice.traits.iter() {
+            for tr in t.traits.iter() {
+                add_target(tr);
+            }
+        }
+        for f in defs.slice.functions.iter() {
+            for param in f.params.iter() {
                 if let Some(ty) = &param.ty {
                     for named in extract_named_objects(ty.as_ref()) {
                         add_target(named.as_ref());
                     }
                 }
             }
-            // Return type
-            if let Some(rt) = method.return_type(db) {
-                for named in extract_named_objects(rt.as_ref()) {
+            if let Some(rt) = f.return_type.as_deref() {
+                for named in extract_named_objects(rt) {
                     add_target(named.as_ref());
                 }
-            }
-        }
-    }
-
-    // Add types from global functions
-    for fqn in db.active_function_node_fqns() {
-        let Some(node) = db.lookup_function_node(fqn.as_ref()) else {
-            continue;
-        };
-        if let Some(file_of_fn) = db.symbol_defining_file(fqn.as_ref()) {
-            if file_of_fn.as_ref() != file {
-                continue;
-            }
-        } else {
-            continue;
-        }
-
-        // Parameter types
-        for param in node.params(db).iter() {
-            if let Some(ty) = &param.ty {
-                for named in extract_named_objects(ty.as_ref()) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-        // Return type
-        if let Some(rt) = node.return_type(db) {
-            for named in extract_named_objects(rt.as_ref()) {
-                add_target(named.as_ref());
             }
         }
     }
@@ -1657,4 +1692,46 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
     }
 
     targets
+}
+
+/// AST visitor that collects class FQCN references for PSR-4 preloading.
+/// Captures identifiers from `new X`, static calls / property / constant
+/// access, type hints, and `instanceof`. Does *not* normalize via PSR-4 /
+/// imports — callers run the raw string through `resolve_name_via_db`.
+fn collect_class_refs_from_ast(program: &php_ast::ast::Program<'_, '_>) -> Vec<String> {
+    use php_ast::ast::ExprKind;
+    use php_ast::visitor::{walk_program, Visitor};
+    use std::ops::ControlFlow;
+
+    struct V {
+        names: std::collections::HashSet<String>,
+    }
+    impl<'arena, 'src> Visitor<'arena, 'src> for V {
+        fn visit_expr(&mut self, expr: &php_ast::ast::Expr<'arena, 'src>) -> ControlFlow<()> {
+            match &expr.kind {
+                ExprKind::New(n) => {
+                    if let ExprKind::Identifier(name) = &n.class.kind {
+                        self.names.insert(name.to_string());
+                    }
+                }
+                ExprKind::StaticMethodCall(c) => {
+                    if let ExprKind::Identifier(name) = &c.class.kind {
+                        self.names.insert(name.to_string());
+                    }
+                }
+                ExprKind::ClassConstAccess(a) => {
+                    if let ExprKind::Identifier(name) = &a.class.kind {
+                        self.names.insert(name.to_string());
+                    }
+                }
+                _ => {}
+            }
+            php_ast::visitor::walk_expr(self, expr)
+        }
+    }
+    let mut v = V {
+        names: std::collections::HashSet::new(),
+    };
+    let _ = walk_program(&mut v, program);
+    v.names.into_iter().collect()
 }

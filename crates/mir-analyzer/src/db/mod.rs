@@ -182,7 +182,9 @@ pub use self::queries::{
 };
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
-pub use self::workspace::{workspace_classes, workspace_functions, WorkspaceRevision};
+pub use self::workspace::{
+    workspace_classes, workspace_fqcn_index, workspace_functions, FqcnIndex, WorkspaceRevision,
+};
 
 // Sub-modules
 mod ancestors;
