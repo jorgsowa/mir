@@ -455,6 +455,19 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     order.into()
 }
 
+/// Phase 4 helper: existence check for "does any ancestor of `fqcn`
+/// have a method named `name`?". Pull-first, push-fallback. Used for
+/// magic-method dispatch checks (`__call`, `__callstatic`,
+/// `__toString`, `__invoke`, `__get`, …) where callers only need
+/// a boolean. Phase 5 drops the push-fallback.
+pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool {
+    let here = Fqcn::new(db, Arc::<str>::from(fqcn));
+    if find_method_in_chain(db, here, name).is_some() {
+        return true;
+    }
+    crate::db::lookup_method_in_chain(db, fqcn, name).is_some()
+}
+
 /// Walk the inheritance chain of `fqcn` and return the first method
 /// matching `name` (case-insensitive PHP semantics), along with the FQCN
 /// of the class that declared it.

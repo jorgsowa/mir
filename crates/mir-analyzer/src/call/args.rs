@@ -606,8 +606,8 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             .any(|p| matches!(p, Atomic::TCallable { .. }))
         {
             let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
-            if crate::db::lookup_method_in_chain(ea.db, &resolved_arg, "__invoke").is_some()
-                || crate::db::lookup_method_in_chain(ea.db, arg_fqcn.as_ref(), "__invoke").is_some()
+            if crate::db::has_method_in_chain(ea.db, &resolved_arg, "__invoke")
+                || crate::db::has_method_in_chain(ea.db, arg_fqcn.as_ref(), "__invoke")
             {
                 return true;
             }
