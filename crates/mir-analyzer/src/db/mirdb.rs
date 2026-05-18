@@ -123,6 +123,10 @@ pub struct MirDb {
     /// handle on `Self`) because the handle is `Copy` and we need
     /// `MirDb: Clone`-friendly storage.
     inferred_return_types_input: Arc<parking_lot::RwLock<Option<InferredReturnTypes>>>,
+    /// Lazily-created [`WorkspaceRevision`] singleton input; bumped on
+    /// file add/remove so workspace-enumeration tracked queries
+    /// (`workspace_classes`, `workspace_functions`) invalidate.
+    workspace_revision_input: Arc<parking_lot::RwLock<Option<WorkspaceRevision>>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -387,6 +391,14 @@ impl MirDatabase for MirDb {
     fn inferred_return_types(&self) -> Option<InferredReturnTypes> {
         *self.inferred_return_types_input.read()
     }
+
+    fn workspace_revision(&self) -> Option<WorkspaceRevision> {
+        *self.workspace_revision_input.read()
+    }
+
+    fn all_source_files(&self) -> Vec<SourceFile> {
+        self.source_files.values().copied().collect()
+    }
 }
 
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
@@ -534,12 +546,33 @@ impl MirDb {
         }
         let sf = SourceFile::new(self, path.clone(), text);
         Arc::make_mut(&mut self.source_files).insert(path, sf);
+        self.bump_workspace_revision();
         sf
     }
 
     /// Remove the Salsa SourceFile handle for `path` from the registry.
     pub fn remove_source_file(&mut self, path: &str) {
-        Arc::make_mut(&mut self.source_files).remove(path);
+        if Arc::make_mut(&mut self.source_files).remove(path).is_some() {
+            self.bump_workspace_revision();
+        }
+    }
+
+    /// Bump the workspace revision so tracked `workspace_*` queries
+    /// reading it invalidate. Lazily creates the singleton input on
+    /// first call.
+    fn bump_workspace_revision(&mut self) {
+        use salsa::Setter as _;
+        let existing = *self.workspace_revision_input.read();
+        match existing {
+            Some(rev) => {
+                let cur = rev.revision(self);
+                rev.set_revision(self).to(cur.wrapping_add(1));
+            }
+            None => {
+                let rev = crate::db::WorkspaceRevision::new(self, 0);
+                *self.workspace_revision_input.write() = Some(rev);
+            }
+        }
     }
 
     /// Number of source files currently registered.
