@@ -9,6 +9,8 @@
 ///
 /// Magic methods (`__construct`, `__destruct`, `__toString`, etc.) and
 /// constructors are excluded because they are called implicitly.
+use std::sync::Arc;
+
 use mir_codebase::storage::Visibility;
 use mir_issues::{Issue, IssueKind, Location, Severity};
 
@@ -115,15 +117,37 @@ impl<'a> DeadCodeAnalyzer<'a> {
         }
 
         // --- Non-referenced free functions ---
+        // Phase 4: enumerate via workspace_functions (pull path) and
+        // fall back to active_function_node_fqns for fixtures not
+        // registered as SourceFiles. Phase 5 removes the fallback.
         let stub_vfs = StubVfs::new();
-        for fqn in self.db.active_function_node_fqns() {
-            let Some(node) = self.db.lookup_function_node(fqn.as_ref()) else {
-                continue;
+        let pull_fns: Vec<Arc<str>> = crate::db::workspace_functions(self.db)
+            .iter()
+            .cloned()
+            .collect();
+        let push_fns: Vec<Arc<str>> = self.db.active_function_node_fqns();
+        let mut seen: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
+        let fqns: Vec<Arc<str>> = pull_fns
+            .into_iter()
+            .chain(push_fns)
+            .filter(|f| seen.insert(f.clone()))
+            .collect();
+        for fqn in fqns {
+            // Prefer the pull-path snapshot for the function's location +
+            // short name; fall back to the push-path node.
+            let here = crate::db::Fqcn::new(self.db, fqn.clone());
+            let pulled = crate::db::find_function(self.db, here);
+            let (location, short_name) = if let Some(f) = pulled.as_ref() {
+                (f.location.clone(), f.short_name.to_string())
+            } else {
+                let Some(node) = self.db.lookup_function_node(fqn.as_ref()) else {
+                    continue;
+                };
+                if !node.active(self.db) {
+                    continue;
+                }
+                (node.location(self.db), node.short_name(self.db).to_string())
             };
-            if !node.active(self.db) {
-                continue;
-            }
-            let location = node.location(self.db);
             // Skip PHP built-in and extension functions loaded from stubs —
             // they are not user-defined dead code.
             if let Some(loc) = &location {
@@ -134,9 +158,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
             if !self.db.has_reference(fqn.as_ref()) {
                 let location = location_from_storage(&location);
                 issues.push(Issue::new(
-                    IssueKind::UnusedFunction {
-                        name: node.short_name(self.db).to_string(),
-                    },
+                    IssueKind::UnusedFunction { name: short_name },
                     location,
                 ));
             }
