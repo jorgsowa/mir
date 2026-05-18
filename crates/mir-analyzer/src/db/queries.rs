@@ -27,6 +27,16 @@ pub struct ClassKind {
 /// `MirDb::ingest_stub_slice`, so a `None` here means the type genuinely
 /// doesn't exist (or is inactive after a `deactivate_class_node` pass).
 pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
+    // Pull-first via ClassLike; push-fallback for tests with direct upsert.
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
+    if let Some(class) = crate::db::find_class_like(db, here) {
+        return Some(ClassKind {
+            is_interface: class.is_interface(),
+            is_trait: class.is_trait(),
+            is_enum: class.is_enum(),
+            is_abstract: class.is_abstract(),
+        });
+    }
     let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
     Some(ClassKind {
         is_interface: node.is_interface(db),
@@ -37,6 +47,10 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
 }
 
 pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
+    if crate::db::find_class_like(db, here).is_some() {
+        return true;
+    }
     db.lookup_class_node(fqcn).is_some_and(|n| n.active(db))
 }
 
@@ -105,6 +119,10 @@ pub fn class_template_params_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
 ) -> Option<Arc<[TemplateParam]>> {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqcn));
+    if let Some(class) = crate::db::find_class_like(db, here) {
+        return Some(Arc::from(class.template_params().to_vec()));
+    }
     let node = db.lookup_class_node(fqcn).filter(|n| n.active(db))?;
     Some(node.template_params(db))
 }
