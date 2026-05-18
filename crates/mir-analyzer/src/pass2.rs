@@ -36,15 +36,33 @@ fn lookup_function_node_for_decl(
     if let Some(n) = db.lookup_function_node(fn_name).filter(|n| n.active(db)) {
         return Some(n);
     }
-    for fqn in db.active_function_node_fqns() {
-        let short = fqn.as_ref().rsplit('\\').next().unwrap_or(fqn.as_ref());
+    // Phase 4: short-name scan via workspace_functions (pull) and
+    // active_function_node_fqns (push fallback). Dedupe.
+    let pull_fns = crate::db::workspace_functions(db);
+    let push_fns = db.active_function_node_fqns();
+    let mut seen: rustc_hash::FxHashSet<&str> = rustc_hash::FxHashSet::default();
+    let scan = |fqn: &str| -> Option<FunctionNode> {
+        let short = fqn.rsplit('\\').next().unwrap_or(fqn);
         if short == fn_name {
-            if let Some(n) = db
-                .lookup_function_node(fqn.as_ref())
-                .filter(|n| n.active(db))
-            {
-                return Some(n);
-            }
+            db.lookup_function_node(fqn).filter(|n| n.active(db))
+        } else {
+            None
+        }
+    };
+    for fqn in pull_fns.iter() {
+        if !seen.insert(fqn.as_ref()) {
+            continue;
+        }
+        if let Some(n) = scan(fqn.as_ref()) {
+            return Some(n);
+        }
+    }
+    for fqn in push_fns.iter() {
+        if !seen.insert(fqn.as_ref()) {
+            continue;
+        }
+        if let Some(n) = scan(fqn.as_ref()) {
+            return Some(n);
         }
     }
     None
