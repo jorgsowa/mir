@@ -149,6 +149,78 @@ impl ClassLike {
     pub fn is_class(&self) -> bool {
         matches!(self, ClassLike::Class(_))
     }
+
+    /// `use SomeTrait;` declarations on a class or trait body. Interfaces
+    /// and enums never have trait uses; they return an empty slice.
+    pub fn class_traits(&self) -> &[Arc<str>] {
+        match self {
+            ClassLike::Class(c) => &c.traits,
+            ClassLike::Trait(t) => &t.traits,
+            _ => &[],
+        }
+    }
+
+    /// `@mixin` FQCNs (class only).
+    pub fn mixins(&self) -> &[Arc<str>] {
+        match self {
+            ClassLike::Class(c) => &c.mixins,
+            _ => &[],
+        }
+    }
+
+    /// `@deprecated` docblock annotation, if present.
+    pub fn deprecated(&self) -> Option<&Arc<str>> {
+        match self {
+            ClassLike::Class(c) => c.deprecated.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Declared `@template` parameters.
+    pub fn template_params(&self) -> &[mir_codebase::storage::TemplateParam] {
+        match self {
+            ClassLike::Class(c) => &c.template_params,
+            ClassLike::Interface(i) => &i.template_params,
+            ClassLike::Trait(t) => &t.template_params,
+            ClassLike::Enum(_) => &[],
+        }
+    }
+
+    /// Source location of the declaration.
+    pub fn location(&self) -> Option<&mir_codebase::storage::Location> {
+        match self {
+            ClassLike::Class(c) => c.location.as_ref(),
+            ClassLike::Interface(i) => i.location.as_ref(),
+            ClassLike::Trait(t) => t.location.as_ref(),
+            ClassLike::Enum(e) => e.location.as_ref(),
+        }
+    }
+
+    /// Implemented interfaces (classes + enums; empty for interfaces and
+    /// traits — interfaces use `extends`, traits use `traits`).
+    pub fn interfaces(&self) -> &[Arc<str>] {
+        match self {
+            ClassLike::Class(c) => &c.interfaces,
+            ClassLike::Enum(e) => &e.interfaces,
+            _ => &[],
+        }
+    }
+
+    /// Parent class (Class only; None otherwise).
+    pub fn parent(&self) -> Option<&Arc<str>> {
+        match self {
+            ClassLike::Class(c) => c.parent.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// For backed enums: the scalar type they map to.
+    pub fn enum_scalar_type(&self) -> Option<&mir_types::Union> {
+        match self {
+            ClassLike::Enum(e) => e.scalar_type.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 /// Locate a plain `class` named `fqcn` defined in `file`. Returns `None`
