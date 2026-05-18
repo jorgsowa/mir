@@ -17,56 +17,50 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Look up the function in the database to get resolved parameter types
         let fn_name = decl.name.to_string();
+        // Phase 4: pull path (find_function) → fallback to push-path.
+        let resolve_fn =
+            |fqn: &str| -> Option<(Vec<mir_codebase::FnParam>, Option<mir_types::Union>)> {
+                let db = self.db;
+                let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
+                if let Some(f) = crate::db::find_function(db, here) {
+                    return Some((
+                        f.params.to_vec(),
+                        f.return_type.as_ref().map(|t| (**t).clone()),
+                    ));
+                }
+                db.lookup_function_node(fqn)
+                    .filter(|n| n.active(db))
+                    .map(|node| {
+                        (
+                            node.params(db).to_vec(),
+                            node.return_type(db).map(|t| (*t).clone()),
+                        )
+                    })
+            };
         let (params, return_ty) = if let Some(ns) = self.db.file_namespace(&self.file) {
             let fqn = format!("{}\\{}", ns, fn_name);
-            if let Some(node) = self
-                .db
-                .lookup_function_node(&fqn)
-                .filter(|n| n.active(self.db))
-            {
-                (
-                    node.params(self.db).to_vec(),
-                    node.return_type(self.db).map(|t| (*t).clone()),
-                )
+            if let Some(found) = resolve_fn(&fqn).or_else(|| resolve_fn(&fn_name)) {
+                found
             } else {
-                // Try global namespace
-                if let Some(node) = self
-                    .db
-                    .lookup_function_node(&fn_name)
-                    .filter(|n| n.active(self.db))
-                {
-                    (
-                        node.params(self.db).to_vec(),
-                        node.return_type(self.db).map(|t| (*t).clone()),
-                    )
-                } else {
-                    // Fallback to AST if not found in database
-                    let ast_params: Vec<mir_codebase::FnParam> = decl
-                        .params
-                        .iter()
-                        .map(|p| mir_codebase::FnParam {
-                            name: Arc::from(p.name.to_string().trim_start_matches('$')),
-                            ty: None,
-                            has_default: p.default.is_some(),
-                            is_variadic: p.variadic,
-                            is_byref: p.by_ref,
-                            is_optional: p.default.is_some() || p.variadic,
-                        })
-                        .collect();
-                    (ast_params, None)
-                }
+                // Fallback to AST if not found in database
+                let ast_params: Vec<mir_codebase::FnParam> = decl
+                    .params
+                    .iter()
+                    .map(|p| mir_codebase::FnParam {
+                        name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                        ty: None,
+                        has_default: p.default.is_some(),
+                        is_variadic: p.variadic,
+                        is_byref: p.by_ref,
+                        is_optional: p.default.is_some() || p.variadic,
+                    })
+                    .collect();
+                (ast_params, None)
             }
         } else {
             // No namespace
-            if let Some(node) = self
-                .db
-                .lookup_function_node(&fn_name)
-                .filter(|n| n.active(self.db))
-            {
-                (
-                    node.params(self.db).to_vec(),
-                    node.return_type(self.db).map(|t| (*t).clone()),
-                )
+            if let Some(found) = resolve_fn(&fn_name) {
+                found
             } else {
                 // Fallback to AST if not found in database
                 let ast_params: Vec<mir_codebase::FnParam> = decl
@@ -120,10 +114,15 @@ impl<'a> StatementsAnalyzer<'a> {
         let class_name = class_name_owned.as_str();
         let resolved = crate::db::resolve_name_via_db(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
-        let parent_fqcn = self
-            .db
-            .lookup_class_node(fqcn.as_ref())
-            .and_then(|node| node.parent(self.db));
+        // Phase 4: pull path first; push-path fallback for tests.
+        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        let parent_fqcn = crate::db::find_class_like(self.db, here)
+            .and_then(|c| c.parent().cloned())
+            .or_else(|| {
+                self.db
+                    .lookup_class_node(fqcn.as_ref())
+                    .and_then(|node| node.parent(self.db))
+            });
 
         let mut param_default_ctx = ctx.clone();
         param_default_ctx.self_fqcn = Some(fqcn.clone());

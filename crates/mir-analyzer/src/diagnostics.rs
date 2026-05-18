@@ -240,8 +240,14 @@ fn check_name_class_with_context(
 
     // Check if extending an interface
     if is_extends {
-        if let Some(node) = db.lookup_class_node(&resolved) {
-            if node.is_interface(db) {
+        // Phase 4: pull-path first; push-path fallback.
+        let here = crate::db::Fqcn::new(db, Arc::<str>::from(resolved.as_str()));
+        let is_iface = crate::db::find_class_like(db, here)
+            .map(|c| c.is_interface())
+            .or_else(|| db.lookup_class_node(&resolved).map(|n| n.is_interface(db)))
+            .unwrap_or(false);
+        if is_iface {
+            {
                 let span = name.span();
                 let (line, col_start) = offset_to_line_col(source, span.start, source_map);
                 let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
