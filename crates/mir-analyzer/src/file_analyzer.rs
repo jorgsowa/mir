@@ -86,6 +86,7 @@ impl<'a> FileAnalyzer<'a> {
         program: &Program<'_, '_>,
         source_map: &SourceMap,
     ) -> FileAnalysis {
+        crate::metrics::record_file_analysis();
         self.session.ensure_essential_stubs_loaded();
         self.session.ensure_stubs_for_ast(program);
 
@@ -108,29 +109,20 @@ impl<'a> FileAnalyzer<'a> {
             }
             let mut loaded_any = false;
             for fqcn in &unresolved {
-                if self
+                let resolved = self
                     .session
                     .lookup_class_or_load_transitive(fqcn.as_ref())
-                    .is_some()
-                {
+                    .is_some();
+                crate::metrics::record_lazy_load_attempt(resolved);
+                if resolved {
                     loaded_any = true;
                 }
             }
             if !loaded_any {
                 break;
             }
+            crate::metrics::record_retry_iteration();
             analysis = self.run_pass2(file.clone(), source, program, source_map);
-        }
-
-        // While the consumer is still scanning the workspace, the resolver
-        // doesn't yet have access to every file's symbols. Any `UndefinedClass`
-        // diagnostics that survived the lazy-load loop may resolve after later
-        // `set_workspace_files` calls — defer publishing them until the
-        // consumer flips `set_codebase_complete(true)` and re-runs analysis.
-        if !self.session.is_codebase_complete() {
-            analysis
-                .issues
-                .retain(|i| !matches!(i.kind, mir_issues::IssueKind::UndefinedClass { .. }));
         }
 
         analysis
@@ -145,6 +137,7 @@ impl<'a> FileAnalyzer<'a> {
         program: &Program<'_, '_>,
         source_map: &SourceMap,
     ) -> FileAnalysis {
+        let _scope = crate::metrics::Pass2Scope::new();
         let db = self.session.snapshot_db();
         let driver = Pass2Driver::new(&db, self.session.php_version());
         let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);

@@ -111,6 +111,26 @@ pub struct MirDb {
     pending_ref_locs: PendingRefLocs,
     /// File path → Salsa SourceFile input handle.
     source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
+    /// Side-channel resolver state. The `ResolverConfig` salsa input is
+    /// lazily created on first `set_resolver` call; its `revision` is
+    /// bumped on every subsequent change so dependent tracked queries
+    /// (e.g. `resolve_fqcn_to_path`) are invalidated. The `Arc<dyn
+    /// ClassResolver>` lives off-salsa because trait objects don't
+    /// participate in `salsa::Update`.
+    resolver_state: Arc<parking_lot::RwLock<ResolverState>>,
+}
+
+/// Resolver-related state held outside salsa storage. Wrapped in a
+/// `parking_lot::RwLock` so `MirDb::clone()` (cheap for parallel readers)
+/// shares one slot rather than copying.
+#[derive(Default)]
+struct ResolverState {
+    /// Lazily created on first `set_resolver`. Once created, the handle
+    /// is stable across clones and subsequent resolver swaps.
+    config: Option<ResolverConfig>,
+    /// Currently active resolver. `None` for sessions configured without
+    /// PSR-4 / classmap support.
+    resolver: Option<Arc<dyn crate::ClassResolver>>,
 }
 
 #[salsa::db]
@@ -350,6 +370,14 @@ impl MirDatabase for MirDb {
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
         self.source_files.get(path).copied()
     }
+
+    fn resolver_config(&self) -> Option<ResolverConfig> {
+        self.resolver_state.read().config
+    }
+
+    fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>> {
+        self.resolver_state.read().resolver.clone()
+    }
 }
 
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
@@ -454,6 +482,35 @@ impl MirDb {
     pub fn commit_pending_to_maps(&self) {
         let locs = std::mem::take(&mut *self.pending_ref_locs.0.lock());
         self.commit_reference_locations_batch(locs);
+    }
+
+    /// Install or replace the active class resolver.
+    ///
+    /// First call lazily creates the singleton [`ResolverConfig`] salsa
+    /// input (revision = 0); subsequent calls bump the revision so
+    /// downstream tracked queries (notably
+    /// [`crate::db::resolve_fqcn_to_path`]) are invalidated.
+    ///
+    /// `None` clears the resolver. The `ResolverConfig` input is *not*
+    /// removed — it remains as a versioned anchor, with revision bumped to
+    /// signal the change.
+    pub fn set_resolver(&mut self, resolver: Option<Arc<dyn crate::ClassResolver>>) {
+        use salsa::Setter as _;
+        // The lock and salsa storage are independent; we briefly read /
+        // briefly write the lock, but never hold it across a salsa setter
+        // call (which needs `&mut self`).
+        let existing = self.resolver_state.read().config;
+        match existing {
+            Some(c) => {
+                let current = c.revision(self);
+                c.set_revision(self).to(current.wrapping_add(1));
+            }
+            None => {
+                let c = ResolverConfig::new(self, 0);
+                self.resolver_state.write().config = Some(c);
+            }
+        }
+        self.resolver_state.write().resolver = resolver;
     }
 
     /// Create a new or update an existing Salsa SourceFile input for `path`.

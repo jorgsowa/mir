@@ -207,6 +207,7 @@ impl SharedDb {
             });
 
         if let Some((slice, _hash)) = cache_hit {
+            crate::metrics::record_stub_cache_hit();
             let file_defs = crate::db::FileDefinitions {
                 slice: Arc::new(slice),
                 issues: Arc::new(Vec::new()),
@@ -216,6 +217,7 @@ impl SharedDb {
             guard.ingest_stub_slice(&file_defs.slice);
             return file_defs;
         }
+        crate::metrics::record_stub_cache_miss();
 
         // ---- Phase 1: parse + collect outside the lock ---------------------
         let arena = crate::arena::create_parse_arena(source.len());

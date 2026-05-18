@@ -125,10 +125,28 @@ pub trait MirDatabase: salsa::Database {
 
     /// Return the Salsa SourceFile handle registered for `path`, if any.
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile>;
+
+    /// Return the singleton [`ResolverConfig`] input handle, if a resolver
+    /// has ever been attached via `MirDb::set_resolver`. Tracked queries
+    /// read `cfg.revision(db)` to anchor on the resolver's version so
+    /// they're invalidated when the resolver changes.
+    fn resolver_config(&self) -> Option<ResolverConfig>;
+
+    /// Return the current class resolver, if any. **Side channel** — this
+    /// read is not salsa-tracked. Tracked queries that consult this must
+    /// also read `resolver_config().revision(db)` so salsa correctly
+    /// invalidates on resolver swap.
+    fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
 pub use self::ancestors::*;
+pub use self::find_queries::{
+    class_ancestors_by_fqcn, class_in_file, enum_in_file, find_class_constant_in_chain,
+    find_class_constant_in_class, find_class_like, find_function, find_global_constant,
+    find_method_in_chain, find_method_in_class, find_property_in_chain, find_property_in_class,
+    function_in_file, global_constant_in_file, interface_in_file, trait_in_file, ClassLike,
+};
 #[allow(unused_imports)]
 pub use self::mirdb::{ClassNodeFields, MirDb};
 pub use self::nodes::*;
@@ -142,13 +160,16 @@ pub use self::queries::{
     InferredFileTypes,
 };
 pub use self::reference_locations::*;
+pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 
 // Sub-modules
 mod ancestors;
+mod find_queries;
 mod mirdb;
 mod nodes;
 mod queries;
 mod reference_locations;
+mod resolver;
 
 #[cfg(test)]
 pub mod tests;

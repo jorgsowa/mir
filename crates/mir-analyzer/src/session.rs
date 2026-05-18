@@ -61,18 +61,29 @@ pub struct AnalysisSession {
     /// The set may contain symbols with no current referencers; those are
     /// harmless — the `symbol_referencers_of` lookup returns empty.
     stale_defined_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
-    /// Negative cache: FQCNs the resolver has already failed to map, so
-    /// repeated `lookup_class_or_load` calls in a hot path don't re-attempt
-    /// resolution every time. Cleared whenever a file is ingested or
-    /// invalidated — any source change may add the missing symbol.
-    unresolvable_fqcns: Arc<RwLock<HashSet<Arc<str>>>>,
-    /// Whether the consumer considers the codebase view complete. Defaults
-    /// to `true`; LSP-style consumers flip it to `false` during the workspace
-    /// scan and back to `true` once registration is done. While `false`,
-    /// [`crate::FileAnalyzer::analyze`] suppresses `UndefinedClass`
-    /// diagnostics. See [`Self::set_codebase_complete`].
-    codebase_complete: Arc<std::sync::atomic::AtomicBool>,
+    /// Negative cache: FQCNs that `lookup_class_or_load` already failed on.
+    /// The value is the resolver-mapped path (when known) so eviction on
+    /// `set_file_text` / `ingest_file` is a path equality check rather than
+    /// re-running the resolver per entry. `None` means the resolver itself
+    /// couldn't map the FQCN; those entries survive file edits (no source
+    /// change makes a never-resolvable name resolvable).
+    /// Bounded to `UNRESOLVABLE_CACHE_CAP`; clears on overflow.
+    unresolvable_fqcns: UnresolvableCache,
+    /// Pluggable source-text provider for lazy-load. Defaults to filesystem
+    /// reads ([`crate::FsSourceProvider`]); LSPs swap in a VFS-backed
+    /// implementation so unsaved buffers override on-disk content.
+    source_provider: Arc<dyn crate::SourceProvider>,
 }
+
+/// FQCN → optional resolver-mapped path. See the field doc on
+/// `AnalysisSession::unresolvable_fqcns`.
+type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
+
+/// Cap on the negative-resolution cache. Sized to accommodate a large
+/// workspace's worth of genuinely-missing references without unbounded
+/// growth. On overflow the cache is cleared; the cost is a few extra
+/// resolver calls until it re-fills.
+const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
 impl AnalysisSession {
     /// Create a session targeting the given PHP language version.
@@ -87,37 +98,17 @@ impl AnalysisSession {
             user_stub_dirs: Vec::new(),
             reverse_dep_map: Arc::new(RwLock::new(HashMap::new())),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::new())),
-            unresolvable_fqcns: Arc::new(RwLock::new(HashSet::new())),
-            // Default: assume the consumer has already populated whatever it
-            // wants the session to know (CLI batch tools, tests).  LSP-style
-            // consumers should explicitly call `set_codebase_complete(false)`
-            // before their workspace scan, then `(true)` once it finishes.
-            codebase_complete: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            unresolvable_fqcns: Arc::new(RwLock::new(HashMap::new())),
+            source_provider: Arc::new(crate::FsSourceProvider),
         }
     }
 
-    /// Mark whether the session's view of the codebase is complete.
-    ///
-    /// Defaults to `true` (batch tools and tests are assumed to have already
-    /// populated everything they care about). LSP-style consumers should
-    /// set this to `false` at startup, populate the workspace via
-    /// [`Self::set_workspace_files`], then set it back to `true`.
-    ///
-    /// While `false`, [`crate::FileAnalyzer::analyze`] suppresses
-    /// `UndefinedClass` diagnostics for FQCNs the resolver cannot map —
-    /// they may yet resolve once more files are registered. After the flag
-    /// flips back to `true`, re-analyzing affected files publishes any
-    /// genuinely-missing symbols.
-    pub fn set_codebase_complete(&self, complete: bool) {
-        self.codebase_complete
-            .store(complete, std::sync::atomic::Ordering::Release);
-    }
-
-    /// Whether the session's view of the codebase is currently considered
-    /// complete (see [`Self::set_codebase_complete`]). Defaults to `false`.
-    pub fn is_codebase_complete(&self) -> bool {
-        self.codebase_complete
-            .load(std::sync::atomic::Ordering::Acquire)
+    /// Swap in a custom [`crate::SourceProvider`]. LSPs install a VFS-backed
+    /// provider here so the analyzer reads from unsaved editor buffers
+    /// instead of disk.
+    pub fn with_source_provider(mut self, provider: Arc<dyn crate::SourceProvider>) -> Self {
+        self.source_provider = provider;
+        self
     }
 
     /// Attach a pre-built [`AnalysisCache`] (the Pass-2 issue cache) and
@@ -165,7 +156,11 @@ impl AnalysisSession {
     pub fn with_psr4(mut self, map: Arc<Psr4Map>) -> Self {
         let resolver: Arc<dyn crate::ClassResolver> = map.clone();
         self.psr4 = Some(map);
-        self.resolver = Some(resolver);
+        self.resolver = Some(resolver.clone());
+        // Mirror into MirDb so salsa-tracked resolver queries
+        // (`db::resolve_fqcn_to_path`, Phase 2) see the same resolver and
+        // are invalidated on swap.
+        self.shared_db.salsa.write().set_resolver(Some(resolver));
         self
     }
 
@@ -173,6 +168,10 @@ impl AnalysisSession {
     /// (WordPress, Drupal, custom autoloaders, workspace-walk indexes).
     /// Replaces any previously-set Composer-backed resolver.
     pub fn with_class_resolver(mut self, resolver: Arc<dyn crate::ClassResolver>) -> Self {
+        self.shared_db
+            .salsa
+            .write()
+            .set_resolver(Some(resolver.clone()));
         self.resolver = Some(resolver);
         self
     }
@@ -468,7 +467,6 @@ impl AnalysisSession {
     ///     .map(|path| (path, fs::read(&path).unwrap()))
     ///     .collect();
     /// session.set_workspace_files(files);
-    /// // session.codebase_complete = true; (Phase 3)
     /// ```
     /// After this call, every file's source text is known to salsa. No
     /// parsing has happened yet — Pass 1 runs per file on the first
@@ -538,6 +536,11 @@ impl AnalysisSession {
     /// Resolve a top-level symbol (class or function) to its declaration
     /// location. Powers go-to-definition.
     ///
+    /// **Side effects:** if the symbol isn't yet known, this may invoke the
+    /// configured [`crate::SourceProvider`] to fault in additional files and
+    /// mutate the salsa input set. Use [`Self::definition_of_loaded`] for a
+    /// pure variant that only consults already-loaded state.
+    ///
     /// Returns:
     /// - `Ok(Location)` — symbol found with a source location
     /// - `Err(NotFound)` — no such symbol in the codebase
@@ -581,11 +584,52 @@ impl AnalysisSession {
         }
     }
 
+    /// Pure variant of [`Self::definition_of`]. Never invokes the
+    /// [`crate::SourceProvider`] and never mutates salsa inputs; resolves
+    /// only against state already loaded by `set_file_text` / `ingest_file`.
+    /// Returns `Err(NotFound)` when the symbol isn't in the loaded set, even
+    /// if a resolver could in principle map it.
+    pub fn definition_of_loaded(
+        &self,
+        symbol: &crate::Symbol,
+    ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
+        let db = self.snapshot_db();
+        match symbol {
+            crate::Symbol::Class(fqcn) => {
+                let node = db
+                    .lookup_class_node(fqcn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                node.location(&db)
+                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+            }
+            crate::Symbol::Function(fqn) => {
+                let node = db
+                    .lookup_function_node(fqn.as_ref())
+                    .filter(|n| n.active(&db))
+                    .ok_or(crate::SymbolLookupError::NotFound)?;
+                node.location(&db)
+                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
+            }
+            crate::Symbol::Method { class, name }
+            | crate::Symbol::Property { class, name }
+            | crate::Symbol::ClassConstant { class, name } => {
+                crate::db::member_location_via_db(&db, class, name)
+                    .ok_or(crate::SymbolLookupError::NotFound)
+            }
+            crate::Symbol::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
+        }
+    }
+
     /// Hover information for a symbol: type, docstring, and definition location.
     ///
     /// Use [`crate::FileAnalysis::symbol_at`] to find the symbol at a cursor
     /// position, then build a [`crate::Symbol`] from its `kind`. This method
     /// assembles the displayable hover data.
+    ///
+    /// **Side effects:** when `symbol`'s owning class isn't yet loaded, this
+    /// may invoke the configured [`crate::SourceProvider`] to fault in
+    /// dependencies. Use [`Self::hover_loaded`] for a pure variant.
     ///
     /// Returns `Err(NotFound)` if the symbol doesn't exist. May still return
     /// `Ok` with `docstring: None` or `definition: None` if those specific
@@ -594,7 +638,6 @@ impl AnalysisSession {
         &self,
         symbol: &crate::Symbol,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        use mir_types::{Atomic, Union};
         // Trigger lazy loading for class-rooted symbols before snapshotting.
         // No-op when the class is already known; ensures inherited member
         // lookups have the chain present.
@@ -609,6 +652,16 @@ impl AnalysisSession {
             }
             _ => {}
         }
+        self.hover_loaded(symbol)
+    }
+
+    /// Pure variant of [`Self::hover`]. Never invokes the
+    /// [`crate::SourceProvider`]; consults only the already-loaded db.
+    pub fn hover_loaded(
+        &self,
+        symbol: &crate::Symbol,
+    ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
+        use mir_types::{Atomic, Union};
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Function(fqn) => {
@@ -900,13 +953,16 @@ impl AnalysisSession {
     /// - The file can't be read, or
     /// - The file parsed but did not define `fqcn`.
     pub fn lazy_load_class(&self, fqcn: &str) -> bool {
+        use crate::metrics::{record_lazy_load_failure, LazyLoadFailure};
         if self.contains_class(fqcn) {
             return true;
         }
         let Some(resolver) = &self.resolver else {
+            record_lazy_load_failure(LazyLoadFailure::NoResolver, fqcn);
             return false;
         };
         let Some(path) = resolver.resolve(fqcn) else {
+            record_lazy_load_failure(LazyLoadFailure::ResolverNone, fqcn);
             return false;
         };
         let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
@@ -916,15 +972,21 @@ impl AnalysisSession {
         // same path.
         let src: Arc<str> = match self.source_of(&file) {
             Some(text) => text,
-            None => {
-                let Ok(disk_src) = std::fs::read_to_string(&path) else {
+            None => match self.source_provider.read(&path.to_string_lossy()) {
+                Some(text) => text,
+                None => {
+                    record_lazy_load_failure(LazyLoadFailure::SourceUnreadable, fqcn);
                     return false;
-                };
-                Arc::from(disk_src)
-            }
+                }
+            },
         };
         self.ingest_file(file, src);
-        self.contains_class(fqcn)
+        if self.contains_class(fqcn) {
+            true
+        } else {
+            record_lazy_load_failure(LazyLoadFailure::IngestThenMissing, fqcn);
+            false
+        }
     }
 
     /// Lazy-load every class transitively reachable from `fqcn` via parent /
@@ -979,37 +1041,27 @@ impl AnalysisSession {
         loaded
     }
 
-    /// Evict every negative-cache entry whose resolver-mapped path equals
-    /// `file`. FQCNs the resolver can't map are left alone — no source-text
-    /// change can make them resolvable.
+    /// Evict every negative-cache entry whose stored resolver-mapped path
+    /// equals `file`. FQCNs cached as never-resolvable (path `None`) are left
+    /// alone — no source-text change can make them resolvable.
     fn evict_unresolvable_for_file(&self, file: &str) {
-        let Some(resolver) = self.resolver.clone() else {
-            return;
-        };
         let mut cache = self.unresolvable_fqcns.write();
         if cache.is_empty() {
             return;
         }
-        cache.retain(|fqcn| match resolver.resolve(fqcn) {
-            Some(p) => p.to_string_lossy().as_ref() != file,
-            None => true,
-        });
+        cache.retain(|_fqcn, path| path.as_deref() != Some(file));
     }
 
-    /// Bulk variant. One resolver call per cached FQCN, comparing against a
-    /// `HashSet` of registered paths. Cheaper than calling
-    /// `evict_unresolvable_for_file` once per file in tight loops.
+    /// Bulk variant of [`Self::evict_unresolvable_for_file`]. One `HashSet`
+    /// build + one pass over the cache; no resolver calls.
     fn evict_unresolvable_for_files(&self, files: &[Arc<str>]) {
-        let Some(resolver) = self.resolver.clone() else {
-            return;
-        };
         let mut cache = self.unresolvable_fqcns.write();
         if cache.is_empty() {
             return;
         }
         let registered: HashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
-        cache.retain(|fqcn| match resolver.resolve(fqcn) {
-            Some(p) => !registered.contains(p.to_string_lossy().as_ref()),
+        cache.retain(|_fqcn, path| match path {
+            Some(p) => !registered.contains(p.as_ref()),
             None => true,
         });
     }
@@ -1034,11 +1086,23 @@ impl AnalysisSession {
                 return Some(node);
             }
         }
-        if self.unresolvable_fqcns.read().contains(fqcn) {
+        if self.unresolvable_fqcns.read().contains_key(fqcn) {
             return None;
         }
         if !self.lazy_load_class(fqcn) {
-            self.unresolvable_fqcns.write().insert(Arc::from(fqcn));
+            // Cache the failure with the resolver-mapped path (if any) so
+            // future file edits can selectively evict.
+            let resolved_path: Option<Arc<str>> = self
+                .resolver
+                .as_ref()
+                .and_then(|r| r.resolve(fqcn))
+                .map(|p| Arc::from(p.to_string_lossy().as_ref()));
+            let key: Arc<str> = Arc::from(fqcn);
+            let mut cache = self.unresolvable_fqcns.write();
+            if cache.len() >= UNRESOLVABLE_CACHE_CAP {
+                cache.clear();
+            }
+            cache.insert(key, resolved_path);
             return None;
         }
         let db = self.snapshot_db();

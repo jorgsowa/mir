@@ -12,6 +12,8 @@ pub(crate) mod diagnostics;
 pub(crate) mod expr;
 pub mod file_analyzer;
 pub(crate) mod generic;
+#[doc(hidden)]
+pub mod metrics;
 pub(crate) mod narrowing;
 #[doc(hidden)]
 pub mod parser;
@@ -20,6 +22,7 @@ pub mod php_version;
 pub mod project;
 pub mod session;
 pub(crate) mod shared_db;
+pub mod source_provider;
 pub(crate) mod stmt;
 #[doc(hidden)]
 pub mod stub_cache;
@@ -34,6 +37,7 @@ pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};
 pub use project::{AnalysisResult, ProjectAnalyzer};
 pub use session::AnalysisSession;
+pub use source_provider::{FsSourceProvider, SourceProvider};
 pub use stubs::{is_builtin_function, stub_files, StubVfs};
 
 // ============================================================================
