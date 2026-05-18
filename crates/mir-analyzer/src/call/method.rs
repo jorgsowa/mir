@@ -51,7 +51,17 @@ pub(super) fn resolve_method_from_db(
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
 
-    let inferred = node.inferred_return_type(db);
+    // Phase 4: read inferred-return-type from the salsa-pure input,
+    // keyed by (owner_fqcn, method_name_lower). Reading from the owner —
+    // not the call-site `fqcn` — preserves correctness for inherited
+    // methods. The map key is `name.to_ascii_lowercase()` to match how
+    // `commit_inferred_return_types` lowercases the name.
+    let name_lower = if name.chars().all(|c| !c.is_uppercase()) {
+        name.clone()
+    } else {
+        Arc::<str>::from(name.to_ascii_lowercase().as_str())
+    };
+    let inferred = crate::db::inferred_method_return_type(db, &owner_fqcn, &name_lower);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)

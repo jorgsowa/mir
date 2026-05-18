@@ -137,6 +137,11 @@ pub trait MirDatabase: salsa::Database {
     /// also read `resolver_config().revision(db)` so salsa correctly
     /// invalidates on resolver swap.
     fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>>;
+
+    /// Return the singleton [`InferredReturnTypes`] input, if the
+    /// inference sweep has ever committed. Pass-2 readers go through the
+    /// `inferred_*_return_type` helpers in `db::inferred_types`.
+    fn inferred_return_types(&self) -> Option<InferredReturnTypes>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
@@ -146,6 +151,10 @@ pub use self::find_queries::{
     find_class_constant_in_class, find_class_like, find_function, find_global_constant,
     find_method_in_chain, find_method_in_class, find_property_in_chain, find_property_in_class,
     function_in_file, global_constant_in_file, interface_in_file, trait_in_file, ClassLike,
+};
+pub use self::inferred_types::{
+    inferred_function_return_type, inferred_method_return_type, FunctionInferredMap,
+    InferredReturnTypes, MethodInferredMap,
 };
 #[allow(unused_imports)]
 pub use self::mirdb::{ClassNodeFields, MirDb};
@@ -165,6 +174,7 @@ pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, Resol
 // Sub-modules
 mod ancestors;
 mod find_queries;
+mod inferred_types;
 mod mirdb;
 mod nodes;
 mod queries;

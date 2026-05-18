@@ -32,7 +32,11 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    let inferred = node.inferred_return_type(db);
+    // Phase 4: read inferred-return-type from the salsa-pure input
+    // (db::inferred_function_return_type), not the node handle. The node
+    // still carries the field today for the dual-write transition, but
+    // this site no longer depends on it.
+    let inferred = crate::db::inferred_function_return_type(db, fqn);
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
