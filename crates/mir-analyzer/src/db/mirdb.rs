@@ -151,95 +151,52 @@ impl MirDatabase for MirDb {
         Arc::from("8.2")
     }
 
-    fn lookup_class_node(&self, fqcn: &str) -> Option<ClassNode> {
-        if let Some(&node) = self.class_nodes.get(fqcn) {
-            return Some(node);
-        }
-        let lower = fqcn.to_ascii_lowercase();
-        let canonical = self.class_node_keys_lower.get(&lower)?;
-        self.class_nodes.get(canonical.as_ref()).copied()
+    fn lookup_class_node(&self, _fqcn: &str) -> Option<ClassNode> {
+        None
     }
 
-    fn lookup_function_node(&self, fqn: &str) -> Option<FunctionNode> {
-        if let Some(&node) = self.function_nodes.get(fqn) {
-            return Some(node);
-        }
-        let lower = fqn.to_ascii_lowercase();
-        let canonical = self.function_node_keys_lower.get(&lower)?;
-        self.function_nodes.get(canonical.as_ref()).copied()
+    fn lookup_function_node(&self, _fqn: &str) -> Option<FunctionNode> {
+        None
     }
 
-    fn lookup_method_node(&self, fqcn: &str, method_name_lower: &str) -> Option<MethodNode> {
-        self.method_nodes
-            .get(fqcn)
-            .and_then(|m| m.get(method_name_lower).copied())
+    fn lookup_method_node(&self, _fqcn: &str, _method_name_lower: &str) -> Option<MethodNode> {
+        None
     }
 
-    fn lookup_property_node(&self, fqcn: &str, prop_name: &str) -> Option<PropertyNode> {
-        self.property_nodes
-            .get(fqcn)
-            .and_then(|m| m.get(prop_name).copied())
+    fn lookup_property_node(&self, _fqcn: &str, _prop_name: &str) -> Option<PropertyNode> {
+        None
     }
 
     fn lookup_class_constant_node(
         &self,
-        fqcn: &str,
-        const_name: &str,
+        _fqcn: &str,
+        _const_name: &str,
     ) -> Option<ClassConstantNode> {
-        self.class_constant_nodes
-            .get(fqcn)
-            .and_then(|m| m.get(const_name).copied())
+        None
     }
 
-    fn lookup_global_constant_node(&self, fqn: &str) -> Option<GlobalConstantNode> {
-        self.global_constant_nodes.get(fqn).copied()
+    fn lookup_global_constant_node(&self, _fqn: &str) -> Option<GlobalConstantNode> {
+        None
     }
 
-    fn class_own_methods(&self, fqcn: &str) -> Vec<MethodNode> {
-        self.method_nodes
-            .get(fqcn)
-            .map(|m| m.values().copied().collect())
-            .unwrap_or_default()
+    fn class_own_methods(&self, _fqcn: &str) -> Vec<MethodNode> {
+        vec![]
     }
 
-    fn class_own_properties(&self, fqcn: &str) -> Vec<PropertyNode> {
-        self.property_nodes
-            .get(fqcn)
-            .map(|m| m.values().copied().collect())
-            .unwrap_or_default()
+    fn class_own_properties(&self, _fqcn: &str) -> Vec<PropertyNode> {
+        vec![]
     }
 
-    fn class_own_constants(&self, fqcn: &str) -> Vec<ClassConstantNode> {
-        self.class_constant_nodes
-            .get(fqcn)
-            .map(|m| m.values().copied().collect())
-            .unwrap_or_default()
+    fn class_own_constants(&self, _fqcn: &str) -> Vec<ClassConstantNode> {
+        vec![]
     }
 
     fn active_class_node_fqcns(&self) -> Vec<Arc<str>> {
-        self.class_nodes
-            .iter()
-            .filter_map(|(fqcn, node)| {
-                if node.active(self) {
-                    Some(fqcn.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+        vec![]
     }
 
     fn active_function_node_fqns(&self) -> Vec<Arc<str>> {
-        self.function_nodes
-            .iter()
-            .filter_map(|(fqn, node)| {
-                if node.active(self) {
-                    Some(fqn.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+        vec![]
     }
 
     fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
