@@ -94,7 +94,12 @@ pub(crate) fn stub_path_for_function(name: &str) -> Option<&'static str> {
 /// Look up the stub virtual path that defines a built-in PHP class / interface
 /// / trait / enum. Lookup is case-insensitive. Strips a single leading
 /// backslash if present. Returns `None` if not a known built-in type.
-pub(crate) fn stub_path_for_class(fqcn: &str) -> Option<&'static str> {
+///
+/// Public so the [`StubClassResolver`] in this crate (used by
+/// `AnalysisSession` to make `find_class_like` aware of PHP built-ins)
+/// can reach it, and so LSP consumers building their own chained
+/// resolvers can compose it explicitly.
+pub fn stub_path_for_class(fqcn: &str) -> Option<&'static str> {
     let trimmed = fqcn.strip_prefix('\\').unwrap_or(fqcn);
     let lower = trimmed.to_ascii_lowercase();
     STUB_CLASS_INDEX
@@ -265,6 +270,23 @@ pub(crate) fn load_stubs(db: &mut MirDb) {
 /// PHP 8) gated by `@since`/`@removed` collapse to the one matching variant.
 #[allow(dead_code)]
 pub(crate) fn load_stubs_for_version(db: &mut MirDb, php_version: PhpVersion) {
+    // Built stubs in two parallel layers so both lookup paths see them:
+    //   1. `upsert_source_file` registers each stub's filename + content
+    //      as a salsa `SourceFile` input. With a stub-aware resolver in
+    //      place, `find_class_like` (the pull path) can then locate
+    //      built-in PHP classes by FQCN.
+    //   2. `ingest_stub_slice` populates the push-based FQCN→handle
+    //      index that Pass-2 still uses today. Goes away with Phase 5.
+    //
+    // Both paths consume the same bundled `STUB_FILES`, so the data
+    // they produce is identical. The double registration cost (~600 KB
+    // of `Arc<str>` clones and ~120 salsa input creations) is paid once
+    // per session.
+    for (filename, content) in STUB_FILES {
+        let arc_path: Arc<str> = Arc::from(*filename);
+        let arc_content: Arc<str> = Arc::from(*content);
+        db.upsert_source_file(arc_path, arc_content);
+    }
     for slice in builtin_stub_slices_for_version(php_version) {
         db.ingest_stub_slice(&slice);
     }
@@ -398,6 +420,58 @@ impl StubVfs {
 impl Default for StubVfs {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StubClassResolver — ClassResolver for bundled PHP built-in stubs
+// ---------------------------------------------------------------------------
+
+/// [`crate::ClassResolver`] that maps PHP built-in class FQCNs
+/// (`ArrayObject`, `Exception`, `ReflectionClass`, …) to the stub virtual
+/// path that defines them. Used by [`crate::ChainedClassResolver`] to
+/// make `find_class_like` aware of PHP built-ins in addition to the
+/// user's PSR-4 / classmap.
+///
+/// The returned paths are the same virtual paths used by [`StubVfs`] and
+/// matched against `MirDb`'s registered `SourceFile`s when stubs are
+/// loaded (see `load_stubs_for_version`, which calls `upsert_source_file`
+/// for each stub).
+pub struct StubClassResolver;
+
+impl crate::ClassResolver for StubClassResolver {
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+        stub_path_for_class(fqcn).map(std::path::PathBuf::from)
+    }
+}
+
+/// [`crate::ClassResolver`] composing a primary resolver (user's PSR-4 /
+/// classmap) with a fallback (typically [`StubClassResolver`]). The
+/// primary is consulted first; if it misses, the fallback is tried.
+///
+/// `AnalysisSession::with_psr4` and `with_class_resolver` automatically
+/// wrap the user-supplied resolver in this chain so PHP built-ins are
+/// resolvable through `resolve_fqcn_to_path` (and therefore
+/// `find_class_like`) without per-consumer setup.
+pub struct ChainedClassResolver {
+    primary: Arc<dyn crate::ClassResolver>,
+    fallback: Arc<dyn crate::ClassResolver>,
+}
+
+impl ChainedClassResolver {
+    pub fn new(
+        primary: Arc<dyn crate::ClassResolver>,
+        fallback: Arc<dyn crate::ClassResolver>,
+    ) -> Self {
+        Self { primary, fallback }
+    }
+}
+
+impl crate::ClassResolver for ChainedClassResolver {
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+        self.primary
+            .resolve(fqcn)
+            .or_else(|| self.fallback.resolve(fqcn))
     }
 }
 

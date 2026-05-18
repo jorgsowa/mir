@@ -38,7 +38,10 @@ pub use php_version::{ParsePhpVersionError, PhpVersion};
 pub use project::{AnalysisResult, ProjectAnalyzer};
 pub use session::AnalysisSession;
 pub use source_provider::{FsSourceProvider, SourceProvider};
-pub use stubs::{is_builtin_function, stub_files, StubVfs};
+pub use stubs::{
+    is_builtin_function, stub_files, stub_path_for_class, ChainedClassResolver, StubClassResolver,
+    StubVfs,
+};
 
 // ============================================================================
 // API Unification: ProjectAnalyzer and AnalysisSession
