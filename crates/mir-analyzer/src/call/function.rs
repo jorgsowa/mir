@@ -31,12 +31,28 @@ struct ResolvedFn {
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
-    let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    // Phase 4: read inferred-return-type from the salsa-pure input
-    // (db::inferred_function_return_type), not the node handle. The node
-    // still carries the field today for the dual-write transition, but
-    // this site no longer depends on it.
     let inferred = crate::db::inferred_function_return_type(db, fqn);
+    // Phase 4: pull path first; push-path fallback for tests / not-yet-
+    // SourceFile-registered fixtures. Phase 5 deletes the fallback.
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
+    if let Some(f) = crate::db::find_function(db, here) {
+        let return_ty_raw = f
+            .return_type
+            .clone()
+            .or(inferred)
+            .map(|t| (*t).clone())
+            .unwrap_or_else(Union::mixed);
+        return Some(ResolvedFn {
+            fqn: f.fqn.clone(),
+            deprecated: f.deprecated.clone(),
+            params: f.params.to_vec(),
+            template_params: f.template_params.clone(),
+            assertions: f.assertions.clone(),
+            return_ty_raw,
+            throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
+        });
+    }
+    let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
     let return_ty_raw = node
         .return_type(db)
         .or(inferred)
@@ -149,7 +165,9 @@ impl CallAnalyzer {
             };
             let fn_exists = |name: &str| -> bool {
                 let db = ea.db;
-                db.lookup_function_node(name).is_some_and(|n| n.active(db))
+                let here = crate::db::Fqcn::new(db, Arc::<str>::from(name));
+                crate::db::find_function(db, here).is_some()
+                    || db.lookup_function_node(name).is_some_and(|n| n.active(db))
             };
             if fn_exists(qualified.as_str()) {
                 qualified
@@ -215,12 +233,20 @@ impl CallAnalyzer {
             if let Some(arg) = call.args.first() {
                 if let ExprKind::String(name) = &arg.value.kind {
                     let fqn = name.strip_prefix('\\').unwrap_or(name);
-                    if let Some(node) = ea.db.lookup_function_node(fqn).filter(|n| n.active(ea.db))
-                    {
+                    let here = crate::db::Fqcn::new(ea.db, Arc::<str>::from(fqn));
+                    let canonical_fqn: Option<Arc<str>> = crate::db::find_function(ea.db, here)
+                        .map(|f| f.fqn.clone())
+                        .or_else(|| {
+                            ea.db
+                                .lookup_function_node(fqn)
+                                .filter(|n| n.active(ea.db))
+                                .map(|n| n.fqn(ea.db))
+                        });
+                    if let Some(canonical_fqn) = canonical_fqn {
                         if !ea.inference_only {
                             let (line, col_start, col_end) = ea.span_to_ref_loc(arg.span);
                             ea.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: Arc::from(node.fqn(ea.db).as_ref()),
+                                symbol_key: Arc::from(canonical_fqn.as_ref()),
                                 file: ea.file.clone(),
                                 line,
                                 col_start,
