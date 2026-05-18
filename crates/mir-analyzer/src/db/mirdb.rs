@@ -118,6 +118,11 @@ pub struct MirDb {
     /// ClassResolver>` lives off-salsa because trait objects don't
     /// participate in `salsa::Update`.
     resolver_state: Arc<parking_lot::RwLock<ResolverState>>,
+    /// Lazily-created singleton [`InferredReturnTypes`] input. Stored
+    /// alongside `resolver_state` (rather than as a bare salsa input
+    /// handle on `Self`) because the handle is `Copy` and we need
+    /// `MirDb: Clone`-friendly storage.
+    inferred_return_types_input: Arc<parking_lot::RwLock<Option<InferredReturnTypes>>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -377,6 +382,10 @@ impl MirDatabase for MirDb {
 
     fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>> {
         self.resolver_state.read().resolver.clone()
+    }
+
+    fn inferred_return_types(&self) -> Option<InferredReturnTypes> {
+        *self.inferred_return_types_input.read()
     }
 }
 
@@ -1133,12 +1142,25 @@ impl MirDb {
         methods: Vec<(Arc<str>, Arc<str>, mir_types::Union)>,
     ) {
         use salsa::Setter as _;
+
+        // Aggregate maps for the new salsa-input path. Built in lockstep
+        // with the legacy node-setter writes so the two paths stay
+        // consistent during the Phase-4 migration. Pass-2 readers will
+        // switch to the input one site at a time; once all are migrated,
+        // the legacy node writes go away (Phase 5).
+        let merged_functions = self.inferred_function_map_clone();
+        let merged_methods = self.inferred_method_map_clone();
+        let mut new_functions = (*merged_functions).clone();
+        let mut new_methods = (*merged_methods).clone();
+
         for (fqn, inferred) in functions {
+            let arc_inferred = Arc::new(inferred);
+            new_functions.insert(fqn.clone(), arc_inferred.clone());
             if let Some(&node) = self.function_nodes.get(fqn.as_ref()) {
                 if !node.active(self) {
                     continue;
                 }
-                let new = Some(Arc::new(inferred));
+                let new = Some(arc_inferred);
                 if node.inferred_return_type(self) == new {
                     continue;
                 }
@@ -1151,6 +1173,8 @@ impl MirDb {
             } else {
                 Arc::from(name.to_lowercase().as_str())
             };
+            let arc_inferred = Arc::new(inferred);
+            new_methods.insert((fqcn.clone(), name_lower.clone()), arc_inferred.clone());
             let node = self
                 .method_nodes
                 .get(fqcn.as_ref())
@@ -1160,11 +1184,54 @@ impl MirDb {
                 if !node.active(self) {
                     continue;
                 }
-                let new = Some(Arc::new(inferred));
+                let new = Some(arc_inferred);
                 if node.inferred_return_type(self) == new {
                     continue;
                 }
                 node.set_inferred_return_type(self).to(new);
+            }
+        }
+
+        self.set_inferred_return_types_input(Arc::new(new_functions), Arc::new(new_methods));
+    }
+
+    /// Snapshot the function inferred map from the singleton input, or an
+    /// empty map if the input hasn't been created yet.
+    fn inferred_function_map_clone(&self) -> Arc<crate::db::FunctionInferredMap> {
+        match *self.inferred_return_types_input.read() {
+            Some(input) => input.functions(self),
+            None => Arc::new(rustc_hash::FxHashMap::default()),
+        }
+    }
+
+    /// Snapshot the method inferred map from the singleton input, or an
+    /// empty map if the input hasn't been created yet.
+    fn inferred_method_map_clone(&self) -> Arc<crate::db::MethodInferredMap> {
+        match *self.inferred_return_types_input.read() {
+            Some(input) => input.methods(self),
+            None => Arc::new(rustc_hash::FxHashMap::default()),
+        }
+    }
+
+    /// Set / create the singleton [`crate::db::InferredReturnTypes`] input.
+    /// Lazily creates the input on first call (handle stored on
+    /// `inferred_return_types_input`); subsequent calls update the
+    /// existing handle via setters.
+    fn set_inferred_return_types_input(
+        &mut self,
+        functions: Arc<crate::db::FunctionInferredMap>,
+        methods: Arc<crate::db::MethodInferredMap>,
+    ) {
+        use salsa::Setter as _;
+        let existing = *self.inferred_return_types_input.read();
+        match existing {
+            Some(handle) => {
+                handle.set_functions(self).to(functions);
+                handle.set_methods(self).to(methods);
+            }
+            None => {
+                let handle = crate::db::InferredReturnTypes::new(self, functions, methods);
+                *self.inferred_return_types_input.write() = Some(handle);
             }
         }
     }
