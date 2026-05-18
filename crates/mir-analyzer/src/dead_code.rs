@@ -53,65 +53,141 @@ impl<'a> DeadCodeAnalyzer<'a> {
         // --- Private methods / properties on classes ---
         // Walk only class-kind nodes (not interfaces/traits/enums); private
         // members on the other kinds aren't subject to dead-code reporting.
-        for fqcn in self.db.active_class_node_fqcns() {
-            let Some(class_node) = self.db.lookup_class_node(fqcn.as_ref()) else {
-                continue;
+        //
+        // Phase 4: enumerate via workspace_classes + push-path
+        // active_class_node_fqcns for completeness; dedupe by FQCN.
+        // Phase 5 drops the push-path leg.
+        let pull_classes: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+            .iter()
+            .cloned()
+            .collect();
+        let push_classes: Vec<Arc<str>> = self.db.active_class_node_fqcns();
+        let mut seen_classes: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
+        let class_fqcns: Vec<Arc<str>> = pull_classes
+            .into_iter()
+            .chain(push_classes)
+            .filter(|f| seen_classes.insert(f.clone()))
+            .collect();
+
+        for fqcn in &class_fqcns {
+            // Prefer the pull-path snapshot; if missing, fall back to the
+            // push-path node. Both yield the same is-class predicate and
+            // own_methods / own_properties iteration shape.
+            let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+            let pulled = crate::db::find_class_like(self.db, here);
+            let is_class = match pulled.as_ref() {
+                Some(c) => c.is_class(),
+                None => self
+                    .db
+                    .lookup_class_node(fqcn.as_ref())
+                    .map(|n| {
+                        !n.is_interface(self.db) && !n.is_trait(self.db) && !n.is_enum(self.db)
+                    })
+                    .unwrap_or(false),
             };
-            if class_node.is_interface(self.db)
-                || class_node.is_trait(self.db)
-                || class_node.is_enum(self.db)
-            {
+            if !is_class {
                 continue;
             }
             let fqcn_str = fqcn.as_ref();
 
-            for method in self.db.class_own_methods(fqcn_str) {
-                if !method.active(self.db) {
-                    continue;
+            // Methods.
+            if let Some(class) = pulled.as_ref() {
+                for (name, method) in class.own_methods().iter() {
+                    if method.visibility != Visibility::Private {
+                        continue;
+                    }
+                    let name_lower = name.to_ascii_lowercase();
+                    if MAGIC_METHODS.contains(&name_lower.as_str()) {
+                        continue;
+                    }
+                    if !self.db.has_reference(&format!(
+                        "{}::{}",
+                        fqcn_str,
+                        name.to_ascii_lowercase()
+                    )) {
+                        let location = location_from_storage(&method.location);
+                        issues.push(Issue::new(
+                            IssueKind::UnusedMethod {
+                                class: fqcn_str.to_string(),
+                                method: name.to_string(),
+                            },
+                            location,
+                        ));
+                    }
                 }
-                if method.visibility(self.db) != Visibility::Private {
-                    continue;
-                }
-                let name = method.name(self.db);
-                let name_lower = name.to_lowercase();
-                if MAGIC_METHODS.contains(&name_lower.as_str()) {
-                    continue;
-                }
-                if !self
-                    .db
-                    .has_reference(&format!("{}::{}", fqcn_str, name.to_lowercase()))
-                {
-                    let location = location_from_storage(&method.location(self.db));
-                    issues.push(Issue::new(
-                        IssueKind::UnusedMethod {
-                            class: fqcn_str.to_string(),
-                            method: name.to_string(),
-                        },
-                        location,
-                    ));
+            } else {
+                for method in self.db.class_own_methods(fqcn_str) {
+                    if !method.active(self.db) {
+                        continue;
+                    }
+                    if method.visibility(self.db) != Visibility::Private {
+                        continue;
+                    }
+                    let name = method.name(self.db);
+                    let name_lower = name.to_lowercase();
+                    if MAGIC_METHODS.contains(&name_lower.as_str()) {
+                        continue;
+                    }
+                    if !self
+                        .db
+                        .has_reference(&format!("{}::{}", fqcn_str, name.to_lowercase()))
+                    {
+                        let location = location_from_storage(&method.location(self.db));
+                        issues.push(Issue::new(
+                            IssueKind::UnusedMethod {
+                                class: fqcn_str.to_string(),
+                                method: name.to_string(),
+                            },
+                            location,
+                        ));
+                    }
                 }
             }
 
-            for prop in self.db.class_own_properties(fqcn_str) {
-                if !prop.active(self.db) {
-                    continue;
+            // Properties.
+            if let Some(class) = pulled.as_ref() {
+                if let Some(props) = class.own_properties() {
+                    for (name, prop) in props.iter() {
+                        if prop.visibility != Visibility::Private {
+                            continue;
+                        }
+                        if !self
+                            .db
+                            .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
+                        {
+                            let location = location_from_storage(&prop.location);
+                            issues.push(Issue::new(
+                                IssueKind::UnusedProperty {
+                                    class: fqcn_str.to_string(),
+                                    property: name.to_string(),
+                                },
+                                location,
+                            ));
+                        }
+                    }
                 }
-                if prop.visibility(self.db) != Visibility::Private {
-                    continue;
-                }
-                let name = prop.name(self.db);
-                if !self
-                    .db
-                    .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
-                {
-                    let location = location_from_storage(&prop.location(self.db));
-                    issues.push(Issue::new(
-                        IssueKind::UnusedProperty {
-                            class: fqcn_str.to_string(),
-                            property: name.to_string(),
-                        },
-                        location,
-                    ));
+            } else {
+                for prop in self.db.class_own_properties(fqcn_str) {
+                    if !prop.active(self.db) {
+                        continue;
+                    }
+                    if prop.visibility(self.db) != Visibility::Private {
+                        continue;
+                    }
+                    let name = prop.name(self.db);
+                    if !self
+                        .db
+                        .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
+                    {
+                        let location = location_from_storage(&prop.location(self.db));
+                        issues.push(Issue::new(
+                            IssueKind::UnusedProperty {
+                                class: fqcn_str.to_string(),
+                                property: name.to_string(),
+                            },
+                            location,
+                        ));
+                    }
                 }
             }
         }
