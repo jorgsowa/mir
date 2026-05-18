@@ -638,3 +638,119 @@ fn ingest_file_maintains_reverse_dep_graph_for_session_callers() {
         "Child.php cache entry must have been evicted as a dependent of Base.php"
     );
 }
+
+/// Phase 2.4: `FileAnalyzer::analyze` self-loads referenced classes via the
+/// configured `ClassResolver`. The caller no longer has to enumerate class
+/// references and pre-load them before analysis — the post-Pass-2 lazy-load
+/// loop runs internally.
+///
+/// Setup: PSR-4 maps `App\` to a `src/` dir. `Lib.php` defines `App\Lib` and
+/// is **not** ingested; `Consumer.php` uses `App\Lib` and is analyzed
+/// directly. Pre-Phase-2.4 behaviour: `UndefinedClass: App\Lib`. After
+/// Phase 2.4: clean.
+#[test]
+fn file_analyzer_self_loads_psr4_classes_without_pre_enumeration() {
+    use std::fs;
+
+    let root = create_temp_dir("self_load");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+    fs::write(
+        root.path().join("src/Lib.php"),
+        "<?php\nnamespace App;\nclass Lib {\n    public function go(): void {}\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    let psr4 =
+        mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map creation");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+
+    // Consumer file references App\Lib without `use`. The session is told
+    // about *only* this file — Lib.php is never explicitly ingested.
+    let consumer_src =
+        "<?php\nfunction probe(): void {\n    $x = new \\App\\Lib();\n    $x->go();\n}\n";
+    let consumer_path: Arc<str> =
+        Arc::from(root.path().join("Consumer.php").to_string_lossy().as_ref());
+    session.ingest_file(consumer_path.clone(), Arc::from(consumer_src));
+
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, consumer_src);
+    let analyzer = FileAnalyzer::new(&session);
+    let result = analyzer.analyze(
+        consumer_path,
+        consumer_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let undefined: Vec<_> = result
+        .issues
+        .iter()
+        .filter(|i| matches!(i.kind.name(), "UndefinedClass" | "UndefinedMethod"))
+        .map(|i| (i.kind.name(), format!("{:?}", i.kind)))
+        .collect();
+    assert!(
+        undefined.is_empty(),
+        "FileAnalyzer must self-load App\\Lib via PSR-4 and resolve ->go(); got: {undefined:?}"
+    );
+}
+
+/// Phase 3: when `codebase_complete` is `false`, `FileAnalyzer::analyze`
+/// suppresses `UndefinedClass` diagnostics — they may become resolvable
+/// once the workspace scan finishes. Flipping the flag to `true` and
+/// re-analyzing publishes any genuinely-missing symbols.
+#[test]
+fn file_analyzer_suppresses_undefined_class_during_workspace_scan() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    // No PSR-4 resolver, no other files registered: NotDefined is genuinely
+    // missing. We're using this to drive the "scan in progress" UX, not to
+    // test resolver behaviour.
+    session.set_codebase_complete(false);
+
+    let src = "<?php\nfunction probe(): void { new NotDefined(); }\n";
+    let file: Arc<str> = Arc::from("<scan-test>");
+    session.ingest_file(file.clone(), Arc::from(src));
+
+    let arena = bumpalo::Bump::new();
+    let parsed = php_rs_parser::parse(&arena, src);
+    let analyzer = FileAnalyzer::new(&session);
+    let result_during_scan =
+        analyzer.analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+
+    let undefined_class_during_scan = result_during_scan
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedClass")
+        .count();
+    assert_eq!(
+        undefined_class_during_scan,
+        0,
+        "UndefinedClass must be suppressed while codebase_complete is false; got issues: {:?}",
+        result_during_scan
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
+    );
+
+    // Once the consumer flips the flag, the deferred diagnostic publishes.
+    session.set_codebase_complete(true);
+    let result_after_scan = analyzer.analyze(file, src, &parsed.program, &parsed.source_map);
+    let undefined_class_after_scan = result_after_scan
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedClass")
+        .count();
+    assert!(
+        undefined_class_after_scan > 0,
+        "UndefinedClass must publish once codebase_complete is true; got issues: {:?}",
+        result_after_scan
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
+    );
+}

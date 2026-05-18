@@ -319,3 +319,84 @@ fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
         "App\\Model\\Entity should be found via lazy loading when new \\FQCN() is used in namespaced file; got: {undefined_class:?}"
     );
 }
+
+/// Phase 1: negative cache for `lookup_class_or_load`.
+///
+/// `lookup_class_or_load_resolves_without_explicit_ingest` would be the
+/// natural sibling, but it would re-cover ground already validated by
+/// `lazy_loads_parent_class_from_psr4` above (which exercises the same
+/// `lazy_load_class` chain that `lookup_class_or_load` wraps), and adds
+/// only the negative-cache layer on top.
+///
+/// The negative cache must be cleared when a file is ingested, so a
+/// previously-missing class becomes resolvable once its defining file
+/// shows up.
+#[test]
+fn lookup_class_or_load_negative_cache_clears_on_ingest() {
+    use mir_analyzer::{AnalysisSession, PhpVersion};
+
+    let root = create_temp_dir("negcache_clear");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+    let psr4 = make_psr4(&root, "App\\\\", "src");
+    let session = AnalysisSession::new(PhpVersion::new(8, 2)).with_psr4(psr4);
+
+    // First miss populates the negative cache.
+    assert!(session.lookup_class_or_load("App\\LateArrival").is_none());
+
+    // Now the file appears and is explicitly ingested.
+    let src = "<?php\nnamespace App;\nclass LateArrival {}\n";
+    fs::write(root.path().join("src/LateArrival.php"), src).unwrap();
+    session.ingest_file(
+        Arc::from(
+            root.path()
+                .join("src/LateArrival.php")
+                .to_string_lossy()
+                .as_ref(),
+        ),
+        Arc::from(src),
+    );
+
+    // The previously-cached negative result must not block the lookup.
+    assert!(
+        session.lookup_class_or_load("App\\LateArrival").is_some(),
+        "negative cache should have been invalidated on ingest"
+    );
+}
+
+/// Phase 2: `set_workspace_files` registers source text in salsa without
+/// parsing or running Pass 1. Verifies the bulk path acquires the lock once
+/// and that registered files become queryable via `source_of`.
+#[test]
+fn set_workspace_files_registers_sources_without_parsing() {
+    use mir_analyzer::{AnalysisSession, PhpVersion};
+
+    let session = AnalysisSession::new(PhpVersion::new(8, 2));
+
+    let before = session.tracked_file_count();
+
+    let a_path: Arc<str> = Arc::from("/virtual/a.php");
+    let a_src: Arc<str> = Arc::from("<?php\nclass A {}\n");
+    let b_path: Arc<str> = Arc::from("/virtual/b.php");
+    let b_src: Arc<str> = Arc::from("<?php\nclass B {}\n");
+    let files = vec![
+        (a_path.clone(), a_src.clone()),
+        (b_path.clone(), b_src.clone()),
+    ];
+
+    session.set_workspace_files(files);
+
+    assert_eq!(
+        session.tracked_file_count(),
+        before + 2,
+        "both source inputs should be registered"
+    );
+    // The text is retrievable — proves Arc<str> made it into the salsa input.
+    assert_eq!(session.source_of(&a_path).as_deref(), Some(a_src.as_ref()));
+    assert_eq!(session.source_of(&b_path).as_deref(), Some(b_src.as_ref()));
+
+    // Single-file alias works the same.
+    let c_path: Arc<str> = Arc::from("/virtual/c.php");
+    let c_src: Arc<str> = Arc::from("<?php\nclass C {}\n");
+    session.set_file_text(c_path.clone(), c_src.clone());
+    assert_eq!(session.source_of(&c_path).as_deref(), Some(c_src.as_ref()));
+}

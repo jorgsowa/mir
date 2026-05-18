@@ -59,18 +59,26 @@ impl<'a> FileAnalyzer<'a> {
         Self { session }
     }
 
-    /// Single-pass Pass 2. Returns issues and per-expression resolved symbols.
+    /// Pass 2 with bounded post-pass lazy-load.
     ///
     /// Pass 2 runs against a cloned db snapshot — the lock is not held during
     /// analysis, so concurrent edits and reads on the session proceed without
     /// blocking on this call.
     ///
+    /// If Pass 2 emits `UndefinedClass` diagnostics for FQCNs the session's
+    /// resolver can map (PSR-4, classmap, etc.), the corresponding files are
+    /// lazy-ingested and Pass 2 is re-run. Bounded at 3 iterations to handle
+    /// transitive parent → grandparent loads while avoiding pathological
+    /// loops. The session's negative cache short-circuits repeated lookups
+    /// for genuinely-missing names.
+    ///
+    /// This means LSP consumers can call `analyze` for any file without
+    /// first enumerating its class references and pre-loading them — the
+    /// session resolves them on demand.
+    ///
     /// Stub loading: ensures the session's essentials are loaded, then auto-
     /// discovers any extension stubs (`imagecreate` → gd, `ReflectionClass` →
-    /// Reflection, …) referenced by `source` and lazy-ingests them. This
-    /// keeps essentials-only sessions correct without callers having to
-    /// enumerate stubs by hand. Call `ensure_all_stubs_loaded` once if the
-    /// consumer prefers eager loading instead.
+    /// Reflection, …) referenced by `source` and lazy-ingests them.
     pub fn analyze(
         &self,
         file: Arc<str>,
@@ -80,6 +88,63 @@ impl<'a> FileAnalyzer<'a> {
     ) -> FileAnalysis {
         self.session.ensure_essential_stubs_loaded();
         self.session.ensure_stubs_for_ast(program);
+
+        let mut analysis = self.run_pass2(file.clone(), source, program, source_map);
+
+        const MAX_LAZY_LOAD_ITERATIONS: usize = 3;
+        for _ in 0..MAX_LAZY_LOAD_ITERATIONS {
+            let unresolved: Vec<Arc<str>> = analysis
+                .issues
+                .iter()
+                .filter_map(|i| match &i.kind {
+                    mir_issues::IssueKind::UndefinedClass { name } => {
+                        Some(Arc::<str>::from(name.as_str()))
+                    }
+                    _ => None,
+                })
+                .collect();
+            if unresolved.is_empty() {
+                break;
+            }
+            let mut loaded_any = false;
+            for fqcn in &unresolved {
+                if self
+                    .session
+                    .lookup_class_or_load_transitive(fqcn.as_ref())
+                    .is_some()
+                {
+                    loaded_any = true;
+                }
+            }
+            if !loaded_any {
+                break;
+            }
+            analysis = self.run_pass2(file.clone(), source, program, source_map);
+        }
+
+        // While the consumer is still scanning the workspace, the resolver
+        // doesn't yet have access to every file's symbols. Any `UndefinedClass`
+        // diagnostics that survived the lazy-load loop may resolve after later
+        // `set_workspace_files` calls — defer publishing them until the
+        // consumer flips `set_codebase_complete(true)` and re-runs analysis.
+        if !self.session.is_codebase_complete() {
+            analysis
+                .issues
+                .retain(|i| !matches!(i.kind, mir_issues::IssueKind::UndefinedClass { .. }));
+        }
+
+        analysis
+    }
+
+    /// Inner Pass 2 invocation. Separate from `analyze` so the post-Pass-2
+    /// lazy-load loop can re-run it without re-paying the stub-loading cost.
+    fn run_pass2(
+        &self,
+        file: Arc<str>,
+        source: &str,
+        program: &Program<'_, '_>,
+        source_map: &SourceMap,
+    ) -> FileAnalysis {
         let db = self.session.snapshot_db();
         let driver = Pass2Driver::new(&db, self.session.php_version());
         let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
