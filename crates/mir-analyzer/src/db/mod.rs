@@ -142,6 +142,18 @@ pub trait MirDatabase: salsa::Database {
     /// inference sweep has ever committed. Pass-2 readers go through the
     /// `inferred_*_return_type` helpers in `db::inferred_types`.
     fn inferred_return_types(&self) -> Option<InferredReturnTypes>;
+
+    /// Return the singleton [`WorkspaceRevision`] input. Tracked
+    /// workspace-enumeration queries (`workspace_classes`,
+    /// `workspace_functions`) read its `revision` to anchor on
+    /// add/remove invalidations.
+    fn workspace_revision(&self) -> Option<WorkspaceRevision>;
+
+    /// Snapshot every registered SourceFile. Side channel — not
+    /// salsa-tracked; tracked queries that consult this must also
+    /// read `workspace_revision().revision(db)` so file add/remove
+    /// correctly invalidates results.
+    fn all_source_files(&self) -> Vec<SourceFile>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
@@ -170,6 +182,7 @@ pub use self::queries::{
 };
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
+pub use self::workspace::{workspace_classes, workspace_functions, WorkspaceRevision};
 
 // Sub-modules
 mod ancestors;
@@ -180,6 +193,7 @@ mod nodes;
 mod queries;
 mod reference_locations;
 mod resolver;
+mod workspace;
 
 #[cfg(test)]
 pub mod tests;
