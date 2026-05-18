@@ -1029,16 +1029,14 @@ impl<'a> Pass2Driver<'a> {
     /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
     /// `@psalm-require-implements` constraint declared on the traits it uses.
     fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
-        // Used-trait list, ancestor chain, and `@psalm-require-*` constraints
-        // all come from the salsa db.
-        let Some(node) = self.db.lookup_class_node(fqcn) else {
+        let here = crate::db::Fqcn::new(self.db, Arc::<str>::from(fqcn));
+        let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
-        let trait_list = node.traits(self.db);
-        let trait_locs = node.trait_use_locations(self.db);
-        let class_all_parents: Vec<Arc<str>> =
-            crate::db::class_ancestors(self.db, crate::db::Fqcn::new(self.db, node.fqcn(self.db)))
-                .0;
+        let trait_list: Vec<Arc<str>> = class.class_traits().to_vec();
+        let trait_locs: Vec<(Arc<str>, mir_codebase::storage::Location)> =
+            class.trait_use_locations().to_vec();
+        let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, here).0;
 
         for trait_fqcn in trait_list.iter() {
             // Derive short name from the FQCN's trailing segment.  Matches
@@ -1069,7 +1067,8 @@ impl<'a> Pass2Driver<'a> {
                     })
             };
 
-            let trait_node = match self.db.lookup_class_node(trait_fqcn.as_ref()) {
+            let trait_here = crate::db::Fqcn::new(self.db, trait_fqcn.clone());
+            let trait_class = match crate::db::find_class_like(self.db, trait_here) {
                 None => {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedTrait {
@@ -1079,14 +1078,13 @@ impl<'a> Pass2Driver<'a> {
                     ));
                     continue;
                 }
-                Some(n) if !n.active(self.db) => continue,
-                Some(n) => n,
+                Some(c) => c,
             };
 
-            if !trait_node.is_trait(self.db) {
-                let (article, kind) = if trait_node.is_interface(self.db) {
+            if !trait_class.is_trait() {
+                let (article, kind) = if trait_class.is_interface() {
                     ("an", "interface")
-                } else if trait_node.is_enum(self.db) {
+                } else if trait_class.is_enum() {
                     ("an", "enum")
                 } else {
                     ("a", "class")
@@ -1101,8 +1099,12 @@ impl<'a> Pass2Driver<'a> {
                 continue;
             }
 
-            let req_ext = trait_node.require_extends(self.db);
-            let req_impl = trait_node.require_implements(self.db);
+            let (req_ext, req_impl): (Vec<Arc<str>>, Vec<Arc<str>>) = match &trait_class {
+                crate::db::ClassLike::Trait(t) => {
+                    (t.require_extends.to_vec(), t.require_implements.to_vec())
+                }
+                _ => (vec![], vec![]),
+            };
             if req_ext.is_empty() && req_impl.is_empty() {
                 continue;
             }

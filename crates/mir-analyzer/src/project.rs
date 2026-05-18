@@ -429,6 +429,17 @@ impl ProjectAnalyzer {
         // Load user-configured stubs
         self.shared_db
             .ingest_user_stubs(&self.stub_files, &self.stub_dirs);
+
+        // Ensure a resolver is configured so pull-path lookups (`find_class_like`,
+        // `find_function`) can map built-in FQCNs to the stub VFS paths registered
+        // as SourceFile inputs above. If a PSR-4 / user resolver is already wired
+        // (e.g. via `from_composer`), it's chained with `StubClassResolver` at
+        // session-construction time elsewhere.
+        let mut guard = self.shared_db.salsa.write();
+        if guard.current_resolver().is_none() {
+            let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::StubClassResolver);
+            guard.set_resolver(Some(resolver));
+        }
     }
 
     fn collect_and_ingest_source(&self, file: Arc<str>, src: &str) -> FileDefinitions {

@@ -71,6 +71,62 @@ pub fn source_file_for_fqcn<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
 ) -> Option<crate::db::SourceFile> {
-    let path = resolve_fqcn_to_path(db, fqcn)?;
-    db.lookup_source_file(&path)
+    if let Some(path) = resolve_fqcn_to_path(db, fqcn) {
+        if let Some(sf) = db.lookup_source_file(&path) {
+            return Some(sf);
+        }
+    }
+    // Resolver miss / no resolver: scan registered SourceFiles for one that
+    // defines `fqcn`. Required for project-only classes (PSR-4 misses, or
+    // tests that register source files without a resolver).
+    let name = fqcn.name(db);
+    workspace_scan_for_fqcn(db, name.as_ref())
+}
+
+/// Linear scan of registered SourceFiles for one whose `collect_file_definitions`
+/// output declares `fqcn`. O(workspace_files); cached results in each
+/// `class_in_file` / `function_in_file` etc. tracked query keep repeated
+/// lookups cheap.
+fn workspace_scan_for_fqcn(db: &dyn MirDatabase, fqcn: &str) -> Option<crate::db::SourceFile> {
+    // Anchor on workspace revision so cache invalidates on add/remove.
+    if let Some(rev) = db.workspace_revision() {
+        let _ = rev.revision(db);
+    }
+    for file in db.all_source_files() {
+        let defs = crate::db::collect_file_definitions(db, file);
+        if defs
+            .slice
+            .classes
+            .iter()
+            .any(|c| c.fqcn.eq_ignore_ascii_case(fqcn))
+            || defs
+                .slice
+                .interfaces
+                .iter()
+                .any(|i| i.fqcn.eq_ignore_ascii_case(fqcn))
+            || defs
+                .slice
+                .traits
+                .iter()
+                .any(|t| t.fqcn.eq_ignore_ascii_case(fqcn))
+            || defs
+                .slice
+                .enums
+                .iter()
+                .any(|e| e.fqcn.eq_ignore_ascii_case(fqcn))
+            || defs
+                .slice
+                .functions
+                .iter()
+                .any(|f| f.fqn.eq_ignore_ascii_case(fqcn))
+            || defs
+                .slice
+                .constants
+                .iter()
+                .any(|(name, _)| name.as_ref() == fqcn)
+        {
+            return Some(file);
+        }
+    }
+    None
 }
