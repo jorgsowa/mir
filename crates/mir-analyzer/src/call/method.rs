@@ -46,16 +46,44 @@ pub(super) fn resolve_method_from_db(
 ) -> Option<ResolvedMethod> {
     let db = ea.db;
 
-    // Walk own → mixins → traits → ancestors via the canonical chain helper.
+    // Pull-first via find_method_in_chain; fall back to the push-path walker
+    // for test fixtures that register classes via direct upsert_class_node.
+    if let Some((owner_fqcn, storage)) = crate::db::find_method_in_chain(
+        db,
+        crate::db::Fqcn::new(db, fqcn.clone()),
+        method_name_lower,
+    ) {
+        let name = storage.name.clone();
+        let name_lower = if name.chars().all(|c| !c.is_uppercase()) {
+            name.clone()
+        } else {
+            Arc::<str>::from(name.to_ascii_lowercase().as_str())
+        };
+        let inferred = crate::db::inferred_method_return_type(db, &owner_fqcn, &name_lower);
+        let return_ty_raw = storage
+            .return_type
+            .clone()
+            .or(inferred)
+            .map(|t| (*t).clone())
+            .unwrap_or_else(Union::mixed);
+
+        return Some(ResolvedMethod {
+            owner_fqcn,
+            name,
+            visibility: storage.visibility,
+            deprecated: storage.deprecated.clone(),
+            is_internal: storage.is_internal,
+            params: storage.params.to_vec(),
+            template_params: storage.template_params.clone(),
+            return_ty_raw,
+            throws: storage.throws.clone().into(),
+        });
+    }
+
+    // Push-path fallback (test fixtures).
     let node = crate::db::lookup_method_in_chain(db, fqcn, method_name_lower)?;
     let owner_fqcn = node.fqcn(db);
     let name = node.name(db);
-
-    // Phase 4: read inferred-return-type from the salsa-pure input,
-    // keyed by (owner_fqcn, method_name_lower). Reading from the owner —
-    // not the call-site `fqcn` — preserves correctness for inherited
-    // methods. The map key is `name.to_ascii_lowercase()` to match how
-    // `commit_inferred_return_types` lowercases the name.
     let name_lower = if name.chars().all(|c| !c.is_uppercase()) {
         name.clone()
     } else {
