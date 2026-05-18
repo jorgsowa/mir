@@ -221,6 +221,62 @@ impl ClassLike {
             _ => None,
         }
     }
+
+    /// `extends` list (interfaces only; class uses `parent`).
+    pub fn extends(&self) -> &[Arc<str>] {
+        match self {
+            ClassLike::Interface(i) => &i.extends,
+            _ => &[],
+        }
+    }
+
+    /// `@extends Parent<T1, T2>` type args (class only).
+    pub fn extends_type_args(&self) -> &[mir_types::Union] {
+        match self {
+            ClassLike::Class(c) => &c.extends_type_args,
+            _ => &[],
+        }
+    }
+
+    /// `@implements Iface<T1, T2>` type args (class only).
+    pub fn implements_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Union>)] {
+        match self {
+            ClassLike::Class(c) => &c.implements_type_args,
+            _ => &[],
+        }
+    }
+
+    /// Per-`use SomeTrait;` declaration locations (class + trait).
+    pub fn trait_use_locations(&self) -> &[(Arc<str>, mir_codebase::storage::Location)] {
+        match self {
+            ClassLike::Class(c) => &c.trait_use_locations,
+            _ => &[],
+        }
+    }
+
+    /// Whether the class is `readonly` (PHP 8.2+).
+    pub fn is_readonly(&self) -> bool {
+        match self {
+            ClassLike::Class(c) => c.is_readonly,
+            _ => false,
+        }
+    }
+
+    /// Whether the class is marked `@internal`.
+    pub fn is_internal(&self) -> bool {
+        match self {
+            ClassLike::Class(c) => c.is_internal,
+            _ => false,
+        }
+    }
+
+    /// Backed-enum check (`enum Foo: int { ... }`).
+    pub fn is_backed_enum(&self) -> bool {
+        match self {
+            ClassLike::Enum(e) => e.scalar_type.is_some(),
+            _ => false,
+        }
+    }
 }
 
 /// Locate a plain `class` named `fqcn` defined in `file`. Returns `None`
