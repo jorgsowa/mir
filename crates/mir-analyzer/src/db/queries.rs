@@ -62,14 +62,15 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
                 }
             }
         }
+        // If the name is already a known FQCN (e.g. stored in TNamedObject by a prior
+        // resolution step), return it unchanged to avoid double-prepending the namespace.
         if type_exists_via_db(db, name) {
             return name.to_string();
         }
+        // Qualified name not yet in the DB (PSR-4 lazy-load will fire after this call):
+        // PHP always prepends the current namespace unconditionally.
         if let Some(ns) = db.file_namespace(file) {
-            let qualified = format!("{}\\{}", ns, name);
-            if type_exists_via_db(db, &qualified) {
-                return qualified;
-            }
+            return format!("{}\\{}", ns, name);
         }
         return name.to_string();
     }

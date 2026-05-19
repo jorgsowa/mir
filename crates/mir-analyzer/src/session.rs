@@ -1685,8 +1685,8 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 /// access, type hints, and `instanceof`. Does *not* normalize via PSR-4 /
 /// imports — callers run the raw string through `resolve_name_via_db`.
 fn collect_class_refs_from_ast(program: &php_ast::ast::Program<'_, '_>) -> Vec<String> {
-    use php_ast::ast::ExprKind;
-    use php_ast::visitor::{walk_program, Visitor};
+    use php_ast::ast::{BinaryOp, ExprKind, TypeHintKind};
+    use php_ast::visitor::{walk_catch_clause, walk_expr, walk_program, walk_type_hint, Visitor};
     use std::ops::ControlFlow;
 
     struct V {
@@ -1705,14 +1705,47 @@ fn collect_class_refs_from_ast(program: &php_ast::ast::Program<'_, '_>) -> Vec<S
                         self.names.insert(name.to_string());
                     }
                 }
+                ExprKind::StaticPropertyAccess(a) => {
+                    if let ExprKind::Identifier(name) = &a.class.kind {
+                        self.names.insert(name.to_string());
+                    }
+                }
                 ExprKind::ClassConstAccess(a) => {
                     if let ExprKind::Identifier(name) = &a.class.kind {
                         self.names.insert(name.to_string());
                     }
                 }
+                ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+                    if let ExprKind::Identifier(name) = &b.right.kind {
+                        self.names.insert(name.to_string());
+                    }
+                }
                 _ => {}
             }
-            php_ast::visitor::walk_expr(self, expr)
+            walk_expr(self, expr)
+        }
+
+        fn visit_type_hint(
+            &mut self,
+            hint: &php_ast::ast::TypeHint<'arena, 'src>,
+        ) -> ControlFlow<()> {
+            if let TypeHintKind::Named(name) = &hint.kind {
+                let s = name.to_string_repr().into_owned();
+                if !s.is_empty() {
+                    self.names.insert(s);
+                }
+            }
+            walk_type_hint(self, hint)
+        }
+
+        fn visit_catch_clause(
+            &mut self,
+            catch: &php_ast::ast::CatchClause<'arena, 'src>,
+        ) -> ControlFlow<()> {
+            for ty in catch.types.iter() {
+                self.names.insert(ty.to_string_repr().into_owned());
+            }
+            walk_catch_clause(self, catch)
         }
     }
     let mut v = V {
