@@ -700,89 +700,78 @@ impl AnalysisSession {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Function(fqn) => {
-                let node = db
-                    .lookup_function_node(fqn.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = node
-                    .return_type(&db)
-                    .map(|t| (*t).clone())
+                let ty = f
+                    .return_type
+                    .as_deref()
+                    .cloned()
                     .unwrap_or_else(Union::mixed);
-                let docstring = node.docstring(&db).map(|s| s.to_string());
-                let definition = node.location(&db);
+                let docstring = f.docstring.as_ref().map(|s| s.to_string());
                 Ok(crate::HoverInfo {
                     ty,
                     docstring,
-                    definition,
+                    definition: f.location.clone(),
                 })
             }
             crate::Symbol::Method { class, name } => {
-                let node = db
-                    .lookup_method_node(class.as_ref(), name.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, class.clone());
+                let (_, m) = crate::db::find_method_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = node
-                    .return_type(&db)
-                    .map(|t| (*t).clone())
+                let ty = m
+                    .return_type
+                    .as_deref()
+                    .cloned()
                     .unwrap_or_else(Union::mixed);
-                let docstring = node.docstring(&db).map(|s| s.to_string());
-                let definition = node.location(&db);
+                let docstring = m.docstring.as_ref().map(|s| s.to_string());
                 Ok(crate::HoverInfo {
                     ty,
                     docstring,
-                    definition,
+                    definition: m.location.clone(),
                 })
             }
             crate::Symbol::Class(fqcn) => {
-                let node = db
-                    .lookup_class_node(fqcn.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = Union::single(Atomic::TNamedObject {
                     fqcn: fqcn.clone(),
                     type_params: Vec::new(),
                 });
-                let definition = node.location(&db);
                 Ok(crate::HoverInfo {
                     ty,
                     docstring: None,
-                    definition,
+                    definition: class.location().cloned(),
                 })
             }
             crate::Symbol::Property { class, name } => {
-                let node = db
-                    .lookup_property_node(class.as_ref(), name.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, class.clone());
+                let (_, p) = crate::db::find_property_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = node.ty(&db).unwrap_or_else(Union::mixed);
-                let definition = node.location(&db);
+                let ty = p.ty.clone().unwrap_or_else(Union::mixed);
                 Ok(crate::HoverInfo {
                     ty,
                     docstring: None,
-                    definition,
+                    definition: p.location.clone(),
                 })
             }
             crate::Symbol::ClassConstant { class, name } => {
-                let node = db
-                    .lookup_class_constant_node(class.as_ref(), name.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, class.clone());
+                let (_, c) = crate::db::find_class_constant_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = node.ty(&db);
-                let definition = node.location(&db);
                 Ok(crate::HoverInfo {
-                    ty,
+                    ty: c.ty.clone(),
                     docstring: None,
-                    definition,
+                    definition: c.location.clone(),
                 })
             }
             crate::Symbol::GlobalConstant(fqn) => {
-                let node = db
-                    .lookup_global_constant_node(fqn.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let ty = crate::db::find_global_constant(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = node.ty(&db);
                 Ok(crate::HoverInfo {
-                    ty,
+                    ty: (*ty).clone(),
                     docstring: None,
                     definition: None,
                 })
@@ -1324,14 +1313,12 @@ impl AnalysisSession {
     /// only exposes the iterator.
     pub fn all_classes(&self) -> Vec<(Arc<str>, Option<mir_codebase::storage::Location>)> {
         let db = self.snapshot_db();
-        db.active_class_node_fqcns()
-            .into_iter()
+        crate::db::workspace_classes(&db)
+            .iter()
             .filter_map(|fqcn| {
-                let node = db.lookup_class_node(fqcn.as_ref())?;
-                if !node.active(&db) {
-                    return None;
-                }
-                Some((fqcn, node.location(&db)))
+                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                crate::db::find_class_like(&db, here)
+                    .map(|class| (fqcn.clone(), class.location().cloned()))
             })
             .collect()
     }
@@ -1340,14 +1327,11 @@ impl AnalysisSession {
     /// with their declaration location when available.
     pub fn all_functions(&self) -> Vec<(Arc<str>, Option<mir_codebase::storage::Location>)> {
         let db = self.snapshot_db();
-        db.active_function_node_fqns()
-            .into_iter()
+        crate::db::workspace_functions(&db)
+            .iter()
             .filter_map(|fqn| {
-                let node = db.lookup_function_node(fqn.as_ref())?;
-                if !node.active(&db) {
-                    return None;
-                }
-                Some((fqn, node.location(&db)))
+                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                crate::db::find_function(&db, here).map(|f| (fqn.clone(), f.location.clone()))
             })
             .collect()
     }
