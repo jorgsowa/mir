@@ -899,10 +899,11 @@ fn generic_ancestor_type_args_inner(
         return None;
     }
 
-    let node = ea.db.lookup_class_node(child).filter(|n| n.active(ea.db))?;
-    let parent = node.parent(ea.db);
-    let extends_type_args: Vec<Union> = node.extends_type_args(ea.db).to_vec();
-    let implements_type_args = node.implements_type_args(ea.db);
+    let here = crate::db::Fqcn::new(ea.db, std::sync::Arc::<str>::from(child));
+    let cl = crate::db::find_class_like(ea.db, here)?;
+    let parent = cl.parent().cloned();
+    let extends_type_args: Vec<Union> = cl.extends_type_args().to_vec();
+    let implements_type_args = cl.implements_type_args();
 
     for (iface, args) in implements_type_args.iter() {
         if iface.as_ref() == ancestor {

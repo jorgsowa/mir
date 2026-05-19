@@ -145,12 +145,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let here = crate::db::Fqcn::new(db, fqcn.clone());
                             let prop_info: Option<(bool, Option<Union>)> =
                                 crate::db::find_property_in_class(db, here, &prop_name)
-                                    .map(|p| (p.is_readonly, p.ty.clone()))
-                                    .or_else(|| {
-                                        db.lookup_property_node(fqcn, &prop_name)
-                                            .filter(|n| n.active(db))
-                                            .map(|n| (n.is_readonly(db), n.ty(db)))
-                                    });
+                                    .map(|p| (p.is_readonly, p.ty.clone()));
                             if let Some((is_readonly, prop_ty)) = prop_info {
                                 if is_readonly && !ctx.inside_constructor {
                                     self.emit(

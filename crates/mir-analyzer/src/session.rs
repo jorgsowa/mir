@@ -18,7 +18,7 @@ use parking_lot::RwLock;
 
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
-use crate::db::{ClassNode, FunctionNode, MirDatabase, MirDb, RefLoc};
+use crate::db::{MirDatabase, MirDb, RefLoc};
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 
@@ -1134,15 +1134,14 @@ impl AnalysisSession {
     ///
     /// Returns `None` if the class is not registered AND the resolver can't
     /// map `fqcn` to a readable file that defines it.
-    pub fn lookup_class_or_load(&self, fqcn: &str) -> Option<ClassNode> {
-        let db = self.snapshot_db();
-        if let Some(node) = db.lookup_class_node(fqcn) {
-            if node.active(&db) {
-                return Some(node);
-            }
+    /// Returns `true` if `fqcn` is resolvable (already loaded or lazily
+    /// loaded on this call). Returns `false` if resolution fails.
+    pub fn lookup_class_or_load(&self, fqcn: &str) -> bool {
+        if self.contains_class(fqcn) {
+            return true;
         }
         if self.unresolvable_fqcns.read().contains_key(fqcn) {
-            return None;
+            return false;
         }
         if !self.lazy_load_class(fqcn) {
             // Cache the failure with the resolver-mapped path (if any) so
@@ -1158,34 +1157,29 @@ impl AnalysisSession {
                 cache.clear();
             }
             cache.insert(key, resolved_path);
-            return None;
+            return false;
         }
-        let db = self.snapshot_db();
-        db.lookup_class_node(fqcn).filter(|n| n.active(&db))
+        true
     }
 
     /// Like [`Self::lookup_class_or_load`] but additionally walks the
     /// inheritance chain (parent + interfaces + traits) so subsequent
     /// member-lookup queries on the returned node have the full chain loaded.
-    /// Useful where you immediately follow up with method / property /
-    /// constant resolution that must consider inherited members.
-    pub fn lookup_class_or_load_transitive(&self, fqcn: &str) -> Option<ClassNode> {
-        let node = self.lookup_class_or_load(fqcn)?;
+    pub fn lookup_class_or_load_transitive(&self, fqcn: &str) -> bool {
+        if !self.lookup_class_or_load(fqcn) {
+            return false;
+        }
         // 10 mirrors the default depth used by analyze_dependents_of.
         self.lazy_load_class_transitive(fqcn, 10);
-        Some(node)
+        true
     }
 
-    /// Resolve `fqn` to its [`FunctionNode`] from the index.
-    ///
-    /// Currently has no resolver-driven slow path: PHP global functions are
-    /// not name-mapped to files by PSR-4. A future Phase 2 may add lazy
-    /// loading via `files`-autoload entries, but for now functions only
-    /// resolve if their defining file has been ingested. Returns `None`
-    /// otherwise.
-    pub fn lookup_function_or_load(&self, fqn: &str) -> Option<FunctionNode> {
+    /// Returns `true` if `fqn` is a known global function. No resolver-driven
+    /// slow path: functions are not name-mapped to files by PSR-4.
+    pub fn lookup_function_or_load(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
-        db.lookup_function_node(fqn).filter(|n| n.active(&db))
+        let here = crate::db::Fqcn::new(&db, std::sync::Arc::<str>::from(fqn));
+        crate::db::find_function(&db, here).is_some()
     }
 
     /// Retrieve the source text the session has registered for `file`, if

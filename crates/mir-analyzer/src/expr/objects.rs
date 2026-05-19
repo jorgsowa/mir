@@ -94,33 +94,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 n.class.span,
                             );
                         }
-                    } else if let Some(node) = self
-                        .db
-                        .lookup_class_node(fqcn.as_ref())
-                        .filter(|n| n.active(self.db))
-                    {
-                        // Push-path fallback for classes not yet
-                        // reachable via the pull path (test fixtures
-                        // that ingest without registering SourceFile).
-                        if node.is_abstract(self.db) {
-                            self.emit(
-                                IssueKind::AbstractInstantiation {
-                                    class: fqcn.to_string(),
-                                },
-                                Severity::Error,
-                                n.class.span,
-                            );
-                        }
-                        if let Some(msg) = node.deprecated(self.db) {
-                            self.emit(
-                                IssueKind::DeprecatedClass {
-                                    name: fqcn.to_string(),
-                                    message: Some(msg).filter(|m| !m.is_empty()),
-                                },
-                                Severity::Info,
-                                n.class.span,
-                            );
-                        }
                     }
                     let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
                     let ctor_params = crate::db::find_method_in_chain(
@@ -188,12 +161,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let here = crate::db::Fqcn::new(self.db, fqcn.clone());
                         let is_abstract_class = crate::db::find_class_like(self.db, here)
                             .map(|c| c.is_class() && c.is_abstract())
-                            .or_else(|| {
-                                self.db
-                                    .lookup_class_node(fqcn.as_ref())
-                                    .filter(|n| n.active(self.db))
-                                    .map(|n| n.is_abstract(self.db))
-                            })
                             .unwrap_or(false);
                         if is_abstract_class {
                             self.emit(
@@ -493,12 +460,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let here = crate::db::Fqcn::new(self.db, fqcn.clone());
                             if let Some(scalar_ty) = crate::db::find_class_like(self.db, here)
                                 .and_then(|c| c.enum_scalar_type().cloned())
-                                .or_else(|| {
-                                    self.db
-                                        .lookup_class_node(fqcn.as_ref())
-                                        .filter(|n| n.active(self.db))
-                                        .and_then(|n| n.enum_scalar_type(self.db))
-                                })
                             {
                                 return scalar_ty;
                             }

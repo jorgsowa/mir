@@ -52,21 +52,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
         });
     }
-    let node = db.lookup_function_node(fqn).filter(|n| n.active(db))?;
-    let return_ty_raw = node
-        .return_type(db)
-        .or(inferred)
-        .map(|t| (*t).clone())
-        .unwrap_or_else(Union::mixed);
-    Some(ResolvedFn {
-        fqn: node.fqn(db),
-        deprecated: node.deprecated(db),
-        params: node.params(db).to_vec(),
-        template_params: node.template_params(db).to_vec(),
-        assertions: node.assertions(db).to_vec(),
-        return_ty_raw,
-        throws: node.throws(db),
-    })
+    None
 }
 
 impl CallAnalyzer {
@@ -167,7 +153,6 @@ impl CallAnalyzer {
                 let db = ea.db;
                 let here = crate::db::Fqcn::new(db, Arc::<str>::from(name));
                 crate::db::find_function(db, here).is_some()
-                    || db.lookup_function_node(name).is_some_and(|n| n.active(db))
             };
             if fn_exists(qualified.as_str()) {
                 qualified
@@ -234,14 +219,8 @@ impl CallAnalyzer {
                 if let ExprKind::String(name) = &arg.value.kind {
                     let fqn = name.strip_prefix('\\').unwrap_or(name);
                     let here = crate::db::Fqcn::new(ea.db, Arc::<str>::from(fqn));
-                    let canonical_fqn: Option<Arc<str>> = crate::db::find_function(ea.db, here)
-                        .map(|f| f.fqn.clone())
-                        .or_else(|| {
-                            ea.db
-                                .lookup_function_node(fqn)
-                                .filter(|n| n.active(ea.db))
-                                .map(|n| n.fqn(ea.db))
-                        });
+                    let canonical_fqn: Option<Arc<str>> =
+                        crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
                     if let Some(canonical_fqn) = canonical_fqn {
                         if !ea.inference_only {
                             let (line, col_start, col_end) = ea.span_to_ref_loc(arg.span);

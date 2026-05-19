@@ -75,16 +75,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
             // own_methods / own_properties iteration shape.
             let here = crate::db::Fqcn::new(self.db, fqcn.clone());
             let pulled = crate::db::find_class_like(self.db, here);
-            let is_class = match pulled.as_ref() {
-                Some(c) => c.is_class(),
-                None => self
-                    .db
-                    .lookup_class_node(fqcn.as_ref())
-                    .map(|n| {
-                        !n.is_interface(self.db) && !n.is_trait(self.db) && !n.is_enum(self.db)
-                    })
-                    .unwrap_or(false),
-            };
+            let is_class = pulled.as_ref().map(|c| c.is_class()).unwrap_or(false);
             if !is_class {
                 continue;
             }
@@ -213,17 +204,10 @@ impl<'a> DeadCodeAnalyzer<'a> {
             // short name; fall back to the push-path node.
             let here = crate::db::Fqcn::new(self.db, fqn.clone());
             let pulled = crate::db::find_function(self.db, here);
-            let (location, short_name) = if let Some(f) = pulled.as_ref() {
-                (f.location.clone(), f.short_name.to_string())
-            } else {
-                let Some(node) = self.db.lookup_function_node(fqn.as_ref()) else {
-                    continue;
-                };
-                if !node.active(self.db) {
-                    continue;
-                }
-                (node.location(self.db), node.short_name(self.db).to_string())
+            let Some(f) = pulled.as_ref() else {
+                continue;
             };
+            let (location, short_name) = (f.location.clone(), f.short_name.to_string());
             // Skip PHP built-in and extension functions loaded from stubs —
             // they are not user-defined dead code.
             if let Some(loc) = &location {

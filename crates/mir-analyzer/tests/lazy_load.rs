@@ -341,7 +341,7 @@ fn lookup_class_or_load_negative_cache_clears_on_ingest() {
     let session = AnalysisSession::new(PhpVersion::new(8, 2)).with_psr4(psr4);
 
     // First miss populates the negative cache.
-    assert!(session.lookup_class_or_load("App\\LateArrival").is_none());
+    assert!(!session.lookup_class_or_load("App\\LateArrival"));
 
     // Now the file appears and is explicitly ingested.
     let src = "<?php\nnamespace App;\nclass LateArrival {}\n";
@@ -358,7 +358,7 @@ fn lookup_class_or_load_negative_cache_clears_on_ingest() {
 
     // The previously-cached negative result must not block the lookup.
     assert!(
-        session.lookup_class_or_load("App\\LateArrival").is_some(),
+        session.lookup_class_or_load("App\\LateArrival"),
         "negative cache should have been invalidated on ingest"
     );
 }

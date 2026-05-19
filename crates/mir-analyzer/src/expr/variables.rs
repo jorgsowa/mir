@@ -87,26 +87,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             .file_namespace(self.file.as_ref())
             .map(|ns| format!("{}\\{}", ns, name_str));
 
-        // Phase 4: try the pull path first (find_global_constant), then
-        // the push-path lookup_global_constant_node as fallback. Phase 5
-        // deletes the fallback.
         let resolve_pull = |fqn: &str| -> Option<mir_types::Union> {
             let here = crate::db::Fqcn::new(self.db, Arc::<str>::from(fqn));
             crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
-        };
-        let resolve_push = |fqn: &str| -> Option<mir_types::Union> {
-            self.db
-                .lookup_global_constant_node(fqn)
-                .filter(|n| n.active(self.db))
-                .map(|n| n.ty(self.db))
         };
 
         let ty = ns_qualified
             .as_deref()
             .and_then(resolve_pull)
-            .or_else(|| resolve_pull(name_str))
-            .or_else(|| ns_qualified.as_deref().and_then(resolve_push))
-            .or_else(|| resolve_push(name_str));
+            .or_else(|| resolve_pull(name_str));
 
         if let Some(ty) = ty {
             ty
