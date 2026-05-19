@@ -127,6 +127,14 @@ pub struct MirDb {
     /// file add/remove so workspace-enumeration tracked queries
     /// (`workspace_classes`, `workspace_functions`) invalidate.
     workspace_revision_input: Arc<parking_lot::RwLock<Option<WorkspaceRevision>>>,
+    /// Paths of user-provided stub files (registered via `ingest_user_stubs`).
+    /// Used by `workspace_symbol_index` to give user stubs priority over
+    /// native stubs when two files define the same symbol.
+    user_stub_paths: Arc<parking_lot::RwLock<rustc_hash::FxHashSet<Arc<str>>>>,
+    /// Target PHP version for this analysis run. Defaults to "8.2".
+    /// Set once before any analysis begins; read by `collect_file_definitions`
+    /// to filter `@since`/`@removed` stub symbols.
+    php_version: Arc<parking_lot::RwLock<Arc<str>>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -167,6 +175,8 @@ impl Default for MirDb {
             resolver_state: Arc::default(),
             inferred_return_types_input: Arc::default(),
             workspace_revision_input: Arc::default(),
+            user_stub_paths: Arc::default(),
+            php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
         };
         db.init_workspace_revision();
         db
@@ -179,7 +189,7 @@ impl salsa::Database for MirDb {}
 #[salsa::db]
 impl MirDatabase for MirDb {
     fn php_version_str(&self) -> Arc<str> {
-        Arc::from("8.2")
+        self.php_version.read().clone()
     }
 
     fn lookup_class_node(&self, _fqcn: &str) -> Option<ClassNode> {
@@ -387,6 +397,15 @@ impl MirDatabase for MirDb {
     fn all_source_files(&self) -> Vec<SourceFile> {
         self.source_files.values().copied().collect()
     }
+
+    fn user_stub_source_files(&self) -> Vec<SourceFile> {
+        let user_paths = self.user_stub_paths.read();
+        self.source_files
+            .iter()
+            .filter(|(path, _)| user_paths.contains(path.as_ref()))
+            .map(|(_, &sf)| sf)
+            .collect()
+    }
 }
 
 /// Field bag for [`MirDb::upsert_class_node`].  Construct with `..Default::default()`
@@ -500,6 +519,24 @@ impl MirDb {
     /// downstream tracked queries (notably
     /// [`crate::db::resolve_fqcn_to_path`]) are invalidated.
     ///
+    /// Mark a file path as a user-provided stub so `workspace_symbol_index`
+    /// gives it priority over native stubs for the same symbol.
+    pub fn register_user_stub_path(&self, path: Arc<str>) {
+        self.user_stub_paths.write().insert(path);
+    }
+
+    /// Returns `true` if `file` was registered as a user stub.
+    pub fn is_user_stub_file(&self, file: SourceFile, db: &dyn crate::db::MirDatabase) -> bool {
+        self.user_stub_paths.read().contains(file.path(db).as_ref())
+    }
+
+    /// Update the target PHP version for `@since`/`@removed` filtering in
+    /// `collect_file_definitions`. Must be called before any stub files are
+    /// registered so the salsa cache sees consistent results.
+    pub fn set_php_version(&mut self, version: Arc<str>) {
+        *self.php_version.write() = version;
+    }
+
     /// `None` clears the resolver. The `ResolverConfig` input is *not*
     /// removed — it remains as a versioned anchor, with revision bumped to
     /// signal the change.

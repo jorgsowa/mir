@@ -408,6 +408,13 @@ impl ProjectAnalyzer {
     pub fn load_stubs(&self) {
         let php_version = self.resolved_php_version();
 
+        // Wire the PHP version into the db before any SourceFile inputs are
+        // registered — collect_file_definitions reads it for @since/@removed filtering.
+        {
+            let version_str = Arc::from(php_version.to_string().as_str());
+            self.shared_db.salsa.write().set_php_version(version_str);
+        }
+
         // Load all built-in stubs for the configured PHP version
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
         self.shared_db.ingest_stub_paths(&paths, php_version);

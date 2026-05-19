@@ -154,6 +154,11 @@ pub trait MirDatabase: salsa::Database {
     /// read `workspace_revision().revision(db)` so file add/remove
     /// correctly invalidates results.
     fn all_source_files(&self) -> Vec<SourceFile>;
+
+    /// Return the subset of registered SourceFile inputs that are user-provided
+    /// stubs. Used by `workspace_symbol_index` to give user stubs priority
+    /// over native stubs for the same symbol.
+    fn user_stub_source_files(&self) -> Vec<SourceFile>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.

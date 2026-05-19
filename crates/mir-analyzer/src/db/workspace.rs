@@ -192,6 +192,7 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let mut functions: FxHashMap<String, SymbolLoc> = FxHashMap::default();
     let mut constants: FxHashMap<String, SymbolLoc> = FxHashMap::default();
 
+    // First pass: all files with or_insert (first-write-wins for native stubs).
     for file in files.iter() {
         let defs = collect_file_definitions(db, *file);
         for (idx, c) in defs.slice.classes.iter().enumerate() {
@@ -223,6 +224,44 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
             constants
                 .entry(name.to_string())
                 .or_insert(SymbolLoc::Constant { file: *file, idx });
+        }
+    }
+
+    // Second pass: user stubs overwrite native stubs for the same symbol.
+    for file in db.user_stub_source_files().iter() {
+        let defs = collect_file_definitions(db, *file);
+        for (idx, c) in defs.slice.classes.iter().enumerate() {
+            class_like.insert(
+                c.fqcn.to_ascii_lowercase(),
+                SymbolLoc::Class { file: *file, idx },
+            );
+        }
+        for (idx, i) in defs.slice.interfaces.iter().enumerate() {
+            class_like.insert(
+                i.fqcn.to_ascii_lowercase(),
+                SymbolLoc::Interface { file: *file, idx },
+            );
+        }
+        for (idx, t) in defs.slice.traits.iter().enumerate() {
+            class_like.insert(
+                t.fqcn.to_ascii_lowercase(),
+                SymbolLoc::Trait { file: *file, idx },
+            );
+        }
+        for (idx, e) in defs.slice.enums.iter().enumerate() {
+            class_like.insert(
+                e.fqcn.to_ascii_lowercase(),
+                SymbolLoc::Enum { file: *file, idx },
+            );
+        }
+        for (idx, f) in defs.slice.functions.iter().enumerate() {
+            functions.insert(
+                f.fqn.to_ascii_lowercase(),
+                SymbolLoc::Function { file: *file, idx },
+            );
+        }
+        for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
+            constants.insert(name.to_string(), SymbolLoc::Constant { file: *file, idx });
         }
     }
 
@@ -263,6 +302,28 @@ pub fn workspace_fqcn_index(db: &dyn MirDatabase) -> FqcnIndex {
         }
         for (name, _) in defs.slice.constants.iter() {
             constants.entry(name.to_string()).or_insert(*file);
+        }
+    }
+    // User stubs override native stubs for the same symbol.
+    for file in db.user_stub_source_files().iter() {
+        let defs = collect_file_definitions(db, *file);
+        for c in defs.slice.classes.iter() {
+            classes.insert(c.fqcn.to_ascii_lowercase(), *file);
+        }
+        for i in defs.slice.interfaces.iter() {
+            classes.insert(i.fqcn.to_ascii_lowercase(), *file);
+        }
+        for t in defs.slice.traits.iter() {
+            classes.insert(t.fqcn.to_ascii_lowercase(), *file);
+        }
+        for e in defs.slice.enums.iter() {
+            classes.insert(e.fqcn.to_ascii_lowercase(), *file);
+        }
+        for f in defs.slice.functions.iter() {
+            functions.insert(f.fqn.to_ascii_lowercase(), *file);
+        }
+        for (name, _) in defs.slice.constants.iter() {
+            constants.insert(name.to_string(), *file);
         }
     }
     FqcnIndex {
