@@ -140,8 +140,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
-                            // Phase 4: try pull path first; push-path
-                            // fallback for non-SourceFile classes (tests).
                             let here = crate::db::Fqcn::new(db, fqcn.clone());
                             let prop_info: Option<(bool, Option<Union>)> =
                                 crate::db::find_property_in_class(db, here, &prop_name)

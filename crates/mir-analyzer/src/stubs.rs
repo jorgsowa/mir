@@ -545,13 +545,6 @@ mod tests {
             .find(|cls| cls.fqcn.as_ref() == name)
     }
 
-    // PHP-version filtering for stub symbols was a push-path concern enforced
-    // in `ingest_stub_slice`; pull-path equivalent (filtering inside
-    // `class_in_file` / `function_in_file` based on a salsa-tracked
-    // `PhpVersion` input) is a follow-up. Tests for it removed during
-    // Phase 5 demolition — the underlying `@since` / `@removed` metadata
-    // is still parsed and stored in `StubSlice` for re-use.
-
     #[test]
     fn since_filter_applies_to_methods() {
         // Direct stub-slice probe — independent of which path is consulted
@@ -756,9 +749,6 @@ mod tests {
 
     #[test]
     fn stubs_coverage_counts() {
-        // Direct stub-slice probe — independent of which path stores the
-        // symbols at runtime. `function_count` / `type_count` /
-        // `constant_count` are push-path accessors removed in Phase 5.
         let mut fn_count = 0usize;
         let mut type_count = 0usize;
         let mut const_count = 0usize;
@@ -831,10 +821,12 @@ mod tests {
     #[test]
     fn symbol_to_file_paths_are_resolvable_via_stub_vfs() {
         let mut db = MirDb::default();
+        db.init_workspace_revision();
         load_stubs(&mut db);
         let vfs = StubVfs::new();
 
-        for symbol in db.active_function_node_fqns() {
+        let functions = crate::db::workspace_functions(&db);
+        for symbol in functions.iter() {
             let Some(path) = db.symbol_defining_file(symbol.as_ref()) else {
                 continue;
             };

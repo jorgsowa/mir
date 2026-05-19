@@ -1,20 +1,13 @@
-//! Phase 4 prep — salsa-pure storage for Pass-2-inferred return types.
+//! Salsa-pure storage for Pass-2-inferred return types.
 //!
-//! Currently inferred return types live on the `FunctionNode` /
-//! `MethodNode` salsa input handles (the push-based world), populated by
-//! `MirDb::commit_inferred_return_types` after the inference sweep. Those
-//! handles are being deleted in Phase 5; this module is the new home.
-//!
-//! Design: one singleton `#[salsa::input] InferredReturnTypes` per
-//! database, holding `Arc<FxHashMap>`s keyed by FQN (functions) and
-//! `(FQCN, name_lower)` tuples (methods). The input handle is created
-//! lazily on first commit and stored on `MirDb::inferred_return_types`.
-//! Salsa's ptr_eq update semantics make replacing the maps cheap when
-//! their contents are unchanged.
+//! One singleton `#[salsa::input] InferredReturnTypes` per database, holding
+//! `Arc<FxHashMap>`s keyed by FQN (functions) and `(FQCN, name_lower)` tuples
+//! (methods). The input handle is created lazily on first commit and stored on
+//! `MirDb::inferred_return_types`. Salsa's ptr_eq update semantics make
+//! replacing the maps cheap when their contents are unchanged.
 //!
 //! Pass-2 callers go through [`inferred_function_return_type`] /
-//! [`inferred_method_return_type`] rather than the `_node.inferred_return_type(db)`
-//! accessors that vanish with Phase 5.
+//! [`inferred_method_return_type`].
 
 use std::sync::Arc;
 

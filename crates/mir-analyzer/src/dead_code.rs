@@ -50,29 +50,14 @@ impl<'a> DeadCodeAnalyzer<'a> {
     pub fn analyze(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
 
-        // --- Private methods / properties on classes ---
-        // Walk only class-kind nodes (not interfaces/traits/enums); private
+        // Walk only plain classes (not interfaces/traits/enums); private
         // members on the other kinds aren't subject to dead-code reporting.
-        //
-        // Phase 4: enumerate via workspace_classes + push-path
-        // active_class_node_fqcns for completeness; dedupe by FQCN.
-        // Phase 5 drops the push-path leg.
-        let pull_classes: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+        let class_fqcns: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
             .cloned()
             .collect();
-        let push_classes: Vec<Arc<str>> = self.db.active_class_node_fqcns();
-        let mut seen_classes: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
-        let class_fqcns: Vec<Arc<str>> = pull_classes
-            .into_iter()
-            .chain(push_classes)
-            .filter(|f| seen_classes.insert(f.clone()))
-            .collect();
 
         for fqcn in &class_fqcns {
-            // Prefer the pull-path snapshot; if missing, fall back to the
-            // push-path node. Both yield the same is-class predicate and
-            // own_methods / own_properties iteration shape.
             let here = crate::db::Fqcn::new(self.db, fqcn.clone());
             let pulled = crate::db::find_class_like(self.db, here);
             let is_class = pulled.as_ref().map(|c| c.is_class()).unwrap_or(false);
@@ -106,33 +91,6 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         ));
                     }
                 }
-            } else {
-                for method in self.db.class_own_methods(fqcn_str) {
-                    if !method.active(self.db) {
-                        continue;
-                    }
-                    if method.visibility(self.db) != Visibility::Private {
-                        continue;
-                    }
-                    let name = method.name(self.db);
-                    let name_lower = name.to_lowercase();
-                    if MAGIC_METHODS.contains(&name_lower.as_str()) {
-                        continue;
-                    }
-                    if !self
-                        .db
-                        .has_reference(&format!("{}::{}", fqcn_str, name.to_lowercase()))
-                    {
-                        let location = location_from_storage(&method.location(self.db));
-                        issues.push(Issue::new(
-                            IssueKind::UnusedMethod {
-                                class: fqcn_str.to_string(),
-                                method: name.to_string(),
-                            },
-                            location,
-                        ));
-                    }
-                }
             }
 
             // Properties.
@@ -157,51 +115,16 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         }
                     }
                 }
-            } else {
-                for prop in self.db.class_own_properties(fqcn_str) {
-                    if !prop.active(self.db) {
-                        continue;
-                    }
-                    if prop.visibility(self.db) != Visibility::Private {
-                        continue;
-                    }
-                    let name = prop.name(self.db);
-                    if !self
-                        .db
-                        .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
-                    {
-                        let location = location_from_storage(&prop.location(self.db));
-                        issues.push(Issue::new(
-                            IssueKind::UnusedProperty {
-                                class: fqcn_str.to_string(),
-                                property: name.to_string(),
-                            },
-                            location,
-                        ));
-                    }
-                }
             }
         }
 
         // --- Non-referenced free functions ---
-        // Phase 4: enumerate via workspace_functions (pull path) and
-        // fall back to active_function_node_fqns for fixtures not
-        // registered as SourceFiles. Phase 5 removes the fallback.
         let stub_vfs = StubVfs::new();
-        let pull_fns: Vec<Arc<str>> = crate::db::workspace_functions(self.db)
+        let fqns: Vec<Arc<str>> = crate::db::workspace_functions(self.db)
             .iter()
             .cloned()
             .collect();
-        let push_fns: Vec<Arc<str>> = self.db.active_function_node_fqns();
-        let mut seen: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
-        let fqns: Vec<Arc<str>> = pull_fns
-            .into_iter()
-            .chain(push_fns)
-            .filter(|f| seen.insert(f.clone()))
-            .collect();
         for fqn in fqns {
-            // Prefer the pull-path snapshot for the function's location +
-            // short name; fall back to the push-path node.
             let here = crate::db::Fqcn::new(self.db, fqn.clone());
             let pulled = crate::db::find_function(self.db, here);
             let Some(f) = pulled.as_ref() else {

@@ -321,8 +321,11 @@ fn bench_read_query_latency(c: &mut Criterion) {
     group.bench_function("session_read_lookup", |b| {
         b.iter(|| {
             session.read(|db| {
-                db.lookup_class_node("Illuminate\\Database\\Eloquent\\Model")
-                    .is_some()
+                let fqcn = mir_analyzer::db::Fqcn::new(
+                    db,
+                    std::sync::Arc::from("Illuminate\\Database\\Eloquent\\Model"),
+                );
+                mir_analyzer::db::find_class_like(db, fqcn).is_some()
             })
         });
     });
