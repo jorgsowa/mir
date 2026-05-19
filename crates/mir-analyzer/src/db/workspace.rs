@@ -20,10 +20,6 @@
 
 use std::sync::Arc;
 
-use mir_codebase::storage::{
-    ClassStorage, EnumStorage, FunctionStorage, InterfaceStorage, TraitStorage,
-};
-use mir_types::Union;
 use rustc_hash::FxHashMap;
 
 use crate::db::{collect_file_definitions, MirDatabase, SourceFile};
@@ -133,35 +129,40 @@ unsafe impl salsa::Update for FqcnIndex {
 // (PHP semantics); constants stay case-sensitive.
 // ---------------------------------------------------------------------------
 
-/// Hot-path bundle holding the materialised storage for every symbol in the
-/// workspace. Built once per workspace_revision × file content; Arc-shared
-/// so consumers clone-and-read without locks.
+/// Symbol kind tag + slice index. Building one is a single integer tag
+/// (no storage cloning). Resolution via `collect_file_definitions(file)`
+/// goes through a salsa-memoized query → direct slice access.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SymbolLoc {
+    Class { file: SourceFile, idx: usize },
+    Interface { file: SourceFile, idx: usize },
+    Trait { file: SourceFile, idx: usize },
+    Enum { file: SourceFile, idx: usize },
+    Function { file: SourceFile, idx: usize },
+    Constant { file: SourceFile, idx: usize },
+}
+
+/// Lightweight FQCN→location index. Built lazily per workspace revision;
+/// holds *no* storage data — just (file, slice_index) tags.
+///
+/// Replaces the 3-deep `resolve_fqcn_to_path → lookup_source_file →
+/// class_in_file` query stack with one O(1) map lookup. Storage is fetched
+/// on-demand via the already-memoized `collect_file_definitions(file)`.
 #[derive(Clone, Default)]
 pub struct WorkspaceSymbolIndex {
-    pub classes: Arc<FxHashMap<String, Arc<ClassStorage>>>,
-    pub interfaces: Arc<FxHashMap<String, Arc<InterfaceStorage>>>,
-    pub traits: Arc<FxHashMap<String, Arc<TraitStorage>>>,
-    pub enums: Arc<FxHashMap<String, Arc<EnumStorage>>>,
-    pub functions: Arc<FxHashMap<String, Arc<FunctionStorage>>>,
-    pub constants: Arc<FxHashMap<String, Arc<Union>>>,
-    /// FQCN (lowered) → defining file. Lets callers route "where is X defined?"
-    /// in O(1) without iterating the workspace.
-    pub class_files: Arc<FxHashMap<String, SourceFile>>,
-    pub function_files: Arc<FxHashMap<String, SourceFile>>,
-    pub constant_files: Arc<FxHashMap<String, SourceFile>>,
+    /// Class / interface / trait / enum FQCN (lowered) → location.
+    pub class_like: Arc<FxHashMap<String, SymbolLoc>>,
+    /// Function FQN (lowered) → location.
+    pub functions: Arc<FxHashMap<String, SymbolLoc>>,
+    /// Constant FQN (case-sensitive) → location.
+    pub constants: Arc<FxHashMap<String, SymbolLoc>>,
 }
 
 impl PartialEq for WorkspaceSymbolIndex {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.classes, &other.classes)
-            && Arc::ptr_eq(&self.interfaces, &other.interfaces)
-            && Arc::ptr_eq(&self.traits, &other.traits)
-            && Arc::ptr_eq(&self.enums, &other.enums)
+        Arc::ptr_eq(&self.class_like, &other.class_like)
             && Arc::ptr_eq(&self.functions, &other.functions)
             && Arc::ptr_eq(&self.constants, &other.constants)
-            && Arc::ptr_eq(&self.class_files, &other.class_files)
-            && Arc::ptr_eq(&self.function_files, &other.function_files)
-            && Arc::ptr_eq(&self.constant_files, &other.constant_files)
     }
 }
 
@@ -184,72 +185,48 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let _ = rev.revision(db);
 
     let files = db.all_source_files();
-    let mut classes: FxHashMap<String, Arc<ClassStorage>> = FxHashMap::default();
-    let mut interfaces: FxHashMap<String, Arc<InterfaceStorage>> = FxHashMap::default();
-    let mut traits_: FxHashMap<String, Arc<TraitStorage>> = FxHashMap::default();
-    let mut enums: FxHashMap<String, Arc<EnumStorage>> = FxHashMap::default();
-    let mut functions: FxHashMap<String, Arc<FunctionStorage>> = FxHashMap::default();
-    let mut constants: FxHashMap<String, Arc<Union>> = FxHashMap::default();
-    let mut class_files: FxHashMap<String, SourceFile> = FxHashMap::default();
-    let mut function_files: FxHashMap<String, SourceFile> = FxHashMap::default();
-    let mut constant_files: FxHashMap<String, SourceFile> = FxHashMap::default();
+    let mut class_like: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+    let mut functions: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+    let mut constants: FxHashMap<String, SymbolLoc> = FxHashMap::default();
 
     for file in files.iter() {
         let defs = collect_file_definitions(db, *file);
-        for c in defs.slice.classes.iter() {
-            let key = c.fqcn.to_ascii_lowercase();
-            classes
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(c.clone()));
-            class_files.entry(key).or_insert(*file);
+        for (idx, c) in defs.slice.classes.iter().enumerate() {
+            class_like
+                .entry(c.fqcn.to_ascii_lowercase())
+                .or_insert(SymbolLoc::Class { file: *file, idx });
         }
-        for i in defs.slice.interfaces.iter() {
-            let key = i.fqcn.to_ascii_lowercase();
-            interfaces
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(i.clone()));
-            class_files.entry(key).or_insert(*file);
+        for (idx, i) in defs.slice.interfaces.iter().enumerate() {
+            class_like
+                .entry(i.fqcn.to_ascii_lowercase())
+                .or_insert(SymbolLoc::Interface { file: *file, idx });
         }
-        for t in defs.slice.traits.iter() {
-            let key = t.fqcn.to_ascii_lowercase();
-            traits_
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(t.clone()));
-            class_files.entry(key).or_insert(*file);
+        for (idx, t) in defs.slice.traits.iter().enumerate() {
+            class_like
+                .entry(t.fqcn.to_ascii_lowercase())
+                .or_insert(SymbolLoc::Trait { file: *file, idx });
         }
-        for e in defs.slice.enums.iter() {
-            let key = e.fqcn.to_ascii_lowercase();
-            enums
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(e.clone()));
-            class_files.entry(key).or_insert(*file);
+        for (idx, e) in defs.slice.enums.iter().enumerate() {
+            class_like
+                .entry(e.fqcn.to_ascii_lowercase())
+                .or_insert(SymbolLoc::Enum { file: *file, idx });
         }
-        for f in defs.slice.functions.iter() {
-            let key = f.fqn.to_ascii_lowercase();
+        for (idx, f) in defs.slice.functions.iter().enumerate() {
             functions
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(f.clone()));
-            function_files.entry(key).or_insert(*file);
+                .entry(f.fqn.to_ascii_lowercase())
+                .or_insert(SymbolLoc::Function { file: *file, idx });
         }
-        for (name, ty) in defs.slice.constants.iter() {
-            let key = name.to_string();
+        for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
             constants
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(ty.clone()));
-            constant_files.entry(key).or_insert(*file);
+                .entry(name.to_string())
+                .or_insert(SymbolLoc::Constant { file: *file, idx });
         }
     }
 
     WorkspaceSymbolIndex {
-        classes: Arc::new(classes),
-        interfaces: Arc::new(interfaces),
-        traits: Arc::new(traits_),
-        enums: Arc::new(enums),
+        class_like: Arc::new(class_like),
         functions: Arc::new(functions),
         constants: Arc::new(constants),
-        class_files: Arc::new(class_files),
-        function_files: Arc::new(function_files),
-        constant_files: Arc::new(constant_files),
     }
 }
 
