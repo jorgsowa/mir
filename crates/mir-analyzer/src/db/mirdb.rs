@@ -107,6 +107,16 @@ pub struct MirDb {
     /// Set once before any analysis begins; read by `collect_file_definitions`
     /// to filter `@since`/`@removed` stub symbols.
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
+    /// Optional disk-backed Pass-1 cache. Shared with `SharedDb::stub_cache`
+    /// so `collect_file_definitions` can consult it without going through the
+    /// push-based `collect_and_ingest_file` path.
+    stub_cache: Arc<parking_lot::RwLock<Option<Arc<crate::stub_cache::StubSliceCache>>>>,
+    /// In-process parse-result cache: content-hash → StubSlice. Populated by
+    /// `collect_and_ingest_file` so that `collect_file_definitions_uncached`
+    /// can skip re-parsing files that were already parsed in the same session.
+    /// Keyed by blake3 hash of the source text so stale entries from prior
+    /// file versions are naturally evicted (different hash → different key).
+    parse_cache: Arc<parking_lot::RwLock<FxHashMap<[u8; 32], Arc<StubSlice>>>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -141,6 +151,8 @@ impl Default for MirDb {
             workspace_revision_input: Arc::default(),
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
+            stub_cache: Arc::default(),
+            parse_cache: Arc::default(),
         };
         db.init_workspace_revision();
         db
@@ -322,9 +334,30 @@ impl MirDatabase for MirDb {
             .map(|(_, &sf)| sf)
             .collect()
     }
+
+    fn stub_cache(&self) -> Option<Arc<crate::stub_cache::StubSliceCache>> {
+        self.stub_cache.read().clone()
+    }
+
+    fn parse_cache(&self) -> Arc<parking_lot::RwLock<FxHashMap<[u8; 32], Arc<StubSlice>>>> {
+        self.parse_cache.clone()
+    }
 }
 
 impl MirDb {
+    /// Wire a disk-backed stub cache into this db so `collect_file_definitions`
+    /// can skip reparsing on cache hits. Called by `SharedDb::with_cache_dir`.
+    pub fn set_stub_cache(&self, cache: Arc<crate::stub_cache::StubSliceCache>) {
+        *self.stub_cache.write() = Some(cache);
+    }
+
+    /// Store a pre-computed `StubSlice` for a given content hash so that
+    /// `collect_file_definitions_uncached` can skip re-parsing files already
+    /// processed by `collect_and_ingest_file` in the same session.
+    pub fn prime_parse_cache(&self, hash: [u8; 32], slice: Arc<StubSlice>) {
+        self.parse_cache.write().insert(hash, slice);
+    }
+
     /// Commit a batch of reference locations into the shared maps in one lock
     /// acquisition per map.  Must be called serially after all parallel workers
     /// have dropped their db clones and returned their pending buffers.
@@ -412,14 +445,31 @@ impl MirDb {
     /// Create a new or update an existing Salsa SourceFile input for `path`.
     /// Returns the stable handle that callers should retain for tracked queries.
     pub fn upsert_source_file(&mut self, path: Arc<str>, text: Arc<str>) -> SourceFile {
+        self.upsert_source_file_with_durability(path, text, salsa::Durability::LOW)
+    }
+
+    /// Like [`upsert_source_file`] but lets callers set the salsa durability.
+    ///
+    /// Use `Durability::HIGH` for files that will not change within the session
+    /// (built-in PHP stubs, vendor packages). This lets salsa skip O(N)
+    /// dependency verification for `workspace_symbol_index` when only a
+    /// `Durability::LOW` project file changes.
+    pub fn upsert_source_file_with_durability(
+        &mut self,
+        path: Arc<str>,
+        text: Arc<str>,
+        durability: salsa::Durability,
+    ) -> SourceFile {
         use salsa::Setter as _;
         if let Some(&sf) = self.source_files.get(&path) {
             if sf.text(self) != text {
-                sf.set_text(self).to(text);
+                sf.set_text(self).with_durability(durability).to(text);
             }
             return sf;
         }
-        let sf = SourceFile::new(self, path.clone(), text);
+        let sf = SourceFile::builder(path.clone(), text)
+            .durability(durability)
+            .new(self);
         Arc::make_mut(&mut self.source_files).insert(path, sf);
         self.bump_workspace_revision();
         sf

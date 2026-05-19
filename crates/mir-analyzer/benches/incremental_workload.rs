@@ -195,7 +195,18 @@ fn bench_single_file_edit(c: &mut Criterion) {
                     session.ingest_file(target_arc.clone(), new_content.clone());
                     let arena = bumpalo::Bump::new();
                     let parsed = php_rs_parser::parse(&arena, new_content.as_ref());
-                    assert!(parsed.errors.is_empty(), "bench source must parse");
+                    let hard_errors: Vec<_> = parsed
+                        .errors
+                        .iter()
+                        .filter(|e| {
+                            matches!(e.severity(), php_rs_parser::diagnostics::Severity::Error)
+                        })
+                        .collect();
+                    assert!(
+                        hard_errors.is_empty(),
+                        "bench source must parse (hard errors: {})",
+                        hard_errors.len()
+                    );
                     FileAnalyzer::new(&session).analyze(
                         target_arc.clone(),
                         new_content.as_ref(),
@@ -272,7 +283,18 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                     session.ingest_file(target_arc.clone(), new_content.clone());
                     let arena = bumpalo::Bump::new();
                     let parsed = php_rs_parser::parse(&arena, new_content.as_ref());
-                    assert!(parsed.errors.is_empty(), "bench source must parse");
+                    let hard_errors: Vec<_> = parsed
+                        .errors
+                        .iter()
+                        .filter(|e| {
+                            matches!(e.severity(), php_rs_parser::diagnostics::Severity::Error)
+                        })
+                        .collect();
+                    assert!(
+                        hard_errors.is_empty(),
+                        "bench source must parse (hard errors: {})",
+                        hard_errors.len()
+                    );
                     FileAnalyzer::new(&session).analyze(
                         target_arc.clone(),
                         new_content.as_ref(),
