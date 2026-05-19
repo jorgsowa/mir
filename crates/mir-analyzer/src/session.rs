@@ -364,6 +364,15 @@ impl AnalysisSession {
         self.resolver.is_some()
     }
 
+    /// Run both pre-passes (builtin-stub loading and PSR-4 class preloading)
+    /// in one call.  Replaces the two separate `ensure_stubs_for_ast` /
+    /// `preload_psr4_classes_for_ast` calls at every `FileAnalyzer::analyze`
+    /// site.
+    pub fn prepare_ast_for_analysis(&self, program: &php_ast::ast::Program<'_, '_>, file: &str) {
+        self.ensure_stubs_for_ast(program);
+        self.preload_psr4_classes_for_ast(program, file);
+    }
+
     pub fn preload_psr4_classes_for_ast(
         &self,
         program: &php_ast::ast::Program<'_, '_>,

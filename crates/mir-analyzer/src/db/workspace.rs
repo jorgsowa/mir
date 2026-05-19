@@ -325,3 +325,55 @@ pub fn workspace_fqcn_index(db: &dyn MirDatabase) -> FqcnIndex {
         constants: Arc::new(constants),
     }
 }
+
+// ---------------------------------------------------------------------------
+// workspace_global_vars
+// ---------------------------------------------------------------------------
+
+/// Name → type map for every PHP global variable defined across all
+/// registered source files.  Built from `global_vars` entries in each
+/// file's `StubSlice`; the PHP standard stubs contribute the predefined
+/// superglobals (`$_SERVER`, `$_GET`, …).
+///
+/// `Arc::ptr_eq` is used for change detection so salsa skips re-running
+/// dependents when the same map is produced across revisions.
+#[derive(Clone, Default, Debug)]
+pub struct GlobalVarMap(pub Arc<FxHashMap<Arc<str>, mir_types::Union>>);
+
+impl PartialEq for GlobalVarMap {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+unsafe impl salsa::Update for GlobalVarMap {
+    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
+        let old = unsafe { &mut *old_ptr };
+        if *old == new_val {
+            return false;
+        }
+        *old = new_val;
+        true
+    }
+}
+
+/// Aggregate all `global_vars` entries from every registered `SourceFile`.
+/// Tracked so salsa invalidates it when any file's text changes.
+#[salsa::tracked]
+pub fn workspace_global_vars(db: &dyn MirDatabase) -> GlobalVarMap {
+    let rev = db
+        .workspace_revision()
+        .expect("WorkspaceRevision not initialized");
+    let _ = rev.revision(db);
+
+    let files = db.all_source_files();
+    let mut out: FxHashMap<Arc<str>, mir_types::Union> = FxHashMap::default();
+    for file in files.iter() {
+        let defs = collect_file_definitions(db, *file);
+        for (name, ty) in &defs.slice.global_vars {
+            let gname: Arc<str> = Arc::from(name.strip_prefix('$').unwrap_or(name.as_ref()));
+            out.entry(gname).or_insert_with(|| ty.clone());
+        }
+    }
+    GlobalVarMap(Arc::new(out))
+}

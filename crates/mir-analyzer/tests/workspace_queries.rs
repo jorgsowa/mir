@@ -71,6 +71,7 @@ fn workspace_revision_bumps_on_remove() {
     );
     let db1 = session.snapshot_db();
     assert_eq!(workspace_classes(&db1).len(), 2);
+    drop(db1);
 
     session.invalidate_file("/proj/B.php");
     let db2 = session.snapshot_db();

@@ -75,18 +75,8 @@ impl<'a> FileAnalyzer<'a> {
     ) -> FileAnalysis {
         crate::metrics::record_file_analysis();
         self.session.ensure_essential_stubs_loaded();
-        self.session.ensure_stubs_for_ast(program);
-
-        // Pre-load any PSR-4-mapped classes referenced in this file's AST so
-        // their SourceFiles are registered before Pass-2 reads them via
-        // `find_class_like`. (Salsa tracked queries cannot mutate inputs
-        // mid-evaluation, so lazy-loading is staged here outside the query.)
-        // Only do this when a resolver is configured — otherwise the AST
-        // scan is wasted work for every per-file analysis.
-        if self.session.has_resolver() {
-            self.session
-                .preload_psr4_classes_for_ast(program, file.as_ref());
-        }
+        self.session
+            .prepare_ast_for_analysis(program, file.as_ref());
 
         // Pull-path Pass-2: `find_class_like` / `find_function` etc. consult
         // the salsa query graph; a single pass is sufficient.

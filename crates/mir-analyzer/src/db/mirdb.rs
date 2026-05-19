@@ -24,13 +24,8 @@ type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16,
 type FileReferences = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 /// Reverse reference index: symbol key → set of files that reference it.
 /// Transpose of `FileReferences`; maintained in lockstep so deletions can
-/// find referencing files in O(1) even after the symbol's defining file entry
-/// has been removed from `symbol_to_file`.
+/// find referencing files in O(1).
 type SymbolReferencers = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
-/// Forward index: file path → set of symbol FQNs it defines.
-/// Maintained in lockstep with `symbol_to_file` so `remove_file_definitions`
-/// can find a file's symbols in O(symbols_in_file) instead of O(total_symbols).
-type FileDefinedSymbols = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 
 /// Per-clone staging buffer for reference locations recorded during a parallel
 /// Pass 2 worker.  `record_reference_location` pushes here instead of directly
@@ -54,22 +49,6 @@ impl Clone for PendingRefLocs {
 #[derive(Clone)]
 pub struct MirDb {
     storage: salsa::Storage<Self>,
-    // Keep registries behind `Arc`s so `MirDb::clone()` stays cheap for
-    // parallel analysis workers. The salsa storage is already shared by clone;
-    // these maps only hold stable input handles, so copy-on-write insertion is
-    // enough for the canonical mutable db paths.
-    /// File path → first declared namespace.
-    file_namespaces: Arc<FxHashMap<Arc<str>, Arc<str>>>,
-    /// File path → use-alias imports.
-    file_imports: Arc<FxHashMap<Arc<str>, HashMap<String, String>>>,
-    /// Global variable name (without `$`) → collected type.
-    global_vars: Arc<FxHashMap<Arc<str>, Union>>,
-    /// Symbol FQN → defining file.
-    symbol_to_file: Arc<FxHashMap<Arc<str>, Arc<str>>>,
-    /// Forward index: file → set of symbol FQNs it defines.
-    /// Maintained in lockstep with `symbol_to_file` so `remove_file_definitions`
-    /// can find a file's symbols in O(symbols_in_file) instead of O(total_symbols).
-    file_to_defined_symbols: FileDefinedSymbols,
     /// Public symbol key → reference locations.
     reference_locations: ReferenceLocations,
     /// Forward index: file → set of symbol keys it references. Kept in sync
@@ -136,11 +115,6 @@ impl Default for MirDb {
     fn default() -> Self {
         let mut db = Self {
             storage: salsa::Storage::default(),
-            file_namespaces: Arc::default(),
-            file_imports: Arc::default(),
-            global_vars: Arc::default(),
-            symbol_to_file: Arc::default(),
-            file_to_defined_symbols: FileDefinedSymbols::default(),
             reference_locations: ReferenceLocations::default(),
             file_references: FileReferences::default(),
             symbol_referencers: SymbolReferencers::default(),
@@ -169,42 +143,98 @@ impl MirDatabase for MirDb {
     }
 
     fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
-        self.file_namespaces.get(file).cloned()
+        let sf = self.source_files.get(file).copied()?;
+        crate::db::collect_file_definitions(self, sf)
+            .slice
+            .namespace
+            .clone()
     }
 
     fn file_imports(&self, file: &str) -> HashMap<String, String> {
-        self.file_imports.get(file).cloned().unwrap_or_default()
+        let Some(sf) = self.source_files.get(file).copied() else {
+            return HashMap::default();
+        };
+        crate::db::collect_file_definitions(self, sf)
+            .slice
+            .imports
+            .clone()
     }
 
     fn global_var_type(&self, name: &str) -> Option<Union> {
-        self.global_vars.get(name).cloned()
+        crate::db::workspace_global_vars(self).0.get(name).cloned()
     }
 
     fn file_import_snapshots(&self) -> Vec<(Arc<str>, HashMap<String, String>)> {
-        self.file_imports
+        self.source_files
             .iter()
-            .map(|(file, imports)| (file.clone(), imports.clone()))
+            .map(|(path, &sf)| {
+                let imports = crate::db::collect_file_definitions(self, sf)
+                    .slice
+                    .imports
+                    .clone();
+                (path.clone(), imports)
+            })
             .collect()
     }
 
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
-        self.symbol_to_file.get(symbol).cloned()
+        let idx = crate::db::workspace_symbol_index(self);
+        let lower = symbol.to_ascii_lowercase();
+        // Class-like and function keys are case-folded (PHP semantics).
+        // Constants are case-sensitive, so tried last without lowercasing.
+        // Global variables are not indexed here — they are not FQCNs and
+        // are not looked up via this method in any current caller.
+        let loc = idx
+            .class_like
+            .get(&lower)
+            .or_else(|| idx.functions.get(&lower))
+            .or_else(|| idx.constants.get(symbol));
+        loc.map(|l| {
+            let sf = match l {
+                SymbolLoc::Class { file, .. }
+                | SymbolLoc::Interface { file, .. }
+                | SymbolLoc::Trait { file, .. }
+                | SymbolLoc::Enum { file, .. }
+                | SymbolLoc::Function { file, .. }
+                | SymbolLoc::Constant { file, .. } => *file,
+            };
+            sf.path(self)
+        })
     }
 
     fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>> {
-        self.file_to_defined_symbols
-            .lock()
-            .get(file)
-            .map(|s| s.iter().cloned().collect())
-            .unwrap_or_default()
+        self.file_defined_symbols(file).into_iter().collect()
     }
 
     fn file_defined_symbols(&self, file: &str) -> HashSet<Arc<str>> {
-        self.file_to_defined_symbols
-            .lock()
-            .get(file)
-            .cloned()
-            .unwrap_or_default()
+        let Some(sf) = self.source_files.get(file).copied() else {
+            return HashSet::default();
+        };
+        let defs = crate::db::collect_file_definitions(self, sf);
+        let mut out = HashSet::new();
+        for c in defs.slice.classes.iter() {
+            out.insert(c.fqcn.clone());
+        }
+        for i in defs.slice.interfaces.iter() {
+            out.insert(i.fqcn.clone());
+        }
+        for t in defs.slice.traits.iter() {
+            out.insert(t.fqcn.clone());
+        }
+        for e in defs.slice.enums.iter() {
+            out.insert(e.fqcn.clone());
+        }
+        for f in defs.slice.functions.iter() {
+            out.insert(f.fqn.clone());
+        }
+        for (name, _) in defs.slice.constants.iter() {
+            out.insert(name.clone());
+        }
+        for (name, _) in defs.slice.global_vars.iter() {
+            let gname: Arc<str> = Arc::from(name.strip_prefix('$').unwrap_or(name.as_ref()));
+            out.insert(gname);
+        }
+        out
     }
 
     fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
@@ -520,102 +550,27 @@ impl MirDb {
         self.source_files.keys().cloned().collect()
     }
 
-    /// Insert `symbol` into both `symbol_to_file` and the `file_to_defined_symbols`
-    /// forward index. All definition-registration sites must use this helper.
-    fn register_symbol(&mut self, symbol: Arc<str>, file: Arc<str>) {
-        Arc::make_mut(&mut self.symbol_to_file).insert(symbol.clone(), file.clone());
-        self.file_to_defined_symbols
-            .lock()
-            .entry(file)
-            .or_default()
-            .insert(symbol);
-    }
-
+    /// Clear push-based state for `file` and reset its reference-location
+    /// index.  After the salsa migration all symbol lookups are derived from
+    /// `collect_file_definitions`; only the reference-location side-index
+    /// still needs explicit clearing before re-analysis.
     pub fn remove_file_definitions(&mut self, file: &str) {
-        // O(1) forward-index lookup instead of O(total_symbols) scan.
-        let symbol_set: HashSet<Arc<str>> = self
-            .file_to_defined_symbols
-            .lock()
-            .remove(file)
-            .unwrap_or_default();
-        {
-            let s2f = Arc::make_mut(&mut self.symbol_to_file);
-            for sym in &symbol_set {
-                s2f.remove(sym.as_ref());
-            }
-        }
-        Arc::make_mut(&mut self.file_namespaces).retain(|path, _| path.as_ref() != file);
-        Arc::make_mut(&mut self.file_imports).retain(|path, _| path.as_ref() != file);
-        Arc::make_mut(&mut self.global_vars).retain(|name, _| !symbol_set.contains(name));
         self.clear_file_references(file);
     }
 
-    /// Walk one collected [`StubSlice`] and upsert the corresponding db nodes.
-    ///
-    /// This is the canonical post-Pass-1 ingestion path: each file's slice is
-    /// fed in directly, so batch analysis does not need any intermediate
-    /// mutable codebase store between Pass 1 and Pass 2.
-    pub fn ingest_stub_slice(&mut self, slice: &StubSlice) {
-        if let Some(file) = &slice.file {
-            if let Some(namespace) = &slice.namespace {
-                Arc::make_mut(&mut self.file_namespaces).insert(file.clone(), namespace.clone());
-            }
-            if !slice.imports.is_empty() {
-                Arc::make_mut(&mut self.file_imports).insert(file.clone(), slice.imports.clone());
-            }
-            for (name, _) in &slice.global_vars {
-                let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
-                self.register_symbol(Arc::from(global_name), file.clone());
-            }
-            for cls in &slice.classes {
-                self.register_symbol(cls.fqcn.clone(), file.clone());
-            }
-            for iface in &slice.interfaces {
-                self.register_symbol(iface.fqcn.clone(), file.clone());
-            }
-            for tr in &slice.traits {
-                self.register_symbol(tr.fqcn.clone(), file.clone());
-            }
-            for en in &slice.enums {
-                self.register_symbol(en.fqcn.clone(), file.clone());
-            }
-            for func in &slice.functions {
-                self.register_symbol(func.fqn.clone(), file.clone());
-            }
-        }
-        for (name, ty) in &slice.global_vars {
-            let global_name = name.strip_prefix('$').unwrap_or(name.as_ref());
-            Arc::make_mut(&mut self.global_vars).insert(Arc::from(global_name), ty.clone());
-        }
-    }
+    /// No-op — retained only so call sites that were written against the old
+    /// push-based ingest path continue to compile without changes.  All symbol
+    /// data is now derived lazily from `collect_file_definitions` tracked
+    /// queries; calling this function has no effect.
+    #[inline]
+    pub fn ingest_stub_slice(&mut self, _slice: &StubSlice) {}
 
-    /// Bulk-ingest many stub slices in one call.
-    ///
-    /// Why this exists: when an external `Arc<MirDb>` snapshot is alive (e.g.
-    /// an LSP server holds one for query serving), each `Arc::make_mut` inside
-    /// [`Self::ingest_stub_slice`] forces a copy-on-write clone of the
-    /// underlying `HashMap`. Calling `ingest_stub_slice` N times in sequence
-    /// with the snapshot alive between calls pays one clone *per call* —
-    /// asymptotically O(N × map_size), which becomes pathological at vendor
-    /// scale (~2k+ slices).
-    ///
-    /// Inside this bulk path the snapshot doesn't get refreshed between
-    /// slices, so the first slice's clone establishes a fresh inner `Arc` with
-    /// `strong_count == 1` and every subsequent insert in the batch is O(1).
-    /// Net cost: O(N + map_size) instead of O(N × map_size).
-    ///
-    /// Use this whenever you're about to ingest more than one slice in a row,
-    /// such as in:
-    /// - LSP warm-up over a `composer.lock` worth of vendor files
-    /// - Project-wide reindex
-    /// - Cache hydration on session restart
-    pub fn ingest_stub_slices<'a, I>(&mut self, slices: I)
+    /// No-op — retained for the same reason as `ingest_stub_slice`.
+    #[inline]
+    pub fn ingest_stub_slices<'a, I>(&mut self, _slices: I)
     where
         I: IntoIterator<Item = &'a StubSlice>,
     {
-        for slice in slices {
-            self.ingest_stub_slice(slice);
-        }
     }
 
     /// Commit a parallel-sweep-collected [`InferredReturnTypes`] buffer

@@ -153,8 +153,9 @@ pub use self::queries::{
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 pub use self::workspace::{
-    workspace_classes, workspace_fqcn_index, workspace_functions, workspace_symbol_index,
-    FqcnIndex, SymbolLoc, WorkspaceRevision, WorkspaceSymbolIndex,
+    workspace_classes, workspace_fqcn_index, workspace_functions, workspace_global_vars,
+    workspace_symbol_index, FqcnIndex, GlobalVarMap, SymbolLoc, WorkspaceRevision,
+    WorkspaceSymbolIndex,
 };
 
 // Sub-modules

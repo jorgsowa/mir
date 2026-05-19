@@ -194,9 +194,8 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     /// Writes accumulated namespace and import data into `self.slice` so that
-    /// `MirDatabase::ingest_stub_slice` can populate the db's `file_namespaces`
-    /// and `file_imports` tables. Called at the end of `collect_slice` to
-    /// ensure the slice carries the complete data.
+    /// `file_namespace()` and `file_imports()` can derive them via
+    /// `collect_file_definitions`. Called at the end of `collect_slice`.
     fn finalize_slice(&mut self) {
         if let Some(ns) = self.first_namespace.take() {
             self.slice.namespace = Some(Arc::from(ns.as_str()));
@@ -839,7 +838,7 @@ mod tests {
     #[test]
     fn collect_slice_captures_namespace() {
         // The first namespace declaration must end up in slice.namespace so
-        // that ingest_stub_slice can populate the db's file_namespaces table.
+        // that file_namespace() can derive it via collect_file_definitions.
         let slice = parse_and_collect_slice(
             "src/Service.php",
             "<?php\nnamespace App\\Service;\nclass Handler {}\n",
@@ -854,7 +853,7 @@ mod tests {
     #[test]
     fn collect_slice_captures_use_imports() {
         // All `use` imports (plain and aliased) must end up in slice.imports so
-        // that ingest_stub_slice can populate the db's file_imports table and
+        // that file_imports() can derive them via collect_file_definitions and
         // Pass 2 can resolve short names like `new Entity()` correctly.
         let slice = parse_and_collect_slice(
             "src/Handler.php",
@@ -876,8 +875,7 @@ mod tests {
     #[test]
     fn collect_slice_captures_namespace_none_when_no_namespace() {
         // Global-scope files have no namespace declaration; slice.namespace must
-        // be None so inject_stub_slice does not insert a spurious entry into
-        // file_namespaces.
+        // be None so file_namespace() correctly returns None for global-scope files.
         let slice = parse_and_collect_slice("src/global.php", "<?php\nfunction foo(): void {}\n");
         assert!(
             slice.namespace.is_none(),
