@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::db::MirDatabase;
 use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 
@@ -93,7 +94,10 @@ impl SharedDb {
     /// passed per call so the same cache directory remains usable across
     /// version changes (entries from other versions become misses).
     pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
-        self.stub_cache = Some(Arc::new(crate::stub_cache::StubSliceCache::open(cache_dir)));
+        let cache = Arc::new(crate::stub_cache::StubSliceCache::open(cache_dir));
+        // Wire cache into the salsa db so collect_file_definitions can use it.
+        self.salsa.write().set_stub_cache(cache.clone());
+        self.stub_cache = Some(cache);
         self
     }
 
@@ -153,8 +157,14 @@ impl SharedDb {
                 // Mirror as a SourceFile so the pull path (find_class_like)
                 // can resolve built-in PHP classes once a stub-aware
                 // resolver is installed on the session.
+                // HIGH durability: built-in stubs never change within a session,
+                // so salsa can skip re-verifying them when project files change.
                 if let Some(content) = crate::stubs::stub_content_for_path(path) {
-                    guard.upsert_source_file(Arc::from(*path), Arc::from(content));
+                    guard.upsert_source_file_with_durability(
+                        Arc::from(*path),
+                        Arc::from(content),
+                        salsa::Durability::HIGH,
+                    );
                 }
                 to_ingest.push(slice);
             }
@@ -225,24 +235,75 @@ impl SharedDb {
         // walk entirely — the dominant cost on cold sessions. Parse-error
         // issues aren't cached (they're reported through Pass 2 anyway for
         // project files), so a hit returns an empty issues list.
-        let cache_hit = self
-            .stub_cache
-            .as_ref()
-            .map(|c| (c, crate::stub_cache::hash_source(source)))
-            .and_then(|(cache, hash)| {
-                let mut slice = cache.get(&file, &hash, php_v)?;
-                crate::stub_cache::prepare_for_ingest(&mut slice);
-                Some((slice, hash))
-            });
 
-        if let Some((slice, _hash)) = cache_hit {
+        // Always compute the content hash — needed for both cache paths and
+        // for priming the in-process parse cache that collect_file_definitions
+        // checks to avoid re-parsing in the same session.
+        let content_hash = crate::stub_cache::hash_source(source);
+
+        // Vendor and user-stub files won't change within a session; project
+        // files may be edited repeatedly. HIGH durability tells salsa it can
+        // skip re-verifying vendor SourceFiles when only project files change,
+        // reducing O(N_total_files) verification to O(N_project_files) on
+        // every incremental edit.
+        let durability = if file.contains("/vendor/") || file.contains("\\vendor\\") {
+            salsa::Durability::HIGH
+        } else {
+            salsa::Durability::LOW
+        };
+
+        // Check in-process parse cache first (fastest path, avoids even disk I/O).
+        {
+            let guard = self.salsa.read();
+            let pc = guard.parse_cache();
+            let pc_guard = pc.read();
+            if let Some(slice) = pc_guard.get(&content_hash) {
+                crate::metrics::record_stub_cache_hit();
+                let slice_arc = if slice.file.as_deref() == Some(&*file) {
+                    // Path matches — share the Arc directly (no data clone needed).
+                    Arc::clone(slice)
+                } else {
+                    // Different path — fix the `file` field.
+                    let mut owned = (**slice).clone();
+                    owned.file = Some(file.clone());
+                    Arc::new(owned)
+                };
+                let file_defs = crate::db::FileDefinitions {
+                    slice: slice_arc,
+                    issues: Arc::new(Vec::new()),
+                };
+                drop(pc_guard);
+                drop(guard);
+                let mut write_guard = self.salsa.write();
+                write_guard.upsert_source_file_with_durability(
+                    file.clone(),
+                    Arc::from(source),
+                    durability,
+                );
+                write_guard.ingest_stub_slice(&file_defs.slice);
+                return file_defs;
+            }
+        }
+
+        let cache_hit = self.stub_cache.as_ref().and_then(|cache| {
+            let mut slice = cache.get(&file, &content_hash, php_v)?;
+            crate::stub_cache::prepare_for_ingest(&mut slice);
+            Some(slice)
+        });
+
+        if let Some(slice) = cache_hit {
             crate::metrics::record_stub_cache_hit();
+            let slice_arc = Arc::new(slice);
+            // Prime the in-process cache so later collect_file_definitions calls hit.
+            self.salsa
+                .read()
+                .prime_parse_cache(content_hash, slice_arc.clone());
             let file_defs = crate::db::FileDefinitions {
-                slice: Arc::new(slice),
+                slice: slice_arc,
                 issues: Arc::new(Vec::new()),
             };
             let mut guard = self.salsa.write();
-            guard.upsert_source_file(file.clone(), Arc::from(source));
+            guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
             guard.ingest_stub_slice(&file_defs.slice);
             return file_defs;
         }
@@ -270,18 +331,22 @@ impl SharedDb {
         all_issues.extend(collector_issues);
         mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
-        // Write to the cache on miss. Only files without hard parse errors are
-        // cached — a hard error may leave the slice partial. ForbiddenWarning
-        // diagnostics produce a complete AST and are safe to cache.
+        let slice_arc = Arc::new(slice);
+
+        // Write to the caches on a clean parse so future lookups hit.
         if !has_hard_parse_errors && !has_collector_issues {
+            // In-process cache: prevents re-parsing in the same session.
+            self.salsa
+                .read()
+                .prime_parse_cache(content_hash, Arc::clone(&slice_arc));
+            // Disk cache: prevents re-parsing in future sessions.
             if let Some(cache) = &self.stub_cache {
-                let hash = crate::stub_cache::hash_source(source);
-                cache.put(&file, &hash, php_v, &slice);
+                cache.put(&file, &content_hash, php_v, &slice_arc);
             }
         }
 
         let file_defs = crate::db::FileDefinitions {
-            slice: Arc::new(slice),
+            slice: slice_arc,
             issues: Arc::new(all_issues),
         };
 
@@ -289,7 +354,7 @@ impl SharedDb {
         // The expensive parse and AST walk above ran lock-free.
         {
             let mut guard = self.salsa.write();
-            guard.upsert_source_file(file.clone(), Arc::from(source));
+            guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
             guard.ingest_stub_slice(&file_defs.slice);
         }
 

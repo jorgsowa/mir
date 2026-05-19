@@ -110,6 +110,20 @@ pub trait MirDatabase: salsa::Database {
     /// stubs. Used by `workspace_symbol_index` to give user stubs priority
     /// over native stubs for the same symbol.
     fn user_stub_source_files(&self) -> Vec<SourceFile>;
+
+    /// Return the disk-backed stub slice cache, if configured. **Side channel**
+    /// — not salsa-tracked. Safe to use inside tracked queries because the
+    /// cache is content-addressed: same `(path, hash, php_version)` always
+    /// yields the same `StubSlice`.
+    fn stub_cache(&self) -> Option<Arc<crate::stub_cache::StubSliceCache>>;
+
+    /// Return the in-process parse-result cache. **Side channel** — not
+    /// salsa-tracked. Populated by `collect_and_ingest_file` so that
+    /// `collect_file_definitions_uncached` avoids re-parsing files that were
+    /// already parsed in the same session.
+    fn parse_cache(
+        &self,
+    ) -> Arc<parking_lot::RwLock<rustc_hash::FxHashMap<[u8; 32], Arc<mir_codebase::StubSlice>>>>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.

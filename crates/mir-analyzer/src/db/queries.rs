@@ -221,8 +221,62 @@ pub fn collect_file_definitions_uncached(
     let path = file.path(db);
     let text = file.text(db);
 
+    use std::str::FromStr as _;
+    let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
+        .unwrap_or(crate::php_version::PhpVersion::LATEST);
+
+    // Content hash needed for both in-process and disk cache lookups.
+    let content_hash = crate::stub_cache::hash_source(&text);
+
+    // Fast path 1: in-process parse cache (populated by collect_and_ingest_file).
+    // Avoids re-parsing files that were already processed in the same session.
+    // Safe inside a tracked query: content-addressed by source hash, not mutated.
+    {
+        let cache = db.parse_cache();
+        let guard = cache.read();
+        if let Some(slice) = guard.get(&content_hash) {
+            crate::metrics::record_stub_cache_hit();
+            if slice.file.as_deref() == Some(&*path) {
+                // Path matches — share the Arc directly (no data clone needed).
+                return FileDefinitions {
+                    slice: Arc::clone(slice),
+                    issues: Arc::new(Vec::new()),
+                };
+            }
+            // Different path — same source text at a different location.
+            // Must fix the `file` field before returning.
+            let mut owned = (**slice).clone();
+            owned.file = Some(path.clone());
+            crate::stub_cache::prepare_for_ingest(&mut owned);
+            return FileDefinitions {
+                slice: Arc::new(owned),
+                issues: Arc::new(Vec::new()),
+            };
+        }
+    }
+
+    // Fast path 2: disk cache hit avoids arena alloc + parse + collection walk.
+    // Safe inside a tracked query because the cache is content-addressed.
+    let disk_cache_state = db.stub_cache().map(|cache| {
+        let php_v = php_version.cache_byte();
+        (cache, php_v)
+    });
+    if let Some((cache, php_v)) = &disk_cache_state {
+        if let Some(mut slice) = cache.get(&path, &content_hash, *php_v) {
+            crate::stub_cache::prepare_for_ingest(&mut slice);
+            crate::metrics::record_stub_cache_hit();
+            return FileDefinitions {
+                slice: Arc::new(slice),
+                issues: Arc::new(Vec::new()),
+            };
+        }
+        crate::metrics::record_stub_cache_miss();
+    }
+
     let arena = crate::arena::create_parse_arena(text.len());
     let parsed = php_rs_parser::parse(&arena, &text);
+
+    let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 
     let mut all_issues: Vec<Issue> = parsed
         .errors
@@ -230,18 +284,33 @@ pub fn collect_file_definitions_uncached(
         .map(|err| crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map))
         .collect();
 
-    use std::str::FromStr as _;
-    let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
-        .unwrap_or(crate::php_version::PhpVersion::LATEST);
-    let collector =
-        crate::collector::DefinitionCollector::new_for_slice(path, &text, &parsed.source_map)
-            .with_php_version(php_version);
+    let collector = crate::collector::DefinitionCollector::new_for_slice(
+        path.clone(),
+        &text,
+        &parsed.source_map,
+    )
+    .with_php_version(php_version);
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
+    let has_collector_issues = !collector_issues.is_empty();
     all_issues.extend(collector_issues);
     mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
+    let slice_arc = Arc::new(slice);
+
+    // Write back to both caches on a clean parse.
+    if !has_hard_parse_errors && !has_collector_issues {
+        // In-process cache: prevents re-parsing in the same session.
+        db.parse_cache()
+            .write()
+            .insert(content_hash, Arc::clone(&slice_arc));
+        // Disk cache: prevents re-parsing in future sessions.
+        if let Some((cache, php_v)) = &disk_cache_state {
+            cache.put(&path, &content_hash, *php_v, &slice_arc);
+        }
+    }
+
     FileDefinitions {
-        slice: Arc::new(slice),
+        slice: slice_arc,
         issues: Arc::new(all_issues),
     }
 }

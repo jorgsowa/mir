@@ -25,7 +25,15 @@ pub struct FileDefinitions {
 
 impl PartialEq for FileDefinitions {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.slice, &other.slice) && Arc::ptr_eq(&self.issues, &other.issues)
+        // Structural comparison on the slice lets salsa skip workspace_symbol_index
+        // rebuilds when file text changed but definitions are unchanged
+        // (e.g. comment edits, whitespace-only saves in LSP).
+        // Issues are deliberately excluded: diagnostics changing doesn't affect
+        // symbol lookups and shouldn't force the workspace index to rebuild.
+        if Arc::ptr_eq(&self.slice, &other.slice) {
+            return true;
+        }
+        *self.slice == *other.slice
     }
 }
 

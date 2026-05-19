@@ -526,7 +526,7 @@ impl FunctionStorage {
 /// Produced by `mir-stubs-gen` at code-generation time and deserialized at
 /// runtime to ingest definitions into the salsa db via
 /// `MirDatabase::ingest_stub_slice`.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StubSlice {
     pub classes: Vec<Arc<ClassStorage>>,
     pub interfaces: Vec<Arc<InterfaceStorage>>,
