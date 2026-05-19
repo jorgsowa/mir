@@ -71,56 +71,27 @@ impl<'a> ClassAnalyzer<'a> {
         // Phase 4: enumerate via workspace_classes (pull) merged with
         // active_class_node_fqcns (push fallback). Filter to plain
         // classes only.
-        let pull_classes: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+        let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
-            .cloned()
-            .collect();
-        let push_classes: Vec<Arc<str>> = self.db.active_class_node_fqcns();
-        let mut seen: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
-        let mut class_keys: Vec<Arc<str>> = pull_classes
-            .into_iter()
-            .chain(push_classes)
-            .filter(|f| seen.insert(f.clone()))
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::new(self.db, fqcn.clone());
-                if let Some(c) = crate::db::find_class_like(self.db, here) {
-                    return c.is_class();
-                }
-                self.db
-                    .lookup_class_node(fqcn.as_ref())
-                    .map(|n| {
-                        !n.is_interface(self.db) && !n.is_trait(self.db) && !n.is_enum(self.db)
-                    })
+                let here = crate::db::Fqcn::new(self.db, (*fqcn).clone());
+                crate::db::find_class_like(self.db, here)
+                    .map(|c| c.is_class())
                     .unwrap_or(false)
             })
+            .cloned()
             .collect();
         // Sort for deterministic issue order across runs.
         class_keys.sort();
 
         for fqcn in &class_keys {
-            // Pull-first + push-fallback class data.
             let here = crate::db::Fqcn::new(self.db, fqcn.clone());
-            let pulled = crate::db::find_class_like(self.db, here);
-            let push_node = self
-                .db
-                .lookup_class_node(fqcn.as_ref())
-                .filter(|n| n.active(self.db));
-            let location: Option<StorageLocation> = pulled
-                .as_ref()
-                .and_then(|c| c.location().cloned())
-                .or_else(|| push_node.and_then(|n| n.location(self.db)));
-            let parent_fqcn: Option<Arc<str>> = pulled
-                .as_ref()
-                .and_then(|c| c.parent().cloned())
-                .or_else(|| push_node.and_then(|n| n.parent(self.db)));
-            let is_abstract = pulled
-                .as_ref()
-                .map(|c| c.is_abstract())
-                .or_else(|| push_node.map(|n| n.is_abstract(self.db)))
-                .unwrap_or(false);
-            if pulled.is_none() && push_node.is_none() {
+            let Some(class) = crate::db::find_class_like(self.db, here) else {
                 continue;
-            }
+            };
+            let location: Option<StorageLocation> = class.location().cloned();
+            let parent_fqcn: Option<Arc<str>> = class.parent().cloned();
+            let is_abstract = class.is_abstract();
 
             // Skip classes from vendor / stub files — only check user-analyzed files
             if !self.analyzed_files.is_empty() {
@@ -137,20 +108,13 @@ impl<'a> ClassAnalyzer<'a> {
             if let Some(parent_fqcn) = parent_fqcn.as_ref() {
                 let parent_here = crate::db::Fqcn::new(self.db, parent_fqcn.clone());
                 let parent_pulled = crate::db::find_class_like(self.db, parent_here);
-                let parent_push = self
-                    .db
-                    .lookup_class_node(parent_fqcn.as_ref())
-                    .filter(|n| n.active(self.db));
                 let parent_is_final = parent_pulled
                     .as_ref()
                     .map(|c| c.is_final())
-                    .or_else(|| parent_push.map(|n| n.is_final(self.db)))
                     .unwrap_or(false);
-                let parent_deprecated: Option<Arc<str>> = parent_pulled
-                    .as_ref()
-                    .and_then(|c| c.deprecated().cloned())
-                    .or_else(|| parent_push.and_then(|n| n.deprecated(self.db)));
-                if parent_pulled.is_some() || parent_push.is_some() {
+                let parent_deprecated: Option<Arc<str>> =
+                    parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
+                if parent_pulled.is_some() {
                     if parent_is_final {
                         let loc = issue_location(
                             location.as_ref(),
@@ -647,29 +611,15 @@ impl<'a> ClassAnalyzer<'a> {
     fn check_circular_class_inheritance(&self, issues: &mut Vec<Issue>) {
         let mut globally_done: HashSet<String> = HashSet::new();
 
-        // Phase 4: enumerate via workspace_classes (pull) + push fallback.
-        let pull_classes: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+        let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
-            .cloned()
-            .collect();
-        let push_classes: Vec<Arc<str>> = self.db.active_class_node_fqcns();
-        let mut seen: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
-        let mut class_keys: Vec<Arc<str>> = pull_classes
-            .into_iter()
-            .chain(push_classes)
-            .filter(|f| seen.insert(f.clone()))
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::new(self.db, fqcn.clone());
-                if let Some(c) = crate::db::find_class_like(self.db, here) {
-                    return c.is_class();
-                }
-                self.db
-                    .lookup_class_node(fqcn.as_ref())
-                    .map(|n| {
-                        !n.is_interface(self.db) && !n.is_trait(self.db) && !n.is_enum(self.db)
-                    })
+                let here = crate::db::Fqcn::new(self.db, (*fqcn).clone());
+                crate::db::find_class_like(self.db, here)
+                    .map(|c| c.is_class())
                     .unwrap_or(false)
             })
+            .cloned()
             .collect();
         class_keys.sort();
 
@@ -710,13 +660,7 @@ impl<'a> ClassAnalyzer<'a> {
                         let here = crate::db::Fqcn::new(self.db, offender.clone());
                         let location: Option<StorageLocation> =
                             crate::db::find_class_like(self.db, here)
-                                .and_then(|c| c.location().cloned())
-                                .or_else(|| {
-                                    self.db
-                                        .lookup_class_node(offender.as_ref())
-                                        .filter(|n| n.active(self.db))
-                                        .and_then(|n| n.location(self.db))
-                                });
+                                .and_then(|c| c.location().cloned());
                         let loc = issue_location(
                             location.as_ref(),
                             offender,
@@ -745,14 +689,8 @@ impl<'a> ClassAnalyzer<'a> {
                 chain.push(current.clone());
 
                 let here = crate::db::Fqcn::new(self.db, current.clone());
-                let parent: Option<Arc<str>> = crate::db::find_class_like(self.db, here)
-                    .and_then(|c| c.parent().cloned())
-                    .or_else(|| {
-                        self.db
-                            .lookup_class_node(current.as_ref())
-                            .filter(|n| n.active(self.db))
-                            .and_then(|n| n.parent(self.db))
-                    });
+                let parent: Option<Arc<str>> =
+                    crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
                 match parent {
                     Some(p) => current = p,
