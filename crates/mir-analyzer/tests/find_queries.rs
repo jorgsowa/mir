@@ -184,16 +184,29 @@ fn find_class_like_resolves_php_builtin_via_stub_resolver() {
 }
 
 #[test]
-fn find_returns_none_when_resolver_misses() {
+fn find_returns_class_from_set_file_text() {
+    // With the pull-based architecture, set_file_text is enough to make a
+    // class findable via workspace_symbol_index — no resolver needed.
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
         Arc::from("<?php\nclass Foo {}\n"),
     );
 
-    // No resolver attached.
     let db = session.snapshot_db();
     let fqcn = Fqcn::new(&db, Arc::from("Foo"));
+    assert!(
+        find_class_like(&db, fqcn).is_some(),
+        "class registered via set_file_text must be findable"
+    );
+}
+
+#[test]
+fn find_returns_none_for_unregistered_class() {
+    // A class that was never registered in any way must return None.
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let db = session.snapshot_db();
+    let fqcn = Fqcn::new(&db, Arc::from("NeverRegistered"));
     assert!(find_class_like(&db, fqcn).is_none());
 }
 

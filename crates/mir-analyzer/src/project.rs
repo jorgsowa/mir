@@ -9,8 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
 use crate::db::{
-    collect_file_definitions, collect_file_definitions_uncached, FileDefinitions, MirDatabase,
-    MirDb, RefLoc, SourceFile,
+    collect_file_definitions, FileDefinitions, MirDatabase, MirDb, RefLoc, SourceFile,
 };
 use crate::pass2::{InferredTypes, Pass2Driver};
 use crate::php_version::PhpVersion;
@@ -541,6 +540,32 @@ impl ProjectAnalyzer {
             }
         }
         let _t_ingest = _t0.elapsed();
+
+        // ---- Pre-warm collect_file_definitions for project files -------------
+        // After ingest, project SourceFiles have their text set in salsa.
+        // Prime the tracked `collect_file_definitions` cache for each project
+        // file in parallel so that `workspace_symbol_index` (called from class
+        // analysis and Pass-2) finds all cache hits and doesn't need to
+        // (re-)parse project files inline — eliminating a serial bottleneck on
+        // cold starts, especially at high thread counts.
+        {
+            let db_prewarm = {
+                let guard = self.shared_db.salsa.read();
+                (**guard).clone()
+            };
+            let project_source_files: Vec<SourceFile> = {
+                let guard = self.shared_db.salsa.read();
+                parsed_files
+                    .iter()
+                    .filter_map(|p| (**guard).lookup_source_file(&p.file))
+                    .collect()
+            };
+            project_source_files
+                .into_par_iter()
+                .for_each_with(db_prewarm, |db, sf| {
+                    let _ = collect_file_definitions(db as &dyn MirDatabase, sf);
+                });
+        }
 
         // ---- Lazy-load unknown classes via PSR-4 (issue #50) ----------------
         if let Some(psr4) = &self.psr4 {
@@ -1146,9 +1171,13 @@ impl ProjectAnalyzer {
             (**guard).clone()
         };
         let stub_cache = self.shared_db.stub_cache.clone();
-        // `into_par_iter` so cached slices can be moved (not cloned) into the
-        // result vec. Cloning 10k StubSlices on warm vendor would burn most
-        // of the churn-reduction win the cache exists to produce.
+        // Use the salsa-tracked `collect_file_definitions` for cache misses so
+        // that `workspace_symbol_index` (called during project Pass-2) gets a
+        // salsa cache HIT instead of re-parsing every vendor file a second time.
+        // Clones share salsa storage, so results written here are visible to
+        // the main db handle.  For stub-cache hits, the slice comes from disk and
+        // salsa will parse on-demand (lazily) when the workspace index is built —
+        // still only one parse per file total.
         let prepared: Vec<mir_codebase::storage::StubSlice> = entries
             .into_par_iter()
             .zip(source_files.into_par_iter())
@@ -1156,12 +1185,14 @@ impl ProjectAnalyzer {
                 if let Some(slice) = entry.cached.take() {
                     return slice;
                 }
-                let defs = collect_file_definitions_uncached(&*db, salsa_file);
-                let slice = Arc::unwrap_or_clone(defs.slice);
+                // Tracked version: result is memoized in the shared salsa
+                // storage.  `workspace_symbol_index` will get a cache hit.
+                let defs = collect_file_definitions(&*db, salsa_file);
                 if let Some(cache) = stub_cache.as_ref() {
-                    cache.put(&entry.file, &entry.hash, php_v, &slice);
+                    cache.put(&entry.file, &entry.hash, php_v, &defs.slice);
                 }
-                slice
+                // Cheap clone: StubSlice now holds Vec<Arc<Storage>> items.
+                (*defs.slice).clone()
             })
             .collect();
         let _t_collect = _t0.elapsed();

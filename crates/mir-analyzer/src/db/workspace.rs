@@ -40,9 +40,9 @@ pub struct WorkspaceRevision {
 /// can ptr_eq-compare for cheap skip.
 #[salsa::tracked]
 pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
-    let Some(rev) = db.workspace_revision() else {
-        return Arc::from([]);
-    };
+    let rev = db
+        .workspace_revision()
+        .expect("WorkspaceRevision not initialized");
     // Anchor on the revision so file add/remove invalidates this query.
     let _ = rev.revision(db);
 
@@ -69,9 +69,9 @@ pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
 /// Iterate over every function FQN defined in any registered SourceFile.
 #[salsa::tracked]
 pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
-    let Some(rev) = db.workspace_revision() else {
-        return Arc::from([]);
-    };
+    let rev = db
+        .workspace_revision()
+        .expect("WorkspaceRevision not initialized");
     let _ = rev.revision(db);
 
     let files = db.all_source_files();
@@ -179,9 +179,12 @@ unsafe impl salsa::Update for WorkspaceSymbolIndex {
 
 #[salsa::tracked]
 pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
-    let Some(rev) = db.workspace_revision() else {
-        return WorkspaceSymbolIndex::default();
-    };
+    // workspace_revision() is always Some — init_workspace_revision() is called
+    // at SharedDb::new() so this query always reads the revision and salsa can
+    // properly invalidate it when files are added or removed.
+    let rev = db
+        .workspace_revision()
+        .expect("WorkspaceRevision not initialized");
     let _ = rev.revision(db);
 
     let files = db.all_source_files();
@@ -232,9 +235,9 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
 
 #[salsa::tracked]
 pub fn workspace_fqcn_index(db: &dyn MirDatabase) -> FqcnIndex {
-    let Some(rev) = db.workspace_revision() else {
-        return FqcnIndex::default();
-    };
+    let rev = db
+        .workspace_revision()
+        .expect("WorkspaceRevision not initialized");
     let _ = rev.revision(db);
 
     let files = db.all_source_files();

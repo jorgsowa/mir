@@ -528,11 +528,11 @@ impl FunctionStorage {
 /// `MirDatabase::ingest_stub_slice`.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct StubSlice {
-    pub classes: Vec<ClassStorage>,
-    pub interfaces: Vec<InterfaceStorage>,
-    pub traits: Vec<TraitStorage>,
-    pub enums: Vec<EnumStorage>,
-    pub functions: Vec<FunctionStorage>,
+    pub classes: Vec<Arc<ClassStorage>>,
+    pub interfaces: Vec<Arc<InterfaceStorage>>,
+    pub traits: Vec<Arc<TraitStorage>>,
+    pub enums: Vec<Arc<EnumStorage>>,
+    pub functions: Vec<Arc<FunctionStorage>>,
     #[serde(default)]
     pub constants: Vec<(Arc<str>, Union)>,
     /// Source file this slice was collected from. `None` for bundled stub slices
@@ -595,35 +595,35 @@ pub fn deduplicate_params_in_slice(slice: &mut StubSlice) {
 
     // Deduplicate method params in all classes
     for cls in &mut slice.classes {
-        for method in cls.own_methods.values_mut() {
+        for method in Arc::make_mut(cls).own_methods.values_mut() {
             deduplicate(&mut Arc::make_mut(method).params);
         }
     }
 
     // Deduplicate method params in all interfaces
     for iface in &mut slice.interfaces {
-        for method in iface.own_methods.values_mut() {
+        for method in Arc::make_mut(iface).own_methods.values_mut() {
             deduplicate(&mut Arc::make_mut(method).params);
         }
     }
 
     // Deduplicate method params in all traits
     for tr in &mut slice.traits {
-        for method in tr.own_methods.values_mut() {
+        for method in Arc::make_mut(tr).own_methods.values_mut() {
             deduplicate(&mut Arc::make_mut(method).params);
         }
     }
 
     // Deduplicate method params in all enums
     for en in &mut slice.enums {
-        for method in en.own_methods.values_mut() {
+        for method in Arc::make_mut(en).own_methods.values_mut() {
             deduplicate(&mut Arc::make_mut(method).params);
         }
     }
 
     // Deduplicate function params
     for func in &mut slice.functions {
-        deduplicate(&mut func.params);
+        deduplicate(&mut Arc::make_mut(func).params);
     }
     slice.is_deduped = true;
 }

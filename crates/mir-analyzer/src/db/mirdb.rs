@@ -56,7 +56,7 @@ impl Clone for PendingRefLocs {
 }
 
 #[salsa::db]
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct MirDb {
     storage: salsa::Storage<Self>,
     // Keep registries behind `Arc`s so `MirDb::clone()` stays cheap for
@@ -140,6 +140,37 @@ struct ResolverState {
     /// Currently active resolver. `None` for sessions configured without
     /// PSR-4 / classmap support.
     resolver: Option<Arc<dyn crate::ClassResolver>>,
+}
+
+impl Default for MirDb {
+    fn default() -> Self {
+        let mut db = Self {
+            storage: salsa::Storage::default(),
+            class_nodes: Arc::default(),
+            class_node_keys_lower: Arc::default(),
+            function_nodes: Arc::default(),
+            function_node_keys_lower: Arc::default(),
+            method_nodes: MemberRegistry::default(),
+            property_nodes: MemberRegistry::default(),
+            class_constant_nodes: MemberRegistry::default(),
+            global_constant_nodes: Arc::default(),
+            file_namespaces: Arc::default(),
+            file_imports: Arc::default(),
+            global_vars: Arc::default(),
+            symbol_to_file: Arc::default(),
+            file_to_defined_symbols: FileDefinedSymbols::default(),
+            reference_locations: ReferenceLocations::default(),
+            file_references: FileReferences::default(),
+            symbol_referencers: SymbolReferencers::default(),
+            pending_ref_locs: PendingRefLocs::default(),
+            source_files: Arc::default(),
+            resolver_state: Arc::default(),
+            inferred_return_types_input: Arc::default(),
+            workspace_revision_input: Arc::default(),
+        };
+        db.init_workspace_revision();
+        db
+    }
 }
 
 #[salsa::db]
@@ -511,6 +542,16 @@ impl MirDb {
     pub fn remove_source_file(&mut self, path: &str) {
         if Arc::make_mut(&mut self.source_files).remove(path).is_some() {
             self.bump_workspace_revision();
+        }
+    }
+
+    /// Create the WorkspaceRevision salsa input at revision 0 if it doesn't
+    /// exist yet. Called once at database construction so workspace_symbol_index
+    /// always reads the revision and salsa can invalidate it on first file add.
+    pub fn init_workspace_revision(&mut self) {
+        if self.workspace_revision_input.read().is_none() {
+            let rev = crate::db::WorkspaceRevision::new(self, 0);
+            *self.workspace_revision_input.write() = Some(rev);
         }
     }
 

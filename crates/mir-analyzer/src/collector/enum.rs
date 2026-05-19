@@ -86,15 +86,17 @@ impl DefinitionCollector<'_> {
             Some(self.location(stmt_span.start, stmt_span.end)),
         );
 
-        self.slice.enums.push(mir_codebase::EnumStorage {
-            fqcn: fqcn.into(),
-            short_name: Arc::from(decl.name.to_string()),
-            scalar_type,
-            interfaces,
-            cases,
-            own_methods,
-            own_constants,
-            location: Some(self.location(stmt_span.start, stmt_span.end)),
-        });
+        self.slice
+            .enums
+            .push(std::sync::Arc::new(mir_codebase::EnumStorage {
+                fqcn: fqcn.into(),
+                short_name: Arc::from(decl.name.to_string()),
+                scalar_type,
+                interfaces,
+                cases,
+                own_methods,
+                own_constants,
+                location: Some(self.location(stmt_span.start, stmt_span.end)),
+            }));
     }
 }
