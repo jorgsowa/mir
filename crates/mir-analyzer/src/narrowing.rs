@@ -305,11 +305,9 @@ fn apply_docblock_assertions<'arena, 'src>(
         .strip_prefix('\\')
         .map(|s| s.to_string())
         .unwrap_or_else(|| fn_name.to_string());
-    // Phase 4: function existence check uses pull-path first.
     let fn_active = |name: &str| -> bool {
         let here = crate::db::Fqcn::new(db, Arc::<str>::from(name));
         crate::db::find_function(db, here).is_some()
-            || db.lookup_function_node(name).is_some_and(|n| n.active(db))
     };
     let resolved_fn_name = {
         let qualified = crate::db::resolve_name_via_db(db, file, &fn_name);
@@ -322,10 +320,8 @@ fn apply_docblock_assertions<'arena, 'src>(
         }
     };
 
-    let Some(node) = db
-        .lookup_function_node(resolved_fn_name.as_str())
-        .filter(|n| n.active(db))
-    else {
+    let here = crate::db::Fqcn::new(db, Arc::<str>::from(resolved_fn_name.as_str()));
+    let Some(f) = crate::db::find_function(db, here) else {
         return false;
     };
     let expected_kind = if is_true {
@@ -334,8 +330,8 @@ fn apply_docblock_assertions<'arena, 'src>(
         AssertionKind::AssertIfFalse
     };
 
-    let assertions = node.assertions(db);
-    let params = node.params(db);
+    let assertions = &f.assertions;
+    let params = &f.params;
 
     let mut applied = false;
     for assertion in assertions

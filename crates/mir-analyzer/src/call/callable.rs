@@ -37,8 +37,8 @@ pub(crate) fn extract_callable_params(
             }
             Atomic::TLiteralString(fn_name) => {
                 let here = crate::db::Fqcn::new(ea.db, fn_name.clone());
-                let params: Option<Vec<ParamInfo>> = crate::db::find_function(ea.db, here)
-                    .map(|f| {
+                let params: Option<Vec<ParamInfo>> =
+                    crate::db::find_function(ea.db, here).map(|f| {
                         f.params
                             .iter()
                             .map(|p| ParamInfo {
@@ -46,20 +46,6 @@ pub(crate) fn extract_callable_params(
                                 is_variadic: p.is_variadic,
                             })
                             .collect()
-                    })
-                    .or_else(|| {
-                        ea.db
-                            .lookup_function_node(fn_name.as_ref())
-                            .filter(|n| n.active(ea.db))
-                            .map(|node| {
-                                node.params(ea.db)
-                                    .iter()
-                                    .map(|p| ParamInfo {
-                                        is_optional: p.is_optional,
-                                        is_variadic: p.is_variadic,
-                                    })
-                                    .collect()
-                            })
                     });
                 if let Some(params) = params {
                     return Some(params);

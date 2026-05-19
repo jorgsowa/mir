@@ -91,11 +91,6 @@ impl CallAnalyzer {
             let here = crate::db::Fqcn::new(ea.db, fqcn_arc.clone());
             let is_interface = crate::db::find_class_like(ea.db, here)
                 .map(|c| c.is_interface())
-                .or_else(|| {
-                    ea.db
-                        .lookup_class_node(&fqcn)
-                        .map(|n| n.is_interface(ea.db))
-                })
                 .unwrap_or(false);
             if is_interface {
                 ea.emit(

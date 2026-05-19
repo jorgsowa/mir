@@ -627,10 +627,9 @@ impl<'a> Pass2Driver<'a> {
         let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
-        let parent_fqcn = self
-            .db
-            .lookup_class_node(fqcn)
-            .and_then(|node| node.parent(self.db));
+        let here = crate::db::Fqcn::new(self.db, std::sync::Arc::<str>::from(fqcn));
+        let parent_fqcn =
+            crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
@@ -874,10 +873,9 @@ impl<'a> Pass2Driver<'a> {
         let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
-        let parent_fqcn = self
-            .db
-            .lookup_class_node(fqcn)
-            .and_then(|node| node.parent(self.db));
+        let here = crate::db::Fqcn::new(self.db, std::sync::Arc::<str>::from(fqcn));
+        let parent_fqcn =
+            crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
