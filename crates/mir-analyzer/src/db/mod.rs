@@ -184,7 +184,7 @@ pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 pub use self::workspace::{
     workspace_classes, workspace_fqcn_index, workspace_functions, workspace_symbol_index,
-    FqcnIndex, WorkspaceRevision, WorkspaceSymbolIndex,
+    FqcnIndex, SymbolLoc, WorkspaceRevision, WorkspaceSymbolIndex,
 };
 
 // Sub-modules

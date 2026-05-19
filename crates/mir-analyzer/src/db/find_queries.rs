@@ -399,25 +399,50 @@ pub fn global_constant_in_file<'db>(
 /// `set_file_text` or `set_workspace_files`), but Pass-1 collection
 /// happens on demand inside salsa.
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
-    // Phase 6 hot path: one O(1) HashMap lookup over a salsa-cached
-    // workspace-wide map. Replaces the 4-deep nested tracked-query stack
-    // (resolve_fqcn_to_path → lookup_source_file → class_in_file).
+    use crate::db::SymbolLoc;
+    // Phase 6 hot path: one O(1) lookup in the lightweight index plus one
+    // memoized `collect_file_definitions(file)` to fetch the storage from
+    // its slice. Replaces the 4-deep nested tracked-query stack the prior
+    // pull-path paid for every method/class lookup.
     let name = fqcn.name(db);
     let key = name.to_ascii_lowercase();
     let index = crate::db::workspace_symbol_index(db);
-    if let Some(c) = index.classes.get(&key) {
-        return Some(ClassLike::Class(c.clone()));
+    let loc = index.class_like.get(&key).copied()?;
+    let (file, kind_idx) = match loc {
+        SymbolLoc::Class { file, idx } => (file, ("class", idx)),
+        SymbolLoc::Interface { file, idx } => (file, ("interface", idx)),
+        SymbolLoc::Trait { file, idx } => (file, ("trait", idx)),
+        SymbolLoc::Enum { file, idx } => (file, ("enum", idx)),
+        SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => return None,
+    };
+    let defs = collect_file_definitions(db, file);
+    match kind_idx.0 {
+        "class" => defs
+            .slice
+            .classes
+            .get(kind_idx.1)
+            .cloned()
+            .map(|c| ClassLike::Class(Arc::new(c))),
+        "interface" => defs
+            .slice
+            .interfaces
+            .get(kind_idx.1)
+            .cloned()
+            .map(|i| ClassLike::Interface(Arc::new(i))),
+        "trait" => defs
+            .slice
+            .traits
+            .get(kind_idx.1)
+            .cloned()
+            .map(|t| ClassLike::Trait(Arc::new(t))),
+        "enum" => defs
+            .slice
+            .enums
+            .get(kind_idx.1)
+            .cloned()
+            .map(|e| ClassLike::Enum(Arc::new(e))),
+        _ => None,
     }
-    if let Some(i) = index.interfaces.get(&key) {
-        return Some(ClassLike::Interface(i.clone()));
-    }
-    if let Some(t) = index.traits.get(&key) {
-        return Some(ClassLike::Trait(t.clone()));
-    }
-    if let Some(e) = index.enums.get(&key) {
-        return Some(ClassLike::Enum(e.clone()));
-    }
-    None
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate the
@@ -426,12 +451,15 @@ pub fn find_function<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
 ) -> Option<Arc<FunctionStorage>> {
+    use crate::db::SymbolLoc;
     let name = fqn.name(db);
     let key = name.to_ascii_lowercase();
-    crate::db::workspace_symbol_index(db)
-        .functions
-        .get(&key)
-        .cloned()
+    let index = crate::db::workspace_symbol_index(db);
+    let SymbolLoc::Function { file, idx } = index.functions.get(&key).copied()? else {
+        return None;
+    };
+    let defs = collect_file_definitions(db, file);
+    defs.slice.functions.get(idx).cloned().map(Arc::new)
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate a global
@@ -440,10 +468,15 @@ pub fn find_global_constant<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
 ) -> Option<Arc<mir_types::Union>> {
+    use crate::db::SymbolLoc;
     let name = fqn.name(db);
     let key = name.to_string();
-    if let Some(c) = crate::db::workspace_symbol_index(db).constants.get(&key) {
-        return Some(c.clone());
+    let index = crate::db::workspace_symbol_index(db);
+    if let Some(SymbolLoc::Constant { file, idx }) = index.constants.get(&key).copied() {
+        let defs = collect_file_definitions(db, file);
+        if let Some((_, ty)) = defs.slice.constants.get(idx) {
+            return Some(Arc::new(ty.clone()));
+        }
     }
     let file = source_file_for_fqcn(db, fqn)?;
     global_constant_in_file(db, file, fqn)
