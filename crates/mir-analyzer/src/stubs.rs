@@ -495,7 +495,7 @@ pub fn is_builtin_function(name: &str) -> bool {
     static FALLBACK: LazyLock<HashSet<Arc<str>>> = LazyLock::new(|| {
         builtin_stub_slices_for_version(PhpVersion::LATEST)
             .into_iter()
-            .flat_map(|slice| slice.functions.into_iter().map(|func| func.fqn))
+            .flat_map(|slice| slice.functions.into_iter().map(|func| func.fqn.clone()))
             .collect()
     });
     FALLBACK.contains(name)
@@ -525,14 +525,20 @@ mod tests {
         db
     }
 
-    fn stub_function_for(version: PhpVersion, name: &str) -> Option<mir_codebase::FunctionStorage> {
+    fn stub_function_for(
+        version: PhpVersion,
+        name: &str,
+    ) -> Option<std::sync::Arc<mir_codebase::FunctionStorage>> {
         builtin_stub_slices_for_version(version)
             .into_iter()
             .flat_map(|slice| slice.functions.into_iter())
             .find(|func| func.fqn.as_ref() == name)
     }
 
-    fn stub_class_for(version: PhpVersion, name: &str) -> Option<mir_codebase::ClassStorage> {
+    fn stub_class_for(
+        version: PhpVersion,
+        name: &str,
+    ) -> Option<std::sync::Arc<mir_codebase::ClassStorage>> {
         builtin_stub_slices_for_version(version)
             .into_iter()
             .flat_map(|slice| slice.classes.into_iter())

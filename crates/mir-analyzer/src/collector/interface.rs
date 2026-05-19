@@ -104,15 +104,17 @@ impl<'a> DefinitionCollector<'a> {
             Some(self.location(stmt_span.start, stmt_span.end)),
         );
 
-        self.slice.interfaces.push(InterfaceStorage {
-            fqcn: fqcn.into(),
-            short_name: Arc::from(decl.name.to_string()),
-            extends,
-            own_methods,
-            own_constants,
-            template_params,
-            location: Some(self.location(stmt_span.start, stmt_span.end)),
-        });
+        self.slice
+            .interfaces
+            .push(std::sync::Arc::new(InterfaceStorage {
+                fqcn: fqcn.into(),
+                short_name: Arc::from(decl.name.to_string()),
+                extends,
+                own_methods,
+                own_constants,
+                template_params,
+                location: Some(self.location(stmt_span.start, stmt_span.end)),
+            }));
 
         ControlFlow::Continue(())
     }

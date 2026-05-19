@@ -72,8 +72,15 @@ pub struct SharedDb {
 
 impl SharedDb {
     pub fn new() -> Self {
+        let mut db = MirDb::default();
+        // Pre-create the WorkspaceRevision salsa input so workspace_symbol_index
+        // always reads it and salsa properly invalidates it on first file add.
+        // Without this, querying workspace_symbol_index before any file is
+        // ingested memoizes an empty result that salsa can never invalidate
+        // (because the query never read the revision during that execution).
+        db.init_workspace_revision();
         Self {
-            salsa: RwLock::new(MirDbRw(MirDb::default())),
+            salsa: RwLock::new(MirDbRw(db)),
             loaded_stubs: Mutex::new(HashSet::new()),
             user_stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             stub_cache: None,

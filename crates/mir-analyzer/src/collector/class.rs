@@ -246,7 +246,7 @@ impl<'a> DefinitionCollector<'a> {
                 .collect(),
         };
 
-        self.slice.classes.push(storage);
+        self.slice.classes.push(std::sync::Arc::new(storage));
         ControlFlow::Continue(())
     }
 }

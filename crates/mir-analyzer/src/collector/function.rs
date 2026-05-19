@@ -149,7 +149,7 @@ impl DefinitionCollector<'_> {
             docstring,
         };
 
-        self.slice.functions.push(storage);
+        self.slice.functions.push(std::sync::Arc::new(storage));
 
         // Scan the function body for `@var`-annotated global declarations.
         self.scan_stmts_for_global_vars(&decl.body);

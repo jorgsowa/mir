@@ -300,7 +300,6 @@ pub fn class_in_file<'db>(
         .iter()
         .find(|c| c.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
-        .map(Arc::new)
 }
 
 /// Locate an `interface` named `fqcn` defined in `file`.
@@ -317,7 +316,6 @@ pub fn interface_in_file<'db>(
         .iter()
         .find(|i| i.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
-        .map(Arc::new)
 }
 
 /// Locate a `trait` named `fqcn` defined in `file`.
@@ -334,7 +332,6 @@ pub fn trait_in_file<'db>(
         .iter()
         .find(|t| t.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
-        .map(Arc::new)
 }
 
 /// Locate an `enum` named `fqcn` defined in `file`.
@@ -351,7 +348,6 @@ pub fn enum_in_file<'db>(
         .iter()
         .find(|e| e.fqcn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
-        .map(Arc::new)
 }
 
 /// Locate a function named `fqn` defined in `file`.
@@ -368,7 +364,6 @@ pub fn function_in_file<'db>(
         .iter()
         .find(|f| f.fqn.eq_ignore_ascii_case(target.as_ref()))
         .cloned()
-        .map(Arc::new)
 }
 
 /// Locate a global constant `fqn` defined in `file`. Returns
@@ -407,7 +402,7 @@ pub fn class_storage_at(
     idx: u32,
 ) -> Option<Arc<ClassStorage>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.classes.get(idx as usize).cloned().map(Arc::new)
+    defs.slice.classes.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
@@ -417,11 +412,7 @@ pub fn interface_storage_at(
     idx: u32,
 ) -> Option<Arc<InterfaceStorage>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice
-        .interfaces
-        .get(idx as usize)
-        .cloned()
-        .map(Arc::new)
+    defs.slice.interfaces.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
@@ -431,7 +422,7 @@ pub fn trait_storage_at(
     idx: u32,
 ) -> Option<Arc<TraitStorage>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.traits.get(idx as usize).cloned().map(Arc::new)
+    defs.slice.traits.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
@@ -441,7 +432,7 @@ pub fn enum_storage_at(
     idx: u32,
 ) -> Option<Arc<EnumStorage>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.enums.get(idx as usize).cloned().map(Arc::new)
+    defs.slice.enums.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
@@ -451,11 +442,7 @@ pub fn function_storage_at(
     idx: u32,
 ) -> Option<Arc<FunctionStorage>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice
-        .functions
-        .get(idx as usize)
-        .cloned()
-        .map(Arc::new)
+    defs.slice.functions.get(idx as usize).cloned()
 }
 
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {

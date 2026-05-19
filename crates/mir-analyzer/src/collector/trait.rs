@@ -166,7 +166,7 @@ impl<'a> DefinitionCollector<'a> {
             .map(|s| self.resolve_type_name(&Arc::from(s.as_str()), true))
             .collect();
 
-        self.slice.traits.push(TraitStorage {
+        self.slice.traits.push(std::sync::Arc::new(TraitStorage {
             fqcn: fqcn.into(),
             short_name: Arc::from(decl.name.to_string()),
             own_methods,
@@ -177,7 +177,7 @@ impl<'a> DefinitionCollector<'a> {
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             require_extends,
             require_implements,
-        });
+        }));
 
         ControlFlow::Continue(())
     }
