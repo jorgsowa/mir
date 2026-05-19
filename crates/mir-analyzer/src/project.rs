@@ -273,34 +273,21 @@ impl ProjectAnalyzer {
     /// Returns `true` if a function with `fqn` is registered and active.
     pub fn contains_function(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
-        // Phase 4: pull-first, push fallback.
         let here = crate::db::Fqcn::new(&db, Arc::<str>::from(fqn));
-        if crate::db::find_function(&db, here).is_some() {
-            return true;
-        }
-        db.lookup_function_node(fqn).is_some_and(|n| n.active(&db))
+        crate::db::find_function(&db, here).is_some()
     }
 
     /// Returns `true` if a class / interface / trait / enum is registered.
     pub fn contains_class(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
         let here = crate::db::Fqcn::new(&db, Arc::<str>::from(fqcn));
-        if crate::db::find_class_like(&db, here).is_some() {
-            return true;
-        }
-        db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db))
+        crate::db::find_class_like(&db, here).is_some()
     }
 
     /// Returns `true` if `class` has a method named `name` (case-insensitive).
     pub fn contains_method(&self, class: &str, name: &str) -> bool {
         let db = self.snapshot_db();
-        let name_lower = name.to_ascii_lowercase();
-        let here = crate::db::Fqcn::new(&db, Arc::<str>::from(class));
-        if crate::db::find_method_in_class(&db, here, &name_lower).is_some() {
-            return true;
-        }
-        db.lookup_method_node(class, &name_lower)
-            .is_some_and(|n| n.active(&db))
+        crate::db::has_method_in_chain(&db, class, name)
     }
 
     /// Acquire a cheap clone of the salsa db for a read-only query.
@@ -337,14 +324,13 @@ impl ProjectAnalyzer {
     #[doc(hidden)]
     pub fn symbol_location(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
         let db = self.snapshot_db();
-        db.lookup_class_node(symbol)
-            .filter(|n| n.active(&db))
-            .and_then(|n| n.location(&db))
-            .or_else(|| {
-                db.lookup_function_node(symbol)
-                    .filter(|n| n.active(&db))
-                    .and_then(|n| n.location(&db))
-            })
+        let here = crate::db::Fqcn::new(&db, Arc::<str>::from(symbol));
+        if let Some(class) = crate::db::find_class_like(&db, here) {
+            if let Some(loc) = class.location() {
+                return Some(loc.clone());
+            }
+        }
+        crate::db::find_function(&db, here).and_then(|f| f.location.clone())
     }
 
     /// Legacy: raw reference locations as `(file, line, col_start, col_end)`.
@@ -795,31 +781,32 @@ impl ProjectAnalyzer {
             let import_candidates = {
                 let db_owned = self.snapshot_db();
                 let db = &db_owned;
-                for fqcn in db.active_class_node_fqcns() {
+                for fqcn in crate::db::workspace_classes(db).iter() {
                     if scanned.contains(fqcn.as_ref()) {
                         continue;
                     }
-                    let Some(node) = db.lookup_class_node(&fqcn) else {
+                    let here = crate::db::Fqcn::new(db, fqcn.clone());
+                    let Some(class) = crate::db::find_class_like(db, here) else {
                         continue;
                     };
                     scanned.insert(fqcn.clone());
-                    if node.is_interface(db) {
-                        for parent in node.extends(db).iter() {
+                    if class.is_interface() {
+                        for parent in class.extends().iter() {
                             inheritance_candidates.push(parent.to_string());
                         }
-                    } else if node.is_enum(db) {
-                        for iface in node.interfaces(db).iter() {
+                    } else if class.is_enum() {
+                        for iface in class.interfaces().iter() {
                             inheritance_candidates.push(iface.to_string());
                         }
-                    } else if node.is_trait(db) {
-                        for used in node.traits(db).iter() {
+                    } else if class.is_trait() {
+                        for used in class.class_traits().iter() {
                             inheritance_candidates.push(used.to_string());
                         }
                     } else {
-                        if let Some(parent) = node.parent(db) {
+                        if let Some(parent) = class.parent() {
                             inheritance_candidates.push(parent.to_string());
                         }
-                        for iface in node.interfaces(db).iter() {
+                        for iface in class.interfaces().iter() {
                             inheritance_candidates.push(iface.to_string());
                         }
                     }
@@ -1268,57 +1255,51 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
             .collect::<Vec<_>>()
     };
 
-    for fqcn in db.active_class_node_fqcns() {
-        // Only true classes contribute class-direction edges in this loop.
-        // Interface / trait / enum edges are not currently emitted here —
-        // this function only ever read classes.
-        let kind = match crate::db::class_kind_via_db(db, fqcn.as_ref()) {
-            Some(k) if !k.is_interface && !k.is_trait && !k.is_enum => k,
-            _ => continue,
+    for fqcn in crate::db::workspace_classes(db).iter() {
+        let here = crate::db::Fqcn::new(db, fqcn.clone());
+        let Some(class) = crate::db::find_class_like(db, here) else {
+            continue;
         };
-        let _ = kind;
+        // Only true classes contribute class-direction edges in this loop.
+        if class.is_interface() || class.is_trait() || class.is_enum() {
+            continue;
+        }
         let Some(file) = db
             .symbol_defining_file(fqcn.as_ref())
             .map(|f| f.as_ref().to_string())
+            .or_else(|| class.location().map(|l| l.file.as_ref().to_string()))
         else {
             continue;
         };
 
-        let Some(node) = db.lookup_class_node(fqcn.as_ref()) else {
-            continue;
-        };
-        if let Some(parent) = node.parent(db) {
+        if let Some(parent) = class.parent() {
             add_edge(parent.as_ref(), &file);
         }
-        for iface in node.interfaces(db).iter() {
+        for iface in class.interfaces().iter() {
             add_edge(iface.as_ref(), &file);
         }
-        for tr in node.traits(db).iter() {
+        for tr in class.class_traits().iter() {
             add_edge(tr.as_ref(), &file);
         }
-
-        // Add types from properties
-        for prop in db.class_own_properties(fqcn.as_ref()).iter() {
-            if let Some(ty) = prop.ty(db) {
-                for named in extract_named_objects(&ty) {
-                    add_edge(named.as_ref(), &file);
+        if let Some(props) = class.own_properties() {
+            for (_, p) in props.iter() {
+                if let Some(ty) = &p.ty {
+                    for named in extract_named_objects(ty) {
+                        add_edge(named.as_ref(), &file);
+                    }
                 }
             }
         }
-
-        // Add types from methods
-        for method in db.class_own_methods(fqcn.as_ref()).iter() {
-            // Parameter types
-            for param in method.params(db).iter() {
+        for (_, method) in class.own_methods().iter() {
+            for param in method.params.iter() {
                 if let Some(ty) = &param.ty {
                     for named in extract_named_objects(ty.as_ref()) {
                         add_edge(named.as_ref(), &file);
                     }
                 }
             }
-            // Return type
-            if let Some(rt) = method.return_type(db) {
-                for named in extract_named_objects(rt.as_ref()) {
+            if let Some(rt) = method.return_type.as_deref() {
+                for named in extract_named_objects(rt) {
                     add_edge(named.as_ref(), &file);
                 }
             }
@@ -1326,28 +1307,28 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
     }
 
     // Add types from global functions
-    for fqn in db.active_function_node_fqns() {
-        let Some(node) = db.lookup_function_node(fqn.as_ref()) else {
+    for fqn in crate::db::workspace_functions(db).iter() {
+        let here = crate::db::Fqcn::new(db, fqn.clone());
+        let Some(f) = crate::db::find_function(db, here) else {
             continue;
         };
         let Some(file) = db
             .symbol_defining_file(fqn.as_ref())
             .map(|f| f.as_ref().to_string())
+            .or_else(|| f.location.as_ref().map(|l| l.file.as_ref().to_string()))
         else {
             continue;
         };
 
-        // Parameter types
-        for param in node.params(db).iter() {
+        for param in f.params.iter() {
             if let Some(ty) = &param.ty {
                 for named in extract_named_objects(ty.as_ref()) {
                     add_edge(named.as_ref(), &file);
                 }
             }
         }
-        // Return type
-        if let Some(rt) = node.return_type(db) {
-            for named in extract_named_objects(rt.as_ref()) {
+        if let Some(rt) = f.return_type.as_deref() {
+            for named in extract_named_objects(rt) {
                 add_edge(named.as_ref(), &file);
             }
         }

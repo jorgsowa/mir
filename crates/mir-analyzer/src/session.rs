@@ -1064,19 +1064,20 @@ impl AnalysisSession {
                 let resolved = self.lazy_load_class(&name);
                 if resolved && !was_present {
                     loaded += 1;
-                    // Walk the new class's parent / interfaces / traits.
+                    // Walk the new class's parent / interfaces / traits via pull.
                     let db = self.snapshot_db();
-                    if let Some(node) = db.lookup_class_node(&name) {
-                        if let Some(parent) = node.parent(&db) {
+                    let here = crate::db::Fqcn::new(&db, Arc::<str>::from(name.as_str()));
+                    if let Some(class) = crate::db::find_class_like(&db, here) {
+                        if let Some(parent) = class.parent() {
                             next.push(parent.to_string());
                         }
-                        for iface in node.interfaces(&db).iter() {
+                        for iface in class.interfaces().iter() {
                             next.push(iface.to_string());
                         }
-                        for tr in node.traits(&db).iter() {
+                        for tr in class.class_traits().iter() {
                             next.push(tr.to_string());
                         }
-                        for ext in node.extends(&db).iter() {
+                        for ext in class.extends().iter() {
                             next.push(ext.to_string());
                         }
                     }
@@ -1264,11 +1265,10 @@ impl AnalysisSession {
         }
         let mut out = Vec::new();
         for fqcn in imports.values() {
-            // Cheap check: skip imports already in the codebase.
-            if db.lookup_class_node(fqcn).is_some_and(|n| n.active(&db)) {
+            let here = crate::db::Fqcn::new(&db, Arc::<str>::from(fqcn.as_str()));
+            if crate::db::find_class_like(&db, here).is_some() {
                 continue;
             }
-            // Only worth queueing if the resolver could in principle find it.
             if let Some(resolver) = &self.resolver {
                 if resolver.resolve(fqcn).is_some() {
                     out.push(Arc::from(fqcn.as_str()));
