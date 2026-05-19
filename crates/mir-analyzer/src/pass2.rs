@@ -4,7 +4,7 @@ use mir_issues::Issue;
 use mir_types::Union;
 use parking_lot::Mutex;
 
-use crate::db::{resolve_name_via_db, FunctionNode, MirDatabase};
+use crate::db::{resolve_name_via_db, MirDatabase};
 use crate::diagnostics::{
     check_expr_for_undefined_classes, check_name_class, check_type_hint_classes,
     collect_type_hint_class_refs, emit_unused_params, emit_unused_variables,
@@ -45,51 +45,29 @@ fn method_chain_signature(
     (vec![], None, vec![], Arc::from([]))
 }
 
-/// Resolve a function declaration's `FunctionNode` via the salsa db,
-/// matching the pre-S5 fallback chain (qualified FQN → raw name →
-/// short-name scan).  `None` if no active node matches.
+/// Resolve a function declaration's storage via the salsa pull path
+/// (qualified FQN → raw name → short-name scan over `workspace_functions`).
 fn lookup_function_node_for_decl(
     db: &dyn MirDatabase,
     file: &str,
     fn_name: &str,
-) -> Option<FunctionNode> {
+) -> Option<(Arc<str>, Arc<mir_codebase::storage::FunctionStorage>)> {
     let qualified = resolve_name_via_db(db, file, fn_name);
-    if let Some(n) = db
-        .lookup_function_node(qualified.as_str())
-        .filter(|n| n.active(db))
-    {
-        return Some(n);
-    }
-    if let Some(n) = db.lookup_function_node(fn_name).filter(|n| n.active(db)) {
-        return Some(n);
-    }
-    // Phase 4: short-name scan via workspace_functions (pull) and
-    // active_function_node_fqns (push fallback). Dedupe.
-    let pull_fns = crate::db::workspace_functions(db);
-    let push_fns = db.active_function_node_fqns();
-    let mut seen: rustc_hash::FxHashSet<&str> = rustc_hash::FxHashSet::default();
-    let scan = |fqn: &str| -> Option<FunctionNode> {
-        let short = fqn.rsplit('\\').next().unwrap_or(fqn);
-        if short == fn_name {
-            db.lookup_function_node(fqn).filter(|n| n.active(db))
-        } else {
-            None
-        }
+    let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::storage::FunctionStorage>> {
+        crate::db::find_function(db, crate::db::Fqcn::new(db, Arc::<str>::from(fqn)))
     };
-    for fqn in pull_fns.iter() {
-        if !seen.insert(fqn.as_ref()) {
-            continue;
-        }
-        if let Some(n) = scan(fqn.as_ref()) {
-            return Some(n);
-        }
+    if let Some(f) = try_lookup(qualified.as_str()) {
+        return Some((Arc::from(qualified), f));
     }
-    for fqn in push_fns.iter() {
-        if !seen.insert(fqn.as_ref()) {
-            continue;
-        }
-        if let Some(n) = scan(fqn.as_ref()) {
-            return Some(n);
+    if let Some(f) = try_lookup(fn_name) {
+        return Some((Arc::from(fn_name), f));
+    }
+    for fqn in crate::db::workspace_functions(db).iter() {
+        let short = fqn.rsplit('\\').next().unwrap_or(fqn.as_ref());
+        if short == fn_name {
+            if let Some(f) = try_lookup(fqn.as_ref()) {
+                return Some((fqn.clone(), f));
+            }
         }
     }
     None
@@ -549,27 +527,27 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
-        let fqn = node_opt.map(|n| n.fqn(self.db));
+        let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         let (params, return_ty, template_params, declared_throws): (
             Vec<mir_codebase::FnParam>,
             _,
             Vec<_>,
             Arc<[Arc<str>]>,
-        ) = match node_opt {
-            Some(n) => {
-                let stored = n.params(self.db);
-                if stored.len() == decl.params.len()
-                    && stored
+        ) = match &resolved {
+            Some((_, storage)) => {
+                if storage.params.len() == decl.params.len()
+                    && storage
+                        .params
                         .iter()
                         .zip(decl.params.iter())
                         .all(|(cp, ap)| ap.name.to_string() == *cp.name)
                 {
                     (
-                        stored.to_vec(),
-                        n.return_type(self.db).map(|t| (*t).clone()),
-                        n.template_params(self.db).to_vec(),
-                        n.throws(self.db),
+                        storage.params.to_vec(),
+                        storage.return_type.as_deref().cloned(),
+                        storage.template_params.clone(),
+                        Arc::from(storage.throws.clone()),
                     )
                 } else {
                     (
@@ -802,22 +780,22 @@ impl<'a> Pass2Driver<'a> {
             self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
         }
 
-        let node_opt = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
-        let fqn = node_opt.map(|n| n.fqn(self.db));
+        let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         let (params, return_ty, declared_throws): (Vec<mir_codebase::FnParam>, _, Arc<[Arc<str>]>) =
-            match node_opt {
-                Some(n) => {
-                    let stored = n.params(self.db);
-                    if stored.len() == decl.params.len()
-                        && stored
+            match &resolved {
+                Some((_, storage)) => {
+                    if storage.params.len() == decl.params.len()
+                        && storage
+                            .params
                             .iter()
                             .zip(decl.params.iter())
                             .all(|(cp, ap)| ap.name.to_string() == *cp.name)
                     {
                         (
-                            stored.to_vec(),
-                            n.return_type(self.db).map(|t| (*t).clone()),
-                            n.throws(self.db),
+                            storage.params.to_vec(),
+                            storage.return_type.as_deref().cloned(),
+                            Arc::from(storage.throws.clone()),
                         )
                     } else {
                         (ast_derived_fn_params(&decl.params), None, Arc::from([]))
