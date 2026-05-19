@@ -150,15 +150,11 @@ impl SharedDb {
         // Filter again under the lock to avoid double-ingestion races, then
         // bulk-ingest so the Arc::make_mut clones amortize over the batch
         // instead of paying per slice.
-        let mut to_ingest: Vec<&mir_codebase::storage::StubSlice> =
-            Vec::with_capacity(slices.len());
-        for (path, slice) in &slices {
+        for (path, _slice) in &slices {
             if loaded.insert(*path) {
-                // Mirror as a SourceFile so the pull path (find_class_like)
-                // can resolve built-in PHP classes once a stub-aware
-                // resolver is installed on the session.
-                // HIGH durability: built-in stubs never change within a session,
-                // so salsa can skip re-verifying them when project files change.
+                // Register as a SourceFile so the pull path (workspace_symbol_index
+                // → collect_file_definitions) can index built-in PHP classes.
+                // HIGH durability: built-in stubs never change within a session.
                 if let Some(content) = crate::stubs::stub_content_for_path(path) {
                     guard.upsert_source_file_with_durability(
                         Arc::from(*path),
@@ -166,10 +162,8 @@ impl SharedDb {
                         salsa::Durability::HIGH,
                     );
                 }
-                to_ingest.push(slice);
             }
         }
-        guard.ingest_stub_slices(to_ingest.iter().copied());
     }
 
     /// Ingest user stub slices from configured files and directories.
@@ -195,7 +189,6 @@ impl SharedDb {
             .filter_map(|p| std::fs::read_to_string(&p).ok().map(|s| (p, s)))
             .collect();
 
-        let slices = crate::stubs::user_stub_slices(files, dirs);
         let mut guard = self.salsa.write();
         // Register each user stub as a SourceFile so workspace_symbol_index
         // can index its functions, classes, etc. via the pull path.
@@ -206,7 +199,6 @@ impl SharedDb {
             guard.upsert_source_file(path_arc.clone(), Arc::from(source.as_str()));
             guard.register_user_stub_path(path_arc);
         }
-        guard.ingest_stub_slices(slices.iter());
         self.user_stubs_loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
@@ -280,7 +272,6 @@ impl SharedDb {
                     Arc::from(source),
                     durability,
                 );
-                write_guard.ingest_stub_slice(&file_defs.slice);
                 return file_defs;
             }
         }
@@ -304,7 +295,6 @@ impl SharedDb {
             };
             let mut guard = self.salsa.write();
             guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
-            guard.ingest_stub_slice(&file_defs.slice);
             return file_defs;
         }
         crate::metrics::record_stub_cache_miss();
@@ -350,12 +340,11 @@ impl SharedDb {
             issues: Arc::new(all_issues),
         };
 
-        // ---- Phase 2: register the salsa input + ingest under the write lock --
+        // ---- Phase 2: register the salsa input under the write lock --
         // The expensive parse and AST walk above ran lock-free.
         {
             let mut guard = self.salsa.write();
             guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
-            guard.ingest_stub_slice(&file_defs.slice);
         }
 
         file_defs

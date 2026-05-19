@@ -532,19 +532,15 @@ impl ProjectAnalyzer {
 
         let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
-        {
-            let mut guard = self.shared_db.salsa.write();
-            for defs in file_defs {
-                for issue in defs.issues.iter() {
-                    if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
-                        && issue.severity == mir_issues::Severity::Error
-                    {
-                        files_with_parse_errors.insert(issue.location.file.clone());
-                    }
+        for defs in file_defs {
+            for issue in defs.issues.iter() {
+                if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
+                    && issue.severity == mir_issues::Severity::Error
+                {
+                    files_with_parse_errors.insert(issue.location.file.clone());
                 }
-                guard.ingest_stub_slice(&defs.slice);
-                all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
+            all_issues.extend(Arc::unwrap_or_clone(defs.issues));
         }
         let _t_ingest = _t0.elapsed();
 
@@ -1020,9 +1016,7 @@ impl ProjectAnalyzer {
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
         let symbols = {
-            let mut guard = self.shared_db.salsa.write();
-
-            guard.ingest_stub_slice(&file_defs.slice);
+            let guard = self.shared_db.salsa.write();
 
             // Resolve any newly-collected @psalm-import-type declarations so
             // Pass 2 reads the imported aliases out of `type_aliases`.
@@ -1066,13 +1060,12 @@ impl ProjectAnalyzer {
         let analyzer = ProjectAnalyzer::new();
         let file: Arc<str> = Arc::from("<source>");
         let mut db = MirDb::default();
-        for slice in crate::stubs::builtin_stub_slices_for_version(analyzer.resolved_php_version())
-        {
-            db.ingest_stub_slice(&slice);
-        }
+        db.set_php_version(Arc::from(
+            analyzer.resolved_php_version().to_string().as_str(),
+        ));
+        crate::stubs::load_stubs_for_version(&mut db, analyzer.resolved_php_version());
         let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
         let file_defs = collect_file_definitions(&db, salsa_file);
-        db.ingest_stub_slice(&file_defs.slice);
         let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
         if all_issues.iter().any(|issue| {
             matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
@@ -1201,12 +1194,7 @@ impl ProjectAnalyzer {
             })
             .collect();
         let _t_collect = _t0.elapsed();
-
-        let mut guard = self.shared_db.salsa.write();
-        for slice in &prepared {
-            guard.ingest_stub_slice(slice);
-        }
-        drop(guard);
+        drop(prepared); // stubs are now indexed via salsa pull path; no push ingest needed
         let _t_ingest = _t0.elapsed();
 
         if _timing {

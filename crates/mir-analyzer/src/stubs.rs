@@ -359,10 +359,10 @@ pub(crate) fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
 /// Called after built-in stubs are loaded so user definitions can override or
 /// supplement built-ins (e.g. framework-specific classes, IDE helpers).
 #[allow(dead_code)]
-pub(crate) fn load_user_stubs(db: &mut MirDb, files: &[PathBuf], dirs: &[PathBuf]) {
-    for slice in user_stub_slices(files, dirs) {
-        db.ingest_stub_slice(&slice);
-    }
+pub(crate) fn load_user_stubs(_db: &mut MirDb, files: &[PathBuf], dirs: &[PathBuf]) {
+    // No-op: user stub registration now happens through shared_db::ingest_user_stubs
+    // which registers SourceFile inputs directly for the pull-based salsa path.
+    let _ = user_stub_slices(files, dirs);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,8 +379,8 @@ pub(crate) fn load_user_stubs(db: &mut MirDb, files: &[PathBuf], dirs: &[PathBuf
 /// ```ignore
 /// let vfs = StubVfs::new();
 /// // After analysis:
-/// if let Some(path) = codebase.symbol_to_file.get("strlen") {
-///     if let Some(src) = vfs.get(&path) {
+/// if let Some(path) = session.symbol_defining_file("strlen") {
+///     if let Some(src) = vfs.get(path.as_ref()) {
 ///         // serve `src` as a read-only virtual document
 ///     }
 /// }
