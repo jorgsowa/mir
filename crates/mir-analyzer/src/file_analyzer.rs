@@ -94,8 +94,12 @@ impl<'a> FileAnalyzer<'a> {
         // their SourceFiles are registered before Pass-2 reads them via
         // `find_class_like`. (Salsa tracked queries cannot mutate inputs
         // mid-evaluation, so lazy-loading is staged here outside the query.)
-        self.session
-            .preload_psr4_classes_for_ast(program, file.as_ref());
+        // Only do this when a resolver is configured — otherwise the AST
+        // scan is wasted work for every per-file analysis.
+        if self.session.has_resolver() {
+            self.session
+                .preload_psr4_classes_for_ast(program, file.as_ref());
+        }
 
         // Pull-path Pass-2: `find_class_like` / `find_function` etc. consult
         // the salsa query graph; a single pass is sufficient.

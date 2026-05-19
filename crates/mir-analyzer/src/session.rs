@@ -356,6 +356,14 @@ impl AnalysisSession {
     /// through [`Self::lazy_load_class_transitive`] so their inheritance
     /// chain is also primed (Pass-2 reads parents/interfaces while
     /// resolving members).
+    /// Returns true if this session has a configured class resolver
+    /// (typically a PSR-4 / classmap autoloader chained with the stub
+    /// resolver). Used by `FileAnalyzer` to skip the AST-scan preload
+    /// when no resolver is wired up.
+    pub fn has_resolver(&self) -> bool {
+        self.resolver.is_some()
+    }
+
     pub fn preload_psr4_classes_for_ast(
         &self,
         program: &php_ast::ast::Program<'_, '_>,
