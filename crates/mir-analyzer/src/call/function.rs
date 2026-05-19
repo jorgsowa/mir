@@ -32,8 +32,6 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let inferred = crate::db::inferred_function_return_type(db, fqn);
-    // Phase 4: pull path first; push-path fallback for tests / not-yet-
-    // SourceFile-registered fixtures. Phase 5 deletes the fallback.
     let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
     if let Some(f) = crate::db::find_function(db, here) {
         let return_ty_raw = f

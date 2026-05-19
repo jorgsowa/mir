@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::*;
 
-// class_ancestors tracked query — Phase 5: pull-only via `find_class_like`.
+// class_ancestors tracked query — pull-only via `find_class_like`.
 //
 // Order matches `Codebase::ensure_finalized`: parent → parent's ancestors →
 // implemented interfaces + their ancestors → used traits (for a class);

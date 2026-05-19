@@ -1019,8 +1019,6 @@ impl ProjectAnalyzer {
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
-        // --- S2 + Pass 2: hold the Salsa lock for ClassNode upserts and body
-        // analysis so the db reference is live during Pass 2 (S5).
         let symbols = {
             let mut guard = self.shared_db.salsa.write();
 
@@ -1204,7 +1202,6 @@ impl ProjectAnalyzer {
             .collect();
         let _t_collect = _t0.elapsed();
 
-        // ---- Phase 4: serial ingest under the write lock -------------------
         let mut guard = self.shared_db.salsa.write();
         for slice in &prepared {
             guard.ingest_stub_slice(slice);

@@ -1,4 +1,4 @@
-//! Phase 3 — pull-based symbol lookups.
+//! Pull-based symbol lookups.
 //!
 //! Per-file extractor queries (`class_in_file`, `interface_in_file`, …)
 //! that read from the already-tracked `collect_file_definitions` and locate
@@ -6,24 +6,10 @@
 //! `find_function`) that combine resolution + extraction so callers can
 //! "find by FQCN" with a single call.
 //!
-//! ## Design
-//!
-//! These return `Arc<StorageType>` rather than the push-based
-//! `ClassNode` / `FunctionNode` salsa input handles, because the data
-//! lives in the `StubSlice` produced by `collect_file_definitions` and has
-//! not (yet) been ingested into the FQCN→handle index. The Arc-wrap makes
-//! salsa's identity comparison cheap (ptr_eq) and avoids deep clones.
-//!
-//! ## Status
-//!
-//! Phase 3 ships the infrastructure; Pass-2 still calls the legacy
-//! `MirDatabase::lookup_*_node` methods. Phase 4 will migrate the ~138
-//! call-sites to `find_*` and delete `file_analyzer.rs`'s retry loop.
-//! Phase 5 will delete the push-based index entirely, leaving these
-//! queries as the only path.
-//!
-//! Foundation laid by Phase 3 of
-//! `~/.claude/plans/sequential-popping-parasol.md`.
+//! These return `Arc<StorageType>` rather than salsa input handles. The data
+//! lives in the `StubSlice` produced by `collect_file_definitions`; the
+//! Arc-wrap makes salsa's identity comparison cheap (ptr_eq) and avoids
+//! deep clones.
 
 use std::sync::Arc;
 
@@ -451,10 +437,8 @@ pub fn function_storage_at(
 
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
     use crate::db::SymbolLoc;
-    // Phase 6 hot path: O(1) HashMap lookup in the lightweight index, then
-    // a per-(file, idx) salsa-memoized fetch of the Arc<Storage>. One
-    // Arc::new per distinct class ever queried; subsequent calls return
-    // the same Arc free.
+    // O(1) HashMap lookup in the workspace symbol index, then a per-(file, idx)
+    // salsa-memoized fetch of the Arc<Storage>.
     let name = fqcn.name(db);
     let key = name.to_ascii_lowercase();
     let index = crate::db::workspace_symbol_index(db);
@@ -516,7 +500,7 @@ pub fn find_global_constant<'db>(
 ///
 /// For enums, also synthesizes the built-in `cases()`, `from()`, and
 /// `tryFrom()` static methods that PHP provides at runtime but that the
-/// collector does not emit (mirroring the old push-path synthesis).
+/// collector does not emit.
 pub fn find_method_in_class<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
@@ -643,11 +627,9 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     order.into()
 }
 
-/// Phase 4 helper: existence check for "does any ancestor of `fqcn`
-/// have a method named `name`?". Pull-first, push-fallback. Used for
-/// magic-method dispatch checks (`__call`, `__callstatic`,
-/// `__toString`, `__invoke`, `__get`, …) where callers only need
-/// a boolean. Phase 5 drops the push-fallback.
+/// Existence check for "does any ancestor of `fqcn` have a method named
+/// `name`?". Used for magic-method dispatch checks (`__call`, `__callstatic`,
+/// `__toString`, `__invoke`, `__get`, …) where callers only need a boolean.
 pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool {
     let here = Fqcn::new(db, Arc::<str>::from(fqcn));
     find_method_in_chain(db, here, name).is_some()

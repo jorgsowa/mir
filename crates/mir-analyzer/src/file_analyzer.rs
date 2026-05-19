@@ -59,26 +59,13 @@ impl<'a> FileAnalyzer<'a> {
         Self { session }
     }
 
-    /// Pass 2 with bounded post-pass lazy-load.
+    /// Run Pass 2 against a db snapshot.
     ///
     /// Pass 2 runs against a cloned db snapshot — the lock is not held during
     /// analysis, so concurrent edits and reads on the session proceed without
-    /// blocking on this call.
-    ///
-    /// If Pass 2 emits `UndefinedClass` diagnostics for FQCNs the session's
-    /// resolver can map (PSR-4, classmap, etc.), the corresponding files are
-    /// lazy-ingested and Pass 2 is re-run. Bounded at 3 iterations to handle
-    /// transitive parent → grandparent loads while avoiding pathological
-    /// loops. The session's negative cache short-circuits repeated lookups
-    /// for genuinely-missing names.
-    ///
-    /// This means LSP consumers can call `analyze` for any file without
-    /// first enumerating its class references and pre-loading them — the
-    /// session resolves them on demand.
-    ///
-    /// Stub loading: ensures the session's essentials are loaded, then auto-
-    /// discovers any extension stubs (`imagecreate` → gd, `ReflectionClass` →
-    /// Reflection, …) referenced by `source` and lazy-ingests them.
+    /// blocking on this call. PSR-4-mapped classes referenced in the AST are
+    /// pre-loaded before Pass 2 so `find_class_like` resolves them in a single
+    /// pass via the salsa query graph.
     pub fn analyze(
         &self,
         file: Arc<str>,
@@ -106,8 +93,7 @@ impl<'a> FileAnalyzer<'a> {
         self.run_pass2(file, source, program, source_map)
     }
 
-    /// Inner Pass 2 invocation. Separate from `analyze` so the post-Pass-2
-    /// lazy-load loop can re-run it without re-paying the stub-loading cost.
+    /// Inner Pass 2 invocation.
     fn run_pass2(
         &self,
         file: Arc<str>,

@@ -164,25 +164,15 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
         "initial analysis should report UndefinedFunction"
     );
 
-    // Insert ghost_fn() into the salsa db so a slow-path re-analysis would
-    // find it and produce no issues.
+    // Register ghost_fn() as a source file so a slow-path re-analysis would
+    // find it via workspace_symbol_index and produce no issues.
     {
         let mut guard = analyzer.salsa_db_for_test();
         let db = &mut *guard;
-        db.upsert_function_node(&mir_codebase::FunctionStorage {
-            fqn: Arc::from("ghost_fn"),
-            short_name: Arc::from("ghost_fn"),
-            params: Arc::from([].as_slice()),
-            return_type: None,
-            inferred_return_type: None,
-            template_params: vec![],
-            assertions: vec![],
-            throws: vec![],
-            deprecated: None,
-            is_pure: false,
-            location: None,
-            docstring: None,
-        });
+        db.upsert_source_file(
+            Arc::from("ghost_fn.php"),
+            Arc::from("<?php\nfunction ghost_fn(): void {}\n"),
+        );
     }
 
     // Re-analyze with identical content — must hit the cache.

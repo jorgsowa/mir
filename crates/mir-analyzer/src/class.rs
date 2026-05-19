@@ -56,7 +56,6 @@ impl<'a> ClassAnalyzer<'a> {
     /// Ancestor chain for `fqcn` from the salsa db, or empty if the class
     /// isn't registered.
     fn ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        // Phase 4 H1: keyed by Fqcn now.
         class_ancestors(
             self.db,
             crate::db::Fqcn::new(self.db, Arc::<str>::from(fqcn)),
@@ -68,9 +67,6 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn analyze_all(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
 
-        // Phase 4: enumerate via workspace_classes (pull) merged with
-        // active_class_node_fqcns (push fallback). Filter to plain
-        // classes only.
         let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
@@ -818,8 +814,7 @@ impl<'a> ClassAnalyzer<'a> {
     }
 
     fn iface_in_analyzed_files(&self, fqcn: &Arc<str>) -> bool {
-        // Same lookup path as `class_in_analyzed_files` — interface and class
-        // nodes share `ClassNode` storage, distinguished by `is_interface`.
+        // Same lookup path as `class_in_analyzed_files`.
         self.class_in_analyzed_files(fqcn)
     }
 }

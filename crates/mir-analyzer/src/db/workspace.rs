@@ -1,11 +1,4 @@
-//! Phase 4 enabler — pull-path workspace enumeration.
-//!
-//! Allows tracked queries to iterate everything defined across all
-//! registered `SourceFile` inputs without going through the push-based
-//! `MirDb::active_*_fqcns` methods. Needed by `class.rs::analyze_all`,
-//! `dead_code.rs`, and `project.rs` after Phase 5 deletes those.
-//!
-//! ## Design
+//! Pull-path workspace enumeration.
 //!
 //! A single `WorkspaceRevision` salsa input holds a monotonic counter
 //! bumped whenever a file is added or removed (`upsert_source_file` /

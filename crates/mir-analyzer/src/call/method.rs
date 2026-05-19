@@ -46,8 +46,6 @@ pub(super) fn resolve_method_from_db(
 ) -> Option<ResolvedMethod> {
     let db = ea.db;
 
-    // Pull-first via find_method_in_chain; fall back to the push-path walker
-    // for test fixtures that register classes via direct upsert_class_node.
     if let Some((owner_fqcn, storage)) = crate::db::find_method_in_chain(
         db,
         crate::db::Fqcn::new(db, fqcn.clone()),

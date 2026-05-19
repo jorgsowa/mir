@@ -598,9 +598,8 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Inferred return type → Salsa `FunctionNode::inferred_return_type`
-        // via the parallel-safe buffer (committed serially after the
-        // priming sweep returns).  See `InferredReturnTypes`.
+        // Buffer the inferred return type for serial commit after the
+        // priming sweep returns. See `InferredReturnTypes`.
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
         }

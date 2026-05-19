@@ -157,7 +157,7 @@ impl AnalysisSession {
         let user_resolver: Arc<dyn crate::ClassResolver> = map.clone();
         // Wrap with stub awareness so `find_class_like` / `resolve_fqcn_to_path`
         // can map built-in PHP class FQCNs (`ArrayObject`, `Exception`, …)
-        // to their stub virtual paths. Unblocks Phase 4 Pass-2 migration.
+        // to their stub virtual paths.
         let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::ChainedClassResolver::new(
             user_resolver,
             Arc::new(crate::StubClassResolver),
@@ -1121,8 +1121,8 @@ impl AnalysisSession {
         });
     }
 
-    /// Resolve `fqcn` to its [`ClassNode`], lazy-loading via the configured
-    /// [`crate::ClassResolver`] if the index doesn't already contain it.
+    /// Resolve `fqcn` to a source file, lazy-loading via the configured
+    /// [`crate::ClassResolver`] if it isn't already registered.
     ///
     /// This is the recommended entry point for callers (LSP, Pass 2 diagnostic
     /// emission) that want "does this class exist anywhere in the workspace?"

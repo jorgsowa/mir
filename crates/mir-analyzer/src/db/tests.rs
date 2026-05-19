@@ -1,12 +1,3 @@
-// Tests
-//
-// Phase 5 demolition: tests that exercised the push-based symbol indexes
-// (`upsert_class_node`, `upsert_method_node`, etc.) have been deleted along
-// with the indexes themselves. PHP semantic coverage is preserved by the
-// integration fixtures in `crates/mir-analyzer/tests/fixtures/` (238 dirs,
-// 1497 `.phpt` files) which drive real PHP source through the pull-based
-// pipeline end-to-end.
-
 // Import everything from parent module (mod.rs re-exports)
 use super::*;
 
