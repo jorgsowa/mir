@@ -335,7 +335,7 @@ fn parse_stub_file_slice(path: &Path) -> Option<StubSlice> {
     ))
 }
 
-fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
+pub(crate) fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) => {

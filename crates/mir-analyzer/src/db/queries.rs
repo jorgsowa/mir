@@ -230,8 +230,12 @@ pub fn collect_file_definitions_uncached(
         .map(|err| crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map))
         .collect();
 
+    use std::str::FromStr as _;
+    let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
+        .unwrap_or(crate::php_version::PhpVersion::LATEST);
     let collector =
-        crate::collector::DefinitionCollector::new_for_slice(path, &text, &parsed.source_map);
+        crate::collector::DefinitionCollector::new_for_slice(path, &text, &parsed.source_map)
+            .with_php_version(php_version);
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
     all_issues.extend(collector_issues);
     mir_codebase::storage::deduplicate_params_in_slice(&mut slice);

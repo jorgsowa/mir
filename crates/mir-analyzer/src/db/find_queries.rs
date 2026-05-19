@@ -70,6 +70,10 @@ impl ClassLike {
     ///   - Interface: `extends` (multi)
     ///   - Trait: used `traits`
     ///   - Enum: `interfaces`
+    ///
+    /// `@mixin` FQCNs are intentionally excluded here — they are handled by
+    /// `find_method_in_chain` via a separate cycle-safe walk so they don't
+    /// affect `has_unknown_ancestor_via_db` checks.
     pub fn ancestor_fqcns(&self) -> Vec<Arc<str>> {
         match self {
             ClassLike::Class(c) => {
@@ -509,19 +513,60 @@ pub fn find_global_constant<'db>(
 /// Locate a method named `name` (case-insensitive PHP semantics) on the
 /// class `fqcn`'s **own** methods only — no inheritance walk. Use
 /// [`find_method_in_chain`] for the inherited variant.
+///
+/// For enums, also synthesizes the built-in `cases()`, `from()`, and
+/// `tryFrom()` static methods that PHP provides at runtime but that the
+/// collector does not emit (mirroring the old push-path synthesis).
 pub fn find_method_in_class<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<Arc<MethodStorage>> {
     let class = find_class_like(db, fqcn)?;
-    class.own_methods().iter().find_map(|(k, v)| {
+    if let Some(m) = class.own_methods().iter().find_map(|(k, v)| {
         if k.as_ref().eq_ignore_ascii_case(name) {
             Some(v.clone())
         } else {
             None
         }
-    })
+    }) {
+        return Some(m);
+    }
+    // Synthesize PHP built-in enum static methods.
+    if let ClassLike::Enum(e) = &class {
+        let lower = name.to_ascii_lowercase();
+        let is_backed = e.scalar_type.is_some();
+        let synth = |method_name: &str| {
+            Arc::new(mir_codebase::storage::MethodStorage {
+                fqcn: e.fqcn.clone(),
+                name: Arc::from(method_name),
+                params: Arc::from([].as_ref()),
+                return_type: Some(Arc::new(mir_types::Union::mixed())),
+                inferred_return_type: None,
+                visibility: mir_codebase::storage::Visibility::Public,
+                is_static: true,
+                is_abstract: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                is_final: false,
+                is_virtual: false,
+                is_internal: false,
+                is_pure: false,
+                deprecated: None,
+                location: None,
+                docstring: None,
+            })
+        };
+        if lower == "cases" {
+            return Some(synth("cases"));
+        }
+        if is_backed && (lower == "from" || lower == "tryfrom") {
+            return Some(synth(name));
+        }
+    }
+    None
 }
 
 /// Locate a property named `name` on the class `fqcn`'s **own**
@@ -537,14 +582,30 @@ pub fn find_property_in_class<'db>(
 }
 
 /// Locate a class constant named `name` on the class `fqcn`'s **own**
-/// constants only.
+/// constants only. For enums, also checks cases (which the collector stores
+/// separately in `EnumStorage.cases`, not in `own_constants`).
 pub fn find_class_constant_in_class<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<ConstantStorage> {
     let class = find_class_like(db, fqcn)?;
-    class.own_constants().get(name).cloned()
+    if let Some(c) = class.own_constants().get(name) {
+        return Some(c.clone());
+    }
+    // Enum cases live in EnumStorage.cases, not own_constants.
+    if let ClassLike::Enum(e) = &class {
+        if let Some(case) = e.cases.get(name) {
+            return Some(mir_codebase::storage::ConstantStorage {
+                name: case.name.clone(),
+                ty: mir_types::Union::mixed(),
+                visibility: None,
+                is_final: false,
+                location: case.location.clone(),
+            });
+        }
+    }
+    None
 }
 
 /// Walk the ancestor chain of `fqcn` (parent class + interfaces + traits,
@@ -594,7 +655,8 @@ pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool
 
 /// Walk the inheritance chain of `fqcn` and return the first method
 /// matching `name` (case-insensitive PHP semantics), along with the FQCN
-/// of the class that declared it.
+/// of the class that declared it. Also searches `@mixin` classes via a
+/// separate cycle-safe walk so they don't pollute `has_unknown_ancestor_via_db`.
 pub fn find_method_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
@@ -604,6 +666,40 @@ pub fn find_method_in_chain<'db>(
         let here = Fqcn::new(db, ancestor.clone());
         if let Some(m) = find_method_in_class(db, here, name) {
             return Some((ancestor.clone(), m));
+        }
+    }
+    // Separate @mixin walk — cycle-safe, depth-first.
+    let mut visited_mixins = std::collections::HashSet::<Arc<str>>::new();
+    find_method_in_mixins(db, fqcn, name, &mut visited_mixins)
+}
+
+fn find_method_in_mixins<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: &str,
+    visited: &mut std::collections::HashSet<Arc<str>>,
+) -> Option<(Arc<str>, Arc<MethodStorage>)> {
+    let class = find_class_like(db, fqcn)?;
+    for m in class.mixins() {
+        let mixin_fqcn: Arc<str> = if let Some(pos) = m.find('<') {
+            Arc::from(&m[..pos])
+        } else {
+            m.clone()
+        };
+        if !visited.insert(mixin_fqcn.clone()) {
+            continue;
+        }
+        let mixin_here = Fqcn::new(db, mixin_fqcn.clone());
+        // Walk the mixin's full inheritance chain.
+        for ancestor in class_ancestors_by_fqcn(db, mixin_here).iter() {
+            let here = Fqcn::new(db, ancestor.clone());
+            if let Some(m) = find_method_in_class(db, here, name) {
+                return Some((ancestor.clone(), m));
+            }
+        }
+        // Recurse into the mixin's own mixins.
+        if let Some(result) = find_method_in_mixins(db, mixin_here, name, visited) {
+            return Some(result);
         }
     }
     None

@@ -175,8 +175,27 @@ impl SharedDb {
             return;
         }
 
+        // Collect paths + raw source so we can register SourceFile inputs.
+        let mut all_paths: Vec<PathBuf> = files.to_vec();
+        for dir in dirs {
+            crate::stubs::collect_stub_dir_paths(dir, &mut all_paths);
+        }
+        let path_sources: Vec<(PathBuf, String)> = all_paths
+            .into_iter()
+            .filter_map(|p| std::fs::read_to_string(&p).ok().map(|s| (p, s)))
+            .collect();
+
         let slices = crate::stubs::user_stub_slices(files, dirs);
         let mut guard = self.salsa.write();
+        // Register each user stub as a SourceFile so workspace_symbol_index
+        // can index its functions, classes, etc. via the pull path.
+        // Also mark each path as a user stub so user stubs take priority
+        // over native stubs for the same symbol in workspace_symbol_index.
+        for (path, source) in &path_sources {
+            let path_arc: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+            guard.upsert_source_file(path_arc.clone(), Arc::from(source.as_str()));
+            guard.register_user_stub_path(path_arc);
+        }
         guard.ingest_stub_slices(slices.iter());
         self.user_stubs_loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
