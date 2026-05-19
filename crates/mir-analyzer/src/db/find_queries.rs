@@ -399,18 +399,23 @@ pub fn global_constant_in_file<'db>(
 /// `set_file_text` or `set_workspace_files`), but Pass-1 collection
 /// happens on demand inside salsa.
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
-    let file = source_file_for_fqcn(db, fqcn)?;
-    if let Some(c) = class_in_file(db, file, fqcn) {
-        return Some(ClassLike::Class(c));
+    // Phase 6 hot path: one O(1) HashMap lookup over a salsa-cached
+    // workspace-wide map. Replaces the 4-deep nested tracked-query stack
+    // (resolve_fqcn_to_path → lookup_source_file → class_in_file).
+    let name = fqcn.name(db);
+    let key = name.to_ascii_lowercase();
+    let index = crate::db::workspace_symbol_index(db);
+    if let Some(c) = index.classes.get(&key) {
+        return Some(ClassLike::Class(c.clone()));
     }
-    if let Some(i) = interface_in_file(db, file, fqcn) {
-        return Some(ClassLike::Interface(i));
+    if let Some(i) = index.interfaces.get(&key) {
+        return Some(ClassLike::Interface(i.clone()));
     }
-    if let Some(t) = trait_in_file(db, file, fqcn) {
-        return Some(ClassLike::Trait(t));
+    if let Some(t) = index.traits.get(&key) {
+        return Some(ClassLike::Trait(t.clone()));
     }
-    if let Some(e) = enum_in_file(db, file, fqcn) {
-        return Some(ClassLike::Enum(e));
+    if let Some(e) = index.enums.get(&key) {
+        return Some(ClassLike::Enum(e.clone()));
     }
     None
 }
@@ -421,8 +426,12 @@ pub fn find_function<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
 ) -> Option<Arc<FunctionStorage>> {
-    let file = source_file_for_fqcn(db, fqn)?;
-    function_in_file(db, file, fqn)
+    let name = fqn.name(db);
+    let key = name.to_ascii_lowercase();
+    crate::db::workspace_symbol_index(db)
+        .functions
+        .get(&key)
+        .cloned()
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate a global
@@ -431,6 +440,11 @@ pub fn find_global_constant<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
 ) -> Option<Arc<mir_types::Union>> {
+    let name = fqn.name(db);
+    let key = name.to_string();
+    if let Some(c) = crate::db::workspace_symbol_index(db).constants.get(&key) {
+        return Some(c.clone());
+    }
     let file = source_file_for_fqcn(db, fqn)?;
     global_constant_in_file(db, file, fqn)
 }
