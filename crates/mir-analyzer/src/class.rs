@@ -231,17 +231,16 @@ impl<'a> ClassAnalyzer<'a> {
         // Walk every ancestor class and collect abstract methods
         let ancestors = self.ancestors(fqcn);
         for ancestor_fqcn in &ancestors {
-            // Read abstract method names from the salsa db.  PR52 wired
-            // pruning into `ingest_codebase`, so `method_nodes` no longer
-            // accumulates stale stub entries when a user file shadows a
-            // bundled-stub class with a different method set.
-            let abstract_methods: Vec<Arc<str>> = self
-                .db
-                .class_own_methods(ancestor_fqcn.as_ref())
-                .into_iter()
-                .filter(|m| m.active(self.db) && m.is_abstract(self.db))
-                .map(|m| m.name(self.db))
-                .collect();
+            let here = crate::db::Fqcn::new(self.db, ancestor_fqcn.clone());
+            let abstract_methods: Vec<Arc<str>> = crate::db::find_class_like(self.db, here)
+                .map(|c| {
+                    c.own_methods()
+                        .iter()
+                        .filter(|(_, m)| m.is_abstract)
+                        .map(|(_, m)| m.name.clone())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
 
             for method_name in abstract_methods {
                 // Check if the concrete class (or any closer ancestor) provides it
@@ -293,20 +292,19 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for iface_fqcn in &all_ifaces {
-            // Read method names from the salsa db.  PR52 wired pruning into
-            // `ingest_codebase`, so `method_nodes` no longer accumulates stale
-            // stub entries when a user file shadows a bundled-stub interface.
-            let method_nodes = self.db.class_own_methods(iface_fqcn.as_ref());
-            if method_nodes.is_empty() {
-                // Skip interfaces with no registered methods (unregistered or
-                // empty marker interfaces).
+            let here = crate::db::Fqcn::new(self.db, iface_fqcn.clone());
+            let method_names: Vec<Arc<str>> = match crate::db::find_class_like(self.db, here) {
+                Some(c) => c
+                    .own_methods()
+                    .iter()
+                    .filter(|(_, m)| !m.is_virtual)
+                    .map(|(_, m)| m.name.clone())
+                    .collect(),
+                None => continue,
+            };
+            if method_names.is_empty() {
                 continue;
             }
-            let method_names: Vec<Arc<str>> = method_nodes
-                .into_iter()
-                .filter(|m| m.active(self.db) && !m.is_virtual(self.db))
-                .map(|m| m.name(self.db))
-                .collect();
 
             for method_name in method_names {
                 // PHP method names are case-insensitive; normalize before lookup so that
@@ -353,12 +351,17 @@ impl<'a> ClassAnalyzer<'a> {
         _cls_location: Option<&StorageLocation>,
         issues: &mut Vec<Issue>,
     ) {
-        let own_methods = self.db.class_own_methods(fqcn.as_ref());
-        for own in own_methods {
-            if !own.active(self.db) {
-                continue;
-            }
-            let method_name: Arc<str> = own.name(self.db);
+        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        let Some(class) = crate::db::find_class_like(self.db, here) else {
+            return;
+        };
+        let own_methods: Vec<(Arc<str>, Arc<mir_codebase::storage::MethodStorage>)> = class
+            .own_methods()
+            .iter()
+            .map(|(k, m)| (k.clone(), m.clone()))
+            .collect();
+        for (_, own) in own_methods {
+            let method_name: Arc<str> = own.name.clone();
 
             // PHP does not enforce constructor signature compatibility
             if method_name.as_ref() == "__construct" {
@@ -371,14 +374,22 @@ impl<'a> ClassAnalyzer<'a> {
             } else {
                 Arc::from(method_name.to_lowercase().as_str())
             };
-            let parent_method = self.find_parent_method(fqcn, method_name_lower.as_ref());
+            // Walk ancestors (skipping self) for an inherited definition.
+            let parent_method = crate::db::class_ancestors_by_fqcn(self.db, here)
+                .iter()
+                .skip(1)
+                .find_map(|anc| {
+                    let here2 = crate::db::Fqcn::new(self.db, anc.clone());
+                    crate::db::find_method_in_class(self.db, here2, method_name_lower.as_ref())
+                        .map(|m| (anc.clone(), m))
+                });
 
-            let parent = match parent_method {
+            let (parent_fqcn, parent) = match parent_method {
                 Some(m) => m,
                 None => continue, // not an override
             };
 
-            let own_location = own.location(self.db);
+            let own_location = own.location.clone();
             let loc = issue_location(
                 own_location.as_ref(),
                 fqcn,
@@ -388,12 +399,12 @@ impl<'a> ClassAnalyzer<'a> {
             );
 
             // ---- a. Cannot override a final method -------------------------
-            if parent.is_final(self.db) {
+            if parent.is_final {
                 let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
                         method: method_name_lower.to_string(),
-                        parent: parent.fqcn(self.db).to_string(),
+                        parent: parent_fqcn.to_string(),
                     },
                     loc.clone(),
                 );
@@ -404,7 +415,7 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- b. Visibility must not be reduced -------------------------
-            if visibility_reduced(own.visibility(self.db), parent.visibility(self.db)) {
+            if visibility_reduced(own.visibility, parent.visibility) {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
@@ -419,13 +430,8 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- c. Return type must be covariant --------------------------
-            // Only check when both sides have an explicit return type.
-            // Skip when:
-            //   - Parent type is from a docblock (PHP doesn't enforce docblock override compat)
-            //   - Either type is mixed
-            //   - Parent type contains a template param
-            let parent_return_type = parent.return_type(self.db);
-            let own_return_type = own.return_type(self.db);
+            let parent_return_type = parent.return_type.as_deref().cloned();
+            let own_return_type = own.return_type.as_deref().cloned();
             if let (Some(child_ret), Some(parent_ret)) =
                 (own_return_type.as_ref(), parent_return_type.as_ref())
             {
@@ -474,8 +480,8 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- d. Required param count must not increase -----------------
-            let parent_params = parent.params(self.db);
-            let own_params = own.params(self.db);
+            let parent_params = parent.params.clone();
+            let own_params = own.params.clone();
             let parent_required = parent_params
                 .iter()
                 .filter(|p| !p.is_optional && !p.is_variadic)
@@ -634,26 +640,6 @@ impl<'a> ClassAnalyzer<'a> {
         })
     }
 
-    /// Find a method with the given name in the closest ancestor (not the class itself).
-    /// Returns the parent's `MethodNode` (db-tracked).
-    fn find_parent_method(
-        &self,
-        fqcn: &Arc<str>,
-        method_name_lower: &str,
-    ) -> Option<crate::db::MethodNode> {
-        let ancestors = self.ancestors(fqcn);
-        for ancestor_fqcn in &ancestors {
-            if let Some(node) = self
-                .db
-                .lookup_method_node(ancestor_fqcn.as_ref(), method_name_lower)
-                .filter(|n| n.active(self.db))
-            {
-                return Some(node);
-            }
-        }
-        None
-    }
-
     // -----------------------------------------------------------------------
     // Check: circular class inheritance (class A extends B extends A)
     // -----------------------------------------------------------------------
@@ -788,16 +774,15 @@ impl<'a> ClassAnalyzer<'a> {
     fn check_circular_interface_inheritance(&self, issues: &mut Vec<Issue>) {
         let mut globally_done: HashSet<String> = HashSet::new();
 
-        let mut iface_keys: Vec<Arc<str>> = self
-            .db
-            .active_class_node_fqcns()
-            .into_iter()
+        let mut iface_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+            .iter()
             .filter(|fqcn| {
-                self.db
-                    .lookup_class_node(fqcn.as_ref())
-                    .map(|n| n.is_interface(self.db))
+                let here = crate::db::Fqcn::new(self.db, (*fqcn).clone());
+                crate::db::find_class_like(self.db, here)
+                    .map(|c| c.is_interface())
                     .unwrap_or(false)
             })
+            .cloned()
             .collect();
         iface_keys.sort();
 
@@ -842,11 +827,9 @@ impl<'a> ClassAnalyzer<'a> {
                 .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
 
             if let Some(offender) = offender {
-                let location = self
-                    .db
-                    .lookup_class_node(offender.as_ref())
-                    .filter(|n| n.active(self.db))
-                    .and_then(|n| n.location(self.db));
+                let here = crate::db::Fqcn::new(self.db, offender.clone());
+                let location =
+                    crate::db::find_class_like(self.db, here).and_then(|c| c.location().cloned());
                 let loc = issue_location(
                     location.as_ref(),
                     offender,
@@ -871,11 +854,9 @@ impl<'a> ClassAnalyzer<'a> {
         stack_set.insert(fqcn.to_string());
         in_stack.push(fqcn.clone());
 
-        let extends: Vec<Arc<str>> = self
-            .db
-            .lookup_class_node(fqcn.as_ref())
-            .filter(|n| n.active(self.db))
-            .map(|n| n.extends(self.db).to_vec())
+        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        let extends: Vec<Arc<str>> = crate::db::find_class_like(self.db, here)
+            .map(|c| c.extends().to_vec())
             .unwrap_or_default();
 
         for parent in extends {
@@ -891,10 +872,9 @@ impl<'a> ClassAnalyzer<'a> {
         if self.analyzed_files.is_empty() {
             return true;
         }
-        self.db
-            .lookup_class_node(fqcn.as_ref())
-            .filter(|n| n.active(self.db))
-            .and_then(|n| n.location(self.db))
+        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        crate::db::find_class_like(self.db, here)
+            .and_then(|c| c.location().cloned())
             .map(|loc| self.analyzed_files.contains(&loc.file))
             .unwrap_or(false)
     }

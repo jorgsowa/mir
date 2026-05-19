@@ -367,19 +367,20 @@ impl ProjectAnalyzer {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                let node = db
-                    .lookup_class_node(fqcn.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                node.location(&db)
+                class
+                    .location()
+                    .cloned()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Function(fqn) => {
-                let node = db
-                    .lookup_function_node(fqn.as_ref())
-                    .filter(|n| n.active(&db))
+                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                node.location(&db)
+                f.location
+                    .clone()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Method { class, name }
