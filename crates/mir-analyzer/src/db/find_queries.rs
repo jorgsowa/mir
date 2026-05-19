@@ -398,50 +398,88 @@ pub fn global_constant_in_file<'db>(
 /// call is required: the file's text must be registered (via
 /// `set_file_text` or `set_workspace_files`), but Pass-1 collection
 /// happens on demand inside salsa.
+/// Salsa-tracked per-(file, idx) class storage. One memo entry per distinct
+/// class ever queried; subsequent calls return the same Arc cheaply.
+#[salsa::tracked]
+pub fn class_storage_at(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    idx: u32,
+) -> Option<Arc<ClassStorage>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice.classes.get(idx as usize).cloned().map(Arc::new)
+}
+
+#[salsa::tracked]
+pub fn interface_storage_at(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    idx: u32,
+) -> Option<Arc<InterfaceStorage>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice
+        .interfaces
+        .get(idx as usize)
+        .cloned()
+        .map(Arc::new)
+}
+
+#[salsa::tracked]
+pub fn trait_storage_at(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    idx: u32,
+) -> Option<Arc<TraitStorage>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice.traits.get(idx as usize).cloned().map(Arc::new)
+}
+
+#[salsa::tracked]
+pub fn enum_storage_at(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    idx: u32,
+) -> Option<Arc<EnumStorage>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice.enums.get(idx as usize).cloned().map(Arc::new)
+}
+
+#[salsa::tracked]
+pub fn function_storage_at(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    idx: u32,
+) -> Option<Arc<FunctionStorage>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice
+        .functions
+        .get(idx as usize)
+        .cloned()
+        .map(Arc::new)
+}
+
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
     use crate::db::SymbolLoc;
-    // Phase 6 hot path: one O(1) lookup in the lightweight index plus one
-    // memoized `collect_file_definitions(file)` to fetch the storage from
-    // its slice. Replaces the 4-deep nested tracked-query stack the prior
-    // pull-path paid for every method/class lookup.
+    // Phase 6 hot path: O(1) HashMap lookup in the lightweight index, then
+    // a per-(file, idx) salsa-memoized fetch of the Arc<Storage>. One
+    // Arc::new per distinct class ever queried; subsequent calls return
+    // the same Arc free.
     let name = fqcn.name(db);
     let key = name.to_ascii_lowercase();
     let index = crate::db::workspace_symbol_index(db);
     let loc = index.class_like.get(&key).copied()?;
-    let (file, kind_idx) = match loc {
-        SymbolLoc::Class { file, idx } => (file, ("class", idx)),
-        SymbolLoc::Interface { file, idx } => (file, ("interface", idx)),
-        SymbolLoc::Trait { file, idx } => (file, ("trait", idx)),
-        SymbolLoc::Enum { file, idx } => (file, ("enum", idx)),
-        SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => return None,
-    };
-    let defs = collect_file_definitions(db, file);
-    match kind_idx.0 {
-        "class" => defs
-            .slice
-            .classes
-            .get(kind_idx.1)
-            .cloned()
-            .map(|c| ClassLike::Class(Arc::new(c))),
-        "interface" => defs
-            .slice
-            .interfaces
-            .get(kind_idx.1)
-            .cloned()
-            .map(|i| ClassLike::Interface(Arc::new(i))),
-        "trait" => defs
-            .slice
-            .traits
-            .get(kind_idx.1)
-            .cloned()
-            .map(|t| ClassLike::Trait(Arc::new(t))),
-        "enum" => defs
-            .slice
-            .enums
-            .get(kind_idx.1)
-            .cloned()
-            .map(|e| ClassLike::Enum(Arc::new(e))),
-        _ => None,
+    match loc {
+        SymbolLoc::Class { file, idx } => {
+            class_storage_at(db, file, idx as u32).map(ClassLike::Class)
+        }
+        SymbolLoc::Interface { file, idx } => {
+            interface_storage_at(db, file, idx as u32).map(ClassLike::Interface)
+        }
+        SymbolLoc::Trait { file, idx } => {
+            trait_storage_at(db, file, idx as u32).map(ClassLike::Trait)
+        }
+        SymbolLoc::Enum { file, idx } => enum_storage_at(db, file, idx as u32).map(ClassLike::Enum),
+        SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => None,
     }
 }
 
@@ -458,8 +496,7 @@ pub fn find_function<'db>(
     let SymbolLoc::Function { file, idx } = index.functions.get(&key).copied()? else {
         return None;
     };
-    let defs = collect_file_definitions(db, file);
-    defs.slice.functions.get(idx).cloned().map(Arc::new)
+    function_storage_at(db, file, idx as u32)
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate a global
