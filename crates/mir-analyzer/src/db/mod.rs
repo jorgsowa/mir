@@ -100,6 +100,13 @@ pub trait MirDatabase: salsa::Database {
     /// add/remove invalidations.
     fn workspace_revision(&self) -> Option<WorkspaceRevision>;
 
+    /// Return the pre-built workspace symbol index singleton, if populated.
+    /// **Side channel** — not salsa-tracked. Call `singleton.index(db)` on
+    /// the returned handle to read the index with an O(1) tracked dep
+    /// (`Durability::HIGH`). Falls back to the tracked `workspace_symbol_index`
+    /// query when `None`.
+    fn workspace_symbol_index_singleton(&self) -> Option<WorkspaceSymbolIndexSingleton>;
+
     /// Snapshot every registered SourceFile. Side channel — not
     /// salsa-tracked; tracked queries that consult this must also
     /// read `workspace_revision().revision(db)` so file add/remove
@@ -153,9 +160,9 @@ pub use self::queries::{
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 pub use self::workspace::{
-    workspace_classes, workspace_fqcn_index, workspace_functions, workspace_global_vars,
-    workspace_symbol_index, FqcnIndex, GlobalVarMap, SymbolLoc, WorkspaceRevision,
-    WorkspaceSymbolIndex,
+    collect_file_declarations, workspace_classes, workspace_fqcn_index, workspace_functions,
+    workspace_global_vars, workspace_symbol_index, FileDeclarations, FqcnIndex, GlobalVarMap,
+    SymbolLoc, WorkspaceRevision, WorkspaceSymbolIndex, WorkspaceSymbolIndexSingleton,
 };
 
 // Sub-modules
