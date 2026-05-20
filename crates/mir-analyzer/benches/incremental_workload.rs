@@ -117,6 +117,10 @@ fn warm_project_analyzer(
 /// Ingest every project + vendor file into a session so subsequent analyses
 /// see the full codebase. Equivalent in coverage to ProjectAnalyzer's
 /// load_stubs + collect_types_only + analyze.
+///
+/// Vendor files are registered with HIGH durability (they won't be edited
+/// during the session) so salsa can skip O(N) dep-verification for them on
+/// each subsequent project-file edit.
 fn warm_session(
     cache_dir: &TempDir,
     vendor_files: &[PathBuf],
@@ -125,12 +129,28 @@ fn warm_session(
     let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
     session.ensure_stubs_loaded();
-    for path in vendor_files.iter().chain(project_files.iter()) {
+    // Vendor files: HIGH durability (stable within session).
+    let vendor_pairs: Vec<(Arc<str>, Arc<str>)> = vendor_files
+        .iter()
+        .filter_map(|path| {
+            let src = std::fs::read_to_string(path).ok()?;
+            Some((
+                Arc::from(path.to_string_lossy().as_ref()),
+                Arc::from(src.as_str()),
+            ))
+        })
+        .collect();
+    session.set_stable_workspace_files(vendor_pairs);
+    // Project files: LOW durability (may be edited).
+    for path in project_files.iter() {
         if let Ok(src) = std::fs::read_to_string(path) {
             let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
             session.ingest_file(file, Arc::from(src));
         }
     }
+    // Build the workspace symbol index singleton once so subsequent
+    // ingest_file + analyze iterations can read symbols in O(1).
+    session.rebuild_workspace_symbol_index();
     session
 }
 

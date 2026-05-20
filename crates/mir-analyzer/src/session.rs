@@ -498,6 +498,23 @@ impl AnalysisSession {
         // where wholesale clearing forces every unresolved FQCN to re-hit
         // the resolver on the next FileAnalyzer iteration.
         self.evict_unresolvable_for_file(&file);
+
+        // If the workspace symbol index singleton has already been built,
+        // check whether this edit changed any declared names. If so, rebuild
+        // the singleton so subsequent `find_class_like` / `find_function`
+        // calls see the new names. Body-only edits skip this (name-only
+        // PartialEq on FileDeclarations returns equal → no rebuild → the
+        // HIGH-durability singleton dep short-circuits in O(1)).
+        {
+            let mut guard = self.shared_db.salsa.write();
+            if guard.workspace_symbol_index_singleton().is_some() {
+                if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
+                    if guard.file_declarations_changed(sf) {
+                        guard.rebuild_workspace_symbol_index();
+                    }
+                }
+            }
+        }
     }
 
     /// Register `source` as the text of `file` in the salsa input layer **without**
@@ -523,6 +540,43 @@ impl AnalysisSession {
             guard.upsert_source_file(file.clone(), source);
         }
         self.evict_unresolvable_for_file(&file);
+    }
+
+    /// Bulk-register stable vendor / library files with HIGH salsa durability.
+    ///
+    /// HIGH-durability files are not expected to change during the session.
+    /// When a LOW-durability project file is edited, salsa can skip O(N)
+    /// dependency verification for every HIGH-durability file, reducing
+    /// `workspace_symbol_index` re-verification cost to O(project files only).
+    ///
+    /// Pass 1 runs lazily on first symbol access; no parsing at call time.
+    pub fn set_stable_workspace_files<I>(&self, files: I)
+    where
+        I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
+    {
+        let mut guard = self.shared_db.salsa.write();
+        for (file, source) in files {
+            guard.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
+        }
+    }
+
+    /// Build or refresh the `WorkspaceSymbolIndexSingleton` from all currently
+    /// registered files.
+    ///
+    /// After this call, `find_class_like`, `find_function`, and
+    /// `find_global_constant` read `singleton.index(db)` — a single
+    /// `Durability::HIGH` tracked dep — instead of recomputing the full
+    /// O(N_files) dep list via `workspace_symbol_index`. On subsequent
+    /// LOW-durability (project-file) body edits the dep short-circuits in O(1).
+    ///
+    /// Call this once after all vendor + stub + project files have been
+    /// ingested (end of workspace warm-up). Also called automatically by
+    /// [`Self::ingest_file`] when a file's declared names change.
+    pub fn rebuild_workspace_symbol_index(&self) {
+        self.shared_db
+            .salsa
+            .write()
+            .rebuild_workspace_symbol_index();
     }
 
     /// Bulk variant of [`Self::set_file_text`]. Acquires the salsa write lock

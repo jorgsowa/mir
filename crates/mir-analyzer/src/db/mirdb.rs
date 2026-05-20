@@ -96,6 +96,19 @@ pub struct MirDb {
     /// Keyed by blake3 hash of the source text so stale entries from prior
     /// file versions are naturally evicted (different hash → different key).
     parse_cache: Arc<parking_lot::RwLock<FxHashMap<[u8; 32], Arc<StubSlice>>>>,
+    /// Pre-built FQCN symbol index singleton. Written imperatively by
+    /// `rebuild_workspace_symbol_index` and read by `find_class_like` /
+    /// `find_function` / `find_global_constant` via `singleton.index(db)`
+    /// (one HIGH-durability tracked dep) instead of the O(N_files) tracked
+    /// dep list that `workspace_symbol_index` accumulates.
+    workspace_symbol_index_input:
+        Arc<parking_lot::RwLock<Option<crate::db::WorkspaceSymbolIndexSingleton>>>,
+    /// Per-file declaration snapshots used to detect name changes during
+    /// incremental edits. When `ingest_file` is called with a body-only
+    /// edit the snapshot comparison returns `false` and the rebuild is
+    /// skipped, keeping the singleton's revision unchanged.
+    file_decl_snapshots:
+        Arc<parking_lot::RwLock<FxHashMap<SourceFile, crate::db::FileDeclarations>>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -127,6 +140,8 @@ impl Default for MirDb {
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
             stub_cache: Arc::default(),
             parse_cache: Arc::default(),
+            workspace_symbol_index_input: Arc::default(),
+            file_decl_snapshots: Arc::default(),
         };
         db.init_workspace_revision();
         db
@@ -352,6 +367,10 @@ impl MirDatabase for MirDb {
         *self.workspace_revision_input.read()
     }
 
+    fn workspace_symbol_index_singleton(&self) -> Option<crate::db::WorkspaceSymbolIndexSingleton> {
+        *self.workspace_symbol_index_input.read()
+    }
+
     fn all_source_files(&self) -> Vec<SourceFile> {
         self.source_files.values().copied().collect()
     }
@@ -386,6 +405,119 @@ impl MirDb {
     /// processed by `collect_and_ingest_file` in the same session.
     pub fn prime_parse_cache(&self, hash: [u8; 32], slice: Arc<StubSlice>) {
         self.parse_cache.write().insert(hash, slice);
+    }
+
+    /// Rebuild the `WorkspaceSymbolIndexSingleton` salsa input from scratch.
+    ///
+    /// Iterates every registered `SourceFile`, calls `collect_file_declarations`
+    /// on each (salsa-memoized — cheap after Parse-1 primes the caches), builds
+    /// a fresh `WorkspaceSymbolIndex`, and sets it on the singleton input with
+    /// `Durability::HIGH`.  Tracked queries that read `singleton.index(db)` get
+    /// a single HIGH-durability dep; on LOW-durability project-file body edits
+    /// salsa short-circuits the dep in O(1) instead of walking O(N_files).
+    ///
+    /// Also updates `file_decl_snapshots` so `file_declarations_changed` can
+    /// quickly detect whether a subsequent edit changed any declared names.
+    ///
+    /// **Must be called outside any tracked-query context** (it sets a salsa
+    /// input field).  Typical call sites: end of `collect_types_only`, end of
+    /// `AnalysisSession::rebuild_workspace_symbol_index`, and after any
+    /// `ingest_file` that detects a declaration change.
+    pub fn rebuild_workspace_symbol_index(&mut self) {
+        use crate::db::{
+            collect_file_declarations, FileDeclarations, SymbolLoc, WorkspaceSymbolIndex,
+            WorkspaceSymbolIndexSingleton,
+        };
+        use salsa::Setter as _;
+
+        let files = self.all_source_files();
+        let user_stub_files = self.user_stub_source_files();
+
+        let mut class_like: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+        let mut functions: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+        let mut constants: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+        let mut new_snapshots: FxHashMap<SourceFile, FileDeclarations> = FxHashMap::default();
+
+        // Immutable borrow scope: collect declarations from all files.
+        {
+            let db: &dyn MirDatabase = &*self;
+            for &file in files.iter() {
+                let decls = collect_file_declarations(db, file);
+                for (key, loc) in &decls.class_like {
+                    class_like.entry(key.clone()).or_insert(*loc);
+                }
+                for (key, loc) in &decls.functions {
+                    functions.entry(key.clone()).or_insert(*loc);
+                }
+                for (key, loc) in &decls.constants {
+                    constants.entry(key.clone()).or_insert(*loc);
+                }
+                new_snapshots.insert(file, decls);
+            }
+            // User stubs override native stubs for the same symbol.
+            for &file in user_stub_files.iter() {
+                let decls = collect_file_declarations(db, file);
+                for (key, loc) in &decls.class_like {
+                    class_like.insert(key.clone(), *loc);
+                }
+                for (key, loc) in &decls.functions {
+                    functions.insert(key.clone(), *loc);
+                }
+                for (key, loc) in &decls.constants {
+                    constants.insert(key.clone(), *loc);
+                }
+            }
+        }
+
+        *self.file_decl_snapshots.write() = new_snapshots;
+
+        let new_index = WorkspaceSymbolIndex {
+            class_like: Arc::new(class_like),
+            functions: Arc::new(functions),
+            constants: Arc::new(constants),
+        };
+
+        let existing = *self.workspace_symbol_index_input.read();
+        match existing {
+            Some(s) => {
+                let old = s.index(self);
+                if old != new_index {
+                    s.set_index(self)
+                        .with_durability(salsa::Durability::HIGH)
+                        .to(new_index);
+                }
+            }
+            None => {
+                let s = WorkspaceSymbolIndexSingleton::builder(new_index)
+                    .durability(salsa::Durability::HIGH)
+                    .new(self);
+                *self.workspace_symbol_index_input.write() = Some(s);
+            }
+        }
+    }
+
+    /// Check whether the declared names in `file` differ from the last
+    /// snapshot captured by `rebuild_workspace_symbol_index`.
+    ///
+    /// Returns `true` if the declarations changed (or the file is new) so
+    /// the caller should call `rebuild_workspace_symbol_index`. Returns
+    /// `false` if the names are identical (body-only edit) so the rebuild
+    /// — and its HIGH-durability singleton set — can be skipped.
+    ///
+    /// Updates the snapshot for `file` when a change is detected.
+    pub fn file_declarations_changed(&mut self, file: SourceFile) -> bool {
+        let new_decls = {
+            let db: &dyn MirDatabase = &*self;
+            crate::db::collect_file_declarations(db, file)
+        };
+        let mut snapshots = self.file_decl_snapshots.write();
+        match snapshots.get(&file) {
+            Some(old) if *old == new_decls => false,
+            _ => {
+                snapshots.insert(file, new_decls);
+                true
+            }
+        }
     }
 
     /// Commit a batch of reference locations into the shared maps in one lock
@@ -538,6 +670,11 @@ impl MirDb {
                 *self.workspace_revision_input.write() = Some(rev);
             }
         }
+        // A new file was added to the workspace. The pre-built symbol index
+        // singleton no longer covers all registered files; clear it so
+        // `find_class_like` / `find_function` fall back to the tracked
+        // `workspace_symbol_index` query until an explicit rebuild is done.
+        *self.workspace_symbol_index_input.write() = None;
     }
 
     /// Number of source files currently registered.

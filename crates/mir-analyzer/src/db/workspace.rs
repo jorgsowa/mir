@@ -10,6 +10,23 @@
 //! then enumerate via the off-salsa `source_files` registry and demand
 //! `collect_file_definitions` per file. Salsa invalidates the aggregator
 //! when either the file set or any file's content changes.
+//!
+//! ## Incremental edit performance
+//!
+//! Two mechanisms together keep `workspace_symbol_index` cheap on project-file
+//! edits:
+//!
+//! 1. **Salsa durability short-circuit** — vendor and built-in stub files are
+//!    registered with `Durability::HIGH`.  When a LOW-durability project file
+//!    changes, salsa's per-durability revision counter proves that every HIGH-
+//!    durability dep is still valid without walking each one, reducing O(N)
+//!    dep-verification to O(project_files_only).
+//!
+//! 2. **Name-only intermediary** — `workspace_symbol_index` calls
+//!    `collect_file_declarations` (not `collect_file_definitions` directly).
+//!    `collect_file_declarations` has a name-only `PartialEq`: body-only edits
+//!    (method implementations, docblocks, whitespace) do NOT propagate to
+//!    `workspace_symbol_index`, so it is not re-run unless declared names change.
 
 use std::sync::Arc;
 
@@ -122,6 +139,101 @@ unsafe impl salsa::Update for FqcnIndex {
 // (PHP semantics); constants stay case-sensitive.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// FileDeclarations — name-only intermediary for workspace_symbol_index
+// ---------------------------------------------------------------------------
+
+/// Name-only summary of the declarations in one source file.
+///
+/// `PartialEq` compares only the declared names (not body content), so salsa
+/// skips re-running `workspace_symbol_index` when a file's method bodies
+/// change but its set of class / function / constant names is unchanged.
+#[derive(Clone)]
+pub struct FileDeclarations {
+    /// `(lowercased_fqcn, SymbolLoc)` for every class-like symbol.
+    pub class_like: Vec<(String, SymbolLoc)>,
+    /// `(lowercased_fqn, SymbolLoc)` for every function.
+    pub functions: Vec<(String, SymbolLoc)>,
+    /// `(name, SymbolLoc)` for every constant (case-sensitive key).
+    pub constants: Vec<(String, SymbolLoc)>,
+}
+
+impl PartialEq for FileDeclarations {
+    fn eq(&self, other: &Self) -> bool {
+        self.class_like.len() == other.class_like.len()
+            && self
+                .class_like
+                .iter()
+                .zip(&other.class_like)
+                .all(|(a, b)| a.0 == b.0)
+            && self.functions.len() == other.functions.len()
+            && self
+                .functions
+                .iter()
+                .zip(&other.functions)
+                .all(|(a, b)| a.0 == b.0)
+            && self.constants.len() == other.constants.len()
+            && self
+                .constants
+                .iter()
+                .zip(&other.constants)
+                .all(|(a, b)| a.0 == b.0)
+    }
+}
+
+unsafe impl salsa::Update for FileDeclarations {
+    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
+        let old = unsafe { &mut *old_ptr };
+        if *old == new_val {
+            return false;
+        }
+        *old = new_val;
+        true
+    }
+}
+
+/// Extract the declared names from one source file without exposing body
+/// content.  Used as the input to `workspace_symbol_index` so that body-only
+/// edits don't propagate to the workspace-wide FQCN index.
+#[salsa::tracked]
+pub fn collect_file_declarations(db: &dyn MirDatabase, file: SourceFile) -> FileDeclarations {
+    let defs = collect_file_definitions(db, file);
+    let mut class_like = Vec::new();
+    let mut functions = Vec::new();
+    let mut constants = Vec::new();
+
+    for (idx, c) in defs.slice.classes.iter().enumerate() {
+        class_like.push((c.fqcn.to_ascii_lowercase(), SymbolLoc::Class { file, idx }));
+    }
+    for (idx, i) in defs.slice.interfaces.iter().enumerate() {
+        class_like.push((
+            i.fqcn.to_ascii_lowercase(),
+            SymbolLoc::Interface { file, idx },
+        ));
+    }
+    for (idx, t) in defs.slice.traits.iter().enumerate() {
+        class_like.push((t.fqcn.to_ascii_lowercase(), SymbolLoc::Trait { file, idx }));
+    }
+    for (idx, e) in defs.slice.enums.iter().enumerate() {
+        class_like.push((e.fqcn.to_ascii_lowercase(), SymbolLoc::Enum { file, idx }));
+    }
+    for (idx, f) in defs.slice.functions.iter().enumerate() {
+        functions.push((
+            f.fqn.to_ascii_lowercase(),
+            SymbolLoc::Function { file, idx },
+        ));
+    }
+    for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
+        constants.push((name.to_string(), SymbolLoc::Constant { file, idx }));
+    }
+
+    FileDeclarations {
+        class_like,
+        functions,
+        constants,
+    }
+}
+
 /// Symbol kind tag + slice index. Building one is a single integer tag
 /// (no storage cloning). Resolution via `collect_file_definitions(file)`
 /// goes through a salsa-memoized query → direct slice access.
@@ -133,6 +245,23 @@ pub enum SymbolLoc {
     Enum { file: SourceFile, idx: usize },
     Function { file: SourceFile, idx: usize },
     Constant { file: SourceFile, idx: usize },
+}
+
+/// Salsa input singleton holding the pre-built [`WorkspaceSymbolIndex`].
+///
+/// Written imperatively by `MirDb::rebuild_workspace_symbol_index` after
+/// batch file loads and after incremental edits that change declared names.
+/// Reading `singleton.index(db)` inside a tracked query creates exactly
+/// ONE tracked dep (this input field) with `Durability::HIGH`, so on
+/// project-file body edits (LOW durability) salsa short-circuits in O(1)
+/// instead of walking the O(N_files) dep list that `workspace_symbol_index`
+/// (the tracked fn) accumulates.
+///
+/// Falls back to `workspace_symbol_index(db)` when the singleton has not
+/// yet been populated (e.g. in unit tests that never call rebuild).
+#[salsa::input]
+pub struct WorkspaceSymbolIndexSingleton {
+    pub index: WorkspaceSymbolIndex,
 }
 
 /// Lightweight FQCN→location index. Built lazily per workspace revision;
@@ -186,75 +315,32 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let mut constants: FxHashMap<String, SymbolLoc> = FxHashMap::default();
 
     // First pass: all files with or_insert (first-write-wins for native stubs).
+    // collect_file_declarations has a name-only PartialEq so body-only edits
+    // don't propagate to this index.
     for file in files.iter() {
-        let defs = collect_file_definitions(db, *file);
-        for (idx, c) in defs.slice.classes.iter().enumerate() {
-            class_like
-                .entry(c.fqcn.to_ascii_lowercase())
-                .or_insert(SymbolLoc::Class { file: *file, idx });
+        let decls = collect_file_declarations(db, *file);
+        for (key, loc) in &decls.class_like {
+            class_like.entry(key.clone()).or_insert(*loc);
         }
-        for (idx, i) in defs.slice.interfaces.iter().enumerate() {
-            class_like
-                .entry(i.fqcn.to_ascii_lowercase())
-                .or_insert(SymbolLoc::Interface { file: *file, idx });
+        for (key, loc) in &decls.functions {
+            functions.entry(key.clone()).or_insert(*loc);
         }
-        for (idx, t) in defs.slice.traits.iter().enumerate() {
-            class_like
-                .entry(t.fqcn.to_ascii_lowercase())
-                .or_insert(SymbolLoc::Trait { file: *file, idx });
-        }
-        for (idx, e) in defs.slice.enums.iter().enumerate() {
-            class_like
-                .entry(e.fqcn.to_ascii_lowercase())
-                .or_insert(SymbolLoc::Enum { file: *file, idx });
-        }
-        for (idx, f) in defs.slice.functions.iter().enumerate() {
-            functions
-                .entry(f.fqn.to_ascii_lowercase())
-                .or_insert(SymbolLoc::Function { file: *file, idx });
-        }
-        for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
-            constants
-                .entry(name.to_string())
-                .or_insert(SymbolLoc::Constant { file: *file, idx });
+        for (key, loc) in &decls.constants {
+            constants.entry(key.clone()).or_insert(*loc);
         }
     }
 
     // Second pass: user stubs overwrite native stubs for the same symbol.
     for file in db.user_stub_source_files().iter() {
-        let defs = collect_file_definitions(db, *file);
-        for (idx, c) in defs.slice.classes.iter().enumerate() {
-            class_like.insert(
-                c.fqcn.to_ascii_lowercase(),
-                SymbolLoc::Class { file: *file, idx },
-            );
+        let decls = collect_file_declarations(db, *file);
+        for (key, loc) in decls.class_like {
+            class_like.insert(key, loc);
         }
-        for (idx, i) in defs.slice.interfaces.iter().enumerate() {
-            class_like.insert(
-                i.fqcn.to_ascii_lowercase(),
-                SymbolLoc::Interface { file: *file, idx },
-            );
+        for (key, loc) in decls.functions {
+            functions.insert(key, loc);
         }
-        for (idx, t) in defs.slice.traits.iter().enumerate() {
-            class_like.insert(
-                t.fqcn.to_ascii_lowercase(),
-                SymbolLoc::Trait { file: *file, idx },
-            );
-        }
-        for (idx, e) in defs.slice.enums.iter().enumerate() {
-            class_like.insert(
-                e.fqcn.to_ascii_lowercase(),
-                SymbolLoc::Enum { file: *file, idx },
-            );
-        }
-        for (idx, f) in defs.slice.functions.iter().enumerate() {
-            functions.insert(
-                f.fqn.to_ascii_lowercase(),
-                SymbolLoc::Function { file: *file, idx },
-            );
-        }
-        for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
-            constants.insert(name.to_string(), SymbolLoc::Constant { file: *file, idx });
+        for (key, loc) in decls.constants {
+            constants.insert(key, loc);
         }
     }
 

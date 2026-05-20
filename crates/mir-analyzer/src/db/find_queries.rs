@@ -441,7 +441,11 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     // salsa-memoized fetch of the Arc<Storage>.
     let name = fqcn.name(db);
     let key = name.to_ascii_lowercase();
-    let index = crate::db::workspace_symbol_index(db);
+    let index = if let Some(s) = db.workspace_symbol_index_singleton() {
+        s.index(db)
+    } else {
+        crate::db::workspace_symbol_index(db)
+    };
     let loc = index.class_like.get(&key).copied()?;
     match loc {
         SymbolLoc::Class { file, idx } => {
@@ -467,7 +471,11 @@ pub fn find_function<'db>(
     use crate::db::SymbolLoc;
     let name = fqn.name(db);
     let key = name.to_ascii_lowercase();
-    let index = crate::db::workspace_symbol_index(db);
+    let index = if let Some(s) = db.workspace_symbol_index_singleton() {
+        s.index(db)
+    } else {
+        crate::db::workspace_symbol_index(db)
+    };
     let SymbolLoc::Function { file, idx } = index.functions.get(&key).copied()? else {
         return None;
     };
@@ -483,7 +491,11 @@ pub fn find_global_constant<'db>(
     use crate::db::SymbolLoc;
     let name = fqn.name(db);
     let key = name.to_string();
-    let index = crate::db::workspace_symbol_index(db);
+    let index = if let Some(s) = db.workspace_symbol_index_singleton() {
+        s.index(db)
+    } else {
+        crate::db::workspace_symbol_index(db)
+    };
     if let Some(SymbolLoc::Constant { file, idx }) = index.constants.get(&key).copied() {
         let defs = collect_file_definitions(db, file);
         if let Some((_, ty)) = defs.slice.constants.get(idx) {

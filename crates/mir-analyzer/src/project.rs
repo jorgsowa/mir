@@ -777,6 +777,16 @@ impl ProjectAnalyzer {
         if let Some(dump) = crate::metrics::dump() {
             eprintln!("{dump}");
         }
+
+        // ---- Build workspace symbol index singleton -------------------------
+        // All files (including PSR-4 lazy-loaded ones) are now in salsa.
+        // Build the singleton once so subsequent `re_analyze_file` calls get
+        // O(1) symbol lookups instead of O(N_files) dep-list traversal.
+        {
+            let mut guard = self.shared_db.salsa.write();
+            guard.rebuild_workspace_symbol_index();
+        }
+
         AnalysisResult::build(all_issues, std::collections::HashMap::new(), all_symbols)
     }
 
@@ -1015,6 +1025,20 @@ impl ProjectAnalyzer {
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
+        // Check if declared names changed; rebuild singleton if so.
+        // Body-only edits skip this (O(1) comparison), keeping the singleton's
+        // HIGH-durability revision unchanged so Pass-2 lookups stay O(1).
+        {
+            let mut guard = self.shared_db.salsa.write();
+            if guard.workspace_symbol_index_singleton().is_some() {
+                if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
+                    if guard.file_declarations_changed(sf) {
+                        guard.rebuild_workspace_symbol_index();
+                    }
+                }
+            }
+        }
+
         let symbols = {
             let guard = self.shared_db.salsa.write();
 
@@ -1152,13 +1176,20 @@ impl ProjectAnalyzer {
         let _t_read = _t0.elapsed();
 
         // ---- Phase 2: register all SourceFile inputs in salsa --------------
-        // Lazy-load (e.g. UndefinedClass → vendor file) may later query any of
-        // these as a salsa input, so we register both hits and misses.
+        // Vendor files won't change during the session → HIGH durability so
+        // salsa can skip O(N) verification of these deps when a project file
+        // is edited (only LOW-durability project-file deps need re-verification).
         let source_files: Vec<SourceFile> = {
             let mut guard = self.shared_db.salsa.write();
             entries
                 .iter()
-                .map(|e| guard.upsert_source_file(e.file.clone(), e.src.clone()))
+                .map(|e| {
+                    guard.upsert_source_file_with_durability(
+                        e.file.clone(),
+                        e.src.clone(),
+                        salsa::Durability::HIGH,
+                    )
+                })
                 .collect()
         };
         let _t_reg = _t0.elapsed();
@@ -1207,6 +1238,16 @@ impl ProjectAnalyzer {
                 (_t_ingest - _t_collect).as_secs_f64() * 1000.0,
                 _t_ingest.as_secs_f64() * 1000.0,
             );
+        }
+
+        // ---- Build workspace symbol index singleton -------------------------
+        // All vendor SourceFiles and their definitions are now registered and
+        // memoized. Build the singleton once so the subsequent `analyze` call
+        // (and any `re_analyze_file` calls) pay O(1) per symbol lookup instead
+        // of O(N_vendor_files) dep-list traversal.
+        {
+            let mut guard = self.shared_db.salsa.write();
+            guard.rebuild_workspace_symbol_index();
         }
 
         // Print profiling statistics for the collection phase.
