@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use php_ast::ast::{ExprKind, MethodCallExpr};
+use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
@@ -13,8 +13,8 @@ use crate::generic::{build_class_bindings, check_template_bounds, infer_template
 use crate::symbol::SymbolKind;
 
 use super::args::{
-    check_args, check_method_visibility, expr_can_be_passed_by_reference, spread_element_type,
-    substitute_static_in_return, CheckArgsParams,
+    check_args, check_method_visibility, expr_can_be_passed_by_reference_owned,
+    spread_element_type, substitute_static_in_return, CheckArgsParams,
 };
 use super::CallAnalyzer;
 
@@ -82,18 +82,17 @@ pub(super) fn resolve_method_from_db(
 }
 
 impl CallAnalyzer {
-    pub fn analyze_method_call<'a, 'arena, 'src>(
+    pub fn analyze_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
-        call: &MethodCallExpr<'arena, 'src>,
+        call: &MethodCallExpr,
         ctx: &mut Context,
         span: Span,
         nullsafe: bool,
     ) -> Union {
-        let owned_obj = php_ast::owned::to_owned_expr(call.object);
-        let obj_ty = ea.analyze(&owned_obj, ctx);
+        let obj_ty = ea.analyze(&call.object, ctx);
 
         let method_name = match &call.method.kind {
-            ExprKind::Identifier(name) => name.as_str(),
+            ExprKind::Identifier(name) => name.as_ref(),
             _ => return Union::mixed(),
         };
 
@@ -104,8 +103,7 @@ impl CallAnalyzer {
             .args
             .iter()
             .map(|arg| {
-                let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
-                let ty = ea.analyze(&owned_arg, ctx);
+                let ty = ea.analyze(&arg.value, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {
@@ -282,10 +280,10 @@ impl CallAnalyzer {
 /// Resolves method return type for a known receiver FQCN, shared between the
 /// `TNamedObject` and `TSelf`/`TStaticObject`/`TParent` branches.
 #[allow(clippy::too_many_arguments)]
-fn resolve_method_return<'a, 'arena, 'src>(
+fn resolve_method_return<'a>(
     ea: &mut ExpressionAnalyzer<'a>,
     ctx: &Context,
-    call: &MethodCallExpr<'arena, 'src>,
+    call: &MethodCallExpr,
     span: Span,
     method_name: &str,
     fqcn: &Arc<str>,
@@ -348,12 +346,12 @@ fn resolve_method_return<'a, 'arena, 'src>(
         let arg_names: Vec<Option<String>> = call
             .args
             .iter()
-            .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
+            .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
             .collect();
         let arg_can_be_byref: Vec<bool> = call
             .args
             .iter()
-            .map(|a| expr_can_be_passed_by_reference(&a.value))
+            .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
         // Build class-level template bindings before arg-checking so we can substitute
         // template params (e.g. T → int from Box<int>) into param types.

@@ -26,9 +26,6 @@ pub fn is_superglobal(name: &str) -> bool {
 // Sink classification
 // ---------------------------------------------------------------------------
 
-// TODO(owned-migration): SinkKind and classify_sink are used by call/function.rs
-// once it is migrated to owned types.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SinkKind {
     Html,  // echo / print → XSS
@@ -37,7 +34,6 @@ pub enum SinkKind {
 }
 
 /// Return the sink kind for a built-in function name, if it is a taint sink.
-#[allow(dead_code)]
 pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     match fn_name.to_lowercase().as_str() {
         // HTML output

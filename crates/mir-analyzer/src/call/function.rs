@@ -1,4 +1,4 @@
-use php_ast::ast::{ExprKind, FunctionCallExpr};
+use php_ast::owned::{ExprKind, FunctionCallExpr};
 use php_ast::Span;
 
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::symbol::SymbolKind;
 use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 
 use super::args::{
-    check_args, expr_can_be_passed_by_reference, spread_element_type, CheckArgsParams,
+    check_args, expr_can_be_passed_by_reference_owned, spread_element_type, CheckArgsParams,
 };
 use super::callable::extract_callable_params;
 use super::CallAnalyzer;
@@ -54,20 +54,18 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
 }
 
 impl CallAnalyzer {
-    pub fn analyze_function_call<'a, 'arena, 'src>(
+    pub fn analyze_function_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
-        call: &FunctionCallExpr<'arena, 'src>,
+        call: &FunctionCallExpr,
         ctx: &mut Context,
         span: Span,
     ) -> Union {
         let fn_name = match &call.name.kind {
-            ExprKind::Identifier(name) => (*name).to_string(),
+            ExprKind::Identifier(name) => name.as_ref().to_string(),
             _ => {
-                let owned_name = php_ast::owned::to_owned_expr(call.name);
-                let callee_ty = ea.analyze(&owned_name, ctx);
+                let callee_ty = ea.analyze(&call.name, ctx);
                 for arg in call.args.iter() {
-                    let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
-                    ea.analyze(&owned_arg, ctx);
+                    ea.analyze(&arg.value, ctx);
                 }
 
                 // Validate callable arity
@@ -120,7 +118,7 @@ impl CallAnalyzer {
         // Taint sink check (M19): before evaluating args so we can inspect raw exprs
         if let Some(sink_kind) = classify_sink(&fn_name) {
             for arg in call.args.iter() {
-                if is_expr_tainted(&php_ast::owned::to_owned_expr(&arg.value), ctx) {
+                if is_expr_tainted(&arg.value, ctx) {
                     let issue_kind = match sink_kind {
                         SinkKind::Html => IssueKind::TaintedHtml,
                         SinkKind::Sql => IssueKind::TaintedSql,
@@ -173,7 +171,7 @@ impl CallAnalyzer {
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
-                                let var_name = name.as_str().trim_start_matches('$');
+                                let var_name = name.as_ref().trim_start_matches('$');
                                 if !ctx.var_is_defined(var_name) {
                                     ctx.set_var(var_name, Union::mixed());
                                 }
@@ -181,7 +179,7 @@ impl CallAnalyzer {
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_str().trim_start_matches('$');
+                            let var_name = name.as_ref().trim_start_matches('$');
                             if !ctx.var_is_defined(var_name) {
                                 ctx.set_var(var_name, Union::mixed());
                             }
@@ -195,8 +193,7 @@ impl CallAnalyzer {
             .args
             .iter()
             .map(|arg| {
-                let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
-                let ty = ea.analyze(&owned_arg, ctx);
+                let ty = ea.analyze(&arg.value, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {
@@ -218,7 +215,7 @@ impl CallAnalyzer {
         ) {
             if let Some(arg) = call.args.first() {
                 if let ExprKind::String(name) = &arg.value.kind {
-                    let fqn = name.strip_prefix('\\').unwrap_or(name);
+                    let fqn = name.as_ref().strip_prefix('\\').unwrap_or(name.as_ref());
                     let here = crate::db::Fqcn::new(ea.db, Arc::<str>::from(fqn));
                     let canonical_fqn: Option<Arc<str>> =
                         crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
@@ -242,7 +239,7 @@ impl CallAnalyzer {
         if fn_name == "compact" {
             for arg in call.args.iter() {
                 if let ExprKind::String(name) = &arg.value.kind {
-                    ctx.read_vars.insert((*name).to_string());
+                    ctx.read_vars.insert(name.as_ref().to_string());
                 }
             }
         }
@@ -284,12 +281,12 @@ impl CallAnalyzer {
                     arg_names: &call
                         .args
                         .iter()
-                        .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
+                        .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
                         .collect::<Vec<_>>(),
                     arg_can_be_byref: &call
                         .args
                         .iter()
-                        .map(|a| expr_can_be_passed_by_reference(&a.value))
+                        .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
                         .collect::<Vec<_>>(),
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
@@ -322,13 +319,13 @@ impl CallAnalyzer {
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
-                                let var_name = name.as_str().trim_start_matches('$');
+                                let var_name = name.as_ref().trim_start_matches('$');
                                 ctx.set_var(var_name, Union::mixed());
                             }
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_str().trim_start_matches('$');
+                            let var_name = name.as_ref().trim_start_matches('$');
                             ctx.set_var(var_name, Union::mixed());
                         }
                     }
@@ -365,7 +362,7 @@ impl CallAnalyzer {
                                 Some(b) => assertion.ty.substitute_templates(b),
                                 None => assertion.ty.clone(),
                             };
-                            ctx.set_var(name.as_str().trim_start_matches('$'), asserted_ty);
+                            ctx.set_var(name.as_ref().trim_start_matches('$'), asserted_ty);
                         }
                     }
                 }

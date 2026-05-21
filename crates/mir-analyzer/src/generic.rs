@@ -1,6 +1,3 @@
-// TODO(owned-migration): All functions here are used by call/method.rs once
-// it is migrated to owned types.
-#![allow(dead_code)]
 /// Generic type inference — infer template bindings from argument types and
 /// substitute them into return types.
 use std::collections::HashMap;

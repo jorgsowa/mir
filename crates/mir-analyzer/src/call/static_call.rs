@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use php_ast::ast::{ExprKind, StaticDynMethodCallExpr, StaticMethodCallExpr};
+use php_ast::owned::{ExprKind, StaticDynMethodCallExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -11,8 +11,8 @@ use crate::expr::ExpressionAnalyzer;
 use crate::symbol::SymbolKind;
 
 use super::args::{
-    check_args, expr_can_be_passed_by_reference, spread_element_type, substitute_static_in_return,
-    CheckArgsParams,
+    check_args, expr_can_be_passed_by_reference_owned, spread_element_type,
+    substitute_static_in_return, CheckArgsParams,
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
@@ -36,14 +36,14 @@ fn is_valid_class_name_type(ty: &Union) -> bool {
 }
 
 impl CallAnalyzer {
-    pub fn analyze_static_method_call<'a, 'arena, 'src>(
+    pub fn analyze_static_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
-        call: &StaticMethodCallExpr<'arena, 'src>,
+        call: &StaticMethodCallExpr,
         ctx: &mut Context,
         span: Span,
     ) -> Union {
         let method_name = match &call.method.kind {
-            ExprKind::Identifier(name) => name.as_str(),
+            ExprKind::Identifier(name) => name.as_ref(),
             _ => return Union::mixed(),
         };
 
@@ -52,8 +52,7 @@ impl CallAnalyzer {
                 crate::db::resolve_name_via_db(ea.db, &ea.file, name.as_ref())
             }
             _ => {
-                let owned_class = php_ast::owned::to_owned_expr(call.class);
-                let ty = ea.analyze(&owned_class, ctx);
+                let ty = ea.analyze(&call.class, ctx);
                 // Check if the expression could evaluate to a valid class name
                 if !is_valid_class_name_type(&ty) {
                     ea.emit(
@@ -74,8 +73,7 @@ impl CallAnalyzer {
             .args
             .iter()
             .map(|arg| {
-                let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
-                let ty = ea.analyze(&owned_arg, ctx);
+                let ty = ea.analyze(&arg.value, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {
@@ -146,12 +144,12 @@ impl CallAnalyzer {
             let arg_names: Vec<Option<String>> = call
                 .args
                 .iter()
-                .map(|a| a.name.as_ref().map(|n| n.to_string_repr().into_owned()))
+                .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
                 .collect();
             let arg_can_be_byref: Vec<bool> = call
                 .args
                 .iter()
-                .map(|a| expr_can_be_passed_by_reference(&a.value))
+                .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
                 .collect();
             check_args(
                 ea,
@@ -212,14 +210,13 @@ impl CallAnalyzer {
         }
     }
 
-    pub fn analyze_static_dyn_method_call<'a, 'arena, 'src>(
+    pub fn analyze_static_dyn_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
-        call: &StaticDynMethodCallExpr<'arena, 'src>,
+        call: &StaticDynMethodCallExpr,
         ctx: &mut Context,
     ) -> Union {
         for arg in call.args.iter() {
-            let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
-            ea.analyze(&owned_arg, ctx);
+            ea.analyze(&arg.value, ctx);
         }
         Union::mixed()
     }

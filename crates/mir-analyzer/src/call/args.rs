@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use php_ast::ast::{Expr, ExprKind};
 use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
@@ -170,15 +169,15 @@ pub(crate) fn check_method_visibility(
     }
 }
 
-pub(crate) fn expr_can_be_passed_by_reference(expr: &Expr<'_, '_>) -> bool {
+pub(crate) fn expr_can_be_passed_by_reference_owned(expr: &php_ast::owned::Expr) -> bool {
     matches!(
         expr.kind,
-        ExprKind::Variable(_)
-            | ExprKind::ArrayAccess(_)
-            | ExprKind::PropertyAccess(_)
-            | ExprKind::NullsafePropertyAccess(_)
-            | ExprKind::StaticPropertyAccess(_)
-            | ExprKind::StaticPropertyAccessDynamic { .. }
+        php_ast::owned::ExprKind::Variable(_)
+            | php_ast::owned::ExprKind::ArrayAccess(_)
+            | php_ast::owned::ExprKind::PropertyAccess(_)
+            | php_ast::owned::ExprKind::NullsafePropertyAccess(_)
+            | php_ast::owned::ExprKind::StaticPropertyAccess(_)
+            | php_ast::owned::ExprKind::StaticPropertyAccessDynamic { .. }
     )
 }
 

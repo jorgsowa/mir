@@ -38,8 +38,6 @@ pub struct ExpressionAnalyzer<'a> {
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
-    // TODO(owned-migration): used by call/function.rs once it's migrated to owned types.
-    #[allow(dead_code)]
     pub php_version: PhpVersion,
     /// When true, skip all reference-tracking side-effects (used by the
     /// inference priming pass so reference locations aren't double-counted).
@@ -192,131 +190,25 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::StaticPropertyAccessDynamic { .. } => Union::mixed(),
 
             // --- Method calls ----------------------------------------------
-            // TODO(owned-migration): re-enable CallAnalyzer once it's migrated to owned types.
             ExprKind::MethodCall(mc) => {
-                self.analyze(&mc.object, ctx);
-                for arg in mc.args.iter() {
-                    self.analyze(&arg.value, ctx);
-                }
-                Union::mixed()
+                crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false)
             }
 
             ExprKind::NullsafeMethodCall(mc) => {
-                self.analyze(&mc.object, ctx);
-                for arg in mc.args.iter() {
-                    self.analyze(&arg.value, ctx);
-                }
-                Union::mixed()
+                crate::call::CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true)
             }
 
             ExprKind::StaticMethodCall(smc) => {
-                // Record a symbol reference for the static call so that
-                // analyze_dependents_of() can track bare FQN static calls.
-                if let (ExprKind::Identifier(class_name), ExprKind::Identifier(method_name)) =
-                    (&smc.class.kind, &smc.method.kind)
-                {
-                    let fqcn =
-                        crate::db::resolve_name_via_db(self.db, &self.file, class_name.as_ref());
-                    let fqcn = resolve_static_class_owned(&fqcn, ctx);
-                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
-                    let method_str = method_name.as_ref();
-                    self.record_symbol(
-                        smc.method.span,
-                        SymbolKind::StaticCall {
-                            class: fqcn_arc.clone(),
-                            method: Arc::from(method_str),
-                        },
-                        Union::mixed(),
-                    );
-                    if !self.inference_only {
-                        let (line, col_start, col_end) = self.span_to_ref_loc(smc.method.span);
-                        self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(
-                                format!("{}::{}", fqcn_arc, method_str.to_lowercase()).as_str(),
-                            ),
-                            file: self.file.clone(),
-                            line,
-                            col_start,
-                            col_end,
-                        });
-                    }
-                }
-                self.analyze(&smc.class, ctx);
-                for arg in smc.args.iter() {
-                    self.analyze(&arg.value, ctx);
-                }
-                Union::mixed()
+                crate::call::CallAnalyzer::analyze_static_method_call(self, smc, ctx, expr.span)
             }
 
             ExprKind::StaticDynMethodCall(smc) => {
-                self.analyze(&smc.class, ctx);
-                for arg in smc.args.iter() {
-                    self.analyze(&arg.value, ctx);
-                }
-                Union::mixed()
+                crate::call::CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx)
             }
 
             // --- Function calls --------------------------------------------
-            // TODO(owned-migration): re-enable CallAnalyzer once it's migrated to owned types.
             ExprKind::FunctionCall(fc) => {
-                self.analyze(&fc.name, ctx);
-
-                // Resolve function name for symbol recording and by-ref pre-marking.
-                if let ExprKind::Identifier(fn_name_box) = &fc.name.kind {
-                    let fn_name_raw = fn_name_box.as_ref();
-                    let fn_name_raw = fn_name_raw.strip_prefix('\\').unwrap_or(fn_name_raw);
-                    let resolved_fn_name = self.resolve_fn_name(fn_name_raw);
-                    let fqn_arc = Arc::<str>::from(resolved_fn_name.as_str());
-                    let here = crate::db::Fqcn::new(self.db, fqn_arc.clone());
-                    if let Some(f) = crate::db::find_function(self.db, here) {
-                        // Record a symbol reference for this call site so that
-                        // references_to() and analyze_dependents_of() work correctly.
-                        self.record_symbol(
-                            fc.name.span,
-                            SymbolKind::FunctionCall(f.fqn.clone()),
-                            Union::mixed(),
-                        );
-                        if !self.inference_only {
-                            let (line, col_start, col_end) = self.span_to_ref_loc(fc.name.span);
-                            self.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: f.fqn.clone(),
-                                file: self.file.clone(),
-                                line,
-                                col_start,
-                                col_end,
-                            });
-                        }
-                        // Pre-mark by-reference parameter variables as defined BEFORE
-                        // evaluating args so that callers like sscanf(%d, $row, $col)
-                        // don't produce UndefinedVariable for the output variables.
-                        for (i, param) in f.params.iter().enumerate() {
-                            if param.is_byref {
-                                if param.is_variadic {
-                                    for arg in fc.args.iter().skip(i) {
-                                        if let ExprKind::Variable(name) = &arg.value.kind {
-                                            let var_name = name.as_ref().trim_start_matches('$');
-                                            if !ctx.var_is_defined(var_name) {
-                                                ctx.set_var(var_name, Union::mixed());
-                                            }
-                                        }
-                                    }
-                                } else if let Some(arg) = fc.args.get(i) {
-                                    if let ExprKind::Variable(name) = &arg.value.kind {
-                                        let var_name = name.as_ref().trim_start_matches('$');
-                                        if !ctx.var_is_defined(var_name) {
-                                            ctx.set_var(var_name, Union::mixed());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                for arg in fc.args.iter() {
-                    self.analyze(&arg.value, ctx);
-                }
-                Union::mixed()
+                crate::call::CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span)
             }
 
             // --- Closures / arrow functions --------------------------------
@@ -408,32 +300,6 @@ impl<'a> ExpressionAnalyzer<'a> {
             .unwrap_or(0);
         let col_end = self.source[end_line_start..end_off].chars().count() as u16;
         (line, col_start, col_end)
-    }
-
-    /// Resolve a plain function name to its fully-qualified name using the
-    /// current file's namespace and import map.
-    fn resolve_fn_name(&self, fn_name_raw: &str) -> String {
-        let imports = self.db.file_imports(&self.file);
-        let qualified = if let Some(imported) = imports.get(fn_name_raw) {
-            imported.clone()
-        } else if fn_name_raw.contains('\\') {
-            crate::db::resolve_name_via_db(self.db, &self.file, fn_name_raw)
-        } else if let Some(ns) = self.db.file_namespace(&self.file) {
-            format!("{}\\{}", ns, fn_name_raw)
-        } else {
-            fn_name_raw.to_string()
-        };
-        let fn_exists = |name: &str| -> bool {
-            let here = crate::db::Fqcn::new(self.db, Arc::<str>::from(name));
-            crate::db::find_function(self.db, here).is_some()
-        };
-        if fn_exists(&qualified) {
-            qualified
-        } else if fn_exists(fn_name_raw) {
-            fn_name_raw.to_string()
-        } else {
-            qualified
-        }
     }
 
     /// Walk a type hint and emit `UndefinedClass` for any named type not in the codebase.
@@ -530,24 +396,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Resolve `self`, `parent`, and `static` class name references for static calls.
-fn resolve_static_class_owned(name: &str, ctx: &Context) -> String {
-    match name.to_lowercase().as_str() {
-        "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
-        "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
-        "static" => ctx
-            .static_fqcn
-            .as_deref()
-            .unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static"))
-            .to_string(),
-        _ => name.to_string(),
     }
 }
 
