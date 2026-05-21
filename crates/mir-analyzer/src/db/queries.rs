@@ -275,7 +275,7 @@ pub fn collect_file_definitions_uncached(
     }
 
     let arena = crate::arena::create_parse_arena(text.len());
-    let parsed = php_rs_parser::parse(&arena, &text);
+    let parsed = php_rs_parser::parse_arena(&arena, &text);
 
     let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 
@@ -386,7 +386,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         .unwrap_or(crate::php_version::PhpVersion::LATEST);
 
     let arena = crate::arena::create_parse_arena(text.len());
-    let parsed = php_rs_parser::parse(&arena, text.as_ref());
+    let parsed = php_rs_parser::parse_arena(&arena, text.as_ref());
 
     if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
         return InferredFileTypes::empty();

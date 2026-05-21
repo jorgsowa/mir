@@ -214,7 +214,7 @@ fn bench_single_file_edit(c: &mut Criterion) {
                     // Re-ingest Pass 1 + run single-pass Pass 2.
                     session.ingest_file(target_arc.clone(), new_content.clone());
                     let arena = bumpalo::Bump::new();
-                    let parsed = php_rs_parser::parse(&arena, new_content.as_ref());
+                    let parsed = php_rs_parser::parse_arena(&arena, new_content.as_ref());
                     let hard_errors: Vec<_> = parsed
                         .errors
                         .iter()
@@ -302,7 +302,7 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                 |new_content| {
                     session.ingest_file(target_arc.clone(), new_content.clone());
                     let arena = bumpalo::Bump::new();
-                    let parsed = php_rs_parser::parse(&arena, new_content.as_ref());
+                    let parsed = php_rs_parser::parse_arena(&arena, new_content.as_ref());
                     let hard_errors: Vec<_> = parsed
                         .errors
                         .iter()
@@ -619,7 +619,7 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
     // already been analyzed at least once).
     session.ingest_file(target_arc.clone(), source_arc.clone());
     let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse(&arena, source_arc.as_ref());
+    let parsed = php_rs_parser::parse_arena(&arena, source_arc.as_ref());
     let _ = FileAnalyzer::new(&session).analyze(
         target_arc.clone(),
         source_arc.as_ref(),
@@ -636,7 +636,7 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
             // Caller-side parse is part of the actual FileAnalyzer API
             // contract, so measure it as part of the iteration body.
             let arena = bumpalo::Bump::new();
-            let parsed = php_rs_parser::parse(&arena, source_arc.as_ref());
+            let parsed = php_rs_parser::parse_arena(&arena, source_arc.as_ref());
             FileAnalyzer::new(&session).analyze(
                 target_arc.clone(),
                 source_arc.as_ref(),
@@ -696,7 +696,7 @@ fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
     let mut analyzed = 0usize;
     for (file, source) in &sources {
         let arena = bumpalo::Bump::new();
-        let parsed = php_rs_parser::parse(&arena, source.as_ref());
+        let parsed = php_rs_parser::parse_arena(&arena, source.as_ref());
         if !parsed.errors.is_empty() {
             continue;
         }

@@ -25,10 +25,10 @@ mir-codebase   = { path = "crates/mir-codebase",   version = "0.28.0" }
 mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.28.0" }
 
 # PHP parsing
-php-rs-parser   = "0.13.0"
-php-ast         = "0.13.0"
-php-lexer       = "0.13.0"
-phpdoc-parser   = "0.13.0"
+php-rs-parser   = { path = "../rust-php-parser/crates/php-parser", version = "0.14.0" }
+php-ast         = { path = "../rust-php-parser/crates/php-ast",    version = "0.14.0" }
+php-lexer       = { path = "../rust-php-parser/crates/php-lexer",  version = "0.14.0" }
+phpdoc-parser   = { path = "../rust-php-parser/crates/phpdoc-parser", version = "0.14.0" }
 bumpalo         = { version = "3", features = ["collections"] }
 
 # Data structures

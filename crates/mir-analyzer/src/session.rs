@@ -1299,7 +1299,7 @@ impl AnalysisSession {
             .into_par_iter()
             .map(|(file, source)| {
                 let arena = crate::arena::create_parse_arena(source.len());
-                let parsed = php_rs_parser::parse(&arena, source.as_ref());
+                let parsed = php_rs_parser::parse_arena(&arena, source.as_ref());
                 let analyzer = crate::FileAnalyzer::new(self);
                 let analysis = analyzer.analyze(
                     file.clone(),

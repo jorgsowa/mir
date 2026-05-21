@@ -74,21 +74,21 @@ pub struct ProjectAnalyzer {
 struct ParsedProjectFile {
     file: Arc<str>,
     source: Arc<str>,
-    parsed: ManuallyDrop<php_rs_parser::ParseResult<'static, 'static>>,
+    parsed: ManuallyDrop<php_rs_parser::ArenaParseResult<'static, 'static>>,
     arena: ManuallyDrop<Box<bumpalo::Bump>>,
 }
 
 impl ParsedProjectFile {
     fn new(file: Arc<str>, source: Arc<str>) -> Self {
         let arena = Box::new(crate::arena::create_parse_arena(source.len()));
-        let parsed = php_rs_parser::parse(&arena, &source);
+        let parsed = php_rs_parser::parse_arena(&arena, &source);
         // SAFETY: `parsed` borrows from `arena` and `source`, both owned by this
         // struct and kept alive until `Drop`. `Drop` manually destroys `parsed`
         // before releasing either owner, so the widened lifetimes never escape.
         let parsed = unsafe {
             std::mem::transmute::<
-                php_rs_parser::ParseResult<'_, '_>,
-                php_rs_parser::ParseResult<'static, 'static>,
+                php_rs_parser::ArenaParseResult<'_, '_>,
+                php_rs_parser::ArenaParseResult<'static, 'static>,
             >(parsed)
         };
         Self {
@@ -103,7 +103,7 @@ impl ParsedProjectFile {
         self.source.as_ref()
     }
 
-    fn parsed(&self) -> &php_rs_parser::ParseResult<'_, '_> {
+    fn parsed(&self) -> &php_rs_parser::ArenaParseResult<'_, '_> {
         &self.parsed
     }
 }
@@ -962,7 +962,7 @@ impl ProjectAnalyzer {
                         let driver =
                             Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
                         let arena = crate::arena::create_parse_arena(src.len());
-                        let parsed = php_rs_parser::parse(&arena, src);
+                        let parsed = php_rs_parser::parse_arena(&arena, src);
                         let (issues, symbols) = driver.analyze_bodies(
                             &parsed.program,
                             file.clone(),
@@ -1046,7 +1046,7 @@ impl ProjectAnalyzer {
             // Pass 2 reads the imported aliases out of `type_aliases`.
             // Re-parse in the arena so Pass 2 can walk the AST.
             let arena = bumpalo::Bump::new();
-            let parsed = php_rs_parser::parse(&arena, new_content);
+            let parsed = php_rs_parser::parse_arena(&arena, new_content);
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             if !has_hard_errors {
@@ -1101,7 +1101,7 @@ impl ProjectAnalyzer {
         let mut type_envs = std::collections::HashMap::new();
         let mut all_symbols = Vec::new();
         let arena = bumpalo::Bump::new();
-        let result = php_rs_parser::parse(&arena, source);
+        let result = php_rs_parser::parse_arena(&arena, source);
 
         let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(

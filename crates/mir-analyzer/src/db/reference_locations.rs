@@ -129,7 +129,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
     let text = file.text(db);
 
     let arena = crate::arena::create_parse_arena(text.len());
-    let parsed = php_rs_parser::parse(&arena, &text);
+    let parsed = php_rs_parser::parse_arena(&arena, &text);
 
     for err in &parsed.errors {
         let issue = crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map);
