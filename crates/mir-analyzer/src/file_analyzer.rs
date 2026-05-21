@@ -17,8 +17,7 @@
 use std::sync::Arc;
 
 use mir_issues::Issue;
-use php_ast::ast::Program;
-use php_ast::owned::to_owned_program;
+use php_ast::owned::Program;
 use php_rs_parser::source_map::SourceMap;
 use rayon::prelude::*;
 
@@ -71,7 +70,7 @@ impl<'a> FileAnalyzer<'a> {
         &self,
         file: Arc<str>,
         source: &str,
-        program: &Program<'_, '_>,
+        program: &Program,
         source_map: &SourceMap,
     ) -> FileAnalysis {
         crate::metrics::record_file_analysis();
@@ -79,27 +78,26 @@ impl<'a> FileAnalyzer<'a> {
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());
 
-        // Pull-path Pass-2: `find_class_like` / `find_function` etc. consult
-        // the salsa query graph; a single pass is sufficient.
-        self.run_pass2(file, source, program, source_map)
-    }
-
-    /// Inner Pass 2 invocation.
-    fn run_pass2(
-        &self,
-        file: Arc<str>,
-        source: &str,
-        program: &Program<'_, '_>,
-        source_map: &SourceMap,
-    ) -> FileAnalysis {
         let _scope = crate::metrics::Pass2Scope::new();
         let db = self.session.snapshot_db();
         let driver = Pass2Driver::new(&db, self.session.php_version());
-        let owned = to_owned_program(program);
-        let (issues, symbols) = driver.analyze_bodies(&owned, file, source, source_map);
+        let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
         self.session
             .commit_ref_locs_batch(db.take_pending_ref_locs());
         FileAnalysis { issues, symbols }
+    }
+
+    /// Convenience wrapper: parse from arena then analyze. Kept for callers that
+    /// still hold arena-allocated ASTs.
+    pub fn analyze_arena(
+        &self,
+        file: Arc<str>,
+        source: &str,
+        program: &php_ast::ast::Program<'_, '_>,
+        source_map: &SourceMap,
+    ) -> FileAnalysis {
+        let owned = php_ast::owned::to_owned_program(program);
+        self.analyze(file, source, &owned, source_map)
     }
 }
 
@@ -112,15 +110,11 @@ pub struct BatchFileAnalyzer<'a> {
 }
 
 /// A pre-parsed file ready for batch analysis.
-///
-/// Use [`ParsedFile::new`] (unsafe) to construct. Fields are intentionally
-/// private — the raw pointer fields must satisfy a non-trivial safety contract
-/// enforced only by the constructor.
 pub struct ParsedFile {
     pub(crate) file: Arc<str>,
     pub(crate) source: Arc<str>,
-    pub(crate) program: *const Program<'static, 'static>,
-    pub(crate) source_map: *const SourceMap,
+    pub(crate) program: Program,
+    pub(crate) source_map: SourceMap,
 }
 
 impl ParsedFile {
@@ -133,40 +127,38 @@ impl ParsedFile {
     pub fn source(&self) -> &Arc<str> {
         &self.source
     }
-}
 
-// SAFETY: ParsedFile contains pointers to owned AST and source_map that are kept
-// alive by the parser and owned by the caller. Analysis only reads these, never mutates.
-unsafe impl Send for ParsedFile {}
-unsafe impl Sync for ParsedFile {}
-
-impl ParsedFile {
-    /// Create a ParsedFile from a pre-parsed AST and source map.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that:
-    /// - `program` points to a valid `Program` that remains alive during the entire
-    ///   `BatchFileAnalyzer::analyze_batch` call
-    /// - `source_map` points to a valid `SourceMap` that remains alive during the entire
-    ///   `BatchFileAnalyzer::analyze_batch` call
-    /// - Both pointers came from the same `php_rs_parser::parse()` call and use the same
-    ///   bump allocator
-    ///
-    /// The typical usage pattern is to call `php_rs_parser::parse(&arena, source)` and
-    /// immediately pass the resulting `program` and `source_map` pointers (obtained via
-    /// `&parsed.program` and `&parsed.source_map`) to this function. The arena must be
-    /// kept alive until analysis completes.
-    pub unsafe fn new(
-        file: Arc<str>,
-        source: Arc<str>,
-        program: *const Program<'static, 'static>,
-        source_map: *const SourceMap,
-    ) -> Self {
+    /// Create a `ParsedFile` from an owned program and source map.
+    pub fn new(file: Arc<str>, source: Arc<str>, program: Program, source_map: SourceMap) -> Self {
         Self {
             file,
             source,
             program,
+            source_map,
+        }
+    }
+
+    /// Create a `ParsedFile` from an arena-allocated AST.
+    ///
+    /// Converts to owned internally; the arena may be dropped after this call.
+    ///
+    /// # Safety
+    ///
+    /// `program` and `source_map` must remain valid for the duration of this call
+    /// (they are converted before this function returns, so the arena doesn't need
+    /// to survive beyond the constructor).
+    pub unsafe fn from_arena(
+        file: Arc<str>,
+        source: Arc<str>,
+        program: *const php_ast::ast::Program<'static, 'static>,
+        _source_map: *const SourceMap,
+    ) -> Self {
+        let owned = php_ast::owned::to_owned_program(&*program);
+        let source_map = SourceMap::new(source.as_ref());
+        Self {
+            file,
+            source,
+            program: owned,
             source_map,
         }
     }
@@ -179,24 +171,14 @@ impl<'a> BatchFileAnalyzer<'a> {
 
     /// Analyze multiple pre-parsed files in parallel.
     ///
-    /// Each file must already have its AST and source_map computed and kept alive
-    /// by the caller. This function processes all files in parallel using rayon.
-    ///
     /// Each rayon worker gets its own cloned database snapshot, so concurrent
     /// analysis proceeds without lock contention on the session.
-    ///
-    /// # Safety
-    ///
-    /// The caller is responsible for ensuring that the Program and SourceMap pointers
-    /// remain valid for the duration of this call.
     pub fn analyze_batch(&self, files: Vec<ParsedFile>) -> Vec<(Arc<str>, FileAnalysis)> {
         self.session.ensure_essential_stubs_loaded();
 
         // First pass: collect all ASTs and auto-discover stubs.
         files.iter().for_each(|file| {
-            // SAFETY: Caller guarantees pointer validity.
-            let program = unsafe { &*file.program };
-            self.session.ensure_stubs_for_ast(program);
+            self.session.ensure_stubs_for_ast(&file.program);
         });
 
         // Second pass: analyze files in parallel.
@@ -205,13 +187,13 @@ impl<'a> BatchFileAnalyzer<'a> {
         let results: Vec<(Arc<str>, FileAnalysis, Vec<crate::db::RefLoc>)> = files
             .into_par_iter()
             .map_with(db, |db, file| {
-                // SAFETY: Caller guarantees pointer validity.
-                let program = unsafe { &*file.program };
-                let source_map = unsafe { &*file.source_map };
                 let driver = Pass2Driver::new(db as &dyn MirDatabase, self.session.php_version());
-                let owned = to_owned_program(program);
-                let (issues, symbols) =
-                    driver.analyze_bodies(&owned, file.file.clone(), &file.source, source_map);
+                let (issues, symbols) = driver.analyze_bodies(
+                    &file.program,
+                    file.file.clone(),
+                    &file.source,
+                    &file.source_map,
+                );
                 let pending = db.take_pending_ref_locs();
                 let analysis = FileAnalysis { issues, symbols };
                 (file.file, analysis, pending)

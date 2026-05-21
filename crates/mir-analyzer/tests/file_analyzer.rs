@@ -18,8 +18,7 @@ fn parse_and_analyze(source: &str) -> mir_analyzer::FileAnalysis {
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(source));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, source);
+    let parsed = php_rs_parser::parse(source);
     assert!(
         parsed.errors.is_empty(),
         "parser errors in test source: {:?}",
@@ -184,8 +183,7 @@ function encode(array $data): string {
 ";
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
 
     let analysis =
@@ -234,8 +232,7 @@ function build(): Greeter { return new Greeter(); }
 ";
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     let analysis =
         FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
 
@@ -302,8 +299,7 @@ function caller(): string { return helper(); }
 ";
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     let _ =
         FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
 
@@ -328,8 +324,7 @@ target(); function target(): void {}
 ";
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     let analysis =
         FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
 
@@ -355,8 +350,8 @@ fn location_from_span_translates_pass2_spans_to_source_locations() {
 function helper(): string { return 'x'; }
 function caller(): string { return helper(); }
 ";
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+
+    let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
@@ -402,8 +397,7 @@ function caller(): void {
 ";
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     let analysis =
         FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
 
@@ -472,8 +466,7 @@ function foo(): string { return bar(); }
     // Run sweep so bar()'s inferred return type lands in the canonical db.
     session.run_inference_sweep(&[(file.clone(), Arc::from(src))]);
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
 
     let analysis =
@@ -564,8 +557,7 @@ function caller_v1() { foo(); }
 ";
     session.ingest_file(file.clone(), Arc::from(v1));
     {
-        let arena = bumpalo::Bump::new();
-        let parsed = php_rs_parser::parse_arena(&arena, v1);
+        let parsed = php_rs_parser::parse(v1);
         FileAnalyzer::new(&session).analyze(file.clone(), v1, &parsed.program, &parsed.source_map);
     }
 
@@ -583,8 +575,7 @@ function caller_v2() { bar(); }
 ";
     session.ingest_file(file.clone(), Arc::from(v2));
     {
-        let arena = bumpalo::Bump::new();
-        let parsed = php_rs_parser::parse_arena(&arena, v2);
+        let parsed = php_rs_parser::parse(v2);
         FileAnalyzer::new(&session).analyze(file.clone(), v2, &parsed.program, &parsed.source_map);
     }
 
@@ -682,8 +673,7 @@ fn file_analyzer_self_loads_psr4_classes_without_pre_enumeration() {
         Arc::from(root.path().join("Consumer.php").to_string_lossy().as_ref());
     session.ingest_file(consumer_path.clone(), Arc::from(consumer_src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, consumer_src);
+    let parsed = php_rs_parser::parse(consumer_src);
     let analyzer = FileAnalyzer::new(&session);
     let result = analyzer.analyze(
         consumer_path,
@@ -716,8 +706,7 @@ fn file_analyzer_reports_undefined_class_unconditionally() {
     let file: Arc<str> = Arc::from("<scan-test>");
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     let analyzer = FileAnalyzer::new(&session);
     let result = analyzer.analyze(file, src, &parsed.program, &parsed.source_map);
 

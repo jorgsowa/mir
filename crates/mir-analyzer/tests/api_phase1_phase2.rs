@@ -141,8 +141,7 @@ fn references_to_takes_typed_symbol() {
 
     // Now run pass 2 to record references
     use mir_analyzer::FileAnalyzer;
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, &source);
+    let parsed = php_rs_parser::parse(&source);
     let _analysis = FileAnalyzer::new(&session).analyze(
         file.clone(),
         &source,
@@ -248,8 +247,7 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
 
     session.ingest_file(file.clone(), source.clone());
 
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, &source);
+    let parsed = php_rs_parser::parse(&source);
     let analysis = FileAnalyzer::new(&session).analyze(
         file.clone(),
         &source,
@@ -399,8 +397,7 @@ fn analyze_dependents_of_runs_in_parallel() {
         (&dep_a, "<?php\nclass A extends Base {}\n"),
         (&dep_b, "<?php\nclass B extends Base {}\n"),
     ] {
-        let arena = bumpalo::Bump::new();
-        let parsed = php_rs_parser::parse_arena(&arena, src);
+        let parsed = php_rs_parser::parse(src);
         FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
     }
 
@@ -475,8 +472,7 @@ fn analyze_dependents_of_tracks_bare_fqn_new() {
     );
 
     let consumer_src = "<?php\nfunction consume(): void { $s = new \\Service(); $s->run(); }\n";
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, consumer_src);
+    let parsed = php_rs_parser::parse(consumer_src);
     FileAnalyzer::new(&session).analyze(
         consumer.clone(),
         consumer_src,
@@ -513,8 +509,7 @@ fn analyze_dependents_of_tracks_bare_fqn_static_call() {
     );
 
     let caller_src = "<?php\nfunction call_it(): void { \\Helper::go(); }\n";
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, caller_src);
+    let parsed = php_rs_parser::parse(caller_src);
     FileAnalyzer::new(&session).analyze(
         caller.clone(),
         caller_src,
@@ -555,8 +550,7 @@ fn dependency_graph_includes_unused_param_type_hint() {
 
     // Analyze the consumer file to trigger Pass 2
     let consumer_src = "<?php\nnamespace Vendor\nfunction consume(Service $s) { }\n";
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, consumer_src);
+    let parsed = php_rs_parser::parse(consumer_src);
     FileAnalyzer::new(&session).analyze(
         consumer.clone(),
         consumer_src,
@@ -587,8 +581,7 @@ fn dependency_graph_includes_unused_param_type_hint() {
 /// Helper: run Pass 2 on `src` under `file` path in `session`.
 fn analyze_file(session: &AnalysisSession, file: Arc<str>, src: &str) {
     use mir_analyzer::FileAnalyzer;
-    let arena = bumpalo::Bump::new();
-    let parsed = php_rs_parser::parse_arena(&arena, src);
+    let parsed = php_rs_parser::parse(src);
     FileAnalyzer::new(session).analyze(file, src, &parsed.program, &parsed.source_map);
 }
 

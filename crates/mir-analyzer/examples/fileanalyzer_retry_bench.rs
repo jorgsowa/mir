@@ -107,8 +107,7 @@ fn main() {
         // Mimics the LSP's didOpen / didChange flow.
         session.ingest_file(file.clone(), Arc::<str>::from(source.as_str()));
 
-        let arena = bumpalo::Bump::new();
-        let parsed = php_rs_parser::parse_arena(&arena, &source);
+        let parsed = php_rs_parser::parse(&source);
         let analyzer = FileAnalyzer::new(&session);
         let result = analyzer.analyze(file, &source, &parsed.program, &parsed.source_map);
         total_issues += result.issues.len();

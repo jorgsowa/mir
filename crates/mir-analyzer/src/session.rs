@@ -332,7 +332,7 @@ impl AnalysisSession {
     /// already available (e.g., in [`crate::FileAnalyzer`]).
     ///
     /// Idempotent and skips the scan if all stubs are already loaded.
-    pub fn ensure_stubs_for_ast(&self, program: &php_ast::ast::Program<'_, '_>) {
+    pub fn ensure_stubs_for_ast(&self, program: &php_ast::owned::Program) {
         {
             let loaded = self.shared_db.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
@@ -368,16 +368,12 @@ impl AnalysisSession {
     /// in one call.  Replaces the two separate `ensure_stubs_for_ast` /
     /// `preload_psr4_classes_for_ast` calls at every `FileAnalyzer::analyze`
     /// site.
-    pub fn prepare_ast_for_analysis(&self, program: &php_ast::ast::Program<'_, '_>, file: &str) {
+    pub fn prepare_ast_for_analysis(&self, program: &php_ast::owned::Program, file: &str) {
         self.ensure_stubs_for_ast(program);
         self.preload_psr4_classes_for_ast(program, file);
     }
 
-    pub fn preload_psr4_classes_for_ast(
-        &self,
-        program: &php_ast::ast::Program<'_, '_>,
-        file: &str,
-    ) {
+    pub fn preload_psr4_classes_for_ast(&self, program: &php_ast::owned::Program, file: &str) {
         if self.resolver.is_none() {
             return;
         }
@@ -1298,8 +1294,7 @@ impl AnalysisSession {
         with_source
             .into_par_iter()
             .map(|(file, source)| {
-                let arena = crate::arena::create_parse_arena(source.len());
-                let parsed = php_rs_parser::parse_arena(&arena, source.as_ref());
+                let parsed = php_rs_parser::parse(source.as_ref());
                 let analyzer = crate::FileAnalyzer::new(self);
                 let analysis = analyzer.analyze(
                     file.clone(),
@@ -1747,73 +1742,85 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 /// Captures identifiers from `new X`, static calls / property / constant
 /// access, type hints, and `instanceof`. Does *not* normalize via PSR-4 /
 /// imports — callers run the raw string through `resolve_name_via_db`.
-fn collect_class_refs_from_ast(program: &php_ast::ast::Program<'_, '_>) -> Vec<String> {
-    use php_ast::ast::{BinaryOp, ExprKind, TypeHintKind};
-    use php_ast::visitor::{walk_catch_clause, walk_expr, walk_program, walk_type_hint, Visitor};
+fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String> {
+    use php_ast::ast::BinaryOp;
+    use php_ast::owned::visitor::{
+        walk_owned_catch_clause, walk_owned_expr, walk_owned_program, walk_owned_type_hint,
+        OwnedVisitor,
+    };
+    use php_ast::owned::{ExprKind, TypeHintKind};
     use std::ops::ControlFlow;
+
+    fn owned_name_str(name: &php_ast::owned::Name) -> String {
+        let joined: String = name
+            .parts
+            .iter()
+            .map(|p| p.as_ref())
+            .collect::<Vec<&str>>()
+            .join("\\");
+        if name.kind == php_ast::ast::NameKind::FullyQualified {
+            format!("\\{joined}")
+        } else {
+            joined
+        }
+    }
 
     struct V {
         names: std::collections::HashSet<String>,
     }
-    impl<'arena, 'src> Visitor<'arena, 'src> for V {
-        fn visit_expr(&mut self, expr: &php_ast::ast::Expr<'arena, 'src>) -> ControlFlow<()> {
+    impl OwnedVisitor for V {
+        fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
             match &expr.kind {
                 ExprKind::New(n) => {
                     if let ExprKind::Identifier(name) = &n.class.kind {
-                        self.names.insert(name.to_string());
+                        self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::StaticMethodCall(c) => {
                     if let ExprKind::Identifier(name) = &c.class.kind {
-                        self.names.insert(name.to_string());
+                        self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::StaticPropertyAccess(a) => {
                     if let ExprKind::Identifier(name) = &a.class.kind {
-                        self.names.insert(name.to_string());
+                        self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::ClassConstAccess(a) => {
                     if let ExprKind::Identifier(name) = &a.class.kind {
-                        self.names.insert(name.to_string());
+                        self.names.insert(name.as_ref().to_string());
                     }
                 }
                 ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
                     if let ExprKind::Identifier(name) = &b.right.kind {
-                        self.names.insert(name.to_string());
+                        self.names.insert(name.as_ref().to_string());
                     }
                 }
                 _ => {}
             }
-            walk_expr(self, expr)
+            walk_owned_expr(self, expr)
         }
 
-        fn visit_type_hint(
-            &mut self,
-            hint: &php_ast::ast::TypeHint<'arena, 'src>,
-        ) -> ControlFlow<()> {
+        fn visit_type_hint(&mut self, hint: &php_ast::owned::TypeHint) -> ControlFlow<()> {
             if let TypeHintKind::Named(name) = &hint.kind {
-                let s = name.to_string_repr().into_owned();
+                let s = owned_name_str(name);
                 if !s.is_empty() {
                     self.names.insert(s);
                 }
             }
-            walk_type_hint(self, hint)
+            walk_owned_type_hint(self, hint)
         }
 
-        fn visit_catch_clause(
-            &mut self,
-            catch: &php_ast::ast::CatchClause<'arena, 'src>,
-        ) -> ControlFlow<()> {
+        fn visit_catch_clause(&mut self, catch: &php_ast::owned::CatchClause) -> ControlFlow<()> {
             for ty in catch.types.iter() {
-                self.names.insert(ty.to_string_repr().into_owned());
+                self.names.insert(owned_name_str(ty));
             }
-            walk_catch_clause(self, catch)
+            walk_owned_catch_clause(self, catch)
         }
     }
     let mut v = V {
         names: std::collections::HashSet::new(),
     };
-    let _ = walk_program(&mut v, program);
+    let _ = walk_owned_program(&mut v, program);
     v.names.into_iter().collect()
 }
