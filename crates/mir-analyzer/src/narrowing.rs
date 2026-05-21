@@ -4,7 +4,8 @@
 /// module updates the `Context` to narrow variable types accordingly.
 use std::sync::Arc;
 
-use php_ast::ast::{AssignOp, BinaryOp, ExprKind, UnaryPrefixOp};
+use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
+use php_ast::owned::ExprKind;
 
 use mir_codebase::storage::AssertionKind;
 use mir_types::{Atomic, Union};
@@ -17,8 +18,8 @@ use crate::db::MirDatabase;
 // ---------------------------------------------------------------------------
 
 /// Narrow the types in `ctx` as if `expr` evaluates to `is_true`.
-pub fn narrow_from_condition<'arena, 'src>(
-    expr: &php_ast::ast::Expr<'arena, 'src>,
+pub fn narrow_from_condition(
+    expr: &php_ast::owned::Expr,
     ctx: &mut Context,
     is_true: bool,
     db: &dyn MirDatabase,
@@ -32,25 +33,25 @@ pub fn narrow_from_condition<'arena, 'src>(
 
         // !expr  →  narrow as if expr is !is_true
         ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
-            narrow_from_condition(u.operand, ctx, !is_true, db, file);
+            narrow_from_condition(&u.operand, ctx, !is_true, db, file);
         }
 
         // $a && $b  →  if true: narrow both; if false: no constraint
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanAnd || b.op == BinaryOp::LogicalAnd => {
             if is_true {
-                narrow_from_condition(b.left, ctx, true, db, file);
-                narrow_from_condition(b.right, ctx, true, db, file);
+                narrow_from_condition(&b.left, ctx, true, db, file);
+                narrow_from_condition(&b.right, ctx, true, db, file);
             }
         }
 
         // $a || $b  →  if false: narrow both; if true: try to narrow same-var instanceof union
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
             if !is_true {
-                narrow_from_condition(b.left, ctx, false, db, file);
-                narrow_from_condition(b.right, ctx, false, db, file);
+                narrow_from_condition(&b.left, ctx, false, db, file);
+                narrow_from_condition(&b.right, ctx, false, db, file);
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
-                narrow_or_instanceof_true(b.left, b.right, ctx, db, file);
+                narrow_or_instanceof_true(&b.left, &b.right, ctx, db, file);
             }
         }
 
@@ -61,57 +62,57 @@ pub fn narrow_from_condition<'arena, 'src>(
 
             // `$x === null`
             if matches!(b.right.kind, ExprKind::Null) {
-                if let Some(name) = extract_var_name(b.left) {
+                if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
-                if let Some(name) = extract_var_name(b.right) {
+                if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
                 }
             }
             // `$x === true` / `$x === false`
             else if matches!(b.right.kind, ExprKind::Bool(true)) {
-                if let Some(name) = extract_var_name(b.left) {
+                if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, true, effective_true);
                 }
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
-                if let Some(name) = extract_var_name(b.left) {
+                if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, false, effective_true);
                 }
             }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
-                if let Some(obj_var_name) = extract_get_class_arg(b.left) {
-                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str);
+                if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
+                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
-                } else if let Some(name) = extract_var_name(b.left) {
+                } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
-                if let Some(obj_var_name) = extract_get_class_arg(b.right) {
-                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str);
+                if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
-                } else if let Some(name) = extract_var_name(b.right) {
+                } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
                 }
             }
             // `$x === 42`
             else if let ExprKind::Int(n) = &b.right.kind {
-                if let Some(name) = extract_var_name(b.left) {
+                if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
-                if let Some(name) = extract_var_name(b.right) {
+                if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
                 }
             }
             // `$x === EnumName::CaseName`
             else if let ExprKind::StaticPropertyAccess(_) = &b.right.kind {
-                if let Some(var_name) = extract_var_name(b.left) {
+                if let Some(var_name) = extract_var_name(&b.left) {
                     if let Some((enum_fqcn, case_name)) =
-                        extract_enum_case(b.right, ctx.self_fqcn.as_deref(), db, file)
+                        extract_enum_case(&b.right, ctx.self_fqcn.as_deref(), db, file)
                     {
                         narrow_var_to_literal_enum_case(
                             ctx,
@@ -123,9 +124,9 @@ pub fn narrow_from_condition<'arena, 'src>(
                     }
                 }
             } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
-                if let Some(var_name) = extract_var_name(b.right) {
+                if let Some(var_name) = extract_var_name(&b.right) {
                     if let Some((enum_fqcn, case_name)) =
-                        extract_enum_case(b.left, ctx.self_fqcn.as_deref(), db, file)
+                        extract_enum_case(&b.left, ctx.self_fqcn.as_deref(), db, file)
                     {
                         narrow_var_to_literal_enum_case(
                             ctx,
@@ -139,7 +140,7 @@ pub fn narrow_from_condition<'arena, 'src>(
             }
             // `$x === SomeClass::class`
             else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                if let Some(var_name) = extract_var_name(b.left) {
+                if let Some(var_name) = extract_var_name(&b.left) {
                     if let Some(fqcn) =
                         extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
                     {
@@ -147,7 +148,7 @@ pub fn narrow_from_condition<'arena, 'src>(
                     }
                 }
             } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                if let Some(var_name) = extract_var_name(b.right) {
+                if let Some(var_name) = extract_var_name(&b.right) {
                     if let Some(fqcn) =
                         extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
                     {
@@ -162,11 +163,11 @@ pub fn narrow_from_condition<'arena, 'src>(
             let is_equal = b.op == BinaryOp::Equal;
             let effective_true = if is_equal { is_true } else { !is_true };
             if matches!(b.right.kind, ExprKind::Null) {
-                if let Some(name) = extract_var_name(b.left) {
+                if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
-                if let Some(name) = extract_var_name(b.right) {
+                if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
                 }
             }
@@ -174,8 +175,8 @@ pub fn narrow_from_condition<'arena, 'src>(
 
         // $x instanceof ClassName
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-            if let Some(var_name) = extract_var_name(b.left) {
-                if let Some(raw_name) = extract_class_name(b.right, ctx.self_fqcn.as_deref()) {
+            if let Some(var_name) = extract_var_name(&b.left) {
+                if let Some(raw_name) = extract_class_name(&b.right, ctx.self_fqcn.as_deref()) {
                     // Resolve the short name to its FQCN using file imports
                     let class_name = crate::db::resolve_name_via_db(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
@@ -198,7 +199,7 @@ pub fn narrow_from_condition<'arena, 'src>(
         // Also handles assert($x instanceof Y) — narrows like a bare condition.
         ExprKind::FunctionCall(call) => {
             let fn_name_opt: Option<&str> = match &call.name.kind {
-                ExprKind::Identifier(name) => Some(name),
+                ExprKind::Identifier(name) => Some(name.as_ref()),
                 ExprKind::Variable(name) => Some(name.as_ref()),
                 _ => None,
             };
@@ -253,7 +254,7 @@ pub fn narrow_from_condition<'arena, 'src>(
         // The assignment has already been evaluated (ctx holds the post-assignment type).
         // Narrow the target variable based on the truthiness of the expression result.
         ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign | AssignOp::Coalesce) => {
-            if let Some(var_name) = extract_var_name(a.target) {
+            if let Some(var_name) = extract_var_name(&a.target) {
                 let current = ctx.get_var(&var_name);
                 let narrowed = if is_true {
                     current.narrow_to_truthy()
@@ -293,8 +294,8 @@ pub fn narrow_from_condition<'arena, 'src>(
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn apply_docblock_assertions<'arena, 'src>(
-    call: &php_ast::ast::FunctionCallExpr<'arena, 'src>,
+fn apply_docblock_assertions(
+    call: &php_ast::owned::FunctionCallExpr,
     ctx: &mut Context,
     is_true: bool,
     db: &dyn MirDatabase,
@@ -353,9 +354,9 @@ fn apply_docblock_assertions<'arena, 'src>(
 
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
-fn narrow_or_instanceof_true<'arena, 'src>(
-    left: &php_ast::ast::Expr<'arena, 'src>,
-    right: &php_ast::ast::Expr<'arena, 'src>,
+fn narrow_or_instanceof_true(
+    left: &php_ast::owned::Expr,
+    right: &php_ast::owned::Expr,
     ctx: &mut Context,
     db: &dyn MirDatabase,
     file: &str,
@@ -366,8 +367,8 @@ fn narrow_or_instanceof_true<'arena, 'src>(
     let mut var_name: Option<String> = None;
     let mut class_names: Vec<String> = vec![];
 
-    fn collect_instanceof<'a, 's>(
-        expr: &php_ast::ast::Expr<'a, 's>,
+    fn collect_instanceof(
+        expr: &php_ast::owned::Expr,
         var_name: &mut Option<String>,
         class_names: &mut Vec<String>,
         db: &dyn MirDatabase,
@@ -377,8 +378,8 @@ fn narrow_or_instanceof_true<'arena, 'src>(
         match &expr.kind {
             ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
                 if let (Some(vn), Some(cn)) = (
-                    extract_var_name(b.left),
-                    extract_class_name(b.right, self_fqcn),
+                    extract_var_name(&b.left),
+                    extract_class_name(&b.right, self_fqcn),
                 ) {
                     let resolved = crate::db::resolve_name_via_db(db, file, &cn);
                     match var_name {
@@ -398,8 +399,8 @@ fn narrow_or_instanceof_true<'arena, 'src>(
                 }
             }
             ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
-                collect_instanceof(b.left, var_name, class_names, db, file, self_fqcn)
-                    && collect_instanceof(b.right, var_name, class_names, db, file, self_fqcn)
+                collect_instanceof(&b.left, var_name, class_names, db, file, self_fqcn)
+                    && collect_instanceof(&b.right, var_name, class_names, db, file, self_fqcn)
             }
             ExprKind::Parenthesized(inner) => {
                 collect_instanceof(inner, var_name, class_names, db, file, self_fqcn)
@@ -774,23 +775,18 @@ fn narrow_var_to_specific_class(ctx: &mut Context, name: &str, fqcn: &str, is_ex
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
-fn extract_var_name<'a, 'arena, 'src>(
-    expr: &'a php_ast::ast::Expr<'arena, 'src>,
-) -> Option<String> {
+fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
         _ => None,
     }
 }
 
-fn extract_class_name<'arena, 'src>(
-    expr: &php_ast::ast::Expr<'arena, 'src>,
-    self_fqcn: Option<&str>,
-) -> Option<String> {
+fn extract_class_name(expr: &php_ast::owned::Expr, self_fqcn: Option<&str>) -> Option<String> {
     match &expr.kind {
         ExprKind::Identifier(name) => Some(name.to_string()),
-        ExprKind::Variable(name) if name.as_str().trim_start_matches('$') == "this" => {
+        ExprKind::Variable(name) if name.trim_start_matches('$') == "this" => {
             self_fqcn.map(|s| s.to_string())
         }
         ExprKind::Variable(_) => None, // dynamic class — can't narrow
@@ -798,14 +794,14 @@ fn extract_class_name<'arena, 'src>(
     }
 }
 
-fn extract_enum_case<'arena, 'src>(
-    expr: &php_ast::ast::Expr<'arena, 'src>,
+fn extract_enum_case(
+    expr: &php_ast::owned::Expr,
     self_fqcn: Option<&str>,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<(String, String)> {
     if let ExprKind::StaticPropertyAccess(spa) = &expr.kind {
-        if let Some(enum_short_name) = extract_class_name(spa.class, self_fqcn) {
+        if let Some(enum_short_name) = extract_class_name(&spa.class, self_fqcn) {
             let enum_fqcn = crate::db::resolve_name_via_db(db, file, &enum_short_name);
             if let ExprKind::Identifier(case_name) = &spa.member.kind {
                 return Some((enum_fqcn, case_name.to_string()));
@@ -815,20 +811,21 @@ fn extract_enum_case<'arena, 'src>(
     None
 }
 
-fn extract_class_const_fqcn<'arena, 'src>(
-    cca: &php_ast::ast::StaticAccessExpr<'arena, 'src>,
+fn extract_class_const_fqcn(
+    cca: &php_ast::owned::StaticAccessExpr,
     self_fqcn: Option<&str>,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<String> {
-    if cca.member.name_str() != Some("class") {
+    let is_class = matches!(&cca.member.kind, ExprKind::Identifier(n) if n.as_ref() == "class");
+    if !is_class {
         return None;
     }
-    let short = extract_class_name(cca.class, self_fqcn)?;
+    let short = extract_class_name(&cca.class, self_fqcn)?;
     Some(crate::db::resolve_name_via_db(db, file, &short))
 }
 
-fn extract_get_class_arg<'arena, 'src>(expr: &php_ast::ast::Expr<'arena, 'src>) -> Option<String> {
+fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
             if name.eq_ignore_ascii_case("get_class") {

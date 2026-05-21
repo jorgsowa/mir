@@ -2,13 +2,14 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
-use php_ast::ast::{CastKind, Expr};
+use php_ast::ast::CastKind;
+use php_ast::owned::Expr;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_cast<'arena, 'src>(
+    pub(super) fn analyze_cast(
         &mut self,
         kind: &CastKind,
-        inner: &Expr<'arena, 'src>,
+        inner: &Expr,
         ctx: &mut Context,
     ) -> Union {
         let inner_ty = self.analyze(inner, ctx);

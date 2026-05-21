@@ -3,14 +3,15 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
-use php_ast::ast::{BinaryExpr, BinaryOp, ExprKind};
+use php_ast::ast::BinaryOp;
+use php_ast::owned::{BinaryExpr, ExprKind};
 use php_ast::Span;
 use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_binary_expr<'arena, 'src>(
+    pub(super) fn analyze_binary_expr(
         &mut self,
-        b: &BinaryExpr<'arena, 'src>,
+        b: &BinaryExpr,
         _span: Span,
         ctx: &mut Context,
     ) -> Union {
@@ -19,18 +20,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             b.op,
             B::BooleanAnd | B::LogicalAnd | B::BooleanOr | B::LogicalOr
         ) {
-            let _left_ty = self.analyze(b.left, ctx);
+            let _left_ty = self.analyze(&b.left, ctx);
             let mut right_ctx = ctx.fork();
             let is_and = matches!(b.op, B::BooleanAnd | B::LogicalAnd);
             crate::narrowing::narrow_from_condition(
-                b.left,
+                &b.left,
                 &mut right_ctx,
                 is_and,
                 self.db,
                 &self.file,
             );
             if !right_ctx.diverges {
-                let _right_ty = self.analyze(b.right, &mut right_ctx);
+                let _right_ty = self.analyze(&b.right, &mut right_ctx);
             }
             for v in right_ctx.read_vars {
                 ctx.read_vars.insert(v.clone());
@@ -45,7 +46,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         if b.op == B::Instanceof {
-            let _left_ty = self.analyze(b.left, ctx);
+            let _left_ty = self.analyze(&b.left, ctx);
             if let ExprKind::Identifier(name) = &b.right.kind {
                 let resolved = crate::db::resolve_name_via_db(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
@@ -72,8 +73,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Union::single(Atomic::TBool);
         }
 
-        let left_ty = self.analyze(b.left, ctx);
-        let right_ty = self.analyze(b.right, ctx);
+        let left_ty = self.analyze(&b.left, ctx);
+        let right_ty = self.analyze(&b.right, ctx);
 
         match b.op {
             BinaryOp::Add

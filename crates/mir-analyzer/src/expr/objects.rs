@@ -4,7 +4,7 @@ use crate::context::Context;
 use crate::symbol::SymbolKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
-use php_ast::ast::{ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
+use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
 fn is_valid_class_name_type(ty: &Union) -> bool {
@@ -17,10 +17,31 @@ fn is_valid_class_name_type(ty: &Union) -> bool {
     })
 }
 
+/// Owned equivalent of `expr_can_be_passed_by_reference` for owned `Expr`.
+fn expr_can_be_passed_by_reference_owned(expr: &Expr) -> bool {
+    matches!(
+        expr.kind,
+        ExprKind::Variable(_)
+            | ExprKind::ArrayAccess(_)
+            | ExprKind::PropertyAccess(_)
+            | ExprKind::NullsafePropertyAccess(_)
+            | ExprKind::StaticPropertyAccess(_)
+            | ExprKind::StaticPropertyAccessDynamic { .. }
+    )
+}
+
+/// Get the name string from an owned `Expr` for Variable/Identifier nodes.
+fn expr_name_str(expr: &Expr) -> Option<&str> {
+    match &expr.kind {
+        ExprKind::Variable(s) | ExprKind::Identifier(s) => Some(s.as_ref()),
+        _ => None,
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_new<'arena, 'src>(
+    pub(super) fn analyze_new(
         &mut self,
-        n: &NewExpr<'arena, 'src>,
+        n: &NewExpr,
         call_span: php_ast::Span,
         ctx: &mut Context,
     ) -> Union {
@@ -40,12 +61,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         let arg_names: Vec<Option<String>> = n
             .args
             .iter()
-            .map(|a| a.name.as_ref().map(|nm| nm.to_string_repr().into_owned()))
+            .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
             .collect();
         let arg_can_be_byref: Vec<bool> = n
             .args
             .iter()
-            .map(|a| crate::call::expr_can_be_passed_by_reference(&a.value))
+            .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
 
         let class_ty = match &n.class.kind {
@@ -141,7 +162,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ty
             }
             _ => {
-                let ty = self.analyze(n.class, ctx);
+                let ty = self.analyze(&n.class, ctx);
                 // Check if the expression could evaluate to a valid class name
                 // (but skip anonymous class definitions, which are valid)
                 if !matches!(n.class.kind, ExprKind::AnonymousClass(_))
@@ -179,15 +200,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         class_ty
     }
 
-    pub(super) fn analyze_property_access<'arena, 'src>(
+    pub(super) fn analyze_property_access(
         &mut self,
-        pa: &PropertyAccessExpr<'arena, 'src>,
+        pa: &PropertyAccessExpr,
         expr_span: php_ast::Span,
         ctx: &mut Context,
     ) -> Union {
-        let obj_ty = self.analyze(pa.object, ctx);
+        let obj_ty = self.analyze(&pa.object, ctx);
         let prop_name =
-            extract_string_from_expr(pa.property).unwrap_or_else(|| "<dynamic>".to_string());
+            extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
 
         if obj_ty.contains(|t| matches!(t, Atomic::TNull)) && obj_ty.is_single() {
             self.emit(
@@ -229,14 +250,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         resolved
     }
 
-    pub(super) fn analyze_nullsafe_property_access<'arena, 'src>(
+    pub(super) fn analyze_nullsafe_property_access(
         &mut self,
-        pa: &PropertyAccessExpr<'arena, 'src>,
+        pa: &PropertyAccessExpr,
         ctx: &mut Context,
     ) -> Union {
-        let obj_ty = self.analyze(pa.object, ctx);
+        let obj_ty = self.analyze(&pa.object, ctx);
         let prop_name =
-            extract_string_from_expr(pa.property).unwrap_or_else(|| "<dynamic>".to_string());
+            extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
         if prop_name == "<dynamic>" {
             return Union::mixed();
         }
@@ -259,10 +280,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         prop_ty
     }
 
-    pub(super) fn analyze_static_property_access<'arena, 'src>(
-        &mut self,
-        spa: &StaticAccessExpr<'arena, 'src>,
-    ) -> Union {
+    pub(super) fn analyze_static_property_access(&mut self, spa: &StaticAccessExpr) -> Union {
         if let ExprKind::Identifier(id) = &spa.class.kind {
             let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
             if !matches!(resolved.as_str(), "self" | "static" | "parent")
@@ -278,13 +296,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         Union::mixed()
     }
 
-    pub(super) fn analyze_class_const_access<'arena, 'src>(
+    pub(super) fn analyze_class_const_access(
         &mut self,
-        cca: &StaticAccessExpr<'arena, 'src>,
+        cca: &StaticAccessExpr,
         expr_span: php_ast::Span,
         ctx: &Context,
     ) -> Union {
-        if cca.member.name_str() == Some("class") {
+        if expr_name_str(&cca.member) == Some("class") {
             let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
@@ -315,7 +333,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Union::single(Atomic::TClassString(fqcn));
         }
 
-        let const_name = match cca.member.name_str() {
+        let const_name = match expr_name_str(&cca.member) {
             Some(n) => n.to_string(),
             None => return Union::mixed(),
         };

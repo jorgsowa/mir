@@ -63,9 +63,11 @@ impl CallAnalyzer {
         let fn_name = match &call.name.kind {
             ExprKind::Identifier(name) => (*name).to_string(),
             _ => {
-                let callee_ty = ea.analyze(call.name, ctx);
+                let owned_name = php_ast::owned::to_owned_expr(call.name);
+                let callee_ty = ea.analyze(&owned_name, ctx);
                 for arg in call.args.iter() {
-                    ea.analyze(&arg.value, ctx);
+                    let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
+                    ea.analyze(&owned_arg, ctx);
                 }
 
                 // Validate callable arity
@@ -118,7 +120,7 @@ impl CallAnalyzer {
         // Taint sink check (M19): before evaluating args so we can inspect raw exprs
         if let Some(sink_kind) = classify_sink(&fn_name) {
             for arg in call.args.iter() {
-                if is_expr_tainted(&arg.value, ctx) {
+                if is_expr_tainted(&php_ast::owned::to_owned_expr(&arg.value), ctx) {
                     let issue_kind = match sink_kind {
                         SinkKind::Html => IssueKind::TaintedHtml,
                         SinkKind::Sql => IssueKind::TaintedSql,
@@ -193,7 +195,8 @@ impl CallAnalyzer {
             .args
             .iter()
             .map(|arg| {
-                let ty = ea.analyze(&arg.value, ctx);
+                let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
+                let ty = ea.analyze(&owned_arg, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {

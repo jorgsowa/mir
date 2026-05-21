@@ -34,8 +34,8 @@ pub(crate) fn offset_to_line_col(
 // Type-hint class existence checker
 // ---------------------------------------------------------------------------
 
-pub(crate) fn check_type_hint_classes<'arena, 'src>(
-    hint: &php_ast::ast::TypeHint<'arena, 'src>,
+pub(crate) fn check_type_hint_classes(
+    hint: &php_ast::owned::TypeHint,
     db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
@@ -43,10 +43,10 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
 ) {
-    use php_ast::ast::TypeHintKind;
+    use php_ast::owned::TypeHintKind;
     match &hint.kind {
         TypeHintKind::Named(name) => {
-            let name_str = crate::parser::name_to_string(name);
+            let name_str = crate::parser::name_to_string_owned(name);
             if is_pseudo_type(&name_str) {
                 return;
             }
@@ -109,8 +109,8 @@ pub(crate) fn check_type_hint_classes<'arena, 'src>(
 /// Collect all resolved Named class FQCNs referenced in a type hint, regardless
 /// of whether those classes exist. Used to record dependency edges even for
 /// classes that are defined (not just missing ones).
-pub(crate) fn collect_type_hint_class_refs<'arena, 'src>(
-    hint: &php_ast::ast::TypeHint<'arena, 'src>,
+pub(crate) fn collect_type_hint_class_refs(
+    hint: &php_ast::owned::TypeHint,
     db: &dyn MirDatabase,
     file: &Arc<str>,
 ) -> Vec<(Arc<str>, php_ast::Span)> {
@@ -119,16 +119,16 @@ pub(crate) fn collect_type_hint_class_refs<'arena, 'src>(
     out
 }
 
-fn collect_type_hint_class_refs_inner<'arena, 'src>(
-    hint: &php_ast::ast::TypeHint<'arena, 'src>,
+fn collect_type_hint_class_refs_inner(
+    hint: &php_ast::owned::TypeHint,
     db: &dyn MirDatabase,
     file: &Arc<str>,
     out: &mut Vec<(Arc<str>, php_ast::Span)>,
 ) {
-    use php_ast::ast::TypeHintKind;
+    use php_ast::owned::TypeHintKind;
     match &hint.kind {
         TypeHintKind::Named(name) => {
-            let name_str = crate::parser::name_to_string(name);
+            let name_str = crate::parser::name_to_string_owned(name);
             if is_pseudo_type(&name_str) {
                 return;
             }
@@ -148,7 +148,7 @@ fn collect_type_hint_class_refs_inner<'arena, 'src>(
 }
 
 pub(crate) fn check_name_class(
-    name: &php_ast::ast::Name<'_, '_>,
+    name: &php_ast::owned::Name,
     db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
@@ -169,7 +169,7 @@ pub(crate) fn check_name_class(
 }
 
 pub(crate) fn check_name_class_for_extends(
-    name: &php_ast::ast::Name<'_, '_>,
+    name: &php_ast::owned::Name,
     db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
@@ -191,7 +191,7 @@ pub(crate) fn check_name_class_for_extends(
 
 #[allow(clippy::too_many_arguments)]
 fn check_name_class_with_context(
-    name: &php_ast::ast::Name<'_, '_>,
+    name: &php_ast::owned::Name,
     db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
@@ -200,7 +200,7 @@ fn check_name_class_with_context(
     php_version: PhpVersion,
     is_extends: bool,
 ) {
-    let name_str = crate::parser::name_to_string(name);
+    let name_str = crate::parser::name_to_string_owned(name);
     let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
     if !type_exists_via_db(db, &resolved) {
         // Soft-fallback: see call/function.rs for the rationale.
@@ -219,7 +219,7 @@ fn check_name_class_with_context(
                 }
             }
         }
-        let span = name.span();
+        let span = name.span;
         let (line, col_start) = offset_to_line_col(source, span.start, source_map);
         let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
         issues.push(
@@ -246,7 +246,7 @@ fn check_name_class_with_context(
             .unwrap_or(false);
         if is_iface {
             {
-                let span = name.span();
+                let span = name.span;
                 let (line, col_start) = offset_to_line_col(source, span.start, source_map);
                 let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
                 issues.push(
@@ -289,8 +289,8 @@ fn is_pseudo_type(name: &str) -> bool {
 // Expression class checking
 // ---------------------------------------------------------------------------
 
-pub(crate) fn check_expr_for_undefined_classes<'arena, 'src>(
-    expr: &php_ast::ast::Expr<'arena, 'src>,
+pub(crate) fn check_expr_for_undefined_classes(
+    expr: &php_ast::owned::Expr,
     db: &dyn MirDatabase,
     file: &Arc<str>,
     source: &str,
@@ -298,7 +298,7 @@ pub(crate) fn check_expr_for_undefined_classes<'arena, 'src>(
     issues: &mut Vec<mir_issues::Issue>,
     _php_version: PhpVersion,
 ) {
-    use php_ast::ast::ExprKind;
+    use php_ast::owned::ExprKind;
     if let ExprKind::ClassConstAccess(cca) = &expr.kind {
         // Check for undefined class in ::CONSTANT or ::class
         if let ExprKind::Identifier(class_name) = &cca.class.kind {

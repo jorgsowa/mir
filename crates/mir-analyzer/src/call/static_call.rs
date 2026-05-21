@@ -52,7 +52,8 @@ impl CallAnalyzer {
                 crate::db::resolve_name_via_db(ea.db, &ea.file, name.as_ref())
             }
             _ => {
-                let ty = ea.analyze(call.class, ctx);
+                let owned_class = php_ast::owned::to_owned_expr(call.class);
+                let ty = ea.analyze(&owned_class, ctx);
                 // Check if the expression could evaluate to a valid class name
                 if !is_valid_class_name_type(&ty) {
                     ea.emit(
@@ -73,7 +74,8 @@ impl CallAnalyzer {
             .args
             .iter()
             .map(|arg| {
-                let ty = ea.analyze(&arg.value, ctx);
+                let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
+                let ty = ea.analyze(&owned_arg, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {
@@ -216,7 +218,8 @@ impl CallAnalyzer {
         ctx: &mut Context,
     ) -> Union {
         for arg in call.args.iter() {
-            ea.analyze(&arg.value, ctx);
+            let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
+            ea.analyze(&owned_arg, ctx);
         }
         Union::mixed()
     }

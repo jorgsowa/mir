@@ -17,8 +17,6 @@ use crate::shared_db::SharedDb;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
 use mir_issues::Issue;
 
-pub(crate) use crate::pass2::merge_return_types;
-
 /// Issue kinds emitted by [`crate::dead_code::DeadCodeAnalyzer`].
 ///
 /// The dead-code pass is just an error group — these names participate in

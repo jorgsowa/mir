@@ -89,7 +89,8 @@ impl CallAnalyzer {
         span: Span,
         nullsafe: bool,
     ) -> Union {
-        let obj_ty = ea.analyze(call.object, ctx);
+        let owned_obj = php_ast::owned::to_owned_expr(call.object);
+        let obj_ty = ea.analyze(&owned_obj, ctx);
 
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_str(),
@@ -103,7 +104,8 @@ impl CallAnalyzer {
             .args
             .iter()
             .map(|arg| {
-                let ty = ea.analyze(&arg.value, ctx);
+                let owned_arg = php_ast::owned::to_owned_expr(&arg.value);
+                let ty = ea.analyze(&owned_arg, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {

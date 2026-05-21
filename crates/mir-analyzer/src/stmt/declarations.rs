@@ -10,8 +10,9 @@ impl<'a> StatementsAnalyzer<'a> {
     ) {
         for p in decl.params.iter() {
             if let Some(default) = &p.default {
+                let owned = php_ast::owned::to_owned_expr(default);
                 let mut ea = self.expr_analyzer(ctx);
-                let _ = ea.analyze(default, ctx);
+                let _ = ea.analyze(&owned, ctx);
             }
         }
 
@@ -120,8 +121,9 @@ impl<'a> StatementsAnalyzer<'a> {
             };
             for p in method.params.iter() {
                 if let Some(default) = &p.default {
+                    let owned = php_ast::owned::to_owned_expr(default);
                     let mut ea = self.expr_analyzer(&param_default_ctx);
-                    let _ = ea.analyze(default, &mut param_default_ctx);
+                    let _ = ea.analyze(&owned, &mut param_default_ctx);
                 }
             }
             let Some(body) = &method.body else { continue };

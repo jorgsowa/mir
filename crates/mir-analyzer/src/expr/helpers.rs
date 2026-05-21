@@ -1,5 +1,5 @@
 use mir_types::{Atomic, Union};
-use php_ast::ast::{Expr, ExprKind};
+use php_ast::owned::{Expr, ExprKind};
 use std::sync::Arc;
 
 pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
@@ -101,15 +101,15 @@ pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
     }
 }
 
-pub fn extract_simple_var<'arena, 'src>(expr: &Expr<'arena, 'src>) -> Option<String> {
+pub fn extract_simple_var(expr: &Expr) -> Option<String> {
     match &expr.kind {
-        ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
+        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_simple_var(inner),
         _ => None,
     }
 }
 
-pub fn extract_destructure_vars<'arena, 'src>(expr: &Expr<'arena, 'src>) -> Vec<String> {
+pub fn extract_destructure_vars(expr: &Expr) -> Vec<String> {
     match &expr.kind {
         ExprKind::Array(elements) => {
             let mut vars = vec![];
@@ -129,8 +129,8 @@ pub fn extract_destructure_vars<'arena, 'src>(expr: &Expr<'arena, 'src>) -> Vec<
     }
 }
 
-pub(crate) fn ast_params_to_fn_params_resolved<'arena, 'src>(
-    params: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Param<'arena, 'src>>,
+pub(crate) fn ast_params_to_fn_params_resolved(
+    params: &[php_ast::owned::Param],
     self_fqcn: Option<&str>,
     db: &dyn crate::db::MirDatabase,
     file: &str,
@@ -138,13 +138,14 @@ pub(crate) fn ast_params_to_fn_params_resolved<'arena, 'src>(
     params
         .iter()
         .map(|p| {
+            let name_str = p.name.as_deref().unwrap_or("").trim_start_matches('$');
             let ty = p
                 .type_hint
                 .as_ref()
-                .map(|h| crate::parser::type_from_hint(h, self_fqcn))
+                .map(|h| crate::parser::type_from_hint_owned(h, self_fqcn))
                 .map(|u| resolve_named_objects_in_union(u, db, file));
             mir_codebase::FnParam {
-                name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                name: Arc::from(name_str),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default: p.default.is_some(),
                 is_variadic: p.variadic,
@@ -182,7 +183,7 @@ pub(crate) fn resolve_named_objects_in_union(
     result
 }
 
-pub(crate) fn extract_string_from_expr<'arena, 'src>(expr: &Expr<'arena, 'src>) -> Option<String> {
+pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Identifier(s) => Some(s.trim_start_matches('$').to_string()),
         ExprKind::Variable(_) => None,

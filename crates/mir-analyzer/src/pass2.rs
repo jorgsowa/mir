@@ -154,8 +154,9 @@ impl<'a> Pass2Driver<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
+        let owned_hint = php_ast::owned::to_owned_type_hint(hint);
         check_type_hint_classes(
-            hint,
+            &owned_hint,
             self.db,
             file,
             source,
@@ -164,7 +165,7 @@ impl<'a> Pass2Driver<'a> {
             self.php_version,
         );
         if !self.inference_only {
-            for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
+            for (fqcn, span) in collect_type_hint_class_refs(&owned_hint, self.db, file) {
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                 let (_, col_end) =
@@ -510,7 +511,7 @@ impl<'a> Pass2Driver<'a> {
             // Check parameter default values for undefined classes
             if let Some(default_expr) = &param.default {
                 check_expr_for_undefined_classes(
-                    default_expr,
+                    &php_ast::owned::to_owned_expr(default_expr),
                     self.db,
                     file,
                     source,
@@ -632,7 +633,7 @@ impl<'a> Pass2Driver<'a> {
 
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
-                parent,
+                &php_ast::owned::to_owned_name(parent),
                 self.db,
                 file,
                 source,
@@ -643,7 +644,7 @@ impl<'a> Pass2Driver<'a> {
         }
         for iface in decl.implements.iter() {
             check_name_class(
-                iface,
+                &php_ast::owned::to_owned_name(iface),
                 self.db,
                 file,
                 source,
@@ -695,8 +696,9 @@ impl<'a> Pass2Driver<'a> {
                 default_ctx.static_fqcn = Some(Arc::from(fqcn));
                 for p in method.params.iter() {
                     if let Some(default) = &p.default {
+                        let owned = php_ast::owned::to_owned_expr(default);
                         let mut ea = sa.expr_analyzer(&default_ctx);
-                        let _ = ea.analyze(default, &mut default_ctx);
+                        let _ = ea.analyze(&owned, &mut default_ctx);
                     }
                 }
                 drop(sa);
@@ -878,7 +880,7 @@ impl<'a> Pass2Driver<'a> {
 
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
-                parent,
+                &php_ast::owned::to_owned_name(parent),
                 self.db,
                 file,
                 source,
@@ -889,7 +891,7 @@ impl<'a> Pass2Driver<'a> {
         }
         for iface in decl.implements.iter() {
             check_name_class(
-                iface,
+                &php_ast::owned::to_owned_name(iface),
                 self.db,
                 file,
                 source,
@@ -941,8 +943,9 @@ impl<'a> Pass2Driver<'a> {
                 default_ctx.static_fqcn = Some(Arc::from(fqcn));
                 for p in method.params.iter() {
                     if let Some(default) = &p.default {
+                        let owned = php_ast::owned::to_owned_expr(default);
                         let mut ea = sa.expr_analyzer(&default_ctx);
-                        let _ = ea.analyze(default, &mut default_ctx);
+                        let _ = ea.analyze(&owned, &mut default_ctx);
                     }
                 }
                 drop(sa);
@@ -1306,7 +1309,7 @@ impl<'a> Pass2Driver<'a> {
         use php_ast::ast::EnumMemberKind;
         for iface in decl.implements.iter() {
             check_name_class(
-                iface,
+                &php_ast::owned::to_owned_name(iface),
                 self.db,
                 file,
                 source,
@@ -1343,7 +1346,7 @@ impl<'a> Pass2Driver<'a> {
         use php_ast::ast::ClassMemberKind;
         for parent in decl.extends.iter() {
             check_name_class(
-                parent,
+                &php_ast::owned::to_owned_name(parent),
                 self.db,
                 file,
                 source,

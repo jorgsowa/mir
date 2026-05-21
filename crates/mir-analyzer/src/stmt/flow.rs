@@ -21,7 +21,8 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut crate::context::Context,
     ) {
         if let Some(expr) = opt_expr {
-            let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+            let owned = php_ast::owned::to_owned_expr(expr);
+            let ret_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
 
             // If there's a bare `@var Type` (no variable name) on the return statement,
             // use the annotated type for the return-type compatibility check.
@@ -132,7 +133,8 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt_span: php_ast::Span,
         ctx: &mut crate::context::Context,
     ) {
-        let thrown_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+        let owned = php_ast::owned::to_owned_expr(expr);
+        let thrown_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
         // Validate that the thrown type extends Throwable
         for atomic in &thrown_ty.types {
             match atomic {

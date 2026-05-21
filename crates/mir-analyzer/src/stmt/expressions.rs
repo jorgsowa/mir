@@ -9,7 +9,8 @@ impl<'a> StatementsAnalyzer<'a> {
         expr: &php_ast::ast::Expr<'arena, 'src>,
         ctx: &mut Context,
     ) {
-        let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+        let owned = php_ast::owned::to_owned_expr(expr);
+        let expr_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
         if expr_ty.is_never() {
             ctx.diverges = true;
         }
@@ -17,7 +18,13 @@ impl<'a> StatementsAnalyzer<'a> {
             if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
                 if fn_name.eq_ignore_ascii_case("assert") {
                     if let Some(arg) = call.args.first() {
-                        narrow_from_condition(&arg.value, ctx, true, self.db, &self.file);
+                        narrow_from_condition(
+                            &php_ast::owned::to_owned_expr(&arg.value),
+                            ctx,
+                            true,
+                            self.db,
+                            &self.file,
+                        );
                     }
                 }
             }
@@ -31,9 +38,10 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut Context,
     ) {
         for expr in exprs.iter() {
-            let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+            let owned = php_ast::owned::to_owned_expr(expr);
+            let expr_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
             self.check_echo_implicit_to_string_cast(&expr_ty, expr.span);
-            if crate::taint::is_expr_tainted(expr, ctx) {
+            if crate::taint::is_expr_tainted(&php_ast::owned::to_owned_expr(expr), ctx) {
                 let (line, col_start) = self.offset_to_line_col(stmt_span.start);
                 let (line_end, col_end) = if stmt_span.start < stmt_span.end {
                     let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);

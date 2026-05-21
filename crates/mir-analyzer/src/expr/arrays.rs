@@ -2,15 +2,11 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
-use php_ast::ast::{ArenaVec, ArrayAccessExpr, ArrayElement, Expr, ExprKind};
+use php_ast::owned::{ArrayAccessExpr, ArrayElement, Expr, ExprKind};
 use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_array<'arena, 'src>(
-        &mut self,
-        elements: &ArenaVec<'arena, ArrayElement<'arena, 'src>>,
-        ctx: &mut Context,
-    ) -> Union {
+    pub(super) fn analyze_array(&mut self, elements: &[ArrayElement], ctx: &mut Context) -> Union {
         use mir_types::atomic::{ArrayKey, KeyedProperty};
 
         if elements.is_empty() {
@@ -124,13 +120,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         })
     }
 
-    pub(super) fn analyze_array_access<'arena, 'src>(
+    pub(super) fn analyze_array_access(
         &mut self,
-        aa: &ArrayAccessExpr<'arena, 'src>,
-        expr: &Expr<'arena, 'src>,
+        aa: &ArrayAccessExpr,
+        expr: &Expr,
         ctx: &mut Context,
     ) -> Union {
-        let arr_ty = self.analyze(aa.array, ctx);
+        let arr_ty = self.analyze(&aa.array, ctx);
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
             // Float keys are silently truncated to int in PHP
@@ -159,7 +155,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let literal_key: Option<mir_types::atomic::ArrayKey> =
             aa.index.as_ref().and_then(|idx| match &idx.kind {
-                ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(Arc::from(&**s))),
+                ExprKind::String(s) => {
+                    Some(mir_types::atomic::ArrayKey::String(Arc::from(s.as_ref())))
+                }
                 ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
                 _ => None,
             });

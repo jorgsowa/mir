@@ -1,12 +1,11 @@
 /// Expression analyzer — infers the `Union` type of any PHP expression.
 use std::sync::Arc;
 
-use php_ast::ast::ExprKind;
+use php_ast::owned::ExprKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location, Severity};
 use mir_types::{Atomic, Union};
 
-use crate::call::CallAnalyzer;
 use crate::context::Context;
 use crate::db::MirDatabase;
 use crate::php_version::PhpVersion;
@@ -39,6 +38,8 @@ pub struct ExpressionAnalyzer<'a> {
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
+    // TODO(owned-migration): used by call/function.rs once it's migrated to owned types.
+    #[allow(dead_code)]
     pub php_version: PhpVersion,
     /// When true, skip all reference-tracking side-effects (used by the
     /// inference priming pass so reference locations aren't double-counted).
@@ -79,11 +80,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         });
     }
 
-    pub fn analyze<'arena, 'src>(
-        &mut self,
-        expr: &php_ast::ast::Expr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
+    pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut Context) -> Union {
         match &expr.kind {
             // --- Literals ---------------------------------------------------
             ExprKind::Int(_)
@@ -94,7 +91,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
                 for part in parts.iter() {
-                    if let php_ast::StringPart::Expr(e) = part {
+                    if let php_ast::owned::StringPart::Expr(e) = part {
                         let expr_ty = self.analyze(e, ctx);
                         self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                     }
@@ -105,9 +102,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::ShellExec(_) => Union::single(Atomic::TString),
 
             // --- Variables --------------------------------------------------
-            ExprKind::Variable(name) => self.analyze_variable(name, expr, ctx),
+            ExprKind::Variable(name) => self.analyze_variable(name.as_ref(), expr, ctx),
             ExprKind::VariableVariable(inner) => self.analyze_variable_variable(inner, ctx),
-            ExprKind::Identifier(name) => self.analyze_identifier(name, expr, ctx),
+            ExprKind::Identifier(name) => self.analyze_identifier(name.as_ref(), expr, ctx),
 
             // --- Assignment -------------------------------------------------
             ExprKind::Assign(a) => self.analyze_assign(a, expr.span, ctx),
@@ -176,33 +173,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- new ClassName(...) ----------------------------------------
             ExprKind::New(n) => self.analyze_new(n, expr.span, ctx),
 
-            ExprKind::AnonymousClass(anon) => {
-                for member in anon.members.iter() {
-                    if let php_ast::ast::ClassMemberKind::Method(method) = &member.kind {
-                        let Some(body) = &method.body else { continue };
-                        let mut sa = crate::stmt::StatementsAnalyzer::new(
-                            self.db,
-                            self.file.clone(),
-                            self.source,
-                            self.source_map,
-                            self.issues,
-                            self.symbols,
-                            self.php_version,
-                            self.inference_only,
-                        );
-                        let mut method_ctx = crate::context::Context::for_function(
-                            &[],
-                            None,
-                            std::sync::Arc::from([]),
-                            None,
-                            None,
-                            None,
-                            ctx.strict_types,
-                            false,
-                        );
-                        sa.analyze_stmts(body, &mut method_ctx);
-                    }
-                }
+            // --- Anonymous class -------------------------------------------
+            ExprKind::AnonymousClass(_anon) => {
+                // TODO(owned-migration): analyze anonymous class bodies once stmt/ is migrated to owned
                 Union::single(Atomic::TObject)
             }
 
@@ -219,25 +192,131 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::StaticPropertyAccessDynamic { .. } => Union::mixed(),
 
             // --- Method calls ----------------------------------------------
+            // TODO(owned-migration): re-enable CallAnalyzer once it's migrated to owned types.
             ExprKind::MethodCall(mc) => {
-                CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, false)
+                self.analyze(&mc.object, ctx);
+                for arg in mc.args.iter() {
+                    self.analyze(&arg.value, ctx);
+                }
+                Union::mixed()
             }
 
             ExprKind::NullsafeMethodCall(mc) => {
-                CallAnalyzer::analyze_method_call(self, mc, ctx, expr.span, true)
+                self.analyze(&mc.object, ctx);
+                for arg in mc.args.iter() {
+                    self.analyze(&arg.value, ctx);
+                }
+                Union::mixed()
             }
 
             ExprKind::StaticMethodCall(smc) => {
-                CallAnalyzer::analyze_static_method_call(self, smc, ctx, expr.span)
+                // Record a symbol reference for the static call so that
+                // analyze_dependents_of() can track bare FQN static calls.
+                if let (ExprKind::Identifier(class_name), ExprKind::Identifier(method_name)) =
+                    (&smc.class.kind, &smc.method.kind)
+                {
+                    let fqcn =
+                        crate::db::resolve_name_via_db(self.db, &self.file, class_name.as_ref());
+                    let fqcn = resolve_static_class_owned(&fqcn, ctx);
+                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+                    let method_str = method_name.as_ref();
+                    self.record_symbol(
+                        smc.method.span,
+                        SymbolKind::StaticCall {
+                            class: fqcn_arc.clone(),
+                            method: Arc::from(method_str),
+                        },
+                        Union::mixed(),
+                    );
+                    if !self.inference_only {
+                        let (line, col_start, col_end) = self.span_to_ref_loc(smc.method.span);
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(
+                                format!("{}::{}", fqcn_arc, method_str.to_lowercase()).as_str(),
+                            ),
+                            file: self.file.clone(),
+                            line,
+                            col_start,
+                            col_end,
+                        });
+                    }
+                }
+                self.analyze(&smc.class, ctx);
+                for arg in smc.args.iter() {
+                    self.analyze(&arg.value, ctx);
+                }
+                Union::mixed()
             }
 
             ExprKind::StaticDynMethodCall(smc) => {
-                CallAnalyzer::analyze_static_dyn_method_call(self, smc, ctx)
+                self.analyze(&smc.class, ctx);
+                for arg in smc.args.iter() {
+                    self.analyze(&arg.value, ctx);
+                }
+                Union::mixed()
             }
 
             // --- Function calls --------------------------------------------
+            // TODO(owned-migration): re-enable CallAnalyzer once it's migrated to owned types.
             ExprKind::FunctionCall(fc) => {
-                CallAnalyzer::analyze_function_call(self, fc, ctx, expr.span)
+                self.analyze(&fc.name, ctx);
+
+                // Resolve function name for symbol recording and by-ref pre-marking.
+                if let ExprKind::Identifier(fn_name_box) = &fc.name.kind {
+                    let fn_name_raw = fn_name_box.as_ref();
+                    let fn_name_raw = fn_name_raw.strip_prefix('\\').unwrap_or(fn_name_raw);
+                    let resolved_fn_name = self.resolve_fn_name(fn_name_raw);
+                    let fqn_arc = Arc::<str>::from(resolved_fn_name.as_str());
+                    let here = crate::db::Fqcn::new(self.db, fqn_arc.clone());
+                    if let Some(f) = crate::db::find_function(self.db, here) {
+                        // Record a symbol reference for this call site so that
+                        // references_to() and analyze_dependents_of() work correctly.
+                        self.record_symbol(
+                            fc.name.span,
+                            SymbolKind::FunctionCall(f.fqn.clone()),
+                            Union::mixed(),
+                        );
+                        if !self.inference_only {
+                            let (line, col_start, col_end) = self.span_to_ref_loc(fc.name.span);
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: f.fqn.clone(),
+                                file: self.file.clone(),
+                                line,
+                                col_start,
+                                col_end,
+                            });
+                        }
+                        // Pre-mark by-reference parameter variables as defined BEFORE
+                        // evaluating args so that callers like sscanf(%d, $row, $col)
+                        // don't produce UndefinedVariable for the output variables.
+                        for (i, param) in f.params.iter().enumerate() {
+                            if param.is_byref {
+                                if param.is_variadic {
+                                    for arg in fc.args.iter().skip(i) {
+                                        if let ExprKind::Variable(name) = &arg.value.kind {
+                                            let var_name = name.as_ref().trim_start_matches('$');
+                                            if !ctx.var_is_defined(var_name) {
+                                                ctx.set_var(var_name, Union::mixed());
+                                            }
+                                        }
+                                    }
+                                } else if let Some(arg) = fc.args.get(i) {
+                                    if let ExprKind::Variable(name) = &arg.value.kind {
+                                        let var_name = name.as_ref().trim_start_matches('$');
+                                        if !ctx.var_is_defined(var_name) {
+                                            ctx.set_var(var_name, Union::mixed());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for arg in fc.args.iter() {
+                    self.analyze(&arg.value, ctx);
+                }
+                Union::mixed()
             }
 
             // --- Closures / arrow functions --------------------------------
@@ -331,12 +410,38 @@ impl<'a> ExpressionAnalyzer<'a> {
         (line, col_start, col_end)
     }
 
+    /// Resolve a plain function name to its fully-qualified name using the
+    /// current file's namespace and import map.
+    fn resolve_fn_name(&self, fn_name_raw: &str) -> String {
+        let imports = self.db.file_imports(&self.file);
+        let qualified = if let Some(imported) = imports.get(fn_name_raw) {
+            imported.clone()
+        } else if fn_name_raw.contains('\\') {
+            crate::db::resolve_name_via_db(self.db, &self.file, fn_name_raw)
+        } else if let Some(ns) = self.db.file_namespace(&self.file) {
+            format!("{}\\{}", ns, fn_name_raw)
+        } else {
+            fn_name_raw.to_string()
+        };
+        let fn_exists = |name: &str| -> bool {
+            let here = crate::db::Fqcn::new(self.db, Arc::<str>::from(name));
+            crate::db::find_function(self.db, here).is_some()
+        };
+        if fn_exists(&qualified) {
+            qualified
+        } else if fn_exists(fn_name_raw) {
+            fn_name_raw.to_string()
+        } else {
+            qualified
+        }
+    }
+
     /// Walk a type hint and emit `UndefinedClass` for any named type not in the codebase.
-    fn check_type_hint(&mut self, hint: &php_ast::ast::TypeHint<'_, '_>) {
-        use php_ast::ast::TypeHintKind;
+    fn check_type_hint(&mut self, hint: &php_ast::owned::TypeHint) {
+        use php_ast::owned::TypeHintKind;
         match &hint.kind {
             TypeHintKind::Named(name) => {
-                let name_str = crate::parser::name_to_string(name);
+                let name_str = crate::parser::name_to_string_owned(name);
                 if matches!(
                     name_str.to_lowercase().as_str(),
                     "self"
@@ -425,6 +530,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Resolve `self`, `parent`, and `static` class name references for static calls.
+fn resolve_static_class_owned(name: &str, ctx: &Context) -> String {
+    match name.to_lowercase().as_str() {
+        "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
+        "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
+        "static" => ctx
+            .static_fqcn
+            .as_deref()
+            .unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static"))
+            .to_string(),
+        _ => name.to_string(),
     }
 }
 

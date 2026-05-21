@@ -1,7 +1,7 @@
 use mir_types::{Atomic, Union};
-use php_ast::ast::ExprKind;
+use php_ast::owned::ExprKind;
 
-pub(crate) fn analyze<'arena, 'src>(kind: &ExprKind<'arena, 'src>) -> Union {
+pub(crate) fn analyze(kind: &ExprKind) -> Union {
     match kind {
         ExprKind::Int(n) => Union::single(Atomic::TLiteralInt(*n)),
         ExprKind::Float(f) => {
@@ -11,7 +11,7 @@ pub(crate) fn analyze<'arena, 'src>(kind: &ExprKind<'arena, 'src>) -> Union {
                 (bits & 0xFFFF_FFFF) as i64,
             ))
         }
-        ExprKind::String(s) => Union::single(Atomic::TLiteralString((*s).into())),
+        ExprKind::String(s) => Union::single(Atomic::TLiteralString(s.as_ref().into())),
         ExprKind::Bool(b) => {
             if *b {
                 Union::single(Atomic::TTrue)

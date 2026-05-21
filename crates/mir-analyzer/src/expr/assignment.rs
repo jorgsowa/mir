@@ -6,33 +6,34 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
-use php_ast::ast::{AssignExpr, AssignOp, ExprKind};
+use php_ast::ast::AssignOp;
+use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_assign<'arena, 'src>(
+    pub(super) fn analyze_assign(
         &mut self,
-        a: &AssignExpr<'arena, 'src>,
+        a: &AssignExpr,
         expr_span: Span,
         ctx: &mut Context,
     ) -> Union {
-        let rhs_tainted = crate::taint::is_expr_tainted(a.value, ctx);
-        let rhs_ty = self.analyze(a.value, ctx);
+        let rhs_tainted = crate::taint::is_expr_tainted(&a.value, ctx);
+        let rhs_ty = self.analyze(&a.value, ctx);
         if rhs_ty.is_never() {
             return rhs_ty;
         }
         match a.op {
             AssignOp::Assign => {
-                self.assign_to_target(a.target, rhs_ty.clone(), ctx, expr_span);
+                self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
                 if rhs_tainted {
-                    if let php_ast::ast::ExprKind::Variable(name) = &a.target.kind {
+                    if let ExprKind::Variable(name) = &a.target.kind {
                         ctx.taint_var(name.as_ref());
                     }
                 }
                 rhs_ty
             }
             AssignOp::Concat => {
-                if let Some(var_name) = extract_simple_var(a.target) {
+                if let Some(var_name) = extract_simple_var(&a.target) {
                     ctx.set_var(&var_name, Union::single(Atomic::TString));
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
@@ -46,9 +47,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             | AssignOp::Div
             | AssignOp::Mod
             | AssignOp::Pow => {
-                let lhs_ty = self.analyze(a.target, ctx);
+                let lhs_ty = self.analyze(&a.target, ctx);
                 let result_ty = infer_arithmetic(&lhs_ty, &rhs_ty);
-                if let Some(var_name) = extract_simple_var(a.target) {
+                if let Some(var_name) = extract_simple_var(&a.target) {
                     ctx.set_var(&var_name, result_ty.clone());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
@@ -57,9 +58,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 result_ty
             }
             AssignOp::Coalesce => {
-                let lhs_ty = self.analyze(a.target, ctx);
+                let lhs_ty = self.analyze(&a.target, ctx);
                 let merged = Union::merge(&lhs_ty.remove_null(), &rhs_ty);
-                if let Some(var_name) = extract_simple_var(a.target) {
+                if let Some(var_name) = extract_simple_var(&a.target) {
                     ctx.set_var(&var_name, merged.clone());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
@@ -68,7 +69,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 merged
             }
             _ => {
-                if let Some(var_name) = extract_simple_var(a.target) {
+                if let Some(var_name) = extract_simple_var(&a.target) {
                     ctx.set_var(&var_name, Union::mixed());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
@@ -79,16 +80,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn assign_to_target<'arena, 'src>(
+    pub(super) fn assign_to_target(
         &mut self,
-        target: &php_ast::ast::Expr<'arena, 'src>,
+        target: &Expr,
         ty: Union,
         ctx: &mut Context,
         span: Span,
     ) {
         match &target.kind {
             ExprKind::Variable(name) => {
-                let name_str = name.as_str().trim_start_matches('$').to_string();
+                let name_str = name.trim_start_matches('$').to_string();
                 if ctx.byref_param_names.contains(&name_str) {
                     ctx.read_vars.insert(name_str.clone());
                 }
@@ -135,8 +136,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::PropertyAccess(pa) => {
-                let obj_ty = self.analyze(pa.object, ctx);
-                if let Some(prop_name) = extract_string_from_expr(pa.property) {
+                let obj_ty = self.analyze(&pa.object, ctx);
+                if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
@@ -181,11 +182,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(idx) = &aa.index {
                     self.analyze(idx, ctx);
                 }
-                let mut base = aa.array;
+                let mut base: &Expr = &aa.array;
                 loop {
                     match &base.kind {
                         ExprKind::Variable(name) => {
-                            let name_str = name.as_str().trim_start_matches('$');
+                            let name_str = name.trim_start_matches('$');
                             if !ctx.var_is_defined(name_str) {
                                 ctx.vars.insert(
                                     name_str.to_string(),
@@ -211,7 +212,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             if let Some(idx) = &inner.index {
                                 self.analyze(idx, ctx);
                             }
-                            base = inner.array;
+                            base = &inner.array;
                         }
                         _ => break,
                     }

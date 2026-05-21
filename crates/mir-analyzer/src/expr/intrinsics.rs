@@ -1,14 +1,11 @@
 use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_types::{Atomic, Union};
-use php_ast::ast::{MagicConstKind, YieldExpr};
+use php_ast::ast::MagicConstKind;
+use php_ast::owned::YieldExpr;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_yield<'arena, 'src>(
-        &mut self,
-        y: &YieldExpr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
+    pub(super) fn analyze_yield(&mut self, y: &YieldExpr, ctx: &mut Context) -> Union {
         if let Some(key) = &y.key {
             self.analyze(key, ctx);
         }

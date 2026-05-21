@@ -22,11 +22,12 @@ impl<'a> StatementsAnalyzer<'a> {
     ) {
         let pre_ctx = ctx.clone();
 
-        let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
+        let owned_cond = php_ast::owned::to_owned_expr(&if_stmt.condition);
+        let cond_type = self.expr_analyzer(ctx).analyze(&owned_cond, ctx);
         let pre_diverges = ctx.diverges;
 
         let mut then_ctx = ctx.fork();
-        narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
+        narrow_from_condition(&owned_cond, &mut then_ctx, true, self.db, &self.file);
         let then_unreachable_from_narrowing = then_ctx.diverges;
         if !then_ctx.diverges {
             self.analyze_stmt(if_stmt.then_branch, &mut then_ctx);
@@ -35,18 +36,13 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut elseif_ctxs: Vec<Context> = vec![];
         for elseif in if_stmt.elseif_branches.iter() {
             let mut pre_elseif = ctx.fork();
-            narrow_from_condition(
-                &if_stmt.condition,
-                &mut pre_elseif,
-                false,
-                self.db,
-                &self.file,
-            );
+            narrow_from_condition(&owned_cond, &mut pre_elseif, false, self.db, &self.file);
             let pre_elseif_diverges = pre_elseif.diverges;
 
+            let owned_elseif_cond = php_ast::owned::to_owned_expr(&elseif.condition);
             let mut elseif_true_ctx = pre_elseif.clone();
             narrow_from_condition(
-                &elseif.condition,
+                &owned_elseif_cond,
                 &mut elseif_true_ctx,
                 true,
                 self.db,
@@ -54,7 +50,7 @@ impl<'a> StatementsAnalyzer<'a> {
             );
             let mut elseif_false_ctx = pre_elseif.clone();
             narrow_from_condition(
-                &elseif.condition,
+                &owned_elseif_cond,
                 &mut elseif_false_ctx,
                 false,
                 self.db,
@@ -65,7 +61,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.span_to_location(elseif.condition.span);
                 let elseif_cond_type = self
                     .expr_analyzer(ctx)
-                    .analyze(&elseif.condition, &mut ctx.fork());
+                    .analyze(&owned_elseif_cond, &mut ctx.fork());
                 self.issues.add(
                     mir_issues::Issue::new(
                         IssueKind::RedundantCondition {
@@ -87,7 +83,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
             let mut branch_ctx = elseif_true_ctx;
             self.expr_analyzer(&branch_ctx)
-                .analyze(&elseif.condition, &mut branch_ctx);
+                .analyze(&owned_elseif_cond, &mut branch_ctx);
             if !branch_ctx.diverges {
                 self.analyze_stmt(&elseif.body, &mut branch_ctx);
             }
@@ -95,13 +91,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let mut else_ctx = ctx.fork();
-        narrow_from_condition(
-            &if_stmt.condition,
-            &mut else_ctx,
-            false,
-            self.db,
-            &self.file,
-        );
+        narrow_from_condition(&owned_cond, &mut else_ctx, false, self.db, &self.file);
         let else_unreachable_from_narrowing = else_ctx.diverges;
         if !else_ctx.diverges {
             if let Some(else_branch) = &if_stmt.else_branch {
@@ -142,18 +132,20 @@ impl<'a> StatementsAnalyzer<'a> {
         w: &php_ast::ast::WhileStmt<'arena, 'src>,
         ctx: &mut Context,
     ) {
-        self.expr_analyzer(ctx).analyze(&w.condition, ctx);
+        let owned_while_cond = php_ast::owned::to_owned_expr(&w.condition);
+        self.expr_analyzer(ctx).analyze(&owned_while_cond, ctx);
         let pre = ctx.clone();
 
         let mut entry = ctx.fork();
-        narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
+        narrow_from_condition(&owned_while_cond, &mut entry, true, self.db, &self.file);
 
         let post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
                 sa.analyze_stmt(w.body, iter);
-                sa.expr_analyzer(iter).analyze(&w.condition, iter);
+                let c = php_ast::owned::to_owned_expr(&w.condition);
+                sa.expr_analyzer(iter).analyze(&c, iter);
             },
             false,
         );
@@ -173,7 +165,8 @@ impl<'a> StatementsAnalyzer<'a> {
             entry,
             |sa, iter| {
                 sa.analyze_stmt(dw.body, iter);
-                sa.expr_analyzer(iter).analyze(&dw.condition, iter);
+                let c = php_ast::owned::to_owned_expr(&dw.condition);
+                sa.expr_analyzer(iter).analyze(&c, iter);
             },
             true,
         );
@@ -186,12 +179,14 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut Context,
     ) {
         for init in f.init.iter() {
-            self.expr_analyzer(ctx).analyze(init, ctx);
+            let owned = php_ast::owned::to_owned_expr(init);
+            self.expr_analyzer(ctx).analyze(&owned, ctx);
         }
         let pre = ctx.clone();
         let mut entry = ctx.fork();
         for cond in f.condition.iter() {
-            self.expr_analyzer(&entry).analyze(cond, &mut entry);
+            let owned = php_ast::owned::to_owned_expr(cond);
+            self.expr_analyzer(&entry).analyze(&owned, &mut entry);
         }
 
         let post = self.analyze_loop_widened(
@@ -200,10 +195,12 @@ impl<'a> StatementsAnalyzer<'a> {
             |sa, iter| {
                 sa.analyze_stmt(f.body, iter);
                 for update in f.update.iter() {
-                    sa.expr_analyzer(iter).analyze(update, iter);
+                    let owned = php_ast::owned::to_owned_expr(update);
+                    sa.expr_analyzer(iter).analyze(&owned, iter);
                 }
                 for cond in f.condition.iter() {
-                    sa.expr_analyzer(iter).analyze(cond, iter);
+                    let owned = php_ast::owned::to_owned_expr(cond);
+                    sa.expr_analyzer(iter).analyze(&owned, iter);
                 }
             },
             false,
@@ -217,10 +214,12 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt_span: php_ast::Span,
         ctx: &mut Context,
     ) {
-        let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
+        let owned_fe_expr = php_ast::owned::to_owned_expr(&fe.expr);
+        let arr_ty = self.expr_analyzer(ctx).analyze(&owned_fe_expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types(&arr_ty);
 
-        if let Some(vname) = extract_simple_var(&fe.value) {
+        let owned_fe_value = php_ast::owned::to_owned_expr(&fe.value);
+        if let Some(vname) = extract_simple_var(&owned_fe_value) {
             let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
             if let Some(ann) = self.extract_var_annotation_from(doc.as_deref()) {
                 if ann.name.as_deref() == Some(vname.as_str()) {
@@ -233,12 +232,13 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut entry = ctx.fork();
 
         if let Some(key_expr) = &fe.key {
-            if let Some(var_name) = extract_simple_var(key_expr) {
+            let owned_key = php_ast::owned::to_owned_expr(key_expr);
+            if let Some(var_name) = extract_simple_var(&owned_key) {
                 entry.set_var(var_name, key_ty.clone());
             }
         }
-        let value_var = extract_simple_var(&fe.value);
-        let value_destructure_vars = extract_destructure_vars(&fe.value);
+        let value_var = extract_simple_var(&owned_fe_value);
+        let value_destructure_vars = extract_destructure_vars(&owned_fe_value);
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
         } else {
@@ -253,7 +253,8 @@ impl<'a> StatementsAnalyzer<'a> {
             entry,
             |sa, iter| {
                 if let Some(key_expr) = &fe.key {
-                    if let Some(var_name) = extract_simple_var(key_expr) {
+                    let owned_key = php_ast::owned::to_owned_expr(key_expr);
+                    if let Some(var_name) = extract_simple_var(&owned_key) {
                         iter.set_var(var_name, key_ty.clone());
                     }
                 }
@@ -276,7 +277,8 @@ impl<'a> StatementsAnalyzer<'a> {
         sw: &php_ast::ast::SwitchStmt<'arena, 'src>,
         ctx: &mut Context,
     ) {
-        let _subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
+        let owned_sw_expr = php_ast::owned::to_owned_expr(&sw.expr);
+        let _subject_ty = self.expr_analyzer(ctx).analyze(&owned_sw_expr, ctx);
         let subject_var: Option<String> = match &sw.expr.kind {
             ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
             _ => None,
@@ -292,8 +294,9 @@ impl<'a> StatementsAnalyzer<'a> {
         for case in sw.cases.iter() {
             let mut case_ctx = pre_ctx.fork();
             if let Some(val) = &case.value {
+                let owned_val = php_ast::owned::to_owned_expr(val);
                 if switch_on_true {
-                    narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
+                    narrow_from_condition(&owned_val, &mut case_ctx, true, self.db, &self.file);
                 } else if let Some(ref var_name) = subject_var {
                     let narrow_ty = match &val.kind {
                         ExprKind::Int(n) => Some(Union::single(Atomic::TLiteralInt(*n))),
@@ -312,7 +315,8 @@ impl<'a> StatementsAnalyzer<'a> {
                         case_ctx.set_var(var_name, narrowed);
                     }
                 }
-                self.expr_analyzer(&case_ctx).analyze(val, &mut case_ctx);
+                self.expr_analyzer(&case_ctx)
+                    .analyze(&owned_val, &mut case_ctx);
             }
             self.analyze_stmts(&case.body, &mut case_ctx);
             case_results.push(case_ctx);

@@ -1,20 +1,16 @@
 use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_types::Union;
-use php_ast::ast::{ExprKind, MatchExpr, NullCoalesceExpr, TernaryExpr};
+use php_ast::owned::{ExprKind, MatchExpr, NullCoalesceExpr, TernaryExpr};
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_ternary<'arena, 'src>(
-        &mut self,
-        t: &TernaryExpr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
-        let cond_ty = self.analyze(t.condition, ctx);
+    pub(super) fn analyze_ternary(&mut self, t: &TernaryExpr, ctx: &mut Context) -> Union {
+        let cond_ty = self.analyze(&t.condition, ctx);
         match &t.then_expr {
             Some(then_expr) => {
                 let mut then_ctx = ctx.fork();
                 crate::narrowing::narrow_from_condition(
-                    t.condition,
+                    &t.condition,
                     &mut then_ctx,
                     true,
                     self.db,
@@ -24,13 +20,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
                 let mut else_ctx = ctx.fork();
                 crate::narrowing::narrow_from_condition(
-                    t.condition,
+                    &t.condition,
                     &mut else_ctx,
                     false,
                     self.db,
                     &self.file,
                 );
-                let else_ty = self.analyze(t.else_expr, &mut else_ctx);
+                let else_ty = self.analyze(&t.else_expr, &mut else_ctx);
 
                 for name in then_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
                     ctx.read_vars.insert(name.clone());
@@ -38,7 +34,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Union::merge(&then_ty, &else_ty)
             }
             None => {
-                let else_ty = self.analyze(t.else_expr, ctx);
+                let else_ty = self.analyze(&t.else_expr, ctx);
                 let truthy_ty = cond_ty.narrow_to_truthy();
                 if truthy_ty.is_empty() {
                     else_ty
@@ -49,13 +45,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_null_coalesce<'arena, 'src>(
+    pub(super) fn analyze_null_coalesce(
         &mut self,
-        nc: &NullCoalesceExpr<'arena, 'src>,
+        nc: &NullCoalesceExpr,
         ctx: &mut Context,
     ) -> Union {
-        let left_ty = self.analyze(nc.left, ctx);
-        let right_ty = self.analyze(nc.right, ctx);
+        let left_ty = self.analyze(&nc.left, ctx);
+        let right_ty = self.analyze(&nc.right, ctx);
         let non_null_left = left_ty.remove_null();
         if non_null_left.is_empty() {
             right_ty
@@ -64,14 +60,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_match<'arena, 'src>(
-        &mut self,
-        m: &MatchExpr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
-        let subject_ty = self.analyze(m.subject, ctx);
+    pub(super) fn analyze_match(&mut self, m: &MatchExpr, ctx: &mut Context) -> Union {
+        let subject_ty = self.analyze(&m.subject, ctx);
         let subject_var = match &m.subject.kind {
-            ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
+            ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
             _ => None,
         };
 

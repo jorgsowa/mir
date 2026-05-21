@@ -2,15 +2,11 @@ use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_
 use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_types::{Atomic, Union};
-use php_ast::ast::{ArrowFunctionExpr, ClosureExpr};
+use php_ast::owned::{ArrowFunctionExpr, ClosureExpr};
 use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_closure<'arena, 'src>(
-        &mut self,
-        c: &ClosureExpr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
+    pub(super) fn analyze_closure(&mut self, c: &ClosureExpr, ctx: &mut Context) -> Union {
         for param in c.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_type_hint(hint);
@@ -29,7 +25,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let return_ty_hint = c
             .return_type
             .as_ref()
-            .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
+            .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
             .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
 
         let mut closure_ctx = crate::context::Context::for_function(
@@ -72,26 +68,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.read_vars.insert(name.to_string());
         }
 
-        let inferred_return = {
-            let mut sa = crate::stmt::StatementsAnalyzer::new(
-                self.db,
-                self.file.clone(),
-                self.source,
-                self.source_map,
-                self.issues,
-                self.symbols,
-                self.php_version,
-                self.inference_only,
-            );
-            sa.analyze_stmts(&c.body, &mut closure_ctx);
-            let ret = crate::project::merge_return_types(&sa.return_types);
-            drop(sa);
-            ret
-        };
-
-        for name in &closure_ctx.read_vars {
-            ctx.read_vars.insert(name.clone());
-        }
+        // TODO(owned-migration): analyze closure body once stmt/ is migrated to owned types.
+        // Body analysis is skipped here because analyze_stmts still takes arena stmts.
+        let inferred_return = Union::mixed();
+        let _ = closure_ctx;
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);
         let closure_params: Vec<mir_types::atomic::FnParam> = params
@@ -125,9 +105,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         })
     }
 
-    pub(super) fn analyze_arrow_function<'arena, 'src>(
+    pub(super) fn analyze_arrow_function(
         &mut self,
-        af: &ArrowFunctionExpr<'arena, 'src>,
+        af: &ArrowFunctionExpr,
         ctx: &mut Context,
     ) -> Union {
         for param in af.params.iter() {
@@ -148,7 +128,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let return_ty_hint = af
             .return_type
             .as_ref()
-            .map(|h| crate::parser::type_from_hint(h, ctx.self_fqcn.as_deref()))
+            .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
             .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
 
         let mut arrow_ctx = crate::context::Context::for_function(
@@ -167,7 +147,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
-        let inferred_return = self.analyze(af.body, &mut arrow_ctx);
+        let inferred_return = self.analyze(&af.body, &mut arrow_ctx);
         for name in &arrow_ctx.read_vars {
             ctx.read_vars.insert(name.clone());
         }

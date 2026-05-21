@@ -6,16 +6,11 @@ use crate::context::Context;
 use crate::symbol::SymbolKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Union};
-use php_ast::ast::Expr;
+use php_ast::owned::Expr;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_variable<'arena, 'src>(
-        &mut self,
-        name: &php_ast::ast::NameStr<'arena, 'src>,
-        expr: &Expr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
-        let name_str = name.as_str().trim_start_matches('$');
+    pub(super) fn analyze_variable(&mut self, name: &str, expr: &Expr, ctx: &mut Context) -> Union {
+        let name_str = name.trim_start_matches('$');
         if !ctx.var_is_defined(name_str) {
             if ctx.var_possibly_defined(name_str) {
                 self.emit(
@@ -57,11 +52,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ty
     }
 
-    pub(super) fn analyze_variable_variable<'arena, 'src>(
-        &mut self,
-        inner: &Expr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
+    pub(super) fn analyze_variable_variable(&mut self, inner: &Expr, ctx: &mut Context) -> Union {
         let inner_ty = self.analyze(inner, ctx);
         if let Some(var_name) = extract_simple_var(inner) {
             ctx.read_vars.insert(var_name.clone());
@@ -74,13 +65,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         Union::mixed()
     }
 
-    pub(super) fn analyze_identifier<'arena, 'src>(
+    pub(super) fn analyze_identifier(
         &mut self,
-        name: &php_ast::ast::NameStr<'arena, 'src>,
-        expr: &Expr<'arena, 'src>,
+        name: &str,
+        expr: &Expr,
         _ctx: &mut Context,
     ) -> Union {
-        let name_str: &str = name.as_str();
+        let name_str: &str = name;
         let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
         let ns_qualified = self
             .db

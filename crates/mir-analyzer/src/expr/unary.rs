@@ -2,15 +2,12 @@ use super::helpers::extract_simple_var;
 use super::ExpressionAnalyzer;
 use crate::context::Context;
 use mir_types::{Atomic, Union};
-use php_ast::ast::{UnaryPostfixExpr, UnaryPostfixOp, UnaryPrefixExpr, UnaryPrefixOp};
+use php_ast::ast::{UnaryPostfixOp, UnaryPrefixOp};
+use php_ast::owned::{UnaryPostfixExpr, UnaryPrefixExpr};
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_unary_prefix<'arena, 'src>(
-        &mut self,
-        u: &UnaryPrefixExpr<'arena, 'src>,
-        ctx: &mut Context,
-    ) -> Union {
-        let operand_ty = self.analyze(u.operand, ctx);
+    pub(super) fn analyze_unary_prefix(&mut self, u: &UnaryPrefixExpr, ctx: &mut Context) -> Union {
+        let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPrefixOp::BooleanNot => Union::single(Atomic::TBool),
             UnaryPrefixOp::Negate => {
@@ -23,7 +20,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             UnaryPrefixOp::Plus => operand_ty,
             UnaryPrefixOp::BitwiseNot => Union::single(Atomic::TInt),
             UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement => {
-                if let Some(var_name) = extract_simple_var(u.operand) {
+                if let Some(var_name) = extract_simple_var(&u.operand) {
                     let ty = ctx.get_var(&var_name);
                     let new_ty = if ty
                         .contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
@@ -44,15 +41,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_unary_postfix<'arena, 'src>(
+    pub(super) fn analyze_unary_postfix(
         &mut self,
-        u: &UnaryPostfixExpr<'arena, 'src>,
+        u: &UnaryPostfixExpr,
         ctx: &mut Context,
     ) -> Union {
-        let operand_ty = self.analyze(u.operand, ctx);
+        let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPostfixOp::PostIncrement | UnaryPostfixOp::PostDecrement => {
-                if let Some(var_name) = extract_simple_var(u.operand) {
+                if let Some(var_name) = extract_simple_var(&u.operand) {
                     let new_ty = if operand_ty
                         .contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
                     {
