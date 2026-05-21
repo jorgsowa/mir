@@ -498,10 +498,19 @@ impl ProjectAnalyzer {
         let _t_salsa_reg = _t0.elapsed();
 
         // ---- Pass 1: definition collection from the already-parsed AST -------
-        let file_defs: Vec<FileDefinitions> = parsed_files
+        // Returns (FileDefinitions, content_hash, has_hard_parse_errors) so we
+        // can prime the parse cache before the pre-warm loop below, eliminating
+        // the re-parse that `collect_file_definitions` would otherwise trigger.
+        type Pass1Entry = (FileDefinitions, [u8; 32], bool);
+        let file_defs: Vec<Pass1Entry> = parsed_files
             .par_iter()
             .map(|parsed| {
                 let parse_result = parsed.parsed();
+                let content_hash = hash_source(parsed.source());
+                let has_hard_parse_errors = parse_result
+                    .errors
+                    .iter()
+                    .any(crate::parser::is_hard_parse_error);
                 let mut all_issues: Vec<Issue> = parse_result
                     .errors
                     .iter()
@@ -523,17 +532,29 @@ impl ProjectAnalyzer {
                 let (mut slice, collector_issues) = collector.collect_slice(&owned_program);
                 all_issues.extend(collector_issues);
                 mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
-                FileDefinitions {
+                let defs = FileDefinitions {
                     slice: Arc::new(slice),
                     issues: Arc::new(all_issues),
-                }
+                };
+                (defs, content_hash, has_hard_parse_errors)
             })
             .collect();
         let _t_pass1 = _t0.elapsed();
 
+        // Prime the in-process parse cache so the pre-warm loop below avoids
+        // re-parsing every project file through collect_file_definitions.
+        {
+            let guard = self.shared_db.salsa.read();
+            for (defs, hash, has_hard_parse_errors) in &file_defs {
+                if !*has_hard_parse_errors {
+                    guard.prime_parse_cache(*hash, Arc::clone(&defs.slice));
+                }
+            }
+        }
+
         let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
             std::collections::HashSet::new();
-        for defs in file_defs {
+        for (defs, _hash, _hard_err) in file_defs {
             for issue in defs.issues.iter() {
                 if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
                     && issue.severity == mir_issues::Severity::Error
