@@ -306,8 +306,7 @@ pub(crate) fn stub_slice_from_source(
     content: &str,
     php_version: Option<PhpVersion>,
 ) -> StubSlice {
-    let arena = crate::arena::create_parse_arena(content.len());
-    let result = php_rs_parser::parse_arena(&arena, content);
+    let result = php_rs_parser::parse(content);
     let file: Arc<str> = Arc::from(filename);
     let collector =
         crate::collector::DefinitionCollector::new_for_slice(file, content, &result.source_map);

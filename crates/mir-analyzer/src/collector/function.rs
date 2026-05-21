@@ -3,15 +3,15 @@ use std::sync::Arc;
 use mir_codebase::storage::{wrap_return_type, FnParam, FunctionStorage, TemplateParam};
 
 use super::DefinitionCollector;
-use crate::parser::type_from_hint;
+use crate::parser::type_from_hint_owned;
 
 impl DefinitionCollector<'_> {
-    pub(super) fn collect_function<'arena, 'src>(
+    pub(super) fn collect_function(
         &mut self,
-        decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
+        decl: &php_ast::owned::FunctionDecl,
         stmt_span: php_ast::Span,
     ) {
-        let short_name = decl.name.to_string();
+        let short_name = decl.name.as_deref().unwrap_or_default().to_string();
         let fqn = if let Some(ns) = &self.namespace {
             format!("{ns}\\{short_name}")
         } else {
@@ -55,8 +55,9 @@ impl DefinitionCollector<'_> {
         let mut local_complex = 0usize;
         let mut local_defaults = 0usize;
         for p in decl.params.iter() {
+            let param_name = p.name.as_deref().unwrap_or_default();
             let ty = doc
-                .get_param_type(&p.name.to_string())
+                .get_param_type(param_name)
                 .cloned()
                 .map(|u| {
                     // If the type is a simple named object that matches a template param,
@@ -69,7 +70,9 @@ impl DefinitionCollector<'_> {
                     )
                 })
                 .or_else(|| {
-                    self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint(h, None)))
+                    self.resolve_union_opt(
+                        p.type_hint.as_ref().map(|h| type_from_hint_owned(h, None)),
+                    )
                 });
             if let Some(ty_ref) = &ty {
                 if super::is_simple_scalar(ty_ref) {
@@ -84,7 +87,7 @@ impl DefinitionCollector<'_> {
             }
 
             params.push(FnParam {
-                name: Arc::from(p.name.to_string()),
+                name: Arc::from(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,
@@ -114,7 +117,7 @@ impl DefinitionCollector<'_> {
                     &template_params,
                 ))
             }
-            (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, None))),
+            (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint_owned(h, None))),
             (None, None) => None,
         };
 
@@ -155,10 +158,7 @@ impl DefinitionCollector<'_> {
         self.scan_stmts_for_global_vars(&decl.body);
     }
 
-    pub(super) fn collect_global_stmt<'arena, 'src>(
-        &mut self,
-        stmt: &php_ast::ast::Stmt<'arena, 'src>,
-    ) {
+    pub(super) fn collect_global_stmt(&mut self, stmt: &php_ast::owned::Stmt) {
         // Top-level `global $x` — unusual in PHP but valid.
         self.try_collect_global_var_annotation(stmt);
     }

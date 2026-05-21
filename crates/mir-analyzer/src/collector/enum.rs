@@ -2,35 +2,35 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{ConstantStorage, EnumCaseStorage};
 use mir_types::Union;
-use php_ast::ast::EnumMemberKind;
+use php_ast::owned::EnumMemberKind;
 
 use super::DefinitionCollector;
-use crate::parser::name_to_string;
+use crate::parser::name_to_string_owned;
 
 impl DefinitionCollector<'_> {
-    pub(super) fn collect_enum<'arena, 'src>(
+    pub(super) fn collect_enum(
         &mut self,
-        decl: &php_ast::ast::EnumDecl<'arena, 'src>,
+        decl: &php_ast::owned::EnumDecl,
         stmt_span: php_ast::Span,
     ) {
-        let enum_name = decl.name.to_string();
+        let enum_name = decl.name.as_deref().unwrap_or_default().to_string();
         let fqcn = self.resolve_name(&enum_name);
 
         let enum_doc = decl
             .doc_comment
             .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
             .unwrap_or_default();
 
         let scalar_type = decl
             .scalar_type
             .as_ref()
-            .map(|n| crate::parser::docblock::parse_type_string(&name_to_string(n)));
+            .map(|n| crate::parser::docblock::parse_type_string(&name_to_string_owned(n)));
 
         let interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
-            .map(|n| self.resolve_name(&name_to_string(n)).into())
+            .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
 
         let mut cases = indexmap::IndexMap::new();
@@ -40,10 +40,11 @@ impl DefinitionCollector<'_> {
         for member in decl.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
+                    let case_name = c.name.as_deref().unwrap_or_default();
                     cases.insert(
-                        Arc::from(c.name.to_string()),
+                        Arc::from(case_name),
                         EnumCaseStorage {
-                            name: Arc::from(c.name.to_string()),
+                            name: Arc::from(case_name),
                             value: c.value.as_ref().map(|_| Union::mixed()),
                             location: Some(self.location(member.span.start, member.span.end)),
                         },
@@ -60,10 +61,11 @@ impl DefinitionCollector<'_> {
                     }
                 }
                 EnumMemberKind::ClassConst(c) => {
+                    let const_name = c.name.as_deref().unwrap_or_default();
                     own_constants.insert(
-                        Arc::from(c.name.to_string()),
+                        Arc::from(const_name),
                         ConstantStorage {
-                            name: Arc::from(c.name.to_string()),
+                            name: Arc::from(const_name),
                             ty: Union::mixed(),
                             visibility: None,
                             is_final: c.is_final,
@@ -90,7 +92,7 @@ impl DefinitionCollector<'_> {
             .enums
             .push(std::sync::Arc::new(mir_codebase::EnumStorage {
                 fqcn: fqcn.into(),
-                short_name: Arc::from(decl.name.to_string()),
+                short_name: Arc::from(enum_name.as_str()),
                 scalar_type,
                 interfaces,
                 cases,

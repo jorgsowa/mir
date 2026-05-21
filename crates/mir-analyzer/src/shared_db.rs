@@ -300,8 +300,7 @@ impl SharedDb {
         crate::metrics::record_stub_cache_miss();
 
         // ---- Phase 1: parse + collect outside the lock ---------------------
-        let arena = crate::arena::create_parse_arena(source.len());
-        let parsed = php_rs_parser::parse_arena(&arena, source);
+        let parsed = php_rs_parser::parse(source);
 
         let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 

@@ -1,19 +1,19 @@
 use super::DefinitionCollector;
-use crate::parser::{name_to_string, type_from_hint};
+use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use mir_codebase::storage::{ConstantStorage, PropertyStorage, TemplateParam};
 use mir_codebase::ClassStorage;
 use mir_types::Atomic;
-use php_ast::ast::{ClassDecl, ClassMemberKind};
+use php_ast::owned::{ClassDecl, ClassMemberKind};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 impl<'a> DefinitionCollector<'a> {
-    pub(super) fn collect_class<'arena, 'src>(
+    pub(super) fn collect_class(
         &mut self,
-        decl: &ClassDecl<'arena, 'src>,
+        decl: &ClassDecl,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let name = match decl.name {
+        let name = match decl.name.as_ref().and_then(|n| n.as_deref()) {
             Some(n) => n.to_string(),
             None => return ControlFlow::Continue(()), // anonymous class — handled at expression level
         };
@@ -23,11 +23,11 @@ impl<'a> DefinitionCollector<'a> {
         let parent = decl
             .extends
             .as_ref()
-            .map(|n| self.resolve_name(&name_to_string(n)).into());
+            .map(|n| self.resolve_name(&name_to_string_owned(n)).into());
         let interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
-            .map(|n| self.resolve_name(&name_to_string(n)).into())
+            .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
 
         let mut own_methods = indexmap::IndexMap::new();
@@ -55,14 +55,17 @@ impl<'a> DefinitionCollector<'a> {
         for member in decl.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
-                    if m.name == "__construct" {
+                    if m.name.as_deref() == Some("__construct") {
                         for p in m.params.iter() {
                             if p.visibility.is_some() {
+                                let param_name = p.name.as_deref().unwrap_or_default();
                                 let ty = self.resolve_union_opt(
-                                    p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
+                                    p.type_hint
+                                        .as_ref()
+                                        .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                                 );
                                 let prop = PropertyStorage {
-                                    name: Arc::from(p.name.to_string()),
+                                    name: Arc::from(param_name),
                                     ty,
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
@@ -73,7 +76,7 @@ impl<'a> DefinitionCollector<'a> {
                                         self.location(member.span.start, member.span.end),
                                     ),
                                 };
-                                own_properties.insert(Arc::from(p.name.to_string()), prop);
+                                own_properties.insert(Arc::from(param_name), prop);
                             }
                         }
                     }
@@ -100,10 +103,13 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&prop_doc) {
                         continue;
                     }
+                    let prop_name = p.name.as_deref().unwrap_or_default();
                     let prop = PropertyStorage {
-                        name: Arc::from(p.name.to_string()),
+                        name: Arc::from(prop_name),
                         ty: self.resolve_union_opt(
-                            p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
+                            p.type_hint
+                                .as_ref()
+                                .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                         ),
                         inferred_ty: None,
                         visibility: Self::convert_visibility(p.visibility),
@@ -112,7 +118,7 @@ impl<'a> DefinitionCollector<'a> {
                         default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
                         location: Some(self.location(member.span.start, member.span.end)),
                     };
-                    own_properties.insert(Arc::from(p.name.to_string()), prop);
+                    own_properties.insert(Arc::from(prop_name), prop);
                 }
                 ClassMemberKind::ClassConst(c) => {
                     let const_doc = self.parse_docblock_from_node_or_preceding(
@@ -128,19 +134,20 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
+                    let const_name = c.name.as_deref().unwrap_or_default();
                     let constant = ConstantStorage {
-                        name: Arc::from(c.name.to_string()),
+                        name: Arc::from(const_name),
                         ty: mir_types::Union::mixed(),
                         visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                         is_final: c.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
                     };
-                    own_constants.insert(Arc::from(c.name.to_string()), constant);
+                    own_constants.insert(Arc::from(const_name), constant);
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        let fqcn: Arc<str> = self.resolve_name(&name_to_string(t)).into();
-                        let loc = self.location(t.span().start, t.span().end);
+                        let fqcn: Arc<str> = self.resolve_name(&name_to_string_owned(t)).into();
+                        let loc = self.location(t.span.start, t.span.end);
                         trait_use_locations.push((fqcn.clone(), loc));
                         trait_uses.push(fqcn);
                     }

@@ -6,12 +6,13 @@ use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 /// happens here.
 use std::sync::Arc;
 
-use php_ast::ast::{Program, StmtKind, Visibility as AstVisibility};
 use std::ops::ControlFlow;
 
-use php_ast::visitor::Visitor;
+use php_ast::ast::Visibility as AstVisibility;
+use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
+use php_ast::owned::{Program, StmtKind};
 
-use crate::parser::{name_to_string, type_from_hint};
+use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use crate::php_version::PhpVersion;
 use mir_codebase::storage::{
     wrap_return_type, Assertion, FnParam, Location, MethodStorage, PropertyStorage, StubSlice,
@@ -76,30 +77,30 @@ pub(crate) fn print_collector_stats() {
 // Constant value inference
 // ---------------------------------------------------------------------------
 
-/// Infer the type of a constant value from its AST expression.
+/// Infer the type of a constant value from its AST expression (owned AST).
 /// This handles literal values like integers, strings, etc. used in define().
-fn infer_const_value(expr_kind: &php_ast::ast::ExprKind) -> Option<Union> {
+fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Union> {
     use php_ast::ast::UnaryPrefixOp;
 
     match expr_kind {
-        php_ast::ast::ExprKind::Int(i) => Some(Union::single(Atomic::TLiteralInt(*i))),
-        php_ast::ast::ExprKind::String(s) => {
+        php_ast::owned::ExprKind::Int(i) => Some(Union::single(Atomic::TLiteralInt(*i))),
+        php_ast::owned::ExprKind::String(s) => {
             Some(Union::single(Atomic::TLiteralString(Arc::from(&**s))))
         }
-        php_ast::ast::ExprKind::Float(_f) => Some(Union::single(Atomic::TFloat)),
-        php_ast::ast::ExprKind::Bool(_b) => Some(Union::single(Atomic::TBool)),
-        php_ast::ast::ExprKind::Null => Some(Union::single(Atomic::TNull)),
+        php_ast::owned::ExprKind::Float(_f) => Some(Union::single(Atomic::TFloat)),
+        php_ast::owned::ExprKind::Bool(_b) => Some(Union::single(Atomic::TBool)),
+        php_ast::owned::ExprKind::Null => Some(Union::single(Atomic::TNull)),
         // For unary expressions like -1, try to evaluate them
-        php_ast::ast::ExprKind::UnaryPrefix(u) => match u.op {
+        php_ast::owned::ExprKind::UnaryPrefix(u) => match u.op {
             UnaryPrefixOp::Negate => {
-                if let php_ast::ast::ExprKind::Int(i) = &u.operand.kind {
+                if let php_ast::owned::ExprKind::Int(i) = &u.operand.kind {
                     Some(Union::single(Atomic::TLiteralInt(-i)))
                 } else {
                     None
                 }
             }
             UnaryPrefixOp::Plus => {
-                if let php_ast::ast::ExprKind::Int(i) = &u.operand.kind {
+                if let php_ast::owned::ExprKind::Int(i) = &u.operand.kind {
                     Some(Union::single(Atomic::TLiteralInt(*i)))
                 } else {
                     None
@@ -181,11 +182,11 @@ impl<'a> DefinitionCollector<'a> {
     /// Parse a docblock from a node's doc_comment, falling back to preceding docblock if not found.
     fn parse_docblock_from_node_or_preceding(
         &self,
-        doc_comment: Option<&php_ast::ast::Comment>,
+        doc_comment: Option<&php_ast::owned::Comment>,
         span_start: u32,
     ) -> crate::parser::ParsedDocblock {
         doc_comment
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
             .or_else(|| {
                 crate::parser::find_preceding_docblock(self.source, span_start)
                     .map(|t| crate::parser::DocblockParser::parse(&t))
@@ -205,10 +206,7 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    pub fn collect_slice<'arena, 'src>(
-        mut self,
-        program: &Program<'arena, 'src>,
-    ) -> (StubSlice, Vec<Issue>) {
+    pub fn collect_slice(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
         let _ = self.visit_program(program);
         self.finalize_slice();
         (self.slice, self.issues.into_issues())
@@ -485,10 +483,7 @@ impl<'a> DefinitionCollector<'a> {
     // Process statements
     // -----------------------------------------------------------------------
 
-    fn process_stmts<'arena, 'src>(
-        &mut self,
-        stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
-    ) -> ControlFlow<()> {
+    fn process_stmts(&mut self, stmts: &[php_ast::owned::Stmt]) -> ControlFlow<()> {
         for stmt in stmts.iter() {
             self.visit_stmt(stmt)?;
         }
@@ -501,8 +496,8 @@ impl<'a> DefinitionCollector<'a> {
 
     /// Scan a single statement: if it is `global $x` with a preceding
     /// `/** @var Type $x */` docblock, register the type in the codebase.
-    fn try_collect_global_var_annotation(&mut self, stmt: &php_ast::ast::Stmt<'_, '_>) {
-        let php_ast::ast::StmtKind::Global(vars) = &stmt.kind else {
+    fn try_collect_global_var_annotation(&mut self, stmt: &php_ast::owned::Stmt) {
+        let php_ast::owned::StmtKind::Global(vars) = &stmt.kind else {
             return;
         };
         let Some(doc_text) = crate::parser::find_preceding_docblock(self.source, stmt.span.start)
@@ -517,8 +512,8 @@ impl<'a> DefinitionCollector<'a> {
         let resolved_ty = self.resolve_union_doc(var_type);
 
         for var in vars.iter() {
-            if let php_ast::ast::ExprKind::Variable(raw_name) = &var.kind {
-                let name = raw_name.as_str().trim_start_matches('$');
+            if let php_ast::owned::ExprKind::Variable(raw_name) = &var.kind {
+                let name = raw_name.trim_start_matches('$');
                 // If @var specifies a variable name, only register when it matches.
                 if let Some(ref ann_name) = parsed.var_name {
                     if ann_name != name {
@@ -534,27 +529,28 @@ impl<'a> DefinitionCollector<'a> {
 
     /// Scan a list of statements and register any `@var`-annotated `global`
     /// declarations. Used for function bodies where the visitor does not recurse.
-    fn scan_stmts_for_global_vars<'arena, 'src>(
-        &mut self,
-        stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
-    ) {
+    fn scan_stmts_for_global_vars(&mut self, stmts: &[php_ast::owned::Stmt]) {
         for stmt in stmts.iter() {
             self.try_collect_global_var_annotation(stmt);
         }
     }
 }
 
-impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
-    fn visit_stmt(&mut self, stmt: &php_ast::ast::Stmt<'arena, 'src>) -> ControlFlow<()> {
+impl<'a> OwnedVisitor for DefinitionCollector<'a> {
+    fn visit_program(&mut self, program: &Program) -> ControlFlow<()> {
+        walk_owned_program(self, program)
+    }
+
+    fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
         match &stmt.kind {
             StmtKind::Namespace(ns) => {
-                let new_ns = ns.name.as_ref().map(name_to_string);
+                let new_ns = ns.name.as_ref().map(name_to_string_owned);
                 if self.first_namespace.is_none() {
                     self.first_namespace = new_ns.clone();
                 }
                 self.namespace = new_ns;
                 match &ns.body {
-                    php_ast::ast::NamespaceBody::Braced(stmts) => {
+                    php_ast::owned::NamespaceBody::Braced(stmts) => {
                         // Save and restore use aliases per namespace block
                         let saved_aliases = self.use_aliases.clone();
                         self.use_aliases.clear();
@@ -562,7 +558,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                         self.use_aliases = saved_aliases;
                         flow?;
                     }
-                    php_ast::ast::NamespaceBody::Simple => {
+                    php_ast::owned::NamespaceBody::Simple => {
                         // Simple namespace — affects all subsequent declarations
                     }
                 }
@@ -570,11 +566,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 
             StmtKind::Use(use_decl) => {
                 for item in use_decl.uses.iter() {
-                    let full_name = name_to_string(&item.name)
+                    let full_name = name_to_string_owned(&item.name)
                         .trim_start_matches('\\')
                         .to_string();
                     let alias = item
                         .alias
+                        .as_deref()
                         .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
                     self.use_aliases
                         .insert(alias.to_string(), full_name.clone());
@@ -612,7 +609,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     let const_doc = item
                         .doc_comment
                         .as_ref()
-                        .map(|c| crate::parser::DocblockParser::parse(c.text))
+                        .map(|c| crate::parser::DocblockParser::parse(&c.text))
                         .or_else(|| {
                             crate::parser::find_preceding_docblock(self.source, item.span.start)
                                 .map(|t| crate::parser::DocblockParser::parse(&t))
@@ -627,10 +624,11 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
+                    let name_str = item.name.as_deref().unwrap_or_default();
                     let fqn: Arc<str> = if let Some(ns) = &self.namespace {
-                        format!("{}\\{}", ns, item.name).into()
+                        format!("{}\\{}", ns, name_str).into()
                     } else {
-                        Arc::from(item.name.to_string())
+                        Arc::from(name_str)
                     };
                     self.slice.constants.push((fqn, Union::mixed()));
                 }
@@ -643,11 +641,12 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
             // Collect top-level define('NAME', value) calls as global constants.
             // phpstorm-stubs uses this form extensively in *_defines.php files.
             StmtKind::Expression(expr) => {
-                if let php_ast::ast::ExprKind::FunctionCall(call) = &expr.kind {
-                    if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
+                if let php_ast::owned::ExprKind::FunctionCall(call) = &expr.kind {
+                    if let php_ast::owned::ExprKind::Identifier(fn_name) = &call.name.kind {
                         if fn_name.eq_ignore_ascii_case("define") {
                             if let Some(name_arg) = call.args.first() {
-                                if let php_ast::ast::ExprKind::String(name) = &name_arg.value.kind {
+                                if let php_ast::owned::ExprKind::String(name) = &name_arg.value.kind
+                                {
                                     // Check for @since/@removed on the docblock preceding this define().
                                     let define_doc = crate::parser::find_preceding_docblock(
                                         self.source,
@@ -682,7 +681,7 @@ impl<'a, 'arena, 'src> Visitor<'arena, 'src> for DefinitionCollector<'a> {
 impl<'a> DefinitionCollector<'a> {
     fn build_method_storage(
         &mut self,
-        m: &php_ast::ast::MethodDecl<'_, '_>,
+        m: &php_ast::owned::MethodDecl,
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
         aliases: Option<&std::collections::HashMap<String, Union>>,
@@ -690,7 +689,7 @@ impl<'a> DefinitionCollector<'a> {
         let doc = m
             .doc_comment
             .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
             .unwrap_or_default();
 
         if let Some(c) = m.doc_comment.as_ref() {
@@ -706,8 +705,9 @@ impl<'a> DefinitionCollector<'a> {
         let mut local_complex = 0usize;
         let mut local_defaults = 0usize;
         for p in m.params.iter() {
+            let param_name = p.name.as_deref().unwrap_or_default();
             let ty = doc
-                .get_param_type(&p.name.to_string())
+                .get_param_type(param_name)
                 .cloned()
                 .map(|u| {
                     aliases
@@ -718,7 +718,7 @@ impl<'a> DefinitionCollector<'a> {
                     self.resolve_union_opt(
                         p.type_hint
                             .as_ref()
-                            .map(|h| type_from_hint(h, Some(class_fqcn))),
+                            .map(|h| type_from_hint_owned(h, Some(class_fqcn))),
                     )
                 });
             if let Some(ty_ref) = &ty {
@@ -734,7 +734,7 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             params.push(FnParam {
-                name: Arc::from(p.name.to_string()),
+                name: Arc::from(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,
@@ -760,7 +760,9 @@ impl<'a> DefinitionCollector<'a> {
                     .unwrap_or_else(|| self.resolve_union_doc(ty));
                 Some(Self::fill_self_static_parent(resolved, class_fqcn))
             }
-            (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint(h, Some(class_fqcn)))),
+            (None, Some(h)) => {
+                self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
+            }
             (None, None) => None,
         };
 
@@ -783,8 +785,9 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
+        let method_name = m.name.as_deref().unwrap_or_default();
         Some(MethodStorage {
-            name: Arc::from(m.name.to_string()),
+            name: Arc::from(method_name),
             fqcn: class_fqcn.into(),
             params: Arc::from(params.into_boxed_slice()),
             return_type: wrap_return_type(return_type),
@@ -793,7 +796,7 @@ impl<'a> DefinitionCollector<'a> {
             is_static: m.is_static,
             is_abstract: m.is_abstract,
             is_final: m.is_final,
-            is_constructor: m.name == "__construct",
+            is_constructor: method_name == "__construct",
             template_params,
             assertions: self.build_assertions(&doc),
             throws,
@@ -816,8 +819,7 @@ mod tests {
     use super::*;
 
     fn parse_and_collect_slice(file: &str, src: &str) -> StubSlice {
-        let arena = crate::arena::create_parse_arena(src.len());
-        let result = php_rs_parser::parse_arena(&arena, src);
+        let result = php_rs_parser::parse(src);
         let collector =
             DefinitionCollector::new_for_slice(Arc::from(file), src, &result.source_map);
         let (slice, _) = collector.collect_slice(&result.program);

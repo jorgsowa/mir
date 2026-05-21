@@ -1,24 +1,24 @@
 use super::DefinitionCollector;
-use crate::parser::name_to_string;
+use crate::parser::name_to_string_owned;
 use mir_codebase::storage::{ConstantStorage, InterfaceStorage, TemplateParam};
 use mir_types::Union;
-use php_ast::ast::{ClassMemberKind, InterfaceDecl};
+use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 impl<'a> DefinitionCollector<'a> {
-    pub(super) fn collect_interface<'arena, 'src>(
+    pub(super) fn collect_interface(
         &mut self,
-        decl: &InterfaceDecl<'arena, 'src>,
+        decl: &InterfaceDecl,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let interface_name = decl.name.to_string();
+        let interface_name = decl.name.as_deref().unwrap_or_default().to_string();
         let fqcn = self.resolve_name(&interface_name);
 
         let iface_doc = decl
             .doc_comment
             .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
             .unwrap_or_default();
 
         let iface_doc_span = decl
@@ -46,7 +46,7 @@ impl<'a> DefinitionCollector<'a> {
         let extends: Vec<Arc<str>> = decl
             .extends
             .iter()
-            .map(|n| self.resolve_name(&name_to_string(n)).into())
+            .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
 
         let mut own_methods = indexmap::IndexMap::new();
@@ -78,10 +78,11 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
+                    let const_name = c.name.as_deref().unwrap_or_default();
                     own_constants.insert(
-                        Arc::from(c.name.to_string()),
+                        Arc::from(const_name),
                         ConstantStorage {
-                            name: Arc::from(c.name.to_string()),
+                            name: Arc::from(const_name),
                             ty: Union::mixed(),
                             visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                             is_final: c.is_final,
@@ -108,7 +109,7 @@ impl<'a> DefinitionCollector<'a> {
             .interfaces
             .push(std::sync::Arc::new(InterfaceStorage {
                 fqcn: fqcn.into(),
-                short_name: Arc::from(decl.name.to_string()),
+                short_name: Arc::from(interface_name.as_str()),
                 extends,
                 own_methods,
                 own_constants,

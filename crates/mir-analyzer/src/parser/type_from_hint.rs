@@ -123,3 +123,41 @@ fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Union {
 fn normalize_fqcn(s: &str) -> String {
     s.trim_start_matches('\\').to_string()
 }
+
+/// Same as [`type_from_hint`] but for the owned (lifetime-free) AST.
+pub fn type_from_hint_owned(hint: &php_ast::owned::TypeHint, context_fqcn: Option<&str>) -> Union {
+    match &hint.kind {
+        php_ast::owned::TypeHintKind::Nullable(inner) => {
+            let mut u = type_from_hint_owned(inner, context_fqcn);
+            u.add_type(Atomic::TNull);
+            u
+        }
+        php_ast::owned::TypeHintKind::Union(parts) => {
+            let mut u = Union::empty();
+            for part in parts.iter() {
+                for atomic in type_from_hint_owned(part, context_fqcn).types {
+                    u.add_type(atomic);
+                }
+            }
+            u
+        }
+        php_ast::owned::TypeHintKind::Intersection(parts) => {
+            let resolved: Vec<Union> = parts
+                .iter()
+                .map(|p| type_from_hint_owned(p, context_fqcn))
+                .collect();
+            if resolved.is_empty() {
+                Union::mixed()
+            } else {
+                Union::single(Atomic::TIntersection { parts: resolved })
+            }
+        }
+        php_ast::owned::TypeHintKind::Keyword(builtin, _span) => {
+            builtin_type_to_union(*builtin, context_fqcn)
+        }
+        php_ast::owned::TypeHintKind::Named(name) => {
+            let name_str = super::name_to_string_owned(name);
+            named_type_to_union(&name_str, context_fqcn)
+        }
+    }
+}

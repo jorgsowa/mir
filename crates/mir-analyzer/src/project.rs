@@ -519,7 +519,8 @@ impl ProjectAnalyzer {
                     parsed.source(),
                     &parse_result.source_map,
                 );
-                let (mut slice, collector_issues) = collector.collect_slice(&parse_result.program);
+                let owned_program = php_ast::owned::to_owned_program(&parse_result.program);
+                let (mut slice, collector_issues) = collector.collect_slice(&owned_program);
                 all_issues.extend(collector_issues);
                 mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
                 FileDefinitions {

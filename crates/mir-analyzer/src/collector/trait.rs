@@ -1,24 +1,24 @@
 use super::DefinitionCollector;
-use crate::parser::{name_to_string, type_from_hint};
+use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use mir_codebase::storage::{ConstantStorage, PropertyStorage, TemplateParam, TraitStorage};
 use mir_types::Union;
-use php_ast::ast::{ClassMemberKind, TraitDecl};
+use php_ast::owned::{ClassMemberKind, TraitDecl};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 impl<'a> DefinitionCollector<'a> {
-    pub(super) fn collect_trait<'arena, 'src>(
+    pub(super) fn collect_trait(
         &mut self,
-        decl: &TraitDecl<'arena, 'src>,
+        decl: &TraitDecl,
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
-        let trait_name = decl.name.to_string();
+        let trait_name = decl.name.as_deref().unwrap_or_default().to_string();
         let fqcn = self.resolve_name(&trait_name);
 
         let trait_doc = decl
             .doc_comment
             .as_ref()
-            .map(|c| crate::parser::DocblockParser::parse(c.text))
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
             .unwrap_or_default();
 
         let trait_doc_span = decl
@@ -51,14 +51,17 @@ impl<'a> DefinitionCollector<'a> {
         for member in decl.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
-                    if m.name == "__construct" {
+                    if m.name.as_deref() == Some("__construct") {
                         for p in m.params.iter() {
                             if p.visibility.is_some() {
+                                let param_name = p.name.as_deref().unwrap_or_default();
                                 let ty = self.resolve_union_opt(
-                                    p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
+                                    p.type_hint
+                                        .as_ref()
+                                        .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                                 );
                                 let prop = PropertyStorage {
-                                    name: Arc::from(p.name.to_string()),
+                                    name: Arc::from(param_name),
                                     ty,
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
@@ -69,7 +72,7 @@ impl<'a> DefinitionCollector<'a> {
                                         self.location(member.span.start, member.span.end),
                                     ),
                                 };
-                                own_properties.insert(Arc::from(p.name.to_string()), prop);
+                                own_properties.insert(Arc::from(param_name), prop);
                             }
                         }
                     }
@@ -96,12 +99,15 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&prop_doc) {
                         continue;
                     }
+                    let prop_name = p.name.as_deref().unwrap_or_default();
                     own_properties.insert(
-                        Arc::from(p.name.to_string()),
+                        Arc::from(prop_name),
                         PropertyStorage {
-                            name: Arc::from(p.name.to_string()),
+                            name: Arc::from(prop_name),
                             ty: self.resolve_union_opt(
-                                p.type_hint.as_ref().map(|h| type_from_hint(h, Some(&fqcn))),
+                                p.type_hint
+                                    .as_ref()
+                                    .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                             ),
                             inferred_ty: None,
                             visibility: Self::convert_visibility(p.visibility),
@@ -126,10 +132,11 @@ impl<'a> DefinitionCollector<'a> {
                     if !self.version_allows(&const_doc) {
                         continue;
                     }
+                    let const_name = c.name.as_deref().unwrap_or_default();
                     own_constants.insert(
-                        Arc::from(c.name.to_string()),
+                        Arc::from(const_name),
                         ConstantStorage {
-                            name: Arc::from(c.name.to_string()),
+                            name: Arc::from(const_name),
                             ty: Union::mixed(),
                             visibility: None,
                             is_final: c.is_final,
@@ -139,7 +146,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        trait_uses.push(self.resolve_name(&name_to_string(t)).into());
+                        trait_uses.push(self.resolve_name(&name_to_string_owned(t)).into());
                     }
                 }
             }
@@ -168,7 +175,7 @@ impl<'a> DefinitionCollector<'a> {
 
         self.slice.traits.push(std::sync::Arc::new(TraitStorage {
             fqcn: fqcn.into(),
-            short_name: Arc::from(decl.name.to_string()),
+            short_name: Arc::from(trait_name.as_str()),
             own_methods,
             own_properties,
             own_constants,

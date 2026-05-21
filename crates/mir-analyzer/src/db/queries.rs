@@ -322,8 +322,7 @@ pub fn collect_file_definitions_uncached(
         crate::metrics::record_stub_cache_miss();
     }
 
-    let arena = crate::arena::create_parse_arena(text.len());
-    let parsed = php_rs_parser::parse_arena(&arena, &text);
+    let parsed = php_rs_parser::parse(&text);
 
     let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 

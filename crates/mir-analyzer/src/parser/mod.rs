@@ -8,7 +8,7 @@ use php_rs_parser::ParserContext;
 use thiserror::Error;
 
 pub use docblock::{DocblockParser, ParsedDocblock};
-pub use type_from_hint::type_from_hint;
+pub use type_from_hint::{type_from_hint, type_from_hint_owned};
 
 // ---------------------------------------------------------------------------
 // Parse-error → Issue conversion
@@ -202,4 +202,19 @@ pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<Strin
 
 pub(crate) fn name_to_string(name: &php_ast::ast::Name<'_, '_>) -> String {
     name.to_string_repr().into_owned()
+}
+
+/// Same as [`name_to_string`] but for the owned (lifetime-free) AST.
+pub(crate) fn name_to_string_owned(name: &php_ast::owned::Name) -> String {
+    let joined = name
+        .parts
+        .iter()
+        .map(|p| p.as_ref())
+        .collect::<Vec<&str>>()
+        .join("\\");
+    if name.kind == php_ast::ast::NameKind::FullyQualified {
+        format!("\\{}", joined)
+    } else {
+        joined
+    }
 }
