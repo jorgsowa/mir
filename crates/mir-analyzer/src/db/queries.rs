@@ -439,8 +439,9 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         return InferredFileTypes::empty();
     }
 
+    let owned = php_ast::owned::to_owned_program(&parsed.program);
     let driver = crate::pass2::Pass2Driver::new_inference_only(db, php_version);
-    driver.analyze_bodies(&parsed.program, path, text.as_ref(), &parsed.source_map);
+    driver.analyze_bodies(&owned, path, text.as_ref(), &parsed.source_map);
     let inferred = driver.take_inferred_types();
 
     let mut functions: FxHashMap<Arc<str>, Arc<Union>> =

@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use mir_issues::Issue;
 use php_ast::ast::Program;
+use php_ast::owned::to_owned_program;
 use php_rs_parser::source_map::SourceMap;
 use rayon::prelude::*;
 
@@ -94,7 +95,8 @@ impl<'a> FileAnalyzer<'a> {
         let _scope = crate::metrics::Pass2Scope::new();
         let db = self.session.snapshot_db();
         let driver = Pass2Driver::new(&db, self.session.php_version());
-        let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
+        let owned = to_owned_program(program);
+        let (issues, symbols) = driver.analyze_bodies(&owned, file, source, source_map);
         self.session
             .commit_ref_locs_batch(db.take_pending_ref_locs());
         FileAnalysis { issues, symbols }
@@ -207,8 +209,9 @@ impl<'a> BatchFileAnalyzer<'a> {
                 let program = unsafe { &*file.program };
                 let source_map = unsafe { &*file.source_map };
                 let driver = Pass2Driver::new(db as &dyn MirDatabase, self.session.php_version());
+                let owned = to_owned_program(program);
                 let (issues, symbols) =
-                    driver.analyze_bodies(program, file.file.clone(), &file.source, source_map);
+                    driver.analyze_bodies(&owned, file.file.clone(), &file.source, source_map);
                 let pending = db.take_pending_ref_locs();
                 let analysis = FileAnalysis { issues, symbols };
                 (file.file, analysis, pending)

@@ -655,8 +655,9 @@ impl ProjectAnalyzer {
                         php_version,
                     );
                     let parse_result = parsed.parsed();
+                    let owned = php_ast::owned::to_owned_program(&parse_result.program);
                     driver.analyze_bodies(
-                        &parse_result.program,
+                        &owned,
                         parsed.file.clone(),
                         parsed.source(),
                         &parse_result.source_map,
@@ -701,8 +702,9 @@ impl ProjectAnalyzer {
                             (cached_issues, Vec::new())
                         } else {
                             let parse_result = parsed.parsed();
+                            let owned = php_ast::owned::to_owned_program(&parse_result.program);
                             let (issues, symbols) = driver.analyze_bodies(
-                                &parse_result.program,
+                                &owned,
                                 parsed.file.clone(),
                                 parsed.source(),
                                 &parse_result.source_map,
@@ -720,8 +722,9 @@ impl ProjectAnalyzer {
                         }
                     } else {
                         let parse_result = parsed.parsed();
+                        let owned = php_ast::owned::to_owned_program(&parse_result.program);
                         driver.analyze_bodies(
-                            &parse_result.program,
+                            &owned,
                             parsed.file.clone(),
                             parsed.source(),
                             &parse_result.source_map,
@@ -983,12 +986,9 @@ impl ProjectAnalyzer {
                             Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
                         let arena = crate::arena::create_parse_arena(src.len());
                         let parsed = php_rs_parser::parse_arena(&arena, src);
-                        let (issues, symbols) = driver.analyze_bodies(
-                            &parsed.program,
-                            file.clone(),
-                            src,
-                            &parsed.source_map,
-                        );
+                        let owned = php_ast::owned::to_owned_program(&parsed.program);
+                        let (issues, symbols) =
+                            driver.analyze_bodies(&owned, file.clone(), src, &parsed.source_map);
                         let pending = db.take_pending_ref_locs();
                         (issues, symbols, pending)
                     })
@@ -1072,12 +1072,9 @@ impl ProjectAnalyzer {
             if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
                 let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
-                let (body_issues, symbols) = driver.analyze_bodies(
-                    &parsed.program,
-                    file.clone(),
-                    new_content,
-                    &parsed.source_map,
-                );
+                let owned = php_ast::owned::to_owned_program(&parsed.program);
+                let (body_issues, symbols) =
+                    driver.analyze_bodies(&owned, file.clone(), new_content, &parsed.source_map);
                 all_issues.extend(body_issues);
                 guard.commit_pending_to_maps();
                 symbols
@@ -1122,10 +1119,11 @@ impl ProjectAnalyzer {
         let mut all_symbols = Vec::new();
         let arena = bumpalo::Bump::new();
         let result = php_rs_parser::parse_arena(&arena, source);
+        let owned_result = php_ast::owned::to_owned_program(&result.program);
 
         let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
-            &result.program,
+            &owned_result,
             file.clone(),
             source,
             &result.source_map,

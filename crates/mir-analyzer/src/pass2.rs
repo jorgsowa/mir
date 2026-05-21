@@ -75,13 +75,11 @@ fn lookup_function_node_for_decl(
 
 /// Build `FnParam`s directly from the declaration AST when no storage match is
 /// available.  Defaults are typed as `mixed` since their value type isn't tracked.
-fn ast_derived_fn_params<'arena, 'src>(
-    params: &[php_ast::ast::Param<'arena, 'src>],
-) -> Vec<mir_codebase::FnParam> {
+fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::FnParam> {
     params
         .iter()
         .map(|p| mir_codebase::FnParam {
-            name: Arc::from(p.name.to_string()),
+            name: Arc::from(p.name.as_deref().unwrap_or("")),
             ty: None,
             has_default: p.default.is_some(),
             is_variadic: p.variadic,
@@ -146,17 +144,16 @@ impl<'a> Pass2Driver<'a> {
         }
     }
 
-    fn check_and_record_type_hint_classes<'arena, 'src>(
+    fn check_and_record_type_hint_classes(
         &self,
-        hint: &php_ast::ast::TypeHint<'arena, 'src>,
+        hint: &php_ast::owned::TypeHint,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
-        let owned_hint = php_ast::owned::to_owned_type_hint(hint);
         check_type_hint_classes(
-            &owned_hint,
+            hint,
             self.db,
             file,
             source,
@@ -165,7 +162,7 @@ impl<'a> Pass2Driver<'a> {
             self.php_version,
         );
         if !self.inference_only {
-            for (fqcn, span) in collect_type_hint_class_refs(&owned_hint, self.db, file) {
+            for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                 let (_, col_end) =
@@ -183,14 +180,14 @@ impl<'a> Pass2Driver<'a> {
 
     /// Pass 2: walk all function/method bodies in one file, return issues, and
     /// write inferred return types back to the codebase.
-    pub(crate) fn analyze_bodies<'arena, 'src>(
+    pub(crate) fn analyze_bodies(
         &self,
-        program: &php_ast::ast::Program<'arena, 'src>,
+        program: &php_ast::owned::Program,
         file: Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
     ) -> (Vec<Issue>, Vec<ResolvedSymbol>) {
-        use php_ast::ast::StmtKind;
+        use php_ast::owned::StmtKind;
 
         let mut all_issues = Vec::new();
         let mut all_symbols = Vec::new();
@@ -234,7 +231,7 @@ impl<'a> Pass2Driver<'a> {
                     );
                 }
                 StmtKind::Namespace(ns) => {
-                    if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
+                    if let php_ast::owned::NamespaceBody::Braced(stmts) = &ns.body {
                         for inner in stmts.iter() {
                             match &inner.kind {
                                 StmtKind::Function(decl) => {
@@ -325,8 +322,7 @@ impl<'a> Pass2Driver<'a> {
                     | StmtKind::Use(_)
                     | StmtKind::Declare(_) => {}
                     _ => {
-                        let owned = php_ast::owned::to_owned_stmt(stmt);
-                        sa.analyze_stmt(&owned, &mut ctx);
+                        sa.analyze_stmt(stmt, &mut ctx);
                     }
                 }
             }
@@ -338,9 +334,9 @@ impl<'a> Pass2Driver<'a> {
     }
 
     /// Like `analyze_bodies` but also populates `type_envs` with per-scope type environments.
-    pub(crate) fn analyze_bodies_typed<'arena, 'src>(
+    pub(crate) fn analyze_bodies_typed(
         &self,
-        program: &php_ast::ast::Program<'arena, 'src>,
+        program: &php_ast::owned::Program,
         file: Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -350,7 +346,7 @@ impl<'a> Pass2Driver<'a> {
         >,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) -> Vec<Issue> {
-        use php_ast::ast::StmtKind;
+        use php_ast::owned::StmtKind;
         let mut all_issues = Vec::new();
         for stmt in program.stmts.iter() {
             match &stmt.kind {
@@ -394,7 +390,7 @@ impl<'a> Pass2Driver<'a> {
                     );
                 }
                 StmtKind::Namespace(ns) => {
-                    if let php_ast::ast::NamespaceBody::Braced(stmts) = &ns.body {
+                    if let php_ast::owned::NamespaceBody::Braced(stmts) = &ns.body {
                         for inner in stmts.iter() {
                             match &inner.kind {
                                 StmtKind::Function(decl) => {
@@ -486,8 +482,7 @@ impl<'a> Pass2Driver<'a> {
                     | StmtKind::Use(_)
                     | StmtKind::Declare(_) => {}
                     _ => {
-                        let owned = php_ast::owned::to_owned_stmt(stmt);
-                        sa.analyze_stmt(&owned, &mut ctx);
+                        sa.analyze_stmt(stmt, &mut ctx);
                     }
                 }
             }
@@ -499,25 +494,23 @@ impl<'a> Pass2Driver<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_fn_decl<'arena, 'src>(
+    fn analyze_fn_decl(
         &self,
-        decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
+        decl: &php_ast::owned::FunctionDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        let fn_name = decl.name.to_string();
-        let body = &decl.body;
+        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
-            // Check parameter default values for undefined classes
             if let Some(default_expr) = &param.default {
                 check_expr_for_undefined_classes(
-                    &php_ast::owned::to_owned_expr(default_expr),
+                    default_expr,
                     self.db,
                     file,
                     source,
@@ -548,7 +541,7 @@ impl<'a> Pass2Driver<'a> {
                         .params
                         .iter()
                         .zip(decl.params.iter())
-                        .all(|(cp, ap)| ap.name.to_string() == *cp.name)
+                        .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
                 {
                     (
                         storage.params.to_vec(),
@@ -597,9 +590,7 @@ impl<'a> Pass2Driver<'a> {
             self.php_version,
             self.inference_only,
         );
-        let owned_body: Vec<php_ast::owned::Stmt> =
-            body.iter().map(php_ast::owned::to_owned_stmt).collect();
-        sa.analyze_stmts(&owned_body, &mut ctx);
+        sa.analyze_stmts(&decl.body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -607,17 +598,15 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Buffer the inferred return type for serial commit after the
-        // priming sweep returns. See `InferredReturnTypes`.
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_class_decl<'arena, 'src>(
+    fn analyze_class_decl(
         &self,
-        decl: &php_ast::ast::ClassDecl<'arena, 'src>,
+        decl: &php_ast::owned::ClassDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -630,8 +619,10 @@ impl<'a> Pass2Driver<'a> {
 
         let class_name_owned = decl
             .name
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "<anonymous>".to_string());
+            .as_ref()
+            .and_then(|i| i.as_deref())
+            .unwrap_or("<anonymous>")
+            .to_string();
         let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
@@ -641,7 +632,7 @@ impl<'a> Pass2Driver<'a> {
 
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
-                &php_ast::owned::to_owned_name(parent),
+                parent,
                 self.db,
                 file,
                 source,
@@ -652,7 +643,7 @@ impl<'a> Pass2Driver<'a> {
         }
         for iface in decl.implements.iter() {
             check_name_class(
-                &php_ast::owned::to_owned_name(iface),
+                iface,
                 self.db,
                 file,
                 source,
@@ -663,7 +654,7 @@ impl<'a> Pass2Driver<'a> {
         }
 
         for member in decl.members.iter() {
-            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+            if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
@@ -671,7 +662,7 @@ impl<'a> Pass2Driver<'a> {
                 }
                 continue;
             }
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+            let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
 
@@ -704,9 +695,8 @@ impl<'a> Pass2Driver<'a> {
                 default_ctx.static_fqcn = Some(Arc::from(fqcn));
                 for p in method.params.iter() {
                     if let Some(default) = &p.default {
-                        let owned = php_ast::owned::to_owned_expr(default);
                         let mut ea = sa.expr_analyzer(&default_ctx);
-                        let _ = ea.analyze(&owned, &mut default_ctx);
+                        let _ = ea.analyze(default, &mut default_ctx);
                     }
                 }
                 drop(sa);
@@ -714,11 +704,12 @@ impl<'a> Pass2Driver<'a> {
             }
 
             let Some(body) = &method.body else { continue };
+            let method_name = method.name.as_deref().unwrap_or("");
 
             let (params, return_ty, template_params, declared_throws) =
-                method_chain_signature(self.db, fqcn, &method.name.to_string());
+                method_chain_signature(self.db, fqcn, method_name);
 
-            let is_ctor = method.name == "__construct";
+            let is_ctor = method_name == "__construct";
             let mut ctx = Context::for_method_with_templates(
                 &params,
                 return_ty,
@@ -744,26 +735,24 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            let owned_body: Vec<php_ast::owned::Stmt> =
-                body.iter().map(php_ast::owned::to_owned_stmt).collect();
-            sa.analyze_stmts(&owned_body, &mut ctx);
+            sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
-            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
+            emit_unused_params(&params, &ctx, method_name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
+            self.record_method_inference(fqcn, method_name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_fn_decl_typed<'arena, 'src>(
+    fn analyze_fn_decl_typed(
         &self,
-        decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
+        decl: &php_ast::owned::FunctionDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -778,8 +767,7 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let fn_name = decl.name.to_string();
-        let body = &decl.body;
+        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
@@ -800,7 +788,7 @@ impl<'a> Pass2Driver<'a> {
                             .params
                             .iter()
                             .zip(decl.params.iter())
-                            .all(|(cp, ap)| ap.name.to_string() == *cp.name)
+                            .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
                     {
                         (
                             storage.params.to_vec(),
@@ -836,9 +824,7 @@ impl<'a> Pass2Driver<'a> {
             self.php_version,
             self.inference_only,
         );
-        let owned_body: Vec<php_ast::owned::Stmt> =
-            body.iter().map(php_ast::owned::to_owned_stmt).collect();
-        sa.analyze_stmts(&owned_body, &mut ctx);
+        sa.analyze_stmts(&decl.body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -855,16 +841,15 @@ impl<'a> Pass2Driver<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        // Inferred return type → Salsa, via the priming-sweep buffer.
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_class_decl_typed<'arena, 'src>(
+    fn analyze_class_decl_typed(
         &self,
-        decl: &php_ast::ast::ClassDecl<'arena, 'src>,
+        decl: &php_ast::owned::ClassDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -881,8 +866,10 @@ impl<'a> Pass2Driver<'a> {
 
         let class_name_owned = decl
             .name
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "<anonymous>".to_string());
+            .as_ref()
+            .and_then(|i| i.as_deref())
+            .unwrap_or("<anonymous>")
+            .to_string();
         let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
@@ -892,7 +879,7 @@ impl<'a> Pass2Driver<'a> {
 
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
-                &php_ast::owned::to_owned_name(parent),
+                parent,
                 self.db,
                 file,
                 source,
@@ -903,7 +890,7 @@ impl<'a> Pass2Driver<'a> {
         }
         for iface in decl.implements.iter() {
             check_name_class(
-                &php_ast::owned::to_owned_name(iface),
+                iface,
                 self.db,
                 file,
                 source,
@@ -914,7 +901,7 @@ impl<'a> Pass2Driver<'a> {
         }
 
         for member in decl.members.iter() {
-            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+            if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
@@ -922,7 +909,7 @@ impl<'a> Pass2Driver<'a> {
                 }
                 continue;
             }
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+            let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
 
@@ -955,9 +942,8 @@ impl<'a> Pass2Driver<'a> {
                 default_ctx.static_fqcn = Some(Arc::from(fqcn));
                 for p in method.params.iter() {
                     if let Some(default) = &p.default {
-                        let owned = php_ast::owned::to_owned_expr(default);
                         let mut ea = sa.expr_analyzer(&default_ctx);
-                        let _ = ea.analyze(&owned, &mut default_ctx);
+                        let _ = ea.analyze(default, &mut default_ctx);
                     }
                 }
                 drop(sa);
@@ -965,11 +951,12 @@ impl<'a> Pass2Driver<'a> {
             }
 
             let Some(body) = &method.body else { continue };
+            let method_name = method.name.as_deref().unwrap_or("");
 
             let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, &method.name.to_string());
+                method_chain_signature(self.db, fqcn, method_name);
 
-            let is_ctor = method.name == "__construct";
+            let is_ctor = method_name == "__construct";
             let mut ctx = Context::for_method(
                 &params,
                 return_ty,
@@ -994,25 +981,23 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            let owned_body: Vec<php_ast::owned::Stmt> =
-                body.iter().map(php_ast::owned::to_owned_stmt).collect();
-            sa.analyze_stmts(&owned_body, &mut ctx);
+            sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
             type_envs.insert(
                 crate::type_env::ScopeId::Method {
                     class: Arc::from(fqcn),
-                    method: Arc::from(method.name.to_string()),
+                    method: Arc::from(method_name),
                 },
                 crate::type_env::TypeEnv::new(ctx.vars.clone()),
             );
 
-            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
+            emit_unused_params(&params, &ctx, method_name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
+            self.record_method_inference(fqcn, method_name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -1031,8 +1016,6 @@ impl<'a> Pass2Driver<'a> {
         let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, here).0;
 
         for trait_fqcn in trait_list.iter() {
-            // Derive short name from the FQCN's trailing segment.  Matches
-            // what the collector stores in `TraitStorage::short_name`.
             let tr_short: Arc<str> = trait_fqcn
                 .rsplit('\\')
                 .next()
@@ -1135,9 +1118,9 @@ impl<'a> Pass2Driver<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_trait_decl<'arena, 'src>(
+    fn analyze_trait_decl(
         &self,
-        decl: &php_ast::ast::TraitDecl<'arena, 'src>,
+        decl: &php_ast::owned::TraitDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -1148,11 +1131,12 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved = resolve_name_via_db(self.db, file.as_ref(), &decl.name.to_string());
+        let resolved =
+            resolve_name_via_db(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
-            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+            if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
@@ -1160,7 +1144,7 @@ impl<'a> Pass2Driver<'a> {
                 }
                 continue;
             }
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+            let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
 
@@ -1176,11 +1160,12 @@ impl<'a> Pass2Driver<'a> {
             }
 
             let Some(body) = &method.body else { continue };
+            let method_name = method.name.as_deref().unwrap_or("");
 
             let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, &method.name.to_string());
+                method_chain_signature(self.db, fqcn, method_name);
 
-            let is_ctor = method.name == "__construct";
+            let is_ctor = method_name == "__construct";
             let mut ctx = Context::for_method(
                 &params,
                 return_ty,
@@ -1205,24 +1190,22 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            let owned_body: Vec<php_ast::owned::Stmt> =
-                body.iter().map(php_ast::owned::to_owned_stmt).collect();
-            sa.analyze_stmts(&owned_body, &mut ctx);
+            sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
-            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
+            emit_unused_params(&params, &ctx, method_name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
+            self.record_method_inference(fqcn, method_name, &inferred);
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_trait_decl_typed<'arena, 'src>(
+    fn analyze_trait_decl_typed(
         &self,
-        decl: &php_ast::ast::TraitDecl<'arena, 'src>,
+        decl: &php_ast::owned::TraitDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -1237,11 +1220,12 @@ impl<'a> Pass2Driver<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved = resolve_name_via_db(self.db, file.as_ref(), &decl.name.to_string());
+        let resolved =
+            resolve_name_via_db(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
-            if let php_ast::ast::ClassMemberKind::Property(prop) = &member.kind {
+            if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
@@ -1249,7 +1233,7 @@ impl<'a> Pass2Driver<'a> {
                 }
                 continue;
             }
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+            let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
 
@@ -1265,11 +1249,12 @@ impl<'a> Pass2Driver<'a> {
             }
 
             let Some(body) = &method.body else { continue };
+            let method_name = method.name.as_deref().unwrap_or("");
 
             let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, &method.name.to_string());
+                method_chain_signature(self.db, fqcn, method_name);
 
-            let is_ctor = method.name == "__construct";
+            let is_ctor = method_name == "__construct";
             let mut ctx = Context::for_method(
                 &params,
                 return_ty,
@@ -1294,40 +1279,38 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            let owned_body: Vec<php_ast::owned::Stmt> =
-                body.iter().map(php_ast::owned::to_owned_stmt).collect();
-            sa.analyze_stmts(&owned_body, &mut ctx);
+            sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
             type_envs.insert(
                 crate::type_env::ScopeId::Method {
                     class: Arc::from(fqcn),
-                    method: Arc::from(method.name.to_string()),
+                    method: Arc::from(method_name),
                 },
                 crate::type_env::TypeEnv::new(ctx.vars.clone()),
             );
 
-            emit_unused_params(&params, &ctx, &method.name.to_string(), file, all_issues);
+            emit_unused_params(&params, &ctx, method_name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            self.record_method_inference(fqcn, &method.name.to_string(), &inferred);
+            self.record_method_inference(fqcn, method_name, &inferred);
         }
     }
 
-    fn analyze_enum_decl<'arena, 'src>(
+    fn analyze_enum_decl(
         &self,
-        decl: &php_ast::ast::EnumDecl<'arena, 'src>,
+        decl: &php_ast::owned::EnumDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
-        use php_ast::ast::EnumMemberKind;
+        use php_ast::owned::EnumMemberKind;
         for iface in decl.implements.iter() {
             check_name_class(
-                &php_ast::owned::to_owned_name(iface),
+                iface,
                 self.db,
                 file,
                 source,
@@ -1353,18 +1336,18 @@ impl<'a> Pass2Driver<'a> {
         }
     }
 
-    fn analyze_interface_decl<'arena, 'src>(
+    fn analyze_interface_decl(
         &self,
-        decl: &php_ast::ast::InterfaceDecl<'arena, 'src>,
+        decl: &php_ast::owned::InterfaceDecl,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
-        use php_ast::ast::ClassMemberKind;
+        use php_ast::owned::ClassMemberKind;
         for parent in decl.extends.iter() {
             check_name_class(
-                &php_ast::owned::to_owned_name(parent),
+                parent,
                 self.db,
                 file,
                 source,
@@ -1394,12 +1377,12 @@ impl<'a> Pass2Driver<'a> {
 /// Seed `ctx.var_locations` for function/method parameters using their AST spans.
 fn seed_param_locations(
     ctx: &mut crate::context::Context,
-    ast_params: &php_ast::ast::ArenaVec<'_, php_ast::ast::Param<'_, '_>>,
+    ast_params: &[php_ast::owned::Param],
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
 ) {
     for p in ast_params.iter() {
-        let name_str = p.name.to_string();
+        let name_str = p.name.as_deref().unwrap_or("");
         let name = name_str.trim_start_matches('$');
         let (line, col_start) =
             crate::diagnostics::offset_to_line_col(source, p.span.start, source_map);
