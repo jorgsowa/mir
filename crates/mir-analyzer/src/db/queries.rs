@@ -209,6 +209,54 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
         .any(|p| p.as_ref() == ancestor)
 }
 
+// parse_file tracked query (S0 — owned parse, salsa-memoized)
+
+/// Newtype so `Arc<ParseResult>` can be a salsa tracked-query return type.
+///
+/// Equality is pointer identity — salsa uses it to decide whether
+/// downstream queries need re-running after a re-parse.
+#[derive(Clone)]
+pub struct ParsedFile(pub Arc<php_rs_parser::ParseResult>);
+
+impl std::fmt::Debug for ParsedFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ParsedFile").finish()
+    }
+}
+
+impl PartialEq for ParsedFile {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ParsedFile {}
+
+unsafe impl salsa::Update for ParsedFile {
+    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
+        let old = unsafe { &mut *old_ptr };
+        if *old == new_val {
+            return false;
+        }
+        *old = new_val;
+        true
+    }
+}
+
+/// Parse `file`'s source text into a fully-owned, lifetime-free
+/// [`php_rs_parser::ParseResult`] and memoize it in Salsa.
+///
+/// Salsa invalidates this memo whenever `file.text(db)` changes.  All
+/// downstream queries that need the AST or source-map should call this
+/// instead of calling `php_rs_parser::parse` directly, so they get the
+/// cached result for free on every incremental edit that doesn't touch
+/// this file.
+#[salsa::tracked]
+pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> ParsedFile {
+    let text = file.text(db);
+    ParsedFile(Arc::new(php_rs_parser::parse(text.as_ref())))
+}
+
 // collect_file_definitions tracked query (S1)
 
 /// Uncached version of collect_file_definitions for bulk operations like vendor
