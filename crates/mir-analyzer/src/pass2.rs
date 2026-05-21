@@ -324,7 +324,10 @@ impl<'a> Pass2Driver<'a> {
                     | StmtKind::Namespace(_)
                     | StmtKind::Use(_)
                     | StmtKind::Declare(_) => {}
-                    _ => sa.analyze_stmt(stmt, &mut ctx),
+                    _ => {
+                        let owned = php_ast::owned::to_owned_stmt(stmt);
+                        sa.analyze_stmt(&owned, &mut ctx);
+                    }
                 }
             }
             drop(sa);
@@ -482,7 +485,10 @@ impl<'a> Pass2Driver<'a> {
                     | StmtKind::Namespace(_)
                     | StmtKind::Use(_)
                     | StmtKind::Declare(_) => {}
-                    _ => sa.analyze_stmt(stmt, &mut ctx),
+                    _ => {
+                        let owned = php_ast::owned::to_owned_stmt(stmt);
+                        sa.analyze_stmt(&owned, &mut ctx);
+                    }
                 }
             }
             drop(sa);
@@ -591,7 +597,9 @@ impl<'a> Pass2Driver<'a> {
             self.php_version,
             self.inference_only,
         );
-        sa.analyze_stmts(body, &mut ctx);
+        let owned_body: Vec<php_ast::owned::Stmt> =
+            body.iter().map(php_ast::owned::to_owned_stmt).collect();
+        sa.analyze_stmts(&owned_body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -736,7 +744,9 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            let owned_body: Vec<php_ast::owned::Stmt> =
+                body.iter().map(php_ast::owned::to_owned_stmt).collect();
+            sa.analyze_stmts(&owned_body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -826,7 +836,9 @@ impl<'a> Pass2Driver<'a> {
             self.php_version,
             self.inference_only,
         );
-        sa.analyze_stmts(body, &mut ctx);
+        let owned_body: Vec<php_ast::owned::Stmt> =
+            body.iter().map(php_ast::owned::to_owned_stmt).collect();
+        sa.analyze_stmts(&owned_body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -982,7 +994,9 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            let owned_body: Vec<php_ast::owned::Stmt> =
+                body.iter().map(php_ast::owned::to_owned_stmt).collect();
+            sa.analyze_stmts(&owned_body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -1191,7 +1205,9 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            let owned_body: Vec<php_ast::owned::Stmt> =
+                body.iter().map(php_ast::owned::to_owned_stmt).collect();
+            sa.analyze_stmts(&owned_body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -1278,7 +1294,9 @@ impl<'a> Pass2Driver<'a> {
                 self.php_version,
                 self.inference_only,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            let owned_body: Vec<php_ast::owned::Stmt> =
+                body.iter().map(php_ast::owned::to_owned_stmt).collect();
+            sa.analyze_stmts(&owned_body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 

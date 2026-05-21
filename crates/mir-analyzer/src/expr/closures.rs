@@ -68,10 +68,26 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.read_vars.insert(name.to_string());
         }
 
-        // TODO(owned-migration): analyze closure body once stmt/ is migrated to owned types.
-        // Body analysis is skipped here because analyze_stmts still takes arena stmts.
-        let inferred_return = Union::mixed();
-        let _ = closure_ctx;
+        let mut sa = crate::stmt::StatementsAnalyzer::new(
+            self.db,
+            self.file.clone(),
+            self.source,
+            self.source_map,
+            self.issues,
+            self.symbols,
+            self.php_version,
+            self.inference_only,
+        );
+        sa.analyze_stmts(&c.body, &mut closure_ctx);
+        let inferred_return = crate::pass2::merge_return_types(&sa.return_types);
+
+        // If the closure reads an outer-scope variable without capturing it via `use`,
+        // mark that variable as read in the outer context to suppress false UnusedParam.
+        for name in &closure_ctx.read_vars {
+            if ctx.var_is_defined(name) || ctx.var_possibly_defined(name) {
+                ctx.read_vars.insert(name.clone());
+            }
+        }
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);
         let closure_params: Vec<mir_types::atomic::FnParam> = params

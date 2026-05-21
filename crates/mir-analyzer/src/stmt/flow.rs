@@ -8,21 +8,21 @@ use super::StatementsAnalyzer;
 
 use mir_issues::{IssueKind, Location};
 use mir_types::{Atomic, Union};
+use php_ast::owned::{Expr, StaticVar};
 
 impl<'a> StatementsAnalyzer<'a> {
     // -----------------------------------------------------------------------
     // Return
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_return_stmt<'arena, 'src>(
+    pub(super) fn analyze_return_stmt(
         &mut self,
-        opt_expr: &Option<&php_ast::ast::Expr<'arena, 'src>>,
+        opt_expr: &Option<Box<Expr>>,
         stmt_span: php_ast::Span,
         ctx: &mut crate::context::Context,
     ) {
         if let Some(expr) = opt_expr {
-            let owned = php_ast::owned::to_owned_expr(expr);
-            let ret_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
+            let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
 
             // If there's a bare `@var Type` (no variable name) on the return statement,
             // use the annotated type for the return-type compatibility check.
@@ -127,14 +127,13 @@ impl<'a> StatementsAnalyzer<'a> {
     // Throw
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_throw_stmt<'arena, 'src>(
+    pub(super) fn analyze_throw_stmt(
         &mut self,
-        expr: &php_ast::ast::Expr<'arena, 'src>,
+        expr: &Expr,
         stmt_span: php_ast::Span,
         ctx: &mut crate::context::Context,
     ) {
-        let owned = php_ast::owned::to_owned_expr(expr);
-        let thrown_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
+        let thrown_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
         // Validate that the thrown type extends Throwable
         for atomic in &thrown_ty.types {
             match atomic {
@@ -319,14 +318,14 @@ impl<'a> StatementsAnalyzer<'a> {
     // Unset
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_unset_stmt<'arena, 'src>(
+    pub(super) fn analyze_unset_stmt(
         &mut self,
-        vars: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Expr<'arena, 'src>>,
+        vars: &[php_ast::owned::Expr],
         ctx: &mut crate::context::Context,
     ) {
         for var in vars.iter() {
-            if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
-                ctx.unset_var(name.as_str().trim_start_matches('$'));
+            if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
+                ctx.unset_var(name.trim_start_matches('$'));
             }
         }
     }
@@ -335,15 +334,15 @@ impl<'a> StatementsAnalyzer<'a> {
     // Static variable declaration
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_static_var_stmt<'arena, 'src>(
+    pub(super) fn analyze_static_var_stmt(
         &mut self,
-        vars: &php_ast::ast::ArenaVec<'arena, php_ast::ast::StaticVar<'arena, 'src>>,
+        vars: &[StaticVar],
         ctx: &mut crate::context::Context,
     ) {
         for sv in vars.iter() {
             let ty = Union::mixed(); // static vars are indeterminate on entry
-            let name = sv.name.to_string();
-            let name = name.trim_start_matches('$');
+            let name_str = sv.name.as_deref().unwrap_or("").to_string();
+            let name = name_str.trim_start_matches('$');
             ctx.set_var(name, ty);
             let (line, col_start) = self.offset_to_line_col(sv.span.start);
             let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
@@ -355,14 +354,14 @@ impl<'a> StatementsAnalyzer<'a> {
     // Global declaration
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_global_stmt<'arena, 'src>(
+    pub(super) fn analyze_global_stmt(
         &mut self,
-        vars: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Expr<'arena, 'src>>,
+        vars: &[php_ast::owned::Expr],
         ctx: &mut crate::context::Context,
     ) {
         for var in vars.iter() {
-            if let php_ast::ast::ExprKind::Variable(name) = &var.kind {
-                let var_name = name.as_str().trim_start_matches('$');
+            if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
+                let var_name = name.trim_start_matches('$');
                 let ty = self
                     .db
                     .global_var_type(var_name)
@@ -380,13 +379,13 @@ impl<'a> StatementsAnalyzer<'a> {
     // Declare
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_declare_stmt<'arena, 'src>(
+    pub(super) fn analyze_declare_stmt(
         &mut self,
-        d: &php_ast::ast::DeclareStmt<'arena, 'src>,
+        d: &php_ast::owned::DeclareStmt,
         ctx: &mut crate::context::Context,
     ) {
         for (name, _val) in d.directives.iter() {
-            if *name == "strict_types" {
+            if name.as_ref() == "strict_types" {
                 ctx.strict_types = true;
             }
         }

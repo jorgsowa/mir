@@ -172,8 +172,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::New(n) => self.analyze_new(n, expr.span, ctx),
 
             // --- Anonymous class -------------------------------------------
-            ExprKind::AnonymousClass(_anon) => {
-                // TODO(owned-migration): analyze anonymous class bodies once stmt/ is migrated to owned
+            ExprKind::AnonymousClass(anon) => {
+                let mut sa = crate::stmt::StatementsAnalyzer::new(
+                    self.db,
+                    self.file.clone(),
+                    self.source,
+                    self.source_map,
+                    self.issues,
+                    self.symbols,
+                    self.php_version,
+                    self.inference_only,
+                );
+                sa.analyze_class_decl_stmt(anon, ctx);
                 Union::single(Atomic::TObject)
             }
 

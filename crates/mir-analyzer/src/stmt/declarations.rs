@@ -1,23 +1,19 @@
 use super::StatementsAnalyzer;
 use crate::context::Context;
+use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl};
 use std::sync::Arc;
 
 impl<'a> StatementsAnalyzer<'a> {
-    pub(super) fn analyze_function_decl_stmt<'arena, 'src>(
-        &mut self,
-        decl: &php_ast::ast::FunctionDecl<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
+    pub(crate) fn analyze_function_decl_stmt(&mut self, decl: &FunctionDecl, ctx: &mut Context) {
         for p in decl.params.iter() {
             if let Some(default) = &p.default {
-                let owned = php_ast::owned::to_owned_expr(default);
                 let mut ea = self.expr_analyzer(ctx);
-                let _ = ea.analyze(&owned, ctx);
+                let _ = ea.analyze(default, ctx);
             }
         }
 
         // Look up the function in the database to get resolved parameter types
-        let fn_name = decl.name.to_string();
+        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         let resolve_fn =
             |fqn: &str| -> Option<(Vec<mir_codebase::FnParam>, Option<mir_types::Union>)> {
                 let db = self.db;
@@ -34,12 +30,11 @@ impl<'a> StatementsAnalyzer<'a> {
             if let Some(found) = resolve_fn(&fqn).or_else(|| resolve_fn(&fn_name)) {
                 found
             } else {
-                // Fallback to AST if not found in database
                 let ast_params: Vec<mir_codebase::FnParam> = decl
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                        name: Arc::from(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -50,16 +45,14 @@ impl<'a> StatementsAnalyzer<'a> {
                 (ast_params, None)
             }
         } else {
-            // No namespace
             if let Some(found) = resolve_fn(&fn_name) {
                 found
             } else {
-                // Fallback to AST if not found in database
                 let ast_params: Vec<mir_codebase::FnParam> = decl
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                        name: Arc::from(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -94,16 +87,12 @@ impl<'a> StatementsAnalyzer<'a> {
         sa.analyze_stmts(&decl.body, &mut fn_ctx);
     }
 
-    pub(super) fn analyze_class_decl_stmt<'arena, 'src>(
-        &mut self,
-        decl: &php_ast::ast::ClassDecl<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
-        let class_name_owned = decl
+    pub(crate) fn analyze_class_decl_stmt(&mut self, decl: &ClassDecl, ctx: &mut Context) {
+        let class_name = decl
             .name
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "<anonymous>".to_string());
-        let class_name = class_name_owned.as_str();
+            .as_ref()
+            .and_then(|i| i.as_deref())
+            .unwrap_or("<anonymous>");
         let resolved = crate::db::resolve_name_via_db(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
         let here = crate::db::Fqcn::new(self.db, fqcn.clone());
@@ -116,21 +105,21 @@ impl<'a> StatementsAnalyzer<'a> {
         param_default_ctx.static_fqcn = Some(fqcn.clone());
 
         for member in decl.members.iter() {
-            let php_ast::ast::ClassMemberKind::Method(method) = &member.kind else {
+            let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
             for p in method.params.iter() {
                 if let Some(default) = &p.default {
-                    let owned = php_ast::owned::to_owned_expr(default);
                     let mut ea = self.expr_analyzer(&param_default_ctx);
-                    let _ = ea.analyze(&owned, &mut param_default_ctx);
+                    let _ = ea.analyze(default, &mut param_default_ctx);
                 }
             }
             let Some(body) = &method.body else { continue };
+            let method_name = method.name.as_deref().unwrap_or("");
             let pulled = crate::db::find_method_in_chain(
                 self.db,
                 crate::db::Fqcn::new(self.db, fqcn.clone()),
-                &method.name.to_string(),
+                method_name,
             );
             let (params, return_ty) = if let Some((_, storage)) = pulled {
                 (
@@ -142,7 +131,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name.to_string().trim_start_matches('$')),
+                        name: Arc::from(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -152,7 +141,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .collect();
                 (ast_params, None)
             };
-            let is_ctor = method.name == "__construct";
+            let is_ctor = method_name == "__construct";
             let mut method_ctx = Context::for_method(
                 &params,
                 return_ty,

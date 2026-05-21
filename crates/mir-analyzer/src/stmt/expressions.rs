@@ -2,46 +2,35 @@ use super::StatementsAnalyzer;
 use crate::context::Context;
 use crate::narrowing::narrow_from_condition;
 use mir_issues::IssueKind;
+use php_ast::owned::{Expr, ExprKind};
 
 impl<'a> StatementsAnalyzer<'a> {
-    pub(super) fn analyze_expression_stmt<'arena, 'src>(
-        &mut self,
-        expr: &php_ast::ast::Expr<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
-        let owned = php_ast::owned::to_owned_expr(expr);
-        let expr_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
+    pub(super) fn analyze_expression_stmt(&mut self, expr: &Expr, ctx: &mut Context) {
+        let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
         if expr_ty.is_never() {
             ctx.diverges = true;
         }
-        if let php_ast::ast::ExprKind::FunctionCall(call) = &expr.kind {
-            if let php_ast::ast::ExprKind::Identifier(fn_name) = &call.name.kind {
-                if fn_name.eq_ignore_ascii_case("assert") {
+        if let ExprKind::FunctionCall(call) = &expr.kind {
+            if let ExprKind::Identifier(fn_name) = &call.name.kind {
+                if fn_name.as_ref().eq_ignore_ascii_case("assert") {
                     if let Some(arg) = call.args.first() {
-                        narrow_from_condition(
-                            &php_ast::owned::to_owned_expr(&arg.value),
-                            ctx,
-                            true,
-                            self.db,
-                            &self.file,
-                        );
+                        narrow_from_condition(&arg.value, ctx, true, self.db, &self.file);
                     }
                 }
             }
         }
     }
 
-    pub(super) fn analyze_echo_stmt<'arena, 'src>(
+    pub(super) fn analyze_echo_stmt(
         &mut self,
-        exprs: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Expr<'arena, 'src>>,
+        exprs: &[Expr],
         stmt_span: php_ast::Span,
         ctx: &mut Context,
     ) {
         for expr in exprs.iter() {
-            let owned = php_ast::owned::to_owned_expr(expr);
-            let expr_ty = self.expr_analyzer(ctx).analyze(&owned, ctx);
+            let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
             self.check_echo_implicit_to_string_cast(&expr_ty, expr.span);
-            if crate::taint::is_expr_tainted(&php_ast::owned::to_owned_expr(expr), ctx) {
+            if crate::taint::is_expr_tainted(expr, ctx) {
                 let (line, col_start) = self.offset_to_line_col(stmt_span.start);
                 let (line_end, col_end) = if stmt_span.start < stmt_span.end {
                     let (end_line, end_col) = self.offset_to_line_col(stmt_span.end);

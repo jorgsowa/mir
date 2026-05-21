@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use php_ast::ast::ExprKind;
+use php_ast::owned::{
+    DoWhileStmt, ExprKind, ForStmt, ForeachStmt, IfStmt, SwitchStmt, TryCatchStmt, WhileStmt,
+};
 
 use mir_issues::{Issue, IssueKind, Location};
 use mir_types::{Atomic, Union};
@@ -15,34 +17,34 @@ use super::loops::infer_foreach_types;
 use super::StatementsAnalyzer;
 
 impl<'a> StatementsAnalyzer<'a> {
-    pub(super) fn analyze_if_stmt<'arena, 'src>(
-        &mut self,
-        if_stmt: &php_ast::ast::IfStmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
+    pub(super) fn analyze_if_stmt(&mut self, if_stmt: &IfStmt, ctx: &mut Context) {
         let pre_ctx = ctx.clone();
 
-        let owned_cond = php_ast::owned::to_owned_expr(&if_stmt.condition);
-        let cond_type = self.expr_analyzer(ctx).analyze(&owned_cond, ctx);
+        let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
         let pre_diverges = ctx.diverges;
 
         let mut then_ctx = ctx.fork();
-        narrow_from_condition(&owned_cond, &mut then_ctx, true, self.db, &self.file);
+        narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
         let then_unreachable_from_narrowing = then_ctx.diverges;
         if !then_ctx.diverges {
-            self.analyze_stmt(if_stmt.then_branch, &mut then_ctx);
+            self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
         }
 
         let mut elseif_ctxs: Vec<Context> = vec![];
         for elseif in if_stmt.elseif_branches.iter() {
             let mut pre_elseif = ctx.fork();
-            narrow_from_condition(&owned_cond, &mut pre_elseif, false, self.db, &self.file);
+            narrow_from_condition(
+                &if_stmt.condition,
+                &mut pre_elseif,
+                false,
+                self.db,
+                &self.file,
+            );
             let pre_elseif_diverges = pre_elseif.diverges;
 
-            let owned_elseif_cond = php_ast::owned::to_owned_expr(&elseif.condition);
             let mut elseif_true_ctx = pre_elseif.clone();
             narrow_from_condition(
-                &owned_elseif_cond,
+                &elseif.condition,
                 &mut elseif_true_ctx,
                 true,
                 self.db,
@@ -50,7 +52,7 @@ impl<'a> StatementsAnalyzer<'a> {
             );
             let mut elseif_false_ctx = pre_elseif.clone();
             narrow_from_condition(
-                &owned_elseif_cond,
+                &elseif.condition,
                 &mut elseif_false_ctx,
                 false,
                 self.db,
@@ -61,7 +63,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.span_to_location(elseif.condition.span);
                 let elseif_cond_type = self
                     .expr_analyzer(ctx)
-                    .analyze(&owned_elseif_cond, &mut ctx.fork());
+                    .analyze(&elseif.condition, &mut ctx.fork());
                 self.issues.add(
                     mir_issues::Issue::new(
                         IssueKind::RedundantCondition {
@@ -83,7 +85,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
             let mut branch_ctx = elseif_true_ctx;
             self.expr_analyzer(&branch_ctx)
-                .analyze(&owned_elseif_cond, &mut branch_ctx);
+                .analyze(&elseif.condition, &mut branch_ctx);
             if !branch_ctx.diverges {
                 self.analyze_stmt(&elseif.body, &mut branch_ctx);
             }
@@ -91,7 +93,13 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let mut else_ctx = ctx.fork();
-        narrow_from_condition(&owned_cond, &mut else_ctx, false, self.db, &self.file);
+        narrow_from_condition(
+            &if_stmt.condition,
+            &mut else_ctx,
+            false,
+            self.db,
+            &self.file,
+        );
         let else_unreachable_from_narrowing = else_ctx.diverges;
         if !else_ctx.diverges {
             if let Some(else_branch) = &if_stmt.else_branch {
@@ -127,36 +135,26 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_while_stmt<'arena, 'src>(
-        &mut self,
-        w: &php_ast::ast::WhileStmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
-        let owned_while_cond = php_ast::owned::to_owned_expr(&w.condition);
-        self.expr_analyzer(ctx).analyze(&owned_while_cond, ctx);
+    pub(super) fn analyze_while_stmt(&mut self, w: &WhileStmt, ctx: &mut Context) {
+        self.expr_analyzer(ctx).analyze(&w.condition, ctx);
         let pre = ctx.clone();
 
         let mut entry = ctx.fork();
-        narrow_from_condition(&owned_while_cond, &mut entry, true, self.db, &self.file);
+        narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
 
         let post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
-                sa.analyze_stmt(w.body, iter);
-                let c = php_ast::owned::to_owned_expr(&w.condition);
-                sa.expr_analyzer(iter).analyze(&c, iter);
+                sa.analyze_stmt(&w.body, iter);
+                sa.expr_analyzer(iter).analyze(&w.condition, iter);
             },
             false,
         );
         *ctx = post;
     }
 
-    pub(super) fn analyze_dowhile_stmt<'arena, 'src>(
-        &mut self,
-        dw: &php_ast::ast::DoWhileStmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
+    pub(super) fn analyze_dowhile_stmt(&mut self, dw: &DoWhileStmt, ctx: &mut Context) {
         let pre = ctx.clone();
         let entry = ctx.fork();
         // Do-while always executes at least once (body before condition check)
@@ -164,43 +162,34 @@ impl<'a> StatementsAnalyzer<'a> {
             &pre,
             entry,
             |sa, iter| {
-                sa.analyze_stmt(dw.body, iter);
-                let c = php_ast::owned::to_owned_expr(&dw.condition);
-                sa.expr_analyzer(iter).analyze(&c, iter);
+                sa.analyze_stmt(&dw.body, iter);
+                sa.expr_analyzer(iter).analyze(&dw.condition, iter);
             },
             true,
         );
         *ctx = post;
     }
 
-    pub(super) fn analyze_for_stmt<'arena, 'src>(
-        &mut self,
-        f: &php_ast::ast::ForStmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
+    pub(super) fn analyze_for_stmt(&mut self, f: &ForStmt, ctx: &mut Context) {
         for init in f.init.iter() {
-            let owned = php_ast::owned::to_owned_expr(init);
-            self.expr_analyzer(ctx).analyze(&owned, ctx);
+            self.expr_analyzer(ctx).analyze(init, ctx);
         }
         let pre = ctx.clone();
         let mut entry = ctx.fork();
         for cond in f.condition.iter() {
-            let owned = php_ast::owned::to_owned_expr(cond);
-            self.expr_analyzer(&entry).analyze(&owned, &mut entry);
+            self.expr_analyzer(&entry).analyze(cond, &mut entry);
         }
 
         let post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
-                sa.analyze_stmt(f.body, iter);
+                sa.analyze_stmt(&f.body, iter);
                 for update in f.update.iter() {
-                    let owned = php_ast::owned::to_owned_expr(update);
-                    sa.expr_analyzer(iter).analyze(&owned, iter);
+                    sa.expr_analyzer(iter).analyze(update, iter);
                 }
                 for cond in f.condition.iter() {
-                    let owned = php_ast::owned::to_owned_expr(cond);
-                    sa.expr_analyzer(iter).analyze(&owned, iter);
+                    sa.expr_analyzer(iter).analyze(cond, iter);
                 }
             },
             false,
@@ -208,18 +197,16 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = post;
     }
 
-    pub(super) fn analyze_foreach_stmt<'arena, 'src>(
+    pub(super) fn analyze_foreach_stmt(
         &mut self,
-        fe: &php_ast::ast::ForeachStmt<'arena, 'src>,
+        fe: &ForeachStmt,
         stmt_span: php_ast::Span,
         ctx: &mut Context,
     ) {
-        let owned_fe_expr = php_ast::owned::to_owned_expr(&fe.expr);
-        let arr_ty = self.expr_analyzer(ctx).analyze(&owned_fe_expr, ctx);
+        let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types(&arr_ty);
 
-        let owned_fe_value = php_ast::owned::to_owned_expr(&fe.value);
-        if let Some(vname) = extract_simple_var(&owned_fe_value) {
+        if let Some(vname) = extract_simple_var(&fe.value) {
             let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
             if let Some(ann) = self.extract_var_annotation_from(doc.as_deref()) {
                 if ann.name.as_deref() == Some(vname.as_str()) {
@@ -232,13 +219,12 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut entry = ctx.fork();
 
         if let Some(key_expr) = &fe.key {
-            let owned_key = php_ast::owned::to_owned_expr(key_expr);
-            if let Some(var_name) = extract_simple_var(&owned_key) {
+            if let Some(var_name) = extract_simple_var(key_expr) {
                 entry.set_var(var_name, key_ty.clone());
             }
         }
-        let value_var = extract_simple_var(&owned_fe_value);
-        let value_destructure_vars = extract_destructure_vars(&owned_fe_value);
+        let value_var = extract_simple_var(&fe.value);
+        let value_destructure_vars = extract_destructure_vars(&fe.value);
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
         } else {
@@ -253,8 +239,7 @@ impl<'a> StatementsAnalyzer<'a> {
             entry,
             |sa, iter| {
                 if let Some(key_expr) = &fe.key {
-                    let owned_key = php_ast::owned::to_owned_expr(key_expr);
-                    if let Some(var_name) = extract_simple_var(&owned_key) {
+                    if let Some(var_name) = extract_simple_var(key_expr) {
                         iter.set_var(var_name, key_ty.clone());
                     }
                 }
@@ -265,22 +250,17 @@ impl<'a> StatementsAnalyzer<'a> {
                         iter.set_var(vname, Union::mixed());
                     }
                 }
-                sa.analyze_stmt(fe.body, iter);
+                sa.analyze_stmt(&fe.body, iter);
             },
             loop_guaranteed,
         );
         *ctx = post;
     }
 
-    pub(super) fn analyze_switch_stmt<'arena, 'src>(
-        &mut self,
-        sw: &php_ast::ast::SwitchStmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
-        let owned_sw_expr = php_ast::owned::to_owned_expr(&sw.expr);
-        let _subject_ty = self.expr_analyzer(ctx).analyze(&owned_sw_expr, ctx);
+    pub(super) fn analyze_switch_stmt(&mut self, sw: &SwitchStmt, ctx: &mut Context) {
+        let _subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
         let subject_var: Option<String> = match &sw.expr.kind {
-            ExprKind::Variable(name) => Some(name.as_str().trim_start_matches('$').to_string()),
+            ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
             _ => None,
         };
         let switch_on_true = matches!(&sw.expr.kind, ExprKind::Bool(true));
@@ -294,9 +274,8 @@ impl<'a> StatementsAnalyzer<'a> {
         for case in sw.cases.iter() {
             let mut case_ctx = pre_ctx.fork();
             if let Some(val) = &case.value {
-                let owned_val = php_ast::owned::to_owned_expr(val);
                 if switch_on_true {
-                    narrow_from_condition(&owned_val, &mut case_ctx, true, self.db, &self.file);
+                    narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
                 } else if let Some(ref var_name) = subject_var {
                     let narrow_ty = match &val.kind {
                         ExprKind::Int(n) => Some(Union::single(Atomic::TLiteralInt(*n))),
@@ -315,8 +294,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         case_ctx.set_var(var_name, narrowed);
                     }
                 }
-                self.expr_analyzer(&case_ctx)
-                    .analyze(&owned_val, &mut case_ctx);
+                self.expr_analyzer(&case_ctx).analyze(val, &mut case_ctx);
             }
             self.analyze_stmts(&case.body, &mut case_ctx);
             case_results.push(case_ctx);
@@ -365,11 +343,7 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = merged;
     }
 
-    pub(super) fn analyze_trycatch_stmt<'arena, 'src>(
-        &mut self,
-        tc: &php_ast::ast::TryCatchStmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
+    pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut Context) {
         let pre_ctx = ctx.clone();
         let mut try_ctx = ctx.fork();
         self.analyze_stmts(&tc.body, &mut try_ctx);
@@ -382,10 +356,10 @@ impl<'a> StatementsAnalyzer<'a> {
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
                 if !self.inference_only {
-                    let raw = parser::name_to_string(catch_ty);
+                    let raw = parser::name_to_string_owned(catch_ty);
                     let resolved = db::resolve_name_via_db(self.db, &self.file, &raw);
                     if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                        let span = catch_ty.span();
+                        let span = catch_ty.span;
                         let (line, col_start) = self.offset_to_line_col(span.start);
                         let (_, col_end) = self.offset_to_line_col(span.end);
                         self.db.record_reference_location(crate::db::RefLoc {
@@ -398,13 +372,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                 }
             }
-            if let Some(var) = catch.var {
+            if let Some(var) = &catch.var {
                 let exc_ty = if catch.types.is_empty() {
                     Union::single(Atomic::TObject)
                 } else {
                     let mut u = Union::empty();
                     for catch_ty in catch.types.iter() {
-                        let raw = parser::name_to_string(catch_ty);
+                        let raw = parser::name_to_string_owned(catch_ty);
                         let resolved = db::resolve_name_via_db(self.db, &self.file, &raw);
                         u.add_type(Atomic::TNamedObject {
                             fqcn: resolved.into(),

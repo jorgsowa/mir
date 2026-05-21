@@ -13,7 +13,7 @@ use return_type::resolve_union_for_file;
 
 use std::sync::Arc;
 
-use php_ast::ast::StmtKind;
+use php_ast::owned::StmtKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
 use mir_types::Union;
@@ -37,24 +37,20 @@ struct VarAnnotation {
 
 /// Apply post-narrow: after `$x = expr()`, if the preceding `@var` names `$x`,
 /// override the inferred type with the annotated one.
-fn apply_post_narrow<'arena, 'src>(
-    stmt: &php_ast::ast::Stmt<'arena, 'src>,
-    annotation: &VarAnnotation,
-    ctx: &mut Context,
-) {
+fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ctx: &mut Context) {
     let Some(ref var_name) = annotation.name else {
         return;
     };
-    let php_ast::ast::StmtKind::Expression(e) = &stmt.kind else {
+    let php_ast::owned::StmtKind::Expression(e) = &stmt.kind else {
         return;
     };
-    let php_ast::ast::ExprKind::Assign(a) = &e.kind else {
+    let php_ast::owned::ExprKind::Assign(a) = &e.kind else {
         return;
     };
     if !matches!(&a.op, php_ast::ast::AssignOp::Assign) {
         return;
     }
-    let php_ast::ast::ExprKind::Variable(lhs_name) = &a.target.kind else {
+    let php_ast::owned::ExprKind::Variable(lhs_name) = &a.target.kind else {
         return;
     };
     if lhs_name.trim_start_matches('$') == var_name.as_str() {
@@ -108,11 +104,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_stmts<'arena, 'src>(
-        &mut self,
-        stmts: &php_ast::ast::ArenaVec<'arena, php_ast::ast::Stmt<'arena, 'src>>,
-        ctx: &mut Context,
-    ) {
+    pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut Context) {
         for stmt in stmts.iter() {
             if ctx.diverges {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
@@ -144,11 +136,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_stmt<'arena, 'src>(
-        &mut self,
-        stmt: &php_ast::ast::Stmt<'arena, 'src>,
-        ctx: &mut Context,
-    ) {
+    pub fn analyze_stmt(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut Context) {
         let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
@@ -342,8 +330,8 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     /// Emit `UndefinedClass` for a `Name` AST node if the resolved class does not exist.
-    fn check_name_undefined_class(&mut self, name: &php_ast::ast::Name<'_, '_>) {
-        let raw = crate::parser::name_to_string(name);
+    fn check_name_undefined_class(&mut self, name: &php_ast::owned::Name) {
+        let raw = crate::parser::name_to_string_owned(name);
         let resolved = crate::db::resolve_name_via_db(self.db, &self.file, &raw);
         if matches!(resolved.as_str(), "self" | "static" | "parent") {
             return;
@@ -351,7 +339,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if crate::db::type_exists_via_db(self.db, &resolved) {
             return;
         }
-        let span = name.span();
+        let span = name.span;
         let (line, col_start) = self.offset_to_line_col(span.start);
         let (line_end, col_end) = self.offset_to_line_col(span.end);
         self.issues.add(Issue::new(
