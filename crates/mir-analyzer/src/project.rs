@@ -1189,19 +1189,26 @@ impl ProjectAnalyzer {
             (**guard).clone()
         };
         let stub_cache = self.shared_db.stub_cache.clone();
-        // Use the salsa-tracked `collect_file_definitions` for cache misses so
-        // that `workspace_symbol_index` (called during project Pass-2) gets a
-        // salsa cache HIT instead of re-parsing every vendor file a second time.
-        // Clones share salsa storage, so results written here are visible to
-        // the main db handle.  For stub-cache hits, the slice comes from disk and
-        // salsa will parse on-demand (lazily) when the workspace index is built —
-        // still only one parse per file total.
+        // For disk-cache misses: use the salsa-tracked `collect_file_definitions`
+        // so Salsa memoizes the result and `rebuild_workspace_symbol_index` below
+        // gets a cache hit instead of re-parsing from scratch.
+        //
+        // For disk-cache hits: prime the in-process parse cache with the
+        // pre-deserialized slice so `rebuild_workspace_symbol_index` gets a
+        // fast-path hit in `collect_file_definitions_uncached` instead of
+        // re-reading from the disk cache a second time.
         let prepared: Vec<mir_codebase::storage::StubSlice> = entries
             .into_par_iter()
             .zip(source_files.into_par_iter())
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {
                 if let Some(slice) = entry.cached.take() {
-                    return slice;
+                    // Prime the in-process parse cache so that the
+                    // rebuild_workspace_symbol_index call below gets a fast-path
+                    // hit in collect_file_definitions_uncached instead of
+                    // re-reading from the disk cache a second time.
+                    let slice_arc = Arc::new(slice);
+                    db.parse_cache().insert(entry.hash, Arc::clone(&slice_arc));
+                    return (*slice_arc).clone();
                 }
                 // Tracked version: result is memoized in the shared salsa
                 // storage.  `workspace_symbol_index` will get a cache hit.
