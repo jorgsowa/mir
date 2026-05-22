@@ -1,5 +1,4 @@
 /// Project-level orchestration: file discovery, pass 1, pass 2.
-use std::mem::ManuallyDrop;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -72,28 +71,16 @@ pub struct ProjectAnalyzer {
 struct ParsedProjectFile {
     file: Arc<str>,
     source: Arc<str>,
-    parsed: ManuallyDrop<php_rs_parser::ArenaParseResult<'static, 'static>>,
-    arena: ManuallyDrop<Box<bumpalo::Bump>>,
+    parsed: php_rs_parser::ParseResult,
 }
 
 impl ParsedProjectFile {
     fn new(file: Arc<str>, source: Arc<str>) -> Self {
-        let arena = Box::new(crate::arena::create_parse_arena(source.len()));
-        let parsed = php_rs_parser::parse_arena(&arena, &source);
-        // SAFETY: `parsed` borrows from `arena` and `source`, both owned by this
-        // struct and kept alive until `Drop`. `Drop` manually destroys `parsed`
-        // before releasing either owner, so the widened lifetimes never escape.
-        let parsed = unsafe {
-            std::mem::transmute::<
-                php_rs_parser::ArenaParseResult<'_, '_>,
-                php_rs_parser::ArenaParseResult<'static, 'static>,
-            >(parsed)
-        };
+        let parsed = php_rs_parser::parse(source.as_ref());
         Self {
             file,
             source,
-            parsed: ManuallyDrop::new(parsed),
-            arena: ManuallyDrop::new(arena),
+            parsed,
         }
     }
 
@@ -101,25 +88,18 @@ impl ParsedProjectFile {
         self.source.as_ref()
     }
 
-    fn parsed(&self) -> &php_rs_parser::ArenaParseResult<'_, '_> {
-        &self.parsed
+    fn source_map(&self) -> &php_rs_parser::source_map::SourceMap {
+        &self.parsed.source_map
+    }
+
+    fn errors(&self) -> &[php_rs_parser::diagnostics::ParseError] {
+        &self.parsed.errors
+    }
+
+    fn owned(&self) -> &php_ast::owned::Program {
+        &self.parsed.program
     }
 }
-
-impl Drop for ParsedProjectFile {
-    fn drop(&mut self) {
-        unsafe {
-            ManuallyDrop::drop(&mut self.parsed);
-            ManuallyDrop::drop(&mut self.arena);
-        }
-    }
-}
-
-// SAFETY: after construction the parsed AST and source map are read-only. The
-// bump arena is never mutated again; it only owns backing storage for AST nodes
-// and is dropped after all parallel analysis has completed.
-unsafe impl Send for ParsedProjectFile {}
-unsafe impl Sync for ParsedProjectFile {}
 
 impl ProjectAnalyzer {
     pub fn new() -> Self {
@@ -503,31 +483,29 @@ impl ProjectAnalyzer {
         let file_defs: Vec<Pass1Entry> = parsed_files
             .par_iter()
             .map(|parsed| {
-                let parse_result = parsed.parsed();
                 let content_hash = hash_source(parsed.source());
-                let has_hard_parse_errors = parse_result
-                    .errors
+                let has_hard_parse_errors = parsed
+                    .errors()
                     .iter()
                     .any(crate::parser::is_hard_parse_error);
-                let mut all_issues: Vec<Issue> = parse_result
-                    .errors
+                let mut all_issues: Vec<Issue> = parsed
+                    .errors()
                     .iter()
                     .map(|err| {
                         crate::parser::parse_error_to_issue(
                             err,
                             &parsed.file,
                             parsed.source(),
-                            &parse_result.source_map,
+                            parsed.source_map(),
                         )
                     })
                     .collect();
                 let collector = crate::collector::DefinitionCollector::new_for_slice(
                     parsed.file.clone(),
                     parsed.source(),
-                    &parse_result.source_map,
+                    parsed.source_map(),
                 );
-                let owned_program = php_ast::owned::to_owned_program(&parse_result.program);
-                let (mut slice, collector_issues) = collector.collect_slice(&owned_program);
+                let (mut slice, collector_issues) = collector.collect_slice(parsed.owned());
                 all_issues.extend(collector_issues);
                 mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
                 let defs = FileDefinitions {
@@ -654,13 +632,11 @@ impl ProjectAnalyzer {
                         db as &dyn crate::db::MirDatabase,
                         php_version,
                     );
-                    let parse_result = parsed.parsed();
-                    let owned = php_ast::owned::to_owned_program(&parse_result.program);
                     driver.analyze_bodies(
-                        &owned,
+                        parsed.owned(),
                         parsed.file.clone(),
                         parsed.source(),
-                        &parse_result.source_map,
+                        parsed.source_map(),
                     );
                     driver.take_inferred_types()
                 })
@@ -701,13 +677,11 @@ impl ProjectAnalyzer {
                             db.replay_reference_locations(parsed.file.clone(), &ref_locs);
                             (cached_issues, Vec::new())
                         } else {
-                            let parse_result = parsed.parsed();
-                            let owned = php_ast::owned::to_owned_program(&parse_result.program);
                             let (issues, symbols) = driver.analyze_bodies(
-                                &owned,
+                                parsed.owned(),
                                 parsed.file.clone(),
                                 parsed.source(),
-                                &parse_result.source_map,
+                                parsed.source_map(),
                             );
                             let pending = db.take_pending_ref_locs();
                             let cache_locs = pending
@@ -721,13 +695,11 @@ impl ProjectAnalyzer {
                             return (issues, symbols, pending);
                         }
                     } else {
-                        let parse_result = parsed.parsed();
-                        let owned = php_ast::owned::to_owned_program(&parse_result.program);
                         driver.analyze_bodies(
-                            &owned,
+                            parsed.owned(),
                             parsed.file.clone(),
                             parsed.source(),
-                            &parse_result.source_map,
+                            parsed.source_map(),
                         )
                     };
                     let pending = db.take_pending_ref_locs();
@@ -984,11 +956,13 @@ impl ProjectAnalyzer {
                     .map_with(db_full, |db, (file, src)| {
                         let driver =
                             Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
-                        let arena = crate::arena::create_parse_arena(src.len());
-                        let parsed = php_rs_parser::parse_arena(&arena, src);
-                        let owned = php_ast::owned::to_owned_program(&parsed.program);
-                        let (issues, symbols) =
-                            driver.analyze_bodies(&owned, file.clone(), src, &parsed.source_map);
+                        let parsed = php_rs_parser::parse(src);
+                        let (issues, symbols) = driver.analyze_bodies(
+                            &parsed.program,
+                            file.clone(),
+                            src,
+                            &parsed.source_map,
+                        );
                         let pending = db.take_pending_ref_locs();
                         (issues, symbols, pending)
                     })
@@ -1062,19 +1036,18 @@ impl ProjectAnalyzer {
         let symbols = {
             let guard = self.shared_db.salsa.write();
 
-            // Resolve any newly-collected @psalm-import-type declarations so
-            // Pass 2 reads the imported aliases out of `type_aliases`.
-            // Re-parse in the arena so Pass 2 can walk the AST.
-            let arena = bumpalo::Bump::new();
-            let parsed = php_rs_parser::parse_arena(&arena, new_content);
+            let parsed = php_rs_parser::parse(new_content);
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
                 let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
-                let owned = php_ast::owned::to_owned_program(&parsed.program);
-                let (body_issues, symbols) =
-                    driver.analyze_bodies(&owned, file.clone(), new_content, &parsed.source_map);
+                let (body_issues, symbols) = driver.analyze_bodies(
+                    &parsed.program,
+                    file.clone(),
+                    new_content,
+                    &parsed.source_map,
+                );
                 all_issues.extend(body_issues);
                 guard.commit_pending_to_maps();
                 symbols
@@ -1117,13 +1090,11 @@ impl ProjectAnalyzer {
         }
         let mut type_envs = std::collections::HashMap::new();
         let mut all_symbols = Vec::new();
-        let arena = bumpalo::Bump::new();
-        let result = php_rs_parser::parse_arena(&arena, source);
-        let owned_result = php_ast::owned::to_owned_program(&result.program);
+        let result = php_rs_parser::parse(source);
 
         let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
         all_issues.extend(driver.analyze_bodies_typed(
-            &owned_result,
+            &result.program,
             file.clone(),
             source,
             &result.source_map,

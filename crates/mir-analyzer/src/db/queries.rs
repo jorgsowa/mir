@@ -432,16 +432,14 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
         .unwrap_or(crate::php_version::PhpVersion::LATEST);
 
-    let arena = crate::arena::create_parse_arena(text.len());
-    let parsed = php_rs_parser::parse_arena(&arena, text.as_ref());
+    let parsed = php_rs_parser::parse(text.as_ref());
 
     if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
         return InferredFileTypes::empty();
     }
 
-    let owned = php_ast::owned::to_owned_program(&parsed.program);
     let driver = crate::pass2::Pass2Driver::new_inference_only(db, php_version);
-    driver.analyze_bodies(&owned, path, text.as_ref(), &parsed.source_map);
+    driver.analyze_bodies(&parsed.program, path, text.as_ref(), &parsed.source_map);
     let inferred = driver.take_inferred_types();
 
     let mut functions: FxHashMap<Arc<str>, Arc<Union>> =

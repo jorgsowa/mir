@@ -13,30 +13,33 @@ use tempfile::TempDir;
 
 struct CountingAllocator;
 
-// All three counters are global atomics updated on every alloc/dealloc so
-// numbers are correct across all threads (main + rayon pool).
 // G_LIVE  — current net live bytes (delta from last reset)
 // G_PEAK  — max G_LIVE since last reset
 // G_TOTAL — cumulative bytes allocated since last reset
-static G_LIVE: AtomicI64 = AtomicI64::new(0);
-static G_PEAK: AtomicI64 = AtomicI64::new(0);
-static G_TOTAL: AtomicUsize = AtomicUsize::new(0);
+// Each counter is padded to a full cache line (64 bytes) so the three
+// hot-path atomics don't share a cache line and cause false sharing under
+// multi-threaded bench runs.
+#[repr(align(64))]
+struct CacheAligned<T>(T);
+static G_LIVE: CacheAligned<AtomicI64> = CacheAligned(AtomicI64::new(0));
+static G_PEAK: CacheAligned<AtomicI64> = CacheAligned(AtomicI64::new(0));
+static G_TOTAL: CacheAligned<AtomicUsize> = CacheAligned(AtomicUsize::new(0));
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ptr = System.alloc(layout);
         if !ptr.is_null() {
             let sz = layout.size();
-            G_TOTAL.fetch_add(sz, Relaxed);
-            let new_live = G_LIVE.fetch_add(sz as i64, Relaxed) + sz as i64;
-            G_PEAK.fetch_max(new_live, Relaxed);
+            G_TOTAL.0.fetch_add(sz, Relaxed);
+            let new_live = G_LIVE.0.fetch_add(sz as i64, Relaxed) + sz as i64;
+            G_PEAK.0.fetch_max(new_live, Relaxed);
         }
         ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         System.dealloc(ptr, layout);
-        G_LIVE.fetch_sub(layout.size() as i64, Relaxed);
+        G_LIVE.0.fetch_sub(layout.size() as i64, Relaxed);
     }
 }
 
@@ -44,22 +47,22 @@ unsafe impl GlobalAlloc for CountingAllocator {
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 fn reset_alloc_counters() {
-    G_LIVE.store(0, Relaxed);
-    G_PEAK.store(0, Relaxed);
-    G_TOTAL.store(0, Relaxed);
+    G_LIVE.0.store(0, Relaxed);
+    G_PEAK.0.store(0, Relaxed);
+    G_TOTAL.0.store(0, Relaxed);
 }
 
 fn print_alloc_stats(label: &str) {
-    let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
-    let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    let peak = G_PEAK.0.load(Relaxed) as f64 / 1_048_576.0;
+    let total = G_TOTAL.0.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!(
         "  [memory] {label}: peak live {peak:.1} MiB, total allocated {total:.1} MiB  (one cold run)"
     );
 }
 
 fn checkpoint_alloc(label: &str) {
-    let peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
-    let total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    let peak = G_PEAK.0.load(Relaxed) as f64 / 1_048_576.0;
+    let total = G_TOTAL.0.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!("    [checkpoint] {label:40} peak {peak:7.1} MiB, total {total:7.1} MiB");
 }
 
@@ -596,8 +599,8 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
         analyzer.collect_types_only(&vendor_files);
     }
     let cold = cold_start.elapsed();
-    let cold_peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
-    let cold_total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    let cold_peak = G_PEAK.0.load(Relaxed) as f64 / 1_048_576.0;
+    let cold_total = G_TOTAL.0.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!(
         "  COLD  wall {:>7.0} ms  peak {:>6.1} MiB  churn {:>7.1} MiB",
         cold.as_secs_f64() * 1000.0,
@@ -615,8 +618,8 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
         analyzer.stub_cache_stats()
     };
     let warm = warm_start.elapsed();
-    let warm_peak = G_PEAK.load(Relaxed) as f64 / 1_048_576.0;
-    let warm_total = G_TOTAL.load(Relaxed) as f64 / 1_048_576.0;
+    let warm_peak = G_PEAK.0.load(Relaxed) as f64 / 1_048_576.0;
+    let warm_total = G_TOTAL.0.load(Relaxed) as f64 / 1_048_576.0;
     eprintln!(
         "  WARM  wall {:>7.0} ms  peak {:>6.1} MiB  churn {:>7.1} MiB  (cache hits={hits} misses={misses})",
         warm.as_secs_f64() * 1000.0,
