@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{Assertion, AssertionKind, FnParam, TemplateParam};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
@@ -32,7 +32,7 @@ struct ResolvedFn {
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
     let inferred = crate::db::inferred_function_return_type_demand(db, fqn);
-    let here = crate::db::Fqcn::new(db, Arc::<str>::from(fqn));
+    let here = crate::db::Fqcn::new(db, Symbol::new(fqn));
     if let Some(f) = crate::db::find_function(db, here) {
         let return_ty_raw = f
             .return_type
@@ -149,7 +149,7 @@ impl CallAnalyzer {
             };
             let fn_exists = |name: &str| -> bool {
                 let db = ea.db;
-                let here = crate::db::Fqcn::new(db, Arc::<str>::from(name));
+                let here = crate::db::Fqcn::new(db, Symbol::new(name));
                 crate::db::find_function(db, here).is_some()
             };
             if fn_exists(qualified.as_str()) {
@@ -216,7 +216,7 @@ impl CallAnalyzer {
             if let Some(arg) = call.args.first() {
                 if let ExprKind::String(name) = &arg.value.kind {
                     let fqn = name.as_ref().strip_prefix('\\').unwrap_or(name.as_ref());
-                    let here = crate::db::Fqcn::new(ea.db, Arc::<str>::from(fqn));
+                    let here = crate::db::Fqcn::new(ea.db, Symbol::new(fqn));
                     let canonical_fqn: Option<Arc<str>> =
                         crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
                     if let Some(canonical_fqn) = canonical_fqn {

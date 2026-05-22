@@ -9,7 +9,6 @@ use mir_types::{Atomic, Union};
 use php_ast::ast::AssignOp;
 use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
-use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_assign(
@@ -142,7 +141,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
-                            let here = crate::db::Fqcn::new(db, Arc::from(fqcn.as_ref()));
+                            let here = crate::db::Fqcn::new(db, *fqcn);
                             let prop_info: Option<(bool, Option<Union>)> =
                                 crate::db::find_property_in_class(db, here, &prop_name)
                                     .map(|p| (p.is_readonly, p.ty.clone()));

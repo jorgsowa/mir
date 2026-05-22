@@ -14,6 +14,8 @@ use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use mir_types::Symbol;
+
 use parking_lot::RwLock;
 
 use mir_codebase::{FileId, FileIdMap};
@@ -702,7 +704,7 @@ impl AnalysisSession {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn.as_ref()));
                 let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 class
@@ -711,7 +713,7 @@ impl AnalysisSession {
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Function(fqn) => {
-                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqn.as_ref()));
                 let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 f.location
@@ -772,7 +774,7 @@ impl AnalysisSession {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Function(fqn) => {
-                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqn.as_ref()));
                 let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = f
@@ -788,7 +790,7 @@ impl AnalysisSession {
                 })
             }
             crate::Symbol::Method { class, name } => {
-                let here = crate::db::Fqcn::new(&db, class.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(class.as_ref()));
                 let (_, m) = crate::db::find_method_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = m
@@ -804,7 +806,7 @@ impl AnalysisSession {
                 })
             }
             crate::Symbol::Class(fqcn) => {
-                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn.as_ref()));
                 let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = Union::single(Atomic::TNamedObject {
@@ -818,7 +820,7 @@ impl AnalysisSession {
                 })
             }
             crate::Symbol::Property { class, name } => {
-                let here = crate::db::Fqcn::new(&db, class.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(class.as_ref()));
                 let (_, p) = crate::db::find_property_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = p.ty.clone().unwrap_or_else(Union::mixed);
@@ -829,7 +831,7 @@ impl AnalysisSession {
                 })
             }
             crate::Symbol::ClassConstant { class, name } => {
-                let here = crate::db::Fqcn::new(&db, class.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(class.as_ref()));
                 let (_, c) = crate::db::find_class_constant_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 Ok(crate::HoverInfo {
@@ -839,7 +841,7 @@ impl AnalysisSession {
                 })
             }
             crate::Symbol::GlobalConstant(fqn) => {
-                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqn.as_ref()));
                 let ty = crate::db::find_global_constant(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 Ok(crate::HoverInfo {
@@ -1138,7 +1140,7 @@ impl AnalysisSession {
                     loaded += 1;
                     // Walk the new class's parent / interfaces / traits via pull.
                     let db = self.snapshot_db();
-                    let here = crate::db::Fqcn::new(&db, Arc::<str>::from(name.as_str()));
+                    let here = crate::db::Fqcn::new(&db, Symbol::new(name.as_str()));
                     if let Some(class) = crate::db::find_class_like(&db, here) {
                         if let Some(parent) = class.parent() {
                             next.push(parent.to_string());
@@ -1242,7 +1244,7 @@ impl AnalysisSession {
     /// slow path: functions are not name-mapped to files by PSR-4.
     pub fn lookup_function_or_load(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
-        let here = crate::db::Fqcn::new(&db, std::sync::Arc::<str>::from(fqn));
+        let here = crate::db::Fqcn::new(&db, Symbol::new(fqn));
         crate::db::find_function(&db, here).is_some()
     }
 
@@ -1328,7 +1330,7 @@ impl AnalysisSession {
         }
         let mut out = Vec::new();
         for fqcn in imports.values() {
-            let here = crate::db::Fqcn::new(&db, Arc::<str>::from(fqcn.as_str()));
+            let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn.as_str()));
             if crate::db::find_class_like(&db, here).is_some() {
                 continue;
             }
@@ -1379,7 +1381,7 @@ impl AnalysisSession {
         crate::db::workspace_classes(&db)
             .iter()
             .filter_map(|fqcn| {
-                let here = crate::db::Fqcn::new(&db, fqcn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn.as_ref()));
                 crate::db::find_class_like(&db, here)
                     .map(|class| (fqcn.clone(), class.location().cloned()))
             })
@@ -1393,7 +1395,7 @@ impl AnalysisSession {
         crate::db::workspace_functions(&db)
             .iter()
             .filter_map(|fqn| {
-                let here = crate::db::Fqcn::new(&db, fqn.clone());
+                let here = crate::db::Fqcn::new(&db, Symbol::new(fqn.as_ref()));
                 crate::db::find_function(&db, here).map(|f| (fqn.clone(), f.location.clone()))
             })
             .collect()

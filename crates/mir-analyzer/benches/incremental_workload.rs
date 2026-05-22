@@ -21,6 +21,7 @@ use std::time::Duration;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
 use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer, Symbol};
+use mir_types::Symbol as MirSymbol;
 use tempfile::TempDir;
 
 // Counting allocator — global atomics updated on every alloc/dealloc.
@@ -362,7 +363,7 @@ fn bench_read_query_latency(c: &mut Criterion) {
             session.read(|db| {
                 let fqcn = mir_analyzer::db::Fqcn::new(
                     db,
-                    std::sync::Arc::from("Illuminate\\Database\\Eloquent\\Model"),
+                    MirSymbol::new("Illuminate\\Database\\Eloquent\\Model"),
                 );
                 mir_analyzer::db::find_class_like(db, fqcn).is_some()
             })

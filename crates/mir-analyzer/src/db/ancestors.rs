@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use mir_types::Symbol;
+
 use super::*;
 
 // class_ancestors tracked query — pull-only via `find_class_like`.
@@ -54,7 +56,7 @@ pub fn class_ancestors<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Ancest
         ClassLike::Interface(iface) => {
             for e in iface.extends.iter() {
                 add(e, &mut all, &mut seen);
-                let parent_fqcn = Fqcn::new(db, e.clone());
+                let parent_fqcn = Fqcn::new(db, Symbol::new(e.as_ref()));
                 for a in class_ancestors(db, parent_fqcn).0 {
                     add(&a, &mut all, &mut seen);
                 }
@@ -63,14 +65,14 @@ pub fn class_ancestors<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Ancest
         ClassLike::Class(cls) => {
             if let Some(ref p) = cls.parent {
                 add(p, &mut all, &mut seen);
-                let parent_fqcn = Fqcn::new(db, p.clone());
+                let parent_fqcn = Fqcn::new(db, Symbol::new(p.as_ref()));
                 for a in class_ancestors(db, parent_fqcn).0 {
                     add(&a, &mut all, &mut seen);
                 }
             }
             for iface in cls.interfaces.iter() {
                 add(iface, &mut all, &mut seen);
-                let iface_fqcn = Fqcn::new(db, iface.clone());
+                let iface_fqcn = Fqcn::new(db, Symbol::new(iface.as_ref()));
                 for a in class_ancestors(db, iface_fqcn).0 {
                     add(&a, &mut all, &mut seen);
                 }

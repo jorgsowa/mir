@@ -3,7 +3,7 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use crate::symbol::SymbolKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
@@ -94,7 +94,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         n.class.span,
                     );
                 } else if type_exists {
-                    let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                    let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
                     if let Some(class) = crate::db::find_class_like(self.db, here) {
                         if class.is_class() && class.is_abstract() {
                             self.emit(
@@ -116,10 +116,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                     }
-                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
                     let ctor_params = crate::db::find_method_in_chain(
                         self.db,
-                        crate::db::Fqcn::new(self.db, fqcn_arc),
+                        crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref())),
                         "__construct",
                     )
                     .map(|(_, s)| s.params.to_vec());
@@ -179,7 +178,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Check abstract for known TClassString
                 for atom in ty.types.iter() {
                     if let Atomic::TClassString(Some(fqcn)) = atom {
-                        let here = crate::db::Fqcn::new(self.db, Arc::from(fqcn.as_ref()));
+                        let here = crate::db::Fqcn::new(self.db, *fqcn);
                         let is_abstract_class = crate::db::find_class_like(self.db, here)
                             .map(|c| c.is_class() && c.is_abstract())
                             .unwrap_or(false);
@@ -434,10 +433,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
-                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
                     let prop_found: Option<Union> = crate::db::find_property_in_chain(
                         self.db,
-                        crate::db::Fqcn::new(self.db, fqcn_arc),
+                        crate::db::Fqcn::new(self.db, *fqcn),
                         prop_name,
                     )
                     .map(|(_, p)| p.ty.unwrap_or_else(Union::mixed));
@@ -475,7 +473,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     match prop_name {
                         "name" => return Union::single(Atomic::TNonEmptyString),
                         "value" => {
-                            let here = crate::db::Fqcn::new(self.db, Arc::from(fqcn.as_ref()));
+                            let here = crate::db::Fqcn::new(self.db, *fqcn);
                             if let Some(scalar_ty) = crate::db::find_class_like(self.db, here)
                                 .and_then(|c| c.enum_scalar_type().cloned())
                             {

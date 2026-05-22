@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use crate::db::MirDatabase;
+use mir_types::Symbol;
 
 /// Singleton salsa input that anchors resolver-derived tracked queries on
 /// a revision counter. The actual `Arc<dyn ClassResolver>` lives off-db
@@ -30,12 +31,11 @@ pub struct ResolverConfig {
 ///
 /// Salsa requires tracked-function arguments to be salsa structs; this
 /// gives the FQCN a stable interned identity so the resolution result can
-/// be memoized per name. Cheap to construct (`Fqcn::new(db, arc_str)`);
-/// equality is by Arc pointer or string content.
+/// be memoized per name. Cheap to construct (`Fqcn::new(db, symbol)`);
+/// equality is by ustr pointer (O(1)).
 #[salsa::interned]
 pub struct Fqcn<'db> {
-    #[returns(ref)]
-    pub name: Arc<str>,
+    pub name: Symbol,
 }
 
 /// Resolve an FQCN to its defining file path via the configured resolver.
@@ -56,7 +56,7 @@ pub fn resolve_fqcn_to_path<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> O
     let _rev = cfg.revision(db);
     let resolver = db.current_resolver()?;
     let name = fqcn.name(db);
-    let path = resolver.resolve(name)?;
+    let path = resolver.resolve(name.as_str())?;
     Some(Arc::from(path.to_string_lossy().as_ref()))
 }
 
@@ -87,7 +87,7 @@ pub fn source_file_for_fqcn<'db>(
     if let Some(sf) = index.functions.get(lower.as_str()).copied() {
         return Some(sf);
     }
-    if let Some(sf) = index.constants.get(name.as_ref()).copied() {
+    if let Some(sf) = index.constants.get(name.as_str()).copied() {
         return Some(sf);
     }
     None

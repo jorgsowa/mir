@@ -11,6 +11,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use mir_types::Symbol;
+
 use mir_analyzer::db::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn};
 use mir_analyzer::{AnalysisSession, ClassResolver, PhpVersion};
 
@@ -38,7 +40,7 @@ fn resolve_fqcn_to_path_returns_resolved_path() {
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Arc::from("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
     let path = resolve_fqcn_to_path(&db, fqcn);
     assert_eq!(path.as_deref(), Some("/proj/Foo.php"));
 }
@@ -47,7 +49,7 @@ fn resolve_fqcn_to_path_returns_resolved_path() {
 fn resolve_fqcn_to_path_returns_none_without_resolver() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Arc::from("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
     assert_eq!(resolve_fqcn_to_path(&db, fqcn), None);
 }
 
@@ -56,7 +58,7 @@ fn resolve_fqcn_to_path_returns_none_for_unknown_name() {
     let session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Arc::from("App\\Bar"));
+    let fqcn = Fqcn::new(&db, Symbol::new("App\\Bar"));
     assert_eq!(resolve_fqcn_to_path(&db, fqcn), None);
 }
 
@@ -70,7 +72,7 @@ fn source_file_for_fqcn_finds_registered_file() {
     );
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Arc::from("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
     let source_file = source_file_for_fqcn(&db, fqcn);
     assert!(
         source_file.is_some(),
@@ -87,7 +89,7 @@ fn source_file_for_fqcn_returns_none_when_unregistered() {
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Arc::from("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
     assert!(
         source_file_for_fqcn(&db, fqcn).is_none(),
         "source_file_for_fqcn must return None when the file isn't registered"

@@ -2,13 +2,11 @@
 ///
 /// Given a condition expression and a branch direction (true/false), this
 /// module updates the `Context` to narrow variable types accordingly.
-use std::sync::Arc;
-
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
 use mir_codebase::storage::AssertionKind;
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 
 use crate::context::Context;
 use crate::db::MirDatabase;
@@ -307,7 +305,7 @@ fn apply_docblock_assertions(
         .map(|s| s.to_string())
         .unwrap_or_else(|| fn_name.to_string());
     let fn_active = |name: &str| -> bool {
-        let here = crate::db::Fqcn::new(db, Arc::<str>::from(name));
+        let here = crate::db::Fqcn::new(db, Symbol::new(name));
         crate::db::find_function(db, here).is_some()
     };
     let resolved_fn_name = {
@@ -321,7 +319,7 @@ fn apply_docblock_assertions(
         }
     };
 
-    let here = crate::db::Fqcn::new(db, Arc::<str>::from(resolved_fn_name.as_str()));
+    let here = crate::db::Fqcn::new(db, Symbol::new(resolved_fn_name.as_str()));
     let Some(f) = crate::db::find_function(db, here) else {
         return false;
     };

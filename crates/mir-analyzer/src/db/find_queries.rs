@@ -17,6 +17,7 @@ use mir_codebase::storage::{
     ClassStorage, ConstantStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage,
     PropertyStorage, TraitStorage,
 };
+use mir_types::Symbol;
 
 use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile};
 
@@ -620,13 +621,13 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     let mut order = Vec::<Arc<str>>::new();
     let mut queue = std::collections::VecDeque::<Arc<str>>::new();
 
-    let initial = fqcn.name(db).clone();
+    let initial: Arc<str> = fqcn.name(db).into();
     queue.push_back(initial.clone());
     visited.insert(initial);
 
     while let Some(name) = queue.pop_front() {
         order.push(name.clone());
-        let here = Fqcn::new(db, name);
+        let here = Fqcn::new(db, Symbol::new(name.as_ref()));
         if let Some(class) = find_class_like(db, here) {
             for parent in class.ancestor_fqcns() {
                 if visited.insert(parent.clone()) {
@@ -643,7 +644,7 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
 /// `name`?". Used for magic-method dispatch checks (`__call`, `__callstatic`,
 /// `__toString`, `__invoke`, `__get`, …) where callers only need a boolean.
 pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool {
-    let here = Fqcn::new(db, Arc::<str>::from(fqcn));
+    let here = Fqcn::new(db, Symbol::new(fqcn));
     find_method_in_chain(db, here, name).is_some()
 }
 
@@ -657,7 +658,7 @@ pub fn find_method_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodStorage>)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, ancestor.clone());
+        let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
         if let Some(m) = find_method_in_class(db, here, name) {
             return Some((ancestor.clone(), m));
         }
@@ -683,10 +684,10 @@ fn find_method_in_mixins<'db>(
         if !visited.insert(mixin_fqcn.clone()) {
             continue;
         }
-        let mixin_here = Fqcn::new(db, mixin_fqcn.clone());
+        let mixin_here = Fqcn::new(db, Symbol::new(mixin_fqcn.as_ref()));
         // Walk the mixin's full inheritance chain.
         for ancestor in class_ancestors_by_fqcn(db, mixin_here).iter() {
-            let here = Fqcn::new(db, ancestor.clone());
+            let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
             if let Some(m) = find_method_in_class(db, here, name) {
                 return Some((ancestor.clone(), m));
             }
@@ -708,7 +709,7 @@ pub fn find_property_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, PropertyStorage)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, ancestor.clone());
+        let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
         if let Some(p) = find_property_in_class(db, here, name) {
             return Some((ancestor.clone(), p));
         }
@@ -725,8 +726,7 @@ pub fn is_method_concretely_implemented_pull(
     method_name: &str,
 ) -> bool {
     let lower = method_name.to_lowercase();
-    let fqcn_arc: Arc<str> = Arc::from(fqcn);
-    let here = Fqcn::new(db, fqcn_arc);
+    let here = Fqcn::new(db, Symbol::new(fqcn));
     let Some(self_class) = find_class_like(db, here) else {
         return false;
     };
@@ -734,7 +734,7 @@ pub fn is_method_concretely_implemented_pull(
         return false;
     }
     for ancestor_fqcn in class_ancestors_by_fqcn(db, here).iter() {
-        let here2 = Fqcn::new(db, ancestor_fqcn.clone());
+        let here2 = Fqcn::new(db, Symbol::new(ancestor_fqcn.as_ref()));
         let Some(class) = find_class_like(db, here2) else {
             continue;
         };
@@ -758,7 +758,7 @@ pub fn find_class_constant_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, ConstantStorage)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, ancestor.clone());
+        let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
         if let Some(c) = find_class_constant_in_class(db, here, name) {
             return Some((ancestor.clone(), c));
         }

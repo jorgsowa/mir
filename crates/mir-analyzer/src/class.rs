@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{Location as StorageLocation, Visibility};
 use mir_issues::{Issue, IssueKind, Location};
+use mir_types::Symbol;
 
 use crate::db::{class_ancestors, MirDatabase};
 
@@ -56,11 +57,7 @@ impl<'a> ClassAnalyzer<'a> {
     /// Ancestor chain for `fqcn` from the salsa db, or empty if the class
     /// isn't registered.
     fn ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        class_ancestors(
-            self.db,
-            crate::db::Fqcn::new(self.db, Arc::<str>::from(fqcn)),
-        )
-        .0
+        class_ancestors(self.db, crate::db::Fqcn::new(self.db, Symbol::new(fqcn))).0
     }
 
     /// Run all class-level checks and return every discovered issue.
@@ -70,7 +67,7 @@ impl<'a> ClassAnalyzer<'a> {
         let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::new(self.db, (*fqcn).clone());
+                let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
                 crate::db::find_class_like(self.db, here)
                     .map(|c| c.is_class())
                     .unwrap_or(false)
@@ -81,7 +78,7 @@ impl<'a> ClassAnalyzer<'a> {
         class_keys.sort();
 
         for fqcn in &class_keys {
-            let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+            let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
             let Some(class) = crate::db::find_class_like(self.db, here) else {
                 continue;
             };
@@ -102,7 +99,7 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- 1. Final-class extension check / deprecated parent check ------
             if let Some(parent_fqcn) = parent_fqcn.as_ref() {
-                let parent_here = crate::db::Fqcn::new(self.db, parent_fqcn.clone());
+                let parent_here = crate::db::Fqcn::new(self.db, Symbol::new(parent_fqcn.as_ref()));
                 let parent_pulled = crate::db::find_class_like(self.db, parent_here);
                 let parent_is_final = parent_pulled
                     .as_ref()
@@ -191,7 +188,7 @@ impl<'a> ClassAnalyzer<'a> {
         // Walk every ancestor class and collect abstract methods
         let ancestors = self.ancestors(fqcn);
         for ancestor_fqcn in &ancestors {
-            let here = crate::db::Fqcn::new(self.db, ancestor_fqcn.clone());
+            let here = crate::db::Fqcn::new(self.db, Symbol::new(ancestor_fqcn.as_ref()));
             let abstract_methods: Vec<Arc<str>> = crate::db::find_class_like(self.db, here)
                 .map(|c| {
                     c.own_methods()
@@ -252,7 +249,7 @@ impl<'a> ClassAnalyzer<'a> {
             .collect();
 
         for iface_fqcn in &all_ifaces {
-            let here = crate::db::Fqcn::new(self.db, iface_fqcn.clone());
+            let here = crate::db::Fqcn::new(self.db, Symbol::new(iface_fqcn.as_ref()));
             let method_names: Vec<Arc<str>> = match crate::db::find_class_like(self.db, here) {
                 Some(c) => c
                     .own_methods()
@@ -311,7 +308,7 @@ impl<'a> ClassAnalyzer<'a> {
         _cls_location: Option<&StorageLocation>,
         issues: &mut Vec<Issue>,
     ) {
-        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
@@ -339,7 +336,7 @@ impl<'a> ClassAnalyzer<'a> {
                 .iter()
                 .skip(1)
                 .find_map(|anc| {
-                    let here2 = crate::db::Fqcn::new(self.db, anc.clone());
+                    let here2 = crate::db::Fqcn::new(self.db, Symbol::new(anc.as_ref()));
                     crate::db::find_method_in_class(self.db, here2, method_name_lower.as_ref())
                         .map(|m| (anc.clone(), m))
                 });
@@ -610,7 +607,7 @@ impl<'a> ClassAnalyzer<'a> {
         let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::new(self.db, (*fqcn).clone());
+                let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
                 crate::db::find_class_like(self.db, here)
                     .map(|c| c.is_class())
                     .unwrap_or(false)
@@ -653,7 +650,7 @@ impl<'a> ClassAnalyzer<'a> {
                         .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
 
                     if let Some(offender) = offender {
-                        let here = crate::db::Fqcn::new(self.db, offender.clone());
+                        let here = crate::db::Fqcn::new(self.db, Symbol::new(offender.as_ref()));
                         let location: Option<StorageLocation> =
                             crate::db::find_class_like(self.db, here)
                                 .and_then(|c| c.location().cloned());
@@ -684,7 +681,7 @@ impl<'a> ClassAnalyzer<'a> {
 
                 chain.push(current.clone());
 
-                let here = crate::db::Fqcn::new(self.db, current.clone());
+                let here = crate::db::Fqcn::new(self.db, Symbol::new(current.as_ref()));
                 let parent: Option<Arc<str>> =
                     crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
@@ -711,7 +708,7 @@ impl<'a> ClassAnalyzer<'a> {
         let mut iface_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::new(self.db, (*fqcn).clone());
+                let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
                 crate::db::find_class_like(self.db, here)
                     .map(|c| c.is_interface())
                     .unwrap_or(false)
@@ -761,7 +758,7 @@ impl<'a> ClassAnalyzer<'a> {
                 .max_by(|a, b| a.as_ref().cmp(b.as_ref()));
 
             if let Some(offender) = offender {
-                let here = crate::db::Fqcn::new(self.db, offender.clone());
+                let here = crate::db::Fqcn::new(self.db, Symbol::new(offender.as_ref()));
                 let location =
                     crate::db::find_class_like(self.db, here).and_then(|c| c.location().cloned());
                 let loc = issue_location(
@@ -788,7 +785,7 @@ impl<'a> ClassAnalyzer<'a> {
         stack_set.insert(fqcn.to_string());
         in_stack.push(fqcn.clone());
 
-        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
         let extends: Vec<Arc<str>> = crate::db::find_class_like(self.db, here)
             .map(|c| c.extends().to_vec())
             .unwrap_or_default();
@@ -806,7 +803,7 @@ impl<'a> ClassAnalyzer<'a> {
         if self.analyzed_files.is_empty() {
             return true;
         }
-        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
         crate::db::find_class_like(self.db, here)
             .and_then(|c| c.location().cloned())
             .map(|loc| self.analyzed_files.contains(&loc.file))
