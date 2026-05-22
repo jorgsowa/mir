@@ -1,12 +1,16 @@
-/// Per-file analysis result cache backed by a JSON file on disk.
+/// Per-file analysis result cache backed by a binary file on disk.
 ///
 /// Cache key: file path.  Cache validity: BLAKE3 hash of file content.
 /// If the content hash matches what was stored, the cached issues are returned
 /// and Pass 2 analysis is skipped for that file.
+///
+/// Internally, path strings are mapped to compact [`FileId`] integers so the
+/// hot-path lookups (`get` / `put`) hash a `u32` instead of a full path string.
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use mir_codebase::{FileId, FileIdMap};
 use parking_lot::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -66,9 +70,12 @@ struct CacheFileView<'a> {
 /// Thread-safe, disk-backed cache for per-file analysis results.
 pub struct AnalysisCache {
     cache_dir: PathBuf,
-    entries: Mutex<HashMap<String, CacheEntry>>,
+    /// Path ↔ FileId mapping; owns the canonical string storage so entry/dep
+    /// maps can use 4-byte keys instead of heap-allocated path strings.
+    file_id_map: Mutex<FileIdMap>,
+    entries: Mutex<HashMap<FileId, CacheEntry>>,
     /// Reverse dependency graph loaded from disk (from the previous run).
-    reverse_deps: Mutex<HashMap<String, HashSet<String>>>,
+    reverse_deps: Mutex<HashMap<FileId, HashSet<FileId>>>,
     dirty: AtomicBool,
 }
 
@@ -78,11 +85,31 @@ impl AnalysisCache {
     /// the first `flush()` call.
     pub fn open(cache_dir: &Path) -> Self {
         std::fs::create_dir_all(cache_dir).ok();
-        let file = Self::load(cache_dir);
+        let disk = Self::load(cache_dir);
+
+        // Build a FileIdMap from the on-disk path strings, then convert both
+        // maps to use FileId keys for O(1) u32-hash lookups at runtime.
+        let mut id_map = FileIdMap::new();
+        let entries: HashMap<FileId, CacheEntry> = disk
+            .entries
+            .into_iter()
+            .map(|(path, entry)| (id_map.assign_or_get(&path), entry))
+            .collect();
+        let reverse_deps: HashMap<FileId, HashSet<FileId>> = disk
+            .reverse_deps
+            .into_iter()
+            .map(|(path, dep_paths)| {
+                let id = id_map.assign_or_get(&path);
+                let dep_ids = dep_paths.iter().map(|p| id_map.assign_or_get(p)).collect();
+                (id, dep_ids)
+            })
+            .collect();
+
         Self {
             cache_dir: cache_dir.to_path_buf(),
-            entries: Mutex::new(file.entries),
-            reverse_deps: Mutex::new(file.reverse_deps),
+            file_id_map: Mutex::new(id_map),
+            entries: Mutex::new(entries),
+            reverse_deps: Mutex::new(reverse_deps),
             dirty: AtomicBool::new(false),
         }
     }
@@ -105,8 +132,9 @@ impl AnalysisCache {
     /// `(symbol_key, line, col_start, col_end)` entries to replay into
     /// the salsa db via `MirDatabase::replay_reference_locations`.
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
+        let id = self.file_id_map.lock().get(file_path)?;
         let entries = self.entries.lock();
-        entries.get(file_path).and_then(|e| {
+        entries.get(&id).and_then(|e| {
             if e.content_hash == content_hash {
                 Some((e.issues.clone(), e.reference_locations.clone()))
             } else {
@@ -125,9 +153,10 @@ impl AnalysisCache {
         issues: Vec<Issue>,
         reference_locations: Vec<(String, u32, u16, u16)>,
     ) {
+        let id = self.file_id_map.lock().assign_or_get(file_path);
         let mut entries = self.entries.lock();
         entries.insert(
-            file_path.to_string(),
+            id,
             CacheEntry {
                 content_hash,
                 issues,
@@ -145,8 +174,28 @@ impl AnalysisCache {
             return;
         }
         let cache_file = self.cache_dir.join("cache.bin");
-        let entries = self.entries.lock();
-        let reverse_deps = self.reverse_deps.lock();
+        let id_map = self.file_id_map.lock();
+        let entries_guard = self.entries.lock();
+        let deps_guard = self.reverse_deps.lock();
+
+        // Resolve FileIds back to path strings for the on-disk format.
+        let entries: HashMap<String, CacheEntry> = entries_guard
+            .iter()
+            .filter_map(|(&id, entry)| id_map.path(id).map(|p| (p.to_string(), entry.clone())))
+            .collect();
+        let reverse_deps: HashMap<String, HashSet<String>> = deps_guard
+            .iter()
+            .filter_map(|(&id, dep_ids)| {
+                let path = id_map.path(id)?;
+                let dep_paths: HashSet<String> = dep_ids
+                    .iter()
+                    .filter_map(|&dep_id| id_map.path(dep_id))
+                    .map(|s| s.to_string())
+                    .collect();
+                Some((path.to_string(), dep_paths))
+            })
+            .collect();
+
         let view = CacheFileView {
             entries: &entries,
             reverse_deps: &reverse_deps,
@@ -158,7 +207,17 @@ impl AnalysisCache {
 
     /// Replace the reverse dependency graph (called after each Pass 1).
     pub fn set_reverse_deps(&self, deps: HashMap<String, HashSet<String>>) {
-        *self.reverse_deps.lock() = deps;
+        let mut id_map = self.file_id_map.lock();
+        let converted: HashMap<FileId, HashSet<FileId>> = deps
+            .into_iter()
+            .map(|(path, dep_paths)| {
+                let id = id_map.assign_or_get(&path);
+                let dep_ids = dep_paths.iter().map(|p| id_map.assign_or_get(p)).collect();
+                (id, dep_ids)
+            })
+            .collect();
+        drop(id_map);
+        *self.reverse_deps.lock() = converted;
         self.dirty.store(true, Ordering::Relaxed);
     }
 
@@ -173,18 +232,23 @@ impl AnalysisCache {
     /// Used by `AnalysisSession::ingest_file` to keep cross-file invalidation
     /// correct without rebuilding the whole graph on every edit.
     pub fn update_reverse_deps_for_file(&self, file: &str, new_targets: &HashSet<String>) {
-        let mut deps = self.reverse_deps.lock();
+        let file_id = self.file_id_map.lock().assign_or_get(file);
+        let target_ids: Vec<FileId> = {
+            let mut id_map = self.file_id_map.lock();
+            new_targets
+                .iter()
+                .map(|t| id_map.assign_or_get(t))
+                .collect()
+        };
 
+        let mut deps = self.reverse_deps.lock();
         for dependents in deps.values_mut() {
-            dependents.remove(file);
+            dependents.remove(&file_id);
         }
         deps.retain(|_, dependents| !dependents.is_empty());
-
-        for target in new_targets {
-            if target != file {
-                deps.entry(target.clone())
-                    .or_default()
-                    .insert(file.to_string());
+        for target_id in target_ids {
+            if target_id != file_id {
+                deps.entry(target_id).or_default().insert(file_id);
             }
         }
 
@@ -195,21 +259,28 @@ impl AnalysisCache {
     /// Evicts every reachable dependent's cache entry.
     /// Returns the number of entries evicted.
     pub fn evict_with_dependents(&self, changed_files: &[String]) -> usize {
+        // Resolve paths to FileIds; skip unknown files (no cache entry → nothing to evict).
+        let seed_ids: Vec<FileId> = {
+            let id_map = self.file_id_map.lock();
+            changed_files.iter().filter_map(|p| id_map.get(p)).collect()
+        };
+        if seed_ids.is_empty() {
+            return 0;
+        }
+
         // Phase 1: collect all dependents to evict via BFS (lock held only here).
-        let to_evict: Vec<String> = {
+        let to_evict: Vec<FileId> = {
             let deps = self.reverse_deps.lock();
-            let mut visited: HashSet<String> = changed_files.iter().cloned().collect();
-            let mut queue: std::collections::VecDeque<String> =
-                changed_files.iter().cloned().collect();
+            let mut visited: HashSet<FileId> = seed_ids.iter().copied().collect();
+            let mut queue: std::collections::VecDeque<FileId> = seed_ids.iter().copied().collect();
             let mut result = Vec::new();
 
-            while let Some(file) = queue.pop_front() {
-                if let Some(dependents) = deps.get(&file) {
-                    for dep in dependents {
-                        let cloned = dep.clone();
-                        if visited.insert(cloned.clone()) {
-                            queue.push_back(cloned);
-                            result.push(dep.clone());
+            while let Some(id) = queue.pop_front() {
+                if let Some(dependents) = deps.get(&id) {
+                    for &dep_id in dependents {
+                        if visited.insert(dep_id) {
+                            queue.push_back(dep_id);
+                            result.push(dep_id);
                         }
                     }
                 }
@@ -219,17 +290,25 @@ impl AnalysisCache {
 
         // Phase 2: evict (reverse_deps lock released above, entries lock taken per file).
         let count = to_evict.len();
-        for file in &to_evict {
-            self.evict(file);
+        let mut entries = self.entries.lock();
+        for id in &to_evict {
+            entries.remove(id);
+        }
+        if count > 0 {
+            self.dirty.store(true, Ordering::Relaxed);
         }
         count
     }
 
     /// Remove a single file's cache entry.
     pub fn evict(&self, file_path: &str) {
+        let Some(id) = self.file_id_map.lock().get(file_path) else {
+            return;
+        };
         let mut entries = self.entries.lock();
-        entries.remove(file_path);
-        self.dirty.store(true, Ordering::Relaxed);
+        if entries.remove(&id).is_some() {
+            self.dirty.store(true, Ordering::Relaxed);
+        }
     }
 
     // -----------------------------------------------------------------------

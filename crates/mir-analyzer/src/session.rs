@@ -16,6 +16,8 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
+use mir_codebase::{FileId, FileIdMap};
+
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
 use crate::db::{MirDatabase, MirDb, RefLoc};
@@ -46,11 +48,13 @@ pub struct AnalysisSession {
     php_version: PhpVersion,
     user_stub_files: Vec<PathBuf>,
     user_stub_dirs: Vec<PathBuf>,
+    /// Path ↔ FileId mapping shared with `reverse_dep_map`.
+    file_id_map: Arc<RwLock<FileIdMap>>,
     /// In-memory reverse dependency map: target_file → set of files that
     /// depend on it. Always maintained (not gated on disk cache presence),
     /// enabling `analyze_dependents_of` and `dependency_graph()` without a
     /// disk cache. Updated in `ingest_file` and `invalidate_file`.
-    reverse_dep_map: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+    reverse_dep_map: Arc<RwLock<HashMap<FileId, HashSet<FileId>>>>,
     /// Tracks symbols that were previously defined in a file but have since
     /// been removed (deleted or renamed). When `ingest_file` detects that
     /// a symbol disappears, it records it here so `dependency_graph()` can
@@ -96,6 +100,7 @@ impl AnalysisSession {
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
+            file_id_map: Arc::new(RwLock::new(FileIdMap::new())),
             reverse_dep_map: Arc::new(RwLock::new(HashMap::default())),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
@@ -1413,16 +1418,23 @@ impl AnalysisSession {
     /// Removes `file` from all existing entries, then adds it as a dependent of
     /// each target in `new_targets` (excluding self-edges).
     fn update_in_memory_reverse_deps(&self, file: &str, new_targets: &HashSet<String>) {
+        let file_id = self.file_id_map.write().assign_or_get(file);
+        let target_ids: Vec<FileId> = {
+            let mut id_map = self.file_id_map.write();
+            new_targets
+                .iter()
+                .map(|t| id_map.assign_or_get(t))
+                .collect()
+        };
+
         let mut map = self.reverse_dep_map.write();
         for dependents in map.values_mut() {
-            dependents.remove(file);
+            dependents.remove(&file_id);
         }
         map.retain(|_, dependents| !dependents.is_empty());
-        for target in new_targets {
-            if target != file {
-                map.entry(target.clone())
-                    .or_default()
-                    .insert(file.to_string());
+        for target_id in target_ids {
+            if target_id != file_id {
+                map.entry(target_id).or_default().insert(file_id);
             }
         }
     }
@@ -1436,24 +1448,33 @@ impl AnalysisSession {
     /// references recorded during Pass 2. For full fidelity, use
     /// `dependency_graph().transitive_dependents()` after Pass 2 is complete.
     pub fn structural_dependents_of(&self, file: &str) -> Vec<String> {
+        let Some(start_id) = self.file_id_map.read().get(file) else {
+            return Vec::new();
+        };
         let map = self.reverse_dep_map.read();
-        let mut visited: HashSet<String> = HashSet::default();
-        let mut queue = vec![file.to_string()];
-        let mut result = Vec::new();
-        while let Some(current) = queue.pop() {
-            if !visited.insert(current.clone()) {
+        let mut visited: HashSet<FileId> = HashSet::default();
+        let mut queue = vec![start_id];
+        let mut result_ids = Vec::new();
+        while let Some(current_id) = queue.pop() {
+            if !visited.insert(current_id) {
                 continue;
             }
-            if let Some(deps) = map.get(&current) {
-                for dep in deps {
-                    if !visited.contains(dep) {
-                        queue.push(dep.clone());
-                        result.push(dep.clone());
+            if let Some(deps) = map.get(&current_id) {
+                for &dep_id in deps {
+                    if !visited.contains(&dep_id) {
+                        queue.push(dep_id);
+                        result_ids.push(dep_id);
                     }
                 }
             }
         }
-        result
+        drop(map);
+        let id_map = self.file_id_map.read();
+        result_ids
+            .iter()
+            .filter_map(|&id| id_map.path(id))
+            .map(|s| s.to_string())
+            .collect()
     }
 
     /// File dependency graph: which files depend on which other files.
@@ -1512,9 +1533,18 @@ impl AnalysisSession {
         // and type-hint-only references that never appear in file_referenced_symbols.
         // Together they give a complete picture without requiring Pass 2 on every file.
         {
+            let id_map = self.file_id_map.read();
             let rev = self.reverse_dep_map.read();
-            for (target, dep_set) in rev.iter() {
-                for dep in dep_set {
+            for (&target_id, dep_set) in rev.iter() {
+                let Some(target) = id_map.path(target_id) else {
+                    continue;
+                };
+                let target = target.to_string();
+                for &dep_id in dep_set {
+                    let Some(dep) = id_map.path(dep_id) else {
+                        continue;
+                    };
+                    let dep = dep.to_string();
                     if dep != target {
                         dependents
                             .entry(target.clone())
