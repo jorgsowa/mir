@@ -137,22 +137,22 @@ impl AnalysisCache {
         self.dirty.store(true, Ordering::Relaxed);
     }
 
-    /// Persist the in-memory cache to `{cache_dir}/cache.json`.
+    /// Persist the in-memory cache to `{cache_dir}/cache.bin`.
     /// This is a no-op if nothing changed since the last flush.
     pub fn flush(&self) {
         let was_dirty = self.dirty.swap(false, Ordering::Relaxed);
         if !was_dirty {
             return;
         }
-        let cache_file = self.cache_dir.join("cache.json");
+        let cache_file = self.cache_dir.join("cache.bin");
         let entries = self.entries.lock();
         let reverse_deps = self.reverse_deps.lock();
         let view = CacheFileView {
             entries: &entries,
             reverse_deps: &reverse_deps,
         };
-        if let Ok(json) = serde_json::to_string(&view) {
-            std::fs::write(cache_file, json).ok();
+        if let Ok(bytes) = bincode::serialize(&view) {
+            std::fs::write(cache_file, bytes).ok();
         }
     }
 
@@ -235,11 +235,19 @@ impl AnalysisCache {
     // -----------------------------------------------------------------------
 
     fn load(cache_dir: &Path) -> CacheFile {
-        let cache_file = cache_dir.join("cache.json");
-        let Ok(bytes) = std::fs::read(&cache_file) else {
-            return CacheFile::default();
-        };
-        serde_json::from_slice(&bytes).unwrap_or_default()
+        // Primary: bincode format
+        if let Ok(bytes) = std::fs::read(cache_dir.join("cache.bin")) {
+            if let Ok(file) = bincode::deserialize::<CacheFile>(&bytes) {
+                return file;
+            }
+        }
+        // Fallback: legacy JSON format (migrate on next flush)
+        if let Ok(bytes) = std::fs::read(cache_dir.join("cache.json")) {
+            if let Ok(file) = serde_json::from_slice::<CacheFile>(&bytes) {
+                return file;
+            }
+        }
+        CacheFile::default()
     }
 }
 
