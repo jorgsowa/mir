@@ -293,8 +293,7 @@ impl Context {
     }
 
     /// Set the type of a variable and mark it as assigned.
-    pub fn set_var(&mut self, name: impl Into<String>, ty: Union) {
-        let name: String = name.into();
+    pub fn set_var(&mut self, name: &str, ty: Union) {
         let name = Symbol::from(name.trim_start_matches('$'));
         self.vars.insert(name, ty);
         self.assigned_vars.insert(name);

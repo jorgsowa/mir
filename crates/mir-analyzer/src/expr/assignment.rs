@@ -94,7 +94,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if ctx.byref_param_names.contains(&name_sym) {
                     ctx.read_vars.insert(name_sym);
                 }
-                ctx.set_var(name_str.clone(), ty);
+                ctx.set_var(&name_str, ty);
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(target.span.end);
                 ctx.record_var_location(&name_str, line, col_start, line_end, col_end);
@@ -227,7 +227,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let var_ty = ctx.get_var(&var_name);
                     for atomic in &var_ty.types {
                         if let Atomic::TLiteralString(accessed_var_name) = atomic {
-                            ctx.set_var(accessed_var_name.to_string(), ty.clone());
+                            ctx.set_var(accessed_var_name.as_ref(), ty.clone());
                             let (line, col_start) = self.offset_to_line_col(target.span.start);
                             let (line_end, col_end) = self.offset_to_line_col(target.span.end);
                             ctx.record_var_location(

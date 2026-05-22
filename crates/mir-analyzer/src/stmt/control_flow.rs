@@ -220,7 +220,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
-                entry.set_var(var_name, key_ty.clone());
+                entry.set_var(&var_name, key_ty.clone());
             }
         }
         let value_var = extract_simple_var(&fe.value);
@@ -240,7 +240,7 @@ impl<'a> StatementsAnalyzer<'a> {
             |sa, iter| {
                 if let Some(key_expr) = &fe.key {
                     if let Some(var_name) = extract_simple_var(key_expr) {
-                        iter.set_var(var_name, key_ty.clone());
+                        iter.set_var(&var_name, key_ty.clone());
                     }
                 }
                 if let Some(ref vname) = value_var {

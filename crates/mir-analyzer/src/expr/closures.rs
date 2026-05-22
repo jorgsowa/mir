@@ -159,7 +159,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
         for (name, ty) in &ctx.vars {
             if !arrow_ctx.vars.contains_key(name) {
-                arrow_ctx.set_var(*name, ty.clone());
+                arrow_ctx.set_var(name.as_str(), ty.clone());
             }
         }
 
