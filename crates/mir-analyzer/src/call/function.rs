@@ -189,18 +189,18 @@ impl CallAnalyzer {
             }
         }
 
-        let arg_types: Vec<Union> = call
-            .args
-            .iter()
-            .map(|arg| {
-                let ty = ea.analyze(&arg.value, ctx);
-                if arg.unpack {
-                    spread_element_type(&ty)
-                } else {
-                    ty
-                }
-            })
-            .collect();
+        let mut arg_types = super::ARG_TYPES_BUF
+            .with(|b| b.borrow_mut().take())
+            .unwrap_or_default();
+        arg_types.clear();
+        for arg in call.args.iter() {
+            let ty = ea.analyze(&arg.value, ctx);
+            arg_types.push(if arg.unpack {
+                spread_element_type(&ty)
+            } else {
+                ty
+            });
+        }
 
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
@@ -349,6 +349,13 @@ impl CallAnalyzer {
             } else {
                 None
             };
+
+            super::ARG_TYPES_BUF.with(|b| {
+                let mut g = b.borrow_mut();
+                if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {
+                    *g = Some(arg_types);
+                }
+            });
 
             for assertion in resolved
                 .assertions

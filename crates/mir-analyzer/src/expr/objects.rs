@@ -45,18 +45,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         call_span: php_ast::Span,
         ctx: &mut Context,
     ) -> Union {
-        let arg_types: Vec<Union> = n
-            .args
-            .iter()
-            .map(|a| {
-                let ty = self.analyze(&a.value, ctx);
-                if a.unpack {
-                    crate::call::spread_element_type(&ty)
-                } else {
-                    ty
-                }
-            })
-            .collect();
+        let mut arg_types = crate::call::ARG_TYPES_BUF
+            .with(|b| b.borrow_mut().take())
+            .unwrap_or_default();
+        arg_types.clear();
+        for a in n.args.iter() {
+            let ty = self.analyze(&a.value, ctx);
+            arg_types.push(if a.unpack {
+                crate::call::spread_element_type(&ty)
+            } else {
+                ty
+            });
+        }
         let arg_spans: Vec<php_ast::Span> = n.args.iter().map(|a| a.span).collect();
         let arg_names: Vec<Option<String>> = n
             .args
@@ -139,6 +139,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 }
+                crate::call::ARG_TYPES_BUF.with(|b| {
+                    let mut g = b.borrow_mut();
+                    if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {
+                        *g = Some(arg_types);
+                    }
+                });
                 let ty = Union::single(Atomic::TNamedObject {
                     fqcn: mir_types::Symbol::from(fqcn.as_ref()),
                     type_params: vec![],
