@@ -27,7 +27,7 @@ fn method_chain_signature(
     fqcn: &str,
     method_name: &str,
 ) -> (
-    Vec<mir_codebase::storage::FnParam>,
+    Arc<[mir_codebase::storage::FnParam]>,
     Option<Union>,
     Vec<mir_codebase::storage::TemplateParam>,
     Arc<[Arc<str>]>,
@@ -37,13 +37,13 @@ fn method_chain_signature(
         crate::db::find_method_in_chain(db, crate::db::Fqcn::new(db, fqcn_arc), method_name)
     {
         return (
-            storage.params.to_vec(),
+            Arc::clone(&storage.params),
             storage.return_type.as_deref().cloned(),
             storage.template_params.clone(),
-            Arc::from(storage.throws.clone()),
+            Arc::from(storage.throws.as_slice()),
         );
     }
-    (vec![], None, vec![], Arc::from([]))
+    (Arc::from([]), None, vec![], Arc::from([]))
 }
 
 /// Resolve a function declaration's storage via the salsa pull path
@@ -527,8 +527,9 @@ impl<'a> Pass2Driver<'a> {
 
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
+        #[allow(clippy::type_complexity)]
         let (params, return_ty, template_params, declared_throws): (
-            Vec<mir_codebase::FnParam>,
+            Arc<[mir_codebase::FnParam]>,
             _,
             Vec<_>,
             Arc<[Arc<str>]>,
@@ -542,14 +543,14 @@ impl<'a> Pass2Driver<'a> {
                         .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
                 {
                     (
-                        storage.params.to_vec(),
+                        Arc::clone(&storage.params),
                         storage.return_type.as_deref().cloned(),
                         storage.template_params.clone(),
-                        Arc::from(storage.throws.clone()),
+                        Arc::from(storage.throws.as_slice()),
                     )
                 } else {
                     (
-                        ast_derived_fn_params(&decl.params),
+                        Arc::from(ast_derived_fn_params(&decl.params)),
                         None,
                         vec![],
                         Arc::from([]),
@@ -557,7 +558,7 @@ impl<'a> Pass2Driver<'a> {
                 }
             }
             None => (
-                ast_derived_fn_params(&decl.params),
+                Arc::from(ast_derived_fn_params(&decl.params)),
                 None,
                 vec![],
                 Arc::from([]),
@@ -775,27 +776,38 @@ impl<'a> Pass2Driver<'a> {
 
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
-        let (params, return_ty, declared_throws): (Vec<mir_codebase::FnParam>, _, Arc<[Arc<str>]>) =
-            match &resolved {
-                Some((_, storage)) => {
-                    if storage.params.len() == decl.params.len()
-                        && storage
-                            .params
-                            .iter()
-                            .zip(decl.params.iter())
-                            .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
-                    {
-                        (
-                            storage.params.to_vec(),
-                            storage.return_type.as_deref().cloned(),
-                            Arc::from(storage.throws.clone()),
-                        )
-                    } else {
-                        (ast_derived_fn_params(&decl.params), None, Arc::from([]))
-                    }
+        let (params, return_ty, declared_throws): (
+            Arc<[mir_codebase::FnParam]>,
+            _,
+            Arc<[Arc<str>]>,
+        ) = match &resolved {
+            Some((_, storage)) => {
+                if storage.params.len() == decl.params.len()
+                    && storage
+                        .params
+                        .iter()
+                        .zip(decl.params.iter())
+                        .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref())
+                {
+                    (
+                        Arc::clone(&storage.params),
+                        storage.return_type.as_deref().cloned(),
+                        Arc::from(storage.throws.as_slice()),
+                    )
+                } else {
+                    (
+                        Arc::from(ast_derived_fn_params(&decl.params)),
+                        None,
+                        Arc::from([]),
+                    )
                 }
-                None => (ast_derived_fn_params(&decl.params), None, Arc::from([])),
-            };
+            }
+            None => (
+                Arc::from(ast_derived_fn_params(&decl.params)),
+                None,
+                Arc::from([]),
+            ),
+        };
 
         let mut ctx = Context::for_function(
             &params,
