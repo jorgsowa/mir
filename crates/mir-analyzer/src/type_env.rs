@@ -14,11 +14,11 @@ pub enum ScopeId {
 #[derive(Debug)]
 pub struct TypeEnv {
     #[allow(dead_code)]
-    vars: im::HashMap<Symbol, Union>,
+    vars: rustc_hash::FxHashMap<Symbol, Union>,
 }
 
 impl TypeEnv {
-    pub(crate) fn new(vars: im::HashMap<Symbol, Union>) -> Self {
+    pub(crate) fn new(vars: rustc_hash::FxHashMap<Symbol, Union>) -> Self {
         Self { vars }
     }
 

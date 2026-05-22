@@ -11,7 +11,7 @@ use mir_types::{Symbol, Union};
 #[derive(Debug, Clone)]
 pub struct Context {
     /// Types of variables at this point in execution.
-    pub vars: im::HashMap<Symbol, Union>,
+    pub vars: FxHashMap<Symbol, Union>,
 
     /// Variables that are definitely assigned at this point.
     pub assigned_vars: FxHashSet<Symbol>,
@@ -80,7 +80,7 @@ pub struct Context {
 impl Context {
     pub fn new() -> Self {
         let mut ctx = Self {
-            vars: im::HashMap::new(),
+            vars: FxHashMap::default(),
             assigned_vars: FxHashSet::default(),
             possibly_assigned_vars: FxHashSet::default(),
             self_fqcn: None,

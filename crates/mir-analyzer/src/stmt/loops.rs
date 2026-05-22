@@ -30,8 +30,8 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Union) -> bool {
 /// Returns true when every variable present in `prev` has the same type in
 /// `next`, indicating the fixed-point has been reached.
 pub(super) fn vars_stabilized(
-    prev: &im::HashMap<Symbol, Union>,
-    next: &im::HashMap<Symbol, Union>,
+    prev: &rustc_hash::FxHashMap<Symbol, Union>,
+    next: &rustc_hash::FxHashMap<Symbol, Union>,
 ) -> bool {
     if prev.len() != next.len() {
         return false;
@@ -47,8 +47,8 @@ pub(super) fn vars_stabilized(
 /// variables that are new in the loop (only in current, not in pre) won't be
 /// merged with null/undefined, since the loop will definitely assign them.
 pub(super) fn widen_unstable(
-    pre_vars: &im::HashMap<Symbol, Union>,
-    current_vars: &mut im::HashMap<Symbol, Union>,
+    pre_vars: &rustc_hash::FxHashMap<Symbol, Union>,
+    current_vars: &mut rustc_hash::FxHashMap<Symbol, Union>,
     loop_guaranteed: bool,
 ) {
     for (name, ty) in current_vars.iter_mut() {
