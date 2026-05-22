@@ -225,7 +225,8 @@ pub fn narrow_from_condition(
                         // remove null; mark as definitely assigned
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
-                        ctx.assigned_vars.insert(var_name);
+                        ctx.assigned_vars
+                            .insert(mir_types::Symbol::from(var_name.as_str()));
                     }
                 }
             }
@@ -444,7 +445,7 @@ fn narrow_instanceof_preserving_subtypes(
     current: &Union,
     class_name: &str,
     db: &dyn MirDatabase,
-    template_param_names: &rustc_hash::FxHashSet<String>,
+    template_param_names: &rustc_hash::FxHashSet<mir_types::Symbol>,
 ) -> Union {
     let narrowed_ty = Atomic::TNamedObject {
         fqcn: class_name.into(),
@@ -474,7 +475,7 @@ fn narrow_instanceof_preserving_subtypes(
             Atomic::TNamedObject { fqcn, type_params }
                 if type_params.is_empty()
                     && !fqcn.contains('\\')
-                    && template_param_names.contains(fqcn.as_ref()) =>
+                    && template_param_names.contains(fqcn) =>
             {
                 // Keep the template parameter in the result — it will be constrained by the instanceof check
                 result.add_type(narrowed_ty.clone());

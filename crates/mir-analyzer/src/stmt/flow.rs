@@ -367,7 +367,8 @@ impl<'a> StatementsAnalyzer<'a> {
                     .global_var_type(var_name)
                     .unwrap_or_else(Union::mixed);
                 ctx.set_var(var_name, ty);
-                ctx.byref_param_names.insert(var_name.to_string());
+                ctx.byref_param_names
+                    .insert(mir_types::Symbol::from(var_name));
                 let (line, col_start) = self.offset_to_line_col(var.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(var.span.end);
                 ctx.record_var_location(var_name, line, col_start, line_end, col_end);

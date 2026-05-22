@@ -239,7 +239,7 @@ impl CallAnalyzer {
         if fn_name == "compact" {
             for arg in call.args.iter() {
                 if let ExprKind::String(name) = &arg.value.kind {
-                    ctx.read_vars.insert(name.as_ref().to_string());
+                    ctx.read_vars.insert(mir_types::Symbol::from(name.as_ref()));
                 }
             }
         }

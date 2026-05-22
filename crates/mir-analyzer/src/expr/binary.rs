@@ -34,12 +34,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let _right_ty = self.analyze(&b.right, &mut right_ctx);
             }
             for v in right_ctx.read_vars {
-                ctx.read_vars.insert(v.clone());
+                ctx.read_vars.insert(v);
             }
             for (name, ty) in &right_ctx.vars {
-                if !ctx.vars.contains_key(name.as_str()) {
-                    ctx.vars.insert(name.clone(), ty.clone());
-                    ctx.possibly_assigned_vars.insert(name.clone());
+                if !ctx.vars.contains_key(name) {
+                    ctx.vars.insert(*name, ty.clone());
+                    ctx.possibly_assigned_vars.insert(*name);
                 }
             }
             return Union::single(Atomic::TBool);

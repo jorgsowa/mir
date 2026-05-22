@@ -356,9 +356,13 @@ pub(crate) fn emit_unused_params(
     }
     for p in params {
         let name = p.name.as_ref().trim_start_matches('$');
-        if !ctx.read_vars.contains(name) {
-            let (line, col_start, line_end, col_end) =
-                ctx.var_locations.get(name).copied().unwrap_or((1, 0, 1, 0));
+        let name_sym = mir_types::Symbol::from(name);
+        if !ctx.read_vars.contains(&name_sym) {
+            let (line, col_start, line_end, col_end) = ctx
+                .var_locations
+                .get(&name_sym)
+                .copied()
+                .unwrap_or((1, 0, 1, 0));
             issues.push(
                 mir_issues::Issue::new(
                     mir_issues::IssueKind::UnusedParam {
@@ -400,13 +404,12 @@ pub(crate) fn emit_unused_variables(
             continue;
         }
         if !ctx.read_vars.contains(name) {
-            let (line, col_start, line_end, col_end) = ctx
-                .var_locations
-                .get(name.as_str())
-                .copied()
-                .unwrap_or((1, 0, 1, 0));
+            let (line, col_start, line_end, col_end) =
+                ctx.var_locations.get(name).copied().unwrap_or((1, 0, 1, 0));
             issues.push(mir_issues::Issue::new(
-                mir_issues::IssueKind::UnusedVariable { name: name.clone() },
+                mir_issues::IssueKind::UnusedVariable {
+                    name: name.to_string(),
+                },
                 mir_issues::Location {
                     file: file.clone(),
                     line,

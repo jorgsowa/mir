@@ -90,8 +90,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         match &target.kind {
             ExprKind::Variable(name) => {
                 let name_str = name.trim_start_matches('$').to_string();
-                if ctx.byref_param_names.contains(&name_str) {
-                    ctx.read_vars.insert(name_str.clone());
+                let name_sym = mir_types::Symbol::from(name_str.as_str());
+                if ctx.byref_param_names.contains(&name_sym) {
+                    ctx.read_vars.insert(name_sym);
                 }
                 ctx.set_var(name_str.clone(), ty);
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
@@ -188,14 +189,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ExprKind::Variable(name) => {
                             let name_str = name.trim_start_matches('$');
                             if !ctx.var_is_defined(name_str) {
+                                let name_sym = mir_types::Symbol::from(name_str);
                                 ctx.vars.insert(
-                                    name_str.to_string(),
+                                    name_sym,
                                     Union::single(Atomic::TArray {
                                         key: Box::new(Union::mixed()),
                                         value: Box::new(ty.clone()),
                                     }),
                                 );
-                                ctx.assigned_vars.insert(name_str.to_string());
+                                ctx.assigned_vars.insert(name_sym);
                                 let (line, col_start) = self.offset_to_line_col(base.span.start);
                                 let (line_end, col_end) = self.offset_to_line_col(base.span.end);
                                 ctx.record_var_location(
@@ -220,7 +222,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             ExprKind::VariableVariable(inner) => {
                 if let Some(var_name) = extract_simple_var(inner) {
-                    ctx.read_vars.insert(var_name.clone());
+                    ctx.read_vars
+                        .insert(mir_types::Symbol::from(var_name.as_str()));
                     let var_ty = ctx.get_var(&var_name);
                     for atomic in &var_ty.types {
                         if let Atomic::TLiteralString(accessed_var_name) = atomic {

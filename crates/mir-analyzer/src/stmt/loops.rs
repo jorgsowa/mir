@@ -1,5 +1,4 @@
-use indexmap::IndexMap;
-use mir_types::{ArrayKey, Atomic, Union};
+use mir_types::{ArrayKey, Atomic, Symbol, Union};
 
 // ---------------------------------------------------------------------------
 // Loop execution guarantees
@@ -31,8 +30,8 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Union) -> bool {
 /// Returns true when every variable present in `prev` has the same type in
 /// `next`, indicating the fixed-point has been reached.
 pub(super) fn vars_stabilized(
-    prev: &IndexMap<String, Union>,
-    next: &IndexMap<String, Union>,
+    prev: &im::HashMap<Symbol, Union>,
+    next: &im::HashMap<Symbol, Union>,
 ) -> bool {
     if prev.len() != next.len() {
         return false;
@@ -48,8 +47,8 @@ pub(super) fn vars_stabilized(
 /// variables that are new in the loop (only in current, not in pre) won't be
 /// merged with null/undefined, since the loop will definitely assign them.
 pub(super) fn widen_unstable(
-    pre_vars: &IndexMap<String, Union>,
-    current_vars: &mut IndexMap<String, Union>,
+    pre_vars: &im::HashMap<Symbol, Union>,
+    current_vars: &mut im::HashMap<Symbol, Union>,
     loop_guaranteed: bool,
 ) {
     for (name, ty) in current_vars.iter_mut() {

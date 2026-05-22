@@ -38,7 +38,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             }
         }
-        ctx.read_vars.insert(name_str.to_string());
+        ctx.read_vars.insert(mir_types::Symbol::from(name_str));
         let ty = if name_str == "this" && !ctx.var_is_defined("this") {
             Union::never()
         } else {
@@ -55,10 +55,12 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_variable_variable(&mut self, inner: &Expr, ctx: &mut Context) -> Union {
         let inner_ty = self.analyze(inner, ctx);
         if let Some(var_name) = extract_simple_var(inner) {
-            ctx.read_vars.insert(var_name.clone());
+            ctx.read_vars
+                .insert(mir_types::Symbol::from(var_name.as_str()));
             for atomic in &inner_ty.types {
                 if let Atomic::TLiteralString(accessed_var_name) = atomic {
-                    ctx.read_vars.insert(accessed_var_name.to_string());
+                    ctx.read_vars
+                        .insert(mir_types::Symbol::from(accessed_var_name.as_ref()));
                 }
             }
         }

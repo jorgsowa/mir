@@ -1,6 +1,5 @@
 // crates/mir-analyzer/src/type_env.rs
-use indexmap::IndexMap;
-use mir_types::Union;
+use mir_types::{Symbol, Union};
 use std::sync::Arc;
 
 /// Identifies a single analysis scope within a project.
@@ -15,18 +14,19 @@ pub enum ScopeId {
 #[derive(Debug)]
 pub struct TypeEnv {
     #[allow(dead_code)]
-    vars: IndexMap<String, Union>,
+    vars: im::HashMap<Symbol, Union>,
 }
 
 impl TypeEnv {
-    pub(crate) fn new(vars: IndexMap<String, Union>) -> Self {
+    pub(crate) fn new(vars: im::HashMap<Symbol, Union>) -> Self {
         Self { vars }
     }
 
     /// Returns the inferred type of `$name`, or `None` if the variable was not tracked.
     #[allow(dead_code)]
     pub fn get_var(&self, name: &str) -> Option<&Union> {
-        self.vars.get(name)
+        let sym = Symbol::from(name);
+        self.vars.get(&sym)
     }
 
     /// Iterates over all variable names tracked in this scope.

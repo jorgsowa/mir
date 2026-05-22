@@ -65,7 +65,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 closure_ctx.taint_var(name);
             }
             // Mark the captured variable as read in the parent context
-            ctx.read_vars.insert(name.to_string());
+            ctx.read_vars.insert(mir_types::Symbol::from(name));
         }
 
         let mut sa = crate::stmt::StatementsAnalyzer::new(
@@ -85,7 +85,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // mark that variable as read in the outer context to suppress false UnusedParam.
         for name in &closure_ctx.read_vars {
             if ctx.var_is_defined(name) || ctx.var_possibly_defined(name) {
-                ctx.read_vars.insert(name.clone());
+                ctx.read_vars.insert(*name);
             }
         }
 
@@ -159,13 +159,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
         for (name, ty) in &ctx.vars {
             if !arrow_ctx.vars.contains_key(name) {
-                arrow_ctx.set_var(name, ty.clone());
+                arrow_ctx.set_var(*name, ty.clone());
             }
         }
 
         let inferred_return = self.analyze(&af.body, &mut arrow_ctx);
         for name in &arrow_ctx.read_vars {
-            ctx.read_vars.insert(name.clone());
+            ctx.read_vars.insert(*name);
         }
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);

@@ -1,9 +1,8 @@
 /// Analysis context — carries type state through statement/expression analysis.
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-use indexmap::IndexMap;
-use mir_types::Union;
+use mir_types::{Symbol, Union};
 
 // ---------------------------------------------------------------------------
 // Context
@@ -12,13 +11,13 @@ use mir_types::Union;
 #[derive(Debug, Clone)]
 pub struct Context {
     /// Types of variables at this point in execution.
-    pub vars: IndexMap<String, Union>,
+    pub vars: im::HashMap<Symbol, Union>,
 
     /// Variables that are definitely assigned at this point.
-    pub assigned_vars: HashSet<String>,
+    pub assigned_vars: FxHashSet<Symbol>,
 
     /// Variables that *might* be assigned (e.g. only in one if branch).
-    pub possibly_assigned_vars: HashSet<String>,
+    pub possibly_assigned_vars: FxHashSet<Symbol>,
 
     /// The class in whose body we are analysing (`self`).
     pub self_fqcn: Option<Arc<str>>,
@@ -49,19 +48,19 @@ pub struct Context {
 
     /// Variables that carry tainted (user-controlled) values at this point.
     /// Used by taint analysis (M19).
-    pub tainted_vars: HashSet<String>,
+    pub tainted_vars: FxHashSet<Symbol>,
 
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection (M18).
-    pub read_vars: HashSet<String>,
+    pub read_vars: FxHashSet<Symbol>,
 
     /// Names of function/method parameters in this scope (stripped of `$`).
     /// Used to exclude parameters from UnusedVariable detection.
-    pub param_names: HashSet<String>,
+    pub param_names: FxHashSet<Symbol>,
 
     /// Names of by-reference parameters in this scope (stripped of `$`).
     /// Assigning to these is externally observable, so it counts as usage.
-    pub byref_param_names: HashSet<String>,
+    pub byref_param_names: FxHashSet<Symbol>,
 
     /// Whether every execution path through this context has diverged
     /// (returned, thrown, or exited). Used to detect "all catch branches
@@ -71,19 +70,19 @@ pub struct Context {
 
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
-    pub var_locations: HashMap<String, (u32, u16, u32, u16)>,
+    pub var_locations: FxHashMap<Symbol, (u32, u16, u32, u16)>,
 
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
-    pub template_param_names: HashSet<String>,
+    pub template_param_names: FxHashSet<Symbol>,
 }
 
 impl Context {
     pub fn new() -> Self {
         let mut ctx = Self {
-            vars: IndexMap::new(),
-            assigned_vars: HashSet::default(),
-            possibly_assigned_vars: HashSet::default(),
+            vars: im::HashMap::new(),
+            assigned_vars: FxHashSet::default(),
+            possibly_assigned_vars: FxHashSet::default(),
             self_fqcn: None,
             parent_fqcn: None,
             static_fqcn: None,
@@ -93,21 +92,22 @@ impl Context {
             inside_finally: false,
             inside_constructor: false,
             strict_types: false,
-            tainted_vars: HashSet::default(),
-            read_vars: HashSet::default(),
-            param_names: HashSet::default(),
-            byref_param_names: HashSet::default(),
+            tainted_vars: FxHashSet::default(),
+            read_vars: FxHashSet::default(),
+            param_names: FxHashSet::default(),
+            byref_param_names: FxHashSet::default(),
             diverges: false,
-            var_locations: HashMap::default(),
-            template_param_names: HashSet::default(),
+            var_locations: FxHashMap::default(),
+            template_param_names: FxHashSet::default(),
         };
         // PHP superglobals — always in scope in any context
         for sg in &[
             "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
             "GLOBALS",
         ] {
-            ctx.vars.insert(sg.to_string(), mir_types::Union::mixed());
-            ctx.assigned_vars.insert(sg.to_string());
+            let sym = Symbol::from(*sg);
+            ctx.vars.insert(sym, mir_types::Union::mixed());
+            ctx.assigned_vars.insert(sym);
         }
         ctx
     }
@@ -188,13 +188,13 @@ impl Context {
         ctx.inside_constructor = inside_constructor;
 
         // Build a map of template names to their bounds for parameter type resolution
-        let mut template_bounds_map: rustc_hash::FxHashMap<String, Union> =
-            rustc_hash::FxHashMap::default();
+        let mut template_bounds_map: FxHashMap<Symbol, Union> = FxHashMap::default();
         if let Some(templates) = template_params {
             for tp in templates {
-                ctx.template_param_names.insert(tp.name.to_string());
+                let tp_sym = Symbol::from(tp.name.as_ref());
+                ctx.template_param_names.insert(tp_sym);
                 if let Some(bound) = &tp.bound {
-                    template_bounds_map.insert(tp.name.to_string(), bound.clone());
+                    template_bounds_map.insert(tp_sym, bound.clone());
                 }
             }
         }
@@ -213,7 +213,7 @@ impl Context {
                     mir_types::Atomic::TNamedObject { fqcn, type_params }
                         if type_params.is_empty() && !fqcn.contains('\\') =>
                     {
-                        if let Some(bound) = template_bounds_map.get(fqcn.as_ref()) {
+                        if let Some(bound) = template_bounds_map.get(fqcn) {
                             elem_ty = bound.clone();
                         }
                     }
@@ -248,10 +248,10 @@ impl Context {
             } else {
                 elem_ty
             };
-            let name = p.name.as_ref().trim_start_matches('$').to_string();
-            ctx.vars.insert(name.clone(), ty);
-            ctx.assigned_vars.insert(name.clone());
-            ctx.param_names.insert(name.clone());
+            let name = Symbol::from(p.name.as_ref().trim_start_matches('$'));
+            ctx.vars.insert(name, ty);
+            ctx.assigned_vars.insert(name);
+            ctx.param_names.insert(name);
             if p.is_byref {
                 ctx.byref_param_names.insert(name);
             }
@@ -265,8 +265,9 @@ impl Context {
                     fqcn: mir_types::Symbol::from(fqcn.as_ref()),
                     type_params: mir_types::union::empty_type_params(),
                 });
-                ctx.vars.insert("this".to_string(), this_ty);
-                ctx.assigned_vars.insert("this".to_string());
+                let this_sym = Symbol::from("this");
+                ctx.vars.insert(this_sym, this_ty);
+                ctx.assigned_vars.insert(this_sym);
             }
         }
 
@@ -275,40 +276,40 @@ impl Context {
 
     /// Get the type of a variable. Returns `mixed` if not found.
     pub fn get_var(&self, name: &str) -> Union {
-        let name = name.trim_start_matches('$');
-        self.vars.get(name).cloned().unwrap_or_else(Union::mixed)
+        let sym = Symbol::from(name.trim_start_matches('$'));
+        self.vars.get(&sym).cloned().unwrap_or_else(Union::mixed)
     }
 
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: impl Into<String>, ty: Union) {
         let name: String = name.into();
-        let name = name.trim_start_matches('$').to_string();
-        self.vars.insert(name.clone(), ty);
+        let name = Symbol::from(name.trim_start_matches('$'));
+        self.vars.insert(name, ty);
         self.assigned_vars.insert(name);
     }
 
     /// Check if a variable is definitely in scope.
     pub fn var_is_defined(&self, name: &str) -> bool {
-        let name = name.trim_start_matches('$');
-        self.assigned_vars.contains(name)
+        let sym = Symbol::from(name.trim_start_matches('$'));
+        self.assigned_vars.contains(&sym)
     }
 
     /// Check if a variable might be defined (but not certainly).
     pub fn var_possibly_defined(&self, name: &str) -> bool {
-        let name = name.trim_start_matches('$');
-        self.assigned_vars.contains(name) || self.possibly_assigned_vars.contains(name)
+        let sym = Symbol::from(name.trim_start_matches('$'));
+        self.assigned_vars.contains(&sym) || self.possibly_assigned_vars.contains(&sym)
     }
 
     /// Mark a variable as carrying tainted (user-controlled) data.
     pub fn taint_var(&mut self, name: &str) {
-        let name = name.trim_start_matches('$').to_string();
+        let name = Symbol::from(name.trim_start_matches('$'));
         self.tainted_vars.insert(name);
     }
 
     /// Returns true if the variable is known to carry tainted data.
     pub fn is_tainted(&self, name: &str) -> bool {
-        let name = name.trim_start_matches('$');
-        self.tainted_vars.contains(name)
+        let sym = Symbol::from(name.trim_start_matches('$'));
+        self.tainted_vars.contains(&sym)
     }
 
     /// Record the location of the first assignment to a variable (first-write-wins).
@@ -320,18 +321,18 @@ impl Context {
         line_end: u32,
         col_end: u16,
     ) {
-        let name = name.trim_start_matches('$');
+        let name = Symbol::from(name.trim_start_matches('$'));
         self.var_locations
-            .entry(name.to_string())
+            .entry(name)
             .or_insert((line, col_start, line_end, col_end));
     }
 
     /// Remove a variable from the context (after `unset`).
     pub fn unset_var(&mut self, name: &str) {
-        let name = name.trim_start_matches('$');
-        self.vars.shift_remove(name);
-        self.assigned_vars.remove(name);
-        self.possibly_assigned_vars.remove(name);
+        let sym = Symbol::from(name.trim_start_matches('$'));
+        self.vars.remove(&sym);
+        self.assigned_vars.remove(&sym);
+        self.possibly_assigned_vars.remove(&sym);
     }
 
     /// Fork this context for a branch (e.g. the `if` branch).
@@ -371,53 +372,58 @@ impl Context {
         let mut result = pre.clone();
 
         // Collect all variable names from both branch contexts
-        let all_names: HashSet<&String> = if_ctx.vars.keys().chain(else_ctx.vars.keys()).collect();
+        let all_names: FxHashSet<Symbol> = if_ctx
+            .vars
+            .keys()
+            .chain(else_ctx.vars.keys())
+            .copied()
+            .collect();
 
         for name in all_names {
-            let in_if = if_ctx.assigned_vars.contains(name);
-            let in_else = else_ctx.assigned_vars.contains(name);
-            let in_pre = pre.assigned_vars.contains(name);
+            let in_if = if_ctx.assigned_vars.contains(&name);
+            let in_else = else_ctx.assigned_vars.contains(&name);
+            let in_pre = pre.assigned_vars.contains(&name);
 
-            let ty_if = if_ctx.vars.get(name);
-            let ty_else = else_ctx.vars.get(name);
+            let ty_if = if_ctx.vars.get(&name);
+            let ty_else = else_ctx.vars.get(&name);
 
             match (ty_if, ty_else) {
                 (Some(a), Some(b)) => {
                     let mut merged = a.clone();
                     merged.merge_with(b);
-                    result.vars.insert(name.clone(), merged);
+                    result.vars.insert(name, merged);
                     if in_if && in_else {
-                        result.assigned_vars.insert(name.clone());
+                        result.assigned_vars.insert(name);
                     } else {
-                        result.possibly_assigned_vars.insert(name.clone());
+                        result.possibly_assigned_vars.insert(name);
                     }
                 }
                 (Some(a), None) => {
                     if in_pre {
                         // var existed before: merge with pre type
-                        let pre_ty = pre.vars.get(name).cloned().unwrap_or_else(Union::mixed);
+                        let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
                         let mut merged = a.clone();
                         merged.merge_with(&pre_ty);
-                        result.vars.insert(name.clone(), merged);
-                        result.assigned_vars.insert(name.clone());
+                        result.vars.insert(name, merged);
+                        result.assigned_vars.insert(name);
                     } else {
                         // only assigned in if branch
                         let ty = a.clone().possibly_undefined();
-                        result.vars.insert(name.clone(), ty);
-                        result.possibly_assigned_vars.insert(name.clone());
+                        result.vars.insert(name, ty);
+                        result.possibly_assigned_vars.insert(name);
                     }
                 }
                 (None, Some(b)) => {
                     if in_pre {
-                        let pre_ty = pre.vars.get(name).cloned().unwrap_or_else(Union::mixed);
+                        let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
                         let mut merged = pre_ty;
                         merged.merge_with(b);
-                        result.vars.insert(name.clone(), merged);
-                        result.assigned_vars.insert(name.clone());
+                        result.vars.insert(name, merged);
+                        result.assigned_vars.insert(name);
                     } else {
                         let ty = b.clone().possibly_undefined();
-                        result.vars.insert(name.clone(), ty);
-                        result.possibly_assigned_vars.insert(name.clone());
+                        result.vars.insert(name, ty);
+                        result.possibly_assigned_vars.insert(name);
                     }
                 }
                 (None, None) => {}
@@ -430,12 +436,12 @@ impl Context {
             .iter()
             .chain(else_ctx.tainted_vars.iter())
         {
-            result.tainted_vars.insert(name.clone());
+            result.tainted_vars.insert(*name);
         }
 
         // Read vars: union — if either branch reads a var, it counts as read
         for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
-            result.read_vars.insert(name.clone());
+            result.read_vars.insert(*name);
         }
 
         // Var locations: keep the earliest known span for each variable
@@ -444,7 +450,7 @@ impl Context {
             .iter()
             .chain(else_ctx.var_locations.iter())
         {
-            result.var_locations.entry(name.clone()).or_insert(*loc);
+            result.var_locations.entry(*name).or_insert(*loc);
         }
 
         // After merging branches, the merged context does not diverge
