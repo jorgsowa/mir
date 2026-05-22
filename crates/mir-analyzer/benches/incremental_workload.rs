@@ -22,6 +22,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
 use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer, Symbol};
 use mir_types::Symbol as MirSymbol;
+use salsa::Cancelled;
 use tempfile::TempDir;
 
 // Counting allocator — global atomics updated on every alloc/dealloc.
@@ -489,9 +490,16 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
                         let s = Arc::clone(&session_outer);
                         handles.push(thread::spawn(move || {
                             for _ in 0..READS_PER_THREAD {
-                                let _ = std::hint::black_box(
-                                    s.definition_of(&Symbol::class(target_class)),
-                                );
+                                // Wrap each query in Cancelled::catch — salsa fires
+                                // Cancelled::PendingWrite when the writer bumps the
+                                // revision mid-query. Treat as a no-op read (the bench
+                                // measures contention, not correctness).
+                                let s_ref = &s;
+                                let _ = Cancelled::catch(std::panic::AssertUnwindSafe(|| {
+                                    std::hint::black_box(
+                                        s_ref.definition_of(&Symbol::class(target_class)),
+                                    )
+                                }));
                             }
                         }));
                     }
