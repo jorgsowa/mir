@@ -382,7 +382,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         let resolved = db::resolve_name_via_db(self.db, &self.file, &raw);
                         u.add_type(Atomic::TNamedObject {
                             fqcn: resolved.into(),
-                            type_params: vec![],
+                            type_params: mir_types::union::empty_type_params(),
                         });
                     }
                     u

@@ -95,7 +95,7 @@ pub(crate) fn substitute_static_in_return(ret: Union, receiver_fqcn: &Arc<str>) 
         .map(|a| match a {
             Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
                 fqcn: Symbol::from(receiver_fqcn.as_ref()),
-                type_params: vec![],
+                type_params: mir_types::union::empty_type_params(),
             },
             other => other,
         })
@@ -537,7 +537,7 @@ fn project_generic_ancestor_type(
 
         return Some(Union::single(Atomic::TNamedObject {
             fqcn: *param_fqcn,
-            type_params: ancestor_args,
+            type_params: mir_types::union::vec_to_type_params(ancestor_args),
         }));
     }
 
@@ -631,11 +631,11 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
 
             if is_same_class {
                 let arg_type_params = match a_atomic {
-                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    Atomic::TNamedObject { type_params, .. } => &type_params[..],
                     _ => &[],
                 };
                 let param_type_params = match p_atomic {
-                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    Atomic::TNamedObject { type_params, .. } => &type_params[..],
                     _ => &[],
                 };
                 if !arg_type_params.is_empty() || !param_type_params.is_empty() {
@@ -665,7 +665,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
 
             if arg_extends_param {
                 let param_type_params = match p_atomic {
-                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    Atomic::TNamedObject { type_params, .. } => &type_params[..],
                     _ => &[],
                 };
                 if !param_type_params.is_empty() {
@@ -706,7 +706,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 || crate::db::extends_or_implements_via_db(ea.db, &resolved_param, &resolved_arg)
             {
                 let param_type_params = match p_atomic {
-                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    Atomic::TNamedObject { type_params, .. } => &type_params[..],
                     _ => &[],
                 };
                 if param_type_params.is_empty() {

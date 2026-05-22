@@ -115,7 +115,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             this_type: ctx.self_fqcn.clone().map(|f| {
                 Box::new(Union::single(Atomic::TNamedObject {
                     fqcn: Symbol::from(f.as_ref()),
-                    type_params: vec![],
+                    type_params: mir_types::union::empty_type_params(),
                 }))
             }),
         })
@@ -197,7 +197,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ctx.self_fqcn.clone().map(|f| {
                     Box::new(Union::single(Atomic::TNamedObject {
                         fqcn: Symbol::from(f.as_ref()),
-                        type_params: vec![],
+                        type_params: mir_types::union::empty_type_params(),
                     }))
                 })
             },

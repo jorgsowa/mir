@@ -811,7 +811,7 @@ impl AnalysisSession {
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = Union::single(Atomic::TNamedObject {
                     fqcn: mir_types::Symbol::from(fqcn.as_ref()),
-                    type_params: Vec::new(),
+                    type_params: mir_types::union::empty_type_params(),
                 });
                 Ok(crate::HoverInfo {
                     ty,

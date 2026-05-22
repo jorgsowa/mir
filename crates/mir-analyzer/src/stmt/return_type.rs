@@ -100,11 +100,11 @@ pub(crate) fn named_object_return_compatible(
 
             if is_same_class {
                 let actual_type_params = match actual_atom {
-                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    Atomic::TNamedObject { type_params, .. } => &type_params[..],
                     _ => &[],
                 };
                 let declared_type_params = match declared_atom {
-                    Atomic::TNamedObject { type_params, .. } => type_params.as_slice(),
+                    Atomic::TNamedObject { type_params, .. } => &type_params[..],
                     _ => &[],
                 };
                 if !actual_type_params.is_empty() || !declared_type_params.is_empty() {

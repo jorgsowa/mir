@@ -149,7 +149,7 @@ pub enum Atomic {
     TNamedObject {
         fqcn: Symbol,
         /// Resolved generic type arguments (e.g. `Collection<int>`)
-        type_params: Vec<Union>,
+        type_params: Arc<[Union]>,
     },
     /// `static` — late static binding type; resolved to calling class at call site
     TStaticObject { fqcn: Symbol },
@@ -221,7 +221,7 @@ pub enum Atomic {
 
     // --- Intersection ---
     /// `A&B&C` — PHP 8.1+ pure intersection type
-    TIntersection { parts: Vec<Union> },
+    TIntersection { parts: Arc<[Union]> },
 }
 
 impl Atomic {

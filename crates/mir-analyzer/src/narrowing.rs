@@ -448,7 +448,7 @@ fn narrow_instanceof_preserving_subtypes(
 ) -> Union {
     let narrowed_ty = Atomic::TNamedObject {
         fqcn: class_name.into(),
-        type_params: vec![],
+        type_params: mir_types::union::empty_type_params(),
     };
 
     if current.is_empty() || current.is_mixed() {
@@ -762,7 +762,7 @@ fn narrow_var_to_specific_class(ctx: &mut Context, name: &str, fqcn: &str, is_ex
     let narrowed = if is_exact_class {
         Union::single(Atomic::TNamedObject {
             fqcn: fqcn.into(),
-            type_params: vec![],
+            type_params: mir_types::union::empty_type_params(),
         })
     } else {
         current.filter(|t| match t {

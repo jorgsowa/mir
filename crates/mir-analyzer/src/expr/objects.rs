@@ -147,7 +147,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 });
                 let ty = Union::single(Atomic::TNamedObject {
                     fqcn: mir_types::Symbol::from(fqcn.as_ref()),
-                    type_params: vec![],
+                    type_params: mir_types::union::empty_type_params(),
                 });
                 self.record_symbol(
                     n.class.span,

@@ -520,7 +520,9 @@ pub fn parse_type_string(s: &str) -> Union {
     // Intersection: `A&B&C` — PHP 8.1+ pure intersection type
     if s.contains('&') && !is_inside_generics(s) {
         let parts: Vec<Union> = s.split('&').map(|p| parse_type_string(p.trim())).collect();
-        return Union::single(Atomic::TIntersection { parts });
+        return Union::single(Atomic::TIntersection {
+            parts: mir_types::union::vec_to_type_params(parts),
+        });
     }
 
     // Array shorthand: `Type[]` or `Type[][]`
@@ -620,7 +622,7 @@ pub fn parse_type_string(s: &str) -> Union {
             }
             Union::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(s).into(),
-                type_params: vec![],
+                type_params: mir_types::union::empty_type_params(),
             })
         }
 
@@ -725,7 +727,7 @@ fn parse_generic(name: &str, inner: &str) -> Union {
                 .collect();
             Union::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(name).into(),
-                type_params: params,
+                type_params: mir_types::union::vec_to_type_params(params),
             })
         }
     }

@@ -1,9 +1,28 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use std::sync::{Arc, OnceLock};
 
 use crate::atomic::Atomic;
 use crate::symbol::Symbol;
+
+/// Returns a cached empty `Arc<[Union]>` for `type_params` / `parts` fields.
+/// Re-uses a single Arc allocation so all empty parameter lists share one
+/// control block instead of allocating one per TNamedObject construction.
+pub fn empty_type_params() -> Arc<[Union]> {
+    static EMPTY: OnceLock<Arc<[Union]>> = OnceLock::new();
+    EMPTY.get_or_init(|| Arc::from([] as [Union; 0])).clone()
+}
+
+/// Convert a `Vec<Union>` to `Arc<[Union]>`, using the cached empty Arc when
+/// the vec is empty to avoid an allocation for the common no-generic case.
+pub fn vec_to_type_params(v: Vec<Union>) -> Arc<[Union]> {
+    if v.is_empty() {
+        empty_type_params()
+    } else {
+        Arc::from(v)
+    }
+}
 
 // Most unions contain 1-2 atomics (e.g. `string|null`), so we inline two.
 pub type AtomicVec = SmallVec<[Atomic; 2]>;
@@ -264,7 +283,7 @@ impl Union {
     pub fn narrow_instanceof(&self, class: &str) -> Union {
         let narrowed_ty = Atomic::TNamedObject {
             fqcn: class.into(),
-            type_params: vec![],
+            type_params: empty_type_params(),
         };
         // If any constituent is an object-like type, the result is the specific class.
         let has_object = self.types.iter().any(|t| {
@@ -571,10 +590,12 @@ impl Union {
                 }
                 Atomic::TIntersection { parts } => {
                     result.add_type(Atomic::TIntersection {
-                        parts: parts
-                            .iter()
-                            .map(|p| p.substitute_templates(bindings))
-                            .collect(),
+                        parts: vec_to_type_params(
+                            parts
+                                .iter()
+                                .map(|p| p.substitute_templates(bindings))
+                                .collect(),
+                        ),
                     });
                 }
                 Atomic::TNamedObject { fqcn, type_params } => {
@@ -592,13 +613,13 @@ impl Union {
                             continue;
                         }
                     }
-                    let new_params = type_params
+                    let new_params: Vec<Union> = type_params
                         .iter()
                         .map(|p| p.substitute_templates(bindings))
                         .collect();
                     result.add_type(Atomic::TNamedObject {
                         fqcn: *fqcn,
-                        type_params: new_params,
+                        type_params: vec_to_type_params(new_params),
                     });
                 }
                 _ => {
@@ -973,14 +994,16 @@ mod tests {
         let parts = vec![
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("Iterator"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("Countable"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
         ];
-        let atomic = Atomic::TIntersection { parts };
+        let atomic = Atomic::TIntersection {
+            parts: vec_to_type_params(parts),
+        };
         assert!(atomic.is_object());
         assert!(!atomic.can_be_falsy());
         assert!(atomic.can_be_truthy());
@@ -991,14 +1014,16 @@ mod tests {
         let parts = vec![
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("Iterator"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("Countable"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
         ];
-        let u = Union::single(Atomic::TIntersection { parts });
+        let u = Union::single(Atomic::TIntersection {
+            parts: vec_to_type_params(parts),
+        });
         assert_eq!(format!("{u}"), "Iterator&Countable");
     }
 
@@ -1007,34 +1032,36 @@ mod tests {
         let parts = vec![
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("A"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("B"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
             Union::single(Atomic::TNamedObject {
                 fqcn: Symbol::new("C"),
-                type_params: vec![],
+                type_params: empty_type_params(),
             }),
         ];
-        let u = Union::single(Atomic::TIntersection { parts });
+        let u = Union::single(Atomic::TIntersection {
+            parts: vec_to_type_params(parts),
+        });
         assert_eq!(format!("{u}"), "A&B&C");
     }
 
     #[test]
     fn intersection_in_nullable_union_display() {
         let intersection = Atomic::TIntersection {
-            parts: vec![
+            parts: vec_to_type_params(vec![
                 Union::single(Atomic::TNamedObject {
                     fqcn: Symbol::new("Iterator"),
-                    type_params: vec![],
+                    type_params: empty_type_params(),
                 }),
                 Union::single(Atomic::TNamedObject {
                     fqcn: Symbol::new("Countable"),
-                    type_params: vec![],
+                    type_params: empty_type_params(),
                 }),
-            ],
+            ]),
         };
         let mut u = Union::single(intersection);
         u.add_type(Atomic::TNull);
@@ -1241,13 +1268,13 @@ mod tests {
     #[test]
     fn substitute_intersection_parts() {
         let ty = Union::single(Atomic::TIntersection {
-            parts: vec![
+            parts: vec_to_type_params(vec![
                 Union::single(Atomic::TNamedObject {
                     fqcn: Symbol::new("Countable"),
-                    type_params: vec![],
+                    type_params: empty_type_params(),
                 }),
                 t_param("T"),
-            ],
+            ]),
         });
         let result = ty.substitute_templates(&bindings_t_string());
         let Atomic::TIntersection { parts } = &result.types[0] else {

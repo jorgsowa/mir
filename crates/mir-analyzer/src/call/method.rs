@@ -173,7 +173,7 @@ impl CallAnalyzer {
                         span,
                         method_name,
                         fqcn,
-                        receiver_type_params.as_slice(),
+                        &receiver_type_params[..],
                         &arg_types,
                         &arg_spans,
                     ));
@@ -198,7 +198,7 @@ impl CallAnalyzer {
                 mir_types::Atomic::TIntersection { parts } => {
                     let mut intersection_result = Union::empty();
                     let mut found_method = false;
-                    for part in parts {
+                    for part in parts.iter() {
                         for inner_atomic in &part.types {
                             if let mir_types::Atomic::TNamedObject {
                                 fqcn,
@@ -218,7 +218,7 @@ impl CallAnalyzer {
                                         span,
                                         method_name,
                                         &resolved_arc,
-                                        receiver_type_params.as_slice(),
+                                        &receiver_type_params[..],
                                         &arg_types,
                                         &arg_spans,
                                     ));

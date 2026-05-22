@@ -30,7 +30,9 @@ pub fn type_from_hint(hint: &TypeHint<'_, '_>, context_fqcn: Option<&str>) -> Un
             if resolved.is_empty() {
                 Union::mixed()
             } else {
-                Union::single(Atomic::TIntersection { parts: resolved })
+                Union::single(Atomic::TIntersection {
+                    parts: mir_types::union::vec_to_type_params(resolved),
+                })
             }
         }
         TypeHintKind::Keyword(builtin, _span) => builtin_type_to_union(*builtin, context_fqcn),
@@ -115,7 +117,7 @@ fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Union {
         }
         _ => Union::single(Atomic::TNamedObject {
             fqcn: normalize_fqcn(name).into(),
-            type_params: vec![],
+            type_params: mir_types::union::empty_type_params(),
         }),
     }
 }
@@ -149,7 +151,9 @@ pub fn type_from_hint_owned(hint: &php_ast::owned::TypeHint, context_fqcn: Optio
             if resolved.is_empty() {
                 Union::mixed()
             } else {
-                Union::single(Atomic::TIntersection { parts: resolved })
+                Union::single(Atomic::TIntersection {
+                    parts: mir_types::union::vec_to_type_params(resolved),
+                })
             }
         }
         php_ast::owned::TypeHintKind::Keyword(builtin, _span) => {

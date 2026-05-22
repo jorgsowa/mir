@@ -52,7 +52,7 @@ pub(crate) fn extract_callable_params(
                 }
             }
             Atomic::TIntersection { parts } => {
-                for part in parts {
+                for part in parts.iter() {
                     if let Some(params) = extract_callable_params(part, ea) {
                         return Some(params);
                     }
