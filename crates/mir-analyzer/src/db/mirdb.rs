@@ -95,7 +95,9 @@ pub struct MirDb {
     /// can skip re-parsing files that were already parsed in the same session.
     /// Keyed by blake3 hash of the source text so stale entries from prior
     /// file versions are naturally evicted (different hash → different key).
-    parse_cache: Arc<parking_lot::RwLock<FxHashMap<[u8; 32], Arc<StubSlice>>>>,
+    /// DashMap (64 shards) replaces a single RwLock so parallel workers contend
+    /// on independent shards instead of serialising at a single write lock.
+    parse_cache: Arc<dashmap::DashMap<[u8; 32], Arc<StubSlice>>>,
     /// Pre-built FQCN symbol index singleton. Written imperatively by
     /// `rebuild_workspace_symbol_index` and read by `find_class_like` /
     /// `find_function` / `find_global_constant` via `singleton.index(db)`
@@ -388,7 +390,7 @@ impl MirDatabase for MirDb {
         self.stub_cache.read().clone()
     }
 
-    fn parse_cache(&self) -> Arc<parking_lot::RwLock<FxHashMap<[u8; 32], Arc<StubSlice>>>> {
+    fn parse_cache(&self) -> Arc<dashmap::DashMap<[u8; 32], Arc<StubSlice>>> {
         self.parse_cache.clone()
     }
 }
@@ -404,7 +406,7 @@ impl MirDb {
     /// `collect_file_definitions_uncached` can skip re-parsing files already
     /// processed by `collect_and_ingest_file` in the same session.
     pub fn prime_parse_cache(&self, hash: [u8; 32], slice: Arc<StubSlice>) {
-        self.parse_cache.write().insert(hash, slice);
+        self.parse_cache.insert(hash, slice);
     }
 
     /// Rebuild the `WorkspaceSymbolIndexSingleton` salsa input from scratch.

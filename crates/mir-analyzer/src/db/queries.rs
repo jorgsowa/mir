@@ -280,28 +280,24 @@ pub fn collect_file_definitions_uncached(
     // Fast path 1: in-process parse cache (populated by collect_and_ingest_file).
     // Avoids re-parsing files that were already processed in the same session.
     // Safe inside a tracked query: content-addressed by source hash, not mutated.
-    {
-        let cache = db.parse_cache();
-        let guard = cache.read();
-        if let Some(slice) = guard.get(&content_hash) {
-            crate::metrics::record_stub_cache_hit();
-            if slice.file.as_deref() == Some(&*path) {
-                // Path matches — share the Arc directly (no data clone needed).
-                return FileDefinitions {
-                    slice: Arc::clone(slice),
-                    issues: Arc::new(Vec::new()),
-                };
-            }
-            // Different path — same source text at a different location.
-            // Must fix the `file` field before returning.
-            let mut owned = (**slice).clone();
-            owned.file = Some(path.clone());
-            crate::stub_cache::prepare_for_ingest(&mut owned);
+    if let Some(cached) = db.parse_cache().get(&content_hash).map(|r| Arc::clone(&*r)) {
+        crate::metrics::record_stub_cache_hit();
+        if cached.file.as_deref() == Some(&*path) {
+            // Path matches — share the Arc directly (no data clone needed).
             return FileDefinitions {
-                slice: Arc::new(owned),
+                slice: cached,
                 issues: Arc::new(Vec::new()),
             };
         }
+        // Different path — same source text at a different location.
+        // Must fix the `file` field before returning.
+        let mut owned = (*cached).clone();
+        owned.file = Some(path.clone());
+        crate::stub_cache::prepare_for_ingest(&mut owned);
+        return FileDefinitions {
+            slice: Arc::new(owned),
+            issues: Arc::new(Vec::new()),
+        };
     }
 
     // Fast path 2: disk cache hit avoids arena alloc + parse + collection walk.
@@ -349,7 +345,6 @@ pub fn collect_file_definitions_uncached(
     if !has_hard_parse_errors && !has_collector_issues {
         // In-process cache: prevents re-parsing in the same session.
         db.parse_cache()
-            .write()
             .insert(content_hash, Arc::clone(&slice_arc));
         // Disk cache: prevents re-parsing in future sessions.
         if let Some((cache, php_v)) = &disk_cache_state {

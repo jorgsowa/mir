@@ -1,4 +1,3 @@
-pub(crate) mod arena;
 #[doc(hidden)]
 pub mod cache;
 pub(crate) mod call;

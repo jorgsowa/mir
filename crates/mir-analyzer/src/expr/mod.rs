@@ -417,9 +417,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 mod tests {
     /// Helper to create a SourceMap from PHP source code
     fn create_source_map(source: &str) -> php_rs_parser::source_map::SourceMap {
-        let bump = crate::arena::create_parse_arena(source.len());
-        let result = php_rs_parser::parse_arena(&bump, source);
-        result.source_map
+        php_rs_parser::parse(source).source_map
     }
 
     /// Helper to test offset_to_line_col conversion (Unicode char-count columns).

@@ -1,17 +1,19 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use mir_analyzer::ProjectAnalyzer;
-use std::alloc::{GlobalAlloc, Layout, System};
+use std::alloc::{GlobalAlloc, Layout};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
 use std::time::Duration;
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
-// Counting allocator — global atomics updated on every alloc/dealloc.
-// All three counters are correct across all threads (main + rayon pool).
+// Counting allocator — wraps mimalloc (per-thread arenas, low lock contention)
+// and tracks live/peak/total bytes across all threads.
 // ---------------------------------------------------------------------------
 
 struct CountingAllocator;
+
+static INNER: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 // G_LIVE  — current net live bytes (delta from last reset)
 // G_PEAK  — max G_LIVE since last reset
@@ -27,7 +29,7 @@ static G_TOTAL: CacheAligned<AtomicUsize> = CacheAligned(AtomicUsize::new(0));
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let ptr = System.alloc(layout);
+        let ptr = INNER.alloc(layout);
         if !ptr.is_null() {
             let sz = layout.size();
             G_TOTAL.0.fetch_add(sz, Relaxed);
@@ -38,7 +40,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout);
+        INNER.dealloc(ptr, layout);
         G_LIVE.0.fetch_sub(layout.size() as i64, Relaxed);
     }
 }

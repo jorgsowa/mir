@@ -247,16 +247,19 @@ impl SharedDb {
         // Check in-process parse cache first (fastest path, avoids even disk I/O).
         {
             let guard = self.salsa.read();
-            let pc = guard.parse_cache();
-            let pc_guard = pc.read();
-            if let Some(slice) = pc_guard.get(&content_hash) {
+            let cached = guard
+                .parse_cache()
+                .get(&content_hash)
+                .map(|r| Arc::clone(&*r));
+            drop(guard);
+            if let Some(cached) = cached {
                 crate::metrics::record_stub_cache_hit();
-                let slice_arc = if slice.file.as_deref() == Some(&*file) {
+                let slice_arc = if cached.file.as_deref() == Some(&*file) {
                     // Path matches — share the Arc directly (no data clone needed).
-                    Arc::clone(slice)
+                    cached
                 } else {
                     // Different path — fix the `file` field.
-                    let mut owned = (**slice).clone();
+                    let mut owned = (*cached).clone();
                     owned.file = Some(file.clone());
                     Arc::new(owned)
                 };
@@ -264,8 +267,6 @@ impl SharedDb {
                     slice: slice_arc,
                     issues: Arc::new(Vec::new()),
                 };
-                drop(pc_guard);
-                drop(guard);
                 let mut write_guard = self.salsa.write();
                 write_guard.upsert_source_file_with_durability(
                     file.clone(),

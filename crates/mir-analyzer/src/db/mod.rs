@@ -128,9 +128,7 @@ pub trait MirDatabase: salsa::Database {
     /// salsa-tracked. Populated by `collect_and_ingest_file` so that
     /// `collect_file_definitions_uncached` avoids re-parsing files that were
     /// already parsed in the same session.
-    fn parse_cache(
-        &self,
-    ) -> Arc<parking_lot::RwLock<rustc_hash::FxHashMap<[u8; 32], Arc<mir_codebase::StubSlice>>>>;
+    fn parse_cache(&self) -> Arc<dashmap::DashMap<[u8; 32], Arc<mir_codebase::StubSlice>>>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.

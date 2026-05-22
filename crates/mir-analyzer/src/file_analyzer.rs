@@ -6,10 +6,9 @@
 //! inference-only Pass 2 sweep — that's a batch concern. For cross-file
 //! inferred return types, schedule a project-wide inference sweep on idle.
 //!
-//! Caller is responsible for parsing the file (so they keep ownership of the
-//! arena and AST). The session must already have Pass 1 state for any files
-//! whose definitions this analysis depends on; call
-//! [`AnalysisSession::ingest_file`] first.
+//! Caller is responsible for parsing the file and passing owned AST.
+//! The session must already have Pass 1 state for any files whose definitions
+//! this analysis depends on; call [`AnalysisSession::ingest_file`] first.
 //!
 //! For batch multi-file analysis, use [`BatchFileAnalyzer::analyze_batch`]
 //! which parallelizes analysis across multiple pre-parsed files.
@@ -86,19 +85,6 @@ impl<'a> FileAnalyzer<'a> {
             .commit_ref_locs_batch(db.take_pending_ref_locs());
         FileAnalysis { issues, symbols }
     }
-
-    /// Convenience wrapper: parse from arena then analyze. Kept for callers that
-    /// still hold arena-allocated ASTs.
-    pub fn analyze_arena(
-        &self,
-        file: Arc<str>,
-        source: &str,
-        program: &php_ast::ast::Program<'_, '_>,
-        source_map: &SourceMap,
-    ) -> FileAnalysis {
-        let owned = php_ast::owned::to_owned_program(program);
-        self.analyze(file, source, &owned, source_map)
-    }
 }
 
 /// Batch file analyzer for parallel multi-file analysis.
@@ -134,31 +120,6 @@ impl ParsedFile {
             file,
             source,
             program,
-            source_map,
-        }
-    }
-
-    /// Create a `ParsedFile` from an arena-allocated AST.
-    ///
-    /// Converts to owned internally; the arena may be dropped after this call.
-    ///
-    /// # Safety
-    ///
-    /// `program` and `source_map` must remain valid for the duration of this call
-    /// (they are converted before this function returns, so the arena doesn't need
-    /// to survive beyond the constructor).
-    pub unsafe fn from_arena(
-        file: Arc<str>,
-        source: Arc<str>,
-        program: *const php_ast::ast::Program<'static, 'static>,
-        _source_map: *const SourceMap,
-    ) -> Self {
-        let owned = php_ast::owned::to_owned_program(&*program);
-        let source_map = SourceMap::new(source.as_ref());
-        Self {
-            file,
-            source,
-            program: owned,
             source_map,
         }
     }

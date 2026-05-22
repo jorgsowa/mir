@@ -128,8 +128,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
     let path = file.path(db);
     let text = file.text(db);
 
-    let arena = crate::arena::create_parse_arena(text.len());
-    let parsed = php_rs_parser::parse_arena(&arena, &text);
+    let parsed = php_rs_parser::parse(&text);
 
     for err in &parsed.errors {
         let issue = crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map);
@@ -144,10 +143,13 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
         use std::str::FromStr as _;
         let php_version =
             PhpVersion::from_str(input.php_version(db).as_ref()).unwrap_or(PhpVersion::LATEST);
-        let owned = php_ast::owned::to_owned_program(&parsed.program);
         let driver = Pass2Driver::new(db, php_version);
-        let (issues, _symbols) =
-            driver.analyze_bodies(&owned, path.clone(), text.as_ref(), &parsed.source_map);
+        let (issues, _symbols) = driver.analyze_bodies(
+            &parsed.program,
+            path.clone(),
+            text.as_ref(),
+            &parsed.source_map,
+        );
 
         // Emit issues via accumulator
         for issue in issues {
