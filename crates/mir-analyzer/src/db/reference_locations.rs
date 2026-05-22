@@ -126,7 +126,8 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
     let path = file.path(db);
     let text = file.text(db);
 
-    let parsed = php_rs_parser::parse(&text);
+    let parsed_file = super::queries::parse_file(db, file);
+    let parsed = &*parsed_file.0;
 
     for err in &parsed.errors {
         let issue = crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map);

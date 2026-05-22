@@ -445,7 +445,8 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
         .unwrap_or(crate::php_version::PhpVersion::LATEST);
 
-    let parsed = php_rs_parser::parse(text.as_ref());
+    let parsed_file = parse_file(db, file);
+    let parsed = &*parsed_file.0;
 
     if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
         return InferredFileTypes::empty();
