@@ -1,6 +1,5 @@
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 use rustc_hash::FxHashMap;
-use std::sync::Arc;
 
 pub(super) fn resolve_name(
     name: &str,
@@ -38,23 +37,25 @@ pub(super) fn resolve_alias_only(name: &str, use_aliases: &FxHashMap<String, Str
 }
 
 pub(super) fn resolve_type_name(
-    name: &Arc<str>,
+    name: &str,
     full_qualify: bool,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Arc<str> {
+) -> Symbol {
     let stripped = name.trim_start_matches('\\');
     let first_part = stripped.split('\\').next().unwrap_or(stripped);
     if use_aliases.contains_key(first_part) {
-        return resolve_alias_only(stripped, use_aliases).into();
+        return resolve_alias_only(stripped, use_aliases).as_str().into();
     }
     if stripped.contains('\\') {
-        return Arc::from(stripped);
+        return Symbol::from(stripped);
     }
     if full_qualify {
-        resolve_name(stripped, namespace, use_aliases).into()
+        resolve_name(stripped, namespace, use_aliases)
+            .as_str()
+            .into()
     } else {
-        Arc::from(stripped)
+        Symbol::from(stripped)
     }
 }
 
@@ -83,14 +84,14 @@ pub(super) fn resolve_atomic_inner(
 ) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
-            let resolved = resolve_type_name(&fqcn, full_qualify, namespace, use_aliases);
+            let resolved = resolve_type_name(fqcn.as_str(), full_qualify, namespace, use_aliases);
             Atomic::TNamedObject {
                 fqcn: resolved,
                 type_params,
             }
         }
         Atomic::TClassString(Some(cls)) => {
-            let resolved = resolve_type_name(&cls, full_qualify, namespace, use_aliases);
+            let resolved = resolve_type_name(cls.as_str(), full_qualify, namespace, use_aliases);
             Atomic::TClassString(Some(resolved))
         }
         Atomic::TArray { key, value } => Atomic::TArray {

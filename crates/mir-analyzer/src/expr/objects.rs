@@ -141,7 +141,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 let ty = Union::single(Atomic::TNamedObject {
-                    fqcn: fqcn.clone(),
+                    fqcn: mir_types::Symbol::from(fqcn.as_ref()),
                     type_params: vec![],
                 });
                 self.record_symbol(
@@ -179,7 +179,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Check abstract for known TClassString
                 for atom in ty.types.iter() {
                     if let Atomic::TClassString(Some(fqcn)) = atom {
-                        let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                        let here = crate::db::Fqcn::new(self.db, Arc::from(fqcn.as_ref()));
                         let is_abstract_class = crate::db::find_class_like(self.db, here)
                             .map(|c| c.is_class() && c.is_abstract())
                             .unwrap_or(false);
@@ -239,7 +239,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.record_symbol(
                     pa.property.span,
                     SymbolKind::PropertyAccess {
-                        class: fqcn.clone(),
+                        class: Arc::from(fqcn.as_ref()),
                         property: Arc::from(prop_name.as_str()),
                     },
                     resolved.clone(),
@@ -269,7 +269,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.record_symbol(
                     pa.property.span,
                     SymbolKind::PropertyAccess {
-                        class: fqcn.clone(),
+                        class: Arc::from(fqcn.as_ref()),
                         property: Arc::from(prop_name.as_str()),
                     },
                     prop_ty.clone(),
@@ -326,7 +326,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         });
                     }
                 }
-                Some(Arc::from(resolved.as_str()))
+                Some(mir_types::Symbol::from(resolved.as_str()))
             } else {
                 None
             };
@@ -434,7 +434,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
-                    let fqcn_arc: Arc<str> = fqcn.clone();
+                    let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
                     let prop_found: Option<Union> = crate::db::find_property_in_chain(
                         self.db,
                         crate::db::Fqcn::new(self.db, fqcn_arc),
@@ -475,7 +475,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     match prop_name {
                         "name" => return Union::single(Atomic::TNonEmptyString),
                         "value" => {
-                            let here = crate::db::Fqcn::new(self.db, fqcn.clone());
+                            let here = crate::db::Fqcn::new(self.db, Arc::from(fqcn.as_ref()));
                             if let Some(scalar_ty) = crate::db::find_class_like(self.db, here)
                                 .and_then(|c| c.enum_scalar_type().cloned())
                             {

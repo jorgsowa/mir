@@ -598,13 +598,13 @@ pub fn parse_type_string(s: &str) -> Union {
         "resource" => Union::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
         "static" => Union::single(Atomic::TStaticObject {
-            fqcn: Arc::from(""),
+            fqcn: mir_types::Symbol::from(""),
         }),
         "self" | "$this" => Union::single(Atomic::TSelf {
-            fqcn: Arc::from(""),
+            fqcn: mir_types::Symbol::from(""),
         }),
         "parent" => Union::single(Atomic::TParent {
-            fqcn: Arc::from(""),
+            fqcn: mir_types::Symbol::from(""),
         }),
 
         // Named class

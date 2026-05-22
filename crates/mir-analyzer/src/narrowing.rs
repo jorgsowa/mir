@@ -752,7 +752,7 @@ fn narrow_var_to_literal_enum_case(
 fn narrow_var_to_class_string(ctx: &mut Context, name: &str, fqcn: &str, is_class: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_class {
-        Union::single(Atomic::TClassString(Some(Arc::from(fqcn))))
+        Union::single(Atomic::TClassString(Some(mir_types::Symbol::from(fqcn))))
     } else {
         current.filter(|t| !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn))
     };

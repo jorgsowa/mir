@@ -256,7 +256,7 @@ impl CallAnalyzer {
                 ea.record_symbol(
                     call.method.span,
                     SymbolKind::MethodCall {
-                        class: fqcn.clone(),
+                        class: Arc::from(fqcn.as_ref()),
                         method: Arc::from(method_name),
                     },
                     final_ty.clone(),

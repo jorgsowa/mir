@@ -1,5 +1,6 @@
 use super::StatementsAnalyzer;
 use crate::context::Context;
+use mir_types::Symbol;
 use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl};
 use std::sync::Arc;
 
@@ -34,7 +35,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Symbol::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -52,7 +53,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Symbol::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -131,7 +132,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Arc::from(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Symbol::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,

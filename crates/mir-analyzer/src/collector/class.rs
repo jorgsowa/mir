@@ -198,7 +198,7 @@ impl<'a> DefinitionCollector<'a> {
             .filter_map(|ty| {
                 if let Some(Atomic::TNamedObject { fqcn, type_params }) = ty.types.first() {
                     Some((
-                        self.resolve_type_name(fqcn, true),
+                        self.resolve_type_name(fqcn.as_str(), true).into(),
                         type_params
                             .iter()
                             .map(|tp| self.resolve_union(tp.clone()))
@@ -223,7 +223,7 @@ impl<'a> DefinitionCollector<'a> {
             mixins: class_doc
                 .mixins
                 .iter()
-                .map(|m| self.resolve_type_name(&Arc::from(m.as_str()), true))
+                .map(|m| self.resolve_type_name(m.as_str(), true).into())
                 .collect(),
             template_params,
             extends_type_args,
@@ -242,8 +242,8 @@ impl<'a> DefinitionCollector<'a> {
                 .import_types
                 .iter()
                 .map(|imp| {
-                    let from_resolved =
-                        self.resolve_type_name(&Arc::from(imp.from_class.as_str()), true);
+                    let from_resolved: Arc<str> =
+                        self.resolve_type_name(imp.from_class.as_str(), true).into();
                     (
                         Arc::from(imp.local.as_str()),
                         Arc::from(imp.original.as_str()),

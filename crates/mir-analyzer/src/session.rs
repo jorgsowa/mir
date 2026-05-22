@@ -808,7 +808,7 @@ impl AnalysisSession {
                 let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 let ty = Union::single(Atomic::TNamedObject {
-                    fqcn: fqcn.clone(),
+                    fqcn: mir_types::Symbol::from(fqcn.as_ref()),
                     type_params: Vec::new(),
                 });
                 Ok(crate::HoverInfo {
@@ -1632,7 +1632,7 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
             .types
             .iter()
             .filter_map(|atomic| match atomic {
-                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.clone()),
+                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
                 _ => None,
             })
             .collect::<Vec<_>>()

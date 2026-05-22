@@ -5,7 +5,7 @@ use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 
 use crate::expr::ExpressionAnalyzer;
 
@@ -94,7 +94,7 @@ pub(crate) fn substitute_static_in_return(ret: Union, receiver_fqcn: &Arc<str>) 
         .into_iter()
         .map(|a| match a {
             Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
-                fqcn: receiver_fqcn.clone(),
+                fqcn: Symbol::from(receiver_fqcn.as_ref()),
                 type_params: vec![],
             },
             other => other,
@@ -536,7 +536,7 @@ fn project_generic_ancestor_type(
         }
 
         return Some(Union::single(Atomic::TNamedObject {
-            fqcn: param_fqcn.clone(),
+            fqcn: *param_fqcn,
             type_params: ancestor_args,
         }));
     }
@@ -548,7 +548,7 @@ fn project_generic_ancestor_type(
 /// using codebase-aware class hierarchy checks.
 fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg.types.iter().all(|a_atomic| {
-        let arg_fqcn: &Arc<str> = match a_atomic {
+        let arg_fqcn: &Symbol = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
                 let is_trait =
@@ -614,7 +614,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
         }
 
         param.types.iter().any(|p_atomic| {
-            let param_fqcn: &Arc<str> = match p_atomic {
+            let param_fqcn: &Symbol = match p_atomic {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,
@@ -795,13 +795,13 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
 /// Strict subtype check for generic type parameter positions (no coercion direction).
 fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg.types.iter().all(|a_atomic| {
-        let arg_fqcn: &Arc<str> = match a_atomic {
+        let arg_fqcn: &Symbol = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TNever => return true,
             _ => return false,
         };
         param.types.iter().any(|p_atomic| {
-            let param_fqcn: &Arc<str> = match p_atomic {
+            let param_fqcn: &Symbol = match p_atomic {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 _ => return false,
             };
@@ -920,10 +920,10 @@ fn generic_ancestor_type_args_inner(
     }
 
     let parent_template_params = class_template_params(ea, parent.as_ref());
-    let bindings: FxHashMap<Arc<str>, Union> = parent_template_params
+    let bindings: FxHashMap<Symbol, Union> = parent_template_params
         .iter()
         .zip(extends_type_args.iter())
-        .map(|(tp, ty)| (tp.name.clone(), ty.clone()))
+        .map(|(tp, ty)| (Symbol::from(tp.name.as_ref()), ty.clone()))
         .collect();
 
     Some(
@@ -959,7 +959,7 @@ fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<
 
 fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|av| {
-        let av_fqcn: &Arc<str> = match av {
+        let av_fqcn: &Symbol = match av {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => {
                 fqcn
@@ -984,7 +984,7 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
         };
 
         param_ty.types.iter().any(|pv| {
-            let pv_fqcn: &Arc<str> = match pv {
+            let pv_fqcn: &Symbol = match pv {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn }
                 | Atomic::TStaticObject { fqcn }

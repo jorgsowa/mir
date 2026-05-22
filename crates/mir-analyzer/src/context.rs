@@ -262,7 +262,7 @@ impl Context {
         if !is_static {
             if let Some(fqcn) = self_fqcn {
                 let this_ty = mir_types::Union::single(mir_types::Atomic::TNamedObject {
-                    fqcn,
+                    fqcn: mir_types::Symbol::from(fqcn.as_ref()),
                     type_params: vec![],
                 });
                 ctx.vars.insert("this".to_string(), this_ty);

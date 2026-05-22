@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 
 use crate::db::{extends_or_implements_via_db, MirDatabase};
 
@@ -18,7 +16,7 @@ pub(crate) fn named_object_return_compatible(
 ) -> bool {
     actual.types.iter().all(|actual_atom| {
         // Extract the actual FQCN — handles TNamedObject, TSelf, TStaticObject, TParent
-        let actual_fqcn: &Arc<str> = match actual_atom {
+        let actual_fqcn: &Symbol = match actual_atom {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } => fqcn,
             Atomic::TStaticObject { fqcn } => fqcn,
@@ -62,7 +60,7 @@ pub(crate) fn named_object_return_compatible(
 
         declared.types.iter().any(|declared_atom| {
             // Extract declared FQCN — also handle self/static/parent in declared type
-            let declared_fqcn: &Arc<str> = match declared_atom {
+            let declared_fqcn: &Symbol = match declared_atom {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,
@@ -327,14 +325,14 @@ pub(super) fn return_arrays_compatible(
                     }
                     _ => {}
                 }
-                let av_fqcn: &Arc<str> = match av {
+                let av_fqcn: &Symbol = match av {
                     Atomic::TNamedObject { fqcn, .. } => fqcn,
                     Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => fqcn,
                     Atomic::TClosure { .. } => return true,
                     _ => return Union::single(av.clone()).is_subtype_of_simple(dec_val),
                 };
                 dec_val.types.iter().any(|dv| {
-                    let dv_fqcn: &Arc<str> = match dv {
+                    let dv_fqcn: &Symbol = match dv {
                         Atomic::TNamedObject { fqcn, .. } => fqcn,
                         Atomic::TClosure { .. } => return true,
                         _ => return false,

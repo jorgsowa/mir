@@ -165,12 +165,12 @@ impl<'a> DefinitionCollector<'a> {
         let require_extends: Vec<Arc<str>> = trait_doc
             .require_extends
             .iter()
-            .map(|s| self.resolve_type_name(&Arc::from(s.as_str()), true))
+            .map(|s| self.resolve_type_name(s.as_str(), true).into())
             .collect();
         let require_implements: Vec<Arc<str>> = trait_doc
             .require_implements
             .iter()
-            .map(|s| self.resolve_type_name(&Arc::from(s.as_str()), true))
+            .map(|s| self.resolve_type_name(s.as_str(), true).into())
             .collect();
 
         self.slice.traits.push(std::sync::Arc::new(TraitStorage {

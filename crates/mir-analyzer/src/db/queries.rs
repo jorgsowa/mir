@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{Location, TemplateParam};
 use mir_issues::Issue;
-use mir_types::Union;
+use mir_types::{Symbol, Union};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::*;
@@ -106,8 +106,8 @@ pub fn class_template_params_via_db(
 pub fn inherited_template_bindings_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
-) -> FxHashMap<Arc<str>, Union> {
-    let mut bindings: FxHashMap<Arc<str>, Union> = FxHashMap::default();
+) -> FxHashMap<Symbol, Union> {
+    let mut bindings: FxHashMap<Symbol, Union> = FxHashMap::default();
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     let mut current: Arc<str> = Arc::from(fqcn);
     loop {
@@ -125,9 +125,7 @@ pub fn inherited_template_bindings_via_db(
         if !extends_type_args.is_empty() {
             if let Some(parent_tps) = class_template_params_via_db(db, parent.as_ref()) {
                 for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
-                    bindings
-                        .entry(tp.name.clone())
-                        .or_insert_with(|| ty.clone());
+                    bindings.entry(tp.name).or_insert_with(|| ty.clone());
                 }
             }
         }

@@ -20,7 +20,7 @@ use mir_codebase::storage::{
     TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 
 mod annotation;
 mod class;
@@ -223,7 +223,7 @@ impl<'a> DefinitionCollector<'a> {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
     }
 
-    fn resolve_type_name(&self, name: &Arc<str>, full_qualify: bool) -> Arc<str> {
+    fn resolve_type_name(&self, name: &str, full_qualify: bool) -> mir_types::Symbol {
         resolution::resolve_type_name(name, full_qualify, &self.namespace, &self.use_aliases)
     }
 
@@ -280,7 +280,7 @@ impl<'a> DefinitionCollector<'a> {
 
                     // This is a template parameter reference
                     result.add_type(mir_types::Atomic::TTemplateParam {
-                        name: fqcn.clone(),
+                        name: *fqcn,
                         as_type: Box::new(bound),
                         defining_entity: defining_entity.into(),
                     });
@@ -360,8 +360,7 @@ impl<'a> DefinitionCollector<'a> {
             if import.from_class.is_empty() {
                 continue;
             }
-            let from_resolved =
-                self.resolve_type_name(&Arc::from(import.from_class.as_str()), true);
+            let from_resolved = self.resolve_type_name(import.from_class.as_str(), true);
             let resolved = self
                 .slice
                 .classes
@@ -441,7 +440,7 @@ impl<'a> DefinitionCollector<'a> {
                         Some(self.resolve_union_doc_with_aliases(parsed, aliases))
                     };
                     FnParam {
-                        name: Arc::from(p.name.as_str()),
+                        name: Symbol::new(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
                         has_default: p.is_optional,
                         is_variadic: p.is_variadic,
@@ -732,7 +731,7 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             params.push(FnParam {
-                name: Arc::from(param_name),
+                name: Symbol::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,

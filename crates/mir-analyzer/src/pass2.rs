@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_issues::Issue;
-use mir_types::Union;
+use mir_types::{Symbol, Union};
 use parking_lot::Mutex;
 
 use crate::db::{resolve_name_via_db, MirDatabase};
@@ -80,7 +80,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
     params
         .iter()
         .map(|p| mir_codebase::FnParam {
-            name: Arc::from(p.name.as_deref().unwrap_or("")),
+            name: Symbol::new(p.name.as_deref().unwrap_or("")),
             ty: None,
             has_default: p.default.is_some(),
             is_variadic: p.variadic,

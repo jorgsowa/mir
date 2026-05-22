@@ -1,7 +1,7 @@
 use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_union};
 use super::ExpressionAnalyzer;
 use crate::context::Context;
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Symbol, Union};
 use php_ast::owned::{ArrowFunctionExpr, ClosureExpr};
 use std::sync::Arc;
 
@@ -93,7 +93,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let closure_params: Vec<mir_types::atomic::FnParam> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
-                name: p.name.clone(),
+                name: Symbol::from(p.name.as_ref()),
                 ty: p
                     .ty
                     .as_ref()
@@ -114,7 +114,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             return_type: Box::new(return_ty),
             this_type: ctx.self_fqcn.clone().map(|f| {
                 Box::new(Union::single(Atomic::TNamedObject {
-                    fqcn: f,
+                    fqcn: Symbol::from(f.as_ref()),
                     type_params: vec![],
                 }))
             }),
@@ -172,7 +172,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let closure_params: Vec<mir_types::atomic::FnParam> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
-                name: p.name.clone(),
+                name: Symbol::from(p.name.as_ref()),
                 ty: p
                     .ty
                     .as_ref()
@@ -196,7 +196,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             } else {
                 ctx.self_fqcn.clone().map(|f| {
                     Box::new(Union::single(Atomic::TNamedObject {
-                        fqcn: f,
+                        fqcn: Symbol::from(f.as_ref()),
                         type_params: vec![],
                     }))
                 })

@@ -1282,7 +1282,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
             .types
             .iter()
             .filter_map(|atomic| match atomic {
-                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.clone()),
+                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
                 _ => None,
             })
             .collect::<Vec<_>>()

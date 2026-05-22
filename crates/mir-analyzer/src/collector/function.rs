@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::{wrap_return_type, FnParam, FunctionStorage, TemplateParam};
+use mir_types::Symbol;
 
 use super::DefinitionCollector;
 use crate::parser::type_from_hint_owned;
@@ -87,7 +88,7 @@ impl DefinitionCollector<'_> {
             }
 
             params.push(FnParam {
-                name: Arc::from(param_name),
+                name: Symbol::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,

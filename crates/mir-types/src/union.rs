@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::atomic::Atomic;
+use crate::symbol::Symbol;
 
 // Most unions contain 1-2 atomics (e.g. `string|null`), so we inline two.
 pub type AtomicVec = SmallVec<[Atomic; 2]>;
@@ -464,7 +463,7 @@ impl Union {
     // --- Template substitution ----------------------------------------------
 
     /// Replace template param references with their resolved types.
-    pub fn substitute_templates(&self, bindings: &FxHashMap<Arc<str>, Union>) -> Union {
+    pub fn substitute_templates(&self, bindings: &FxHashMap<Symbol, Union>) -> Union {
         if bindings.is_empty() {
             return self.clone();
         }
@@ -586,7 +585,7 @@ impl Union {
                     // make the docblock parser template-aware so it emits TTemplateParam directly.
                     // See issue #26 for context.
                     if type_params.is_empty() && !fqcn.contains('\\') {
-                        if let Some(resolved) = bindings.get(fqcn.as_ref()) {
+                        if let Some(resolved) = bindings.get(fqcn) {
                             for t in &resolved.types {
                                 result.add_type(t.clone());
                             }
@@ -598,7 +597,7 @@ impl Union {
                         .map(|p| p.substitute_templates(bindings))
                         .collect();
                     result.add_type(Atomic::TNamedObject {
-                        fqcn: fqcn.clone(),
+                        fqcn: *fqcn,
                         type_params: new_params,
                     });
                 }
@@ -660,10 +659,10 @@ impl Union {
 
 fn substitute_in_fn_param(
     p: &crate::atomic::FnParam,
-    bindings: &FxHashMap<Arc<str>, Union>,
+    bindings: &FxHashMap<Symbol, Union>,
 ) -> crate::atomic::FnParam {
     crate::atomic::FnParam {
-        name: p.name.clone(),
+        name: p.name,
         ty: p.ty.as_ref().map(|t| {
             let u = t.to_union();
             let substituted = u.substitute_templates(bindings);
@@ -855,6 +854,8 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
 
     #[test]
@@ -954,12 +955,12 @@ mod tests {
     #[test]
     fn template_substitution() {
         let mut bindings = FxHashMap::default();
-        bindings.insert(Arc::from("T"), Union::single(Atomic::TString));
+        bindings.insert(Symbol::new("T"), Union::single(Atomic::TString));
 
         let tmpl = Union::single(Atomic::TTemplateParam {
-            name: Arc::from("T"),
+            name: Symbol::new("T"),
             as_type: Box::new(Union::mixed()),
-            defining_entity: Arc::from("MyClass"),
+            defining_entity: Symbol::new("MyClass"),
         });
 
         let resolved = tmpl.substitute_templates(&bindings);
@@ -971,11 +972,11 @@ mod tests {
     fn intersection_is_object() {
         let parts = vec![
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("Iterator"),
+                fqcn: Symbol::new("Iterator"),
                 type_params: vec![],
             }),
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("Countable"),
+                fqcn: Symbol::new("Countable"),
                 type_params: vec![],
             }),
         ];
@@ -989,11 +990,11 @@ mod tests {
     fn intersection_display_two_parts() {
         let parts = vec![
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("Iterator"),
+                fqcn: Symbol::new("Iterator"),
                 type_params: vec![],
             }),
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("Countable"),
+                fqcn: Symbol::new("Countable"),
                 type_params: vec![],
             }),
         ];
@@ -1005,15 +1006,15 @@ mod tests {
     fn intersection_display_three_parts() {
         let parts = vec![
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("A"),
+                fqcn: Symbol::new("A"),
                 type_params: vec![],
             }),
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("B"),
+                fqcn: Symbol::new("B"),
                 type_params: vec![],
             }),
             Union::single(Atomic::TNamedObject {
-                fqcn: Arc::from("C"),
+                fqcn: Symbol::new("C"),
                 type_params: vec![],
             }),
         ];
@@ -1026,11 +1027,11 @@ mod tests {
         let intersection = Atomic::TIntersection {
             parts: vec![
                 Union::single(Atomic::TNamedObject {
-                    fqcn: Arc::from("Iterator"),
+                    fqcn: Symbol::new("Iterator"),
                     type_params: vec![],
                 }),
                 Union::single(Atomic::TNamedObject {
-                    fqcn: Arc::from("Countable"),
+                    fqcn: Symbol::new("Countable"),
                     type_params: vec![],
                 }),
             ],
@@ -1045,15 +1046,15 @@ mod tests {
 
     fn t_param(name: &str) -> Union {
         Union::single(Atomic::TTemplateParam {
-            name: Arc::from(name),
+            name: Symbol::new(name),
             as_type: Box::new(Union::mixed()),
-            defining_entity: Arc::from("Fn"),
+            defining_entity: Symbol::new("Fn"),
         })
     }
 
-    fn bindings_t_string() -> FxHashMap<Arc<str>, Union> {
+    fn bindings_t_string() -> FxHashMap<Symbol, Union> {
         let mut b = FxHashMap::default();
-        b.insert(Arc::from("T"), Union::single(Atomic::TString));
+        b.insert(Symbol::new("T"), Union::single(Atomic::TString));
         b
     }
 
@@ -1135,7 +1136,7 @@ mod tests {
         use crate::atomic::FnParam;
         let ty = Union::single(Atomic::TCallable {
             params: Some(vec![FnParam {
-                name: Arc::from("x"),
+                name: Symbol::new("x"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 default: None,
                 is_variadic: false,
@@ -1181,7 +1182,7 @@ mod tests {
         use crate::atomic::FnParam;
         let ty = Union::single(Atomic::TClosure {
             params: vec![FnParam {
-                name: Arc::from("a"),
+                name: Symbol::new("a"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 default: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 is_variadic: true,
@@ -1242,7 +1243,7 @@ mod tests {
         let ty = Union::single(Atomic::TIntersection {
             parts: vec![
                 Union::single(Atomic::TNamedObject {
-                    fqcn: Arc::from("Countable"),
+                    fqcn: Symbol::new("Countable"),
                     type_params: vec![],
                 }),
                 t_param("T"),

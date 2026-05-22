@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use mir_types::Union;
+use mir_types::{Symbol, Union};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -127,16 +127,16 @@ impl std::fmt::Display for Visibility {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateParam {
-    pub name: Arc<str>,
+    pub name: Symbol,
     pub bound: Option<Union>,
     /// The entity (class or function FQN) that declared this template param.
-    pub defining_entity: Arc<str>,
+    pub defining_entity: Symbol,
     pub variance: mir_types::Variance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FnParam {
-    pub name: Arc<str>,
+    pub name: Symbol,
     /// Parameter type. Stored as `Option<Arc<Union>>` to enable deduplication of
     /// common types across parameters. Many parameters share types like `string`,
     /// `int`, `bool`, etc., so interning via Arc saves allocations.

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+use crate::symbol::Symbol;
 use crate::Union;
 
 // ---------------------------------------------------------------------------
@@ -12,7 +13,7 @@ use crate::Union;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FnParam {
-    pub name: Arc<str>,
+    pub name: Symbol,
     /// Parameter type stored as SimpleType for compact representation.
     /// Most params are simple scalars (string, int, etc.) and fit inline.
     pub ty: Option<crate::compact::SimpleType>,
@@ -44,7 +45,7 @@ pub enum Variance {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TemplateParam {
-    pub name: Arc<str>,
+    pub name: Symbol,
     pub bound: Option<Union>,
     pub variance: Variance,
 }
@@ -95,7 +96,7 @@ pub enum Atomic {
     /// `"hello"` — a specific string literal
     TLiteralString(Arc<str>),
     /// `class-string` or `class-string<T>`
-    TClassString(Option<Arc<str>>),
+    TClassString(Option<Symbol>),
     /// `non-empty-string`
     TNonEmptyString,
     /// `numeric-string`
@@ -146,16 +147,16 @@ pub enum Atomic {
     TObject,
     /// `ClassName` / `ClassName<T1, T2>` — specific named class/interface
     TNamedObject {
-        fqcn: Arc<str>,
+        fqcn: Symbol,
         /// Resolved generic type arguments (e.g. `Collection<int>`)
         type_params: Vec<Union>,
     },
     /// `static` — late static binding type; resolved to calling class at call site
-    TStaticObject { fqcn: Arc<str> },
+    TStaticObject { fqcn: Symbol },
     /// `self` — the class in whose body the type appears
-    TSelf { fqcn: Arc<str> },
+    TSelf { fqcn: Symbol },
     /// `parent` — the parent class
-    TParent { fqcn: Arc<str> },
+    TParent { fqcn: Symbol },
 
     // --- Callables ---
     /// `callable` or `callable(T): R`
@@ -191,10 +192,10 @@ pub enum Atomic {
     // --- Generics / meta-types ---
     /// `T` — a template type parameter
     TTemplateParam {
-        name: Arc<str>,
+        name: Symbol,
         as_type: Box<Union>,
         /// The entity (class or function FQN) that declared this template
-        defining_entity: Arc<str>,
+        defining_entity: Symbol,
     },
     /// `(T is string ? A : B)` — conditional type
     TConditional {
@@ -214,8 +215,8 @@ pub enum Atomic {
     // --- Enum cases ---
     /// `EnumName::CaseName` — a specific enum case literal
     TLiteralEnumCase {
-        enum_fqcn: Arc<str>,
-        case_name: Arc<str>,
+        enum_fqcn: Symbol,
+        case_name: Symbol,
     },
 
     // --- Intersection ---
