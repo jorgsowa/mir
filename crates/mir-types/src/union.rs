@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
@@ -422,10 +423,7 @@ impl Union {
     // --- Template substitution ----------------------------------------------
 
     /// Replace template param references with their resolved types.
-    pub fn substitute_templates(
-        &self,
-        bindings: &std::collections::HashMap<Arc<str>, Union>,
-    ) -> Union {
+    pub fn substitute_templates(&self, bindings: &FxHashMap<Arc<str>, Union>) -> Union {
         if bindings.is_empty() {
             return self.clone();
         }
@@ -621,7 +619,7 @@ impl Union {
 
 fn substitute_in_fn_param(
     p: &crate::atomic::FnParam,
-    bindings: &std::collections::HashMap<Arc<str>, Union>,
+    bindings: &FxHashMap<Arc<str>, Union>,
 ) -> crate::atomic::FnParam {
     crate::atomic::FnParam {
         name: p.name.clone(),
@@ -914,7 +912,7 @@ mod tests {
 
     #[test]
     fn template_substitution() {
-        let mut bindings = std::collections::HashMap::new();
+        let mut bindings = FxHashMap::default();
         bindings.insert(Arc::from("T"), Union::single(Atomic::TString));
 
         let tmpl = Union::single(Atomic::TTemplateParam {
@@ -1012,8 +1010,8 @@ mod tests {
         })
     }
 
-    fn bindings_t_string() -> std::collections::HashMap<Arc<str>, Union> {
-        let mut b = std::collections::HashMap::new();
+    fn bindings_t_string() -> FxHashMap<Arc<str>, Union> {
+        let mut b = FxHashMap::default();
         b.insert(Arc::from("T"), Union::single(Atomic::TString));
         b
     }

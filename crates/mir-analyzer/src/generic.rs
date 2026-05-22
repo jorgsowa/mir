@@ -1,6 +1,6 @@
 /// Generic type inference — infer template bindings from argument types and
 /// substitute them into return types.
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_codebase::storage::{FnParam, TemplateParam};
@@ -19,8 +19,8 @@ pub fn infer_template_bindings(
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Union],
-) -> HashMap<Arc<str>, Union> {
-    let mut bindings: HashMap<Arc<str>, Union> = HashMap::new();
+) -> FxHashMap<Arc<str>, Union> {
+    let mut bindings: FxHashMap<Arc<str>, Union> = FxHashMap::default();
     let template_names: std::collections::HashSet<Arc<str>> =
         template_params.iter().map(|tp| tp.name.clone()).collect();
 
@@ -44,7 +44,7 @@ pub fn infer_template_bindings(
 /// Check that each binding satisfies the template's declared bound.
 /// Returns a list of `(template_name, inferred_type, bound)` for violations.
 pub fn check_template_bounds<'a>(
-    bindings: &'a HashMap<Arc<str>, Union>,
+    bindings: &'a FxHashMap<Arc<str>, Union>,
     template_params: &'a [TemplateParam],
 ) -> Vec<(&'a Arc<str>, &'a Union, &'a Union)> {
     let mut violations = Vec::new();
@@ -73,7 +73,7 @@ pub fn check_template_bounds<'a>(
 pub fn build_class_bindings(
     class_template_params: &[TemplateParam],
     receiver_type_params: &[Union],
-) -> HashMap<Arc<str>, Union> {
+) -> FxHashMap<Arc<str>, Union> {
     class_template_params
         .iter()
         .zip(receiver_type_params.iter())
@@ -160,7 +160,7 @@ fn infer_from_pair(
     param_ty: &Union,
     arg_ty: &Union,
     template_names: &std::collections::HashSet<Arc<str>>,
-    bindings: &mut HashMap<Arc<str>, Union>,
+    bindings: &mut FxHashMap<Arc<str>, Union>,
 ) {
     // When the parameter is a union mixing template placeholders with concrete
     // atomics (e.g. `T|null` against `Bar|null`), the template should bind to

@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 #[doc(hidden)]
 pub mod cache;
 pub(crate) mod call;
@@ -239,9 +241,9 @@ pub struct HoverInfo {
 #[derive(Debug, Clone)]
 pub struct DependencyGraph {
     /// Direct dependencies: file → [files it depends on]
-    dependencies: std::collections::HashMap<String, Vec<String>>,
+    dependencies: FxHashMap<String, Vec<String>>,
     /// Reverse dependencies: file → [files that depend on it]
-    dependents: std::collections::HashMap<String, Vec<String>>,
+    dependents: FxHashMap<String, Vec<String>>,
 }
 
 impl DependencyGraph {
@@ -263,7 +265,7 @@ impl DependencyGraph {
 
     /// All files transitively depended upon by `file` (including indirect).
     pub fn transitive_dependencies(&self, file: &str) -> Vec<String> {
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = rustc_hash::FxHashSet::default();
         let mut queue = vec![file.to_string()];
         let mut result = Vec::new();
 
@@ -283,7 +285,7 @@ impl DependencyGraph {
 
     /// All files that transitively depend on `file` (reverse transitive).
     pub fn transitive_dependents(&self, file: &str) -> Vec<String> {
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = rustc_hash::FxHashSet::default();
         let mut queue = vec![file.to_string()];
         let mut result = Vec::new();
 

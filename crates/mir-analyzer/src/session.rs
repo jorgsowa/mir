@@ -10,7 +10,7 @@
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file Pass 2 entry
 //! point that operates against a session.
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -96,9 +96,9 @@ impl AnalysisSession {
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
-            reverse_dep_map: Arc::new(RwLock::new(HashMap::new())),
-            stale_defined_symbols: Arc::new(RwLock::new(HashMap::new())),
-            unresolvable_fqcns: Arc::new(RwLock::new(HashMap::new())),
+            reverse_dep_map: Arc::new(RwLock::new(HashMap::default())),
+            stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
+            unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
         }
     }
@@ -623,11 +623,11 @@ impl AnalysisSession {
             guard.remove_source_file(file);
         }
         // Remove this file's outgoing deps from the in-memory reverse dep map.
-        self.update_in_memory_reverse_deps(file, &HashSet::new());
+        self.update_in_memory_reverse_deps(file, &HashSet::default());
         // Clear stale symbol tracking for this file — it's fully gone.
         self.stale_defined_symbols.write().remove(file);
         if let Some(cache) = &self.cache {
-            cache.update_reverse_deps_for_file(file, &HashSet::new());
+            cache.update_reverse_deps_for_file(file, &HashSet::default());
             cache.evict_with_dependents(&[file.to_string()]);
         }
         // The file is gone; cache entries that previously mapped to it stay
@@ -1116,7 +1116,7 @@ impl AnalysisSession {
         }
         let mut loaded = 0;
         let mut frontier: Vec<String> = vec![fqcn.to_string()];
-        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::default();
 
         for _ in 0..max_depth {
             if frontier.is_empty() {
@@ -1437,7 +1437,7 @@ impl AnalysisSession {
     /// `dependency_graph().transitive_dependents()` after Pass 2 is complete.
     pub fn structural_dependents_of(&self, file: &str) -> Vec<String> {
         let map = self.reverse_dep_map.read();
-        let mut visited: HashSet<String> = HashSet::new();
+        let mut visited: HashSet<String> = HashSet::default();
         let mut queue = vec![file.to_string()];
         let mut result = Vec::new();
         while let Some(current) = queue.pop() {
@@ -1475,13 +1475,13 @@ impl AnalysisSession {
             .map(|f| f.as_ref().to_string())
             .collect();
 
-        let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
-        let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
+        let mut dependencies: HashMap<String, Vec<String>> = HashMap::default();
+        let mut dependents: HashMap<String, Vec<String>> = HashMap::default();
 
         for file in &all_files {
             // O(degree(file)) — forward index lookup, no full-table scan.
             let symbol_keys = db.file_referenced_symbols(file);
-            let mut file_deps: HashSet<String> = HashSet::new();
+            let mut file_deps: HashSet<String> = HashSet::default();
             for symbol_key in &symbol_keys {
                 let lookup: &str = match symbol_key.split_once("::") {
                     Some((class, _)) => class,
@@ -1586,7 +1586,7 @@ impl AnalysisSession {
 /// plus parent / interfaces / traits' defining files for any classes declared
 /// in `file`. Self-edges are excluded.
 fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<String> {
-    let mut targets: HashSet<String> = HashSet::new();
+    let mut targets: HashSet<String> = HashSet::default();
 
     let mut add_target = |symbol: &str| {
         if let Some(defining_file) = db.symbol_defining_file(symbol) {
@@ -1783,7 +1783,7 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
         }
     }
     let mut v = V {
-        names: std::collections::HashSet::new(),
+        names: std::collections::HashSet::default(),
     };
     let _ = walk_owned_program(&mut v, program);
     v.names.into_iter().collect()

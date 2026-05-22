@@ -9,6 +9,7 @@ repository.workspace = true
 homepage.workspace   = true
 
 [dependencies]
-smallvec = { workspace = true }
-indexmap = { workspace = true }
-serde    = { workspace = true, features = ["rc"] }
+smallvec   = { workspace = true }
+indexmap   = { workspace = true }
+serde      = { workspace = true, features = ["rc"] }
+rustc-hash = { workspace = true }

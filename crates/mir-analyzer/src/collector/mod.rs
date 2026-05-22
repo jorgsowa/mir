@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 /// Pass 1 — Definition collector.
 ///
@@ -123,7 +124,7 @@ pub struct DefinitionCollector<'a> {
     source_map: &'a php_rs_parser::source_map::SourceMap,
     namespace: Option<String>,
     /// `use` aliases: alias → FQCN
-    use_aliases: std::collections::HashMap<String, String>,
+    use_aliases: FxHashMap<String, String>,
     issues: IssueBuffer,
     /// When `Some`, stub symbols annotated with `@since`/`@removed` are filtered
     /// against this target version. `None` disables filtering (user code).
@@ -134,7 +135,7 @@ pub struct DefinitionCollector<'a> {
     /// All `use` imports ever encountered in this file, accumulated across all
     /// namespace blocks. Unlike `use_aliases`, this is never cleared or restored,
     /// so braced-namespace imports are not lost.
-    accumulated_imports: std::collections::HashMap<String, String>,
+    accumulated_imports: FxHashMap<String, String>,
 }
 
 impl<'a> DefinitionCollector<'a> {
@@ -153,11 +154,11 @@ impl<'a> DefinitionCollector<'a> {
             file,
             source,
             namespace: None,
-            use_aliases: std::collections::HashMap::new(),
+            use_aliases: FxHashMap::default(),
             issues: IssueBuffer::new(),
             php_version: None,
             first_namespace: None,
-            accumulated_imports: std::collections::HashMap::new(),
+            accumulated_imports: FxHashMap::default(),
         }
     }
 
@@ -241,7 +242,7 @@ impl<'a> DefinitionCollector<'a> {
     fn resolve_union_doc_with_aliases(
         &self,
         union: Union,
-        aliases: &std::collections::HashMap<String, Union>,
+        aliases: &FxHashMap<String, Union>,
     ) -> Union {
         resolution::resolve_union_doc_with_aliases(
             union,
@@ -341,11 +342,8 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    fn build_type_aliases(
-        &self,
-        doc: &crate::parser::ParsedDocblock,
-    ) -> std::collections::HashMap<String, Union> {
-        let mut aliases = std::collections::HashMap::new();
+    fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Union> {
+        let mut aliases = FxHashMap::default();
         for alias in &doc.type_aliases {
             if alias.name.is_empty() || alias.type_expr.is_empty() {
                 continue;
@@ -381,7 +379,7 @@ impl<'a> DefinitionCollector<'a> {
     fn add_docblock_members(
         &self,
         doc: &crate::parser::ParsedDocblock,
-        aliases: &std::collections::HashMap<String, Union>,
+        aliases: &FxHashMap<String, Union>,
         class_fqcn: &str,
         own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodStorage>>,
         own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyStorage>,
@@ -684,7 +682,7 @@ impl<'a> DefinitionCollector<'a> {
         m: &php_ast::owned::MethodDecl,
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
-        aliases: Option<&std::collections::HashMap<String, Union>>,
+        aliases: Option<&FxHashMap<String, Union>>,
     ) -> Option<MethodStorage> {
         let doc = m
             .doc_comment

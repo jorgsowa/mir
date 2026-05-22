@@ -14,7 +14,7 @@
 /// let file = db.symbol_defining_file("strlen"); // → "stubs/standard/standard_0.php"
 /// let src  = stub_vfs.get(&file).unwrap();           // → &'static str PHP source
 /// ```
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
@@ -130,7 +130,7 @@ pub(crate) fn stub_path_for_constant(name: &str) -> Option<&'static str> {
 pub(crate) fn collect_referenced_builtin_paths(source: &str) -> Vec<&'static str> {
     use php_lexer::lex_all;
 
-    let mut tokens: HashSet<&str> = HashSet::new();
+    let mut tokens: HashSet<&str> = HashSet::default();
     let (lexed, _errors) = lex_all(source);
 
     let mut i = 0;
@@ -161,7 +161,7 @@ pub(crate) fn collect_referenced_builtin_paths(source: &str) -> Vec<&'static str
         }
     }
 
-    let mut paths: HashSet<&'static str> = HashSet::new();
+    let mut paths: HashSet<&'static str> = HashSet::default();
     for token in tokens {
         if let Some(p) = stub_path_for_function(token) {
             paths.insert(p);
@@ -188,7 +188,7 @@ pub(crate) fn collect_referenced_builtin_paths_from_ast(
     program: &php_ast::owned::Program,
 ) -> Vec<&'static str> {
     let mut visitor = BuiltinRefVisitor {
-        paths: HashSet::new(),
+        paths: HashSet::default(),
     };
     let _ = walk_owned_program(&mut visitor, program);
     visitor.paths.into_iter().collect()

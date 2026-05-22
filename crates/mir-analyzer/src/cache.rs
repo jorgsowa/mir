@@ -3,7 +3,7 @@
 /// Cache key: file path.  Cache validity: BLAKE3 hash of file content.
 /// If the content hash matches what was stored, the cached issues are returned
 /// and Pass 2 analysis is skipped for that file.
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -270,7 +270,7 @@ mod tests {
         seed(&cache, "B");
         seed(&cache, "C");
 
-        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::default();
         deps.entry("A".into()).or_default().insert("B".into());
         deps.entry("B".into()).or_default().insert("C".into());
         cache.set_reverse_deps(deps);
@@ -294,7 +294,7 @@ mod tests {
         seed(&cache, "C");
         seed(&cache, "D");
 
-        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::default();
         deps.entry("A".into()).or_default().insert("B".into());
         deps.entry("A".into()).or_default().insert("C".into());
         deps.entry("B".into()).or_default().insert("D".into());
@@ -316,7 +316,7 @@ mod tests {
         seed(&cache, "A");
         seed(&cache, "B");
 
-        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::default();
         deps.entry("A".into()).or_default().insert("B".into());
         deps.entry("B".into()).or_default().insert("A".into());
         cache.set_reverse_deps(deps);
@@ -337,7 +337,7 @@ mod tests {
         seed(&cache, "B");
         seed(&cache, "C");
 
-        let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut deps: HashMap<String, HashSet<String>> = HashMap::default();
         deps.entry("A".into()).or_default().insert("B".into());
         cache.set_reverse_deps(deps);
 

@@ -1,5 +1,5 @@
 /// Analysis context — carries type state through statement/expression analysis.
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -82,8 +82,8 @@ impl Context {
     pub fn new() -> Self {
         let mut ctx = Self {
             vars: IndexMap::new(),
-            assigned_vars: HashSet::new(),
-            possibly_assigned_vars: HashSet::new(),
+            assigned_vars: HashSet::default(),
+            possibly_assigned_vars: HashSet::default(),
             self_fqcn: None,
             parent_fqcn: None,
             static_fqcn: None,
@@ -93,13 +93,13 @@ impl Context {
             inside_finally: false,
             inside_constructor: false,
             strict_types: false,
-            tainted_vars: HashSet::new(),
-            read_vars: HashSet::new(),
-            param_names: HashSet::new(),
-            byref_param_names: HashSet::new(),
+            tainted_vars: HashSet::default(),
+            read_vars: HashSet::default(),
+            param_names: HashSet::default(),
+            byref_param_names: HashSet::default(),
             diverges: false,
-            var_locations: HashMap::new(),
-            template_param_names: HashSet::new(),
+            var_locations: HashMap::default(),
+            template_param_names: HashSet::default(),
         };
         // PHP superglobals — always in scope in any context
         for sg in &[
@@ -188,8 +188,8 @@ impl Context {
         ctx.inside_constructor = inside_constructor;
 
         // Build a map of template names to their bounds for parameter type resolution
-        let mut template_bounds_map: std::collections::HashMap<String, Union> =
-            std::collections::HashMap::new();
+        let mut template_bounds_map: rustc_hash::FxHashMap<String, Union> =
+            rustc_hash::FxHashMap::default();
         if let Some(templates) = template_params {
             for tp in templates {
                 ctx.template_param_names.insert(tp.name.to_string());

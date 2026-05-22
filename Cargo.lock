@@ -807,6 +807,7 @@ name = "mir-types"
 version = "0.28.0"
 dependencies = [
  "indexmap",
+ "rustc-hash",
  "serde",
  "smallvec",
 ]

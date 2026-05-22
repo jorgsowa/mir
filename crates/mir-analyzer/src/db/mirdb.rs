@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
@@ -222,7 +222,7 @@ impl MirDatabase for MirDb {
             return HashSet::default();
         };
         let defs = crate::db::collect_file_definitions(self, sf);
-        let mut out = HashSet::new();
+        let mut out = HashSet::default();
         for c in defs.slice.classes.iter() {
             out.insert(c.fqcn.clone());
         }

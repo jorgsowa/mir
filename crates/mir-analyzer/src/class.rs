@@ -7,7 +7,7 @@
 ///   - Overriding method return type is covariant with parent
 ///   - Overriding method does not override a final method
 ///   - Class does not extend a final class
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
 use mir_codebase::storage::{Location as StorageLocation, Visibility};
@@ -32,8 +32,8 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn new(db: &'a dyn MirDatabase) -> Self {
         Self {
             db,
-            analyzed_files: HashSet::new(),
-            sources: HashMap::new(),
+            analyzed_files: HashSet::default(),
+            sources: HashMap::default(),
         }
     }
 
@@ -605,7 +605,7 @@ impl<'a> ClassAnalyzer<'a> {
     // -----------------------------------------------------------------------
 
     fn check_circular_class_inheritance(&self, issues: &mut Vec<Issue>) {
-        let mut globally_done: HashSet<String> = HashSet::new();
+        let mut globally_done: HashSet<String> = HashSet::default();
 
         let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
@@ -626,7 +626,7 @@ impl<'a> ClassAnalyzer<'a> {
 
             // Walk the parent chain, tracking order for cycle reporting.
             let mut chain: Vec<Arc<str>> = Vec::new();
-            let mut chain_set: HashSet<String> = HashSet::new();
+            let mut chain_set: HashSet<String> = HashSet::default();
             let mut current: Arc<str> = start_fqcn.clone();
 
             loop {
@@ -706,7 +706,7 @@ impl<'a> ClassAnalyzer<'a> {
     // -----------------------------------------------------------------------
 
     fn check_circular_interface_inheritance(&self, issues: &mut Vec<Issue>) {
-        let mut globally_done: HashSet<String> = HashSet::new();
+        let mut globally_done: HashSet<String> = HashSet::default();
 
         let mut iface_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
             .iter()
@@ -725,7 +725,7 @@ impl<'a> ClassAnalyzer<'a> {
                 continue;
             }
             let mut in_stack: Vec<Arc<str>> = Vec::new();
-            let mut stack_set: HashSet<String> = HashSet::new();
+            let mut stack_set: HashSet<String> = HashSet::default();
             self.dfs_interface_cycle(
                 start_fqcn.clone(),
                 &mut in_stack,

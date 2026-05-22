@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
 use mir_types::Union;
@@ -15,13 +15,13 @@ pub trait MirDatabase: salsa::Database {
     fn file_namespace(&self, file: &str) -> Option<Arc<str>>;
 
     /// Return this file's `use` alias map.
-    fn file_imports(&self, file: &str) -> HashMap<String, String>;
+    fn file_imports(&self, file: &str) -> FxHashMap<String, String>;
 
     /// Return the known type for a PHP global variable.
     fn global_var_type(&self, name: &str) -> Option<Union>;
 
     /// Return `(file, imports)` snapshots for every known file.
-    fn file_import_snapshots(&self) -> Vec<(Arc<str>, HashMap<String, String>)>;
+    fn file_import_snapshots(&self) -> Vec<(Arc<str>, FxHashMap<String, String>)>;
 
     /// Return the defining file for a symbol, if known.
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>>;
@@ -32,7 +32,7 @@ pub trait MirDatabase: salsa::Database {
     /// Return the set of symbol FQNs currently defined in `file`.
     /// O(1) via the forward index; use instead of `symbols_defined_in_file`
     /// when a `HashSet` is more convenient.
-    fn file_defined_symbols(&self, file: &str) -> std::collections::HashSet<Arc<str>>;
+    fn file_defined_symbols(&self, file: &str) -> FxHashSet<Arc<str>>;
 
     /// Return all files that reference `symbol_key`.
     /// O(1) via the `symbol_referencers` reverse index; valid even after

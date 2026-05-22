@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_issues::Issue;
@@ -340,10 +341,7 @@ impl<'a> Pass2Driver<'a> {
         file: Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
-        type_envs: &mut std::collections::HashMap<
-            crate::type_env::ScopeId,
-            crate::type_env::TypeEnv,
-        >,
+        type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) -> Vec<Issue> {
         use php_ast::owned::StmtKind;
@@ -757,10 +755,7 @@ impl<'a> Pass2Driver<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        type_envs: &mut std::collections::HashMap<
-            crate::type_env::ScopeId,
-            crate::type_env::TypeEnv,
-        >,
+        type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         use crate::context::Context;
@@ -854,10 +849,7 @@ impl<'a> Pass2Driver<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        type_envs: &mut std::collections::HashMap<
-            crate::type_env::ScopeId,
-            crate::type_env::TypeEnv,
-        >,
+        type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         use crate::context::Context;
@@ -1210,10 +1202,7 @@ impl<'a> Pass2Driver<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        type_envs: &mut std::collections::HashMap<
-            crate::type_env::ScopeId,
-            crate::type_env::TypeEnv,
-        >,
+        type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         use crate::context::Context;

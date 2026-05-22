@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use php_ast::Span;
@@ -919,7 +920,7 @@ fn generic_ancestor_type_args_inner(
     }
 
     let parent_template_params = class_template_params(ea, parent.as_ref());
-    let bindings: std::collections::HashMap<Arc<str>, Union> = parent_template_params
+    let bindings: FxHashMap<Arc<str>, Union> = parent_template_params
         .iter()
         .zip(extends_type_args.iter())
         .map(|(tp, ty)| (tp.name.clone(), ty.clone()))

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 use mir_types::Union;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -391,7 +392,7 @@ pub struct ClassStorage {
     pub trait_use_locations: Vec<(Arc<str>, Location)>,
     /// Type aliases declared on this class via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
-    pub type_aliases: std::collections::HashMap<Arc<str>, Union>,
+    pub type_aliases: FxHashMap<Arc<str>, Union>,
     /// Raw import-type declarations (`(local_name, original_name, from_class)`) — resolved during finalization.
     #[serde(default)]
     pub pending_import_types: Vec<(Arc<str>, Arc<str>, Arc<str>)>,
@@ -553,7 +554,7 @@ pub struct StubSlice {
     /// Populated by `DefinitionCollector`; ingested into the salsa db's
     /// `file_imports` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
-    pub imports: std::collections::HashMap<String, String>,
+    pub imports: FxHashMap<String, String>,
     /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
     /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.
     #[serde(skip)]
@@ -564,7 +565,6 @@ pub struct StubSlice {
 // Param list deduplication
 // ---------------------------------------------------------------------------
 
-use rustc_hash::FxHashMap;
 use std::sync::Mutex;
 
 type ParamCache = Mutex<FxHashMap<Vec<FnParam>, Arc<[FnParam]>>>;

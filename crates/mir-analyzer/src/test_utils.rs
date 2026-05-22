@@ -135,7 +135,7 @@ struct FixtureConfig {
     /// analyzer's default suppressions (currently the dead-code group)
     /// apply unchanged. `suppress=` with an empty value clears the set
     /// entirely — that's how a fixture opts in to dead-code reporting.
-    suppressed_issue_kinds: Option<std::collections::HashSet<String>>,
+    suppressed_issue_kinds: Option<rustc_hash::FxHashSet<String>>,
     /// Paths (relative to temp dir) to pass as `analyzer.stub_files`.
     stub_files: Vec<String>,
     /// Paths (relative to temp dir) to pass as `analyzer.stub_dirs`.

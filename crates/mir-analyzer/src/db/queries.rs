@@ -3,7 +3,7 @@ use std::sync::Arc;
 use mir_codebase::storage::{Location, TemplateParam};
 use mir_issues::Issue;
 use mir_types::Union;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::*;
 
@@ -106,9 +106,9 @@ pub fn class_template_params_via_db(
 pub fn inherited_template_bindings_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
-) -> std::collections::HashMap<Arc<str>, Union> {
-    let mut bindings: std::collections::HashMap<Arc<str>, Union> = std::collections::HashMap::new();
-    let mut visited: rustc_hash::FxHashSet<Arc<str>> = rustc_hash::FxHashSet::default();
+) -> FxHashMap<Arc<str>, Union> {
+    let mut bindings: FxHashMap<Arc<str>, Union> = FxHashMap::default();
+    let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     let mut current: Arc<str> = Arc::from(fqcn);
     loop {
         if !visited.insert(current.clone()) {

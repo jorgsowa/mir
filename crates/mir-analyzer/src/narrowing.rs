@@ -446,7 +446,7 @@ fn narrow_instanceof_preserving_subtypes(
     current: &Union,
     class_name: &str,
     db: &dyn MirDatabase,
-    template_param_names: &std::collections::HashSet<String>,
+    template_param_names: &rustc_hash::FxHashSet<String>,
 ) -> Union {
     let narrowed_ty = Atomic::TNamedObject {
         fqcn: class_name.into(),

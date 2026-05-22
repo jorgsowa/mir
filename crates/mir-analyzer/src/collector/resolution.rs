@@ -1,10 +1,11 @@
 use mir_types::{Atomic, Union};
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 pub(super) fn resolve_name(
     name: &str,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> String {
     if name.starts_with('\\') {
         return name.trim_start_matches('\\').to_string();
@@ -23,10 +24,7 @@ pub(super) fn resolve_name(
     name.to_string()
 }
 
-pub(super) fn resolve_alias_only(
-    name: &str,
-    use_aliases: &std::collections::HashMap<String, String>,
-) -> String {
+pub(super) fn resolve_alias_only(name: &str, use_aliases: &FxHashMap<String, String>) -> String {
     let name = name.trim_start_matches('\\');
     let first_part = name.split('\\').next().unwrap_or(name);
     if let Some(resolved) = use_aliases.get(first_part) {
@@ -43,7 +41,7 @@ pub(super) fn resolve_type_name(
     name: &Arc<str>,
     full_qualify: bool,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Arc<str> {
     let stripped = name.trim_start_matches('\\');
     let first_part = stripped.split('\\').next().unwrap_or(stripped);
@@ -64,7 +62,7 @@ pub(super) fn resolve_union_inner(
     union: Union,
     full_qualify: bool,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Union {
     let from_docblock = union.from_docblock;
     let types: Vec<Atomic> = union
@@ -81,7 +79,7 @@ pub(super) fn resolve_atomic_inner(
     atomic: Atomic,
     full_qualify: bool,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
@@ -168,7 +166,7 @@ pub(super) fn fill_self_static_parent(union: Union, class_fqcn: &str) -> Union {
 pub(super) fn resolve_union(
     union: Union,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Union {
     resolve_union_inner(union, true, namespace, use_aliases)
 }
@@ -176,16 +174,16 @@ pub(super) fn resolve_union(
 pub(super) fn resolve_union_doc(
     union: Union,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Union {
     resolve_union_inner(union, false, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_doc_with_aliases(
     union: Union,
-    aliases: &std::collections::HashMap<String, Union>,
+    aliases: &FxHashMap<String, Union>,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Union {
     if aliases.is_empty() {
         return resolve_union_doc(union, namespace, use_aliases);
@@ -220,7 +218,7 @@ pub(super) fn resolve_union_doc_with_aliases(
 pub(super) fn resolve_union_opt(
     opt: Option<Union>,
     namespace: &Option<String>,
-    use_aliases: &std::collections::HashMap<String, String>,
+    use_aliases: &FxHashMap<String, String>,
 ) -> Option<Union> {
     opt.map(|u| resolve_union(u, namespace, use_aliases))
 }

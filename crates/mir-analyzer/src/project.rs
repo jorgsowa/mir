@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use rayon::prelude::*;
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use crate::cache::{hash_content, AnalysisCache};
 use crate::db::{
@@ -58,7 +58,7 @@ pub struct ProjectAnalyzer {
     /// consumer (CLI, test fixture, programmatic caller) adds names. The
     /// dead-code pass is skipped automatically when every
     /// [`dead_code_issue_kinds`] entry is in this set.
-    pub suppressed_issue_kinds: std::collections::HashSet<String>,
+    pub suppressed_issue_kinds: HashSet<String>,
     /// Target PHP language version. `None` means "not configured"; resolved to
     /// `PhpVersion::LATEST` when passed down to `StatementsAnalyzer`.
     pub php_version: Option<PhpVersion>,
@@ -108,7 +108,7 @@ impl ProjectAnalyzer {
             cache: None,
             on_file_done: None,
             psr4: None,
-            suppressed_issue_kinds: std::collections::HashSet::new(),
+            suppressed_issue_kinds: HashSet::default(),
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
@@ -122,7 +122,7 @@ impl ProjectAnalyzer {
             cache: Some(AnalysisCache::open(cache_dir)),
             on_file_done: None,
             psr4: None,
-            suppressed_issue_kinds: std::collections::HashSet::new(),
+            suppressed_issue_kinds: HashSet::default(),
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
@@ -157,7 +157,7 @@ impl ProjectAnalyzer {
             cache: None,
             on_file_done: None,
             psr4: Some(psr4),
-            suppressed_issue_kinds: std::collections::HashSet::new(),
+            suppressed_issue_kinds: HashSet::default(),
             php_version: None,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
@@ -528,8 +528,7 @@ impl ProjectAnalyzer {
             }
         }
 
-        let mut files_with_parse_errors: std::collections::HashSet<Arc<str>> =
-            std::collections::HashSet::new();
+        let mut files_with_parse_errors: HashSet<Arc<str>> = HashSet::default();
         for (defs, _hash, _hard_err) in file_defs {
             for issue in defs.issues.iter() {
                 if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
@@ -586,7 +585,7 @@ impl ProjectAnalyzer {
         }
 
         // ---- Class-level checks (M11) ----------------------------------------
-        let analyzed_file_set: std::collections::HashSet<std::sync::Arc<str>> =
+        let analyzed_file_set: HashSet<Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
             let class_db = {
@@ -757,7 +756,7 @@ impl ProjectAnalyzer {
             guard.rebuild_workspace_symbol_index();
         }
 
-        AnalysisResult::build(all_issues, std::collections::HashMap::new(), all_symbols)
+        AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), all_symbols)
     }
 
     fn lazy_load_missing_classes(
@@ -765,12 +764,11 @@ impl ProjectAnalyzer {
         psr4: Arc<crate::composer::Psr4Map>,
         all_issues: &mut Vec<Issue>,
     ) {
-        use std::collections::HashSet;
         use std::sync::Arc;
 
         let max_depth = 10;
-        let mut loaded: HashSet<String> = HashSet::new();
-        let mut scanned: HashSet<Arc<str>> = HashSet::new();
+        let mut loaded: HashSet<String> = HashSet::default();
+        let mut scanned: HashSet<Arc<str>> = HashSet::default();
 
         for _ in 0..max_depth {
             let mut to_load: Vec<(String, PathBuf)> = Vec::new();
@@ -861,12 +859,12 @@ impl ProjectAnalyzer {
         use mir_issues::IssueKind;
 
         let max_depth = 5;
-        let mut loaded: HashSet<String> = HashSet::new();
+        let mut loaded: HashSet<String> = HashSet::default();
 
         for _ in 0..max_depth {
             // Deduplicate by FQCN: HashMap prevents loading the same class twice
             // when multiple files share the same UndefinedClass diagnostic.
-            let mut to_load: HashMap<String, PathBuf> = HashMap::new();
+            let mut to_load: HashMap<String, PathBuf> = HashMap::default();
 
             for issue in all_issues.iter() {
                 if let IssueKind::UndefinedClass { name } = &issue.kind {
@@ -974,7 +972,7 @@ impl ProjectAnalyzer {
                 guard.replay_reference_locations(file, &ref_locs);
                 guard.commit_pending_to_maps();
                 self.apply_issue_suppressions(&mut issues);
-                return AnalysisResult::build(issues, HashMap::new(), Vec::new());
+                return AnalysisResult::build(issues, HashMap::default(), Vec::new());
             }
         }
 
@@ -1040,7 +1038,7 @@ impl ProjectAnalyzer {
         }
 
         self.apply_issue_suppressions(&mut all_issues);
-        AnalysisResult::build(all_issues, HashMap::new(), symbols)
+        AnalysisResult::build(all_issues, HashMap::default(), symbols)
     }
 
     /// Analyze a PHP source string without a real file path.
@@ -1061,9 +1059,9 @@ impl ProjectAnalyzer {
                 && issue.severity == mir_issues::Severity::Error
         }) {
             analyzer.apply_issue_suppressions(&mut all_issues);
-            return AnalysisResult::build(all_issues, std::collections::HashMap::new(), Vec::new());
+            return AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), Vec::new());
         }
-        let mut type_envs = std::collections::HashMap::new();
+        let mut type_envs = rustc_hash::FxHashMap::default();
         let mut all_symbols = Vec::new();
         let result = php_rs_parser::parse(source);
 
@@ -1258,7 +1256,7 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 // build_reverse_deps
 
 fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSet<String>> {
-    let mut reverse: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut reverse: HashMap<String, HashSet<String>> = HashMap::default();
 
     let mut add_edge = |symbol: &str, dependent_file: &str| {
         if let Some(defining_file) = db.symbol_defining_file(symbol) {
@@ -1396,7 +1394,7 @@ fn extract_reference_locations(
 pub struct AnalysisResult {
     pub issues: Vec<Issue>,
     #[doc(hidden)]
-    pub type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+    pub type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
     /// Per-expression resolved symbols from Pass 2, sorted by file path.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
     /// Maps each file path to the contiguous range within `symbols` that belongs
@@ -1408,11 +1406,11 @@ pub struct AnalysisResult {
 impl AnalysisResult {
     fn build(
         issues: Vec<Issue>,
-        type_envs: std::collections::HashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         mut symbols: Vec<crate::symbol::ResolvedSymbol>,
     ) -> Self {
         symbols.sort_unstable_by(|a, b| a.file.as_ref().cmp(b.file.as_ref()));
-        let mut symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>> = HashMap::new();
+        let mut symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>> = HashMap::default();
         let mut i = 0;
         while i < symbols.len() {
             let file = Arc::clone(&symbols[i].file);
@@ -1447,8 +1445,8 @@ impl AnalysisResult {
     }
 
     /// Group issues by source file.
-    pub fn issues_by_file(&self) -> HashMap<std::sync::Arc<str>, Vec<&Issue>> {
-        let mut map: HashMap<std::sync::Arc<str>, Vec<&Issue>> = HashMap::new();
+    pub fn issues_by_file(&self) -> HashMap<Arc<str>, Vec<&Issue>> {
+        let mut map: HashMap<Arc<str>, Vec<&Issue>> = HashMap::default();
         for issue in &self.issues {
             map.entry(issue.location.file.clone())
                 .or_default()
