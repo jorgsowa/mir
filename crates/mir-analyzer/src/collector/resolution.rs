@@ -198,7 +198,7 @@ pub(super) fn resolve_union_doc_with_aliases(
         match atomic {
             Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
                 if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
-                    result = Union::merge(&result, alias_ty);
+                    result.merge_with(alias_ty);
                 } else {
                     result.add_type(resolve_atomic_inner(
                         Atomic::TNamedObject { fqcn, type_params },

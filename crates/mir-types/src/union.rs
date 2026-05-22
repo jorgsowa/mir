@@ -385,12 +385,53 @@ impl Union {
     /// Merge two unions at a branch join point (e.g. after if/else).
     /// The result is the union of all types in both.
     pub fn merge(a: &Union, b: &Union) -> Union {
-        let mut result = a.clone();
-        for atomic in &b.types {
-            result.add_type(atomic.clone());
+        // Fast path: b is empty — nothing to add.
+        if b.types.is_empty() {
+            let mut result = a.clone();
+            result.possibly_undefined = a.possibly_undefined || b.possibly_undefined;
+            return result;
         }
-        result.possibly_undefined = a.possibly_undefined || b.possibly_undefined;
+        // Fast path: a is empty — clone b.
+        if a.types.is_empty() {
+            let mut result = b.clone();
+            result.possibly_undefined = a.possibly_undefined || b.possibly_undefined;
+            return result;
+        }
+        // Fast path: a is already mixed — b cannot widen it further.
+        if a.types.len() == 1 && matches!(a.types[0], Atomic::TMixed) {
+            let mut result = a.clone();
+            result.possibly_undefined = a.possibly_undefined || b.possibly_undefined;
+            return result;
+        }
+        // Fast path: b contains mixed — result collapses to mixed.
+        if b.types.iter().any(|t| matches!(t, Atomic::TMixed)) {
+            return Union {
+                types: smallvec::smallvec![Atomic::TMixed],
+                possibly_undefined: a.possibly_undefined || b.possibly_undefined,
+                from_docblock: a.from_docblock || b.from_docblock,
+            };
+        }
+        let mut result = a.clone();
+        result.merge_with(b);
         result
+    }
+
+    /// Merge `other` into `self` in-place (avoids cloning `self`).
+    pub fn merge_with(&mut self, other: &Union) {
+        if self.types.iter().any(|t| matches!(t, Atomic::TMixed)) {
+            self.possibly_undefined |= other.possibly_undefined;
+            return;
+        }
+        if other.types.iter().any(|t| matches!(t, Atomic::TMixed)) {
+            self.types.clear();
+            self.types.push(Atomic::TMixed);
+            self.possibly_undefined |= other.possibly_undefined;
+            return;
+        }
+        for atomic in &other.types {
+            self.add_type(atomic.clone());
+        }
+        self.possibly_undefined |= other.possibly_undefined;
     }
 
     /// Intersect with another union: keep only types present in `other`, widening

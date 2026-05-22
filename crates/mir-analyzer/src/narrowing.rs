@@ -426,7 +426,7 @@ fn narrow_or_instanceof_true(
                         db,
                         &ctx.template_param_names,
                     );
-                    narrowed = Union::merge(&narrowed, &n);
+                    narrowed.merge_with(&n);
                 }
                 // Fall back to current if narrowed is empty (e.g. mixed)
                 let result = if narrowed.is_empty() {

@@ -1385,7 +1385,8 @@ pub fn merge_return_types(return_types: &[Union]) -> Union {
     if return_types.is_empty() {
         return Union::single(mir_types::Atomic::TVoid);
     }
-    return_types
-        .iter()
-        .fold(Union::empty(), |acc, t| Union::merge(&acc, t))
+    return_types.iter().fold(Union::empty(), |mut acc, t| {
+        acc.merge_with(t);
+        acc
+    })
 }

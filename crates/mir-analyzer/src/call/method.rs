@@ -166,40 +166,34 @@ impl CallAnalyzer {
                 } => {
                     let fqcn_resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
-                    result = Union::merge(
-                        &result,
-                        &resolve_method_return(
-                            ea,
-                            ctx,
-                            call,
-                            span,
-                            method_name,
-                            fqcn,
-                            receiver_type_params.as_slice(),
-                            &arg_types,
-                            &arg_spans,
-                        ),
-                    );
+                    result.merge_with(&resolve_method_return(
+                        ea,
+                        ctx,
+                        call,
+                        span,
+                        method_name,
+                        fqcn,
+                        receiver_type_params.as_slice(),
+                        &arg_types,
+                        &arg_spans,
+                    ));
                 }
                 mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
                 | mir_types::Atomic::TParent { fqcn } => {
                     let fqcn_resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
-                    result = Union::merge(
-                        &result,
-                        &resolve_method_return(
-                            ea,
-                            ctx,
-                            call,
-                            span,
-                            method_name,
-                            fqcn,
-                            &[],
-                            &arg_types,
-                            &arg_spans,
-                        ),
-                    );
+                    result.merge_with(&resolve_method_return(
+                        ea,
+                        ctx,
+                        call,
+                        span,
+                        method_name,
+                        fqcn,
+                        &[],
+                        &arg_types,
+                        &arg_spans,
+                    ));
                 }
                 mir_types::Atomic::TIntersection { parts } => {
                     let mut intersection_result = Union::empty();
@@ -217,35 +211,32 @@ impl CallAnalyzer {
                                 if crate::db::has_method_in_chain(ea.db, &resolved_arc, method_name)
                                 {
                                     found_method = true;
-                                    intersection_result = Union::merge(
-                                        &intersection_result,
-                                        &resolve_method_return(
-                                            ea,
-                                            ctx,
-                                            call,
-                                            span,
-                                            method_name,
-                                            &resolved_arc,
-                                            receiver_type_params.as_slice(),
-                                            &arg_types,
-                                            &arg_spans,
-                                        ),
-                                    );
+                                    intersection_result.merge_with(&resolve_method_return(
+                                        ea,
+                                        ctx,
+                                        call,
+                                        span,
+                                        method_name,
+                                        &resolved_arc,
+                                        receiver_type_params.as_slice(),
+                                        &arg_types,
+                                        &arg_spans,
+                                    ));
                                 }
                             }
                         }
                     }
                     if found_method {
-                        result = Union::merge(&result, &intersection_result);
+                        result.merge_with(&intersection_result);
                     } else {
-                        result = Union::merge(&result, &Union::mixed());
+                        result.add_type(mir_types::Atomic::TMixed);
                     }
                 }
                 mir_types::Atomic::TObject | mir_types::Atomic::TTemplateParam { .. } => {
-                    result = Union::merge(&result, &Union::mixed());
+                    result.add_type(mir_types::Atomic::TMixed);
                 }
                 _ => {
-                    result = Union::merge(&result, &Union::mixed());
+                    result.add_type(mir_types::Atomic::TMixed);
                 }
             }
         }

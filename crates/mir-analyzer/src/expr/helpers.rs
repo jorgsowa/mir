@@ -12,7 +12,7 @@ pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
             Atomic::TKeyedArray { properties, .. } => {
                 let mut all_values = new_value.clone();
                 for prop in properties.values() {
-                    all_values = Union::merge(&all_values, &prop.ty);
+                    all_values.merge_with(&prop.ty);
                 }
                 result.add_type(Atomic::TArray {
                     key: Box::new(Union::mixed()),

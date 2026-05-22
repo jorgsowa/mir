@@ -174,7 +174,7 @@ fn infer_from_pair(
             Atomic::TTemplateParam { name, .. } => {
                 let bind = template_residual.as_ref().unwrap_or(arg_ty);
                 let entry = bindings.entry(name.clone()).or_insert_with(Union::empty);
-                *entry = Union::merge(entry, bind);
+                entry.merge_with(bind);
             }
 
             // array<K, V> matched against array<k_ty, v_ty>
@@ -213,7 +213,7 @@ fn infer_from_pair(
                 {
                     let bind = template_residual.as_ref().unwrap_or(arg_ty);
                     let entry = bindings.entry(pfqcn.clone()).or_insert_with(Union::empty);
-                    *entry = Union::merge(entry, bind);
+                    entry.merge_with(bind);
                     continue;
                 }
                 for a_atomic in &arg_ty.types {

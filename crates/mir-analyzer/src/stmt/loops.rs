@@ -55,7 +55,7 @@ pub(super) fn widen_unstable(
     for (name, ty) in current_vars.iter_mut() {
         if let Some(pre_ty) = pre_vars.get(name) {
             if pre_ty != ty {
-                *ty = Union::merge(pre_ty, ty);
+                ty.merge_with(pre_ty);
             }
         } else if loop_guaranteed {
             // Variable is new in loop and loop is guaranteed to execute.
@@ -92,8 +92,8 @@ pub(super) fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
                         ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
                         ArrayKey::Int(i) => Atomic::TLiteralInt(*i),
                     };
-                    keys = Union::merge(&keys, &Union::single(key_atomic));
-                    values = Union::merge(&values, &prop.ty);
+                    keys.merge_with(&Union::single(key_atomic));
+                    values.merge_with(&prop.ty);
                 }
                 // Empty keyed array (e.g. `$arr = []` before push) — treat both as
                 // mixed to avoid propagating Union::empty() as a variable type.

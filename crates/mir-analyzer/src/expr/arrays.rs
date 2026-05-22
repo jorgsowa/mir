@@ -85,7 +85,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if elem.unpack {
                 has_unpack = true;
             } else {
-                all_value_types = Union::merge(&all_value_types, &value_ty);
+                all_value_types.merge_with(&value_ty);
                 if let Some(key_expr) = &elem.key {
                     let key_ty = self.analyze(key_expr, ctx);
                     // Float keys are silently truncated to int in PHP
@@ -99,7 +99,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             key_expr.span,
                         );
                     }
-                    key_union = Union::merge(&key_union, &key_ty);
+                    key_union.merge_with(&key_ty);
                 } else {
                     key_union.add_type(Atomic::TInt);
                 }
@@ -172,7 +172,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     let mut result = Union::empty();
                     for prop in properties.values() {
-                        result = Union::merge(&result, &prop.ty);
+                        result.merge_with(&prop.ty);
                     }
                     return if result.types.is_empty() {
                         Union::mixed()

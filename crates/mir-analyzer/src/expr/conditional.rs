@@ -31,7 +31,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 for name in then_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
                     ctx.read_vars.insert(name.clone());
                 }
-                Union::merge(&then_ty, &else_ty)
+                let mut merged = then_ty;
+                merged.merge_with(&else_ty);
+                merged
             }
             None => {
                 let else_ty = self.analyze(&t.else_expr, ctx);
@@ -39,7 +41,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if truthy_ty.is_empty() {
                     else_ty
                 } else {
-                    Union::merge(&truthy_ty, &else_ty)
+                    let mut merged = truthy_ty;
+                    merged.merge_with(&else_ty);
+                    merged
                 }
             }
         }
@@ -56,7 +60,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         if non_null_left.is_empty() {
             right_ty
         } else {
-            Union::merge(&non_null_left, &right_ty)
+            let mut merged = non_null_left;
+            merged.merge_with(&right_ty);
+            merged
         }
     }
 
@@ -75,7 +81,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
                     let cond_ty = self.analyze(cond, ctx);
-                    arm_ty = Union::merge(&arm_ty, &cond_ty);
+                    arm_ty.merge_with(&cond_ty);
                 }
             }
             // Use type narrowing if the subject is a variable
@@ -100,7 +106,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             let arm_body_ty = self.analyze(&arm.body, &mut arm_ctx);
-            result = Union::merge(&result, &arm_body_ty);
+            result.merge_with(&arm_body_ty);
             for name in &arm_ctx.read_vars {
                 ctx.read_vars.insert(name.clone());
             }
