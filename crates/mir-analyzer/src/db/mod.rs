@@ -89,11 +89,6 @@ pub trait MirDatabase: salsa::Database {
     /// invalidates on resolver swap.
     fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>>;
 
-    /// Return the singleton [`InferredReturnTypes`] input, if the
-    /// inference sweep has ever committed. Pass-2 readers go through the
-    /// `inferred_*_return_type` helpers in `db::inferred_types`.
-    fn inferred_return_types(&self) -> Option<InferredReturnTypes>;
-
     /// Return the singleton [`WorkspaceRevision`] input. Tracked
     /// workspace-enumeration queries (`workspace_classes`,
     /// `workspace_functions`) read its `revision` to anchor on
@@ -141,9 +136,7 @@ pub use self::find_queries::{
     is_method_concretely_implemented_pull, trait_in_file, ClassLike,
 };
 pub use self::inferred_types::{
-    inferred_function_return_type, inferred_function_return_type_demand,
-    inferred_method_return_type, inferred_method_return_type_demand, FunctionInferredMap,
-    InferredReturnTypes, MethodInferredMap,
+    inferred_function_return_type_demand, inferred_method_return_type_demand,
 };
 #[allow(unused_imports)]
 pub use self::mirdb::MirDb;
