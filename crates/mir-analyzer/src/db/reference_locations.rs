@@ -118,10 +118,8 @@ pub(crate) fn collect_accumulated_issues(
 /// and calls Pass 2 to analyze function/method bodies. Issues and reference
 /// locations are emitted via `IssueAccumulator` and `RefLocAccumulator`.
 ///
-/// This is still a hybrid: inferred types come from the prior
-/// `run_inference_sweep` → `commit_inferred_return_types` in the double-pass
-/// orchestration. Future S4 PRs will replace that with lazy
-/// `inferred_return_type(node)` tracked queries.
+/// Inferred return types are resolved on demand via `inferred_function_return_type_demand`
+/// and `inferred_method_return_type_demand` — no pre-sweep needed.
 #[salsa::tracked]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileInput) {
     use salsa::Accumulator as _;

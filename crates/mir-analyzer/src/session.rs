@@ -1264,9 +1264,7 @@ impl AnalysisSession {
     /// need to track or re-read files. Files for which the session has no
     /// source are silently skipped (returns the analyzable subset).
     ///
-    /// Does not run inference sweeps. For full-fidelity cross-file inferred
-    /// return types, follow up with [`Self::run_inference_sweep`] over the
-    /// affected file set.
+    /// Cross-file inferred return types are resolved on demand via salsa.
     pub fn analyze_dependents_of(&self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
         use rayon::prelude::*;
 
@@ -1456,40 +1454,6 @@ impl AnalysisSession {
             }
         }
         result
-    }
-
-    /// Cross-file inference sweep. For each `(file, source)` pair, calls the
-    /// Salsa-tracked `infer_file_return_types` query in parallel, then commits
-    /// the collected inferred return types to INPUT fields.
-    ///
-    /// Files must already be ingested via [`Self::ingest_file`] before calling
-    /// this method. Subsequent [`FileAnalyzer::analyze`] calls read the committed
-    /// INPUT fields via O(1) lookups with no lock contention.
-    pub fn run_inference_sweep(&self, files: &[(Arc<str>, Arc<str>)]) {
-        use rayon::prelude::*;
-        let db_priming = self.snapshot_db();
-        let inferred_results: Vec<crate::db::InferredFileTypes> = files
-            .par_iter()
-            .map_with(db_priming, |db, (path, _src)| {
-                if let Some(sf) = db.lookup_source_file(path) {
-                    crate::db::infer_file_return_types(db, sf)
-                } else {
-                    crate::db::InferredFileTypes::empty()
-                }
-            })
-            .collect();
-        let mut functions = Vec::new();
-        let mut methods = Vec::new();
-        for result in inferred_results {
-            for (fqn, ty) in result.functions.iter() {
-                functions.push((fqn.clone(), (**ty).clone()));
-            }
-            for ((fqcn, name), ty) in result.methods.iter() {
-                methods.push((fqcn.clone(), name.clone(), (**ty).clone()));
-            }
-        }
-        let mut guard = self.shared_db.salsa.write();
-        guard.commit_inferred_return_types(functions, methods);
     }
 
     /// File dependency graph: which files depend on which other files.

@@ -7,13 +7,10 @@
 //! for both APIs) and `Database/Eloquent/Model.php` (high fanout — exercises
 //! cross-file invalidation).
 //!
-//! NOTE: `FileAnalyzer::analyze` deliberately skips the inference-only Pass 2
-//! sweep that `ProjectAnalyzer::re_analyze_file` runs. The diagnostic outputs
-//! aren't byte-identical: the session API may briefly miss issues that depend
-//! on within-file inference until `run_inference_sweep` is called explicitly.
-//! This is by design — the latency win is what makes the session API suitable
-//! for keystroke-frequency re-analysis. Run `analyze_real_world` for
-//! full-fidelity diagnostic benchmarks.
+//! NOTE: `FileAnalyzer::analyze` resolves cross-file inferred return types on
+//! demand via salsa; no separate inference sweep is required.  The diagnostic
+//! outputs should be equivalent to `ProjectAnalyzer::re_analyze_file`.
+//! Run `analyze_real_world` for full-fidelity diagnostic benchmarks.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::path::{Path, PathBuf};

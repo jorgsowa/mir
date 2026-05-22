@@ -10,7 +10,7 @@ use crate::cache::{hash_content, AnalysisCache};
 use crate::db::{
     collect_file_definitions, FileDefinitions, MirDatabase, MirDb, RefLoc, SourceFile,
 };
-use crate::pass2::{InferredTypes, Pass2Driver};
+use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
@@ -599,57 +599,32 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- Inference pre-sweep: prime inferred return types ----------------
-        // Run an inference-only Pass 2 over each file in parallel using direct
-        // rayon (no Salsa tracked-query overhead per file), collect the results,
-        // then commit them to Salsa INPUT fields.  The full Pass 2 then reads
-        // those fields via O(1) accesses with no lock contention.
+        // ---- Inference pre-warm: prime inferred return types via salsa --------
+        // Call `infer_file_return_types` in parallel to warm salsa's memo table
+        // before Pass 2.  The full Pass 2 reads per-file inferred types on
+        // demand via `inferred_function_return_type_demand` /
+        // `inferred_method_return_type_demand`, which resolve to these memoized
+        // results.  No pre-committed singleton is needed.
         //
-        // We use `Pass2Driver::new_inference_only` directly rather than the
-        // Salsa-tracked `infer_file_return_types` query so that the batch path
-        // avoids per-file Salsa lock acquisition and memo-table overhead on every
-        // cold start.  `infer_file_return_types` is reserved for the incremental
-        // LSP path (AnalysisSession) where Salsa cache hits across edits matter.
-        //
-        // `map_with` clones `db_priming` once per rayon worker thread (not once
-        // per file as the old `in_place_scope` loop did). For N files on T threads
-        // this reduces clones from N to T.  Results are returned by value and
-        // flattened after `collect()`, replacing the Arc<Mutex<Vec>> accumulator.
-        // All per-thread db clones are dropped when `collect()` returns, so
-        // `commit_inferred_return_types` (which calls Salsa setters that wait for
-        // strong_count == 1) cannot deadlock.
+        // `for_each_with` clones `db_priming` once per rayon worker thread.
         {
+            let source_files: Vec<SourceFile> = {
+                let guard = self.shared_db.salsa.read();
+                parsed_files
+                    .iter()
+                    .filter(|p| !files_with_parse_errors.contains(&p.file))
+                    .filter_map(|p| (**guard).lookup_source_file(&p.file))
+                    .collect()
+            };
             let db_priming = {
                 let guard = self.shared_db.salsa.read();
                 (**guard).clone()
             };
-            let php_version = self.resolved_php_version();
-            let all_inferred: Vec<InferredTypes> = parsed_files
-                .par_iter()
-                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
-                .map_with(db_priming, |db, parsed| {
-                    let driver = Pass2Driver::new_inference_only(
-                        db as &dyn crate::db::MirDatabase,
-                        php_version,
-                    );
-                    driver.analyze_bodies(
-                        parsed.owned(),
-                        parsed.file.clone(),
-                        parsed.source(),
-                        parsed.source_map(),
-                    );
-                    driver.take_inferred_types()
-                })
-                .collect();
-            // db_priming is consumed by map_with; per-thread clones dropped by collect().
-            let mut functions = Vec::new();
-            let mut methods = Vec::new();
-            for inferred in all_inferred {
-                functions.extend(inferred.functions);
-                methods.extend(inferred.methods);
-            }
-            let mut guard = self.shared_db.salsa.write();
-            guard.commit_inferred_return_types(functions, methods);
+            source_files
+                .into_par_iter()
+                .for_each_with(db_priming, |db, sf| {
+                    let _ = crate::db::infer_file_return_types(db as &dyn MirDatabase, sf);
+                });
         }
         let _t_presweep = _t0.elapsed();
 

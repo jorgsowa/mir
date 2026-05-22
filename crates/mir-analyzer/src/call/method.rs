@@ -57,7 +57,7 @@ pub(super) fn resolve_method_from_db(
         } else {
             Arc::<str>::from(name.to_ascii_lowercase().as_str())
         };
-        let inferred = crate::db::inferred_method_return_type(db, &owner_fqcn, &name_lower);
+        let inferred = crate::db::inferred_method_return_type_demand(db, &owner_fqcn, &name_lower);
         let return_ty_raw = storage
             .return_type
             .clone()

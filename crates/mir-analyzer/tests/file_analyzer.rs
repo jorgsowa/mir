@@ -447,14 +447,12 @@ fn ingested_definitions_are_observable() {
     );
 }
 
-/// `FileAnalyzer::analyze` deliberately skips inference, so calls to a
-/// no-hint function fall back to `mixed` until `run_inference_sweep` runs.
-/// This documents and verifies the explicit two-step incremental flow:
-///   1. analyze on edit → fast, may flag false-positive InvalidReturnType
-///   2. inference sweep on idle → primes inferred return types
-///   3. re-analyze → false positive disappears
+/// `FileAnalyzer::analyze` infers cross-file return types on demand via salsa.
+/// No explicit inference sweep is needed — the demand path calls
+/// `infer_file_return_types` lazily when Pass 2 encounters a call to a
+/// function without an explicit return-type hint.
 #[test]
-fn run_inference_sweep_primes_return_types_for_subsequent_analysis() {
+fn analyze_infers_return_types_without_prior_sweep() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/A.php");
     let src = "<?php
@@ -462,9 +460,6 @@ function bar() { return 'hello'; }
 function foo(): string { return bar(); }
 ";
     session.ingest_file(file.clone(), Arc::from(src));
-
-    // Run sweep so bar()'s inferred return type lands in the canonical db.
-    session.run_inference_sweep(&[(file.clone(), Arc::from(src))]);
 
     let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
@@ -480,7 +475,7 @@ function foo(): string { return bar(); }
     assert_eq!(
         invalid_return,
         0,
-        "inference sweep must prime bar()'s return type so foo(): string is OK; got issues: {:?}",
+        "demand-driven inference must resolve bar()'s return type so foo(): string is OK; got issues: {:?}",
         analysis
             .issues
             .iter()
