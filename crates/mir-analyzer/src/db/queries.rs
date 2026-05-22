@@ -419,7 +419,25 @@ unsafe impl salsa::Update for InferredFileTypes {
     }
 }
 
-#[salsa::tracked]
+fn infer_file_return_types_initial(
+    _db: &dyn MirDatabase,
+    _id: salsa::Id,
+    _file: SourceFile,
+) -> InferredFileTypes {
+    InferredFileTypes::empty()
+}
+
+fn infer_file_return_types_cycle(
+    _db: &dyn MirDatabase,
+    _cycle: &salsa::Cycle,
+    _last: &InferredFileTypes,
+    _value: InferredFileTypes,
+    _file: SourceFile,
+) -> InferredFileTypes {
+    InferredFileTypes::empty()
+}
+
+#[salsa::tracked(cycle_fn = infer_file_return_types_cycle, cycle_initial = infer_file_return_types_initial)]
 pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
     use std::str::FromStr as _;
     let path = file.path(db);

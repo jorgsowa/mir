@@ -141,7 +141,8 @@ pub use self::find_queries::{
     is_method_concretely_implemented_pull, trait_in_file, ClassLike,
 };
 pub use self::inferred_types::{
-    inferred_function_return_type, inferred_method_return_type, FunctionInferredMap,
+    inferred_function_return_type, inferred_function_return_type_demand,
+    inferred_method_return_type, inferred_method_return_type_demand, FunctionInferredMap,
     InferredReturnTypes, MethodInferredMap,
 };
 #[allow(unused_imports)]
