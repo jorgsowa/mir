@@ -56,11 +56,13 @@ pub struct Context {
 
     /// Names of function/method parameters in this scope (stripped of `$`).
     /// Used to exclude parameters from UnusedVariable detection.
-    pub param_names: FxHashSet<Symbol>,
+    /// Arc-shared — set once at context construction, never mutated during analysis.
+    pub param_names: Arc<FxHashSet<Symbol>>,
 
     /// Names of by-reference parameters in this scope (stripped of `$`).
     /// Assigning to these is externally observable, so it counts as usage.
-    pub byref_param_names: FxHashSet<Symbol>,
+    /// Arc-shared — set once at context construction, never mutated during analysis.
+    pub byref_param_names: Arc<FxHashSet<Symbol>>,
 
     /// Whether every execution path through this context has diverged
     /// (returned, thrown, or exited). Used to detect "all catch branches
@@ -74,7 +76,8 @@ pub struct Context {
 
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
-    pub template_param_names: FxHashSet<Symbol>,
+    /// Arc-shared — set once at context construction, never mutated during analysis.
+    pub template_param_names: Arc<FxHashSet<Symbol>>,
 }
 
 impl Context {
@@ -94,11 +97,11 @@ impl Context {
             strict_types: false,
             tainted_vars: FxHashSet::default(),
             read_vars: FxHashSet::default(),
-            param_names: FxHashSet::default(),
-            byref_param_names: FxHashSet::default(),
+            param_names: Arc::new(FxHashSet::default()),
+            byref_param_names: Arc::new(FxHashSet::default()),
             diverges: false,
             var_locations: FxHashMap::default(),
-            template_param_names: FxHashSet::default(),
+            template_param_names: Arc::new(FxHashSet::default()),
         };
         // PHP superglobals — always in scope in any context
         for sg in &[
@@ -187,12 +190,17 @@ impl Context {
         ctx.strict_types = strict_types;
         ctx.inside_constructor = inside_constructor;
 
+        // Build local sets — wrap in Arc at the end (set-once, never mutated during analysis).
+        let mut template_param_names: FxHashSet<Symbol> = FxHashSet::default();
+        let mut param_names: FxHashSet<Symbol> = FxHashSet::default();
+        let mut byref_param_names: FxHashSet<Symbol> = FxHashSet::default();
+
         // Build a map of template names to their bounds for parameter type resolution
         let mut template_bounds_map: FxHashMap<Symbol, Union> = FxHashMap::default();
         if let Some(templates) = template_params {
             for tp in templates {
                 let tp_sym = Symbol::from(tp.name.as_ref());
-                ctx.template_param_names.insert(tp_sym);
+                template_param_names.insert(tp_sym);
                 if let Some(bound) = &tp.bound {
                     template_bounds_map.insert(tp_sym, bound.clone());
                 }
@@ -251,9 +259,9 @@ impl Context {
             let name = Symbol::from(p.name.as_ref().trim_start_matches('$'));
             ctx.vars.insert(name, ty);
             ctx.assigned_vars.insert(name);
-            ctx.param_names.insert(name);
+            param_names.insert(name);
             if p.is_byref {
-                ctx.byref_param_names.insert(name);
+                byref_param_names.insert(name);
             }
         }
 
@@ -270,6 +278,10 @@ impl Context {
                 ctx.assigned_vars.insert(this_sym);
             }
         }
+
+        ctx.param_names = Arc::new(param_names);
+        ctx.byref_param_names = Arc::new(byref_param_names);
+        ctx.template_param_names = Arc::new(template_param_names);
 
         ctx
     }
