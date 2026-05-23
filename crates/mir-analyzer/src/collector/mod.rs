@@ -203,7 +203,19 @@ impl<'a> DefinitionCollector<'a> {
             self.slice.namespace = Some(Arc::from(ns.as_str()));
         }
         if !self.accumulated_imports.is_empty() {
-            self.slice.imports = std::mem::take(&mut self.accumulated_imports);
+            // Convert collector's String-keyed map into the storage shape:
+            // Arc<FxHashMap<Symbol, Symbol>>. `Symbol::new` interns each string
+            // via the global ustr pool once per unique alias/FQCN.
+            let raw = std::mem::take(&mut self.accumulated_imports);
+            let mut interned: FxHashMap<mir_types::Symbol, mir_types::Symbol> =
+                FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
+            for (alias, fqcn) in raw {
+                interned.insert(
+                    mir_types::Symbol::new(&alias),
+                    mir_types::Symbol::new(&fqcn),
+                );
+            }
+            self.slice.imports = Arc::new(interned);
         }
     }
 
@@ -860,12 +872,16 @@ mod tests {
         );
         let imports = &slice.imports;
         assert_eq!(
-            imports.get("Entity").map(|s| s.as_str()),
+            imports
+                .get(&mir_types::Symbol::new("Entity"))
+                .map(|s| s.as_str()),
             Some("App\\Model\\Entity"),
             "collect_slice must capture plain use import"
         );
         assert_eq!(
-            imports.get("Repo").map(|s| s.as_str()),
+            imports
+                .get(&mir_types::Symbol::new("Repo"))
+                .map(|s| s.as_str()),
             Some("App\\Repository\\EntityRepo"),
             "collect_slice must capture aliased use import"
         );

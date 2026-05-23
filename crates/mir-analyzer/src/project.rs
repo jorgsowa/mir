@@ -809,7 +809,12 @@ impl ProjectAnalyzer {
                 }
                 db.file_import_snapshots()
                     .into_iter()
-                    .flat_map(|(_, imports)| imports.into_values())
+                    .flat_map(|(_, imports)| {
+                        imports
+                            .values()
+                            .map(|sym| sym.as_str().to_string())
+                            .collect::<Vec<_>>()
+                    })
                     .collect::<Vec<_>>()
             };
             for fqcn in candidates {
@@ -1425,7 +1430,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
     for (file, imports) in db.file_import_snapshots() {
         let file = file.as_ref().to_string();
         for fqcn in imports.values() {
-            add_edge(fqcn, &file);
+            add_edge(fqcn.as_str(), &file);
         }
     }
 

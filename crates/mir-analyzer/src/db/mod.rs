@@ -1,7 +1,12 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-use mir_types::Union;
+use mir_types::{Symbol, Union};
+
+/// `(file_path, alias→FQCN map)` pair returned by
+/// [`MirDatabase::file_import_snapshots`]. The map is `Arc`-shared with the
+/// file's `StubSlice` so producing a snapshot is O(1) per file.
+pub type FileImportSnapshot = (Arc<str>, Arc<FxHashMap<Symbol, Symbol>>);
 
 // MirDatabase trait
 
@@ -15,13 +20,17 @@ pub trait MirDatabase: salsa::Database {
     fn file_namespace(&self, file: &str) -> Option<Arc<str>>;
 
     /// Return this file's `use` alias map.
-    fn file_imports(&self, file: &str) -> FxHashMap<String, String>;
+    ///
+    /// Cheap to call: returns a cloned `Arc` of the underlying map stored
+    /// inside the file's `StubSlice`, not a deep clone of the entries. Pass-2
+    /// `resolve_name_via_db` calls this on every symbol reference.
+    fn file_imports(&self, file: &str) -> Arc<FxHashMap<Symbol, Symbol>>;
 
     /// Return the known type for a PHP global variable.
     fn global_var_type(&self, name: &str) -> Option<Union>;
 
     /// Return `(file, imports)` snapshots for every known file.
-    fn file_import_snapshots(&self) -> Vec<(Arc<str>, FxHashMap<String, String>)>;
+    fn file_import_snapshots(&self) -> Vec<FileImportSnapshot>;
 
     /// Return the defining file for a symbol, if known.
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>>;

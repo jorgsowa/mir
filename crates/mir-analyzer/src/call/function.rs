@@ -138,8 +138,8 @@ impl CallAnalyzer {
             .unwrap_or(fn_name);
         let resolved_fn_name: String = {
             let imports = ea.db.file_imports(&ea.file);
-            let qualified = if let Some(imported) = imports.get(fn_name.as_str()) {
-                imported.clone()
+            let qualified = if let Some(imported) = imports.get(&Symbol::new(fn_name.as_str())) {
+                imported.as_str().to_string()
             } else if fn_name.contains('\\') {
                 crate::db::resolve_name_via_db(ea.db, &ea.file, &fn_name)
             } else if let Some(ns) = ea.db.file_namespace(&ea.file) {

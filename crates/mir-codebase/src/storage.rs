@@ -245,6 +245,45 @@ where
     Vec::<FnParam>::deserialize(deserializer).map(|v| Arc::from(v.into_boxed_slice()))
 }
 
+fn default_imports() -> Arc<FxHashMap<Symbol, Symbol>> {
+    Arc::new(FxHashMap::default())
+}
+
+/// Deserialize imports map. Supports both new (Symbol-keyed) and legacy
+/// (String-keyed) on-disk formats — older `cache.bin` files have plain
+/// `HashMap<String, String>`. Either way, we intern at load time so the
+/// in-memory representation is always `Arc<FxHashMap<Symbol, Symbol>>`.
+fn deserialize_imports<'de, D>(deserializer: D) -> Result<Arc<FxHashMap<Symbol, Symbol>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = FxHashMap::<String, String>::deserialize(deserializer)?;
+    let mut out: FxHashMap<Symbol, Symbol> =
+        FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
+    for (k, v) in raw {
+        out.insert(Symbol::new(&k), Symbol::new(&v));
+    }
+    Ok(Arc::new(out))
+}
+
+/// Serialize imports as the legacy `HashMap<String, String>` shape so disk
+/// caches written by this version remain compatible with readers that haven't
+/// been recompiled yet (and vice-versa).
+fn serialize_imports<S>(
+    value: &Arc<FxHashMap<Symbol, Symbol>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(Some(value.len()))?;
+    for (k, v) in value.iter() {
+        map.serialize_entry(k.as_str(), v.as_str())?;
+    }
+    map.end()
+}
+
 fn serialize_params<S>(value: &Arc<[FnParam]>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -591,10 +630,20 @@ pub struct StubSlice {
     #[serde(default)]
     pub namespace: Option<Arc<str>>,
     /// `use` alias map for this file: alias → FQCN.
-    /// Populated by `DefinitionCollector`; ingested into the salsa db's
-    /// `file_imports` table by `ingest_stub_slice` when `file` is `Some`.
-    #[serde(default)]
-    pub imports: FxHashMap<String, String>,
+    ///
+    /// Stored as `Arc<FxHashMap<Symbol, Symbol>>` so that `file_imports()`
+    /// returns a cheap Arc clone instead of deep-cloning the map on every
+    /// `resolve_name_via_db` call (which fires once per symbol reference in
+    /// Pass 2). `Symbol` keys/values shrink each entry from ~108 bytes
+    /// (two `String` headers + two heap allocs averaging ~30 chars) to
+    /// 16 bytes (two `Ustr` u64 handles); the global ustr interner holds
+    /// one copy of each unique alias / FQCN string for the whole session.
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
+    #[serde(default = "default_imports")]
+    pub imports: Arc<FxHashMap<Symbol, Symbol>>,
     /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
     /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.
     #[serde(skip)]

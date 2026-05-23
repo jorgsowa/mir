@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_codebase::StubSlice;
-use mir_types::Union;
+use mir_types::{Symbol, Union};
 
 use super::*;
 
@@ -161,28 +161,24 @@ impl MirDatabase for MirDb {
             .clone()
     }
 
-    fn file_imports(&self, file: &str) -> HashMap<String, String> {
+    fn file_imports(&self, file: &str) -> Arc<HashMap<Symbol, Symbol>> {
         let Some(sf) = self.source_files.get(file).copied() else {
-            return HashMap::default();
+            return Arc::new(HashMap::default());
         };
-        crate::db::collect_file_definitions(self, sf)
-            .slice
-            .imports
-            .clone()
+        // O(1) Arc refcount inc — `slice.imports` is itself `Arc<FxHashMap<...>>`.
+        Arc::clone(&crate::db::collect_file_definitions(self, sf).slice.imports)
     }
 
     fn global_var_type(&self, name: &str) -> Option<Union> {
         crate::db::workspace_global_vars(self).0.get(name).cloned()
     }
 
-    fn file_import_snapshots(&self) -> Vec<(Arc<str>, HashMap<String, String>)> {
+    fn file_import_snapshots(&self) -> Vec<crate::db::FileImportSnapshot> {
         self.source_files
             .iter()
             .map(|(path, &sf)| {
-                let imports = crate::db::collect_file_definitions(self, sf)
-                    .slice
-                    .imports
-                    .clone();
+                let imports =
+                    Arc::clone(&crate::db::collect_file_definitions(self, sf).slice.imports);
                 (path.clone(), imports)
             })
             .collect()

@@ -1330,12 +1330,12 @@ impl AnalysisSession {
         }
         let mut out = Vec::new();
         for fqcn in imports.values() {
-            let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn.as_str()));
+            let here = crate::db::Fqcn::new(&db, *fqcn);
             if crate::db::find_class_like(&db, here).is_some() {
                 continue;
             }
             if let Some(resolver) = &self.resolver {
-                if resolver.resolve(fqcn).is_some() {
+                if resolver.resolve(fqcn.as_str()).is_some() {
                     out.push(Arc::from(fqcn.as_str()));
                 }
             }
@@ -1642,7 +1642,7 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 
     let imports = db.file_imports(file);
     for fqcn in imports.values() {
-        add_target(fqcn);
+        add_target(fqcn.as_str());
     }
 
     // Walk every class/interface/trait/enum/function defined in this file

@@ -58,8 +58,8 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
     if name.contains('\\') {
         if let Some(imports) = (!name.starts_with('\\')).then(|| db.file_imports(file)) {
             if let Some((first, rest)) = name.split_once('\\') {
-                if let Some(base) = imports.get(first) {
-                    return format!("{base}\\{rest}");
+                if let Some(base) = imports.get(&Symbol::new(first)) {
+                    return format!("{}\\{rest}", base.as_str());
                 }
             }
         }
@@ -77,14 +77,17 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
     }
 
     let imports = db.file_imports(file);
-    if let Some(fqcn) = imports.get(name) {
-        return fqcn.clone();
+    if let Some(fqcn) = imports.get(&Symbol::new(name)) {
+        return fqcn.as_str().to_string();
     }
+    // Case-insensitive fallback: PHP class names are case-insensitive for
+    // resolution. Iterate as a last resort; the exact-case hit above
+    // catches the common path.
     if let Some((_, fqcn)) = imports
         .iter()
-        .find(|(alias, _)| alias.eq_ignore_ascii_case(name))
+        .find(|(alias, _)| alias.as_str().eq_ignore_ascii_case(name))
     {
-        return fqcn.clone();
+        return fqcn.as_str().to_string();
     }
     if let Some(ns) = db.file_namespace(file) {
         return format!("{}\\{}", ns, name);
