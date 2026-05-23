@@ -15,7 +15,7 @@ use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
 use mir_issues::Issue;
-use mir_types::Symbol;
+use mir_types::{Atomic, Symbol, Union};
 
 /// Issue kinds emitted by [`crate::dead_code::DeadCodeAnalyzer`].
 ///
@@ -782,9 +782,17 @@ impl ProjectAnalyzer {
                 }
             };
 
-            // Collect inheritance and import candidates. Only scan classes that
-            // haven't been scanned yet (optimization: avoid redundant full scans).
-            let mut inheritance_candidates = Vec::new();
+            // Collect inheritance, type-reference, and import candidates. Only
+            // scan classes that haven't been scanned yet — newly-loaded classes
+            // appear in `workspace_classes(db)` on the next iteration and get
+            // their refs walked then.
+            //
+            // Walks: parent / interfaces / extends / trait uses / mixins,
+            // PLUS property types, method param/return/throws types, constant
+            // types, type-arg lists, type aliases. Without the type walk, lazy
+            // mode misses transitive vendor classes (e.g. `class A { public B $b; }`
+            // — B is never queued unless explicitly referenced from project code).
+            let mut candidates: Vec<String> = Vec::new();
             let import_candidates = {
                 let db_owned = self.snapshot_db();
                 let db = &db_owned;
@@ -797,33 +805,14 @@ impl ProjectAnalyzer {
                         continue;
                     };
                     scanned.insert(fqcn.clone());
-                    if class.is_interface() {
-                        for parent in class.extends().iter() {
-                            inheritance_candidates.push(parent.to_string());
-                        }
-                    } else if class.is_enum() {
-                        for iface in class.interfaces().iter() {
-                            inheritance_candidates.push(iface.to_string());
-                        }
-                    } else if class.is_trait() {
-                        for used in class.class_traits().iter() {
-                            inheritance_candidates.push(used.to_string());
-                        }
-                    } else {
-                        if let Some(parent) = class.parent() {
-                            inheritance_candidates.push(parent.to_string());
-                        }
-                        for iface in class.interfaces().iter() {
-                            inheritance_candidates.push(iface.to_string());
-                        }
-                    }
+                    collect_class_referenced_fqcns(&class, &mut candidates);
                 }
                 db.file_import_snapshots()
                     .into_iter()
                     .flat_map(|(_, imports)| imports.into_values())
                     .collect::<Vec<_>>()
             };
-            for fqcn in inheritance_candidates {
+            for fqcn in candidates {
                 try_queue(&fqcn);
             }
 
@@ -842,8 +831,15 @@ impl ProjectAnalyzer {
                 loaded.insert(fqcn);
                 if let Ok(src) = std::fs::read_to_string(&path) {
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
+                    let is_vendor = file.contains("/vendor/") || file.contains("\\vendor\\");
                     let defs = self.collect_and_ingest_source(file, &src);
-                    all_issues.extend(Arc::unwrap_or_clone(defs.issues));
+                    // Vendor parse errors are not the user's concern — they
+                    // can't fix vendor code. The eager `collect_types_only`
+                    // path drops them; this lazy path must do the same to
+                    // avoid leaking diagnostics that don't exist in eager mode.
+                    if !is_vendor {
+                        all_issues.extend(Arc::unwrap_or_clone(defs.issues));
+                    }
                 }
             }
         }
@@ -1251,6 +1247,161 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
                 out.push(path);
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FQCN reference walk — collects every class-name reference reachable from a
+// ClassLike's signature surface (parent / interfaces / traits / mixins, plus
+// every type appearing in own_methods / own_properties / own_constants /
+// extends_type_args / implements_type_args). Used by lazy_load_missing_classes
+// to chase transitive vendor types — without this, lazy mode loads class A
+// but not the B in `public B $b` and method resolution fails downstream.
+//
+// Filtering: variants without classlike-FQCN payloads (scalars, void, mixed,
+// template params, etc.) contribute nothing.
+// ---------------------------------------------------------------------------
+
+fn collect_class_referenced_fqcns(class: &crate::db::ClassLike, out: &mut Vec<String>) {
+    if let Some(p) = class.parent() {
+        out.push(p.to_string());
+    }
+    for i in class.interfaces() {
+        out.push(i.to_string());
+    }
+    for e in class.extends() {
+        out.push(e.to_string());
+    }
+    for t in class.class_traits() {
+        out.push(t.to_string());
+    }
+    for m in class.mixins() {
+        out.push(m.to_string());
+    }
+    for u in class.extends_type_args() {
+        collect_fqcns_in_union(u, out);
+    }
+    for (iface, args) in class.implements_type_args() {
+        out.push(iface.to_string());
+        for u in args {
+            collect_fqcns_in_union(u, out);
+        }
+    }
+    for (_, m) in class.own_methods().iter() {
+        for p in m.params.iter() {
+            if let Some(t) = &p.ty {
+                collect_fqcns_in_union(t, out);
+            }
+        }
+        if let Some(t) = &m.return_type {
+            collect_fqcns_in_union(t, out);
+        }
+        for thrown in m.throws.iter() {
+            out.push(thrown.to_string());
+        }
+    }
+    if let Some(props) = class.own_properties() {
+        for (_, p) in props.iter() {
+            if let Some(t) = &p.ty {
+                collect_fqcns_in_union(t, out);
+            }
+        }
+    }
+    for (_, c) in class.own_constants().iter() {
+        collect_fqcns_in_union(&c.ty, out);
+    }
+}
+
+fn collect_fqcns_in_union(u: &Union, out: &mut Vec<String>) {
+    for atom in u.types.iter() {
+        collect_fqcns_in_atomic(atom, out);
+    }
+}
+
+fn collect_fqcns_in_simple(t: &mir_types::compact::SimpleType, out: &mut Vec<String>) {
+    if let mir_types::compact::SimpleType::Complex(u) = t {
+        collect_fqcns_in_union(u, out);
+    }
+    // Scalar SimpleType variants (String/Int/Float/Bool/Mixed/Null/Void/Never) contain no FQCNs.
+}
+
+fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
+    match a {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            out.push(fqcn.to_string());
+            for tp in type_params.iter() {
+                collect_fqcns_in_union(tp, out);
+            }
+        }
+        Atomic::TStaticObject { fqcn } | Atomic::TSelf { fqcn } | Atomic::TParent { fqcn } => {
+            out.push(fqcn.to_string());
+        }
+        Atomic::TLiteralEnumCase { enum_fqcn, .. } => {
+            out.push(enum_fqcn.to_string());
+        }
+        Atomic::TClassString(Some(s)) => {
+            out.push(s.to_string());
+        }
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            collect_fqcns_in_union(key, out);
+            collect_fqcns_in_union(value, out);
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            collect_fqcns_in_union(value, out);
+        }
+        Atomic::TKeyedArray { properties, .. } => {
+            for (_, kp) in properties.iter() {
+                collect_fqcns_in_union(&kp.ty, out);
+            }
+        }
+        Atomic::TClosure {
+            params,
+            return_type,
+            this_type,
+        } => {
+            for p in params {
+                if let Some(t) = &p.ty {
+                    collect_fqcns_in_simple(t, out);
+                }
+            }
+            collect_fqcns_in_union(return_type, out);
+            if let Some(t) = this_type {
+                collect_fqcns_in_union(t, out);
+            }
+        }
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => {
+            if let Some(ps) = params {
+                for p in ps {
+                    if let Some(t) = &p.ty {
+                        collect_fqcns_in_simple(t, out);
+                    }
+                }
+            }
+            if let Some(rt) = return_type {
+                collect_fqcns_in_union(rt, out);
+            }
+        }
+        Atomic::TIntersection { parts } => {
+            for p in parts.iter() {
+                collect_fqcns_in_union(p, out);
+            }
+        }
+        Atomic::TConditional {
+            subject,
+            if_true,
+            if_false,
+        } => {
+            collect_fqcns_in_union(subject, out);
+            collect_fqcns_in_union(if_true, out);
+            collect_fqcns_in_union(if_false, out);
+        }
+        Atomic::TTemplateParam { as_type, .. } => {
+            collect_fqcns_in_union(as_type, out);
+        }
+        _ => {}
     }
 }
 

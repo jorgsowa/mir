@@ -235,7 +235,21 @@ fn main() {
         }
         apply_stub_config(&mut analyzer, &config, &config_base);
 
-        let vendor_files = map.vendor_files();
+        // Lazy vendor: by default only eagerly load `autoload.files` entries
+        // (globals — functions/constants/polyfills not FQCN-resolvable). Everything
+        // else (PSR-4 + classmap) is loaded on demand via `psr4.resolve(fqcn)`
+        // when project code actually references it.
+        //
+        // Set `MIR_EAGER_VENDOR=1` to fall back to the old behavior (parse every
+        // vendor file upfront) — useful for diagnosing lazy-load gaps.
+        let eager_vendor = std::env::var("MIR_EAGER_VENDOR")
+            .ok()
+            .is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes"));
+        let vendor_files: Vec<PathBuf> = if eager_vendor {
+            map.vendor_files()
+        } else {
+            map.vendor_eager_files()
+        };
 
         // Resolve ignore dirs to absolute paths (relative to config file location)
         let ignore_dirs: Vec<PathBuf> = config
@@ -301,10 +315,18 @@ fn main() {
 
         if !vendor_files.is_empty() {
             if !cli.quiet {
-                eprintln!(
-                    "mir: scanning {} vendor files for types...",
-                    vendor_files.len()
-                );
+                if eager_vendor {
+                    eprintln!(
+                        "mir: scanning {} vendor files for types...",
+                        vendor_files.len()
+                    );
+                } else {
+                    eprintln!(
+                        "mir: eager-loading {} files-autoload entries ({} classmap entries available lazily)",
+                        vendor_files.len(),
+                        map.classmap_len()
+                    );
+                }
             }
             analyzer.collect_types_only(&vendor_files);
         }
@@ -448,7 +470,10 @@ fn main() {
     // Load type stubs first (needed before collect_types_only)
     analyzer.load_stubs();
 
-    // Collect types from ignore_dirs (vendor) for Pass 1 — no error reporting there
+    // Collect types from ignore_dirs (vendor) for Pass 1 — no error reporting there.
+    // Note: this non-composer path stays eager because lazy FQCN resolution requires
+    // a `Psr4Map` (built from `composer.json`) and we don't have one here. Users who
+    // want lazy vendor must invoke mir against a composer-managed project root.
     if !ignore_dirs.is_empty() {
         let vendor_files: Vec<PathBuf> = ignore_dirs
             .iter()
