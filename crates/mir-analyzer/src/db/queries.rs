@@ -251,7 +251,14 @@ unsafe impl salsa::Update for ParsedFile {
 /// instead of calling `php_rs_parser::parse` directly, so they get the
 /// cached result for free on every incremental edit that doesn't touch
 /// this file.
-#[salsa::tracked]
+///
+/// `lru = 256` caps the number of owned ASTs held in memory. Beyond that
+/// cap, the least-recently-used parse is evicted; if a later query re-asks,
+/// salsa re-parses on demand. For CLI cold-start the visit pattern is
+/// "parse once, never re-ask," so eviction is effectively free; for LSP
+/// the working set is small. Without the cap, parsing 12k files would
+/// pin ~1–4 GB of owned AST for the whole session.
+#[salsa::tracked(lru = 256)]
 pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> ParsedFile {
     let text = file.text(db);
     ParsedFile(Arc::new(php_rs_parser::parse(text.as_ref())))
