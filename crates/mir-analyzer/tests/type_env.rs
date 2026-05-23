@@ -1,5 +1,5 @@
 // crates/mir-analyzer/tests/type_env.rs
-use mir_analyzer::{ProjectAnalyzer, ScopeId};
+use mir_analyzer::ScopeId;
 use std::sync::Arc;
 
 #[test]
@@ -17,7 +17,7 @@ fn scope_id_function_equality() {
 
 #[test]
 fn analyze_result_has_type_envs_field() {
-    let result = ProjectAnalyzer::analyze_source("<?php\n");
+    let result = mir_analyzer::analyze_source("<?php\n");
     // just verifying the field exists and is empty for a trivial source
     assert!(result.type_envs.is_empty());
 }
@@ -25,7 +25,7 @@ fn analyze_result_has_type_envs_field() {
 #[test]
 fn returns_type_env_for_function_scope() {
     let src = "<?php\nfunction myFn(): void {\n    $greeting = 'hello';\n}\n";
-    let result = ProjectAnalyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source(src);
     let scope = result.type_envs.iter().find(|(k, _)| {
         matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "myFn")
     });
@@ -40,7 +40,7 @@ fn returns_type_env_for_function_scope() {
 #[test]
 fn returns_type_env_for_method_scope() {
     let src = "<?php\nclass MyClass {\n    public function handle(): void {\n        $result = 42;\n    }\n}\n";
-    let result = ProjectAnalyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source(src);
     let scope = result.type_envs.iter().find(|(k, _)| {
         matches!(k, mir_analyzer::ScopeId::Method { method, .. } if method.as_ref() == "handle")
     });
@@ -55,7 +55,7 @@ fn returns_type_env_for_method_scope() {
 #[test]
 fn get_var_returns_none_for_unknown_variable() {
     let src = "<?php\nfunction f(): void {\n    $x = 1;\n}\n";
-    let result = ProjectAnalyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source(src);
     let scope = result.type_envs.iter().find(
         |(k, _)| matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "f"),
     );
@@ -67,7 +67,7 @@ fn get_var_returns_none_for_unknown_variable() {
 #[test]
 fn var_names_lists_all_variables_in_scope() {
     let src = "<?php\nfunction f(): void {\n    $a = 1;\n    $b = 'hello';\n}\n";
-    let result = ProjectAnalyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source(src);
     let env = result.type_envs.values().next().unwrap();
     let names: Vec<&str> = env.var_names().collect();
     assert!(names.contains(&"a"), "Expected 'a' in var_names");

@@ -9,7 +9,9 @@ use owo_colors::OwoColorize;
 mod config;
 
 use config::{Baseline, Config, ErrorLevel};
-use mir_analyzer::{PhpVersion, ProjectAnalyzer};
+use mir_analyzer::{
+    dead_code_issue_kinds, discover_files, AnalysisSession, BatchOptions, PhpVersion,
+};
 use mir_issues::{Issue, Severity};
 
 // ---------------------------------------------------------------------------
@@ -204,36 +206,47 @@ fn main() {
     };
 
     if let Some(ref composer_root) = composer_root {
-        let (mut analyzer, map) = match ProjectAnalyzer::from_composer(composer_root) {
-            Ok(pair) => pair,
+        let map = match mir_analyzer::composer::Psr4Map::from_composer(composer_root) {
+            Ok(m) => m,
             Err(e) => {
                 eprintln!("mir: composer error: {e}");
                 std::process::exit(2);
             }
         };
 
-        // Apply cache dir (explicit flag, then composer-root-local, then platform default)
+        // Resolve PHP version, cache dir, stubs FIRST — before any
+        // file ingest so `with_cache_dir` is safe to call.
+        let version = config
+            .php_version
+            .as_deref()
+            .and_then(|raw| match raw.parse::<PhpVersion>() {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    eprintln!("mir: {}; using default PHP {}", e, PhpVersion::LATEST);
+                    None
+                }
+            })
+            .unwrap_or(PhpVersion::LATEST);
+
+        let mut session = AnalysisSession::new(version);
         if !cli.no_cache {
             let cache_dir = cli
                 .cache_dir
                 .clone()
                 .unwrap_or_else(|| composer_root.join(".mir/cache"));
-            analyzer.set_cache_dir(&cache_dir);
+            session = session.with_cache_dir(&cache_dir);
         }
+        let (stub_files, stub_dirs) = collect_stub_paths(&config, &config_base);
+        if !stub_files.is_empty() || !stub_dirs.is_empty() {
+            session = session.with_user_stubs(stub_files, stub_dirs);
+        }
+        session = session.with_psr4(Arc::new(map.clone()));
 
+        let mut opts = BatchOptions::new();
         if !cli.find_dead_code {
-            for kind in mir_analyzer::project::dead_code_issue_kinds() {
-                analyzer.suppressed_issue_kinds.insert((*kind).to_string());
-            }
+            opts.suppressed_issue_kinds
+                .extend(dead_code_issue_kinds().iter().map(|s| (*s).to_string()));
         }
-
-        if let Some(raw) = &config.php_version {
-            match raw.parse::<PhpVersion>() {
-                Ok(v) => analyzer = analyzer.with_php_version(v),
-                Err(e) => eprintln!("mir: {}; using default PHP {}", e, PhpVersion::LATEST),
-            }
-        }
-        apply_stub_config(&mut analyzer, &config, &config_base);
 
         // Lazy vendor: by default only eagerly load `autoload.files` entries
         // (globals — functions/constants/polyfills not FQCN-resolvable). Everything
@@ -275,7 +288,7 @@ fn main() {
         let discovered_files: Vec<PathBuf> = if analyze_whole_composer_project {
             map.project_files()
         } else {
-            ProjectAnalyzer::discover_files(&cli.paths[0])
+            discover_files(&cli.paths[0])
         };
 
         // Filter out ignored directories from project files.
@@ -311,7 +324,7 @@ fn main() {
             );
         }
 
-        analyzer.load_stubs();
+        session.ensure_all_stubs_loaded();
 
         if !vendor_files.is_empty() {
             if !cli.quiet {
@@ -328,13 +341,13 @@ fn main() {
                     );
                 }
             }
-            analyzer.collect_types_only(&vendor_files);
+            session.collect_types_only(&vendor_files);
         }
 
         let show_progress =
             !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
         let start = std::time::Instant::now();
-        if show_progress {
+        let result = if show_progress {
             let pb = Arc::new(
                 ProgressBar::new(files.len() as u64).with_style(
                     ProgressStyle::with_template(
@@ -345,20 +358,18 @@ fn main() {
                 ),
             );
             let pb2 = pb.clone();
-            analyzer.on_file_done = Some(Arc::new(move || {
+            opts.on_file_done = Some(Arc::new(move || {
                 pb2.inc(1);
             }));
-            let result = analyzer.analyze(&files);
-            let elapsed = start.elapsed();
+            let r = session.analyze_paths(&files, &opts);
             pb.finish_and_clear();
-            let baseline = load_baseline(&cli, &config);
-            run_output(&cli, &config, &files, result, baseline, elapsed);
+            r
         } else {
-            let result = analyzer.analyze(&files);
-            let elapsed = start.elapsed();
-            let baseline = load_baseline(&cli, &config);
-            run_output(&cli, &config, &files, result, baseline, elapsed);
-        }
+            session.analyze_paths(&files, &opts)
+        };
+        let elapsed = start.elapsed();
+        let baseline = load_baseline(&cli, &config);
+        run_output(&cli, &config, &files, result, baseline, elapsed);
         return;
     }
     // --- End composer auto-detection ----------------------------------------
@@ -406,7 +417,7 @@ fn main() {
     let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let files: Vec<PathBuf> = scan_roots
         .iter()
-        .flat_map(|p| ProjectAnalyzer::discover_files(p))
+        .flat_map(|p| discover_files(p))
         .filter(|p| {
             if ignore_dirs.is_empty() {
                 return true;
@@ -440,45 +451,46 @@ fn main() {
         );
     }
 
-    // Build analyzer (skip cache when --no-cache is set)
-    let mut analyzer = if !cli.no_cache {
-        if let Some(cache_dir) = cli.cache_dir.clone().or_else(default_cache_dir) {
-            ProjectAnalyzer::with_cache(&cache_dir)
-        } else {
-            ProjectAnalyzer::new()
-        }
-    } else {
-        ProjectAnalyzer::new()
-    };
-
     // Resolve target PHP version: CLI overrides config; malformed values warn
     // and fall back to the default rather than aborting analysis.
-    if let Some(raw) = &config.php_version {
-        match raw.parse::<PhpVersion>() {
-            Ok(v) => analyzer = analyzer.with_php_version(v),
-            Err(e) => eprintln!("mir: {}; using default PHP {}", e, PhpVersion::LATEST),
+    let version = config
+        .php_version
+        .as_deref()
+        .and_then(|raw| match raw.parse::<PhpVersion>() {
+            Ok(v) => Some(v),
+            Err(e) => {
+                eprintln!("mir: {}; using default PHP {}", e, PhpVersion::LATEST);
+                None
+            }
+        })
+        .unwrap_or(PhpVersion::LATEST);
+
+    // Build the session (skip cache when --no-cache is set). Configure
+    // cache, version, and user stubs before any ingest.
+    let mut session = AnalysisSession::new(version);
+    if !cli.no_cache {
+        if let Some(cache_dir) = cli.cache_dir.clone().or_else(default_cache_dir) {
+            session = session.with_cache_dir(&cache_dir);
         }
+    }
+    let (stub_files, stub_dirs) = collect_stub_paths(&config, &config_base);
+    if !stub_files.is_empty() || !stub_dirs.is_empty() {
+        session = session.with_user_stubs(stub_files, stub_dirs);
     }
 
+    let mut opts = BatchOptions::new();
     if !cli.find_dead_code {
-        for kind in mir_analyzer::project::dead_code_issue_kinds() {
-            analyzer.suppressed_issue_kinds.insert((*kind).to_string());
-        }
+        opts.suppressed_issue_kinds
+            .extend(dead_code_issue_kinds().iter().map(|s| (*s).to_string()));
     }
-    apply_stub_config(&mut analyzer, &config, &config_base);
 
     // Load type stubs first (needed before collect_types_only)
-    analyzer.load_stubs();
+    session.ensure_all_stubs_loaded();
 
     // Collect types from ignore_dirs (vendor) for Pass 1 — no error reporting there.
-    // Note: this non-composer path stays eager because lazy FQCN resolution requires
-    // a `Psr4Map` (built from `composer.json`) and we don't have one here. Users who
-    // want lazy vendor must invoke mir against a composer-managed project root.
     if !ignore_dirs.is_empty() {
-        let vendor_files: Vec<PathBuf> = ignore_dirs
-            .iter()
-            .flat_map(|p| ProjectAnalyzer::discover_files(p))
-            .collect();
+        let vendor_files: Vec<PathBuf> =
+            ignore_dirs.iter().flat_map(|p| discover_files(p)).collect();
         if !vendor_files.is_empty() {
             if !cli.quiet {
                 eprintln!(
@@ -486,13 +498,13 @@ fn main() {
                     vendor_files.len()
                 );
             }
-            analyzer.collect_types_only(&vendor_files);
+            session.collect_types_only(&vendor_files);
         }
     }
 
-    // Progress bar (Pass 2)
     let show_progress = !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
-    if show_progress {
+    let start = std::time::Instant::now();
+    let result = if show_progress {
         let pb = Arc::new(
             ProgressBar::new(files.len() as u64).with_style(
                 ProgressStyle::with_template(
@@ -503,49 +515,51 @@ fn main() {
             ),
         );
         let pb2 = pb.clone();
-        analyzer.on_file_done = Some(Arc::new(move || {
+        opts.on_file_done = Some(Arc::new(move || {
             pb2.inc(1);
         }));
-        // Store the pb so we can finish it after analysis.
-        // We use a thread-local trick: drop happens after `result` is obtained.
-        let start = std::time::Instant::now();
-        let result = analyzer.analyze(&files);
-        let elapsed = start.elapsed();
+        let r = session.analyze_paths(&files, &opts);
         pb.finish_and_clear();
-        let baseline = load_baseline(&cli, &config);
-        run_output(&cli, &config, &files, result, baseline, elapsed);
+        r
     } else {
-        let start = std::time::Instant::now();
-        let result = analyzer.analyze(&files);
-        let elapsed = start.elapsed();
-        let baseline = load_baseline(&cli, &config);
-        run_output(&cli, &config, &files, result, baseline, elapsed);
-    }
+        session.analyze_paths(&files, &opts)
+    };
+    let elapsed = start.elapsed();
+    let baseline = load_baseline(&cli, &config);
+    run_output(&cli, &config, &files, result, baseline, elapsed);
 }
 
-/// Copy stub file/directory paths from `Config` into `ProjectAnalyzer`, resolving
-/// relative paths against `config_base` (the directory containing `mir.xml`).
-fn apply_stub_config(
-    analyzer: &mut ProjectAnalyzer,
+/// Resolve stub file/directory paths from `Config`, treating relative paths
+/// as anchored at `config_base` (the directory containing `mir.xml`).
+fn collect_stub_paths(
     config: &Config,
     config_base: &std::path::Path,
-) {
-    for f in &config.stub_files {
-        let p = PathBuf::from(f);
-        analyzer.stub_files.push(if p.is_absolute() {
-            p
-        } else {
-            config_base.join(f)
-        });
-    }
-    for d in &config.stub_dirs {
-        let p = PathBuf::from(d);
-        analyzer.stub_dirs.push(if p.is_absolute() {
-            p
-        } else {
-            config_base.join(d)
-        });
-    }
+) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let stub_files = config
+        .stub_files
+        .iter()
+        .map(|f| {
+            let p = PathBuf::from(f);
+            if p.is_absolute() {
+                p
+            } else {
+                config_base.join(f)
+            }
+        })
+        .collect();
+    let stub_dirs = config
+        .stub_dirs
+        .iter()
+        .map(|d| {
+            let p = PathBuf::from(d);
+            if p.is_absolute() {
+                p
+            } else {
+                config_base.join(d)
+            }
+        })
+        .collect();
+    (stub_files, stub_dirs)
 }
 
 fn default_cache_dir() -> Option<PathBuf> {

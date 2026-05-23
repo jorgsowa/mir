@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use mir_analyzer::{PhpVersion, ProjectAnalyzer};
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -19,16 +19,15 @@ struct WasmIssue {
 /// reused across `analyze` calls. Re-initialized when the PHP version changes.
 #[wasm_bindgen]
 pub struct Playground {
-    analyzer: ProjectAnalyzer,
+    session: AnalysisSession,
     php_version: PhpVersion,
 }
 
 impl Default for Playground {
     fn default() -> Self {
         let version = PhpVersion::LATEST;
-        let analyzer = make_analyzer(version);
         Self {
-            analyzer,
+            session: make_session(version),
             php_version: version,
         }
     }
@@ -48,10 +47,13 @@ impl Playground {
             .parse::<PhpVersion>()
             .unwrap_or(PhpVersion::LATEST);
         if version != self.php_version {
-            self.analyzer = make_analyzer(version);
+            self.session = make_session(version);
             self.php_version = version;
         }
-        let result = self.analyzer.re_analyze_file("<playground>", source);
+        let opts = BatchOptions::new();
+        let result = self
+            .session
+            .re_analyze_file_batch("<playground>", source, &opts);
         let issues: Vec<WasmIssue> = result
             .issues
             .iter()
@@ -71,8 +73,8 @@ impl Playground {
     }
 }
 
-fn make_analyzer(version: PhpVersion) -> ProjectAnalyzer {
-    let analyzer = ProjectAnalyzer::new().with_php_version(version);
-    analyzer.load_stubs();
-    analyzer
+fn make_session(version: PhpVersion) -> AnalysisSession {
+    let session = AnalysisSession::new(version);
+    session.ensure_all_stubs_loaded();
+    session
 }

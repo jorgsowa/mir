@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 use tempfile::TempDir;
 
 use self::common::create_temp_dir;
@@ -45,15 +45,14 @@ fn analyze_with_psr4(
     lib_src: &str,
     consumer_file: &str,
     consumer_src: &str,
-) -> mir_analyzer::project::AnalysisResult {
+) -> mir_analyzer::AnalysisResult {
     let root = create_temp_dir("test");
     fs::create_dir_all(root.path().join("src")).unwrap();
     fs::write(root.path().join("src").join(lib_file), lib_src).unwrap();
     let consumer_path = write(&root, consumer_file, consumer_src);
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let mut analyzer = ProjectAnalyzer::new();
-    analyzer.psr4 = Some(psr4);
-    analyzer.analyze(&[consumer_path])
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    analyzer.analyze_paths(&[consumer_path], &BatchOptions::new())
 }
 
 #[test]
@@ -112,11 +111,10 @@ fn does_not_loop_when_class_has_no_psr4_match() {
     );
 
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let mut analyzer = ProjectAnalyzer::new();
-    analyzer.psr4 = Some(psr4);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
 
     // Should terminate without hanging or panicking
-    let _result = analyzer.analyze(&[child_path]);
+    let _result = analyzer.analyze_paths(&[child_path], &BatchOptions::new());
 }
 
 #[test]
@@ -246,9 +244,8 @@ fn lazy_loads_fqcn_with_inherited_parent_used_without_use_import() {
         "<?php\nfunction run(): string { return (new \\App\\Child())->hello(); }\n",
     );
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let mut analyzer = ProjectAnalyzer::new();
-    analyzer.psr4 = Some(psr4);
-    let result = analyzer.analyze(&[consumer_path]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let result = analyzer.analyze_paths(&[consumer_path], &BatchOptions::new());
 
     let issues: Vec<_> = result
         .issues
@@ -302,11 +299,10 @@ fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
     .unwrap();
 
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let mut analyzer = ProjectAnalyzer::new();
-    analyzer.psr4 = Some(psr4.clone());
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
 
     let files = psr4.project_files();
-    let result = analyzer.analyze(&files);
+    let result = analyzer.analyze_paths(&files, &BatchOptions::new());
 
     let undefined_class: Vec<_> = result
         .issues

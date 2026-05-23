@@ -38,8 +38,8 @@
 //! ```
 //!
 //! `stub_file=path` and `stub_dir=path` refer to files/directories already declared
-//! with `===file:path===` markers. They are passed to `ProjectAnalyzer::stub_files` /
-//! `stub_dirs` and excluded from the analysis file list, so only the non-stub PHP
+//! with `===file:path===` markers. They are wired into the session via
+//! `AnalysisSession::with_user_stubs` and excluded from the analysis file list, so only the non-stub PHP
 //! files are analysed. Multiple `stub_file=` and `stub_dir=` lines are allowed.
 //!
 //! **With Composer/PSR-4**:
@@ -118,7 +118,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use crate::{project::ProjectAnalyzer, PhpVersion};
+use crate::{batch::BatchOptions, session::AnalysisSession, PhpVersion};
 use mir_issues::{Issue, IssueKind};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -541,7 +541,7 @@ pub fn run_fixture(path: &str) {
     // explicitly set `suppress=...` keep their replacement semantics; this
     // only fills in the default.
     if fixture.config.suppressed_issue_kinds.is_none() {
-        let dead = crate::project::dead_code_issue_kinds();
+        let dead = crate::batch::dead_code_issue_kinds();
         let expects_dead_code = fixture
             .expected
             .iter()
@@ -591,29 +591,26 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
 
     let tmp_dir_str = tmp_dir.to_string_lossy().into_owned();
 
-    let mut analyzer = ProjectAnalyzer::new();
+    // Build BatchOptions from the fixture's suppression config.
+    let mut opts = BatchOptions::new();
     if let Some(explicit) = &config.suppressed_issue_kinds {
-        analyzer.suppressed_issue_kinds = explicit.clone();
+        opts.suppressed_issue_kinds = explicit.clone();
     }
-    if let Some(version) = config.php_version {
-        analyzer = analyzer.with_php_version(version);
-    }
+
+    // Construct session at the requested PHP version (defaulting to LATEST).
+    let version = config.php_version.unwrap_or(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(version);
 
     // Register user stub files and directories from the fixture config.
-    for stub_file in &config.stub_files {
-        analyzer.stub_files.push(tmp_dir.join(stub_file));
-    }
-    for stub_dir in &config.stub_dirs {
-        analyzer.stub_dirs.push(tmp_dir.join(stub_dir));
+    let stub_files: Vec<PathBuf> = config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
+    let stub_dirs: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
+    if !stub_files.is_empty() || !stub_dirs.is_empty() {
+        session = session.with_user_stubs(stub_files.clone(), stub_dirs.clone());
     }
 
-    // Build a set of paths that belong to user stubs so they are excluded from
-    // the list of files passed to `analyze()` (stubs are loaded separately).
-    let stub_file_set: HashSet<PathBuf> =
-        config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
-    let stub_dir_set: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
+    let stub_file_set: HashSet<PathBuf> = stub_files.iter().cloned().collect();
     let is_stub = |p: &PathBuf| -> bool {
-        stub_file_set.contains(p) || stub_dir_set.iter().any(|d| p.starts_with(d))
+        stub_file_set.contains(p) || stub_dirs.iter().any(|d| p.starts_with(d))
     };
 
     let has_composer = files.iter().any(|(name, _)| *name == "composer.json");
@@ -628,7 +625,7 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
                     .filter(|p| !psr4_files.contains(*p) && !is_stub(p))
                     .cloned()
                     .collect();
-                analyzer.psr4 = Some(psr4);
+                session = session.with_psr4(psr4);
                 explicit
             }
             Err(_) => php_files_only(&paths)
@@ -643,13 +640,11 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
             .collect()
     };
 
-    // Re-borrow the analyzer's effective suppression set so the stub-side
-    // filter below knows whether the dead-code pass actually ran.
-    let dead_code_enabled = crate::project::dead_code_issue_kinds()
+    let dead_code_enabled = crate::batch::dead_code_issue_kinds()
         .iter()
-        .any(|k| !analyzer.suppressed_issue_kinds.contains(*k));
+        .any(|k| !opts.suppressed_issue_kinds.contains(*k));
 
-    let result = analyzer.analyze(&explicit_paths);
+    let result = session.analyze_paths(&explicit_paths, &opts);
     std::fs::remove_dir_all(&tmp_dir).ok();
 
     result

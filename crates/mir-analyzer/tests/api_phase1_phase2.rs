@@ -159,18 +159,18 @@ fn references_to_takes_typed_symbol() {
 }
 
 #[test]
-fn project_analyzer_builder_pattern() {
-    use mir_analyzer::ProjectAnalyzer;
+fn analysis_session_builder_pattern() {
+    use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
-    // The builder pattern is chainable
-    let _analyzer = ProjectAnalyzer::new().with_php_version(PhpVersion::LATEST);
+    // Builder pattern is chainable.
+    let _session = AnalysisSession::new(PhpVersion::LATEST);
 
-    // Dead-code reporting is opted in by clearing the dead-code names
-    // from the unified suppression set — there is no special boolean.
-    let mut legacy = ProjectAnalyzer::new();
-    legacy.php_version = Some(PhpVersion::LATEST);
-    for kind in mir_analyzer::project::dead_code_issue_kinds() {
-        legacy.suppressed_issue_kinds.remove(*kind);
+    // Dead-code reporting is opted in by removing the dead-code names from
+    // BatchOptions::suppressed_issue_kinds.
+    let mut opts =
+        BatchOptions::new().with_suppressed(mir_analyzer::dead_code_issue_kinds().iter().copied());
+    for kind in mir_analyzer::dead_code_issue_kinds() {
+        opts.suppressed_issue_kinds.remove(*kind);
     }
 }
 

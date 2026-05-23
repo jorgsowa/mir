@@ -5,7 +5,7 @@
 
 mod common;
 
-use mir_analyzer::{ProjectAnalyzer, Symbol, SymbolLookupError};
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion, Symbol, SymbolLookupError};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
 
@@ -15,8 +15,8 @@ fn definition_of_finds_class() {
     let file = write_file(&dir, "Foo.php", "<?php\nclass Foo {}\n");
     let file_str = path_to_str(&file).to_string();
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(&[file]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     let loc = analyzer
         .definition_of(&Symbol::class("Foo"))
@@ -33,8 +33,8 @@ fn definition_of_finds_function() {
         "<?php\nfunction my_func(): int { return 1; }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(&[file]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
         analyzer.definition_of(&Symbol::function("my_func")).is_ok(),
@@ -51,8 +51,8 @@ fn definition_of_finds_interface() {
         "<?php\ninterface Renderable { public function render(): string; }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(&[file]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
         analyzer.definition_of(&Symbol::class("Renderable")).is_ok(),
@@ -69,8 +69,8 @@ fn definition_of_finds_method() {
         "<?php\nclass Bar {\n    public function baz(): void {}\n}\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(&[file]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
         analyzer
@@ -89,8 +89,8 @@ fn definition_of_finds_property() {
         "<?php\nclass Qux {\n    public string $name = '';\n}\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(&[file]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
         analyzer
@@ -102,7 +102,7 @@ fn definition_of_finds_property() {
 
 #[test]
 fn definition_of_returns_not_found_for_unknown() {
-    let analyzer = ProjectAnalyzer::new();
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     assert_eq!(
         analyzer
             .definition_of(&Symbol::class("NonExistent"))

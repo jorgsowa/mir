@@ -584,13 +584,16 @@ mod tests {
 
     #[test]
     fn sscanf_output_vars_not_undefined() {
-        use crate::project::ProjectAnalyzer;
+        use crate::batch::BatchOptions;
+        use crate::session::AnalysisSession;
+        use crate::PhpVersion;
         use mir_issues::IssueKind;
 
         let src = "<?php\nfunction test($str) {\n    sscanf($str, \"%d %d\", $row, $col);\n    return $row + $col;\n}\n";
         let tmp = std::env::temp_dir().join("mir_test_sscanf_undefined.php");
         std::fs::write(&tmp, src).unwrap();
-        let result = ProjectAnalyzer::new().analyze(std::slice::from_ref(&tmp));
+        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let result = session.analyze_paths(std::slice::from_ref(&tmp), &BatchOptions::new());
         std::fs::remove_file(tmp).ok();
         let undef: Vec<_> = result.issues.iter()
             .filter(|i| matches!(&i.kind, IssueKind::UndefinedVariable { name } if name == "row" || name == "col"))

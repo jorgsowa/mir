@@ -1,5 +1,6 @@
 use rustc_hash::FxHashMap;
 
+pub mod batch;
 #[doc(hidden)]
 pub mod cache;
 pub(crate) mod call;
@@ -20,7 +21,6 @@ pub(crate) mod narrowing;
 pub mod parser;
 pub(crate) mod pass2;
 pub mod php_version;
-pub mod project;
 pub mod session;
 pub(crate) mod shared_db;
 pub mod source_provider;
@@ -32,11 +32,13 @@ pub mod stubs;
 pub(crate) mod taint;
 pub(crate) mod type_env;
 
+pub use batch::{
+    analyze_source, dead_code_issue_kinds, discover_files, AnalysisResult, BatchOptions,
+};
 pub use file_analyzer::{BatchFileAnalyzer, FileAnalysis, FileAnalyzer, ParsedFile};
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};
-pub use project::{AnalysisResult, ProjectAnalyzer};
 pub use session::AnalysisSession;
 pub use source_provider::{FsSourceProvider, SourceProvider};
 pub use stubs::{

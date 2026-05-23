@@ -1,72 +1,103 @@
-/// Project-level orchestration: file discovery, pass 1, pass 2.
+//! Batch-oriented project analysis on [`AnalysisSession`].
+//!
+//! This module hosts the multi-file orchestration that used to live on the
+//! retired `ProjectAnalyzer`: parallel Pass 1, lazy class loading, dead-code
+//! sweep, reverse-dependency index, and the [`AnalysisResult`] return type.
+//! Per-file (LSP) entry points stay on `AnalysisSession` itself in
+//! `session.rs`.
+//!
+//! All methods are `impl AnalysisSession`; configuration that's only
+//! meaningful for batch runs (issue suppressions, progress callback, optional
+//! PHP version override) is grouped in [`BatchOptions`] and passed in rather
+//! than stored on the session.
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rayon::prelude::*;
-
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
-use crate::cache::{hash_content, AnalysisCache};
+use mir_issues::Issue;
+use mir_types::{Atomic, Union};
+
+use crate::cache::hash_content;
 use crate::db::{
     collect_file_definitions, FileDefinitions, MirDatabase, MirDb, RefLoc, SourceFile,
 };
 use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
-use crate::shared_db::SharedDb;
+use crate::session::AnalysisSession;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
-use mir_issues::Issue;
-use mir_types::{Atomic, Union};
 
 /// Issue kinds emitted by [`crate::dead_code::DeadCodeAnalyzer`].
 ///
 /// The dead-code pass is just an error group — these names participate in
-/// `suppressed_issue_kinds` like any other [`IssueKind`]. If every kind
-/// listed here is suppressed, the dead-code pass is skipped entirely (it
-/// has nothing to contribute).
+/// [`BatchOptions::suppressed_issue_kinds`] like any other `IssueKind`. If
+/// every kind listed here is suppressed, the dead-code pass is skipped
+/// entirely.
 pub fn dead_code_issue_kinds() -> &'static [&'static str] {
     &["UnusedMethod", "UnusedProperty", "UnusedFunction"]
 }
 
-/// Batch-oriented analyzer: file discovery, parsing, and analysis.
+/// Per-batch options for [`AnalysisSession::analyze_paths`] and friends.
 ///
-/// ProjectAnalyzer is the primary entry point for analyzing a project as a whole.
-/// It orchestrates parallel file discovery and parsing, using the same core
-/// analysis engine as [`AnalysisSession`] (salsa database and Pass 2 driver).
-///
-/// **Unified Design:** ProjectAnalyzer and `AnalysisSession` now share the same
-/// database management via [`SharedDb`]. ProjectAnalyzer is the batch API
-/// (all files at once), while `AnalysisSession` is the incremental API (file-by-file).
-/// Both use `Pass2Driver`, the same definition collection logic, and identical
-/// database operations, eliminating code duplication.
-///
-/// [`AnalysisSession`]: crate::session::AnalysisSession
-pub struct ProjectAnalyzer {
-    /// Shared database management (salsa, file registry, stub tracking).
-    /// Extracted to allow code sharing with AnalysisSession.
-    shared_db: Arc<SharedDb>,
-    /// Optional cache — when `Some`, Pass 2 results are read/written per file.
-    cache: Option<AnalysisCache>,
-    /// Called once after each file completes Pass 2 (used for progress reporting).
-    pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
-    /// PSR-4 autoloader mapping from composer.json, if available.
-    pub psr4: Option<Arc<crate::composer::Psr4Map>>,
+/// Configuration that only makes sense for full-project (batch) analysis
+/// lives here instead of on [`AnalysisSession`], so the per-file LSP API
+/// isn't bloated with state nothing else reads.
+#[derive(Clone, Default)]
+pub struct BatchOptions {
     /// Names of `IssueKind` variants to drop from the final result, e.g.
     /// `["MissingThrowsDocblock", "UnusedMethod"]`. Applied as a final
-    /// post-filter on every `analyze()` return path, so analyzer internals
-    /// don't need to know which diagnostics the consumer cares about.
-    ///
-    /// Defaults to an empty set — nothing is suppressed unless the
-    /// consumer (CLI, test fixture, programmatic caller) adds names. The
-    /// dead-code pass is skipped automatically when every
-    /// [`dead_code_issue_kinds`] entry is in this set.
+    /// post-filter so analyzer internals don't need to know which
+    /// diagnostics the consumer cares about. Empty by default.
     pub suppressed_issue_kinds: HashSet<String>,
-    /// Target PHP language version. `None` means "not configured"; resolved to
-    /// `PhpVersion::LATEST` when passed down to `StatementsAnalyzer`.
-    pub php_version: Option<PhpVersion>,
-    /// Additional stub files to parse before analysis (absolute paths).
-    pub stub_files: Vec<PathBuf>,
-    /// Additional stub directories to walk and parse before analysis (absolute paths).
-    pub stub_dirs: Vec<PathBuf>,
+    /// Called once after each file completes Pass 2 (progress reporting).
+    pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
+    /// Override the session's configured PHP version for this run. `None`
+    /// uses the session's version.
+    pub php_version_override: Option<PhpVersion>,
+}
+
+impl BatchOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_suppressed<I, S>(mut self, kinds: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.suppressed_issue_kinds = kinds.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn with_progress_callback(mut self, callback: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.on_file_done = Some(callback);
+        self
+    }
+
+    pub fn with_php_version(mut self, version: PhpVersion) -> Self {
+        self.php_version_override = Some(version);
+        self
+    }
+
+    /// True iff at least one dead-code [`IssueKind`] would be emitted (i.e.
+    /// not all of them are suppressed).
+    fn should_run_dead_code(&self) -> bool {
+        dead_code_issue_kinds()
+            .iter()
+            .any(|k| !self.suppressed_issue_kinds.contains(*k))
+    }
+
+    /// Drop issues whose [`IssueKind::name()`] is listed in
+    /// [`Self::suppressed_issue_kinds`].
+    fn apply(&self, issues: &mut Vec<Issue>) {
+        if self.suppressed_issue_kinds.is_empty() {
+            return;
+        }
+        issues.retain(|i| !self.suppressed_issue_kinds.contains(i.kind.name()));
+    }
 }
 
 struct ParsedProjectFile {
@@ -102,139 +133,9 @@ impl ParsedProjectFile {
     }
 }
 
-impl ProjectAnalyzer {
-    pub fn new() -> Self {
-        Self {
-            shared_db: Arc::new(SharedDb::new()),
-            cache: None,
-            on_file_done: None,
-            psr4: None,
-            suppressed_issue_kinds: HashSet::default(),
-            php_version: None,
-            stub_files: Vec::new(),
-            stub_dirs: Vec::new(),
-        }
-    }
-
-    /// Create a `ProjectAnalyzer` with a disk-backed cache stored under `cache_dir`.
-    pub fn with_cache(cache_dir: &Path) -> Self {
-        Self {
-            shared_db: Arc::new(SharedDb::new().with_cache_dir(cache_dir)),
-            cache: Some(AnalysisCache::open(cache_dir)),
-            on_file_done: None,
-            psr4: None,
-            suppressed_issue_kinds: HashSet::default(),
-            php_version: None,
-            stub_files: Vec::new(),
-            stub_dirs: Vec::new(),
-        }
-    }
-
-    /// Enable the disk-backed cache for an already-constructed analyzer.
-    pub fn set_cache_dir(&mut self, cache_dir: &Path) {
-        // Rebuild SharedDb to attach the Pass-1 stub cache. Must be called
-        // before any file is ingested — a previously-populated SharedDb's
-        // state would be silently discarded here, which is almost certainly
-        // a caller bug rather than the intended behavior.
-        debug_assert_eq!(
-            self.shared_db.source_file_count(),
-            0,
-            "ProjectAnalyzer::set_cache_dir must be called before any file is ingested"
-        );
-        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(cache_dir));
-        self.cache = Some(AnalysisCache::open(cache_dir));
-    }
-
-    /// Create a `ProjectAnalyzer` from a project root containing `composer.json`.
-    /// Returns the analyzer (with `psr4` set) and the `Psr4Map` so callers can
-    /// call `map.project_files()` / `map.vendor_files()`.
-    pub fn from_composer(
-        root: &Path,
-    ) -> Result<(Self, crate::composer::Psr4Map), crate::composer::ComposerError> {
-        let map = crate::composer::Psr4Map::from_composer(root)?;
-        let psr4 = Arc::new(map.clone());
-        let analyzer = Self {
-            shared_db: Arc::new(SharedDb::new()),
-            cache: None,
-            on_file_done: None,
-            psr4: Some(psr4),
-            suppressed_issue_kinds: HashSet::default(),
-            php_version: None,
-            stub_files: Vec::new(),
-            stub_dirs: Vec::new(),
-        };
-        Ok((analyzer, map))
-    }
-
-    /// Builder method: set the target PHP version.
-    pub fn with_php_version(mut self, version: PhpVersion) -> Self {
-        self.php_version = Some(version);
-        self
-    }
-
-    /// True iff at least one [`IssueKind`] emitted by the dead-code pass is
-    /// not currently suppressed, so it's worth running.
-    fn should_run_dead_code(&self) -> bool {
-        dead_code_issue_kinds()
-            .iter()
-            .any(|k| !self.suppressed_issue_kinds.contains(*k))
-    }
-
-    /// Builder method: set a progress callback invoked once per analyzed file.
-    pub fn with_progress_callback(mut self, callback: Arc<dyn Fn() + Send + Sync>) -> Self {
-        self.on_file_done = Some(callback);
-        self
-    }
-
-    /// Builder method: add user stub files.
-    pub fn with_stub_files(mut self, files: Vec<PathBuf>) -> Self {
-        self.stub_files = files;
-        self
-    }
-
-    /// Builder method: add user stub directories.
-    pub fn with_stub_dirs(mut self, dirs: Vec<PathBuf>) -> Self {
-        self.stub_dirs = dirs;
-        self
-    }
-
-    /// Drop issues whose [`IssueKind::name()`] is listed in
-    /// [`Self::suppressed_issue_kinds`]. Centralized post-filter so analyzer
-    /// internals never need to know what the consumer cares about.
-    fn apply_issue_suppressions(&self, issues: &mut Vec<mir_issues::Issue>) {
-        if self.suppressed_issue_kinds.is_empty() {
-            return;
-        }
-        issues.retain(|i| !self.suppressed_issue_kinds.contains(i.kind.name()));
-    }
-
-    /// Builder method: configure a disk-backed cache at the given directory.
-    pub fn with_cache_dir(mut self, cache_dir: &Path) -> Self {
-        debug_assert_eq!(
-            self.shared_db.source_file_count(),
-            0,
-            "ProjectAnalyzer::with_cache_dir must be called before any file is ingested"
-        );
-        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(cache_dir));
-        self.cache = Some(AnalysisCache::open(cache_dir));
-        self
-    }
-
-    /// Builder method: attach a PSR-4 autoloader map.
-    pub fn with_psr4(mut self, map: Arc<crate::composer::Psr4Map>) -> Self {
-        self.psr4 = Some(map);
-        self
-    }
-
-    /// Resolve the configured PHP version, defaulting to `PhpVersion::LATEST`
-    /// when none has been set.
-    fn resolved_php_version(&self) -> PhpVersion {
-        self.php_version.unwrap_or(PhpVersion::LATEST)
-    }
-
+impl AnalysisSession {
     /// Cumulative hit / miss counts on the persistent Pass-1 cache attached
-    /// to this analyzer. `(0, 0)` when no cache is configured. Used by
-    /// integration tests and benchmarks to assert the cache actually fires.
+    /// to this session. `(0, 0)` when no cache is configured.
     #[doc(hidden)]
     pub fn stub_cache_stats(&self) -> (u64, u64) {
         match self.shared_db.stub_cache.as_deref() {
@@ -243,150 +144,29 @@ impl ProjectAnalyzer {
         }
     }
 
+    fn batch_php_version(&self, opts: &BatchOptions) -> PhpVersion {
+        opts.php_version_override.unwrap_or(self.php_version)
+    }
+
     fn type_exists(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
         crate::db::type_exists_via_db(&db, fqcn)
     }
 
-    /// Returns `true` if a function with `fqn` is registered and active.
-    pub fn contains_function(&self, fqn: &str) -> bool {
-        let db = self.snapshot_db();
-        let here = crate::db::Fqcn::from_str(&db, fqn);
-        crate::db::find_function(&db, here).is_some()
-    }
-
-    /// Returns `true` if a class / interface / trait / enum is registered.
-    pub fn contains_class(&self, fqcn: &str) -> bool {
-        let db = self.snapshot_db();
-        let here = crate::db::Fqcn::from_str(&db, fqcn);
-        crate::db::find_class_like(&db, here).is_some()
-    }
-
-    /// Returns `true` if `class` has a method named `name` (case-insensitive).
-    pub fn contains_method(&self, class: &str, name: &str) -> bool {
-        let db = self.snapshot_db();
-        crate::db::has_method_in_chain(&db, class, name)
-    }
-
-    /// Acquire a cheap clone of the salsa db for a read-only query.
-    /// The lock is held only for the duration of the clone, so concurrent
-    /// readers never serialize on each other or on writes longer than the
-    /// clone itself.
-    fn snapshot_db(&self) -> MirDb {
-        self.shared_db.snapshot_db()
-    }
-
-    /// Internal: expose the salsa db for unit tests that need a `&dyn MirDatabase`.
-    #[doc(hidden)]
-    pub fn salsa_db_for_test(&self) -> parking_lot::MappedRwLockWriteGuard<'_, MirDb> {
-        let guard = self.shared_db.salsa.write();
-        parking_lot::RwLockWriteGuard::map(guard, |rw| &mut **rw)
-    }
-
-    /// Legacy: look up the source location of a class member by name.
-    ///
-    /// Prefer [`Self::definition_of`] with [`crate::Symbol::method`] etc.
-    #[doc(hidden)]
-    pub fn member_location(
+    fn collect_and_ingest_source(
         &self,
-        fqcn: &str,
-        member_name: &str,
-    ) -> Option<mir_codebase::storage::Location> {
-        let db = self.snapshot_db();
-        crate::db::member_location_via_db(&db, fqcn, member_name)
+        file: Arc<str>,
+        src: &str,
+        php_version: PhpVersion,
+    ) -> FileDefinitions {
+        self.shared_db
+            .collect_and_ingest_file(file, src, php_version)
     }
 
-    /// Legacy: look up a top-level symbol location.
-    ///
-    /// Prefer [`Self::definition_of`] with [`crate::Symbol`].
-    #[doc(hidden)]
-    pub fn symbol_location(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
-        let db = self.snapshot_db();
-        let here = crate::db::Fqcn::from_str(&db, symbol);
-        if let Some(class) = crate::db::find_class_like(&db, here) {
-            if let Some(loc) = class.location() {
-                return Some(loc.clone());
-            }
-        }
-        crate::db::find_function(&db, here).and_then(|f| f.location.clone())
-    }
-
-    /// Legacy: raw reference locations as `(file, line, col_start, col_end)`.
-    ///
-    /// Prefer [`Self::references_to`] which returns `(Arc<str>, Range)` pairs
-    /// and takes a strongly-typed [`crate::Symbol`].
-    #[doc(hidden)]
-    pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let db = self.snapshot_db();
-        db.reference_locations(symbol)
-    }
-
-    /// Resolve a symbol to its declaration location.
-    ///
-    /// Mirrors [`crate::AnalysisSession::definition_of`].
-    pub fn definition_of(
-        &self,
-        symbol: &crate::Symbol,
-    ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
-        let db = self.snapshot_db();
-        match symbol {
-            crate::Symbol::Class(fqcn) => {
-                let here = crate::db::Fqcn::from_str(&db, fqcn.as_ref());
-                let class = crate::db::find_class_like(&db, here)
-                    .ok_or(crate::SymbolLookupError::NotFound)?;
-                class
-                    .location()
-                    .cloned()
-                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
-            }
-            crate::Symbol::Function(fqn) => {
-                let here = crate::db::Fqcn::from_str(&db, fqn.as_ref());
-                let f = crate::db::find_function(&db, here)
-                    .ok_or(crate::SymbolLookupError::NotFound)?;
-                f.location
-                    .clone()
-                    .ok_or(crate::SymbolLookupError::NoSourceLocation)
-            }
-            crate::Symbol::Method { class, name }
-            | crate::Symbol::Property { class, name }
-            | crate::Symbol::ClassConstant { class, name } => {
-                crate::db::member_location_via_db(&db, class, name)
-                    .ok_or(crate::SymbolLookupError::NotFound)
-            }
-            crate::Symbol::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
-        }
-    }
-
-    /// All recorded references to a symbol, as `(file, range)` pairs.
-    ///
-    /// Mirrors [`crate::AnalysisSession::references_to`].
-    pub fn references_to(&self, symbol: &crate::Symbol) -> Vec<(Arc<str>, crate::Range)> {
-        let db = self.snapshot_db();
-        let key = symbol.codebase_key();
-        db.reference_locations(&key)
-            .into_iter()
-            .map(|(file, line, col_start, col_end)| {
-                let range = crate::Range {
-                    start: crate::Position {
-                        line,
-                        column: col_start as u32,
-                    },
-                    end: crate::Position {
-                        line,
-                        column: col_end as u32,
-                    },
-                };
-                (file, range)
-            })
-            .collect()
-    }
-
-    /// Load PHP built-in stubs. Called automatically by `analyze` if not done yet.
-    /// Stubs are filtered against the configured target PHP version (or
-    /// `PhpVersion::LATEST` if none was set).
-    pub fn load_stubs(&self) {
-        let php_version = self.resolved_php_version();
-
+    /// Load the configured PHP version + built-in stubs + user stubs into
+    /// the shared db. Called by [`Self::analyze_paths`] and
+    /// [`Self::collect_types_only`].
+    fn load_batch_stubs(&self, php_version: PhpVersion) {
         // Wire the PHP version into the db before any SourceFile inputs are
         // registered — collect_file_definitions reads it for @since/@removed filtering.
         {
@@ -394,19 +174,16 @@ impl ProjectAnalyzer {
             self.shared_db.salsa.write().set_php_version(version_str);
         }
 
-        // Load all built-in stubs for the configured PHP version
+        // Built-in stubs for the configured PHP version.
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
         self.shared_db.ingest_stub_paths(&paths, php_version);
 
-        // Load user-configured stubs
+        // User-configured stubs.
         self.shared_db
-            .ingest_user_stubs(&self.stub_files, &self.stub_dirs);
+            .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
 
-        // Ensure a resolver is configured so pull-path lookups (`find_class_like`,
-        // `find_function`) can map built-in FQCNs to the stub VFS paths registered
-        // as SourceFile inputs above. If a PSR-4 / user resolver is already wired
-        // (e.g. via `from_composer`), it's chained with `StubClassResolver` at
-        // session-construction time elsewhere.
+        // Ensure a resolver is configured so pull-path lookups can map
+        // built-in FQCNs to the stub VFS paths registered above.
         let mut guard = self.shared_db.salsa.write();
         if guard.current_resolver().is_none() {
             let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::StubClassResolver);
@@ -414,18 +191,14 @@ impl ProjectAnalyzer {
         }
     }
 
-    fn collect_and_ingest_source(&self, file: Arc<str>, src: &str) -> FileDefinitions {
-        self.shared_db
-            .collect_and_ingest_file(file, src, self.resolved_php_version())
-    }
-
-    /// Run the full analysis pipeline on a set of file paths.
-    pub fn analyze(&self, paths: &[PathBuf]) -> AnalysisResult {
+    /// Run the full batch analysis pipeline on a set of file paths.
+    pub fn analyze_paths(&self, paths: &[PathBuf], opts: &BatchOptions) -> AnalysisResult {
+        let php_version = self.batch_php_version(opts);
         let mut all_issues = Vec::new();
         let _t0 = std::time::Instant::now();
 
         // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
-        self.load_stubs();
+        self.load_batch_stubs(php_version);
         let _t_stubs = _t0.elapsed();
 
         // ---- Pass 1: read files in parallel ----------------------------------
@@ -478,8 +251,7 @@ impl ProjectAnalyzer {
 
         // ---- Pass 1: definition collection from the already-parsed AST -------
         // Returns (FileDefinitions, content_hash, has_hard_parse_errors) so we
-        // can prime the parse cache before the pre-warm loop below, eliminating
-        // the re-parse that `collect_file_definitions` would otherwise trigger.
+        // can prime the parse cache before the pre-warm loop below.
         type Pass1Entry = (FileDefinitions, [u8; 32], bool);
         let file_defs: Vec<Pass1Entry> = parsed_files
             .par_iter()
@@ -543,12 +315,6 @@ impl ProjectAnalyzer {
         let _t_ingest = _t0.elapsed();
 
         // ---- Pre-warm collect_file_definitions for project files -------------
-        // After ingest, project SourceFiles have their text set in salsa.
-        // Prime the tracked `collect_file_definitions` cache for each project
-        // file in parallel so that `workspace_symbol_index` (called from class
-        // analysis and Pass-2) finds all cache hits and doesn't need to
-        // (re-)parse project files inline — eliminating a serial bottleneck on
-        // cold starts, especially at high thread counts.
         {
             let db_prewarm = {
                 let guard = self.shared_db.salsa.read();
@@ -568,13 +334,11 @@ impl ProjectAnalyzer {
                 });
         }
 
-        // ---- Lazy-load unknown classes via PSR-4 (issue #50) ----------------
-        if let Some(psr4) = &self.psr4 {
-            self.lazy_load_missing_classes(psr4.clone(), &mut all_issues);
+        // ---- Lazy-load unknown classes via PSR-4 ----------------------------
+        if let Some(psr4) = self.psr4.clone() {
+            self.lazy_load_missing_classes(psr4, php_version, &mut all_issues);
         }
 
-        // ---- Resolve @psalm-import-type declarations now that all Pass 1
-        // classes (including their `type_aliases`) are populated.
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let db_snapshot = {
@@ -585,7 +349,7 @@ impl ProjectAnalyzer {
             cache.set_reverse_deps(rev);
         }
 
-        // ---- Class-level checks (M11) ----------------------------------------
+        // ---- Class-level checks ---------------------------------------------
         let analyzed_file_set: HashSet<Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
@@ -599,23 +363,6 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- No inference pre-warm: Pass 2 triggers cross-file inference -------
-        //
-        // Earlier revisions ran a parallel `infer_file_return_types` sweep over
-        // every project file before Pass 2 to warm salsa's memo table. The
-        // intuition was "do the inference eagerly so Pass 2 reads cached
-        // results." In practice it inferred bodies whose results were never
-        // demanded (most internal helpers), and the eager sweep dominated
-        // cold-start wall time.
-        //
-        // Replaced by lazy on-demand inference: Pass 2 calls
-        // `inferred_function_return_type_demand` /
-        // `inferred_method_return_type_demand` only when a cross-file return
-        // type is actually consulted. Salsa's memoization ensures each file is
-        // inferred at most once total across all workers, so the work done is
-        // bounded by what Pass 2 reaches — typically a small subset of the
-        // declared project. Contention on hot vendor files is real but limited
-        // (salsa serializes via per-key locks; cold compute happens once).
         let _t_presweep = _t0.elapsed();
 
         let db_main = {
@@ -623,19 +370,13 @@ impl ProjectAnalyzer {
             (**guard).clone()
         };
 
-        // ---- Pass 2: analyze function/method bodies in parallel (M14) --------
-        // Each worker db clone has its own `pending_ref_locs` buffer (custom
-        // Clone returns empty).  Workers push reference locations there instead
-        // of into the shared Arc<Mutex<...>> maps, eliminating cross-thread
-        // contention.  After collect() we commit all batches serially in a
-        // single lock acquisition per map.
+        // ---- Pass 2: analyze function/method bodies in parallel --------------
         let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =
             parsed_files
                 .par_iter()
                 .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
                 .map_with(db_main, |db, parsed| {
-                    let driver =
-                        Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
+                    let driver = Pass2Driver::new(&*db as &dyn MirDatabase, php_version);
                     let (issues, symbols) = if let Some(cache) = &self.cache {
                         let h = hash_content(parsed.source());
                         if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
@@ -654,7 +395,7 @@ impl ProjectAnalyzer {
                                 .map(|r| (r.symbol_key.to_string(), r.line, r.col_start, r.col_end))
                                 .collect();
                             cache.put(&parsed.file, h, issues.clone(), cache_locs);
-                            if let Some(cb) = &self.on_file_done {
+                            if let Some(cb) = &opts.on_file_done {
                                 cb();
                             }
                             return (issues, symbols, pending);
@@ -668,7 +409,7 @@ impl ProjectAnalyzer {
                         )
                     };
                     let pending = db.take_pending_ref_locs();
-                    if let Some(cb) = &self.on_file_done {
+                    if let Some(cb) = &opts.on_file_done {
                         cb();
                     }
                     (issues, symbols, pending)
@@ -691,13 +432,10 @@ impl ProjectAnalyzer {
         }
 
         // ---- Post-Pass-2 lazy loading: FQCNs used without `use` imports ------
-        // FQCNs in function/method bodies aren't visible until Pass 2 runs, so
-        // the pre-Pass-2 lazy load misses them.  We collect UndefinedClass names,
-        // resolve them via PSR-4, load those files, re-finalize, then re-analyze
-        // only the affected files to clear the false positives.
-        if let Some(psr4) = &self.psr4 {
+        if let Some(psr4) = self.psr4.clone() {
             self.lazy_load_from_body_issues(
-                psr4.clone(),
+                psr4,
+                php_version,
                 &file_data,
                 &files_with_parse_errors,
                 &mut all_issues,
@@ -710,9 +448,8 @@ impl ProjectAnalyzer {
             cache.flush();
         }
 
-        // ---- Compact the reference index ------------------------------------
-        // ---- Dead-code detection (M18) --------------------------------------
-        if self.should_run_dead_code() {
+        // ---- Dead-code detection -------------------------------------------
+        if opts.should_run_dead_code() {
             let salsa = self.snapshot_db();
             let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa).analyze();
             all_issues.extend(dead_code_issues);
@@ -733,15 +470,12 @@ impl ProjectAnalyzer {
             );
         }
 
-        self.apply_issue_suppressions(&mut all_issues);
+        opts.apply(&mut all_issues);
         if let Some(dump) = crate::metrics::dump() {
             eprintln!("{dump}");
         }
 
         // ---- Build workspace symbol index singleton -------------------------
-        // All files (including PSR-4 lazy-loaded ones) are now in salsa.
-        // Build the singleton once so subsequent `re_analyze_file` calls get
-        // O(1) symbol lookups instead of O(N_files) dep-list traversal.
         {
             let mut guard = self.shared_db.salsa.write();
             guard.rebuild_workspace_symbol_index();
@@ -753,10 +487,9 @@ impl ProjectAnalyzer {
     fn lazy_load_missing_classes(
         &self,
         psr4: Arc<crate::composer::Psr4Map>,
+        php_version: PhpVersion,
         all_issues: &mut Vec<Issue>,
     ) {
-        use std::sync::Arc;
-
         let max_depth = 10;
         let mut loaded: HashSet<String> = HashSet::default();
         let mut scanned: HashSet<Arc<str>> = HashSet::default();
@@ -772,16 +505,6 @@ impl ProjectAnalyzer {
                 }
             };
 
-            // Collect inheritance, type-reference, and import candidates. Only
-            // scan classes that haven't been scanned yet — newly-loaded classes
-            // appear in `workspace_classes(db)` on the next iteration and get
-            // their refs walked then.
-            //
-            // Walks: parent / interfaces / extends / trait uses / mixins,
-            // PLUS property types, method param/return/throws types, constant
-            // types, type-arg lists, type aliases. Without the type walk, lazy
-            // mode misses transitive vendor classes (e.g. `class A { public B $b; }`
-            // — B is never queued unless explicitly referenced from project code).
             let mut candidates: Vec<String> = Vec::new();
             let import_candidates = {
                 let db_owned = self.snapshot_db();
@@ -810,10 +533,6 @@ impl ProjectAnalyzer {
             for fqcn in candidates {
                 try_queue(&fqcn);
             }
-
-            // Also lazy-load any type referenced via `use` imports that isn't yet
-            // in the codebase (covers enums and classes used only in type hints or
-            // static calls, which never appear in the inheritance scan above).
             for fqcn in import_candidates {
                 try_queue(&fqcn);
             }
@@ -827,11 +546,7 @@ impl ProjectAnalyzer {
                 if let Ok(src) = std::fs::read_to_string(&path) {
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let is_vendor = file.contains("/vendor/") || file.contains("\\vendor\\");
-                    let defs = self.collect_and_ingest_source(file, &src);
-                    // Vendor parse errors are not the user's concern — they
-                    // can't fix vendor code. The eager `collect_types_only`
-                    // path drops them; this lazy path must do the same to
-                    // avoid leaking diagnostics that don't exist in eager mode.
+                    let defs = self.collect_and_ingest_source(file, &src, php_version);
                     if !is_vendor {
                         all_issues.extend(Arc::unwrap_or_clone(defs.issues));
                     }
@@ -843,6 +558,7 @@ impl ProjectAnalyzer {
     fn lazy_load_from_body_issues(
         &self,
         psr4: Arc<crate::composer::Psr4Map>,
+        php_version: PhpVersion,
         file_data: &[(Arc<str>, Arc<str>)],
         files_with_parse_errors: &HashSet<Arc<str>>,
         all_issues: &mut Vec<Issue>,
@@ -854,8 +570,6 @@ impl ProjectAnalyzer {
         let mut loaded: HashSet<String> = HashSet::default();
 
         for _ in 0..max_depth {
-            // Deduplicate by FQCN: HashMap prevents loading the same class twice
-            // when multiple files share the same UndefinedClass diagnostic.
             let mut to_load: HashMap<String, PathBuf> = HashMap::default();
 
             for issue in all_issues.iter() {
@@ -877,17 +591,12 @@ impl ProjectAnalyzer {
             for path in to_load.values() {
                 if let Ok(src) = std::fs::read_to_string(path) {
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
-                    let _ = self.collect_and_ingest_source(file, &src);
+                    let _ = self.collect_and_ingest_source(file, &src, php_version);
                 }
             }
 
-            // Load inheritance deps of newly-added types and finalize.
-            // This covers e.g. `class Helper extends \App\Base` where Base is
-            // also not in the initial file set.
-            self.lazy_load_missing_classes(psr4.clone(), all_issues);
+            self.lazy_load_missing_classes(psr4.clone(), php_version, all_issues);
 
-            // Re-analyze every file that has an UndefinedClass for a type now
-            // present in the codebase — covers both direct and transitive loads.
             let files_to_reanalyze: HashSet<Arc<str>> = all_issues
                 .iter()
                 .filter_map(|i| {
@@ -919,8 +628,7 @@ impl ProjectAnalyzer {
                         !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
                     })
                     .map_with(db_full, |db, (file, src)| {
-                        let driver =
-                            Pass2Driver::new(&*db as &dyn MirDatabase, self.resolved_php_version());
+                        let driver = Pass2Driver::new(&*db as &dyn MirDatabase, php_version);
                         let parsed = php_rs_parser::parse(src);
                         let (issues, symbols) = driver.analyze_bodies(
                             &parsed.program,
@@ -946,16 +654,20 @@ impl ProjectAnalyzer {
         }
     }
 
-    /// Re-analyze a single file within the existing codebase.
+    /// Re-analyze a single file (Pass 1 + Pass 2) within the batch context.
     ///
-    /// This is the incremental analysis API for LSP:
-    /// 1. Removes old definitions from this file
-    /// 2. Re-runs Pass 1 (definition collection) on the new content
-    /// 3. Resolves any newly-collected `@psalm-import-type` declarations
-    /// 4. Re-runs Pass 2 (body analysis) on this file
-    /// 5. Returns the analysis result for this file only
-    pub fn re_analyze_file(&self, file_path: &str, new_content: &str) -> AnalysisResult {
-        // Fast path: content unchanged and cache has a valid entry — skip full re-analysis.
+    /// Mirrors the old `ProjectAnalyzer::re_analyze_file` cache-aware path.
+    /// Use [`Self::analyze_dependents_of`] for LSP-style per-file flows that
+    /// don't need batch options.
+    pub fn re_analyze_file_batch(
+        &self,
+        file_path: &str,
+        new_content: &str,
+        opts: &BatchOptions,
+    ) -> AnalysisResult {
+        let php_version = self.batch_php_version(opts);
+
+        // Fast path: content unchanged and cache has a valid entry.
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             if let Some((mut issues, ref_locs)) = cache.get(file_path, &h) {
@@ -963,7 +675,7 @@ impl ProjectAnalyzer {
                 let guard = self.shared_db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
                 guard.commit_pending_to_maps();
-                self.apply_issue_suppressions(&mut issues);
+                opts.apply(&mut issues);
                 return AnalysisResult::build(issues, HashMap::default(), Vec::new());
             }
         }
@@ -975,7 +687,6 @@ impl ProjectAnalyzer {
             guard.remove_file_definitions(file_path);
         }
 
-        // --- Salsa-backed Pass 1: memoized parse + definition collection ------
         let file_defs = {
             let mut guard = self.shared_db.salsa.write();
             let salsa_file = guard.upsert_source_file(file.clone(), Arc::from(new_content));
@@ -984,9 +695,6 @@ impl ProjectAnalyzer {
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
-        // Check if declared names changed; rebuild singleton if so.
-        // Body-only edits skip this (O(1) comparison), keeping the singleton's
-        // HIGH-durability revision unchanged so Pass-2 lookups stay O(1).
         {
             let mut guard = self.shared_db.salsa.write();
             if guard.workspace_symbol_index_singleton().is_some() {
@@ -1006,7 +714,7 @@ impl ProjectAnalyzer {
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
-                let driver = Pass2Driver::new(db_ref, self.resolved_php_version());
+                let driver = Pass2Driver::new(db_ref, php_version);
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,
                     file.clone(),
@@ -1029,76 +737,24 @@ impl ProjectAnalyzer {
             cache.put(file_path, h, all_issues.clone(), ref_locs);
         }
 
-        self.apply_issue_suppressions(&mut all_issues);
+        opts.apply(&mut all_issues);
         AnalysisResult::build(all_issues, HashMap::default(), symbols)
     }
 
-    /// Analyze a PHP source string without a real file path.
-    /// Useful for tests and LSP single-file mode.
-    pub fn analyze_source(source: &str) -> AnalysisResult {
-        let analyzer = ProjectAnalyzer::new();
-        let file: Arc<str> = Arc::from("<source>");
-        let mut db = MirDb::default();
-        db.set_php_version(Arc::from(
-            analyzer.resolved_php_version().to_string().as_str(),
-        ));
-        crate::stubs::load_stubs_for_version(&mut db, analyzer.resolved_php_version());
-        let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
-        let file_defs = collect_file_definitions(&db, salsa_file);
-        let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
-        if all_issues.iter().any(|issue| {
-            matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
-                && issue.severity == mir_issues::Severity::Error
-        }) {
-            analyzer.apply_issue_suppressions(&mut all_issues);
-            return AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), Vec::new());
-        }
-        let mut type_envs = rustc_hash::FxHashMap::default();
-        let mut all_symbols = Vec::new();
-        let result = php_rs_parser::parse(source);
-
-        let driver = Pass2Driver::new(&db, analyzer.resolved_php_version());
-        all_issues.extend(driver.analyze_bodies_typed(
-            &result.program,
-            file.clone(),
-            source,
-            &result.source_map,
-            &mut type_envs,
-            &mut all_symbols,
-        ));
-        analyzer.apply_issue_suppressions(&mut all_issues);
-        AnalysisResult::build(all_issues, type_envs, all_symbols)
-    }
-
-    /// Discover all `.php` files under a directory, recursively.
-    pub fn discover_files(root: &Path) -> Vec<PathBuf> {
-        if root.is_file() {
-            return vec![root.to_path_buf()];
-        }
-        let mut files = Vec::new();
-        collect_php_files(root, &mut files);
-        files
-    }
-
-    /// Pass 1 only: collect type definitions from `paths` into the codebase without
-    /// analyzing method bodies or emitting issues. Used to load vendor types.
+    /// Pass 1 only: collect type definitions from `paths` into the codebase
+    /// without analyzing method bodies or emitting issues. Used to load
+    /// vendor types.
     ///
-    /// When [`Self::with_cache`] is enabled, per-file [`StubSlice`] results from
-    /// previous runs are reused on a content-hash match, eliminating the
-    /// parse + definition-collection step (which is ~95% of vendor wall-time
-    /// on Laravel). Cache misses run the normal pipeline and write back so
-    /// subsequent runs hit.
-    ///
-    /// [`StubSlice`]: mir_codebase::storage::StubSlice
+    /// When a disk-backed cache is attached, per-file `StubSlice` results
+    /// from previous runs are reused on a content-hash match, eliminating
+    /// the parse + definition-collection step. Cache misses run the normal
+    /// pipeline and write back so subsequent runs hit.
     pub fn collect_types_only(&self, paths: &[PathBuf]) {
         let _timing = std::env::var("MIR_TIMING").is_ok();
         let _t0 = std::time::Instant::now();
 
-        let php_v = self.resolved_php_version().cache_byte();
+        let php_v = self.php_version.cache_byte();
 
-        // ---- Phase 1: read + try cache, in parallel ------------------------
-        // Each entry carries either a ready-to-ingest cached slice, or the
-        // source text + hash for the miss path that runs Pass 1.
         struct FileEntry {
             file: Arc<str>,
             src: Arc<str>,
@@ -1114,8 +770,6 @@ impl ProjectAnalyzer {
                 let hash = hash_source(&src);
                 let cached = self.shared_db.stub_cache.as_ref().and_then(|c| {
                     let mut slice = c.get(&file, &hash, php_v)?;
-                    // Re-run dedup outside the serial ingest section so commit
-                    // 3018a1d's parallel-dedup win is preserved on cache hits.
                     prepare_for_ingest(&mut slice);
                     Some(slice)
                 });
@@ -1129,10 +783,6 @@ impl ProjectAnalyzer {
             .collect();
         let _t_read = _t0.elapsed();
 
-        // ---- Phase 2: register all SourceFile inputs in salsa --------------
-        // Vendor files won't change during the session → HIGH durability so
-        // salsa can skip O(N) verification of these deps when a project file
-        // is edited (only LOW-durability project-file deps need re-verification).
         let source_files: Vec<SourceFile> = {
             let mut guard = self.shared_db.salsa.write();
             entries
@@ -1148,45 +798,29 @@ impl ProjectAnalyzer {
         };
         let _t_reg = _t0.elapsed();
 
-        // ---- Phase 3: Pass 1 for misses, cache write-back, in parallel -----
         let db_pass1 = {
             let guard = self.shared_db.salsa.read();
             (**guard).clone()
         };
         let stub_cache = self.shared_db.stub_cache.clone();
-        // For disk-cache misses: use the salsa-tracked `collect_file_definitions`
-        // so Salsa memoizes the result and `rebuild_workspace_symbol_index` below
-        // gets a cache hit instead of re-parsing from scratch.
-        //
-        // For disk-cache hits: prime the in-process parse cache with the
-        // pre-deserialized slice so `rebuild_workspace_symbol_index` gets a
-        // fast-path hit in `collect_file_definitions_uncached` instead of
-        // re-reading from the disk cache a second time.
         let prepared: Vec<mir_codebase::storage::StubSlice> = entries
             .into_par_iter()
             .zip(source_files.into_par_iter())
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {
                 if let Some(slice) = entry.cached.take() {
-                    // Prime the in-process parse cache so that the
-                    // rebuild_workspace_symbol_index call below gets a fast-path
-                    // hit in collect_file_definitions_uncached instead of
-                    // re-reading from the disk cache a second time.
                     let slice_arc = Arc::new(slice);
                     db.parse_cache().insert(entry.hash, Arc::clone(&slice_arc));
                     return (*slice_arc).clone();
                 }
-                // Tracked version: result is memoized in the shared salsa
-                // storage.  `workspace_symbol_index` will get a cache hit.
                 let defs = collect_file_definitions(&*db, salsa_file);
                 if let Some(cache) = stub_cache.as_ref() {
                     cache.put(&entry.file, &entry.hash, php_v, &defs.slice);
                 }
-                // Cheap clone: StubSlice now holds Vec<Arc<Storage>> items.
                 (*defs.slice).clone()
             })
             .collect();
         let _t_collect = _t0.elapsed();
-        drop(prepared); // stubs are now indexed via salsa pull path; no push ingest needed
+        drop(prepared);
         let _t_ingest = _t0.elapsed();
 
         if _timing {
@@ -1201,25 +835,57 @@ impl ProjectAnalyzer {
             );
         }
 
-        // ---- Build workspace symbol index singleton -------------------------
-        // All vendor SourceFiles and their definitions are now registered and
-        // memoized. Build the singleton once so the subsequent `analyze` call
-        // (and any `re_analyze_file` calls) pay O(1) per symbol lookup instead
-        // of O(N_vendor_files) dep-list traversal.
         {
             let mut guard = self.shared_db.salsa.write();
             guard.rebuild_workspace_symbol_index();
         }
 
-        // Print profiling statistics for the collection phase.
         crate::collector::print_collector_stats();
     }
 }
 
-impl Default for ProjectAnalyzer {
-    fn default() -> Self {
-        Self::new()
+/// Analyze a PHP source string without a real file path. Useful for tests
+/// and single-file LSP mode. Allocates a throwaway db; doesn't touch any
+/// existing session.
+pub fn analyze_source(source: &str) -> AnalysisResult {
+    let php_version = PhpVersion::LATEST;
+    let file: Arc<str> = Arc::from("<source>");
+    let mut db = MirDb::default();
+    db.set_php_version(Arc::from(php_version.to_string().as_str()));
+    crate::stubs::load_stubs_for_version(&mut db, php_version);
+    let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
+    let file_defs = collect_file_definitions(&db, salsa_file);
+    let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
+    if all_issues.iter().any(|issue| {
+        matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
+            && issue.severity == mir_issues::Severity::Error
+    }) {
+        return AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), Vec::new());
     }
+    let mut type_envs = rustc_hash::FxHashMap::default();
+    let mut all_symbols = Vec::new();
+    let result = php_rs_parser::parse(source);
+
+    let driver = Pass2Driver::new(&db, php_version);
+    all_issues.extend(driver.analyze_bodies_typed(
+        &result.program,
+        file.clone(),
+        source,
+        &result.source_map,
+        &mut type_envs,
+        &mut all_symbols,
+    ));
+    AnalysisResult::build(all_issues, type_envs, all_symbols)
+}
+
+/// Discover all `.php` files under a directory, recursively.
+pub fn discover_files(root: &Path) -> Vec<PathBuf> {
+    if root.is_file() {
+        return vec![root.to_path_buf()];
+    }
+    let mut files = Vec::new();
+    collect_php_files(root, &mut files);
+    files
 }
 
 pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -1247,14 +913,8 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 // ---------------------------------------------------------------------------
 // FQCN reference walk — collects every class-name reference reachable from a
-// ClassLike's signature surface (parent / interfaces / traits / mixins, plus
-// every type appearing in own_methods / own_properties / own_constants /
-// extends_type_args / implements_type_args). Used by lazy_load_missing_classes
-// to chase transitive vendor types — without this, lazy mode loads class A
-// but not the B in `public B $b` and method resolution fails downstream.
-//
-// Filtering: variants without classlike-FQCN payloads (scalars, void, mixed,
-// template params, etc.) contribute nothing.
+// ClassLike's signature surface. Used by lazy_load_missing_classes to chase
+// transitive vendor types.
 // ---------------------------------------------------------------------------
 
 fn collect_class_referenced_fqcns(class: &crate::db::ClassLike, out: &mut Vec<String>) {
@@ -1317,7 +977,6 @@ fn collect_fqcns_in_simple(t: &mir_types::compact::SimpleType, out: &mut Vec<Str
     if let mir_types::compact::SimpleType::Complex(u) = t {
         collect_fqcns_in_union(u, out);
     }
-    // Scalar SimpleType variants (String/Int/Float/Bool/Mixed/Null/Void/Never) contain no FQCNs.
 }
 
 fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
@@ -1400,8 +1059,6 @@ fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
     }
 }
 
-// build_reverse_deps
-
 fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSet<String>> {
     let mut reverse: HashMap<String, HashSet<String>> = HashMap::default();
 
@@ -1440,7 +1097,6 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         let Some(class) = crate::db::find_class_like(db, here) else {
             continue;
         };
-        // Only true classes contribute class-direction edges in this loop.
         if class.is_interface() || class.is_trait() || class.is_enum() {
             continue;
         }
@@ -1486,7 +1142,6 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         }
     }
 
-    // Add types from global functions
     for fqn in crate::db::workspace_functions(db).iter() {
         let here = crate::db::Fqcn::from_str(db, fqn.as_ref());
         let Some(f) = crate::db::find_function(db, here) else {
@@ -1514,8 +1169,6 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         }
     }
 
-    // Also wire in bare-FQN references from Pass 2 (new \Foo(), \Foo::method(), \foo())
-    // that do not appear in use-import statements.
     for (ref_file, symbol_key) in db.all_reference_location_pairs() {
         let file_str = ref_file.as_ref().to_string();
         let lookup: &str = match symbol_key.split_once("::") {
@@ -1544,9 +1197,8 @@ pub struct AnalysisResult {
     pub type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
     /// Per-expression resolved symbols from Pass 2, sorted by file path.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
-    /// Maps each file path to the contiguous range within `symbols` that belongs
-    /// to it. Built once after analysis; allows `symbol_at` to scan only the
-    /// relevant file's slice rather than the entire codebase-wide vector.
+    /// Maps each file path to the contiguous range within `symbols` that
+    /// belongs to it.
     symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>>,
 }
 
@@ -1574,9 +1226,7 @@ impl AnalysisResult {
             symbols_by_file,
         }
     }
-}
 
-impl AnalysisResult {
     pub fn error_count(&self) -> usize {
         self.issues
             .iter()
@@ -1591,7 +1241,6 @@ impl AnalysisResult {
             .count()
     }
 
-    /// Group issues by source file.
     pub fn issues_by_file(&self) -> HashMap<Arc<str>, Vec<&Issue>> {
         let mut map: HashMap<Arc<str>, Vec<&Issue>> = HashMap::default();
         for issue in &self.issues {
@@ -1602,8 +1251,6 @@ impl AnalysisResult {
         map
     }
 
-    /// Count issues by severity. Returned as `(severity, count)` pairs sorted
-    /// by severity (Info, Warning, Error).
     pub fn count_by_severity(&self) -> Vec<(mir_issues::Severity, usize)> {
         let mut counts: std::collections::BTreeMap<mir_issues::Severity, usize> =
             std::collections::BTreeMap::new();
@@ -1613,13 +1260,10 @@ impl AnalysisResult {
         counts.into_iter().collect()
     }
 
-    /// Total number of issues across all severities and files.
     pub fn total_issue_count(&self) -> usize {
         self.issues.len()
     }
 
-    /// Iterator of issues matching `predicate`. Useful for filtering by
-    /// severity, kind, or file without materializing intermediate vectors.
     pub fn filter_issues<'a, F>(&'a self, predicate: F) -> impl Iterator<Item = &'a Issue>
     where
         F: Fn(&Issue) -> bool + 'a,
@@ -1627,8 +1271,6 @@ impl AnalysisResult {
         self.issues.iter().filter(move |i| predicate(i))
     }
 
-    /// Return the innermost resolved symbol whose span contains `byte_offset`
-    /// in `file`, or `None` if no symbol was recorded at that position.
     pub fn symbol_at(
         &self,
         file: &str,

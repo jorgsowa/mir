@@ -60,11 +60,11 @@ impl std::ops::DerefMut for MirDbRw {
 pub struct SharedDb {
     /// Salsa database (source file handles live inside MirDb.source_files).
     /// RwLock: multiple concurrent snapshot_db() reads; exclusive for writes.
-    pub salsa: RwLock<MirDbRw>,
+    pub(crate) salsa: RwLock<MirDbRw>,
     /// Stubs that have been ingested (for idempotency).
-    pub loaded_stubs: Mutex<HashSet<&'static str>>,
+    pub(crate) loaded_stubs: Mutex<HashSet<&'static str>>,
     /// Whether user stubs have been ingested.
-    pub user_stubs_loaded: std::sync::atomic::AtomicBool,
+    pub(crate) user_stubs_loaded: std::sync::atomic::AtomicBool,
     /// Optional Pass-1 disk cache. When `Some`, `collect_and_ingest_file`
     /// (the per-file LSP path) consults the cache before parsing and writes
     /// back on misses. Wired in by [`Self::with_cache_dir`].

@@ -20,7 +20,9 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer, Symbol};
+use mir_analyzer::{
+    discover_files, AnalysisSession, BatchOptions, FileAnalyzer, PhpVersion, Symbol,
+};
 use mir_types::Symbol as MirSymbol;
 use salsa::Cancelled;
 use tempfile::TempDir;
@@ -88,8 +90,8 @@ fn skip_if_missing(root: &Path) -> bool {
 }
 
 fn split_vendor_project(root: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
-    let vendor_files = ProjectAnalyzer::discover_files(&root.join("vendor"));
-    let project_files = ProjectAnalyzer::discover_files(&root.join("src"));
+    let vendor_files = discover_files(&root.join("vendor"));
+    let project_files = discover_files(&root.join("src"));
     (vendor_files, project_files)
 }
 
@@ -101,11 +103,11 @@ fn warm_project_analyzer(
     cache_dir: &TempDir,
     vendor_files: &[PathBuf],
     project_files: &[PathBuf],
-) -> ProjectAnalyzer {
-    let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
-    analyzer.load_stubs();
+) -> AnalysisSession {
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    analyzer.ensure_all_stubs_loaded();
     analyzer.collect_types_only(vendor_files);
-    let _ = analyzer.analyze(project_files);
+    let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
     analyzer
 }
 
@@ -190,7 +192,9 @@ fn bench_single_file_edit(c: &mut Criterion) {
                     counter += 1;
                     format!("{original}\n// edit {counter}\n")
                 },
-                |new_content| analyzer.re_analyze_file(&target_str, &new_content),
+                |new_content| {
+                    analyzer.re_analyze_file_batch(&target_str, &new_content, &BatchOptions::new())
+                },
                 BatchSize::LargeInput,
             );
         });
@@ -280,7 +284,9 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                     counter += 1;
                     format!("{original}\n// edit {counter}\n")
                 },
-                |new_content| analyzer.re_analyze_file(&target_str, &new_content),
+                |new_content| {
+                    analyzer.re_analyze_file_batch(&target_str, &new_content, &BatchOptions::new())
+                },
                 BatchSize::LargeInput,
             );
         });
@@ -353,7 +359,7 @@ fn bench_read_query_latency(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     group.bench_function("project_analyzer_symbol_location", |b| {
-        b.iter(|| analyzer.symbol_location("Illuminate\\Database\\Eloquent\\Model"));
+        b.iter(|| analyzer.definition_of(&Symbol::class("Illuminate\\Database\\Eloquent\\Model")));
     });
 
     let cache_b: TempDir = tempfile::tempdir().unwrap();

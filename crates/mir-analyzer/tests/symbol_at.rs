@@ -7,7 +7,7 @@
 mod common;
 
 use mir_analyzer::symbol::SymbolKind;
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
 
@@ -22,8 +22,8 @@ fn symbol_at_finds_function_call() {
     let file = write_file(&dir, "a.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet()
     let sym = result
@@ -44,8 +44,8 @@ fn symbol_at_returns_none_for_unknown_offset() {
     let file = write_file(&dir, "b.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Offset 0 is '<?php', before any symbol spans
     assert!(
@@ -69,8 +69,8 @@ fn symbol_at_matches_at_span_start() {
     let file = write_file(&dir, "c.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Locate the exact span start from the recorded symbol
     let sym_recorded = result
@@ -94,8 +94,8 @@ fn symbol_at_matches_at_last_byte_of_span() {
     let file = write_file(&dir, "d.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
         .symbols
@@ -118,8 +118,8 @@ fn symbol_at_returns_none_one_past_span_end() {
     let file = write_file(&dir, "e.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
         .symbols
@@ -165,8 +165,8 @@ fn symbol_at_isolates_symbols_by_file() {
     let file_a_str = path_to_str(&file_a);
     let file_b_str = path_to_str(&file_b);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(&[file_a.clone(), file_b.clone()]);
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(&[file_a.clone(), file_b.clone()], &BatchOptions::new());
 
     // Collect all FunctionCall(run) symbols per file
     let in_a: Vec<_> = result
@@ -223,8 +223,8 @@ fn symbol_at_finds_this_method_call() {
     let file = write_file(&dir, "this_call.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Point cursor at 'helper' in '$this->helper()'
     let offset = src.find("->helper").unwrap() as u32 + 2; // +2 skips '->'
@@ -248,8 +248,8 @@ fn symbol_at_finds_this_property_access() {
     let file = write_file(&dir, "this_prop.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
     let sym = result
@@ -277,8 +277,8 @@ fn symbol_at_this_method_call_full_lsp_flow() {
     let file = write_file(&dir, "this_flow.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
     let sym = result
@@ -310,8 +310,8 @@ fn symbol_at_this_in_non_static_closure() {
     let file = write_file(&dir, "closure_this.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
     let sym = result
@@ -336,8 +336,8 @@ fn symbol_at_returns_innermost_symbol() {
     let file = write_file(&dir, "f.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Find the offset of "run" in "$s->run()"
     let offset = src.rfind("run").unwrap() as u32;
@@ -363,8 +363,8 @@ fn codebase_key_for_function_call_matches_reference_index() {
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
     let file = write_file(&dir, "g.php", src);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
         .symbols
@@ -389,8 +389,8 @@ fn codebase_key_for_method_call_is_lowercased() {
     let src = "<?php\nclass Svc { public function Run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->Run(); }\n";
     let file = write_file(&dir, "h.php", src);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
         .symbols
@@ -415,8 +415,8 @@ fn codebase_key_for_static_call_matches_reference_index() {
     let src = "<?php\nclass Math { public static function square(int $n): int { return $n * $n; } }\nfunction caller(): void { Math::square(3); }\n";
     let file = write_file(&dir, "i.php", src);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
         .symbols
@@ -440,8 +440,8 @@ fn codebase_key_for_property_access_matches_reference_index() {
     let src = "<?php\nclass Counter { public int $count = 0; }\nfunction read(Counter $c): int { return $c->count; }\n";
     let file = write_file(&dir, "j.php", src);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
         .symbols
@@ -465,8 +465,8 @@ fn codebase_key_for_class_reference_matches_reference_index() {
     let src = "<?php\nclass Widget {}\nfunction make(): void { $w = new Widget(); }\n";
     let file = write_file(&dir, "k.php", src);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym = result
         .symbols
@@ -486,7 +486,7 @@ fn codebase_key_for_class_reference_matches_reference_index() {
 fn codebase_key_for_variable_is_none() {
     // Use a parameter that is read so it's recorded as a Variable symbol.
     let src = "<?php\nfunction f(int $n): int { return $n; }\n";
-    let result = ProjectAnalyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source(src);
 
     let sym = result
         .symbols
@@ -510,8 +510,8 @@ fn full_flow_cursor_to_reference_locations() {
     let src = "<?php\nfunction ping(): void {}\nfunction caller(): void { ping(); ping(); }\n";
     let file = write_file(&dir, "l.php", src);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
     let file_str = path_to_str(&file);
 
     let first_call_offset = src.find("{ ping").unwrap() as u32 + 2;
@@ -539,8 +539,8 @@ fn symbol_at_function_call_span_is_identifier_only() {
     let file = write_file(&dir, "span_fn.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
         .symbols
@@ -578,8 +578,8 @@ fn symbol_at_method_call_span_is_identifier_only() {
     let file = write_file(&dir, "span_method.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
         .symbols
@@ -617,8 +617,8 @@ fn symbol_at_static_call_span_is_identifier_only() {
     let file = write_file(&dir, "span_static.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let sym_recorded = result
         .symbols
@@ -660,8 +660,8 @@ fn symbol_at_finds_property_access() {
     let file = write_file(&dir, "m.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Point cursor at 'count' in '$c->count'
     let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
@@ -694,8 +694,8 @@ fn symbol_at_finds_nullsafe_property_access() {
     let file = write_file(&dir, "n.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Point cursor at 'val' in '$b?->val'
     let offset = src.find("?->val").unwrap() as u32 + 3; // +3 skips '?->'
@@ -727,8 +727,8 @@ fn symbol_at_finds_nullsafe_method_call() {
     let file = write_file(&dir, "o.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Point cursor at 'run' in '$s?->run()'
     let offset = src.find("?->run").unwrap() as u32 + 3; // +3 skips '?->'
@@ -763,8 +763,8 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
     let file = write_file(&dir, "span_eq_method.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->run").unwrap() as u32 + 2; // points at 'r' of run
     let sym = result
@@ -795,8 +795,8 @@ fn symbol_at_function_call_span_matches_reference_location_span() {
     let file = write_file(&dir, "span_eq_fn.php", src);
     let file_str = path_to_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    let result = analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet
     let sym = result

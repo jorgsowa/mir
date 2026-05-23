@@ -4,7 +4,7 @@ mod common;
 
 use std::sync::Arc;
 
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, pathbuf_to_arc_str, write_file};
 
@@ -19,8 +19,8 @@ fn function_call_records_reference_location() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs = analyzer.reference_locations("greet");
     assert!(
@@ -42,8 +42,8 @@ fn function_call_span_covers_only_name() {
     let file = write_file(&dir, "b.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("greet")
@@ -72,8 +72,8 @@ fn method_call_span_covers_only_name() {
     let file = write_file(&dir, "h.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Svc::run")
@@ -102,8 +102,8 @@ fn property_access_span_covers_only_name() {
     let file = write_file(&dir, "i.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Counter::count")
@@ -133,8 +133,8 @@ fn nullsafe_property_access_records_reference_location() {
     let file = write_file(&dir, "j.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Box::val")
@@ -161,8 +161,8 @@ fn method_call_records_reference_location() {
         "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         !analyzer.reference_locations("Svc::run").is_empty(),
@@ -180,8 +180,8 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let count = analyzer
         .reference_locations("ping")
@@ -202,8 +202,8 @@ fn new_expression_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs = analyzer.reference_locations("Widget");
     assert!(
@@ -223,8 +223,8 @@ fn re_analyze_removes_stale_reference_locations() {
     let file_str = file.to_str().unwrap().to_string();
     let file_arc: Arc<str> = Arc::from(file_str.as_str());
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         analyzer
@@ -235,9 +235,10 @@ fn re_analyze_removes_stale_reference_locations() {
     );
 
     // Re-analyze with content that no longer calls helper()
-    analyzer.re_analyze_file(
+    analyzer.re_analyze_file_batch(
         &file_str,
         "<?php\nfunction helper(): void {}\nfunction caller(): void {}\n",
+        &BatchOptions::new(),
     );
 
     let stale = analyzer
@@ -262,8 +263,8 @@ fn static_method_call_span_covers_only_name() {
     let file = write_file(&dir, "static_span.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Math::sq")
@@ -294,8 +295,8 @@ fn cache_hit_replays_reference_locations() {
 
     // First run — populates cache
     {
-        let analyzer = ProjectAnalyzer::with_cache(&cache_dir);
-        analyzer.analyze(std::slice::from_ref(&file));
+        let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
+        analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
         assert!(
             !analyzer.reference_locations("cached_fn").is_empty(),
             "first run should record reference"
@@ -304,8 +305,8 @@ fn cache_hit_replays_reference_locations() {
 
     // Second run — file unchanged, cache hit
     {
-        let analyzer = ProjectAnalyzer::with_cache(&cache_dir);
-        analyzer.analyze(std::slice::from_ref(&file));
+        let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
+        analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
         let locs = analyzer.reference_locations("cached_fn");
         assert!(
@@ -328,8 +329,8 @@ fn compact_index_preserves_reference_locations() {
     let file = write_file(&dir, "compact.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // After analyze(), the reference index must hold both call sites.
     let locs: Vec<_> = analyzer
@@ -358,8 +359,8 @@ fn compact_index_survives_re_analyze() {
     let file_str = file.to_str().unwrap().to_string();
     let file_arc: Arc<str> = Arc::from(file_str.as_str());
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Index is now compact; verify initial state.
     assert!(
@@ -371,9 +372,10 @@ fn compact_index_survives_re_analyze() {
     );
 
     // Re-analyze without the call — compact index must be expanded, stale entry removed.
-    analyzer.re_analyze_file(
+    analyzer.re_analyze_file_batch(
         &file_str,
         "<?php\nfunction helper(): void {}\nfunction caller(): void {}\n",
+        &BatchOptions::new(),
     );
 
     let stale = analyzer
@@ -398,8 +400,8 @@ fn this_method_call_records_reference_location() {
         "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         !analyzer.reference_locations("Svc::helper").is_empty(),
@@ -416,8 +418,8 @@ fn this_method_call_span_covers_only_name() {
     let file = write_file(&dir, "this_span.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Svc::helper")
@@ -446,8 +448,8 @@ fn nullsafe_method_call_records_reference_location() {
     let file = write_file(&dir, "nullsafe_method.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Svc::run")
@@ -474,8 +476,8 @@ fn instanceof_records_class_reference() {
         "<?php\nclass Widget {}\nfunction check(mixed $v): bool { return $v instanceof Widget; }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         !analyzer.reference_locations("Widget").is_empty(),
@@ -492,8 +494,8 @@ fn catch_type_records_class_reference() {
         "<?php\nclass AppEx extends \\Exception {}\nfunction run(): void { try {} catch (AppEx $e) { echo $e->getMessage(); } }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         !analyzer.reference_locations("AppEx").is_empty(),
@@ -511,8 +513,8 @@ fn multi_type_catch_records_all_class_references() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs_a: Vec<_> = analyzer
         .reference_locations("ErrA")
@@ -544,8 +546,8 @@ fn class_const_syntax_records_class_reference() {
         "<?php\nclass Router {}\nfunction getClass(): string { return Router::class; }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         !analyzer.reference_locations("Router").is_empty(),
@@ -562,8 +564,8 @@ fn static_const_access_records_class_reference() {
         "<?php\nclass Config { const VERSION = '1.0'; }\nfunction ver(): string { return Config::VERSION; }\n",
     );
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
         !analyzer.reference_locations("Config").is_empty(),
@@ -581,8 +583,8 @@ fn function_param_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Service")
@@ -606,8 +608,8 @@ fn return_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Repo")
@@ -631,8 +633,8 @@ fn property_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = ProjectAnalyzer::new();
-    analyzer.analyze(std::slice::from_ref(&file));
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
         .reference_locations("Logger")

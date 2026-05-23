@@ -10,7 +10,7 @@ mod common;
 
 use std::path::PathBuf;
 
-use mir_analyzer::{AnalysisSession, PhpVersion, ProjectAnalyzer, Symbol};
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion, Symbol};
 
 use self::common::{create_temp_dir, write_file};
 
@@ -46,8 +46,8 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
     let paths = [a.clone(), b.clone()];
 
     // --- Cold: populate the cache. -------------------------------------
-    let cold = ProjectAnalyzer::with_cache(cache_dir.path());
-    let cold_result = cold.analyze(&paths);
+    let cold = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let cold_result = cold.analyze_paths(&paths, &BatchOptions::new());
     let cold_issues = cold_result.issues.len();
     assert!(
         cold.contains_class("App\\A"),
@@ -71,8 +71,8 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
     // so this run should observe hits. Even if re_analyze_file produces
     // no hits the assertion below catches regressions: cold and warm
     // must agree on the observable analyzer state.
-    let warm = ProjectAnalyzer::with_cache(cache_dir.path());
-    let warm_result = warm.analyze(&paths);
+    let warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let warm_result = warm.analyze_paths(&paths, &BatchOptions::new());
     assert_eq!(
         warm_result.issues.len(),
         cold_issues,

@@ -30,7 +30,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion, ProjectAnalyzer};
+use mir_analyzer::{discover_files, AnalysisSession, FileAnalyzer, PhpVersion};
 
 fn main() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel");
@@ -53,8 +53,8 @@ fn main() {
     let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
 
     // 3. Bulk-register every file's source text.
-    let project_files = ProjectAnalyzer::discover_files(&fixture.join("src"));
-    let vendor_files = ProjectAnalyzer::discover_files(&fixture.join("vendor"));
+    let project_files = discover_files(&fixture.join("src"));
+    let vendor_files = discover_files(&fixture.join("vendor"));
     eprintln!(
         "loaded {} project files, {} vendor files",
         project_files.len(),

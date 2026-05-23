@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use mir_analyzer::{AnalysisSession, PhpVersion, ProjectAnalyzer, Psr4Map, Symbol};
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion, Psr4Map, Symbol};
 
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel")
@@ -106,17 +106,21 @@ fn perf_analysis_full_report() {
     println!();
 
     let t0 = Instant::now();
-    let analyzer = ProjectAnalyzer::new();
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     let init_time = t0.elapsed();
-    print_row("ProjectAnalyzer::new()", init_time, "");
+    print_row("AnalysisSession::new(PhpVersion::LATEST)", init_time, "");
 
     let t0 = Instant::now();
-    analyzer.load_stubs();
+    analyzer.ensure_all_stubs_loaded();
     let stubs_time = t0.elapsed();
-    print_row("load_stubs() (all 120)", stubs_time, "one-time cost");
+    print_row(
+        "ensure_all_stubs_loaded() (all 120)",
+        stubs_time,
+        "one-time cost",
+    );
 
     let t0 = Instant::now();
-    let _result = analyzer.analyze(&src_files);
+    let _result = analyzer.analyze_paths(&src_files, &BatchOptions::new());
     let analyze_src_time = t0.elapsed();
     print_row(
         "analyze(src) — 1410 files",

@@ -32,22 +32,21 @@ use crate::shared_db::SharedDb;
 /// [`Self::with_db_mut`].
 pub struct AnalysisSession {
     /// Shared database management (salsa, file registry, stub tracking).
-    /// Extracted to allow code sharing with ProjectAnalyzer.
-    shared_db: Arc<SharedDb>,
-    cache: Option<Arc<AnalysisCache>>,
+    pub(crate) shared_db: Arc<SharedDb>,
+    pub(crate) cache: Option<Arc<AnalysisCache>>,
     /// PSR-4 / Composer autoload map. Retained alongside `resolver` so the
     /// `psr4()` accessor can still return a typed `Psr4Map` for callers that
     /// need Composer-specific data (project_files / vendor_files / etc.).
-    psr4: Option<Arc<Psr4Map>>,
+    pub(crate) psr4: Option<Arc<Psr4Map>>,
     /// Generic class resolver used for on-demand lazy loading. When `psr4`
     /// is set via [`Self::with_psr4`], this is populated with the same map
     /// re-typed as `dyn ClassResolver`. Consumers can also supply their own
     /// resolver via [`Self::with_class_resolver`] without going through
     /// Composer.
     resolver: Option<Arc<dyn crate::ClassResolver>>,
-    php_version: PhpVersion,
-    user_stub_files: Vec<PathBuf>,
-    user_stub_dirs: Vec<PathBuf>,
+    pub(crate) php_version: PhpVersion,
+    pub(crate) user_stub_files: Vec<PathBuf>,
+    pub(crate) user_stub_dirs: Vec<PathBuf>,
     /// Path ↔ FileId mapping shared with `reverse_dep_map`.
     file_id_map: Arc<RwLock<FileIdMap>>,
     /// In-memory reverse dependency map: target_file → set of files that
@@ -90,6 +89,27 @@ type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
 const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
 impl AnalysisSession {
+    /// Create a session reusing an existing [`SharedDb`]. Internal API used
+    /// by the legacy `ProjectAnalyzer` shim so a single db survives across
+    /// session rebuilds when callers mutate config fields.
+    #[doc(hidden)]
+    pub fn from_shared_db(php_version: PhpVersion, shared_db: Arc<SharedDb>) -> Self {
+        Self {
+            shared_db,
+            cache: None,
+            psr4: None,
+            resolver: None,
+            php_version,
+            user_stub_files: Vec::new(),
+            user_stub_dirs: Vec::new(),
+            file_id_map: Arc::new(RwLock::new(FileIdMap::new())),
+            reverse_dep_map: Arc::new(RwLock::new(HashMap::default())),
+            stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
+            unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
+            source_provider: Arc::new(crate::FsSourceProvider),
+        }
+    }
+
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
         Self {
@@ -849,6 +869,16 @@ impl AnalysisSession {
                 })
             }
         }
+    }
+
+    /// Raw reference locations indexed by string symbol key, kept for tests
+    /// that use the legacy stringly-typed API. Prefer [`Self::references_to`]
+    /// with a typed [`crate::Symbol`].
+    #[doc(hidden)]
+    pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
+        use crate::db::MirDatabase;
+        let db = self.snapshot_db();
+        db.reference_locations(symbol)
     }
 
     /// Every recorded reference to `symbol` with its source location as a Range.

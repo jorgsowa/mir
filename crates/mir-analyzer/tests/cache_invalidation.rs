@@ -5,7 +5,7 @@
 
 mod common;
 
-use mir_analyzer::ProjectAnalyzer;
+use mir_analyzer::{dead_code_issue_kinds, AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, write_file};
 
@@ -26,8 +26,8 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
         "<?php\nclass Child extends Base {}\nfunction test(): void {\n    $c = new Child();\n    $c->foo();\n}\n",
     );
 
-    let analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
-    let result1 = analyzer.analyze(&[base.clone(), child.clone()]);
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let result1 = session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
     let undefined_method_count = result1
         .issues
         .iter()
@@ -43,8 +43,8 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
     );
 
     // Second run with a fresh analyzer (simulates a new CLI invocation) but same cache.
-    let analyzer2 = ProjectAnalyzer::with_cache(cache_dir.path());
-    let result2 = analyzer2.analyze(&[base.clone(), child.clone()]);
+    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let result2 = session2.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
     let undefined_method_count2 = result2
         .issues
         .iter()
@@ -76,11 +76,9 @@ fn unrelated_file_cache_entry_survives() {
     // First run — populate cache for both files. Suppress the dead-code
     // group so the bare `helper()` function in Unrelated.php doesn't
     // surface as `UnusedFunction` in the assertions below.
-    let mut analyzer = ProjectAnalyzer::with_cache(cache_dir.path());
-    for kind in mir_analyzer::project::dead_code_issue_kinds() {
-        analyzer.suppressed_issue_kinds.insert((*kind).to_string());
-    }
-    analyzer.analyze(&[base.clone(), unrelated.clone()]);
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let opts = BatchOptions::new().with_suppressed(dead_code_issue_kinds().iter().copied());
+    session.analyze_paths(&[base.clone(), unrelated.clone()], &opts);
 
     // Modify only Base.
     write_file(
@@ -92,11 +90,9 @@ fn unrelated_file_cache_entry_survives() {
     // Second run — Unrelated.php did not change and has no dependency on Base.
     // Its cache entry should survive (we cannot observe this directly from the
     // public API, but we verify no issues are raised for it and the run succeeds).
-    let mut analyzer2 = ProjectAnalyzer::with_cache(cache_dir.path());
-    for kind in mir_analyzer::project::dead_code_issue_kinds() {
-        analyzer2.suppressed_issue_kinds.insert((*kind).to_string());
-    }
-    let result = analyzer2.analyze(&[base.clone(), unrelated.clone()]);
+    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let opts2 = BatchOptions::new().with_suppressed(dead_code_issue_kinds().iter().copied());
+    let result = session2.analyze_paths(&[base.clone(), unrelated.clone()], &opts2);
 
     let unrelated_str = unrelated.to_string_lossy();
     let issues_for_unrelated: Vec<_> = result

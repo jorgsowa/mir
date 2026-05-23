@@ -178,7 +178,8 @@ fn location_from_storage(loc: &Option<mir_codebase::storage::Location>) -> Locat
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::project::ProjectAnalyzer;
+    use crate::session::AnalysisSession;
+    use crate::PhpVersion;
 
     #[test]
     fn builtin_functions_not_flagged_as_unused() {
@@ -186,10 +187,10 @@ mod tests {
         // (strlen, array_map, etc.) even when they are never called in user code.
         // This test bypasses the fixture runner's file-path filter to verify the
         // fix directly on the DeadCodeAnalyzer output.
-        let analyzer = ProjectAnalyzer::new();
-        analyzer.load_stubs();
-        let salsa = analyzer.salsa_db_for_test();
-        let issues = DeadCodeAnalyzer::new(&*salsa).analyze();
+        let session = AnalysisSession::new(PhpVersion::LATEST);
+        session.ensure_all_stubs_loaded();
+        let db = session.snapshot_db();
+        let issues = DeadCodeAnalyzer::new(&db).analyze();
         let builtin_false_positives: Vec<_> = issues
             .iter()
             .filter(|i| {

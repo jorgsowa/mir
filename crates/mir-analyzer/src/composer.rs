@@ -377,7 +377,7 @@ impl Psr4Map {
     pub fn project_files(&self) -> Vec<PathBuf> {
         let mut out = Vec::new();
         for (_, dir) in &self.project_entries {
-            crate::project::collect_php_files(dir, &mut out);
+            crate::batch::collect_php_files(dir, &mut out);
         }
         for path in &self.project_extra_paths {
             collect_php_path(path, &mut out);
@@ -388,7 +388,7 @@ impl Psr4Map {
     pub fn vendor_files(&self) -> Vec<PathBuf> {
         let mut out = Vec::new();
         for (_, dir) in &self.vendor_entries {
-            crate::project::collect_php_files(dir, &mut out);
+            crate::batch::collect_php_files(dir, &mut out);
         }
         for path in &self.vendor_extra_paths {
             collect_php_path(path, &mut out);
@@ -458,7 +458,7 @@ fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>) {
             out.push(path.to_path_buf());
         }
     } else if meta.is_dir() {
-        crate::project::collect_php_files(path, out);
+        crate::batch::collect_php_files(path, out);
     }
 }
 
