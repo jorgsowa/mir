@@ -335,14 +335,20 @@ pub fn collect_file_definitions_uncached(
     )
     .with_php_version(php_version);
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
-    let has_collector_issues = !collector_issues.is_empty();
     all_issues.extend(collector_issues);
     mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
     let slice_arc = Arc::new(slice);
 
-    // Write back to both caches on a clean parse.
-    if !has_hard_parse_errors && !has_collector_issues {
+    // Write back to both caches as long as the AST parsed cleanly.
+    //
+    // Collector-emitted diagnostics (malformed docblocks, unknown @psalm
+    // annotations, etc.) are warnings on a fully-parsed AST — the slice is
+    // complete and valid. Excluding those files from the cache forces a
+    // re-parse on every subsequent session for any vendor file with so much
+    // as a docblock warning. Only hard parse errors (incomplete AST) block
+    // caching.
+    if !has_hard_parse_errors {
         // In-process cache: prevents re-parsing in the same session.
         db.parse_cache()
             .insert(content_hash, Arc::clone(&slice_arc));

@@ -317,14 +317,16 @@ impl SharedDb {
             &parsed.source_map,
         );
         let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
-        let has_collector_issues = !collector_issues.is_empty();
         all_issues.extend(collector_issues);
         mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
 
         let slice_arc = Arc::new(slice);
 
-        // Write to the caches on a clean parse so future lookups hit.
-        if !has_hard_parse_errors && !has_collector_issues {
+        // Write to the caches as long as the AST parsed cleanly. Collector
+        // diagnostics (docblock warnings, etc.) leave the slice complete and
+        // valid, so they should not block caching — see the matching comment
+        // in `db::queries::collect_file_definitions_uncached`.
+        if !has_hard_parse_errors {
             // In-process cache: prevents re-parsing in the same session.
             self.salsa
                 .read()
