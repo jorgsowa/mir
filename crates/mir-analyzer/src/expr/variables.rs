@@ -12,30 +12,33 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_variable(&mut self, name: &str, expr: &Expr, ctx: &mut Context) -> Union {
         let name_str = name.trim_start_matches('$');
         if !ctx.var_is_defined(name_str) {
-            if ctx.var_possibly_defined(name_str) {
-                self.emit(
-                    IssueKind::PossiblyUndefinedVariable {
-                        name: name_str.to_string(),
-                    },
-                    Severity::Warning,
-                    expr.span,
-                );
-            } else if name_str == "this" {
-                self.emit(
-                    IssueKind::InvalidScope {
-                        in_class: ctx.self_fqcn.is_some(),
-                    },
-                    Severity::Error,
-                    expr.span,
-                );
-            } else {
-                self.emit(
-                    IssueKind::UndefinedVariable {
-                        name: name_str.to_string(),
-                    },
-                    Severity::Error,
-                    expr.span,
-                );
+            // isset() and empty() don't error on undefined variables
+            if !self.suppress_undefined_errors {
+                if ctx.var_possibly_defined(name_str) {
+                    self.emit(
+                        IssueKind::PossiblyUndefinedVariable {
+                            name: name_str.to_string(),
+                        },
+                        Severity::Warning,
+                        expr.span,
+                    );
+                } else if name_str == "this" {
+                    self.emit(
+                        IssueKind::InvalidScope {
+                            in_class: ctx.self_fqcn.is_some(),
+                        },
+                        Severity::Error,
+                        expr.span,
+                    );
+                } else {
+                    self.emit(
+                        IssueKind::UndefinedVariable {
+                            name: name_str.to_string(),
+                        },
+                        Severity::Error,
+                        expr.span,
+                    );
+                }
             }
         }
         ctx.read_vars.insert(mir_types::Symbol::from(name_str));

@@ -42,6 +42,8 @@ pub struct ExpressionAnalyzer<'a> {
     /// When true, skip all reference-tracking side-effects (used by the
     /// inference priming pass so reference locations aren't double-counted).
     pub inference_only: bool,
+    /// When true, suppress UndefinedVariable errors (isset/empty don't error on undefined vars).
+    suppress_undefined_errors: bool,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -65,6 +67,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             symbols,
             php_version,
             inference_only,
+            suppress_undefined_errors: false,
         }
     }
 
@@ -135,13 +138,21 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- isset / empty ----------------------------------------------
             ExprKind::Isset(exprs) => {
+                // isset() doesn't error on undefined variables — it checks if they're defined.
+                let old_suppress = self.suppress_undefined_errors;
+                self.suppress_undefined_errors = true;
                 for e in exprs.iter() {
                     self.analyze(e, ctx);
                 }
+                self.suppress_undefined_errors = old_suppress;
                 Union::single(Atomic::TBool)
             }
             ExprKind::Empty(inner) => {
+                // empty() doesn't error on undefined variables — it checks if they're defined.
+                let old_suppress = self.suppress_undefined_errors;
+                self.suppress_undefined_errors = true;
                 self.analyze(inner, ctx);
+                self.suppress_undefined_errors = old_suppress;
                 Union::single(Atomic::TBool)
             }
 
