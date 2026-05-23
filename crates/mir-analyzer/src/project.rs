@@ -599,33 +599,23 @@ impl ProjectAnalyzer {
             all_issues.extend(class_issues);
         }
 
-        // ---- Inference pre-warm: prime inferred return types via salsa --------
-        // Call `infer_file_return_types` in parallel to warm salsa's memo table
-        // before Pass 2.  The full Pass 2 reads per-file inferred types on
-        // demand via `inferred_function_return_type_demand` /
-        // `inferred_method_return_type_demand`, which resolve to these memoized
-        // results.  No pre-committed singleton is needed.
+        // ---- No inference pre-warm: Pass 2 triggers cross-file inference -------
         //
-        // `for_each_with` clones `db_priming` once per rayon worker thread.
-        {
-            let source_files: Vec<SourceFile> = {
-                let guard = self.shared_db.salsa.read();
-                parsed_files
-                    .iter()
-                    .filter(|p| !files_with_parse_errors.contains(&p.file))
-                    .filter_map(|p| (**guard).lookup_source_file(&p.file))
-                    .collect()
-            };
-            let db_priming = {
-                let guard = self.shared_db.salsa.read();
-                (**guard).clone()
-            };
-            source_files
-                .into_par_iter()
-                .for_each_with(db_priming, |db, sf| {
-                    let _ = crate::db::infer_file_return_types(db as &dyn MirDatabase, sf);
-                });
-        }
+        // Earlier revisions ran a parallel `infer_file_return_types` sweep over
+        // every project file before Pass 2 to warm salsa's memo table. The
+        // intuition was "do the inference eagerly so Pass 2 reads cached
+        // results." In practice it inferred bodies whose results were never
+        // demanded (most internal helpers), and the eager sweep dominated
+        // cold-start wall time.
+        //
+        // Replaced by lazy on-demand inference: Pass 2 calls
+        // `inferred_function_return_type_demand` /
+        // `inferred_method_return_type_demand` only when a cross-file return
+        // type is actually consulted. Salsa's memoization ensures each file is
+        // inferred at most once total across all workers, so the work done is
+        // bounded by what Pass 2 reaches — typically a small subset of the
+        // declared project. Contention on hot vendor files is real but limited
+        // (salsa serializes via per-key locks; cold compute happens once).
         let _t_presweep = _t0.elapsed();
 
         let db_main = {
