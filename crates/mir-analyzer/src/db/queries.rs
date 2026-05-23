@@ -148,14 +148,6 @@ pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
         .any(|ancestor| !type_exists_via_db(db, ancestor))
 }
 
-pub fn method_is_concretely_implemented(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-    method_name: &str,
-) -> bool {
-    crate::db::is_method_concretely_implemented_pull(db, fqcn, method_name)
-}
-
 pub fn member_location_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,

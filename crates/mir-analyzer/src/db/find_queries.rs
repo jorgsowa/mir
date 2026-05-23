@@ -710,13 +710,13 @@ pub fn find_property_in_chain<'db>(
 /// Existence-check for "is `name` concretely implemented (non-abstract,
 /// non-interface) somewhere reachable from `fqcn`'s inheritance chain?".
 /// Used to flag UnimplementedAbstractMethod.
-pub fn is_method_concretely_implemented_pull(
+pub fn is_method_concretely_implemented(
     db: &dyn MirDatabase,
     fqcn: &str,
     method_name: &str,
 ) -> bool {
     let lower = method_name.to_lowercase();
-    let here = Fqcn::new(db, Symbol::new(fqcn));
+    let here = Fqcn::from_str(db, fqcn);
     let Some(self_class) = find_class_like(db, here) else {
         return false;
     };
@@ -724,7 +724,7 @@ pub fn is_method_concretely_implemented_pull(
         return false;
     }
     for ancestor_fqcn in class_ancestors_by_fqcn(db, here).iter() {
-        let here2 = Fqcn::new(db, Symbol::new(ancestor_fqcn.as_ref()));
+        let here2 = Fqcn::from_str(db, ancestor_fqcn.as_ref());
         let Some(class) = find_class_like(db, here2) else {
             continue;
         };

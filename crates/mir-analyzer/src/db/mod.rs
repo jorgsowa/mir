@@ -142,7 +142,7 @@ pub use self::find_queries::{
     find_class_constant_in_class, find_class_like, find_function, find_global_constant,
     find_method_in_chain, find_method_in_class, find_property_in_chain, find_property_in_class,
     function_in_file, global_constant_in_file, has_method_in_chain, interface_in_file,
-    is_method_concretely_implemented_pull, trait_in_file, ClassLike,
+    is_method_concretely_implemented, trait_in_file, ClassLike,
 };
 pub use self::inferred_types::{
     inferred_function_return_type_demand, inferred_method_return_type_demand,
@@ -155,8 +155,8 @@ pub use self::queries::{
     collect_file_definitions, collect_file_definitions_uncached, constant_exists_via_db,
     extends_or_implements_via_db, function_exists_via_db, has_unknown_ancestor_via_db,
     infer_file_return_types, inherited_template_bindings_via_db, is_unchecked_exception_via_db,
-    member_location_via_db, method_is_concretely_implemented, parse_file, resolve_name_via_db,
-    type_exists_via_db, ClassKind, InferredFileTypes, ParsedFile,
+    member_location_via_db, parse_file, resolve_name_via_db, type_exists_via_db, ClassKind,
+    InferredFileTypes, ParsedFile,
 };
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
