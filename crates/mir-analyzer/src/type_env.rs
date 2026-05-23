@@ -14,11 +14,11 @@ pub enum ScopeId {
 #[derive(Debug)]
 pub struct TypeEnv {
     #[allow(dead_code)]
-    vars: Arc<rustc_hash::FxHashMap<Symbol, Union>>,
+    vars: Arc<rustc_hash::FxHashMap<Symbol, Arc<Union>>>,
 }
 
 impl TypeEnv {
-    pub(crate) fn new(vars: Arc<rustc_hash::FxHashMap<Symbol, Union>>) -> Self {
+    pub(crate) fn new(vars: Arc<rustc_hash::FxHashMap<Symbol, Arc<Union>>>) -> Self {
         Self { vars }
     }
 
@@ -26,7 +26,7 @@ impl TypeEnv {
     #[allow(dead_code)]
     pub fn get_var(&self, name: &str) -> Option<&Union> {
         let sym = Symbol::from(name);
-        self.vars.get(&sym)
+        self.vars.get(&sym).map(|arc| arc.as_ref())
     }
 
     /// Iterates over all variable names tracked in this scope.

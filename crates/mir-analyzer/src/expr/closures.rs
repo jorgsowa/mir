@@ -159,7 +159,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
         for (name, ty) in ctx.vars.iter() {
             if !arrow_ctx.vars.contains_key(name) {
-                arrow_ctx.set_var(name.as_str(), ty.clone());
+                std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(*name, ty.clone());
+                std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(*name);
             }
         }
 

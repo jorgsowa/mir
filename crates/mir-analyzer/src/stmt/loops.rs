@@ -1,4 +1,5 @@
 use mir_types::{ArrayKey, Atomic, Symbol, Union};
+use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
 // Loop execution guarantees
@@ -30,14 +31,17 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Union) -> bool {
 /// Returns true when every variable present in `prev` has the same type in
 /// `next`, indicating the fixed-point has been reached.
 pub(super) fn vars_stabilized(
-    prev: &rustc_hash::FxHashMap<Symbol, Union>,
-    next: &rustc_hash::FxHashMap<Symbol, Union>,
+    prev: &rustc_hash::FxHashMap<Symbol, Arc<Union>>,
+    next: &rustc_hash::FxHashMap<Symbol, Arc<Union>>,
 ) -> bool {
     if prev.len() != next.len() {
         return false;
     }
-    prev.iter()
-        .all(|(k, v)| next.get(k).map(|u| u == v).unwrap_or(false))
+    prev.iter().all(|(k, v)| {
+        next.get(k)
+            .map(|u| Arc::ptr_eq(u, v) || **u == **v)
+            .unwrap_or(false)
+    })
 }
 
 /// For any variable whose type changed relative to `pre_vars`, widen to
@@ -47,14 +51,16 @@ pub(super) fn vars_stabilized(
 /// variables that are new in the loop (only in current, not in pre) won't be
 /// merged with null/undefined, since the loop will definitely assign them.
 pub(super) fn widen_unstable(
-    pre_vars: &rustc_hash::FxHashMap<Symbol, Union>,
-    current_vars: &mut rustc_hash::FxHashMap<Symbol, Union>,
+    pre_vars: &rustc_hash::FxHashMap<Symbol, Arc<Union>>,
+    current_vars: &mut rustc_hash::FxHashMap<Symbol, Arc<Union>>,
     loop_guaranteed: bool,
 ) {
     for (name, ty) in current_vars.iter_mut() {
         if let Some(pre_ty) = pre_vars.get(name) {
-            if pre_ty != ty {
-                ty.merge_with(pre_ty);
+            if !Arc::ptr_eq(ty, pre_ty) && **ty != **pre_ty {
+                let mut merged = (**ty).clone();
+                merged.merge_with(pre_ty);
+                *ty = Arc::new(merged);
             }
         } else if loop_guaranteed {
             // Variable is new in loop and loop is guaranteed to execute.

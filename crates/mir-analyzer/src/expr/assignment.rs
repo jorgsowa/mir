@@ -192,10 +192,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 let name_sym = mir_types::Symbol::from(name_str);
                                 std::sync::Arc::make_mut(&mut ctx.vars).insert(
                                     name_sym,
-                                    Union::single(Atomic::TArray {
+                                    std::sync::Arc::new(Union::single(Atomic::TArray {
                                         key: Box::new(Union::mixed()),
                                         value: Box::new(ty.clone()),
-                                    }),
+                                    })),
                                 );
                                 std::sync::Arc::make_mut(&mut ctx.assigned_vars).insert(name_sym);
                                 let (line, col_start) = self.offset_to_line_col(base.span.start);

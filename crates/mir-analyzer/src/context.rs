@@ -12,7 +12,8 @@ use mir_types::{Symbol, Union};
 pub struct Context {
     /// Types of variables at this point in execution.
     /// Arc-wrapped for COW semantics: fork() is O(1); mutations trigger a copy only on first write.
-    pub vars: Arc<FxHashMap<Symbol, Union>>,
+    /// Values are Arc<Union> so ptr_eq short-circuits merge_branches for unchanged vars.
+    pub vars: Arc<FxHashMap<Symbol, Arc<Union>>>,
 
     /// Variables that are definitely assigned at this point.
     pub assigned_vars: Arc<FxHashSet<Symbol>>,
@@ -113,7 +114,7 @@ impl Context {
                 "GLOBALS",
             ] {
                 let sym = Symbol::from(*sg);
-                vars.insert(sym, mir_types::Union::mixed());
+                vars.insert(sym, Arc::new(mir_types::Union::mixed()));
                 assigned.insert(sym);
             }
         }
@@ -262,7 +263,7 @@ impl Context {
                 elem_ty
             };
             let name = Symbol::from(p.name.as_ref().trim_start_matches('$'));
-            Arc::make_mut(&mut ctx.vars).insert(name, ty);
+            Arc::make_mut(&mut ctx.vars).insert(name, Arc::new(ty));
             Arc::make_mut(&mut ctx.assigned_vars).insert(name);
             param_names.insert(name);
             if p.is_byref {
@@ -279,7 +280,7 @@ impl Context {
                     type_params: mir_types::union::empty_type_params(),
                 });
                 let this_sym = Symbol::from("this");
-                Arc::make_mut(&mut ctx.vars).insert(this_sym, this_ty);
+                Arc::make_mut(&mut ctx.vars).insert(this_sym, Arc::new(this_ty));
                 Arc::make_mut(&mut ctx.assigned_vars).insert(this_sym);
             }
         }
@@ -294,13 +295,16 @@ impl Context {
     /// Get the type of a variable. Returns `mixed` if not found.
     pub fn get_var(&self, name: &str) -> Union {
         let sym = Symbol::from(name.trim_start_matches('$'));
-        self.vars.get(&sym).cloned().unwrap_or_else(Union::mixed)
+        self.vars
+            .get(&sym)
+            .map(|a| (**a).clone())
+            .unwrap_or_else(Union::mixed)
     }
 
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: &str, ty: Union) {
         let name = Symbol::from(name.trim_start_matches('$'));
-        Arc::make_mut(&mut self.vars).insert(name, ty);
+        Arc::make_mut(&mut self.vars).insert(name, Arc::new(ty));
         Arc::make_mut(&mut self.assigned_vars).insert(name);
     }
 
@@ -410,8 +414,13 @@ impl Context {
 
                 match (ty_if, ty_else) {
                     (Some(a), Some(b)) => {
-                        let mut merged = a.clone();
-                        merged.merge_with(b);
+                        let merged = if Arc::ptr_eq(a, b) {
+                            a.clone()
+                        } else {
+                            let mut m = (**a).clone();
+                            m.merge_with(b);
+                            Arc::new(m)
+                        };
                         result_vars.insert(name, merged);
                         if in_if && in_else {
                             result_assigned.insert(name);
@@ -421,26 +430,48 @@ impl Context {
                     }
                     (Some(a), None) => {
                         if in_pre {
-                            let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
-                            let mut merged = a.clone();
-                            merged.merge_with(&pre_ty);
+                            let pre_arc = pre.vars.get(&name);
+                            let merged = match pre_arc {
+                                Some(pt) if Arc::ptr_eq(a, pt) => a.clone(),
+                                Some(pt) => {
+                                    let mut m = (**a).clone();
+                                    m.merge_with(pt);
+                                    Arc::new(m)
+                                }
+                                None => {
+                                    let mut m = (**a).clone();
+                                    m.merge_with(&Union::mixed());
+                                    Arc::new(m)
+                                }
+                            };
                             result_vars.insert(name, merged);
                             result_assigned.insert(name);
                         } else {
-                            let ty = a.clone().possibly_undefined();
+                            let ty = Arc::new((**a).clone().possibly_undefined());
                             result_vars.insert(name, ty);
                             result_possibly.insert(name);
                         }
                     }
                     (None, Some(b)) => {
                         if in_pre {
-                            let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
-                            let mut merged = pre_ty;
-                            merged.merge_with(b);
+                            let pre_arc = pre.vars.get(&name);
+                            let merged = match pre_arc {
+                                Some(pt) if Arc::ptr_eq(b, pt) => b.clone(),
+                                Some(pt) => {
+                                    let mut m = (**pt).clone();
+                                    m.merge_with(b);
+                                    Arc::new(m)
+                                }
+                                None => {
+                                    let mut m = Union::mixed();
+                                    m.merge_with(b);
+                                    Arc::new(m)
+                                }
+                            };
                             result_vars.insert(name, merged);
                             result_assigned.insert(name);
                         } else {
-                            let ty = b.clone().possibly_undefined();
+                            let ty = Arc::new((**b).clone().possibly_undefined());
                             result_vars.insert(name, ty);
                             result_possibly.insert(name);
                         }
