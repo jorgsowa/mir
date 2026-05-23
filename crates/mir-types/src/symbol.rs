@@ -185,7 +185,13 @@ impl Serialize for Symbol {
 
 impl<'de> Deserialize<'de> for Symbol {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <&str>::deserialize(deserializer)?;
-        Ok(Self::new(s))
+        // Use `Cow<str>` instead of `&str` so this round-trips through both
+        // borrowable formats (`serde_json`, `bincode::deserialize(&bytes)`)
+        // *and* streaming formats that cannot borrow (`bincode::deserialize_from(reader)`).
+        // The stub-cache serializer uses the streaming variant, and `<&str>`
+        // would error with `invalid type: string "...", expected a borrowed
+        // string`, silently turning every cache hit into a miss.
+        let s = std::borrow::Cow::<str>::deserialize(deserializer)?;
+        Ok(Self::new(&s))
     }
 }
