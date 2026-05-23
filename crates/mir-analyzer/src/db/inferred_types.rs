@@ -18,11 +18,7 @@ use crate::db::{MirDatabase, SymbolLoc};
 /// memoizes both queries, so repeated lookups for the same function are free.
 /// Returns `None` when the function is unknown or not in the workspace index.
 pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Union>> {
-    let idx = if let Some(singleton) = db.workspace_symbol_index_singleton() {
-        singleton.index(db)
-    } else {
-        crate::db::workspace_symbol_index(db)
-    };
+    let idx = crate::db::workspace_index(db);
     let key = mir_types::Symbol::new(fqn).ascii_lowercase();
     let sf = match idx.functions.get(&key)? {
         SymbolLoc::Function { file, .. } => *file,
@@ -43,11 +39,7 @@ pub fn inferred_method_return_type_demand(
     fqcn: &str,
     method_name_lower: &str,
 ) -> Option<Arc<Union>> {
-    let idx = if let Some(singleton) = db.workspace_symbol_index_singleton() {
-        singleton.index(db)
-    } else {
-        crate::db::workspace_symbol_index(db)
-    };
+    let idx = crate::db::workspace_index(db);
     let key = mir_types::Symbol::new(fqcn).ascii_lowercase();
     let sf = match idx.class_like.get(&key)? {
         SymbolLoc::Class { file, .. }

@@ -446,11 +446,7 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     // process-global DashMap. The hot Pass-2 path becomes alloc-free after
     // warmup.
     let key = fqcn.name(db).ascii_lowercase();
-    let index = if let Some(s) = db.workspace_symbol_index_singleton() {
-        s.index(db)
-    } else {
-        crate::db::workspace_symbol_index(db)
-    };
+    let index = crate::db::workspace_index(db);
     let loc = index.class_like.get(&key).copied()?;
     match loc {
         SymbolLoc::Class { file, idx } => {
@@ -475,11 +471,7 @@ pub fn find_function<'db>(
 ) -> Option<Arc<FunctionStorage>> {
     use crate::db::SymbolLoc;
     let key = fqn.name(db).ascii_lowercase();
-    let index = if let Some(s) = db.workspace_symbol_index_singleton() {
-        s.index(db)
-    } else {
-        crate::db::workspace_symbol_index(db)
-    };
+    let index = crate::db::workspace_index(db);
     let SymbolLoc::Function { file, idx } = index.functions.get(&key).copied()? else {
         return None;
     };
@@ -494,11 +486,7 @@ pub fn find_global_constant<'db>(
 ) -> Option<Arc<mir_types::Union>> {
     use crate::db::SymbolLoc;
     let key = fqn.name(db);
-    let index = if let Some(s) = db.workspace_symbol_index_singleton() {
-        s.index(db)
-    } else {
-        crate::db::workspace_symbol_index(db)
-    };
+    let index = crate::db::workspace_index(db);
     if let Some(SymbolLoc::Constant { file, idx }) = index.constants.get(&key).copied() {
         let defs = collect_file_definitions(db, file);
         if let Some((_, ty)) = defs.slice.constants.get(idx) {

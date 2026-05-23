@@ -33,13 +33,11 @@ pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::find_class_like(db, here).is_some()
 }
 
-#[allow(dead_code)]
 pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::new(db, Symbol::new(fqn));
     crate::db::find_function(db, here).is_some()
 }
 
-#[allow(dead_code)]
 pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::new(db, Symbol::new(fqn));
     crate::db::find_global_constant(db, here).is_some()

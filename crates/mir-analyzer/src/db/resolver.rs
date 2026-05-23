@@ -76,19 +76,25 @@ pub fn source_file_for_fqcn<'db>(
             return Some(sf);
         }
     }
-    // Resolver miss / no resolver: consult the workspace FQCN→file index
-    // built lazily across all registered SourceFiles.
+    // Resolver miss / no resolver: consult the workspace symbol index built
+    // across all registered SourceFiles.
     let name = fqcn.name(db);
-    let index = crate::db::workspace_fqcn_index(db);
-    let lower = name.to_ascii_lowercase();
-    if let Some(sf) = index.classes.get(lower.as_str()).copied() {
-        return Some(sf);
+    let lower = name.ascii_lowercase();
+    let index = crate::db::workspace_index(db);
+    if let Some(loc) = index.class_like.get(&lower) {
+        return Some(match loc {
+            crate::db::SymbolLoc::Class { file, .. }
+            | crate::db::SymbolLoc::Interface { file, .. }
+            | crate::db::SymbolLoc::Trait { file, .. }
+            | crate::db::SymbolLoc::Enum { file, .. } => *file,
+            _ => return None,
+        });
     }
-    if let Some(sf) = index.functions.get(lower.as_str()).copied() {
-        return Some(sf);
+    if let Some(crate::db::SymbolLoc::Function { file, .. }) = index.functions.get(&lower) {
+        return Some(*file);
     }
-    if let Some(sf) = index.constants.get(name.as_str()).copied() {
-        return Some(sf);
+    if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constants.get(&name) {
+        return Some(*file);
     }
     None
 }
