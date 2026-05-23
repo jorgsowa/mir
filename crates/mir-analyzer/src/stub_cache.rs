@@ -212,8 +212,8 @@ pub fn hash_source(source: &str) -> [u8; 32] {
 }
 
 /// Convert a slice produced by [`StubSliceCache::get`] into one that's safe
-/// to hand directly to `MirDb::ingest_stub_slice` without paying dedup
-/// inside the serial write-lock section. Call from a parallel worker.
+/// to consume immediately without paying dedup cost inside the serial
+/// write-lock section. Call from a parallel worker.
 pub fn prepare_for_ingest(slice: &mut StubSlice) {
     if !slice.is_deduped {
         deduplicate_params_in_slice(slice);

@@ -82,8 +82,8 @@ pub struct MirDb {
     /// to filter `@since`/`@removed` stub symbols.
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
     /// Optional disk-backed Pass-1 cache. Shared with `SharedDb::stub_cache`
-    /// so `collect_file_definitions` can consult it without going through the
-    /// push-based `collect_and_ingest_file` path.
+    /// so `collect_file_definitions` can consult it directly without going
+    /// through `collect_and_ingest_file`.
     stub_cache: Arc<parking_lot::RwLock<Option<Arc<crate::stub_cache::StubSliceCache>>>>,
     /// In-process parse-result cache: content-hash → StubSlice. Populated by
     /// `collect_and_ingest_file` so that `collect_file_definitions_uncached`
@@ -676,26 +676,10 @@ impl MirDb {
         self.source_files.keys().cloned().collect()
     }
 
-    /// Clear push-based state for `file` and reset its reference-location
-    /// index.  After the salsa migration all symbol lookups are derived from
-    /// `collect_file_definitions`; only the reference-location side-index
-    /// still needs explicit clearing before re-analysis.
+    /// Reset `file`'s reference-location index before re-analysis. Symbol
+    /// data itself is derived lazily from `collect_file_definitions` and
+    /// doesn't need explicit clearing.
     pub fn remove_file_definitions(&mut self, file: &str) {
         self.clear_file_references(file);
-    }
-
-    /// No-op — retained only so call sites that were written against the old
-    /// push-based ingest path continue to compile without changes.  All symbol
-    /// data is now derived lazily from `collect_file_definitions` tracked
-    /// queries; calling this function has no effect.
-    #[inline]
-    pub fn ingest_stub_slice(&mut self, _slice: &StubSlice) {}
-
-    /// No-op — retained for the same reason as `ingest_stub_slice`.
-    #[inline]
-    pub fn ingest_stub_slices<'a, I>(&mut self, _slices: I)
-    where
-        I: IntoIterator<Item = &'a StubSlice>,
-    {
     }
 }
