@@ -225,7 +225,7 @@ pub fn narrow_from_condition(
                         // remove null; mark as definitely assigned
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
-                        ctx.assigned_vars
+                        std::sync::Arc::make_mut(&mut ctx.assigned_vars)
                             .insert(mir_types::Symbol::from(var_name.as_str()));
                     }
                 }

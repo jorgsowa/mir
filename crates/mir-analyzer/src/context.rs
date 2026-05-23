@@ -11,13 +11,14 @@ use mir_types::{Symbol, Union};
 #[derive(Debug, Clone)]
 pub struct Context {
     /// Types of variables at this point in execution.
-    pub vars: FxHashMap<Symbol, Union>,
+    /// Arc-wrapped for COW semantics: fork() is O(1); mutations trigger a copy only on first write.
+    pub vars: Arc<FxHashMap<Symbol, Union>>,
 
     /// Variables that are definitely assigned at this point.
-    pub assigned_vars: FxHashSet<Symbol>,
+    pub assigned_vars: Arc<FxHashSet<Symbol>>,
 
     /// Variables that *might* be assigned (e.g. only in one if branch).
-    pub possibly_assigned_vars: FxHashSet<Symbol>,
+    pub possibly_assigned_vars: Arc<FxHashSet<Symbol>>,
 
     /// The class in whose body we are analysing (`self`).
     pub self_fqcn: Option<Arc<str>>,
@@ -83,9 +84,9 @@ pub struct Context {
 impl Context {
     pub fn new() -> Self {
         let mut ctx = Self {
-            vars: FxHashMap::default(),
-            assigned_vars: FxHashSet::default(),
-            possibly_assigned_vars: FxHashSet::default(),
+            vars: Arc::new(FxHashMap::default()),
+            assigned_vars: Arc::new(FxHashSet::default()),
+            possibly_assigned_vars: Arc::new(FxHashSet::default()),
             self_fqcn: None,
             parent_fqcn: None,
             static_fqcn: None,
@@ -104,13 +105,17 @@ impl Context {
             template_param_names: Arc::new(FxHashSet::default()),
         };
         // PHP superglobals — always in scope in any context
-        for sg in &[
-            "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
-            "GLOBALS",
-        ] {
-            let sym = Symbol::from(*sg);
-            ctx.vars.insert(sym, mir_types::Union::mixed());
-            ctx.assigned_vars.insert(sym);
+        {
+            let vars = Arc::make_mut(&mut ctx.vars);
+            let assigned = Arc::make_mut(&mut ctx.assigned_vars);
+            for sg in &[
+                "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
+                "GLOBALS",
+            ] {
+                let sym = Symbol::from(*sg);
+                vars.insert(sym, mir_types::Union::mixed());
+                assigned.insert(sym);
+            }
         }
         ctx
     }
@@ -257,8 +262,8 @@ impl Context {
                 elem_ty
             };
             let name = Symbol::from(p.name.as_ref().trim_start_matches('$'));
-            ctx.vars.insert(name, ty);
-            ctx.assigned_vars.insert(name);
+            Arc::make_mut(&mut ctx.vars).insert(name, ty);
+            Arc::make_mut(&mut ctx.assigned_vars).insert(name);
             param_names.insert(name);
             if p.is_byref {
                 byref_param_names.insert(name);
@@ -274,8 +279,8 @@ impl Context {
                     type_params: mir_types::union::empty_type_params(),
                 });
                 let this_sym = Symbol::from("this");
-                ctx.vars.insert(this_sym, this_ty);
-                ctx.assigned_vars.insert(this_sym);
+                Arc::make_mut(&mut ctx.vars).insert(this_sym, this_ty);
+                Arc::make_mut(&mut ctx.assigned_vars).insert(this_sym);
             }
         }
 
@@ -295,8 +300,8 @@ impl Context {
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: &str, ty: Union) {
         let name = Symbol::from(name.trim_start_matches('$'));
-        self.vars.insert(name, ty);
-        self.assigned_vars.insert(name);
+        Arc::make_mut(&mut self.vars).insert(name, ty);
+        Arc::make_mut(&mut self.assigned_vars).insert(name);
     }
 
     /// Check if a variable is definitely in scope.
@@ -341,9 +346,9 @@ impl Context {
     /// Remove a variable from the context (after `unset`).
     pub fn unset_var(&mut self, name: &str) {
         let sym = Symbol::from(name.trim_start_matches('$'));
-        self.vars.remove(&sym);
-        self.assigned_vars.remove(&sym);
-        self.possibly_assigned_vars.remove(&sym);
+        Arc::make_mut(&mut self.vars).remove(&sym);
+        Arc::make_mut(&mut self.assigned_vars).remove(&sym);
+        Arc::make_mut(&mut self.possibly_assigned_vars).remove(&sym);
     }
 
     /// Fork this context for a branch (e.g. the `if` branch).
@@ -390,54 +395,58 @@ impl Context {
             .copied()
             .collect();
 
-        for name in all_names {
-            let in_if = if_ctx.assigned_vars.contains(&name);
-            let in_else = else_ctx.assigned_vars.contains(&name);
-            let in_pre = pre.assigned_vars.contains(&name);
+        {
+            let result_vars = Arc::make_mut(&mut result.vars);
+            let result_assigned = Arc::make_mut(&mut result.assigned_vars);
+            let result_possibly = Arc::make_mut(&mut result.possibly_assigned_vars);
 
-            let ty_if = if_ctx.vars.get(&name);
-            let ty_else = else_ctx.vars.get(&name);
+            for name in all_names {
+                let in_if = if_ctx.assigned_vars.contains(&name);
+                let in_else = else_ctx.assigned_vars.contains(&name);
+                let in_pre = pre.assigned_vars.contains(&name);
 
-            match (ty_if, ty_else) {
-                (Some(a), Some(b)) => {
-                    let mut merged = a.clone();
-                    merged.merge_with(b);
-                    result.vars.insert(name, merged);
-                    if in_if && in_else {
-                        result.assigned_vars.insert(name);
-                    } else {
-                        result.possibly_assigned_vars.insert(name);
-                    }
-                }
-                (Some(a), None) => {
-                    if in_pre {
-                        // var existed before: merge with pre type
-                        let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
+                let ty_if = if_ctx.vars.get(&name);
+                let ty_else = else_ctx.vars.get(&name);
+
+                match (ty_if, ty_else) {
+                    (Some(a), Some(b)) => {
                         let mut merged = a.clone();
-                        merged.merge_with(&pre_ty);
-                        result.vars.insert(name, merged);
-                        result.assigned_vars.insert(name);
-                    } else {
-                        // only assigned in if branch
-                        let ty = a.clone().possibly_undefined();
-                        result.vars.insert(name, ty);
-                        result.possibly_assigned_vars.insert(name);
-                    }
-                }
-                (None, Some(b)) => {
-                    if in_pre {
-                        let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
-                        let mut merged = pre_ty;
                         merged.merge_with(b);
-                        result.vars.insert(name, merged);
-                        result.assigned_vars.insert(name);
-                    } else {
-                        let ty = b.clone().possibly_undefined();
-                        result.vars.insert(name, ty);
-                        result.possibly_assigned_vars.insert(name);
+                        result_vars.insert(name, merged);
+                        if in_if && in_else {
+                            result_assigned.insert(name);
+                        } else {
+                            result_possibly.insert(name);
+                        }
                     }
+                    (Some(a), None) => {
+                        if in_pre {
+                            let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
+                            let mut merged = a.clone();
+                            merged.merge_with(&pre_ty);
+                            result_vars.insert(name, merged);
+                            result_assigned.insert(name);
+                        } else {
+                            let ty = a.clone().possibly_undefined();
+                            result_vars.insert(name, ty);
+                            result_possibly.insert(name);
+                        }
+                    }
+                    (None, Some(b)) => {
+                        if in_pre {
+                            let pre_ty = pre.vars.get(&name).cloned().unwrap_or_else(Union::mixed);
+                            let mut merged = pre_ty;
+                            merged.merge_with(b);
+                            result_vars.insert(name, merged);
+                            result_assigned.insert(name);
+                        } else {
+                            let ty = b.clone().possibly_undefined();
+                            result_vars.insert(name, ty);
+                            result_possibly.insert(name);
+                        }
+                    }
+                    (None, None) => {}
                 }
-                (None, None) => {}
             }
         }
 

@@ -190,14 +190,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let name_str = name.trim_start_matches('$');
                             if !ctx.var_is_defined(name_str) {
                                 let name_sym = mir_types::Symbol::from(name_str);
-                                ctx.vars.insert(
+                                std::sync::Arc::make_mut(&mut ctx.vars).insert(
                                     name_sym,
                                     Union::single(Atomic::TArray {
                                         key: Box::new(Union::mixed()),
                                         value: Box::new(ty.clone()),
                                     }),
                                 );
-                                ctx.assigned_vars.insert(name_sym);
+                                std::sync::Arc::make_mut(&mut ctx.assigned_vars).insert(name_sym);
                                 let (line, col_start) = self.offset_to_line_col(base.span.start);
                                 let (line_end, col_end) = self.offset_to_line_col(base.span.end);
                                 ctx.record_var_location(

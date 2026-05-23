@@ -157,7 +157,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             af.is_static,
         );
-        for (name, ty) in &ctx.vars {
+        for (name, ty) in ctx.vars.iter() {
             if !arrow_ctx.vars.contains_key(name) {
                 arrow_ctx.set_var(name.as_str(), ty.clone());
             }

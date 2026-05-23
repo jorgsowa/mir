@@ -440,7 +440,11 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Widen any variable still unstable after MAX_ITERS to the union of types
-        widen_unstable(&pre.vars, &mut current.vars, loop_guaranteed);
+        widen_unstable(
+            &pre.vars,
+            std::sync::Arc::make_mut(&mut current.vars),
+            loop_guaranteed,
+        );
 
         // Pop break contexts and merge them into the post-loop result
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();

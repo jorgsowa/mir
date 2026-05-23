@@ -36,10 +36,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             for v in right_ctx.read_vars {
                 ctx.read_vars.insert(v);
             }
-            for (name, ty) in &right_ctx.vars {
+            for (name, ty) in right_ctx.vars.iter() {
                 if !ctx.vars.contains_key(name) {
-                    ctx.vars.insert(*name, ty.clone());
-                    ctx.possibly_assigned_vars.insert(*name);
+                    std::sync::Arc::make_mut(&mut ctx.vars).insert(*name, ty.clone());
+                    std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).insert(*name);
                 }
             }
             return Union::single(Atomic::TBool);
