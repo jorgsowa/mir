@@ -3,7 +3,7 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use crate::symbol::SymbolKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Union};
 use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
@@ -94,7 +94,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         n.class.span,
                     );
                 } else if type_exists {
-                    let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
+                    let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
                     if let Some(class) = crate::db::find_class_like(self.db, here) {
                         if class.is_class() && class.is_abstract() {
                             self.emit(
@@ -118,7 +118,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     let ctor_params = crate::db::find_method_in_chain(
                         self.db,
-                        crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref())),
+                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                         "__construct",
                     )
                     .map(|(_, s)| s.params.to_vec());

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::db::{resolve_name_via_db, type_exists_via_db, MirDatabase};
 use crate::php_version::PhpVersion;
-use mir_types::Symbol;
 
 // ---------------------------------------------------------------------------
 // Offset to char-count column conversion
@@ -241,7 +240,7 @@ fn check_name_class_with_context(
 
     // Check if extending an interface
     if is_extends {
-        let here = crate::db::Fqcn::new(db, Symbol::new(resolved.as_str()));
+        let here = crate::db::Fqcn::from_str(db, resolved.as_str());
         let is_iface = crate::db::find_class_like(db, here)
             .map(|c| c.is_interface())
             .unwrap_or(false);

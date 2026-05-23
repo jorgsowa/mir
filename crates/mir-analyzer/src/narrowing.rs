@@ -6,7 +6,7 @@ use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
 use mir_codebase::storage::AssertionKind;
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Union};
 
 use crate::context::Context;
 use crate::db::MirDatabase;
@@ -306,7 +306,7 @@ fn apply_docblock_assertions(
         .map(|s| s.to_string())
         .unwrap_or_else(|| fn_name.to_string());
     let fn_active = |name: &str| -> bool {
-        let here = crate::db::Fqcn::new(db, Symbol::new(name));
+        let here = crate::db::Fqcn::from_str(db, name);
         crate::db::find_function(db, here).is_some()
     };
     let resolved_fn_name = {
@@ -320,7 +320,7 @@ fn apply_docblock_assertions(
         }
     };
 
-    let here = crate::db::Fqcn::new(db, Symbol::new(resolved_fn_name.as_str()));
+    let here = crate::db::Fqcn::from_str(db, resolved_fn_name.as_str());
     let Some(f) = crate::db::find_function(db, here) else {
         return false;
     };

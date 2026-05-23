@@ -18,7 +18,7 @@ pub struct ClassKind {
 }
 
 pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn));
+    let here = crate::db::Fqcn::from_str(db, fqcn);
     let class = crate::db::find_class_like(db, here)?;
     Some(ClassKind {
         is_interface: class.is_interface(),
@@ -29,17 +29,17 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
 }
 
 pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn));
+    let here = crate::db::Fqcn::from_str(db, fqcn);
     crate::db::find_class_like(db, here).is_some()
 }
 
 pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqn));
+    let here = crate::db::Fqcn::from_str(db, fqn);
     crate::db::find_function(db, here).is_some()
 }
 
 pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqn));
+    let here = crate::db::Fqcn::from_str(db, fqn);
     crate::db::find_global_constant(db, here).is_some()
 }
 
@@ -97,7 +97,7 @@ pub fn class_template_params_via_db(
     db: &dyn MirDatabase,
     fqcn: &str,
 ) -> Option<Arc<[TemplateParam]>> {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn));
+    let here = crate::db::Fqcn::from_str(db, fqcn);
     let class = crate::db::find_class_like(db, here)?;
     Some(Arc::from(class.template_params().to_vec()))
 }
@@ -117,7 +117,7 @@ pub fn inherited_template_bindings_via_db(
             break;
         }
         let Some(class) =
-            crate::db::find_class_like(db, crate::db::Fqcn::new(db, Symbol::new(current.as_ref())))
+            crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, current.as_ref()))
         else {
             break;
         };
@@ -138,7 +138,7 @@ pub fn inherited_template_bindings_via_db(
 }
 
 pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn));
+    let here = crate::db::Fqcn::from_str(db, fqcn);
     if crate::db::find_class_like(db, here).is_none() {
         return false;
     }
@@ -161,7 +161,7 @@ pub fn member_location_via_db(
     fqcn: &str,
     member_name: &str,
 ) -> Option<Location> {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn));
+    let here = crate::db::Fqcn::from_str(db, fqcn);
     if let Some((_, storage)) = crate::db::find_method_in_chain(db, here, member_name) {
         if let Some(loc) = storage.location.clone() {
             return Some(loc);
@@ -181,7 +181,7 @@ pub fn member_location_via_db(
 }
 
 pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {
-    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn));
+    let here = crate::db::Fqcn::from_str(db, fqcn);
     crate::db::find_class_constant_in_chain(db, here, const_name).is_some()
 }
 
@@ -189,7 +189,7 @@ pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor:
     if child == ancestor {
         return true;
     }
-    let here = crate::db::Fqcn::new(db, Symbol::new(child));
+    let here = crate::db::Fqcn::from_str(db, child);
     let Some(class) = crate::db::find_class_like(db, here) else {
         return false;
     };

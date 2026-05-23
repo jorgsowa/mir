@@ -5,7 +5,7 @@ use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Symbol, Union};
+use mir_types::Union;
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
@@ -48,7 +48,7 @@ pub(super) fn resolve_method_from_db(
 
     if let Some((owner_fqcn, storage)) = crate::db::find_method_in_chain(
         db,
-        crate::db::Fqcn::new(db, Symbol::new(fqcn.as_ref())),
+        crate::db::Fqcn::from_str(db, fqcn.as_ref()),
         method_name_lower,
     ) {
         let name = storage.name.clone();

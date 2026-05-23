@@ -2,7 +2,7 @@ use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
 use mir_types::atomic::FnParam;
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Union};
 
 use crate::expr::ExpressionAnalyzer;
 
@@ -36,7 +36,7 @@ pub(crate) fn extract_callable_params(
                 );
             }
             Atomic::TLiteralString(fn_name) => {
-                let here = crate::db::Fqcn::new(ea.db, Symbol::new(fn_name.as_ref()));
+                let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
                 let params: Option<Vec<ParamInfo>> =
                     crate::db::find_function(ea.db, here).map(|f| {
                         f.params

@@ -5,7 +5,7 @@ use super::ExpressionAnalyzer;
 use crate::context::Context;
 use crate::symbol::SymbolKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Union};
 use php_ast::owned::Expr;
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -81,7 +81,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|ns| format!("{}\\{}", ns, name_str));
 
         let resolve_pull = |fqn: &str| -> Option<mir_types::Union> {
-            let here = crate::db::Fqcn::new(self.db, Symbol::new(fqn));
+            let here = crate::db::Fqcn::from_str(self.db, fqn);
             crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
         };
 

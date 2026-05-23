@@ -4,7 +4,7 @@ use php_ast::owned::{ExprKind, StaticDynMethodCallExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Union};
 
 use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
@@ -88,7 +88,7 @@ impl CallAnalyzer {
 
         // Check if trying to call static method on an interface (not allowed)
         if crate::db::type_exists_via_db(ea.db, &fqcn) {
-            let here = crate::db::Fqcn::new(ea.db, Symbol::new(fqcn_arc.as_ref()));
+            let here = crate::db::Fqcn::from_str(ea.db, fqcn_arc.as_ref());
             let is_interface = crate::db::find_class_like(ea.db, here)
                 .map(|c| c.is_interface())
                 .unwrap_or(false);

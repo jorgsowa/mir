@@ -38,6 +38,16 @@ pub struct Fqcn<'db> {
     pub name: Symbol,
 }
 
+impl<'db> Fqcn<'db> {
+    /// Convenience constructor: intern `name` as a [`Symbol`] and build the
+    /// [`Fqcn`] in one call. Replaces the `Fqcn::new(db, Symbol::new(name))`
+    /// pattern used ~30 times across the analyzer.
+    #[inline]
+    pub fn from_str(db: &'db dyn MirDatabase, name: &str) -> Self {
+        Self::new(db, Symbol::new(name))
+    }
+}
+
 /// Resolve an FQCN to its defining file path via the configured resolver.
 ///
 /// Tracked: depends on [`ResolverConfig::revision`], so callers reading

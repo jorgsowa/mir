@@ -15,7 +15,7 @@ use crate::php_version::PhpVersion;
 use crate::shared_db::SharedDb;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
 use mir_issues::Issue;
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Union};
 
 /// Issue kinds emitted by [`crate::dead_code::DeadCodeAnalyzer`].
 ///
@@ -251,14 +251,14 @@ impl ProjectAnalyzer {
     /// Returns `true` if a function with `fqn` is registered and active.
     pub fn contains_function(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
-        let here = crate::db::Fqcn::new(&db, Symbol::new(fqn));
+        let here = crate::db::Fqcn::from_str(&db, fqn);
         crate::db::find_function(&db, here).is_some()
     }
 
     /// Returns `true` if a class / interface / trait / enum is registered.
     pub fn contains_class(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
-        let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn));
+        let here = crate::db::Fqcn::from_str(&db, fqcn);
         crate::db::find_class_like(&db, here).is_some()
     }
 
@@ -302,7 +302,7 @@ impl ProjectAnalyzer {
     #[doc(hidden)]
     pub fn symbol_location(&self, symbol: &str) -> Option<mir_codebase::storage::Location> {
         let db = self.snapshot_db();
-        let here = crate::db::Fqcn::new(&db, Symbol::new(symbol));
+        let here = crate::db::Fqcn::from_str(&db, symbol);
         if let Some(class) = crate::db::find_class_like(&db, here) {
             if let Some(loc) = class.location() {
                 return Some(loc.clone());
@@ -331,7 +331,7 @@ impl ProjectAnalyzer {
         let db = self.snapshot_db();
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                let here = crate::db::Fqcn::new(&db, Symbol::new(fqcn.as_ref()));
+                let here = crate::db::Fqcn::from_str(&db, fqcn.as_ref());
                 let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 class
@@ -340,7 +340,7 @@ impl ProjectAnalyzer {
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
             crate::Symbol::Function(fqn) => {
-                let here = crate::db::Fqcn::new(&db, Symbol::new(fqn.as_ref()));
+                let here = crate::db::Fqcn::from_str(&db, fqn.as_ref());
                 let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
                 f.location
@@ -790,7 +790,7 @@ impl ProjectAnalyzer {
                     if scanned.contains(fqcn.as_ref()) {
                         continue;
                     }
-                    let here = crate::db::Fqcn::new(db, Symbol::new(fqcn.as_ref()));
+                    let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
                     let Some(class) = crate::db::find_class_like(db, here) else {
                         continue;
                     };
@@ -1436,7 +1436,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
     };
 
     for fqcn in crate::db::workspace_classes(db).iter() {
-        let here = crate::db::Fqcn::new(db, Symbol::new(fqcn.as_ref()));
+        let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
         let Some(class) = crate::db::find_class_like(db, here) else {
             continue;
         };
@@ -1488,7 +1488,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
 
     // Add types from global functions
     for fqn in crate::db::workspace_functions(db).iter() {
-        let here = crate::db::Fqcn::new(db, Symbol::new(fqn.as_ref()));
+        let here = crate::db::Fqcn::from_str(db, fqn.as_ref());
         let Some(f) = crate::db::find_function(db, here) else {
             continue;
         };

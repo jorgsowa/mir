@@ -18,7 +18,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let resolve_fn =
             |fqn: &str| -> Option<(Vec<mir_codebase::FnParam>, Option<mir_types::Union>)> {
                 let db = self.db;
-                let here = crate::db::Fqcn::new(db, Symbol::new(fqn));
+                let here = crate::db::Fqcn::from_str(db, fqn);
                 crate::db::find_function(db, here).map(|f| {
                     (
                         f.params.to_vec(),
@@ -96,7 +96,7 @@ impl<'a> StatementsAnalyzer<'a> {
             .unwrap_or("<anonymous>");
         let resolved = crate::db::resolve_name_via_db(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
-        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
@@ -119,7 +119,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let method_name = method.name.as_deref().unwrap_or("");
             let pulled = crate::db::find_method_in_chain(
                 self.db,
-                crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref())),
+                crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                 method_name,
             );
             let (params, return_ty) = if let Some((_, storage)) = pulled {

@@ -32,11 +32,9 @@ fn method_chain_signature(
     Vec<mir_codebase::storage::TemplateParam>,
     Arc<[Arc<str>]>,
 ) {
-    if let Some((_, storage)) = crate::db::find_method_in_chain(
-        db,
-        crate::db::Fqcn::new(db, Symbol::new(fqcn)),
-        method_name,
-    ) {
+    if let Some((_, storage)) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), method_name)
+    {
         return (
             Arc::clone(&storage.params),
             storage.return_type.as_deref().cloned(),
@@ -56,7 +54,7 @@ fn lookup_function_node_for_decl(
 ) -> Option<(Arc<str>, Arc<mir_codebase::storage::FunctionStorage>)> {
     let qualified = resolve_name_via_db(db, file, fn_name);
     let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::storage::FunctionStorage>> {
-        crate::db::find_function(db, crate::db::Fqcn::new(db, Symbol::new(fqn)))
+        crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn))
     };
     if let Some(f) = try_lookup(qualified.as_str()) {
         return Some((Arc::from(qualified), f));
@@ -626,7 +624,7 @@ impl<'a> Pass2Driver<'a> {
         let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
-        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn));
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
@@ -878,7 +876,7 @@ impl<'a> Pass2Driver<'a> {
         let class_name = class_name_owned.as_str();
         let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
-        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn));
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
@@ -1011,7 +1009,7 @@ impl<'a> Pass2Driver<'a> {
     /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
     /// `@psalm-require-implements` constraint declared on the traits it uses.
     fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
-        let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn));
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
@@ -1047,7 +1045,7 @@ impl<'a> Pass2Driver<'a> {
                     })
             };
 
-            let trait_here = crate::db::Fqcn::new(self.db, Symbol::new(trait_fqcn.as_ref()));
+            let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
             let trait_class = match crate::db::find_class_like(self.db, trait_here) {
                 None => {
                     all_issues.push(mir_issues::Issue::new(

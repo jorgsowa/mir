@@ -11,8 +11,6 @@
 /// constructors are excluded because they are called implicitly.
 use std::sync::Arc;
 
-use mir_types::Symbol;
-
 use mir_codebase::storage::Visibility;
 use mir_issues::{Issue, IssueKind, Location, Severity};
 
@@ -60,7 +58,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
             .collect();
 
         for fqcn in &class_fqcns {
-            let here = crate::db::Fqcn::new(self.db, Symbol::new(fqcn.as_ref()));
+            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
             let pulled = crate::db::find_class_like(self.db, here);
             let is_class = pulled.as_ref().map(|c| c.is_class()).unwrap_or(false);
             if !is_class {
@@ -127,7 +125,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
             .cloned()
             .collect();
         for fqn in fqns {
-            let here = crate::db::Fqcn::new(self.db, Symbol::new(fqn.as_ref()));
+            let here = crate::db::Fqcn::from_str(self.db, fqn.as_ref());
             let pulled = crate::db::find_function(self.db, here);
             let Some(f) = pulled.as_ref() else {
                 continue;

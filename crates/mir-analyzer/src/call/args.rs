@@ -717,7 +717,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             if !arg_fqcn.contains('\\') && !type_exists(ea, &resolved_arg) {
                 let target = arg_fqcn.as_ref();
                 for fqcn in crate::db::workspace_classes(ea.db).iter() {
-                    let here = crate::db::Fqcn::new(ea.db, Symbol::new(fqcn.as_ref()));
+                    let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_ref());
                     let is_class =
                         crate::db::find_class_like(ea.db, here).is_some_and(|c| c.is_class());
                     if !is_class {
@@ -751,7 +751,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 let class_fqcns: Vec<std::sync::Arc<str>> = crate::db::workspace_classes(ea.db)
                     .iter()
                     .filter(|fqcn| {
-                        let here = crate::db::Fqcn::new(ea.db, Symbol::new(fqcn.as_ref()));
+                        let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_ref());
                         crate::db::find_class_like(ea.db, here).is_some_and(|c| c.is_class())
                     })
                     .cloned()
@@ -897,7 +897,7 @@ fn generic_ancestor_type_args_inner(
         return None;
     }
 
-    let here = crate::db::Fqcn::new(ea.db, Symbol::new(child));
+    let here = crate::db::Fqcn::from_str(ea.db, child);
     let cl = crate::db::find_class_like(ea.db, here)?;
     let parent = cl.parent().cloned();
     let extends_type_args: Vec<Union> = cl.extends_type_args().to_vec();
