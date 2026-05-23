@@ -13,3 +13,4 @@ mir-types    = { workspace = true }
 indexmap     = { workspace = true }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true }
+dashmap      = { workspace = true }

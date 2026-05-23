@@ -79,9 +79,29 @@ mod interned_types {
         VOID.get_or_init(intern_void).clone()
     }
 
+    /// Global content-keyed `Arc<Union>` interner. Any structurally-identical
+    /// Union is shared as a single Arc across the session.
+    ///
+    /// Why: PHP codebases re-declare a small set of type shapes thousands of
+    /// times — `string|null` return types, `int` params, `array<string, mixed>`
+    /// property types. Without interning, each declaration allocates its own
+    /// `Arc<Union>` plus the inline `SmallVec<[Atomic; 2]>` and any boxed
+    /// `Atomic` payloads. With interning, only the first occurrence allocates.
+    ///
+    /// Trade-off: every `intern_or_wrap` call hashes + does one DashMap lookup.
+    /// Hashing a `Union` is cheap (SmallVec, small atomics) — measured cost is
+    /// well below the alloc-savings benefit on real workloads.
+    static GLOBAL_UNION_INTERN: std::sync::OnceLock<dashmap::DashMap<Union, Arc<Union>>> =
+        std::sync::OnceLock::new();
+
+    fn global_intern_table() -> &'static dashmap::DashMap<Union, Arc<Union>> {
+        GLOBAL_UNION_INTERN.get_or_init(dashmap::DashMap::default)
+    }
+
     /// Try to intern a Union if it matches a common type, otherwise wrap in Arc.
     pub fn intern_or_wrap(union: Union) -> Arc<Union> {
-        // Check if this is a single-atomic type that we intern
+        // Fast path 1: single-atomic scalar — covered by `OnceLock` constants.
+        // Avoids any DashMap traffic for the most common case.
         if union.types.len() == 1 && !union.possibly_undefined && !union.from_docblock {
             match &union.types[0] {
                 mir_types::Atomic::TString => return string(),
@@ -94,7 +114,27 @@ mod interned_types {
                 _ => {}
             }
         }
-        Arc::new(union)
+        // Fast path 2: empty Union — also a common case (e.g. unresolved
+        // return type). Don't pollute the intern table with these.
+        if union.types.is_empty() {
+            return Arc::new(union);
+        }
+        // Global path: dedup against any previously-seen identical Union.
+        let table = global_intern_table();
+        if let Some(existing) = table.get(&union) {
+            return Arc::clone(existing.value());
+        }
+        let arc = Arc::new(union.clone());
+        // `insert` semantics: if a parallel thread beat us, its Arc wins.
+        // The lookup-before-insert race is benign — both Arcs are content-
+        // equal — but we still want to share the canonical one going forward.
+        match table.entry(union) {
+            dashmap::mapref::entry::Entry::Occupied(o) => Arc::clone(o.get()),
+            dashmap::mapref::entry::Entry::Vacant(v) => {
+                v.insert(Arc::clone(&arc));
+                arc
+            }
+        }
     }
 }
 
