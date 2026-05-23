@@ -440,8 +440,12 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     use crate::db::SymbolLoc;
     // O(1) HashMap lookup in the workspace symbol index, then a per-(file, idx)
     // salsa-memoized fetch of the Arc<Storage>.
-    let name = fqcn.name(db);
-    let key = name.to_ascii_lowercase();
+    //
+    // `Symbol::ascii_lowercase` is memoized — first call per unique FQCN
+    // allocates the lowercase string and interns it; subsequent calls hit a
+    // process-global DashMap. The hot Pass-2 path becomes alloc-free after
+    // warmup.
+    let key = fqcn.name(db).ascii_lowercase();
     let index = if let Some(s) = db.workspace_symbol_index_singleton() {
         s.index(db)
     } else {
@@ -470,8 +474,7 @@ pub fn find_function<'db>(
     fqn: Fqcn<'db>,
 ) -> Option<Arc<FunctionStorage>> {
     use crate::db::SymbolLoc;
-    let name = fqn.name(db);
-    let key = name.to_ascii_lowercase();
+    let key = fqn.name(db).ascii_lowercase();
     let index = if let Some(s) = db.workspace_symbol_index_singleton() {
         s.index(db)
     } else {
@@ -490,8 +493,7 @@ pub fn find_global_constant<'db>(
     fqn: Fqcn<'db>,
 ) -> Option<Arc<mir_types::Union>> {
     use crate::db::SymbolLoc;
-    let name = fqn.name(db);
-    let key = name.to_string();
+    let key = fqn.name(db);
     let index = if let Some(s) = db.workspace_symbol_index_singleton() {
         s.index(db)
     } else {

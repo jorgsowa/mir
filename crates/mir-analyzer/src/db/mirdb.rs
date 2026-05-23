@@ -186,7 +186,8 @@ impl MirDatabase for MirDb {
 
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
         let idx = crate::db::workspace_symbol_index(self);
-        let lower = symbol.to_ascii_lowercase();
+        let lower = Symbol::new(symbol).ascii_lowercase();
+        let case_sensitive = Symbol::new(symbol);
         // Class-like and function keys are case-folded (PHP semantics).
         // Constants are case-sensitive, so tried last without lowercasing.
         // Global variables are not indexed here — they are not FQCNs and
@@ -195,7 +196,7 @@ impl MirDatabase for MirDb {
             .class_like
             .get(&lower)
             .or_else(|| idx.functions.get(&lower))
-            .or_else(|| idx.constants.get(symbol));
+            .or_else(|| idx.constants.get(&case_sensitive));
         loc.map(|l| {
             let sf = match l {
                 SymbolLoc::Class { file, .. }
@@ -421,9 +422,9 @@ impl MirDb {
         let files = self.all_source_files();
         let user_stub_files = self.user_stub_source_files();
 
-        let mut class_like: FxHashMap<String, SymbolLoc> = FxHashMap::default();
-        let mut functions: FxHashMap<String, SymbolLoc> = FxHashMap::default();
-        let mut constants: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+        let mut class_like: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
+        let mut functions: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
+        let mut constants: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
         let mut new_snapshots: FxHashMap<SourceFile, FileDeclarations> = FxHashMap::default();
 
         // Immutable borrow scope: collect declarations from all files.
@@ -432,13 +433,13 @@ impl MirDb {
             for &file in files.iter() {
                 let decls = collect_file_declarations(db, file);
                 for (key, loc) in &decls.class_like {
-                    class_like.entry(key.clone()).or_insert(*loc);
+                    class_like.entry(*key).or_insert(*loc);
                 }
                 for (key, loc) in &decls.functions {
-                    functions.entry(key.clone()).or_insert(*loc);
+                    functions.entry(*key).or_insert(*loc);
                 }
                 for (key, loc) in &decls.constants {
-                    constants.entry(key.clone()).or_insert(*loc);
+                    constants.entry(*key).or_insert(*loc);
                 }
                 new_snapshots.insert(file, decls);
             }
@@ -446,13 +447,13 @@ impl MirDb {
             for &file in user_stub_files.iter() {
                 let decls = collect_file_declarations(db, file);
                 for (key, loc) in &decls.class_like {
-                    class_like.insert(key.clone(), *loc);
+                    class_like.insert(*key, *loc);
                 }
                 for (key, loc) in &decls.functions {
-                    functions.insert(key.clone(), *loc);
+                    functions.insert(*key, *loc);
                 }
                 for (key, loc) in &decls.constants {
-                    constants.insert(key.clone(), *loc);
+                    constants.insert(*key, *loc);
                 }
             }
         }

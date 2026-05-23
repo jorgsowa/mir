@@ -30,6 +30,7 @@
 
 use std::sync::Arc;
 
+use mir_types::Symbol;
 use rustc_hash::FxHashMap;
 
 use crate::db::{collect_file_definitions, MirDatabase, SourceFile};
@@ -150,12 +151,12 @@ unsafe impl salsa::Update for FqcnIndex {
 /// change but its set of class / function / constant names is unchanged.
 #[derive(Clone)]
 pub struct FileDeclarations {
-    /// `(lowercased_fqcn, SymbolLoc)` for every class-like symbol.
-    pub class_like: Vec<(String, SymbolLoc)>,
-    /// `(lowercased_fqn, SymbolLoc)` for every function.
-    pub functions: Vec<(String, SymbolLoc)>,
-    /// `(name, SymbolLoc)` for every constant (case-sensitive key).
-    pub constants: Vec<(String, SymbolLoc)>,
+    /// `(lowercased_fqcn_symbol, SymbolLoc)` for every class-like symbol.
+    pub class_like: Vec<(Symbol, SymbolLoc)>,
+    /// `(lowercased_fqn_symbol, SymbolLoc)` for every function.
+    pub functions: Vec<(Symbol, SymbolLoc)>,
+    /// `(name_symbol, SymbolLoc)` for every constant (case-sensitive key).
+    pub constants: Vec<(Symbol, SymbolLoc)>,
 }
 
 impl PartialEq for FileDeclarations {
@@ -202,29 +203,44 @@ pub fn collect_file_declarations(db: &dyn MirDatabase, file: SourceFile) -> File
     let mut functions = Vec::new();
     let mut constants = Vec::new();
 
+    // Pre-lowercase FQCNs once at collection time and intern via Symbol so
+    // downstream lookups (find_class_like, inferred_*_demand) can hash u64
+    // pointers instead of byte-by-byte strings.
     for (idx, c) in defs.slice.classes.iter().enumerate() {
-        class_like.push((c.fqcn.to_ascii_lowercase(), SymbolLoc::Class { file, idx }));
+        class_like.push((
+            Symbol::new(c.fqcn.as_ref()).ascii_lowercase(),
+            SymbolLoc::Class { file, idx },
+        ));
     }
     for (idx, i) in defs.slice.interfaces.iter().enumerate() {
         class_like.push((
-            i.fqcn.to_ascii_lowercase(),
+            Symbol::new(i.fqcn.as_ref()).ascii_lowercase(),
             SymbolLoc::Interface { file, idx },
         ));
     }
     for (idx, t) in defs.slice.traits.iter().enumerate() {
-        class_like.push((t.fqcn.to_ascii_lowercase(), SymbolLoc::Trait { file, idx }));
+        class_like.push((
+            Symbol::new(t.fqcn.as_ref()).ascii_lowercase(),
+            SymbolLoc::Trait { file, idx },
+        ));
     }
     for (idx, e) in defs.slice.enums.iter().enumerate() {
-        class_like.push((e.fqcn.to_ascii_lowercase(), SymbolLoc::Enum { file, idx }));
+        class_like.push((
+            Symbol::new(e.fqcn.as_ref()).ascii_lowercase(),
+            SymbolLoc::Enum { file, idx },
+        ));
     }
     for (idx, f) in defs.slice.functions.iter().enumerate() {
         functions.push((
-            f.fqn.to_ascii_lowercase(),
+            Symbol::new(f.fqn.as_ref()).ascii_lowercase(),
             SymbolLoc::Function { file, idx },
         ));
     }
     for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
-        constants.push((name.to_string(), SymbolLoc::Constant { file, idx }));
+        constants.push((
+            Symbol::new(name.as_ref()),
+            SymbolLoc::Constant { file, idx },
+        ));
     }
 
     FileDeclarations {
@@ -272,12 +288,19 @@ pub struct WorkspaceSymbolIndexSingleton {
 /// on-demand via the already-memoized `collect_file_definitions(file)`.
 #[derive(Clone, Default)]
 pub struct WorkspaceSymbolIndex {
-    /// Class / interface / trait / enum FQCN (lowered) → location.
-    pub class_like: Arc<FxHashMap<String, SymbolLoc>>,
-    /// Function FQN (lowered) → location.
-    pub functions: Arc<FxHashMap<String, SymbolLoc>>,
-    /// Constant FQN (case-sensitive) → location.
-    pub constants: Arc<FxHashMap<String, SymbolLoc>>,
+    /// Class / interface / trait / enum FQCN (lowercased Symbol) → location.
+    ///
+    /// Keys are `Symbol` rather than `String` so lookups from the Pass-2 hot
+    /// path are u64 pointer-eq comparisons instead of byte-by-byte string
+    /// hashes — and so the caller doesn't have to allocate a `String` to do
+    /// the lookup. The lowercased symbol is computed once at index-build
+    /// time and reused by all lookups via `Symbol::ascii_lowercase()` (which
+    /// is itself memoized).
+    pub class_like: Arc<FxHashMap<Symbol, SymbolLoc>>,
+    /// Function FQN (lowercased Symbol) → location.
+    pub functions: Arc<FxHashMap<Symbol, SymbolLoc>>,
+    /// Constant FQN (case-sensitive Symbol) → location.
+    pub constants: Arc<FxHashMap<Symbol, SymbolLoc>>,
 }
 
 impl PartialEq for WorkspaceSymbolIndex {
@@ -310,9 +333,9 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let _ = rev.revision(db);
 
     let files = db.all_source_files();
-    let mut class_like: FxHashMap<String, SymbolLoc> = FxHashMap::default();
-    let mut functions: FxHashMap<String, SymbolLoc> = FxHashMap::default();
-    let mut constants: FxHashMap<String, SymbolLoc> = FxHashMap::default();
+    let mut class_like: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
+    let mut functions: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
+    let mut constants: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
 
     // First pass: all files with or_insert (first-write-wins for native stubs).
     // collect_file_declarations has a name-only PartialEq so body-only edits
@@ -320,13 +343,13 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     for file in files.iter() {
         let decls = collect_file_declarations(db, *file);
         for (key, loc) in &decls.class_like {
-            class_like.entry(key.clone()).or_insert(*loc);
+            class_like.entry(*key).or_insert(*loc);
         }
         for (key, loc) in &decls.functions {
-            functions.entry(key.clone()).or_insert(*loc);
+            functions.entry(*key).or_insert(*loc);
         }
         for (key, loc) in &decls.constants {
-            constants.entry(key.clone()).or_insert(*loc);
+            constants.entry(*key).or_insert(*loc);
         }
     }
 

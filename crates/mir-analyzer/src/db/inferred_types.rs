@@ -23,8 +23,8 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
     } else {
         crate::db::workspace_symbol_index(db)
     };
-    let fqn_lower = fqn.to_ascii_lowercase();
-    let sf = match idx.functions.get(&fqn_lower)? {
+    let key = mir_types::Symbol::new(fqn).ascii_lowercase();
+    let sf = match idx.functions.get(&key)? {
         SymbolLoc::Function { file, .. } => *file,
         _ => return None,
     };
@@ -48,8 +48,8 @@ pub fn inferred_method_return_type_demand(
     } else {
         crate::db::workspace_symbol_index(db)
     };
-    let fqcn_lower = fqcn.to_ascii_lowercase();
-    let sf = match idx.class_like.get(&fqcn_lower)? {
+    let key = mir_types::Symbol::new(fqcn).ascii_lowercase();
+    let sf = match idx.class_like.get(&key)? {
         SymbolLoc::Class { file, .. }
         | SymbolLoc::Interface { file, .. }
         | SymbolLoc::Trait { file, .. }

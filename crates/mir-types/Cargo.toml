@@ -14,3 +14,4 @@ indexmap   = { workspace = true }
 serde      = { workspace = true, features = ["rc"] }
 rustc-hash = { workspace = true }
 ustr       = { workspace = true }
+dashmap    = { workspace = true }

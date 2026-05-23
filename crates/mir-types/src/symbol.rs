@@ -27,6 +27,37 @@ impl Symbol {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    /// ASCII-lowercased twin of this symbol, memoized.
+    ///
+    /// PHP class and function names are case-insensitive for resolution, so
+    /// every workspace symbol-index lookup needs the lowercase form. The
+    /// naive `name.to_ascii_lowercase()` allocates a fresh `String` per call
+    /// — measured at ~9% of total CLI CPU on Laravel-scale fixtures.
+    ///
+    /// This caches `self → lowercase(self)` in a process-global DashMap so
+    /// every unique identifier is lowercased at most once. The result is
+    /// itself a `Symbol`, so downstream HashMap lookups become `u64`-keyed
+    /// (`ustr::Ustr` equality is pointer-eq, not content-eq).
+    ///
+    /// Fast path: if `self` is already all-lowercase, returns `self`
+    /// directly without touching the cache.
+    pub fn ascii_lowercase(self) -> Self {
+        if self.as_str().bytes().all(|b| !b.is_ascii_uppercase()) {
+            return self;
+        }
+        static CACHE: std::sync::OnceLock<dashmap::DashMap<ustr::Ustr, ustr::Ustr>> =
+            std::sync::OnceLock::new();
+        let cache = CACHE.get_or_init(dashmap::DashMap::default);
+        if let Some(v) = cache.get(&self.0) {
+            return Symbol(*v);
+        }
+        // `to_ascii_lowercase` allocates but only on first sight of this
+        // symbol; subsequent calls return from the cache.
+        let lowered = ustr::ustr(&self.as_str().to_ascii_lowercase());
+        cache.insert(self.0, lowered);
+        Symbol(lowered)
+    }
 }
 
 // ---------------------------------------------------------------------------

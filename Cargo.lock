@@ -844,6 +844,7 @@ dependencies = [
 name = "mir-types"
 version = "0.28.0"
 dependencies = [
+ "dashmap",
  "indexmap",
  "rustc-hash",
  "serde",
