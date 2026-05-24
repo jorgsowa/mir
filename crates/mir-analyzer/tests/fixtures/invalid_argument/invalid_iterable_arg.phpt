@@ -2,19 +2,19 @@
 invalidIterableArg
 ===file===
 <?php
-                    /**
-                     * @param  iterable<string> $iter
-                     */
-                    function iterator(iterable $iter): void
-                    {
-                        foreach ($iter as $val) {
-                            //
-                        }
-                    }
+/**
+ * @param  iterable<string> $iter
+ */
+function iterator(iterable $iter): void
+{
+    foreach ($iter as $val) {
+        //
+    }
+}
 
-                    class A {
-                    }
+class A {
+}
 
-                    iterator(new A());
+iterator(new A());
 ===expect===
-InvalidArgument@15:29: Argument $iter of iterator() expects 'array<mixed, string>', got 'A'
+InvalidArgument@15:9: Argument $iter of iterator() expects 'array<mixed, string>', got 'A'

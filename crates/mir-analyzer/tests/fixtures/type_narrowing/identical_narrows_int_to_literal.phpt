@@ -18,4 +18,3 @@ function narrowToFoo(string $x): string {
     return "foo";
 }
 ===expect===
-

@@ -2,23 +2,23 @@
 clearDependentTypeWhenAssigning
 ===file===
 <?php
-                    class A {}
+class A {}
 
-                    class AChild extends A {
-                        public function bar() : void {}
-                    }
+class AChild extends A {
+    public function bar() : void {}
+}
 
-                    class B {}
+class B {}
 
-                    function foo(A $a) : void {
-                        $a_class = get_class($a);
+function foo(A $a) : void {
+    $a_class = get_class($a);
 
-                        $a = new B();
+    $a = new B();
 
-                        switch ($a_class) {
-                            case AChild::class:
-                                $a->bar();
-                        }
-                    }
+    switch ($a_class) {
+        case AChild::class:
+            $a->bar();
+    }
+}
 ===expect===
-UndefinedMethod@17:32: Method B::bar() does not exist
+UndefinedMethod@17:12: Method B::bar() does not exist

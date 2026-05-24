@@ -2,17 +2,17 @@
 annotationInvalidArg
 ===file===
 <?php
-                    class ParentClass {
-                        public function __call(string $name, array $args) {}
-                    }
+class ParentClass {
+    public function __call(string $name, array $args) {}
+}
 
-                    /**
-                     * @method setString(int $integer)
-                     */
-                    class Child extends ParentClass {}
+/**
+ * @method setString(int $integer)
+ */
+class Child extends ParentClass {}
 
-                    $child = new Child();
+$child = new Child();
 
-                    $child->setString("five");
+$child->setString("five");
 ===expect===
-InvalidArgument@13:38: Argument $integer of setString() expects 'int', got '"five"'
+InvalidArgument@13:18: Argument $integer of setString() expects 'int', got '"five"'

@@ -2,13 +2,13 @@
 constantDefinedInFunctionButNotCalled
 ===file===
 <?php
-                    /**
-                     * @return void
-                     */
-                    function defineConstant() {
-                        define("CONSTANT", 1);
-                    }
+/**
+ * @return void
+ */
+function defineConstant() {
+    define("CONSTANT", 1);
+}
 
-                    echo CONSTANT;
+echo CONSTANT;
 ===expect===
-UndefinedConstant@9:25: Constant CONSTANT is not defined
+UndefinedConstant@9:5: Constant CONSTANT is not defined

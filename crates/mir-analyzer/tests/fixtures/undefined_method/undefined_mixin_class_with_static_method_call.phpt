@@ -2,9 +2,9 @@
 undefinedMixinClassWithStaticMethodCall
 ===file===
 <?php
-                    /** @mixin B */
-                    class A {}
+/** @mixin B */
+class A {}
 
-                    A::foo();
+A::foo();
 ===expect===
-UndefinedMethod@5:20: Method A::foo() does not exist
+UndefinedMethod@5:0: Method A::foo() does not exist

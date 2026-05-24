@@ -2,17 +2,17 @@
 unionAnnotationInvalidArg
 ===file===
 <?php
-                    class ParentClass {
-                        public function __call(string $name, array $args) {}
-                    }
+class ParentClass {
+    public function __call(string $name, array $args) {}
+}
 
-                    /**
-                     * @method setBool(string $foo, string|bool $bar)  :   bool dsa sada
-                     */
-                    class Child extends ParentClass {}
+/**
+ * @method setBool(string $foo, string|bool $bar)  :   bool dsa sada
+ */
+class Child extends ParentClass {}
 
-                    $child = new Child();
+$child = new Child();
 
-                    $b = $child->setBool("hello", 5);
+$b = $child->setBool("hello", 5);
 ===expect===
-InvalidArgument@13:50: Argument $bar of setBool() expects 'string|bool', got '5'
+InvalidArgument@13:30: Argument $bar of setBool() expects 'string|bool', got '5'

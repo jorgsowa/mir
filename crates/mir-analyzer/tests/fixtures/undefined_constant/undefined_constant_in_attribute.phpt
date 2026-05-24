@@ -2,14 +2,14 @@
 undefinedConstantInAttribute
 ===file===
 <?php
-                    #[Attribute]
-                    class Foo
-                    {
-                        public function __construct(int $i) {}
-                    }
+#[Attribute]
+class Foo
+{
+    public function __construct(int $i) {}
+}
 
-                    #[Foo(self::BAR_CONST)]
-                    class Bar {}
+#[Foo(self::BAR_CONST)]
+class Bar {}
                 
 ===expect===
-UnusedParam@5:52: Parameter $i is never used
+UnusedParam@5:32: Parameter $i is never used

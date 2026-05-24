@@ -2,10 +2,10 @@
 undefinedClassOneLineInFileAfter
 ===file===
 <?php
-                    /**
-                     * @psalm-suppress UndefinedClass
-                     */
-                    new B();
-                    new C();
+/**
+ * @psalm-suppress UndefinedClass
+ */
+new B();
+new C();
 ===expect===
-UndefinedClass@6:24: Class C does not exist
+UndefinedClass@6:4: Class C does not exist

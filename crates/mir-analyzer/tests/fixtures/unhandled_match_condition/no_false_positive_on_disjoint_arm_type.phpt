@@ -16,4 +16,3 @@ function test(Foo $x): void {
     };
 }
 ===expect===
-

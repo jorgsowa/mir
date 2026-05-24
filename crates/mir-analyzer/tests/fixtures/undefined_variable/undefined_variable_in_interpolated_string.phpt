@@ -2,7 +2,7 @@
 undefinedVariableInInterpolatedString
 ===file===
 <?php
-                    fn(): string => "$a";
+fn(): string => "$a";
                 
 ===expect===
-UndefinedVariable@2:37: Variable $a is not defined
+UndefinedVariable@2:17: Variable $a is not defined

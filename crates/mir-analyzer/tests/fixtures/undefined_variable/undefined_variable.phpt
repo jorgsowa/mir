@@ -2,6 +2,6 @@
 undefinedVariable
 ===file===
 <?php
-                    $a = function() use ($i) {};
+$a = function() use ($i) {};
 ===expect===
-UndefinedVariable@2:41: Variable $i is not defined
+UndefinedVariable@2:21: Variable $i is not defined

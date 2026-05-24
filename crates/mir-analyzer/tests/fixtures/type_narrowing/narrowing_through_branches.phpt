@@ -42,5 +42,6 @@ function testElseAfterNarrowing(string|null $value) {
     }
 }
 ===expect===
-UnusedParam@21:30: Parameter $x is never used
-UnusedParam@33:32: Parameter $value is never used
+UnusedParam@16:30: Parameter $x is never used
+TypeCheckMismatch@28:8: Type of $x is expected to be float, got int|string|float
+UnusedParam@32:32: Parameter $value is never used

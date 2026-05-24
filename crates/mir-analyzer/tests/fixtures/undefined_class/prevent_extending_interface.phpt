@@ -2,8 +2,8 @@
 preventExtendingInterface
 ===file===
 <?php
-                    interface Foo {}
+interface Foo {}
 
-                    class Bar extends Foo {}
+class Bar extends Foo {}
 ===expect===
-UndefinedClass@4:38: Class Foo does not exist
+UndefinedClass@4:18: Class Foo does not exist

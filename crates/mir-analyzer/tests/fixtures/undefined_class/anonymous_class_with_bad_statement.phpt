@@ -2,10 +2,10 @@
 anonymousClassWithBadStatement
 ===file===
 <?php
-                    $foo = new class {
-                        public function a() {
-                            new B();
-                        }
-                    };
+$foo = new class {
+    public function a() {
+        new B();
+    }
+};
 ===expect===
-UndefinedClass@4:32: Class B does not exist
+UndefinedClass@4:12: Class B does not exist
