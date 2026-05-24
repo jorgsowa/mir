@@ -933,45 +933,63 @@ fn param_contains_template_or_unknown(
     let template_names: std::collections::HashSet<&str> =
         template_params.iter().map(|tp| tp.name.as_ref()).collect();
 
-    fn check_union(
-        union: &Union,
-        template_names: &std::collections::HashSet<&str>,
-        ea: &ExpressionAnalyzer<'_>,
-    ) -> bool {
+    fn has_template_param(union: &Union, template_names: &std::collections::HashSet<&str>) -> bool {
         union.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, type_params } => {
-                // Check if this name itself is a template parameter
+                // Check if this name is a template parameter
                 if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
                     return true;
                 }
-                // Check if this is an unknown type
-                if !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref()) {
-                    return true;
-                }
-                // Recursively check type parameters
+                // Check nested type_params for template parameters only
                 type_params
                     .iter()
-                    .any(|tp| check_union(tp, template_names, ea))
+                    .any(|tp| has_template_param(tp, template_names))
             }
             Atomic::TClassString(Some(inner)) => {
-                if inner.contains('\\') {
-                    false
-                } else if template_names.contains(inner.as_ref()) {
-                    true
-                } else {
-                    !type_exists(ea, inner.as_ref())
-                }
+                !inner.contains('\\') && template_names.contains(inner.as_ref())
             }
-            Atomic::TArray { key: _, value }
-            | Atomic::TList { value }
-            | Atomic::TNonEmptyArray { key: _, value }
-            | Atomic::TNonEmptyList { value } => check_union(value, template_names, ea),
             _ => false,
         })
     }
 
-    check_union(param_ty, &template_names, ea)
+    param_ty.types.iter().any(|atomic| match atomic {
+        Atomic::TTemplateParam { .. } => true,
+        Atomic::TNamedObject { fqcn, type_params } => {
+            // Check if this name is a template parameter
+            if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
+                return true;
+            }
+            // Check if this is an unknown type
+            if !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref()) {
+                return true;
+            }
+            // Check nested type_params for template parameters only
+            !type_params.is_empty() && has_template_param(param_ty, &template_names)
+        }
+        Atomic::TClassString(Some(inner)) => {
+            // Check if this name is a template parameter
+            if !inner.contains('\\') && template_names.contains(inner.as_ref()) {
+                return true;
+            }
+            // Check if this is an unknown type
+            !inner.contains('\\') && !type_exists(ea, inner.as_ref())
+        }
+        Atomic::TArray { key: _, value }
+        | Atomic::TList { value }
+        | Atomic::TNonEmptyArray { key: _, value }
+        | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
+            Atomic::TTemplateParam { .. } => true,
+            Atomic::TNamedObject { fqcn, .. } => {
+                if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
+                    return true;
+                }
+                !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
+            }
+            _ => false,
+        }),
+        _ => false,
+    })
 }
 
 fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
