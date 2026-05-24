@@ -939,7 +939,7 @@ dependencies = [
 
 [[package]]
 name = "php-ast"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "bumpalo",
  "serde",
@@ -947,7 +947,7 @@ dependencies = [
 
 [[package]]
 name = "php-lexer"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "memchr",
  "php-ast",
@@ -955,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "php-rs-parser"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "bumpalo",
  "memchr",
@@ -968,7 +968,7 @@ dependencies = [
 
 [[package]]
 name = "phpdoc-parser"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "serde",
 ]

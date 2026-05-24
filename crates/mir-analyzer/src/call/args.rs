@@ -359,21 +359,10 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 }
             }
 
-            // Check if a string callable references an undefined class/method (e.g., "B::bar")
-            if param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TString)) {
-                if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
-                    if let Some((class_name, _method_name)) = s.split_once("::") {
-                        let resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, class_name);
-                        if !crate::db::type_exists_via_db(ea.db, &resolved) {
-                            ea.emit(
-                                mir_issues::IssueKind::UndefinedClass { name: resolved },
-                                Severity::Error,
-                                arg_span,
-                            );
-                        }
-                    }
-                }
-            }
+            // Validate callable and class-string arguments
+            validate_callable_argument(ea, param_ty, &arg_ty, arg_span);
+            validate_class_string_argument(ea, param_ty, &arg_ty, arg_span);
+            validate_callable_type(ea, param_ty, &arg_ty, arg_span);
 
             if !param_ty.is_nullable()
                 && !param_ty.is_mixed()
@@ -1028,4 +1017,148 @@ fn array_list_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyz
             union_compatible(arg_value, param_value, ea)
         })
     })
+}
+
+/// Validate callable arguments: check that string callables reference existing functions/methods
+fn validate_callable_argument(
+    ea: &mut ExpressionAnalyzer<'_>,
+    param_ty: &Union,
+    arg_ty: &Union,
+    arg_span: Span,
+) {
+    // Only validate if parameter is callable
+    if !param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TString)) {
+        return;
+    }
+
+    if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+        // Check for "ClassName::methodName" format
+        if let Some((class_name, method_name)) = s.split_once("::") {
+            let resolved_class = crate::db::resolve_name_via_db(ea.db, &ea.file, class_name);
+            if !crate::db::type_exists_via_db(ea.db, &resolved_class) {
+                ea.emit(
+                    IssueKind::UndefinedClass {
+                        name: resolved_class,
+                    },
+                    Severity::Error,
+                    arg_span,
+                );
+            } else {
+                // Class exists, check if method exists
+                let here = crate::db::Fqcn::new(ea.db, Symbol::from(resolved_class.as_str()));
+                if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
+                    ea.emit(
+                        IssueKind::UndefinedMethod {
+                            class: resolved_class.clone(),
+                            method: method_name.to_string(),
+                        },
+                        Severity::Error,
+                        arg_span,
+                    );
+                }
+            }
+        } else {
+            // Check if it's a function name
+            let here = crate::db::Fqcn::from_str(ea.db, s.as_ref());
+            if crate::db::find_function(ea.db, here).is_none() {
+                ea.emit(
+                    IssueKind::UndefinedFunction {
+                        name: s.to_string(),
+                    },
+                    Severity::Error,
+                    arg_span,
+                );
+            }
+        }
+    }
+}
+
+/// Validate class-string arguments: check that string references existing classes
+fn validate_class_string_argument(
+    ea: &mut ExpressionAnalyzer<'_>,
+    param_ty: &Union,
+    arg_ty: &Union,
+    arg_span: Span,
+) {
+    // Only validate if parameter is class-string
+    let has_class_string = param_ty
+        .types
+        .iter()
+        .any(|t| matches!(t, Atomic::TClassString(_)));
+    if !has_class_string {
+        return;
+    }
+
+    if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+        let resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, s.as_ref());
+        if !crate::db::type_exists_via_db(ea.db, &resolved) {
+            ea.emit(
+                IssueKind::UndefinedClass { name: resolved },
+                Severity::Error,
+                arg_span,
+            );
+        }
+    }
+}
+
+/// Validate callable type arguments: check that arrays are in valid [obj/class, "method"] format
+fn validate_callable_type(
+    ea: &mut ExpressionAnalyzer<'_>,
+    param_ty: &Union,
+    arg_ty: &Union,
+    arg_span: Span,
+) {
+    // Only validate if parameter expects callable
+    let is_callable = param_ty.contains(|t| matches!(t, Atomic::TCallable { .. }));
+    if !is_callable {
+        return;
+    }
+
+    // Check if argument is a keyed array (should be [obj/class, "method"] format)
+    for atomic in &arg_ty.types {
+        if let Atomic::TKeyedArray { properties, .. } = atomic {
+            // Valid callable arrays should have exactly 2 elements: [0] => object/class, [1] => string
+            if properties.len() != 2 {
+                ea.emit(
+                    IssueKind::InvalidArgument {
+                        param: "callback".to_string(),
+                        fn_name: "callable".to_string(),
+                        expected: "callable (string or [object, \"method\"])".to_string(),
+                        actual: arg_ty.to_string(),
+                    },
+                    Severity::Error,
+                    arg_span,
+                );
+                continue;
+            }
+
+            // Validate [$obj/class, "method"] format
+            let obj_prop = properties.values().next();
+            let method_prop = properties.values().nth(1);
+            if let (Some(obj_prop), Some(method_prop)) = (obj_prop, method_prop) {
+                // Check if second element is a string (method name)
+                if let Some(Atomic::TLiteralString(method_name)) = method_prop.ty.types.first() {
+                    // Get the class from the object/class reference
+                    for obj_atomic in &obj_prop.ty.types {
+                        if let Atomic::TNamedObject { fqcn, .. } = obj_atomic {
+                            let resolved_class =
+                                crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn.as_ref());
+                            let here =
+                                crate::db::Fqcn::new(ea.db, Symbol::from(resolved_class.as_str()));
+                            if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
+                                ea.emit(
+                                    IssueKind::UndefinedMethod {
+                                        class: resolved_class.clone(),
+                                        method: method_name.to_string(),
+                                    },
+                                    Severity::Error,
+                                    arg_span,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

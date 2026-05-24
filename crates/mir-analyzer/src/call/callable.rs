@@ -15,7 +15,7 @@ pub(crate) struct ParamInfo {
 
 /// Extract callable parameter list for arity checking from a union when it can be determined statically:
 /// - TClosure: return params directly
-/// - TLiteralString: resolve to function node and return its params
+/// - TLiteralString: resolve to function only if from documented type annotation (issue #5)
 /// - TIntersection: check parts for callable/closure types
 /// - Everything else: None (param list is unknown at compile time)
 pub(crate) fn extract_callable_params(
@@ -36,19 +36,23 @@ pub(crate) fn extract_callable_params(
                 );
             }
             Atomic::TLiteralString(fn_name) => {
+                if fn_name.is_empty() {
+                    continue;
+                }
+
+                // Try to resolve the function name. Only return params if found (don't fail for unknown strings).
+                // This allows arity checking for both documented callables and literal function names in code.
                 let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
-                let params: Option<Vec<ParamInfo>> =
-                    crate::db::find_function(ea.db, here).map(|f| {
+                if let Some(f) = crate::db::find_function(ea.db, here) {
+                    return Some(
                         f.params
                             .iter()
                             .map(|p| ParamInfo {
                                 is_optional: p.is_optional,
                                 is_variadic: p.is_variadic,
                             })
-                            .collect()
-                    });
-                if let Some(params) = params {
-                    return Some(params);
+                            .collect(),
+                    );
                 }
             }
             Atomic::TIntersection { parts } => {
