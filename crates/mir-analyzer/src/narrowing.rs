@@ -50,6 +50,9 @@ pub fn narrow_from_condition(
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
                 narrow_or_instanceof_true(&b.left, &b.right, ctx, db, file);
+
+                // For `!isset($x) || RHS` in true-branch: narrow RHS as if isset($x) is true
+                narrow_or_isset_true(&b.left, &b.right, ctx, db, file);
             }
         }
 
@@ -435,6 +438,58 @@ fn narrow_or_instanceof_true(
                 };
                 if !result.is_empty() {
                     ctx.set_var(&vn, result);
+                }
+            }
+        }
+    }
+}
+
+/// Apply short-circuit narrowing for isset() in || expressions (true branch).
+///
+/// Handles the PHP idiom: `!isset($x) || use($x)`
+///
+/// When the || operator's RHS is evaluated:
+/// - If LHS is `!isset($x)`, then isset($x) must be TRUE in RHS
+///   (because short-circuit: RHS only executes when LHS is false)
+///
+/// The narrowing is scoped to RHS analysis only and is restored afterward.
+/// This ensures the if-body context isn't incorrectly narrowed.
+fn narrow_or_isset_true(
+    left: &php_ast::owned::Expr,
+    right: &php_ast::owned::Expr,
+    ctx: &mut Context,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    // Pattern: !isset($x) || RHS
+    // When RHS is evaluated via short-circuit, !isset($x) is false, so isset($x) is true
+    if let ExprKind::UnaryPrefix(u) = &left.kind {
+        if u.op == UnaryPrefixOp::BooleanNot {
+            if let ExprKind::Isset(vars) = &u.operand.kind {
+                // Save original variable states so narrowing only affects RHS analysis
+                let original_vars: Vec<_> = vars
+                    .iter()
+                    .filter_map(|var_expr| {
+                        extract_var_name(var_expr).map(|name| (name.clone(), ctx.get_var(&name)))
+                    })
+                    .collect();
+
+                // Apply isset narrowing: remove null and mark as definitely assigned
+                for var_expr in vars.iter() {
+                    if let Some(var_name) = extract_var_name(var_expr) {
+                        let current = ctx.get_var(&var_name);
+                        ctx.set_var(&var_name, current.remove_null());
+                        std::sync::Arc::make_mut(&mut ctx.assigned_vars)
+                            .insert(mir_types::Symbol::from(var_name.as_str()));
+                    }
+                }
+
+                // Evaluate RHS with narrowed context
+                narrow_from_condition(right, ctx, true, db, file);
+
+                // Restore original variable states for if-body context
+                for (var_name, original_type) in original_vars {
+                    ctx.set_var(&var_name, original_type);
                 }
             }
         }
