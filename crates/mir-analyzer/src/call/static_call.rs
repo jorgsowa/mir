@@ -163,6 +163,7 @@ impl CallAnalyzer {
                     arg_can_be_byref: &arg_can_be_byref,
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
+                    template_params: &resolved.template_params,
                 },
             );
             let ret_raw = resolved.return_ty_raw;

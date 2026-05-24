@@ -290,6 +290,7 @@ impl CallAnalyzer {
                         .collect::<Vec<_>>(),
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
+                    template_params: &template_params,
                 },
             );
 

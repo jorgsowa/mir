@@ -38,6 +38,7 @@ pub struct CheckArgsParams<'a> {
     pub arg_can_be_byref: &'a [bool],
     pub call_span: Span,
     pub has_spread: bool,
+    pub template_params: &'a [TemplateParam],
 }
 
 pub fn check_constructor_args(
@@ -196,6 +197,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         arg_can_be_byref,
         call_span,
         has_spread,
+        template_params,
     } = p;
 
     let variadic_index = params.iter().position(|p| p.is_variadic);
@@ -437,8 +439,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 && !param_ty.is_mixed()
                 && !arg_ty.is_mixed()
                 && !named_object_subtype(&arg_ty, param_ty, ea)
-                && !param_contains_template_or_unknown(param_ty, ea)
-                && !param_contains_template_or_unknown(&arg_ty, ea)
+                && !param_contains_template_or_unknown(param_ty, ea, template_params)
+                && !param_contains_template_or_unknown(&arg_ty, ea, template_params)
                 && !array_list_compatible(&arg_ty, param_ty, ea)
                 && !(arg_ty.is_single() && param_ty.is_subtype_of_simple(&arg_ty))
                 && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_of_simple(&arg_ty))
@@ -923,27 +925,53 @@ fn generic_ancestor_type_args_inner(
     )
 }
 
-fn param_contains_template_or_unknown(param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
-    param_ty.types.iter().any(|atomic| match atomic {
-        Atomic::TTemplateParam { .. } => true,
-        Atomic::TNamedObject { fqcn, .. } => {
-            !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
-        }
-        Atomic::TClassString(Some(inner)) => {
-            !inner.contains('\\') && !type_exists(ea, inner.as_ref())
-        }
-        Atomic::TArray { key: _, value }
-        | Atomic::TList { value }
-        | Atomic::TNonEmptyArray { key: _, value }
-        | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
+fn param_contains_template_or_unknown(
+    param_ty: &Union,
+    ea: &ExpressionAnalyzer<'_>,
+    template_params: &[TemplateParam],
+) -> bool {
+    let template_names: std::collections::HashSet<&str> =
+        template_params.iter().map(|tp| tp.name.as_ref()).collect();
+
+    fn check_union(
+        union: &Union,
+        template_names: &std::collections::HashSet<&str>,
+        ea: &ExpressionAnalyzer<'_>,
+    ) -> bool {
+        union.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
-            Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
+            Atomic::TNamedObject { fqcn, type_params } => {
+                // Check if this name itself is a template parameter
+                if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
+                    return true;
+                }
+                // Check if this is an unknown type
+                if !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref()) {
+                    return true;
+                }
+                // Recursively check type parameters
+                type_params
+                    .iter()
+                    .any(|tp| check_union(tp, template_names, ea))
             }
+            Atomic::TClassString(Some(inner)) => {
+                if inner.contains('\\') {
+                    false
+                } else if template_names.contains(inner.as_ref()) {
+                    true
+                } else {
+                    !type_exists(ea, inner.as_ref())
+                }
+            }
+            Atomic::TArray { key: _, value }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyArray { key: _, value }
+            | Atomic::TNonEmptyList { value } => check_union(value, template_names, ea),
             _ => false,
-        }),
-        _ => false,
-    })
+        })
+    }
+
+    check_union(param_ty, &template_names, ea)
 }
 
 fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {

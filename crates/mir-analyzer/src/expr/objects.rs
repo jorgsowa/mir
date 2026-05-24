@@ -117,13 +117,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                     }
-                    let ctor_params = crate::db::find_method_in_chain(
+                    let ctor_params_and_templates = crate::db::find_method_in_chain(
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                         "__construct",
                     )
-                    .map(|(_, s)| s.params.to_vec());
-                    if let Some(ctor_params) = ctor_params {
+                    .map(|(_, s)| (s.params.to_vec(), s.template_params.clone()));
+                    if let Some((ctor_params, ctor_templates)) = ctor_params_and_templates {
                         crate::call::check_constructor_args(
                             self,
                             &fqcn,
@@ -136,6 +136,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 arg_can_be_byref: &arg_can_be_byref,
                                 call_span,
                                 has_spread: n.args.iter().any(|a| a.unpack),
+                                template_params: &ctor_templates,
                             },
                         );
                     }
