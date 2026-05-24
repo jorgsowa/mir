@@ -8,11 +8,12 @@ use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessEx
 use std::sync::Arc;
 
 fn is_valid_class_name_type(ty: &Union) -> bool {
-    // Class names must be strings or class-string types
+    // Class names must be strings or class-string types.
+    // Mixed is allowed since it's already imprecise.
     ty.contains(|t| {
         matches!(
             t,
-            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_)
+            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_) | Atomic::TMixed
         )
     })
 }
@@ -174,10 +175,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     && !is_valid_class_name_type(&ty)
                 {
                     self.emit(
-                        IssueKind::UndefinedClass {
-                            name: "<dynamic>".to_string(),
+                        IssueKind::InvalidStringClass {
+                            actual: ty.to_string(),
                         },
-                        Severity::Error,
+                        Severity::Warning,
                         n.class.span,
                     );
                 }

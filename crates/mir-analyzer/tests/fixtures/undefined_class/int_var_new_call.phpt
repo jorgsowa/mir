@@ -5,6 +5,4 @@ intVarNewCall
                     $a = 5;
                     new $a();
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+InvalidStringClass@3:24: Dynamic class instantiation requires string or class-string type, got '5'

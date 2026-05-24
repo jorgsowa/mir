@@ -73,6 +73,9 @@ pub enum IssueKind {
     UndefinedTrait {
         name: String,
     },
+    InvalidStringClass {
+        actual: String,
+    },
 
     // --- Nullability --------------------------------------------------------
     NullArgument {
@@ -396,7 +399,8 @@ impl IssueKind {
             | IssueKind::OverriddenMethodAccess { .. }
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
-            | IssueKind::UnusedVariable { .. } => Severity::Warning,
+            | IssueKind::UnusedVariable { .. }
+            | IssueKind::InvalidStringClass { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -503,6 +507,7 @@ impl IssueKind {
             IssueKind::InvalidOperand { .. } => "MIR0208",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
+            IssueKind::InvalidStringClass { .. } => "MIR0211",
 
             // Array / offset (0300-0399)
             IssueKind::InvalidArrayOffset { .. } => "MIR0300",
@@ -591,6 +596,7 @@ impl IssueKind {
             IssueKind::UndefinedConstant { .. } => "UndefinedConstant",
             IssueKind::PossiblyUndefinedVariable { .. } => "PossiblyUndefinedVariable",
             IssueKind::UndefinedTrait { .. } => "UndefinedTrait",
+            IssueKind::InvalidStringClass { .. } => "InvalidStringClass",
             IssueKind::NullArgument { .. } => "NullArgument",
             IssueKind::NullPropertyFetch { .. } => "NullPropertyFetch",
             IssueKind::NullMethodCall { .. } => "NullMethodCall",
@@ -686,6 +692,9 @@ impl IssueKind {
                 format!("Variable ${name} might not be defined")
             }
             IssueKind::UndefinedTrait { name } => format!("Trait {name} does not exist"),
+            IssueKind::InvalidStringClass { actual } => {
+                format!("Dynamic class instantiation requires string or class-string type, got '{actual}'")
+            }
 
             IssueKind::NullArgument { param, fn_name } => {
                 format!("Argument ${param} of {fn_name}() cannot be null")

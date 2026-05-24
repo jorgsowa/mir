@@ -5,6 +5,4 @@ intVarStaticCall
                     $a = 5;
                     $a::bar();
 ===expect===
-UndefinedClass
-===ignore===
-TODO
+InvalidStringClass@3:20: Dynamic class instantiation requires string or class-string type, got '5'
