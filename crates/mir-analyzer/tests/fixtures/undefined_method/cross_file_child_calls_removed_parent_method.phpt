@@ -11,4 +11,4 @@ function test(): void {
     $c->foo();
 }
 ===expect===
-Child.php: UndefinedMethod@5:4: Method Child::foo() does not exist
+Child.php: UndefinedMethod@5:5: Method Child::foo() does not exist

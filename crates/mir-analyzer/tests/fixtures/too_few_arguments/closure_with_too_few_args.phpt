@@ -10,4 +10,4 @@ function test(callable $fn): void {
 }
 
 ===expect===
-TooFewArguments@6:4: Too few arguments for callable(): expected 2, got 1
+TooFewArguments@6:5: Too few arguments for callable(): expected 2, got 1

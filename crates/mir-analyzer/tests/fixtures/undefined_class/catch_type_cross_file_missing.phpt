@@ -16,6 +16,6 @@ function handle(): void {
     }
 }
 ===expect===
-Handler.php: MissingThrowsDocblock@6:8: Exception Exception is thrown but not declared in @throws
-Handler.php: UnusedVariable@7:12: Variable $e is never read
-Handler.php: UndefinedClass@8:13: Class App\MissingException does not exist
+Handler.php: MissingThrowsDocblock@6:9: Exception Exception is thrown but not declared in @throws
+Handler.php: UnusedVariable@7:13: Variable $e is never read
+Handler.php: UndefinedClass@8:14: Class App\MissingException does not exist

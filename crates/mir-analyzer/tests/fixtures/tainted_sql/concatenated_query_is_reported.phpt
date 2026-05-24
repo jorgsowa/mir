@@ -7,4 +7,4 @@ function run_query(mysqli $db): void {
     mysqli_query($db, $sql);
 }
 ===expect===
-TaintedSql@4:4: Tainted SQL query — possible SQL injection
+TaintedSql@4:5: Tainted SQL query — possible SQL injection

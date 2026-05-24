@@ -13,4 +13,4 @@ function callerNoThrows(): void {
     riskyOperation();
 }
 ===expect===
-MissingThrowsDocblock@10:4: Exception Exception is thrown but not declared in @throws
+MissingThrowsDocblock@10:5: Exception Exception is thrown but not declared in @throws

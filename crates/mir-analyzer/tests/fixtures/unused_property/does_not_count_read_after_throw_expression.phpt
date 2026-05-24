@@ -12,4 +12,4 @@ class Foo {
 }
 ===expect===
 UnusedProperty@3:4: Private property Foo::$name is never read
-UnreachableCode@7:8: Unreachable code detected
+UnreachableCode@7:9: Unreachable code detected

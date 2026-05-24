@@ -12,4 +12,4 @@ class Foo
 class Bar {}
                 
 ===expect===
-UnusedParam@5:32: Parameter $i is never used
+UnusedParam@5:33: Parameter $i is never used

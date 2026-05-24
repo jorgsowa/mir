@@ -5,4 +5,4 @@ undefinedClassConstant
 class A {}
 echo A::HELLO;
 ===expect===
-UndefinedConstant@3:5: Constant A::HELLO is not defined
+UndefinedConstant@3:6: Constant A::HELLO is not defined

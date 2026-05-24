@@ -6,4 +6,4 @@ $x = 42;
 /** @mir-check $x is string */
 echo $x;
 ===expect===
-TypeCheckMismatch@4:0: Type of $x is expected to be string, got int
+TypeCheckMismatch@4:1: Type of $x is expected to be string, got int

@@ -8,4 +8,4 @@ if (!isset($x) || $x->method()) {
     // If !isset($x) is false, then $x IS defined
 }
 ===expect===
-MixedMethodCall@2:18: Method method() called on mixed type
+MixedMethodCall@2:19: Method method() called on mixed type

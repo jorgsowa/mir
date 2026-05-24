@@ -21,4 +21,4 @@ function test(object $c): void {
     $c->get()->undefinedMethod();
 }
 ===expect===
-UndefinedMethod@18:4: Method Item::undefinedMethod() does not exist
+UndefinedMethod@18:5: Method Item::undefinedMethod() does not exist

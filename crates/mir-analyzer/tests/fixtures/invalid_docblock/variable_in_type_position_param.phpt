@@ -8,4 +8,4 @@ variable in type position param
 function foo(mixed $x): void {}
 ===expect===
 InvalidDocblock@2:0: Invalid docblock: @param contains variable `$invalid` in type position
-UnusedParam@5:13: Parameter $x is never used
+UnusedParam@5:14: Parameter $x is never used

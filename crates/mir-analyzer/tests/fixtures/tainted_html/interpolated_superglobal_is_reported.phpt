@@ -6,4 +6,4 @@ function render(): void {
     echo "Hello {$_GET['name']}";
 }
 ===expect===
-TaintedHtml@3:4: Tainted HTML output — possible XSS
+TaintedHtml@3:5: Tainted HTML output — possible XSS

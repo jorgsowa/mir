@@ -15,4 +15,4 @@ $child = new Child();
 
 $child->setString("five");
 ===expect===
-InvalidArgument@13:18: Argument $integer of setString() expects 'int', got '"five"'
+InvalidArgument@13:19: Argument $integer of setString() expects 'int', got '"five"'

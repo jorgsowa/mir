@@ -15,4 +15,4 @@ $child = new Child();
 
 $b = $child->setBool("hello", 5);
 ===expect===
-InvalidArgument@13:30: Argument $bar of setBool() expects 'string|bool', got '5'
+InvalidArgument@13:31: Argument $bar of setBool() expects 'string|bool', got '5'

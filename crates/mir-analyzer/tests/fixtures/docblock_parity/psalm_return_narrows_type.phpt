@@ -16,4 +16,4 @@ function test(): void {
     getProduct()->missing();
 }
 ===expect===
-UndefinedMethod@13:4: Method Product::missing() does not exist
+UndefinedMethod@13:5: Method Product::missing() does not exist

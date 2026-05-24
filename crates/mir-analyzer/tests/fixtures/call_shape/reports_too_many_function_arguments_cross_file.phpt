@@ -7,5 +7,5 @@ function greet(string $name): void {}
 <?php
 greet('Ada', 'Grace');
 ===expect===
-App.php: TooManyArguments@2:13: Too many arguments for greet(): expected 1, got 2
-Helper.php: UnusedParam@2:15: Parameter $name is never used
+App.php: TooManyArguments@2:14: Too many arguments for greet(): expected 1, got 2
+Helper.php: UnusedParam@2:16: Parameter $name is never used

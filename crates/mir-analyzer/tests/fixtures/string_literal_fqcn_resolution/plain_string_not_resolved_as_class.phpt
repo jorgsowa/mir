@@ -7,4 +7,3 @@ plainStringNotResolvedAsClass
 $className = "NonExistentClass";
 $instance = new $className();
 ===expect===
-

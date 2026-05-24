@@ -8,4 +8,4 @@ function f(string|int $x): void {
     }
 }
 ===expect===
-RedundantCondition@4:12: Condition is always true/false for type 'bool'
+RedundantCondition@4:13: Condition is always true/false for type 'bool'

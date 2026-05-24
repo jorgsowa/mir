@@ -7,4 +7,4 @@ $x = 3;
 $y = (int)$x;
 
 ===expect===
-RedundantCast@3:10: Casting '3' to 'int' is redundant
+RedundantCast@3:11: Casting '3' to 'int' is redundant

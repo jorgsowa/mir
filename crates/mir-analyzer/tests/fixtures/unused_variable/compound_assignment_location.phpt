@@ -16,4 +16,4 @@ function test() {
     $a++;
 }
 ===expect===
-UnusedVariable@6:4: Variable $y is never read
+UnusedVariable@6:5: Variable $y is never read

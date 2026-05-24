@@ -16,4 +16,4 @@ function createService($serviceName) {
 // SHOULD emit AbstractInstantiation because AbstractService is abstract
 createService(AbstractService::class);
 ===expect===
-AbstractInstantiation@10:15: Cannot instantiate abstract class AbstractService
+AbstractInstantiation@10:16: Cannot instantiate abstract class AbstractService

@@ -12,5 +12,5 @@ function foo(callable $c): void {}
 
 foo("B::bar");
 ===expect===
-UnusedParam@8:13: Parameter $c is never used
-UndefinedClass@10:4: Class B does not exist
+UnusedParam@8:14: Parameter $c is never used
+UndefinedClass@10:5: Class B does not exist

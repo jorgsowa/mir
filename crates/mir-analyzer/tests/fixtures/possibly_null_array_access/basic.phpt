@@ -9,4 +9,4 @@ function test(?array $arr): void {
     echo $arr[0];
 }
 ===expect===
-PossiblyNullArrayAccess@6:9: Cannot access array on possibly null value
+PossiblyNullArrayAccess@6:10: Cannot access array on possibly null value

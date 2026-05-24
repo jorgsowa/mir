@@ -4,4 +4,4 @@ isset short-circuit with && — no undefined error in true branch
 <?php
 if (isset($x) && $x->method()) {}
 ===expect===
-MixedMethodCall@2:17: Method method() called on mixed type
+MixedMethodCall@2:18: Method method() called on mixed type

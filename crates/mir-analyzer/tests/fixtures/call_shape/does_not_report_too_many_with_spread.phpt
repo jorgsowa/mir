@@ -6,4 +6,4 @@ function takes_one(int $a): void {}
 $arr = [1, 2, 3];
 takes_one(...$arr);
 ===expect===
-UnusedParam@2:19: Parameter $a is never used
+UnusedParam@2:20: Parameter $a is never used

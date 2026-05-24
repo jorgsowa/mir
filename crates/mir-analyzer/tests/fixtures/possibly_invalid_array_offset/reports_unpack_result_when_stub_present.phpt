@@ -7,5 +7,5 @@ function test(): void {
     var_dump($a);
 }
 ===expect===
-PossiblyInvalidArrayOffset@3:4: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'
-PossiblyInvalidArgument@3:23: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
+PossiblyInvalidArrayOffset@3:5: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'
+PossiblyInvalidArgument@3:24: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided

@@ -7,4 +7,4 @@ function foo(): int {
     $x = 2;
 }
 ===expect===
-UnreachableCode@4:4: Unreachable code detected
+UnreachableCode@4:5: Unreachable code detected

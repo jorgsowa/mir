@@ -7,4 +7,4 @@ function test(): void {
     echo $x->prop;
 }
 ===expect===
-NullPropertyFetch@4:9: Cannot access property $prop on null
+NullPropertyFetch@4:10: Cannot access property $prop on null

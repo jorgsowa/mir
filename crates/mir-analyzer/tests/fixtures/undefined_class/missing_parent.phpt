@@ -4,4 +4,4 @@ missingParent
 <?php
 class A extends B { }
 ===expect===
-UndefinedClass@2:16: Class B does not exist
+UndefinedClass@2:17: Class B does not exist

@@ -7,4 +7,4 @@ function first(): int {
     return $values[0];
 }
 ===expect===
-InvalidReturnType@4:4: Return type '"alpha"' is not compatible with declared 'int'
+InvalidReturnType@4:5: Return type '"alpha"' is not compatible with declared 'int'

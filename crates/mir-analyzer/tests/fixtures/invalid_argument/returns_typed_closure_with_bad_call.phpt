@@ -19,4 +19,4 @@ function foo(Closure $f, Closure $g) : Closure {
     };
 }
 ===expect===
-InvalidReturnType@15:8: Return type 'A' is not compatible with declared 'int'
+InvalidReturnType@15:9: Return type 'A' is not compatible with declared 'int'

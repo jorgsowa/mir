@@ -12,4 +12,4 @@ function countWord(string $output): int {
 <?php
 $result = countWord('some text with info here');
 ===expect===
-StringHelper.php: TooFewArguments@4:11: Too few arguments for substr_count(): expected 3, got 2
+StringHelper.php: TooFewArguments@4:12: Too few arguments for substr_count(): expected 3, got 2

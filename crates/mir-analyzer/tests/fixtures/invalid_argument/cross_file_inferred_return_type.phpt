@@ -14,4 +14,4 @@ function getFruit() {
     return new Apple();
 }
 ===expect===
-Consumer.php: InvalidArgument@4:15: Argument $n of requireInt() expects 'int', got 'Apple'
+Consumer.php: InvalidArgument@4:16: Argument $n of requireInt() expects 'int', got 'Apple'

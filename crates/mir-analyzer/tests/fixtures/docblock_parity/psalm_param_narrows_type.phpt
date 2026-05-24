@@ -15,4 +15,4 @@ function process($value): void {
     $value->missing();
 }
 ===expect===
-UndefinedMethod@12:4: Method User::missing() does not exist
+UndefinedMethod@12:5: Method User::missing() does not exist

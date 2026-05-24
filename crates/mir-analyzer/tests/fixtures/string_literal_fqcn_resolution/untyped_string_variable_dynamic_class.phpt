@@ -18,4 +18,4 @@ $name = "ValidClass";
 $obj = createInstance($name);
 $obj->method();
 ===expect===
-InvalidStringClass@11:15: Dynamic class instantiation requires string or class-string type, got 'mixed'
+InvalidStringClass@11:16: Dynamic class instantiation requires string or class-string type, got 'mixed'

@@ -11,4 +11,4 @@ function defineConstant() {
 
 echo CONSTANT;
 ===expect===
-UndefinedConstant@9:5: Constant CONSTANT is not defined
+UndefinedConstant@9:6: Constant CONSTANT is not defined

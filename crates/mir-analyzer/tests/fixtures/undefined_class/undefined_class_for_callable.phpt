@@ -7,5 +7,5 @@ class Foo {
 }
 new Foo(function() : void {});
 ===expect===
-UndefinedClass@3:32: Class UndefinedClass does not exist
-UnusedParam@3:32: Parameter $o is never used
+UndefinedClass@3:33: Class UndefinedClass does not exist
+UnusedParam@3:33: Parameter $o is never used

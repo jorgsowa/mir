@@ -6,4 +6,4 @@ Redundant cast from string literal to string
 $x = (string)"hello";
 
 ===expect===
-RedundantCast@2:13: Casting '"hello"' to 'string' is redundant
+RedundantCast@2:14: Casting '"hello"' to 'string' is redundant

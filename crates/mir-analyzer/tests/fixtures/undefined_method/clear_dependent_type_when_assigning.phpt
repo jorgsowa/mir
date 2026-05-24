@@ -21,4 +21,4 @@ function foo(A $a) : void {
     }
 }
 ===expect===
-UndefinedMethod@17:12: Method B::bar() does not exist
+UndefinedMethod@17:13: Method B::bar() does not exist

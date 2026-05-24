@@ -12,4 +12,4 @@ $a = match (get_class($a)) {
     A::class => $a->barBar(),
 };
 ===expect===
-UndefinedMethod@9:16: Method A::barBar() does not exist
+UndefinedMethod@9:17: Method A::barBar() does not exist

@@ -8,4 +8,4 @@ if (!isset($x) || doSomething($x)) {
     // After fix: $x in function call should be narrowed as defined
 }
 ===expect===
-UnusedParam@2:21: Parameter $obj is never used
+UnusedParam@2:22: Parameter $obj is never used

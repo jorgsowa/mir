@@ -290,25 +290,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     // Issue emission
     // -----------------------------------------------------------------------
 
-    /// Convert a byte offset to a Unicode char-count column on a given line.
-    /// Returns (line, col) where col is a 0-based Unicode code-point count.
     fn offset_to_line_col(&self, offset: u32) -> (u32, u16) {
-        let lc = self.source_map.offset_to_line_col(offset);
-        let line = lc.line + 1;
-
-        let byte_offset = offset as usize;
-        let line_start_byte = if byte_offset == 0 {
-            0
-        } else {
-            self.source[..byte_offset]
-                .rfind('\n')
-                .map(|p| p + 1)
-                .unwrap_or(0)
-        };
-
-        let col = self.source[line_start_byte..byte_offset].chars().count() as u16;
-
-        (line, col)
+        crate::diagnostics::offset_to_line_col(self.source, offset, self.source_map)
     }
 
     /// Convert an AST span to `(line, col_start, col_end)` for reference recording.

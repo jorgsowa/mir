@@ -8,4 +8,4 @@ if (someFunc() && (!isset($x) || $x->method())) {
     // After fix: $x should be narrowed in RHS of !isset($x) ||
 }
 ===expect===
-MixedMethodCall@3:33: Method method() called on mixed type
+MixedMethodCall@3:34: Method method() called on mixed type

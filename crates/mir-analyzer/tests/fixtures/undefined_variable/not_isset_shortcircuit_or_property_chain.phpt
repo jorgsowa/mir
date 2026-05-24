@@ -7,4 +7,4 @@ if (!isset($obj) || $obj->prop->method()) {
     // After fix: $obj should be narrowed as defined in RHS
 }
 ===expect===
-MixedMethodCall@2:20: Method method() called on mixed type
+MixedMethodCall@2:21: Method method() called on mixed type

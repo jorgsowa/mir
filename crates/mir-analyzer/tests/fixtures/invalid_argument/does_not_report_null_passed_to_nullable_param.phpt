@@ -5,4 +5,4 @@ does not report null passed to nullable param
 function f(?string $x): void {}
 function test(): void { f(null); }
 ===expect===
-UnusedParam@2:11: Parameter $x is never used
+UnusedParam@2:12: Parameter $x is never used

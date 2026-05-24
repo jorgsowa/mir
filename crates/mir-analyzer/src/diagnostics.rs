@@ -4,7 +4,7 @@ use crate::db::{resolve_name_via_db, type_exists_via_db, MirDatabase};
 use crate::php_version::PhpVersion;
 
 // ---------------------------------------------------------------------------
-// Offset to char-count column conversion
+// Offset to char-count column conversion (1-indexed)
 // ---------------------------------------------------------------------------
 
 pub(crate) fn offset_to_line_col(
@@ -25,7 +25,7 @@ pub(crate) fn offset_to_line_col(
             .unwrap_or(0)
     };
 
-    let col = source[line_start_byte..byte_offset].chars().count() as u16;
+    let col = (source[line_start_byte..byte_offset].chars().count() + 1) as u16;
 
     (line, col)
 }

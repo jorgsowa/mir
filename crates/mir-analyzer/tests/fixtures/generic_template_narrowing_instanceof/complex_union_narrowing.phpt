@@ -49,8 +49,8 @@ function threeWayCheck(Console|File|Memory $obj): void {
     }
 }
 ===expect===
-UnusedParam@11:24: Parameter $msg is never used
-UnusedParam@15:24: Parameter $msg is never used
-UnusedParam@19:24: Parameter $key is never used
-RedundantCondition@29:14: Condition is always true/false for type 'bool'
-UndefinedMethod@45:8: Method File::get() does not exist
+UnusedParam@11:25: Parameter $msg is never used
+UnusedParam@15:25: Parameter $msg is never used
+UnusedParam@19:25: Parameter $key is never used
+RedundantCondition@29:15: Condition is always true/false for type 'bool'
+UndefinedMethod@45:9: Method File::get() does not exist

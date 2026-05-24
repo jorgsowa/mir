@@ -6,4 +6,4 @@ function test(int $value) {
     $value::method();
 }
 ===expect===
-InvalidStringClass@3:4: Dynamic class instantiation requires string or class-string type, got 'int'
+InvalidStringClass@3:5: Dynamic class instantiation requires string or class-string type, got 'int'

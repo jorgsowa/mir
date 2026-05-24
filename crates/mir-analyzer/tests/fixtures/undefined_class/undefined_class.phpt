@@ -4,4 +4,4 @@ undefinedClass
 <?php
 (new Foo());
 ===expect===
-UndefinedClass@2:5: Class Foo does not exist
+UndefinedClass@2:6: Class Foo does not exist

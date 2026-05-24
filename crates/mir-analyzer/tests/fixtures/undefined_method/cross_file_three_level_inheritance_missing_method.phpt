@@ -16,4 +16,4 @@ function test(): void {
     $c->missing();
 }
 ===expect===
-Child.php: UndefinedMethod@5:4: Method Child::missing() does not exist
+Child.php: UndefinedMethod@5:5: Method Child::missing() does not exist

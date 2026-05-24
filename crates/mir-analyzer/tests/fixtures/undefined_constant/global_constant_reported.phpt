@@ -6,4 +6,4 @@ function test(): void {
     echo UNDEFINED_CONST;
 }
 ===expect===
-UndefinedConstant@3:9: Constant UNDEFINED_CONST is not defined
+UndefinedConstant@3:10: Constant UNDEFINED_CONST is not defined

@@ -17,4 +17,4 @@ function test(A&B $in): void {
 test(new C());
                 
 ===expect===
-InvalidArgument@14:5: Argument $in of test() expects 'A&B', got 'C'
+InvalidArgument@14:6: Argument $in of test() expects 'A&B', got 'C'

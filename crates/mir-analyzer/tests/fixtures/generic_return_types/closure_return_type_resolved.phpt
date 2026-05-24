@@ -17,4 +17,4 @@ function test(): void {
     $maker()->undefinedMethod();
 }
 ===expect===
-UndefinedMethod@14:4: Method Widget::undefinedMethod() does not exist
+UndefinedMethod@14:5: Method Widget::undefinedMethod() does not exist

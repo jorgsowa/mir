@@ -19,4 +19,4 @@ function test(ProductService $s): void {
     $s->get()->missing();
 }
 ===expect===
-UndefinedMethod@16:4: Method Product::missing() does not exist
+UndefinedMethod@16:5: Method Product::missing() does not exist

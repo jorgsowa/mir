@@ -18,4 +18,4 @@ function foo(int $x): void {
     echo $y;
 }
 ===expect===
-UndefinedVariable@13:9: Variable $y is not defined
+UndefinedVariable@13:10: Variable $y is not defined

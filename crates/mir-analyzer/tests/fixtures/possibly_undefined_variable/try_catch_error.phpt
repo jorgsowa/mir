@@ -11,4 +11,4 @@ function foo(): string {
     return $result;
 }
 ===expect===
-PossiblyUndefinedVariable@8:11: Variable $result might not be defined
+PossiblyUndefinedVariable@8:12: Variable $result might not be defined

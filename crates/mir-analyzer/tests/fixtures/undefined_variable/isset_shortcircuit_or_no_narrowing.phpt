@@ -7,5 +7,5 @@ if (isset($x) || $x->method()) {
     // Correctly should error: RHS runs when isset($x) is FALSE, so $x is undefined
 }
 ===expect===
-MixedMethodCall@2:17: Method method() called on mixed type
-UndefinedVariable@2:17: Variable $x is not defined
+MixedMethodCall@2:18: Method method() called on mixed type
+UndefinedVariable@2:18: Variable $x is not defined

@@ -17,4 +17,4 @@ function test(): void {
     $result['item']->undefinedMethod();
 }
 ===expect===
-UndefinedMethod@14:4: Method Item::undefinedMethod() does not exist
+UndefinedMethod@14:5: Method Item::undefinedMethod() does not exist

@@ -6,4 +6,4 @@ function test(mixed $value) {
     new $value();
 }
 ===expect===
-InvalidStringClass@3:8: Dynamic class instantiation requires string or class-string type, got 'mixed'
+InvalidStringClass@3:9: Dynamic class instantiation requires string or class-string type, got 'mixed'

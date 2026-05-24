@@ -8,4 +8,4 @@ function test(): void {
     $f->missing();
 }
 ===expect===
-UndefinedMethod@5:4: Method Foo::missing() does not exist
+UndefinedMethod@5:5: Method Foo::missing() does not exist

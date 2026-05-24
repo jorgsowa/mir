@@ -22,4 +22,4 @@ class C extends B {
     }
 }
 ===expect===
-PossiblyInvalidArgument@10:20: Argument $param of foo() expects 'string', possibly different type 'string|false' provided
+PossiblyInvalidArgument@10:21: Argument $param of foo() expects 'string', possibly different type 'string|false' provided

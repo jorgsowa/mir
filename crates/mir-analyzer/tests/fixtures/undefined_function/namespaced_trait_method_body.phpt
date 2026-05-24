@@ -10,4 +10,4 @@ namespace App {
     }
 }
 ===expect===
-UndefinedFunction@5:12: Function missing_function() is not defined
+UndefinedFunction@5:13: Function missing_function() is not defined

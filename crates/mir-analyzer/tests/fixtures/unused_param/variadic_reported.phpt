@@ -6,4 +6,4 @@ function sum(int ...$nums): int {
     return 0;
 }
 ===expect===
-UnusedParam@2:13: Parameter $nums is never used
+UnusedParam@2:14: Parameter $nums is never used

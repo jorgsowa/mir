@@ -10,4 +10,4 @@ function test(Direction $dir): mixed {
     return $dir->value;
 }
 ===expect===
-UndefinedProperty@7:17: Property Direction::$value does not exist
+UndefinedProperty@7:18: Property Direction::$value does not exist

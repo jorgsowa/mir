@@ -9,7 +9,7 @@ class C {
     }
 }
 ===expect===
-UndefinedClass@3:12: Class ExampleUnknownA does not exist
-UndefinedClass@3:28: Class ExampleUnknownB does not exist
-InvalidPropertyAssignment@5:8: Property $other expects 'ExampleUnknownA&ExampleUnknownB', cannot assign 'ExampleUnknownAB'
-UndefinedClass@5:27: Class ExampleUnknownAB does not exist
+UndefinedClass@3:13: Class ExampleUnknownA does not exist
+UndefinedClass@3:29: Class ExampleUnknownB does not exist
+InvalidPropertyAssignment@5:9: Property $other expects 'ExampleUnknownA&ExampleUnknownB', cannot assign 'ExampleUnknownAB'
+UndefinedClass@5:28: Class ExampleUnknownAB does not exist

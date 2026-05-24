@@ -9,5 +9,5 @@ function test(bool $flag): void {
     $x->foo();
 }
 ===expect===
-PossiblyNullMethodCall@4:4: Cannot call method foo() on possibly null value
-UndefinedMethod@4:4: Method stdClass::foo() does not exist
+PossiblyNullMethodCall@4:5: Cannot call method foo() on possibly null value
+UndefinedMethod@4:5: Method stdClass::foo() does not exist

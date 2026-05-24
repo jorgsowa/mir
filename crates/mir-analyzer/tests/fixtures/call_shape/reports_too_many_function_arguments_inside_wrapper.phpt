@@ -7,5 +7,5 @@ function wrap(): void {
     takes_one('a', 'b', 'c');
 }
 ===expect===
-UnusedParam@2:19: Parameter $s is never used
-TooManyArguments@4:19: Too many arguments for takes_one(): expected 1, got 3
+UnusedParam@2:20: Parameter $s is never used
+TooManyArguments@4:20: Too many arguments for takes_one(): expected 1, got 3

@@ -15,6 +15,6 @@ function wrap(): void {
     } catch (Entity $e) {}
 }
 ===expect===
-Service.php: UnusedVariable@5:4: Variable $x is never read
-Service.php: MissingThrowsDocblock@7:8: Exception Exception is thrown but not declared in @throws
-Service.php: UnusedVariable@8:12: Variable $e is never read
+Service.php: UnusedVariable@5:5: Variable $x is never read
+Service.php: MissingThrowsDocblock@7:9: Exception Exception is thrown but not declared in @throws
+Service.php: UnusedVariable@8:13: Variable $e is never read

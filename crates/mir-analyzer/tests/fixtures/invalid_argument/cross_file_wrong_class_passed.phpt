@@ -13,4 +13,4 @@ function test(): void {
     createUser(new Admin());
 }
 ===expect===
-Service.php: InvalidArgument@4:15: Argument $u of createUser() expects 'User', got 'Admin'
+Service.php: InvalidArgument@4:16: Argument $u of createUser() expects 'User', got 'Admin'

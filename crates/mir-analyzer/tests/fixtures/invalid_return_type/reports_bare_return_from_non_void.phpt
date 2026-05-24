@@ -6,4 +6,4 @@ function f(): int {
     return;
 }
 ===expect===
-InvalidReturnType@3:4: Return type 'void' is not compatible with declared 'int'
+InvalidReturnType@3:5: Return type 'void' is not compatible with declared 'int'

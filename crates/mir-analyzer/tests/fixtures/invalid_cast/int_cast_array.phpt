@@ -6,4 +6,4 @@ Invalid explicit cast from array to int
 $x = (int)[];
 
 ===expect===
-InvalidCast@2:10: Cannot cast 'array{}' to 'int'
+InvalidCast@2:11: Cannot cast 'array{}' to 'int'

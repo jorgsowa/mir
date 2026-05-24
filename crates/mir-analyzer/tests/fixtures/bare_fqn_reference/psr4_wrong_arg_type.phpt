@@ -15,4 +15,4 @@ function run(): void {
     $m->send(42);
 }
 ===expect===
-App.php: InvalidArgument@4:13: Argument $address of send() expects 'string', got '42'
+App.php: InvalidArgument@4:14: Argument $address of send() expects 'string', got '42'

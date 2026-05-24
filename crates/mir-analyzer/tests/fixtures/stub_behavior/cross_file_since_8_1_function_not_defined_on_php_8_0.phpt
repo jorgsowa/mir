@@ -11,4 +11,4 @@ function check_is_list(array $items): void {
 <?php
 check_is_list([1, 2, 3]);
 ===expect===
-ArrayHelper.php: UndefinedFunction@3:4: Function array_is_list() is not defined
+ArrayHelper.php: UndefinedFunction@3:5: Function array_is_list() is not defined

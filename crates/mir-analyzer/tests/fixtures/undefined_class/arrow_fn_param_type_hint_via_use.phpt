@@ -5,4 +5,4 @@ arrow fn param type hint via use
 use Vendor\Missing\Foo;
 $fn = fn(Foo $x) => $x;
 ===expect===
-UndefinedClass@3:9: Class Vendor\Missing\Foo does not exist
+UndefinedClass@3:10: Class Vendor\Missing\Foo does not exist

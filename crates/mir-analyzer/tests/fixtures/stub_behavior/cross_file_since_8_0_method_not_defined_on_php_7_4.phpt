@@ -11,4 +11,4 @@ function from_interface(\DateTimeInterface $dt): void {
 <?php
 from_interface(new DateTime());
 ===expect===
-DateHelper.php: UndefinedMethod@3:4: Method DateTimeImmutable::createFromInterface() does not exist
+DateHelper.php: UndefinedMethod@3:5: Method DateTimeImmutable::createFromInterface() does not exist

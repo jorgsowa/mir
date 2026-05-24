@@ -9,4 +9,4 @@ function test() {
     echo $$key;
 }
 ===expect===
-UnusedVariable@3:4: Variable $unused is never read
+UnusedVariable@3:5: Variable $unused is never read

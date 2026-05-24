@@ -19,4 +19,4 @@ function test(mixed $value): void {
     $value->missing();
 }
 ===expect===
-UndefinedMethod@16:4: Method User::missing() does not exist
+UndefinedMethod@16:5: Method User::missing() does not exist

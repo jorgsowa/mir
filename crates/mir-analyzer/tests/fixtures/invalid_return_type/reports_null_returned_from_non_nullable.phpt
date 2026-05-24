@@ -6,4 +6,4 @@ function f(): string {
     return null;
 }
 ===expect===
-InvalidReturnType@3:4: Return type 'null' is not compatible with declared 'string'
+InvalidReturnType@3:5: Return type 'null' is not compatible with declared 'string'

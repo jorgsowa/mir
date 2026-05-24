@@ -37,6 +37,6 @@ function test(): void {
     reduce($fn3);
 }
 ===expect===
-UnusedParam@8:29: Parameter $processor is never used
-UnusedParam@15:24: Parameter $transform is never used
-UnusedParam@21:16: Parameter $reducer is never used
+UnusedParam@8:30: Parameter $processor is never used
+UnusedParam@15:25: Parameter $transform is never used
+UnusedParam@21:17: Parameter $reducer is never used

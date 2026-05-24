@@ -9,4 +9,4 @@ function test(): void {
     var_dump($a, $b);
 }
 ===expect===
-PossiblyInvalidArrayOffset@5:4: Array offset might be invalid: expects 'array', got 'array<mixed, mixed>|false'
+PossiblyInvalidArrayOffset@5:5: Array offset might be invalid: expects 'array', got 'array<mixed, mixed>|false'

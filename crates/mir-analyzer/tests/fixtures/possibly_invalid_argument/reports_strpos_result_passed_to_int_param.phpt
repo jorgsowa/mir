@@ -7,4 +7,4 @@ function test(string $haystack, string $needle): void {
     takesInt(strpos($haystack, $needle));
 }
 ===expect===
-PossiblyInvalidArgument@4:13: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
+PossiblyInvalidArgument@4:14: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
