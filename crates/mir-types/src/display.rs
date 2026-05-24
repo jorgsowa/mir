@@ -18,6 +18,7 @@ impl fmt::Display for Atomic {
         match self {
             Atomic::TString => write!(f, "string"),
             Atomic::TLiteralString(s) => write!(f, "\"{s}\""),
+            Atomic::TCallableString => write!(f, "callable-string"),
             Atomic::TClassString(None) => write!(f, "class-string"),
             Atomic::TClassString(Some(cls)) => write!(f, "class-string<{cls}>"),
             Atomic::TNonEmptyString => write!(f, "non-empty-string"),

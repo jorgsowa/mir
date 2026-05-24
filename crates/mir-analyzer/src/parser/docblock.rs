@@ -604,7 +604,7 @@ pub fn parse_type_string(s: &str) -> Union {
             params: None,
             return_type: None,
         }),
-        "callable-string" => Union::single(Atomic::TString),
+        "callable-string" => Union::single(Atomic::TCallableString),
         "iterable" => Union::single(Atomic::TArray {
             key: Box::new(Union::single(Atomic::TMixed)),
             value: Box::new(Union::mixed()),

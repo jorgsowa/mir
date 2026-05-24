@@ -95,6 +95,8 @@ pub enum Atomic {
     TString,
     /// `"hello"` — a specific string literal
     TLiteralString(Arc<str>),
+    /// `callable-string` — a string containing a callable name
+    TCallableString,
     /// `class-string` or `class-string<T>`
     TClassString(Option<Symbol>),
     /// `non-empty-string`
@@ -304,6 +306,7 @@ impl Atomic {
             self,
             Atomic::TString
                 | Atomic::TLiteralString(_)
+                | Atomic::TCallableString
                 | Atomic::TClassString(_)
                 | Atomic::TNonEmptyString
                 | Atomic::TNumericString
@@ -361,6 +364,7 @@ impl Atomic {
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
             | Atomic::TNumericString => "string",
+            Atomic::TCallableString => "callable-string",
             Atomic::TClassString(_) => "class-string",
             Atomic::TInt | Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => "int",
             Atomic::TPositiveInt => "positive-int",
@@ -420,6 +424,7 @@ impl Hash for FnParam {
 enum AtomicTag {
     TString = 0,
     TLiteralString,
+    TCallableString,
     TClassString,
     TNonEmptyString,
     TNumericString,
@@ -467,6 +472,7 @@ impl Hash for Atomic {
         match self {
             // --- tag-only variants ---
             Atomic::TString => (T::TString as u8).hash(state),
+            Atomic::TCallableString => (T::TCallableString as u8).hash(state),
             Atomic::TNonEmptyString => (T::TNonEmptyString as u8).hash(state),
             Atomic::TNumericString => (T::TNumericString as u8).hash(state),
             Atomic::TInt => (T::TInt as u8).hash(state),

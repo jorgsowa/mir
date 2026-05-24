@@ -736,9 +736,14 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             let _ = s;
             true
         }
+        (Atomic::TLiteralString(s), Atomic::TCallableString) => {
+            let _ = s;
+            true
+        }
         (Atomic::TLiteralString(s), Atomic::TNonEmptyString) => !s.is_empty(),
         (Atomic::TLiteralString(_), Atomic::TScalar) => true,
         (Atomic::TNonEmptyString, Atomic::TString) => true,
+        (Atomic::TCallableString, Atomic::TString) => true,
         (Atomic::TNumericString, Atomic::TString) => true,
         (Atomic::TClassString(_), Atomic::TString) => true,
         (Atomic::TInterfaceString, Atomic::TString) => true,

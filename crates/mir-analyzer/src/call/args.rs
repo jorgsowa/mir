@@ -1072,8 +1072,8 @@ fn validate_callable_argument(
     arg_ty: &Union,
     arg_span: Span,
 ) {
-    // Only validate if parameter is callable
-    if !param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TString)) {
+    // Only validate if parameter is callable or documented as callable-string
+    if !param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TCallableString)) {
         return;
     }
 
