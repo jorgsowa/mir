@@ -7,6 +7,7 @@ class Foo {
 }
 function test(?Foo $obj): void {
     if ($obj !== null) {
+        /** @mir-check $obj is Foo */
         echo $obj->value;
     }
 }

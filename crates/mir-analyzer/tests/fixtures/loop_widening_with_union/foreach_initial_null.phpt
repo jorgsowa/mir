@@ -13,6 +13,6 @@ $result = null;
 foreach ($items as $item) {
     $result = $item->transform();
 }
-// $result should be string|null, not mixed
+/** @mir-check $result is string|null */
 echo $result;
 ===expect===

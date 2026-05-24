@@ -7,6 +7,7 @@ class Foo {
 }
 
 $f = new Foo();
+/** @mir-check $f is Foo */
 $f->name = 42;
 ===expect===
-InvalidPropertyAssignment@7:0: Property $name expects 'string', cannot assign '42'
+InvalidPropertyAssignment@8:0: Property $name expects 'string', cannot assign '42'

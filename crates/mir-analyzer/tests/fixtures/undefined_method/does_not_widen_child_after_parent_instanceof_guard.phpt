@@ -12,6 +12,7 @@ function test(object $value): void {
     if (!$value instanceof Base) {
         return;
     }
+    /** @mir-check $value is Child */
     $value->childOnly();
 }
 ===expect===
