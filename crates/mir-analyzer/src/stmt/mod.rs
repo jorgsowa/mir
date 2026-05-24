@@ -13,6 +13,8 @@ use return_type::resolve_union_for_file;
 
 use std::sync::Arc;
 
+use crate::parser::docblock::parse_type_string;
+
 use php_ast::owned::StmtKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
@@ -147,6 +149,30 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(ref ann) = var_annotation {
             if let Some(ref name) = ann.name {
                 ctx.set_var(name.as_str(), ann.ty.clone());
+            }
+        }
+
+        // Check `@mir-check` directives
+        let mir_checks = self.extract_mir_checks_from(doc.as_deref());
+        let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
+        for (var_name, expected_str) in mir_checks {
+            let expected = parse_type_string(&expected_str);
+            let actual = ctx.get_var(&var_name);
+            if expected.to_string() != actual.to_string() {
+                self.issues.add(Issue::new(
+                    IssueKind::TypeCheckMismatch {
+                        var: var_name,
+                        expected: expected.to_string(),
+                        actual: actual.to_string(),
+                    },
+                    Location {
+                        file: self.file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
+                    },
+                ));
             }
         }
 
@@ -378,6 +404,30 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
         suppressions
+    }
+
+    /// Extract `@mir-check` directives from a docblock string.
+    /// Returns Vec<(var_name, type_string)> for each `@mir-check $var is TYPE` found.
+    fn extract_mir_checks_from(&self, doc: Option<&str>) -> Vec<(String, String)> {
+        let Some(doc) = doc else {
+            return vec![];
+        };
+        let mut checks = Vec::new();
+        for line in doc.lines() {
+            let line = line.trim().trim_start_matches('*').trim();
+            let Some(rest) = line.strip_prefix("@mir-check ") else {
+                continue;
+            };
+
+            if let Some((var_part, type_part)) = rest.split_once(" is ") {
+                let var_name = var_part.trim().trim_start_matches('$').to_string();
+                let type_string = type_part.trim().to_string();
+                if !var_name.is_empty() && !type_string.is_empty() {
+                    checks.push((var_name, type_string));
+                }
+            }
+        }
+        checks
     }
 
     /// Extract a `@var` annotation from a parsed docblock string.

@@ -163,6 +163,11 @@ pub enum IssueKind {
         declared: String,
         inferred: String,
     },
+    TypeCheckMismatch {
+        var: String,
+        expected: String,
+        actual: String,
+    },
 
     // --- Array issues -------------------------------------------------------
     InvalidArrayOffset {
@@ -382,7 +387,8 @@ impl IssueKind {
             | IssueKind::TaintedShell
             | IssueKind::CircularInheritance { .. }
             | IssueKind::InvalidTraitUse { .. }
-            | IssueKind::UndefinedTrait { .. } => Severity::Error,
+            | IssueKind::UndefinedTrait { .. }
+            | IssueKind::TypeCheckMismatch { .. } => Severity::Error,
 
             // Warnings (shown at default error level)
             IssueKind::NullArgument { .. }
@@ -508,6 +514,7 @@ impl IssueKind {
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
             IssueKind::InvalidStringClass { .. } => "MIR0211",
+            IssueKind::TypeCheckMismatch { .. } => "MIR0212",
 
             // Array / offset (0300-0399)
             IssueKind::InvalidArrayOffset { .. } => "MIR0300",
@@ -618,6 +625,7 @@ impl IssueKind {
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
+            IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
             IssueKind::InvalidArrayOffset { .. } => "InvalidArrayOffset",
             IssueKind::NonExistentArrayOffset { .. } => "NonExistentArrayOffset",
             IssueKind::PossiblyInvalidArrayOffset { .. } => "PossiblyInvalidArrayOffset",
@@ -794,6 +802,13 @@ impl IssueKind {
                 format!(
                     "Docblock type '{declared}' for ${param} does not match inferred '{inferred}'"
                 )
+            }
+            IssueKind::TypeCheckMismatch {
+                var,
+                expected,
+                actual,
+            } => {
+                format!("Type of ${var} is expected to be {expected}, got {actual}")
             }
 
             IssueKind::InvalidArrayOffset { expected, actual } => {
@@ -1200,6 +1215,11 @@ mod code_tests {
                 declared: s(),
                 inferred: s(),
             },
+            IssueKind::TypeCheckMismatch {
+                var: s(),
+                expected: s(),
+                actual: s(),
+            },
             IssueKind::InvalidArrayOffset {
                 expected: s(),
                 actual: s(),
@@ -1390,9 +1410,9 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 76 = current variant count. If this assertion fires after you added
+        // 77 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 76);
+        assert_eq!(one_of_each().len(), 77);
     }
 }
