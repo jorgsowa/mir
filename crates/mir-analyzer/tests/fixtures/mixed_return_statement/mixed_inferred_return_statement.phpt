@@ -2,9 +2,9 @@
 mixedInferredReturnStatement
 ===file===
 <?php
-                    function fooFoo(array $arr): string {
-                        return array_pop($arr);
-                    }
+function fooFoo(array $arr): string {
+    return array_pop($arr);
+}
 ===expect===
 MixedReturnStatement
 ===ignore===

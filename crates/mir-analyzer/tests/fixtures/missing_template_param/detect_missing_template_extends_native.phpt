@@ -2,8 +2,8 @@
 detectMissingTemplateExtendsNative
 ===file===
 <?php
-                    final class C extends ArrayObject {}
-                
+final class C extends ArrayObject {}
+
 ===expect===
 MissingTemplateParam
 ===ignore===

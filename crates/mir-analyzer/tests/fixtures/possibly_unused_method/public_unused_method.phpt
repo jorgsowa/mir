@@ -2,12 +2,12 @@
 publicUnusedMethod
 ===file===
 <?php
-                    final class A {
-                        /** @return void */
-                        public function foo() {}
-                    }
+final class A {
+    /** @return void */
+    public function foo() {}
+}
 
-                    new A();
+new A();
 ===expect===
 PossiblyUnusedMethod
 ===ignore===

@@ -2,15 +2,15 @@
 alreadyHasmethod
 ===file===
 <?php
-                    class A {
-                        public function foo() : void {}
-                    }
+class A {
+    public function foo() : void {}
+}
 
-                    function foo(A $a) : void {
-                        if (method_exists($a, "foo")) {
-                            $object->foo();
-                        }
-                    }
+function foo(A $a) : void {
+    if (method_exists($a, "foo")) {
+        $object->foo();
+    }
+}
 ===expect===
 RedundantCondition
 ===ignore===

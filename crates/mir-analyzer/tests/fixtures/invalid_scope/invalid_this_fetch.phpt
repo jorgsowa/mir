@@ -2,7 +2,7 @@
 invalidThisFetch
 ===file===
 <?php
-                    echo $this;
+echo $this;
 ===expect===
 InvalidScope
 ===ignore===

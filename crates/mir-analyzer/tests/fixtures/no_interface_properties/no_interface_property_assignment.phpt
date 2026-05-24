@@ -2,11 +2,11 @@
 noInterfacePropertyAssignment
 ===file===
 <?php
-                    interface A { }
+interface A { }
 
-                    function fooFoo(A $a): void {
-                        $a->bar = 5;
-                    }
+function fooFoo(A $a): void {
+    $a->bar = 5;
+}
 ===expect===
 NoInterfaceProperties
 ===ignore===

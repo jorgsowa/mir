@@ -2,7 +2,7 @@
 invalidBooleanBitwiseNot
 ===file===
 <?php
-                    $a = ~true;
+$a = ~true;
 ===expect===
 InvalidOperand
 ===ignore===

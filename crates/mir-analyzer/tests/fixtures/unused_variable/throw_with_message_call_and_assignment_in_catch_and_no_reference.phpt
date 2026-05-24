@@ -2,24 +2,24 @@
 throwWithMessageCallAndAssignmentInCatchAndNoReference
 ===file===
 <?php
-                    function dangerous(): string {
-                        if (rand(0, 1)) {
-                            throw new Exception("bad");
-                        }
+function dangerous(): string {
+    if (rand(0, 1)) {
+        throw new Exception("bad");
+    }
 
-                        return "hello";
-                    }
+    return "hello";
+}
 
-                    function callDangerous(): void {
-                        $s = null;
+function callDangerous(): void {
+    $s = null;
 
-                        try {
-                            dangerous();
-                        } catch (Exception $e) {
-                            echo $e->getMessage();
-                            $s = "hello";
-                        }
-                    }
+    try {
+        dangerous();
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        $s = "hello";
+    }
+}
 ===expect===
 UnusedVariable
 ===ignore===

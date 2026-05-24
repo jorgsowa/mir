@@ -2,16 +2,16 @@
 possiblyInvalidArgumentWithOverlap
 ===file===
 <?php
-                    class A {}
-                    class B {}
-                    class C {}
+class A {}
+class B {}
+class C {}
 
-                    $foo = rand(0, 1) ? new A : new B;
+$foo = rand(0, 1) ? new A : new B;
 
-                    /** @param B|C $b */
-                    function bar($b) : void {}
+/** @param B|C $b */
+function bar($b) : void {}
 
-                    bar($foo);
+bar($foo);
 ===expect===
 PossiblyInvalidArgument
 ===ignore===

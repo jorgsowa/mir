@@ -2,8 +2,8 @@
 traitCannotBeAttributeClass
 ===file===
 <?php
-                    #[Attribute]
-                    trait Foo {}
+#[Attribute]
+trait Foo {}
 ===expect===
 InvalidAttribute
 ===ignore===

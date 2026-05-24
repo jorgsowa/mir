@@ -2,8 +2,8 @@
 specificErrorMessage
 ===file===
 <?php
-                    $params = ["key" => "value"];
-                    echo $params["fieldName"];
+$params = ["key" => "value"];
+echo $params["fieldName"];
 ===expect===
 InvalidArrayOffset
 ===ignore===

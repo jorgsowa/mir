@@ -2,19 +2,19 @@
 docblockReadonlyPropertySetInConstructorAndAlsoOutsideClass
 ===file===
 <?php
-                    class A {
-                        /**
-                         * @readonly
-                         */
-                        public string $bar;
+class A {
+    /**
+     * @readonly
+     */
+    public string $bar;
 
-                        public function __construct() {
-                            $this->bar = "hello";
-                        }
-                    }
+    public function __construct() {
+        $this->bar = "hello";
+    }
+}
 
-                    $a = new A();
-                    $a->bar = "goodbye";
+$a = new A();
+$a->bar = "goodbye";
 ===expect===
 InaccessibleProperty
 ===ignore===

@@ -2,12 +2,12 @@
 preventStringDocblockType
 ===file===
 <?php
-                    /**
-                     * @param string $mapper
-                     */
-                    function map2(callable $mapper): void {}
+/**
+ * @param string $mapper
+ */
+function map2(callable $mapper): void {}
 
-                    map2("foo");
+map2("foo");
 ===expect===
 MismatchingDocblockParamType
 ===ignore===

@@ -2,15 +2,15 @@
 varReassignedInBothBranchesOfIf
 ===file===
 <?php
-                    $a = "foo";
+$a = "foo";
 
-                    if (rand(0, 1)) {
-                        $a = "bar";
-                    } else {
-                        $a = "bat";
-                    }
+if (rand(0, 1)) {
+    $a = "bar";
+} else {
+    $a = "bat";
+}
 
-                    echo $a;
+echo $a;
 ===expect===
 UnusedVariable
 ===ignore===

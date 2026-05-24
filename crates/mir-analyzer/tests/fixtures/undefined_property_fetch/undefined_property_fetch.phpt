@@ -2,10 +2,10 @@
 undefinedPropertyFetch
 ===file===
 <?php
-                    class A {
-                    }
+class A {
+}
 
-                    echo (new A)->foo;
+echo (new A)->foo;
 ===expect===
 UndefinedPropertyFetch
 ===ignore===

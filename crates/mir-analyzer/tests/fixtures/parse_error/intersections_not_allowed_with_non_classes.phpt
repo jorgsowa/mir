@@ -2,11 +2,11 @@
 intersectionsNotAllowedWithNonClasses
 ===file===
 <?php
-                    interface A {
-                    }
-                    function foo (A&string $test): A&string {
-                        return $test;
-                    }
+interface A {
+}
+function foo (A&string $test): A&string {
+    return $test;
+}
 ===expect===
 ParseError
 ===ignore===

@@ -2,15 +2,15 @@
 mixedPropertyFetch
 ===file===
 <?php
-                    class Foo {
-                        /** @var string */
-                        public $foo = "";
-                    }
+class Foo {
+    /** @var string */
+    public $foo = "";
+}
 
-                    /** @var mixed */
-                    $a = (new Foo());
+/** @var mixed */
+$a = (new Foo());
 
-                    echo $a->foo;
+echo $a->foo;
 ===expect===
 MixedPropertyFetch
 ===ignore===

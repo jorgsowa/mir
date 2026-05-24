@@ -2,9 +2,9 @@
 simpleUnusedVariable
 ===file===
 <?php
-                    $a = 5;
-                    $b = [];
-                    echo $a;
+$a = 5;
+$b = [];
+echo $a;
 ===expect===
 UnusedVariable
 ===ignore===

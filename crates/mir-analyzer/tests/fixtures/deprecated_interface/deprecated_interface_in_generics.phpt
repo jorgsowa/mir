@@ -2,12 +2,12 @@
 deprecatedInterfaceInGenerics
 ===file===
 <?php
-                    /** @deprecated */
-                    interface MyInterface {}
+/** @deprecated */
+interface MyInterface {}
 
-                    /** @extends ArrayObject<array-key, MyInterface> */
-                    class MyClass extends ArrayObject {}
-                
+/** @extends ArrayObject<array-key, MyInterface> */
+class MyClass extends ArrayObject {}
+
 ===expect===
 DeprecatedInterface
 ===ignore===

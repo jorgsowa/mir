@@ -2,9 +2,9 @@
 attributeInvalidTargetFunction
 ===file===
 <?php
-                    #[Attribute]
-                    function foo(): void {}
-                
+#[Attribute]
+function foo(): void {}
+
 ===expect===
 InvalidAttribute
 ===ignore===

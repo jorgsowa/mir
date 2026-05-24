@@ -2,11 +2,11 @@
 noCrashWithEmptyMatch
 ===file===
 <?php
-                    function foo(int $i) {
-                        match ($i) {
+function foo(int $i) {
+    match ($i) {
 
-                        };
-                    }
+    };
+}
 ===expect===
 UnhandledMatchCondition
 ===ignore===

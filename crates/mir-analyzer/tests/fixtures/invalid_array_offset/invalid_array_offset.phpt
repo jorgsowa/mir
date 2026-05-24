@@ -2,8 +2,8 @@
 invalidArrayOffset
 ===file===
 <?php
-                    $x = ["a"];
-                    $y = $x["b"];
+$x = ["a"];
+$y = $x["b"];
 ===expect===
 InvalidArrayOffset
 ===ignore===

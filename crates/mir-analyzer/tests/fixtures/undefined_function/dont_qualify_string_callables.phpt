@@ -2,15 +2,15 @@
 dontQualifyStringCallables
 ===file===
 <?php
-                    namespace NS;
+namespace NS;
 
-                    function ff() : void {}
+function ff() : void {}
 
-                    function run(callable $f) : void {
-                        $f();
-                    }
+function run(callable $f) : void {
+    $f();
+}
 
-                    run("ff");
+run("ff");
 ===expect===
 UndefinedFunction
 ===ignore===

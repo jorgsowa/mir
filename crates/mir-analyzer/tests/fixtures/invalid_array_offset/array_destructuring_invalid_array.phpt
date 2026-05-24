@@ -2,9 +2,9 @@
 arrayDestructuringInvalidArray
 ===file===
 <?php
-                    $a = 42;
+$a = 42;
 
-                    [$id2, $name2] = $a;
+[$id2, $name2] = $a;
 ===expect===
 InvalidArrayOffset
 ===ignore===

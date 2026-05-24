@@ -2,7 +2,7 @@
 circularReference
 ===file===
 <?php
-                    class A extends A {}
+class A extends A {}
 ===expect===
 CircularReference
 ===ignore===

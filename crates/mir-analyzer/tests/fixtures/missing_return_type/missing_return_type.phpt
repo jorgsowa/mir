@@ -2,9 +2,9 @@
 missingReturnType
 ===file===
 <?php
-                    interface foo {
-                        public function withoutAnyReturnType();
-                    }
+interface foo {
+    public function withoutAnyReturnType();
+}
 ===expect===
 MissingReturnType
 ===ignore===

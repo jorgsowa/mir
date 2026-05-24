@@ -2,15 +2,15 @@
 deprecatedEnumCaseFetchAttr
 ===file===
 <?php
-                    enum Foo {
-                        case A;
+enum Foo {
+    case A;
 
-                        #[Deprecated]
-                        case B;
-                    }
+    #[Deprecated]
+    case B;
+}
 
-                    Foo::B;
-                
+Foo::B;
+
 ===expect===
 DeprecatedConstant
 ===ignore===

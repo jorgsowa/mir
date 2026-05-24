@@ -2,8 +2,8 @@
 invalidBackingType
 ===file===
 <?php
-                    enum Status: array {}
-                
+enum Status: array {}
+
 ===expect===
 InvalidEnumBackingType
 ===ignore===

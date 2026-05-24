@@ -2,7 +2,7 @@
 dateTimeNullFirstArg
 ===file===
 <?php
-                    $date = new DateTime(null);
+$date = new DateTime(null);
 ===expect===
 NullArgument
 ===ignore===

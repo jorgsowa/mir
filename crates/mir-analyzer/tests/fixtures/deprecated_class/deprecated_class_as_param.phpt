@@ -2,12 +2,12 @@
 deprecatedClassAsParam
 ===file===
 <?php
-                    /**
-                     * @deprecated
-                     */
-                    class DeprecatedClass{}
+/**
+ * @deprecated
+ */
+class DeprecatedClass{}
 
-                    function foo(DeprecatedClass $deprecatedClass): void {}
+function foo(DeprecatedClass $deprecatedClass): void {}
 ===expect===
 DeprecatedClass
 ===ignore===

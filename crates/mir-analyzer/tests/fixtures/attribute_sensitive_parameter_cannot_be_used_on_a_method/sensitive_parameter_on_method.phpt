@@ -3,17 +3,17 @@ sensitiveParameterOnMethod
 ===file===
 <?php
 
-                    namespace SensitiveParameter;
+namespace SensitiveParameter;
 
-                    use SensitiveParameter;
+use SensitiveParameter;
 
-                    class HelloWorld {
-                        #[SensitiveParameter]
-                        public function __construct(
-                            string $password
-                        ) {}
-                    }
-                
+class HelloWorld {
+    #[SensitiveParameter]
+    public function __construct(
+        string $password
+    ) {}
+}
+
 ===expect===
 Attribute SensitiveParameter cannot be used on a method
 ===ignore===

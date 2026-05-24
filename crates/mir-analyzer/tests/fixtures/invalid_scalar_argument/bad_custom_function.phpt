@@ -2,16 +2,16 @@
 badCustomFunction
 ===file===
 <?php
-                    /**
-                     * @param callable(int):bool $func
-                     */
-                    function takesFunction(callable $func) : void {}
+/**
+ * @param callable(int):bool $func
+ */
+function takesFunction(callable $func) : void {}
 
-                    function myFunction( string $foo ) : bool {
-                        return false;
-                    }
+function myFunction( string $foo ) : bool {
+    return false;
+}
 
-                    takesFunction("myFunction");
+takesFunction("myFunction");
 ===expect===
 InvalidScalarArgument
 ===ignore===

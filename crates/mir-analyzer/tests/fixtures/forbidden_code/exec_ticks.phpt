@@ -2,7 +2,7 @@
 execTicks
 ===file===
 <?php
-                    `rm -rf`;
+`rm -rf`;
 ===expect===
 ForbiddenCode
 ===ignore===

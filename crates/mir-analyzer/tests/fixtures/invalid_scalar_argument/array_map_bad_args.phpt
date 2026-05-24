@@ -2,11 +2,11 @@
 arrayMapBadArgs
 ===file===
 <?php
-                    function foo(int $i) : bool {
-                      return true;
-                    }
+function foo(int $i) : bool {
+  return true;
+}
 
-                    array_map("foo", ["hello"]);
+array_map("foo", ["hello"]);
 ===expect===
 InvalidScalarArgument
 ===ignore===

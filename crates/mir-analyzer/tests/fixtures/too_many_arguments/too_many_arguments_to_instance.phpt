@@ -2,11 +2,11 @@
 tooManyArgumentsToInstance
 ===file===
 <?php
-                    class A {
-                        public function fooFoo(int $a): void {}
-                    }
+class A {
+    public function fooFoo(int $a): void {}
+}
 
-                    (new A)->fooFoo(5, "dfd");
+(new A)->fooFoo(5, "dfd");
 ===expect===
 TooManyArguments
 ===ignore===

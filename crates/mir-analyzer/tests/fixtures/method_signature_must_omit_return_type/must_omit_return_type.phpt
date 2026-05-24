@@ -2,12 +2,12 @@
 mustOmitReturnType
 ===file===
 <?php
-                    class A
-                    {
-                        public function __construct(): void
-                        {
-                        }
-                    }
+class A
+{
+    public function __construct(): void
+    {
+    }
+}
 ===expect===
 MethodSignatureMustOmitReturnType
 ===ignore===

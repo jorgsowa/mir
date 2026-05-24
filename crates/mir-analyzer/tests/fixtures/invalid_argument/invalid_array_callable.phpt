@@ -2,15 +2,15 @@
 invalidArrayCallable
 ===file===
 <?php
-                    function foo(callable $callback) : void {
-                        $callback();
-                    }
+function foo(callable $callback) : void {
+    $callback();
+}
 
-                    final class Bar {
-                        public static function baz() : void {}
-                    }
+final class Bar {
+    public static function baz() : void {}
+}
 
-                    foo([Bar::class, "baz", 1231233]);
+foo([Bar::class, "baz", 1231233]);
 ===expect===
 InvalidArgument
 ===ignore===

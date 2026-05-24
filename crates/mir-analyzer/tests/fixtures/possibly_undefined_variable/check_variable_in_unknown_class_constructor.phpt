@@ -2,8 +2,8 @@
 checkVariableInUnknownClassConstructor
 ===file===
 <?php
-                    /** @psalm-suppress UndefinedClass */
-                    new Missing($class_arg);
+/** @psalm-suppress UndefinedClass */
+new Missing($class_arg);
 ===expect===
 PossiblyUndefinedVariable
 ===ignore===

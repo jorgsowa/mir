@@ -2,9 +2,9 @@
 missingAttributeOnParam
 ===file===
 <?php
-                    use FooBarPure;
+use FooBarPure;
 
-                    function foo(#[Pure] string $str) : void {}
+function foo(#[Pure] string $str) : void {}
 ===expect===
 UndefinedAttributeClass
 ===ignore===

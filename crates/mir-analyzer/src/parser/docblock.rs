@@ -338,6 +338,17 @@ impl DocblockParser {
                         }
                     }
                 }
+                "mir-check" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((var_part, type_part)) = body_str.split_once(" is ") {
+                            let var_name = var_part.trim().trim_start_matches('$').to_string();
+                            let type_string = type_part.trim().to_string();
+                            if !var_name.is_empty() && !type_string.is_empty() {
+                                result.mir_checks.push((var_name, type_string));
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -460,6 +471,8 @@ pub struct ParsedDocblock {
     pub removed: Option<String>,
     /// Malformed type annotations detected during parsing.
     pub invalid_annotations: Vec<String>,
+    /// `@mir-check $var is TYPE` — (var_name_without_dollar, type_string)
+    pub mir_checks: Vec<(String, String)>,
 }
 
 impl ParsedDocblock {

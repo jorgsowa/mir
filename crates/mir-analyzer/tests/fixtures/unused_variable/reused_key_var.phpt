@@ -2,15 +2,15 @@
 reusedKeyVar
 ===file===
 <?php
-                    $key = "a";
-                    echo $key;
+$key = "a";
+echo $key;
 
-                    $arr = ["foo" => "foo.foo"];
+$arr = ["foo" => "foo.foo"];
 
-                    foreach ($arr as $key => $v) {
-                        list($key) = explode(".", $v);
-                        echo $key;
-                    }
+foreach ($arr as $key => $v) {
+    list($key) = explode(".", $v);
+    echo $key;
+}
 ===expect===
 UnusedVariable
 ===ignore===

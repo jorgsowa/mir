@@ -2,7 +2,7 @@
 possiblyNullFunctionCall
 ===file===
 <?php
-                    $this->foo();
+$this->foo();
 ===expect===
 InvalidScope
 ===ignore===

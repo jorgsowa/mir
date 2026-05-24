@@ -2,7 +2,7 @@
 invalidMethodCall
 ===file===
 <?php
-                    ("hello")->someMethod();
+("hello")->someMethod();
 ===expect===
 InvalidMethodCall
 ===ignore===

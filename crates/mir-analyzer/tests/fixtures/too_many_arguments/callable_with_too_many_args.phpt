@@ -2,12 +2,12 @@
 callableWithTooManyArgs
 ===file===
 <?php
-                    /**
-                     * @param callable(string):void $fn
-                     */
-                    function test(callable $fn): void {
-                        $fn('hello', 'world');
-                    }
+/**
+ * @param callable(string):void $fn
+ */
+function test(callable $fn): void {
+    $fn('hello', 'world');
+}
 
 ===expect===
 TooManyArguments

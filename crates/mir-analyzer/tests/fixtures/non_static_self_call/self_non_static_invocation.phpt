@@ -2,13 +2,13 @@
 selfNonStaticInvocation
 ===file===
 <?php
-                    class A {
-                        public function fooFoo(): void {}
+class A {
+    public function fooFoo(): void {}
 
-                        public static function barBar(): void {
-                            self::fooFoo();
-                        }
-                    }
+    public static function barBar(): void {
+        self::fooFoo();
+    }
+}
 ===expect===
 NonStaticSelfCall
 ===ignore===

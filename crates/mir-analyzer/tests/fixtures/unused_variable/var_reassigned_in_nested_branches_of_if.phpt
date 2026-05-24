@@ -2,19 +2,19 @@
 varReassignedInNestedBranchesOfIf
 ===file===
 <?php
-                    $a = "foo";
+$a = "foo";
 
-                    if (rand(0, 1)) {
-                        if (rand(0, 1)) {
-                            $a = "bar";
-                        } else {
-                            $a = "bat";
-                        }
-                    } else {
-                        $a = "bang";
-                    }
+if (rand(0, 1)) {
+    if (rand(0, 1)) {
+        $a = "bar";
+    } else {
+        $a = "bat";
+    }
+} else {
+    $a = "bang";
+}
 
-                    echo $a;
+echo $a;
 ===expect===
 UnusedVariable
 ===ignore===

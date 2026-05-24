@@ -2,8 +2,8 @@
 undefinedMixinClass
 ===file===
 <?php
-                    /** @mixin B */
-                    class A {}
+/** @mixin B */
+class A {}
 ===expect===
 UndefinedDocblockClass
 ===ignore===

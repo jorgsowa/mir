@@ -2,7 +2,7 @@
 additionWithClassInWeakMode
 ===file===
 <?php
-                    $a = "hi" + (new stdClass);
+$a = "hi" + (new stdClass);
 ===expect===
 InvalidOperand
 ===ignore===

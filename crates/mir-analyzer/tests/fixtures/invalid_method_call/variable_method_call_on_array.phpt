@@ -2,9 +2,9 @@
 variableMethodCallOnArray
 ===file===
 <?php
-                    $arr = [];
-                    $b = "foo";
-                    $arr->$b();
+$arr = [];
+$b = "foo";
+$arr->$b();
 ===expect===
 InvalidMethodCall
 ===ignore===

@@ -3,16 +3,16 @@ deprecatedStaticPropertyFetch
 ===file===
 <?php
 
-                    class Bar
-                    {
-                        /**
-                         * @deprecated
-                         */
-                        public static bool $deprecatedProperty = false;
-                    }
+class Bar
+{
+    /**
+     * @deprecated
+     */
+    public static bool $deprecatedProperty = false;
+}
 
-                    Bar::$deprecatedProperty;
-                    
+Bar::$deprecatedProperty;
+
 ===expect===
 DeprecatedProperty
 ===ignore===

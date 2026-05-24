@@ -2,56 +2,56 @@
 inheritTemplatedMixinWithSelf
 ===file===
 <?php
-                    /**
-                     * @template T
-                     */
-                    class Mixin {
-                        /**
-                         * @psalm-var T
-                         */
-                        private $var;
+/**
+ * @template T
+ */
+class Mixin {
+    /**
+     * @psalm-var T
+     */
+    private $var;
 
-                        /**
-                         * @psalm-param T $var
-                         */
-                        public function __construct ($var) {
-                            $this->var = $var;
-                        }
+    /**
+     * @psalm-param T $var
+     */
+    public function __construct ($var) {
+        $this->var = $var;
+    }
 
-                        /**
-                         * @psalm-return T
-                         */
-                        public function type() {
-                            return $this->var;
-                        }
-                    }
+    /**
+     * @psalm-return T
+     */
+    public function type() {
+        return $this->var;
+    }
+}
 
-                    /**
-                     * @template T as object
-                     * @mixin Mixin<T>
-                     */
-                    abstract class Foo {
-                        /** @var Mixin<T> */
-                        public object $obj;
+/**
+ * @template T as object
+ * @mixin Mixin<T>
+ */
+abstract class Foo {
+    /** @var Mixin<T> */
+    public object $obj;
 
-                        public function __call(string $name, array $args) {
-                            return $this->obj->$name(...$args);
-                        }
-                    }
+    public function __call(string $name, array $args) {
+        return $this->obj->$name(...$args);
+    }
+}
 
-                    /**
-                     * @extends Foo<self>
-                     */
-                    abstract class FooChild extends Foo{}
+/**
+ * @extends Foo<self>
+ */
+abstract class FooChild extends Foo{}
 
-                    /**
-                     * @psalm-suppress MissingConstructor
-                     */
-                    final class FooGrandChild extends FooChild {}
+/**
+ * @psalm-suppress MissingConstructor
+ */
+final class FooGrandChild extends FooChild {}
 
-                    function test() : FooGrandChild {
-                        return (new FooGrandChild)->type();
-                    }
+function test() : FooGrandChild {
+    return (new FooGrandChild)->type();
+}
 ===expect===
 LessSpecificReturnStatement
 ===ignore===

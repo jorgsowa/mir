@@ -2,10 +2,10 @@
 deprecatedClassWithNewAttr
 ===file===
 <?php
-                    #[\Deprecated]
-                    class Foo { }
+#[\Deprecated]
+class Foo { }
 
-                    $a = new Foo();
+$a = new Foo();
 ===expect===
 DeprecatedClass
 ===ignore===

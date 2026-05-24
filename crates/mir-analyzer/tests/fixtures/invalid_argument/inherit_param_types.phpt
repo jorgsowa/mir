@@ -2,23 +2,23 @@
 inheritParamTypes
 ===file===
 <?php
-                    class A {
-                      /**
-                       * @param string $bar
-                       * @return void
-                       */
-                      public function foo($bar) {
-                        echo $bar;
-                      }
-                    }
+class A {
+  /**
+   * @param string $bar
+   * @return void
+   */
+  public function foo($bar) {
+    echo $bar;
+  }
+}
 
-                    class B extends A {
-                      public function foo($bar) {
-                        echo "hello " . $bar;
-                      }
-                    }
+class B extends A {
+  public function foo($bar) {
+    echo "hello " . $bar;
+  }
+}
 
-                    (new B)->foo(new stdClass);
+(new B)->foo(new stdClass);
 ===expect===
 InvalidArgument
 ===ignore===

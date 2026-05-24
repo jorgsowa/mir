@@ -2,13 +2,13 @@
 elseVarReassignedInBranchAndNoReference
 ===file===
 <?php
-                    $a = true;
+$a = true;
 
-                    if (rand(0, 1)) {
-                        // do nothing
-                    } else {
-                        $a = false;
-                    }
+if (rand(0, 1)) {
+    // do nothing
+} else {
+    $a = false;
+}
 ===expect===
 UnusedVariable
 ===ignore===

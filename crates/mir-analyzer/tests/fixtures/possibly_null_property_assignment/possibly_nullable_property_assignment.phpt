@@ -2,14 +2,14 @@
 possiblyNullablePropertyAssignment
 ===file===
 <?php
-                    class Foo {
-                        /** @var string */
-                        public $foo = "";
-                    }
+class Foo {
+    /** @var string */
+    public $foo = "";
+}
 
-                    $a = rand(0, 10) ? new Foo() : null;
+$a = rand(0, 10) ? new Foo() : null;
 
-                    $a->foo = "hello";
+$a->foo = "hello";
 ===expect===
 PossiblyNullPropertyAssignment
 ===ignore===

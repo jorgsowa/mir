@@ -2,11 +2,11 @@
 unimplementedInterfaceMethod
 ===file===
 <?php
-                    interface A {
-                        public function fooFoo() : void;
-                    }
+interface A {
+    public function fooFoo() : void;
+}
 
-                    class B implements A { }
+class B implements A { }
 ===expect===
 UnimplementedInterfaceMethod
 ===ignore===

@@ -2,17 +2,17 @@
 differentArgumentName
 ===file===
 <?php
-                    class A {
-                        public function fooFoo(int $a): void {
+class A {
+    public function fooFoo(int $a): void {
 
-                        }
-                    }
+    }
+}
 
-                    class B extends A {
-                        public function fooFoo(int $b): void {
+class B extends A {
+    public function fooFoo(int $b): void {
 
-                        }
-                    }
+    }
+}
 ===expect===
 ParamNameMismatch
 ===ignore===

@@ -2,9 +2,9 @@
 invalidInferredToStringReturnType
 ===file===
 <?php
-                    class A {
-                        function __toString() { }
-                    }
+class A {
+    function __toString() { }
+}
 ===expect===
 InvalidToString
 ===ignore===

@@ -2,10 +2,10 @@
 noNamedArgsFunction
 ===file===
 <?php
-                    /** @no-named-arguments */
-                    function takesArguments(string $name, int $age) : void {}
+/** @no-named-arguments */
+function takesArguments(string $name, int $age) : void {}
 
-                    takesArguments(age: 5, name: "hello");
+takesArguments(age: 5, name: "hello");
 ===expect===
 NamedArgumentNotAllowed
 ===ignore===

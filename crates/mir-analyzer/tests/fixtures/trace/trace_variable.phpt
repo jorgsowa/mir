@@ -2,8 +2,8 @@
 traceVariable
 ===file===
 <?php
-                    /** @psalm-trace $a */
-                    $a = getmypid();
+/** @psalm-trace $a */
+$a = getmypid();
 ===expect===
 Trace
 ===ignore===

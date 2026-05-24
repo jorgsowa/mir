@@ -2,8 +2,8 @@
 invalidThrowClass
 ===file===
 <?php
-                    class A {}
-                    throw new A();
+class A {}
+throw new A();
 ===expect===
 InvalidThrow
 ===ignore===

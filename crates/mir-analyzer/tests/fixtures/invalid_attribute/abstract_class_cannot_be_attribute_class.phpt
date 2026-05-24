@@ -2,8 +2,8 @@
 abstractClassCannotBeAttributeClass
 ===file===
 <?php
-                    #[Attribute]
-                    abstract class Baz {}
+#[Attribute]
+abstract class Baz {}
 ===expect===
 InvalidAttribute
 ===ignore===

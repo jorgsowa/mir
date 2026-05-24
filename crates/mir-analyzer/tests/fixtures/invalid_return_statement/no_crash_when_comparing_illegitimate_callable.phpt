@@ -2,11 +2,11 @@
 noCrashWhenComparingIllegitimateCallable
 ===file===
 <?php
-                    class C {}
+class C {}
 
-                    function foo() : C {
-                        return fn (int $i) => "";
-                    }
+function foo() : C {
+    return fn (int $i) => "";
+}
 ===expect===
 InvalidReturnStatement
 ===ignore===

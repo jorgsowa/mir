@@ -2,13 +2,13 @@
 loopTypeChangedInIfWithoutReference
 ===file===
 <?php
-                    $a = false;
+$a = false;
 
-                    while (rand(0, 1)) {
-                        if (rand(0, 1)) {
-                            $a = true;
-                        }
-                    }
+while (rand(0, 1)) {
+    if (rand(0, 1)) {
+        $a = true;
+    }
+}
 ===expect===
 UnusedVariable
 ===ignore===

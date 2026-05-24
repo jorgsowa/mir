@@ -2,16 +2,16 @@
 referenceReuseDeclaredInIf
 ===file===
 <?php
-                    /** @var array<int> */
-                    $arr = [];
+/** @var array<int> */
+$arr = [];
 
-                    if (isset($arr[0])) {
-                        $var = &$arr[0];
-                        $var += 1;
-                    }
+if (isset($arr[0])) {
+    $var = &$arr[0];
+    $var += 1;
+}
 
-                    $var = "foo";
-                
+$var = "foo";
+
 ===expect===
 ReferenceReusedFromConfusingScope
 ===ignore===

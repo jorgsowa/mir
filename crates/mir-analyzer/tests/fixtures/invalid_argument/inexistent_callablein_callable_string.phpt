@@ -2,14 +2,14 @@
 inexistentCallableinCallableString
 ===file===
 <?php
-                    /**
-                     * @param callable-string $c
-                     */
-                    function c(string $c): void {
-                        $c();
-                    }
+/**
+ * @param callable-string $c
+ */
+function c(string $c): void {
+    $c();
+}
 
-                    c("hii");
+c("hii");
 ===expect===
 InvalidArgument
 ===ignore===

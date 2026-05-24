@@ -2,11 +2,11 @@
 wrongReturnTypeInNamespace2
 ===file===
 <?php
-                    namespace bar;
+namespace bar;
 
-                    function fooFoo(): string {
-                        return rand(0, 5) ? "hello" : null;
-                    }
+function fooFoo(): string {
+    return rand(0, 5) ? "hello" : null;
+}
 ===expect===
 NullableReturnStatement
 ===ignore===

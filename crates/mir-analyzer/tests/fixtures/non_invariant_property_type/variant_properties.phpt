@@ -2,15 +2,15 @@
 variantProperties
 ===file===
 <?php
-                    class ParentClass
-                    {
-                        protected ?string $mightExist = null;
-                    }
+class ParentClass
+{
+    protected ?string $mightExist = null;
+}
 
-                    class ChildClass extends ParentClass
-                    {
-                        protected string $mightExist = "";
-                    }
+class ChildClass extends ParentClass
+{
+    protected string $mightExist = "";
+}
 ===expect===
 NonInvariantPropertyType
 ===ignore===

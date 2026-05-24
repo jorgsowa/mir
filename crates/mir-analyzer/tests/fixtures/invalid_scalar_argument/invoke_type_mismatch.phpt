@@ -2,12 +2,12 @@
 invokeTypeMismatch
 ===file===
 <?php
-                    class A {
-                        public function __invoke(string $p): void {}
-                    }
+class A {
+    public function __invoke(string $p): void {}
+}
 
-                    $q = new A;
-                    $q(1);
+$q = new A;
+$q(1);
 ===expect===
 InvalidScalarArgument
 ===ignore===

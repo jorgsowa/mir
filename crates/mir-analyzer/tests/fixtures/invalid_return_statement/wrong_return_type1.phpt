@@ -2,9 +2,9 @@
 wrongReturnType1
 ===file===
 <?php
-                    function fooFoo(): string {
-                        return 5;
-                    }
+function fooFoo(): string {
+    return 5;
+}
 ===expect===
 InvalidReturnStatement
 ===ignore===

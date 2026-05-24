@@ -2,7 +2,7 @@
 invalidThisArgument
 ===file===
 <?php
-                    $this = "hello";
+$this = "hello";
 ===expect===
 InvalidScope
 ===ignore===

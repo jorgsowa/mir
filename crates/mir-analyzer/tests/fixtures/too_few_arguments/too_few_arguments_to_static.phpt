@@ -2,11 +2,11 @@
 tooFewArgumentsToStatic
 ===file===
 <?php
-                    class A {
-                        public static function fooFoo(int $a): void {}
-                    }
+class A {
+    public static function fooFoo(int $a): void {}
+}
 
-                    A::fooFoo();
+A::fooFoo();
 ===expect===
 TooFewArguments
 ===ignore===

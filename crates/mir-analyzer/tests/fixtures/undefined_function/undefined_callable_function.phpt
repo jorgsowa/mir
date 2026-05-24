@@ -2,9 +2,9 @@
 undefinedCallableFunction
 ===file===
 <?php
-                    function foo(callable $c): void {}
+function foo(callable $c): void {}
 
-                    foo("trime");
+foo("trime");
 ===expect===
 UndefinedFunction
 ===ignore===

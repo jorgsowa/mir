@@ -2,8 +2,8 @@
 wrongCaseClass
 ===file===
 <?php
-                    class Foo {}
-                    (new foo());
+class Foo {}
+(new foo());
 ===expect===
 InvalidClass
 ===ignore===

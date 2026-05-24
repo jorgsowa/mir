@@ -2,8 +2,8 @@
 nullArgument
 ===file===
 <?php
-                    function fooFoo(int $a): void {}
-                    fooFoo(null);
+function fooFoo(int $a): void {}
+fooFoo(null);
 ===expect===
 NullArgument
 ===ignore===

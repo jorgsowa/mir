@@ -2,9 +2,9 @@
 missingTemplateExtendsNativeInterface
 ===file===
 <?php
-                    interface a extends Iterator {
-                    }
-                
+interface a extends Iterator {
+}
+
 ===expect===
 MissingTemplateParam
 ===ignore===

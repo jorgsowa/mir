@@ -2,14 +2,14 @@
 possiblyInvalidArrayAccessWithNestedArray
 ===file===
 <?php
-                    /**
-                     * @return array<int,array<string,float>>|string
-                     */
-                    function return_array() {
-                        return rand() % 5 > 3 ? [["key" => 3.5]] : "key:3.5";
-                    }
-                    $result = return_array();
-                    $v = $result[0]["key"];
+/**
+ * @return array<int,array<string,float>>|string
+ */
+function return_array() {
+    return rand() % 5 > 3 ? [["key" => 3.5]] : "key:3.5";
+}
+$result = return_array();
+$v = $result[0]["key"];
 ===expect===
 PossiblyInvalidArrayOffset
 ===ignore===

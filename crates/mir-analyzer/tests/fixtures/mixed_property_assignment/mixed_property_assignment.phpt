@@ -2,15 +2,15 @@
 mixedPropertyAssignment
 ===file===
 <?php
-                    class Foo {
-                        /** @var string */
-                        public $foo = "";
-                    }
+class Foo {
+    /** @var string */
+    public $foo = "";
+}
 
-                    /** @var mixed */
-                    $a = (new Foo());
+/** @var mixed */
+$a = (new Foo());
 
-                    $a->foo = "hello";
+$a->foo = "hello";
 ===expect===
 MixedPropertyAssignment
 ===ignore===

@@ -2,10 +2,10 @@
 missingAttributeOnFunction
 ===file===
 <?php
-                    use FooBarPure;
+use FooBarPure;
 
-                    #[Pure]
-                    function foo() : void {}
+#[Pure]
+function foo() : void {}
 ===expect===
 UndefinedAttributeClass
 ===ignore===

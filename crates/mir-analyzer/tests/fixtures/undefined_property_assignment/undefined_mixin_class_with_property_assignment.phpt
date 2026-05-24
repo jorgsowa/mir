@@ -2,10 +2,10 @@
 undefinedMixinClassWithPropertyAssignment
 ===file===
 <?php
-                    /** @mixin B */
-                    class A {}
+/** @mixin B */
+class A {}
 
-                    (new A)->foo = "bar";
+(new A)->foo = "bar";
 ===expect===
 UndefinedPropertyAssignment
 ===ignore===

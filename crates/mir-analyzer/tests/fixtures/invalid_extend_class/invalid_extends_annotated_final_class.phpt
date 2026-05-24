@@ -3,12 +3,12 @@ invalidExtendsAnnotatedFinalClass
 ===file===
 <?php
 
-                /**
-                * @final
-                */
-                class DoctrineA {}
+/**
+* @final
+*/
+class DoctrineA {}
 
-                class DoctrineB extends DoctrineA {}'
+class DoctrineB extends DoctrineA {}'
 
 ===expect===
 InvalidExtendClass

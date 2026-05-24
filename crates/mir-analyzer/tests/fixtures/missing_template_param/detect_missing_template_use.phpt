@@ -2,12 +2,12 @@
 detectMissingTemplateUse
 ===file===
 <?php
-                    /** @template T */
-                    trait A {}
-                    final class B {
-                        use A;
-                    }
-                
+/** @template T */
+trait A {}
+final class B {
+    use A;
+}
+
 ===expect===
 MissingTemplateParam
 ===ignore===

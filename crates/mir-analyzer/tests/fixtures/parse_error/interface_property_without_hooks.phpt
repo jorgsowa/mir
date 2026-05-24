@@ -2,9 +2,9 @@
 interfacePropertyWithoutHooks
 ===file===
 <?php
-                    interface A {
-                        public string $value;
-                    }
+interface A {
+    public string $value;
+}
 ===expect===
 ParseError
 ===ignore===

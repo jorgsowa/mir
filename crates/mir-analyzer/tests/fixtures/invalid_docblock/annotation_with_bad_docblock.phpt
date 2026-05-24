@@ -2,14 +2,14 @@
 annotationWithBadDocblock
 ===file===
 <?php
-                    class ParentClass {
-                        public function __call(string $name, array $args) {}
-                    }
+class ParentClass {
+    public function __call(string $name, array $args) {}
+}
 
-                    /**
-                     * @method string getString()
-                     */
-                    class Child extends ParentClass {}
+/**
+ * @method string getString()
+ */
+class Child extends ParentClass {}
 ===expect===
 InvalidDocblock
 ===ignore===

@@ -2,12 +2,12 @@
 deprecatedClassWithNew
 ===file===
 <?php
-                    /**
-                     * @deprecated
-                     */
-                    class Foo { }
+/**
+ * @deprecated
+ */
+class Foo { }
 
-                    $a = new Foo();
+$a = new Foo();
 ===expect===
 DeprecatedClass
 ===ignore===

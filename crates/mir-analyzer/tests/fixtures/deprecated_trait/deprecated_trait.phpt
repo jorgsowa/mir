@@ -2,13 +2,13 @@
 deprecatedTrait
 ===file===
 <?php
-                    /** @deprecated */
-                    trait T {}
+/** @deprecated */
+trait T {}
 
-                    class C {
-                        use T;
-                    }
-                
+class C {
+    use T;
+}
+
 ===expect===
 DeprecatedTrait
 ===ignore===

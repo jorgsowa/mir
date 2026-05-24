@@ -2,8 +2,8 @@
 falseIncrement
 ===file===
 <?php
-                    $a = false;
-                    $a++;
+$a = false;
+$a++;
 ===expect===
 FalseOperand
 ===ignore===

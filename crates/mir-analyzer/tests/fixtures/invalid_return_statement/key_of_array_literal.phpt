@@ -2,15 +2,15 @@
 keyOfArrayLiteral
 ===file===
 <?php
-                    class A {
-                        /**
-                         * @return key-of<array<int, string>>
-                         */
-                        public function getKey() {
-                            return "foo";
-                        }
-                    }
-                
+class A {
+    /**
+     * @return key-of<array<int, string>>
+     */
+    public function getKey() {
+        return "foo";
+    }
+}
+
 ===expect===
 InvalidReturnStatement
 ===ignore===

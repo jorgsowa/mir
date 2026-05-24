@@ -2,13 +2,13 @@
 deprecatedMethodWithCallAttr
 ===file===
 <?php
-                    class Foo {
-                        #[\Deprecated]
-                        public static function barBar(): void {
-                        }
-                    }
+class Foo {
+    #[\Deprecated]
+    public static function barBar(): void {
+    }
+}
 
-                    Foo::barBar();
+Foo::barBar();
 ===expect===
 DeprecatedMethod
 ===ignore===

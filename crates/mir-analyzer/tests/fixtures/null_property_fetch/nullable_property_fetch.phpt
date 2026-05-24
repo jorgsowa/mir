@@ -2,9 +2,9 @@
 nullablePropertyFetch
 ===file===
 <?php
-                    $a = null;
+$a = null;
 
-                    echo $a->foo;
+echo $a->foo;
 ===expect===
 NullPropertyFetch
 ===ignore===

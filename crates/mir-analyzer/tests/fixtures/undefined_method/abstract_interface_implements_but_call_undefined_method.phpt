@@ -2,15 +2,15 @@
 abstractInterfaceImplementsButCallUndefinedMethod
 ===file===
 <?php
-                    interface I {
-                        public function foo() : void;
-                    }
+interface I {
+    public function foo() : void;
+}
 
-                    abstract class A implements I {
-                        public function bar(): void {
-                            $this->foo2();
-                        }
-                    }
+abstract class A implements I {
+    public function bar(): void {
+        $this->foo2();
+    }
+}
 ===expect===
 UndefinedMethod
 ===ignore===

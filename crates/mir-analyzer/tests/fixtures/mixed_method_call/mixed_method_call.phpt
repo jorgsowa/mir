@@ -2,14 +2,14 @@
 mixedMethodCall
 ===file===
 <?php
-                    class Foo {
-                        public static function barBar(): void {}
-                    }
+class Foo {
+    public static function barBar(): void {}
+}
 
-                    /** @var mixed */
-                    $a = (new Foo());
+/** @var mixed */
+$a = (new Foo());
 
-                    $a->barBar();
+$a->barBar();
 ===expect===
 MixedMethodCall
 ===ignore===

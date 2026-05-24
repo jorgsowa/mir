@@ -2,9 +2,9 @@
 noVisibilityInterfacePropertyWithHooks
 ===file===
 <?php
-                    interface SomeInterface {
-                        string $value { get; }
-                    }
+interface SomeInterface {
+    string $value { get; }
+}
 ===expect===
 ParseError
 ===ignore===

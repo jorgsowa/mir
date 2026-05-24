@@ -2,18 +2,18 @@
 impossibleCaseValue
 ===file===
 <?php
-                    $a = rand(0, 1) ? "a" : "b";
+$a = rand(0, 1) ? "a" : "b";
 
-                    switch ($a) {
-                        case "a":
-                            break;
+switch ($a) {
+    case "a":
+        break;
 
-                        case "b":
-                            break;
+    case "b":
+        break;
 
-                        case "c":
-                            echo "impossible";
-                    }
+    case "c":
+        echo "impossible";
+}
 ===expect===
 TypeDoesNotContainType
 ===ignore===

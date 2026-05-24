@@ -2,13 +2,13 @@
 invalidTypeAlias
 ===file===
 <?php
-                    namespace Barrr;
+namespace Barrr;
 
-                    /**
-                     * @psalm-type CoolType = A|B>
-                     */
+/**
+ * @psalm-type CoolType = A|B>
+ */
 
-                    class A {}
+class A {}
 ===expect===
 InvalidDocblock
 ===ignore===

@@ -2,15 +2,15 @@
 callNamespacedFunctionFromEmptyNamespace
 ===file===
 <?php
-                    namespace A {
-                        /** @return void */
-                        function foo() {
+namespace A {
+    /** @return void */
+    function foo() {
 
-                        }
-                    }
-                    namespace {
-                        foo();
-                    }
+    }
+}
+namespace {
+    foo();
+}
 ===expect===
 UndefinedFunction
 ===ignore===

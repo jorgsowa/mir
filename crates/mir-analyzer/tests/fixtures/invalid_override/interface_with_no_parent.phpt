@@ -2,11 +2,11 @@
 interfaceWithNoParent
 ===file===
 <?php
-                    interface I {
-                        #[Override]
-                        public function f(): void;
-                    }
-                
+interface I {
+    #[Override]
+    public function f(): void;
+}
+
 ===expect===
 InvalidOverride
 ===ignore===

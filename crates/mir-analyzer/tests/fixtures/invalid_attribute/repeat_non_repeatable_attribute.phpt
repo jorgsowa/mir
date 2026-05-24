@@ -2,12 +2,12 @@
 repeatNonRepeatableAttribute
 ===file===
 <?php
-                    #[Attribute]
-                    class Foo {}
+#[Attribute]
+class Foo {}
 
-                    #[Foo, Foo]
-                    class Baz {}
-                
+#[Foo, Foo]
+class Baz {}
+
 ===expect===
 InvalidAttribute
 ===ignore===

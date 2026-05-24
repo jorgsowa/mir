@@ -2,10 +2,10 @@
 FirstClassCallable:UndefinedMethod
 ===file===
 <?php
-                    $queue = new SplQueue;
-                    $closure = $queue->undefined(...);
-                    $count = $closure();
-                
+$queue = new SplQueue;
+$closure = $queue->undefined(...);
+$count = $closure();
+
 ===expect===
 UndefinedMethod
 ===ignore===

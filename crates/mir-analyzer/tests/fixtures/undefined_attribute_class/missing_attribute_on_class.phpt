@@ -2,10 +2,10 @@
 missingAttributeOnClass
 ===file===
 <?php
-                    use FooBarPure;
+use FooBarPure;
 
-                    #[Pure]
-                    class Video {}
+#[Pure]
+class Video {}
 ===expect===
 UndefinedAttributeClass
 ===ignore===

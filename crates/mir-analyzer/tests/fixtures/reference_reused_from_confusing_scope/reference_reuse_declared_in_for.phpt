@@ -2,16 +2,16 @@
 referenceReuseDeclaredInFor
 ===file===
 <?php
-                    /** @var list<int> */
-                    $arr = [];
+/** @var list<int> */
+$arr = [];
 
-                    for ($i = 0; $i < count($arr); ++$i) {
-                        $var = &$arr[$i];
-                        $var += 1;
-                    }
+for ($i = 0; $i < count($arr); ++$i) {
+    $var = &$arr[$i];
+    $var += 1;
+}
 
-                    $var = "foo";
-                
+$var = "foo";
+
 ===expect===
 ReferenceReusedFromConfusingScope
 ===ignore===

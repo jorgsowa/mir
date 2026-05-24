@@ -2,16 +2,16 @@
 invalidArgAfterCallable
 ===file===
 <?php
-                    /**
-                     * @param callable $callback
-                     * @return void
-                     */
-                    function route($callback) {
-                      if (!is_callable($callback)) {  }
-                      takes_int("string");
-                    }
+/**
+ * @param callable $callback
+ * @return void
+ */
+function route($callback) {
+  if (!is_callable($callback)) {  }
+  takes_int("string");
+}
 
-                    function takes_int(int $i) {}
+function takes_int(int $i) {}
 ===expect===
 InvalidScalarArgument
 ===ignore===

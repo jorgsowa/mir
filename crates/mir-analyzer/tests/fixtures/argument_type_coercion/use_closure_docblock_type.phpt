@@ -2,18 +2,18 @@
 useClosureDocblockType
 ===file===
 <?php
-                    class A {}
-                    class B extends A {}
+class A {}
+class B extends A {}
 
-                    function takesA(A $_a) : void {}
-                    function takesB(B $_b) : void {}
+function takesA(A $_a) : void {}
+function takesB(B $_b) : void {}
 
-                    $getAButReallyB = /** @return A */ function() {
-                        return new B;
-                    };
+$getAButReallyB = /** @return A */ function() {
+    return new B;
+};
 
-                    takesA($getAButReallyB());
-                    takesB($getAButReallyB());
+takesA($getAButReallyB());
+takesB($getAButReallyB());
 ===expect===
 ArgumentTypeCoercion
 ===ignore===

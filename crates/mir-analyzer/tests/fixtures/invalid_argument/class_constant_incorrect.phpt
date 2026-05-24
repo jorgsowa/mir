@@ -2,15 +2,15 @@
 classConstantIncorrect
 ===file===
 <?php
-                    namespace Ns;
+namespace Ns;
 
-                    class C {
-                        const A = "bat";
-                        const B = "baz";
-                    }
-                    /** @psalm-param "foo"|"bar"|C::A|C::B $s */
-                    function foo($s) : void {}
-                    foo("for");
+class C {
+    const A = "bat";
+    const B = "baz";
+}
+/** @psalm-param "foo"|"bar"|C::A|C::B $s */
+function foo($s) : void {}
+foo("for");
 ===expect===
 InvalidArgument
 ===ignore===

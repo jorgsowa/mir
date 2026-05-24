@@ -2,8 +2,8 @@
 stringIncrement
 ===file===
 <?php
-                    $a = "hello";
-                    $a++;
+$a = "hello";
+$a++;
 ===expect===
 StringIncrement
 ===ignore===

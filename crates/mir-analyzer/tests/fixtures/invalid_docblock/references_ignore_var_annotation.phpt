@@ -2,10 +2,10 @@
 referencesIgnoreVarAnnotation
 ===file===
 <?php
-                    $a = 1;
-                    /** @var int */
-                    $b = &$a;
-                
+$a = 1;
+/** @var int */
+$b = &$a;
+
 ===expect===
 InvalidDocblock
 ===ignore===

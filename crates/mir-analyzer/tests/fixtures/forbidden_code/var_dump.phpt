@@ -2,7 +2,7 @@
 varDump
 ===file===
 <?php
-                    var_dump("hello");
+var_dump("hello");
 ===expect===
 ForbiddenCode
 ===ignore===

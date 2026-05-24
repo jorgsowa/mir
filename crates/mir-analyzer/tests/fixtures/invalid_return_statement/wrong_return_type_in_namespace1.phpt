@@ -2,11 +2,11 @@
 wrongReturnTypeInNamespace1
 ===file===
 <?php
-                    namespace bar;
+namespace bar;
 
-                    function fooFoo(): string {
-                        return 5;
-                    }
+function fooFoo(): string {
+    return 5;
+}
 ===expect===
 InvalidReturnStatement
 ===ignore===

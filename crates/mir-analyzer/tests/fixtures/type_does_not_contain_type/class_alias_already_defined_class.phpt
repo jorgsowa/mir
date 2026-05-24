@@ -2,17 +2,17 @@
 classAliasAlreadyDefinedClass
 ===file===
 <?php
-                    class A {}
+class A {}
 
-                    class B {}
+class B {}
 
-                    if (false) {
-                        class_alias(A::class, B::class);
-                    }
+if (false) {
+    class_alias(A::class, B::class);
+}
 
-                    function foo(A $a, B $b) : void {
-                        if ($a === $b) {}
-                    }
+function foo(A $a, B $b) : void {
+    if ($a === $b) {}
+}
 ===expect===
 TypeDoesNotContainType
 ===ignore===

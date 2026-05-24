@@ -2,17 +2,17 @@
 concatenateNegativeIntRightSideIsNotNumeric
 ===file===
 <?php
-                    /**
-                     * @param numeric-string $bar
-                     * @return int
-                     */
-                    function foo(string $bar): int
-                    {
-                        return (int) $bar;
-                    }
+/**
+ * @param numeric-string $bar
+ * @return int
+ */
+function foo(string $bar): int
+{
+    return (int) $bar;
+}
 
-                    foo(foo("123") . foo("-456"));
-                
+foo(foo("123") . foo("-456"));
+
 ===expect===
 ArgumentTypeCoercion
 ===ignore===

@@ -2,14 +2,14 @@
 knownVarType
 ===file===
 <?php
-                    function foo() : string {
-                        return "hello";
-                    }
+function foo() : string {
+    return "hello";
+}
 
-                    /** @var string */
-                    $a = foo();
+/** @var string */
+$a = foo();
 
-                    echo $a;
+echo $a;
 ===expect===
 UnnecessaryVarAnnotation
 ===ignore===

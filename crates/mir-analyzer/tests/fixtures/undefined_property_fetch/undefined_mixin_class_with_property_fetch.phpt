@@ -2,10 +2,10 @@
 undefinedMixinClassWithPropertyFetch
 ===file===
 <?php
-                    /** @mixin B */
-                    class A {}
+/** @mixin B */
+class A {}
 
-                    (new A)->foo;
+(new A)->foo;
 ===expect===
 UndefinedPropertyFetch
 ===ignore===

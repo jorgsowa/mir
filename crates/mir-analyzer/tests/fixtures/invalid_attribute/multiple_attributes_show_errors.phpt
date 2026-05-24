@@ -2,15 +2,15 @@
 multipleAttributesShowErrors
 ===file===
 <?php
-                    #[Attribute(Attribute::TARGET_CLASS)]
-                    class Foo {}
+#[Attribute(Attribute::TARGET_CLASS)]
+class Foo {}
 
-                    #[Attribute(Attribute::TARGET_PARAMETER)]
-                    class Bar {}
+#[Attribute(Attribute::TARGET_PARAMETER)]
+class Bar {}
 
-                    #[Foo, Bar]
-                    class Baz {}
-                
+#[Foo, Bar]
+class Baz {}
+
 ===expect===
 InvalidAttribute
 ===ignore===

@@ -2,10 +2,10 @@
 undefinedPropertyAssignment
 ===file===
 <?php
-                    class A {
-                    }
+class A {
+}
 
-                    (new A)->foo = "cool";
+(new A)->foo = "cool";
 ===expect===
 UndefinedPropertyAssignment
 ===ignore===

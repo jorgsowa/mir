@@ -2,13 +2,13 @@
 missingPropertyTypeWithConstructorInit
 ===file===
 <?php
-                    class A {
-                        public $foo;
+class A {
+    public $foo;
 
-                        public function __construct() {
-                            $this->foo = 5;
-                        }
-                    }
+    public function __construct() {
+        $this->foo = 5;
+    }
+}
 ===expect===
 MissingPropertyType
 ===ignore===

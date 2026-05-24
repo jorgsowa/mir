@@ -2,8 +2,8 @@
 interfaceCannotBeAttributeClass
 ===file===
 <?php
-                    #[Attribute]
-                    interface Foo {}
+#[Attribute]
+interface Foo {}
 ===expect===
 InvalidAttribute
 ===ignore===

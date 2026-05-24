@@ -2,10 +2,10 @@
 lonelyMethod
 ===file===
 <?php
-                    /**
-                     * @method
-                     */
-                    class C {}
+/**
+ * @method
+ */
+class C {}
 ===expect===
 InvalidDocblock
 ===ignore===

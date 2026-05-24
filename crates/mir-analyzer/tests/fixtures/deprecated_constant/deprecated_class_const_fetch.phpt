@@ -2,14 +2,14 @@
 deprecatedClassConstFetch
 ===file===
 <?php
-                    class Foo {
-                        const A = 1;
+class Foo {
+    const A = 1;
 
-                        /** @deprecated */
-                        const B = 2;
-                    }
-                    Foo::B;
-                
+    /** @deprecated */
+    const B = 2;
+}
+Foo::B;
+
 ===expect===
 DeprecatedConstant
 ===ignore===

@@ -2,13 +2,13 @@
 possiblyUnusedPropertyWrittenNeverRead
 ===file===
 <?php
-                    final class A {
-                        /** @var string */
-                        public $foo = "hello";
-                    }
+final class A {
+    /** @var string */
+    public $foo = "hello";
+}
 
-                    $a = new A();
-                    $a->foo = "bar";
+$a = new A();
+$a->foo = "bar";
 ===expect===
 PossiblyUnusedProperty
 ===ignore===

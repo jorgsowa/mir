@@ -3,9 +3,9 @@ invalidExtendsFinalClass
 ===file===
 <?php
 
-                final class A {}
+final class A {}
 
-                class B extends A {}'
+class B extends A {}'
 
 ===expect===
 InvalidExtendClass

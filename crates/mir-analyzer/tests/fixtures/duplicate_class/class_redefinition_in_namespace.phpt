@@ -2,10 +2,10 @@
 classRedefinitionInNamespace
 ===file===
 <?php
-                    namespace Aye {
-                        class Foo {}
-                        class Foo {}
-                    }
+namespace Aye {
+    class Foo {}
+    class Foo {}
+}
 ===expect===
 DuplicateClass
 ===ignore===

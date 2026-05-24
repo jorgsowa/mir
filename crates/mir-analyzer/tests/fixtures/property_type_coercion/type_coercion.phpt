@@ -2,17 +2,17 @@
 typeCoercion
 ===file===
 <?php
-                    class A {
-                        /** @var B|null */
-                        public $foo;
+class A {
+    /** @var B|null */
+    public $foo;
 
-                        public function barBar(A $a): void
-                        {
-                            $this->foo = $a;
-                        }
-                    }
+    public function barBar(A $a): void
+    {
+        $this->foo = $a;
+    }
+}
 
-                    class B extends A {}
+class B extends A {}
 ===expect===
 PropertyTypeCoercion
 ===ignore===

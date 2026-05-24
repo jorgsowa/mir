@@ -2,11 +2,11 @@
 noParent
 ===file===
 <?php
-                    class Foo {
-                        public function barBar(): void {
-                            parent::barBar();
-                        }
-                    }
+class Foo {
+    public function barBar(): void {
+        parent::barBar();
+    }
+}
 ===expect===
 ParentNotFound
 ===ignore===

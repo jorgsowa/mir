@@ -2,26 +2,26 @@
 propertySealedDocblockDefinedPropertyAssignment
 ===file===
 <?php
-                    /**
-                     * @property string $foo
-                     * @psalm-seal-properties
-                     */
-                    class A {
-                        public function __get(string $name): ?string {
-                            if ($name === "foo") {
-                                return "hello";
-                            }
+/**
+ * @property string $foo
+ * @psalm-seal-properties
+ */
+class A {
+    public function __get(string $name): ?string {
+        if ($name === "foo") {
+            return "hello";
+        }
 
-                            return null;
-                        }
+        return null;
+    }
 
-                        /** @param mixed $value */
-                        public function __set(string $name, $value): void {
-                        }
-                    }
+    /** @param mixed $value */
+    public function __set(string $name, $value): void {
+    }
+}
 
-                    $a = new A();
-                    $a->foo = 5;
+$a = new A();
+$a->foo = 5;
 ===expect===
 InvalidPropertyAssignmentValue
 ===ignore===

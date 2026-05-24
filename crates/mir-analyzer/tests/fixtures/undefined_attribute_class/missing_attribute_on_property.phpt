@@ -2,14 +2,14 @@
 missingAttributeOnProperty
 ===file===
 <?php
-                    use FooBarPure;
+use FooBarPure;
 
-                    class Baz
-                    {
-                        #[Pure]
-                        public string $foo = "bar";
-                    }
-                
+class Baz
+{
+    #[Pure]
+    public string $foo = "bar";
+}
+
 ===expect===
 UndefinedAttributeClass
 ===ignore===

@@ -2,12 +2,12 @@
 deprecatedClassWithExtends
 ===file===
 <?php
-                    /**
-                     * @deprecated
-                     */
-                    class Foo { }
+/**
+ * @deprecated
+ */
+class Foo { }
 
-                    class Bar extends Foo {}
+class Bar extends Foo {}
 ===expect===
 DeprecatedClass
 ===ignore===

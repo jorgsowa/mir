@@ -2,18 +2,18 @@
 loopReassignedInIfAndContinueWithoutReference
 ===file===
 <?php
-                    $a = 3;
+$a = 3;
 
-                    echo $a;
+echo $a;
 
-                    while (rand(0, 1)) {
-                        if (rand(0, 1)) {
-                            $a = 5;
-                            continue;
-                        }
+while (rand(0, 1)) {
+    if (rand(0, 1)) {
+        $a = 5;
+        continue;
+    }
 
-                        $a = 3;
-                    }
+    $a = 3;
+}
 ===expect===
 UnusedVariable
 ===ignore===

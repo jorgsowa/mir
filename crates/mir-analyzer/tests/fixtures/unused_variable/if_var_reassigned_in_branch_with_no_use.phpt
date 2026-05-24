@@ -2,11 +2,11 @@
 ifVarReassignedInBranchWithNoUse
 ===file===
 <?php
-                    $a = true;
+$a = true;
 
-                    if (rand(0, 1)) {
-                        $a = false;
-                    }
+if (rand(0, 1)) {
+    $a = false;
+}
 ===expect===
 UnusedVariable
 ===ignore===

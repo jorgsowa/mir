@@ -2,9 +2,9 @@
 wrongTypeVariadicArguments
 ===file===
 <?php
-                    function takesArguments(int ...$args) : void {}
+function takesArguments(int ...$args) : void {}
 
-                    takesArguments(age: "abc");
+takesArguments(age: "abc");
 ===expect===
 InvalidScalarArgument
 ===ignore===

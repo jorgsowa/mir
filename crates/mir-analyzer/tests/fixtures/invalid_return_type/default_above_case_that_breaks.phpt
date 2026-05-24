@@ -2,19 +2,19 @@
 defaultAboveCaseThatBreaks
 ===file===
 <?php
-                    function foo(string $a) : string {
-                      switch ($a) {
-                        case "a":
-                          return "hello";
+function foo(string $a) : string {
+  switch ($a) {
+    case "a":
+      return "hello";
 
-                        default:
-                        case "b":
-                          break;
+    default:
+    case "b":
+      break;
 
-                        case "c":
-                          return "goodbye";
-                      }
-                    }
+    case "c":
+      return "goodbye";
+  }
+}
 ===expect===
 InvalidReturnType
 ===ignore===

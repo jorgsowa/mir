@@ -2,28 +2,28 @@
 preventPossiblyUndefinedVarInTry
 ===file===
 <?php
-                    class Foo {
-                        public static function possiblyThrows(): bool {
-                            $result = (bool)rand(0, 1);
+class Foo {
+    public static function possiblyThrows(): bool {
+        $result = (bool)rand(0, 1);
 
-                            if (!$result) {
-                                throw new Exception("BOOM");
-                            }
+        if (!$result) {
+            throw new Exception("BOOM");
+        }
 
-                            return true;
-                        }
-                    }
+        return true;
+    }
+}
 
-                    try {
-                        $result = Foo::possiblyThrows();
-                        $a = "ACME";
+try {
+    $result = Foo::possiblyThrows();
+    $a = "ACME";
 
-                        if ($result) {
-                            echo $a;
-                        }
-                    } catch (Exception $e) {
-                        echo $a;
-                    }
+    if ($result) {
+        echo $a;
+    }
+} catch (Exception $e) {
+    echo $a;
+}
 ===expect===
 PossiblyUndefinedGlobalVariable
 ===ignore===

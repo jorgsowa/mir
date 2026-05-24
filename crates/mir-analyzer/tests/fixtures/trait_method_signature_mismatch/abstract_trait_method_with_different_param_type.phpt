@@ -2,18 +2,18 @@
 abstractTraitMethodWithDifferentParamType
 ===file===
 <?php
-                    class A {}
-                    class B {}
+class A {}
+class B {}
 
-                    trait T {
-                        abstract public function foo(A $a) : void;
-                    }
+trait T {
+    abstract public function foo(A $a) : void;
+}
 
-                    class C {
-                        use T;
+class C {
+    use T;
 
-                        public function foo(B $a) : void {}
-                    }
+    public function foo(B $a) : void {}
+}
 ===expect===
 TraitMethodSignatureMismatch
 ===ignore===

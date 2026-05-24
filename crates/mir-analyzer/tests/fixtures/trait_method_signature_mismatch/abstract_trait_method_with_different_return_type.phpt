@@ -2,20 +2,20 @@
 abstractTraitMethodWithDifferentReturnType
 ===file===
 <?php
-                    class A {}
-                    class B {}
+class A {}
+class B {}
 
-                    trait T {
-                        abstract public function foo() : A;
-                    }
+trait T {
+    abstract public function foo() : A;
+}
 
-                    class C {
-                        use T;
+class C {
+    use T;
 
-                        public function foo() : B{
-                            return new B();
-                        }
-                    }
+    public function foo() : B{
+        return new B();
+    }
+}
 ===expect===
 TraitMethodSignatureMismatch
 ===ignore===

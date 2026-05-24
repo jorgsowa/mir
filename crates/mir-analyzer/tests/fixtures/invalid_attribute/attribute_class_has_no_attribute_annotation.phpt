@@ -2,10 +2,10 @@
 attributeClassHasNoAttributeAnnotation
 ===file===
 <?php
-                    class A {}
+class A {}
 
-                    #[A]
-                    class B {}
+#[A]
+class B {}
 ===expect===
 InvalidAttribute
 ===ignore===

@@ -2,28 +2,28 @@
 impureConstructorCall
 ===file===
 <?php
-                    namespace Bar;
+namespace Bar;
 
-                    class A {
-                        public int $a = 5;
-                    }
+class A {
+    public int $a = 5;
+}
 
-                    class B {
-                        public function __construct(A $a) {
-                            $a->a++;
-                        }
-                    }
+class B {
+    public function __construct(A $a) {
+        $a->a++;
+    }
+}
 
-                    /** @psalm-pure */
-                    function filterOdd(int $i, A $a) : ?int {
-                        $b = new B($a);
+/** @psalm-pure */
+function filterOdd(int $i, A $a) : ?int {
+    $b = new B($a);
 
-                        if ($i % 2 === 0 || $a->a === 2) {
-                            return $i;
-                        }
+    if ($i % 2 === 0 || $a->a === 2) {
+        return $i;
+    }
 
-                        return null;
-                    }
+    return null;
+}
 ===expect===
 ImpureMethodCall
 ===ignore===

@@ -2,20 +2,20 @@
 paradoxInFunctionCall
 ===file===
 <?php
-                    /** @psalm-return 1|2|3 */
-                    function foo() {
-                        /** @psalm-var 1|2|3 $bar */
-                        $bar = rand(1, 3);
-                        return $bar;
-                    }
+/** @psalm-return 1|2|3 */
+function foo() {
+    /** @psalm-var 1|2|3 $bar */
+    $bar = rand(1, 3);
+    return $bar;
+}
 
-                    switch(foo()) {
-                        case 1: break;
-                        case 2: break;
-                        case 3: break;
-                        default:
-                            echo "bar";
-                    }
+switch(foo()) {
+    case 1: break;
+    case 2: break;
+    case 3: break;
+    default:
+        echo "bar";
+}
 ===expect===
 ParadoxicalCondition
 ===ignore===

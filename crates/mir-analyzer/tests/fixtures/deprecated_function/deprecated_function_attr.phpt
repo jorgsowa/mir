@@ -2,10 +2,10 @@
 deprecatedFunctionAttr
 ===file===
 <?php
-                    #[Deprecated]
-                    function a(): void {}
-                    a();
-                
+#[Deprecated]
+function a(): void {}
+a();
+
 ===expect===
 DeprecatedFunction
 ===ignore===

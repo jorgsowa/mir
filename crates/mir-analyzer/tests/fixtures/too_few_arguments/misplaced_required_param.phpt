@@ -2,8 +2,8 @@
 misplacedRequiredParam
 ===file===
 <?php
-                    function foo(string $bar = null, int $bat): void {}
-                    foo();
+function foo(string $bar = null, int $bat): void {}
+foo();
 ===expect===
 TooFewArguments
 ===ignore===

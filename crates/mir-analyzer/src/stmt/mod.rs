@@ -18,7 +18,7 @@ use crate::parser::docblock::parse_type_string;
 use php_ast::owned::StmtKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
-use mir_types::Union;
+use mir_types::{Atomic, Union};
 
 use crate::context::Context;
 use crate::db::MirDatabase;
@@ -157,7 +157,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
         for (var_name, expected_str) in mir_checks {
             let expected = parse_type_string(&expected_str);
-            let actual = ctx.get_var(&var_name);
+            let actual = widen_for_check(ctx.get_var(&var_name));
             if expected.to_string() != actual.to_string() {
                 self.issues.add(Issue::new(
                     IssueKind::TypeCheckMismatch {
@@ -406,28 +406,11 @@ impl<'a> StatementsAnalyzer<'a> {
         suppressions
     }
 
-    /// Extract `@mir-check` directives from a docblock string.
-    /// Returns Vec<(var_name, type_string)> for each `@mir-check $var is TYPE` found.
     fn extract_mir_checks_from(&self, doc: Option<&str>) -> Vec<(String, String)> {
         let Some(doc) = doc else {
             return vec![];
         };
-        let mut checks = Vec::new();
-        for line in doc.lines() {
-            let line = line.trim().trim_start_matches('*').trim();
-            let Some(rest) = line.strip_prefix("@mir-check ") else {
-                continue;
-            };
-
-            if let Some((var_part, type_part)) = rest.split_once(" is ") {
-                let var_name = var_part.trim().trim_start_matches('$').to_string();
-                let type_string = type_part.trim().to_string();
-                if !var_name.is_empty() && !type_string.is_empty() {
-                    checks.push((var_name, type_string));
-                }
-            }
-        }
-        checks
+        crate::parser::DocblockParser::parse(doc).mir_checks
     }
 
     /// Extract a `@var` annotation from a parsed docblock string.
@@ -504,4 +487,21 @@ impl<'a> StatementsAnalyzer<'a> {
 
         current
     }
+}
+
+/// Widen literal types to their base scalar type for `@mir-check` comparisons.
+/// `TLiteralInt(42)` → `TInt`, `TLiteralString("s")` → `TString`, etc.
+fn widen_for_check(u: Union) -> Union {
+    let mut out = Union::empty();
+    for atomic in u.types {
+        let widened = match atomic {
+            Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => Atomic::TInt,
+            Atomic::TLiteralString(_) => Atomic::TString,
+            Atomic::TLiteralFloat(_, _) => Atomic::TFloat,
+            Atomic::TTrue | Atomic::TFalse => Atomic::TBool,
+            other => other,
+        };
+        out.add_type(widened);
+    }
+    out
 }

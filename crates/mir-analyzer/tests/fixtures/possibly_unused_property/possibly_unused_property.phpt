@@ -2,12 +2,12 @@
 possiblyUnusedProperty
 ===file===
 <?php
-                    final class A {
-                        /** @var string */
-                        public $foo = "hello";
-                    }
+final class A {
+    /** @var string */
+    public $foo = "hello";
+}
 
-                    $a = new A();
+$a = new A();
 ===expect===
 PossiblyUnusedProperty
 ===ignore===

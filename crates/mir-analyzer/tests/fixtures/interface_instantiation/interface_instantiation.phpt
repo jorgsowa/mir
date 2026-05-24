@@ -2,8 +2,8 @@
 interfaceInstantiation
 ===file===
 <?php
-                    interface myInterface{}
-                    new myInterface();
+interface myInterface{}
+new myInterface();
 ===expect===
 InterfaceInstantiation
 ===ignore===

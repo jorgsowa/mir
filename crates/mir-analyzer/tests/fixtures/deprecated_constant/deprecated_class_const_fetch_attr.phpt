@@ -2,15 +2,15 @@
 deprecatedClassConstFetchAttr
 ===file===
 <?php
-                    class Foo {
-                        const A = 1;
+class Foo {
+    const A = 1;
 
-                        #[Deprecated]
-                        const B = 2;
-                    }
+    #[Deprecated]
+    const B = 2;
+}
 
-                    Foo::B;
-                
+Foo::B;
+
 ===expect===
 DeprecatedConstant
 ===ignore===

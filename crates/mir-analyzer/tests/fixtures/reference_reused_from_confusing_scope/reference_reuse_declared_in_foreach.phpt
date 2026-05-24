@@ -2,16 +2,16 @@
 referenceReuseDeclaredInForeach
 ===file===
 <?php
-                    /** @var array<int> */
-                    $arr = [];
+/** @var array<int> */
+$arr = [];
 
-                    foreach ($arr as $val) {
-                        $var = &$val;
-                        $var += 1;
-                    }
+foreach ($arr as $val) {
+    $var = &$val;
+    $var += 1;
+}
 
-                    $var = "foo";
-                
+$var = "foo";
+
 ===expect===
 ReferenceReusedFromConfusingScope
 ===ignore===

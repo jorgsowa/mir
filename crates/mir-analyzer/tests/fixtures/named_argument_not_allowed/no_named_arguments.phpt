@@ -2,14 +2,14 @@
 noNamedArguments
 ===file===
 <?php
-                    /**
-                     * @psalm-suppress UnusedParam
-                     * @no-named-arguments
-                     */
-                    function foo(int $arg1, int $arg2): void {}
+/**
+ * @psalm-suppress UnusedParam
+ * @no-named-arguments
+ */
+function foo(int $arg1, int $arg2): void {}
 
-                    foo(arg2: 0, arg1: 1);
-                
+foo(arg2: 0, arg1: 1);
+
 ===expect===
 NamedArgumentNotAllowed
 ===ignore===

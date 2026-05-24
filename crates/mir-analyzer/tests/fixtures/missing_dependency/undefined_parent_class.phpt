@@ -2,12 +2,12 @@
 undefinedParentClass
 ===file===
 <?php
-                    /**
-                     * @psalm-suppress UndefinedClass
-                     */
-                    class B extends A {}
+/**
+ * @psalm-suppress UndefinedClass
+ */
+class B extends A {}
 
-                    $b = new B();
+$b = new B();
 ===expect===
 MissingDependency
 ===ignore===

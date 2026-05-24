@@ -2,7 +2,7 @@
 undefinedVariableStaticCall
 ===file===
 <?php
-                    $foo::bar();
+$foo::bar();
 ===expect===
 UndefinedGlobalVariable
 ===ignore===

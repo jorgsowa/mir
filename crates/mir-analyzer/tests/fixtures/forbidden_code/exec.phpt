@@ -2,7 +2,7 @@
 exec
 ===file===
 <?php
-                    shell_exec("rm -rf");
+shell_exec("rm -rf");
 ===expect===
 ForbiddenCode
 ===ignore===

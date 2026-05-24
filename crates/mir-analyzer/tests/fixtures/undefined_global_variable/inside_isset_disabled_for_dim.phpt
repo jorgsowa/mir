@@ -2,7 +2,7 @@
 insideIssetDisabledForDim
 ===file===
 <?php
-                    isset($a[$b]);
+isset($a[$b]);
 ===expect===
 UndefinedGlobalVariable
 ===ignore===

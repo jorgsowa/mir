@@ -2,15 +2,15 @@
 referenceReuseForeachValue
 ===file===
 <?php
-                    /** @var array<int> */
-                    $arr = [];
+/** @var array<int> */
+$arr = [];
 
-                    foreach ($arr as &$var) {
-                        $var += 1;
-                    }
+foreach ($arr as &$var) {
+    $var += 1;
+}
 
-                    $var = "foo";
-                
+$var = "foo";
+
 ===expect===
 ReferenceReusedFromConfusingScope
 ===ignore===

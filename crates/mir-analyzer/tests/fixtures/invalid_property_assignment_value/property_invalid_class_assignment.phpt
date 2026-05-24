@@ -2,34 +2,34 @@
 propertyInvalidClassAssignment
 ===file===
 <?php
-                    namespace Bar;
+namespace Bar;
 
-                    class PropertyType {}
-                    class SomeOtherPropertyType {}
+class PropertyType {}
+class SomeOtherPropertyType {}
 
-                    /**
-                     * @property PropertyType $foo
-                     */
-                    class A {
-                        /** @param string $name */
-                        public function __get($name): ?string {
-                            if ($name === "foo") {
-                                return "hello";
-                            }
+/**
+ * @property PropertyType $foo
+ */
+class A {
+    /** @param string $name */
+    public function __get($name): ?string {
+        if ($name === "foo") {
+            return "hello";
+        }
 
-                            return null;
-                        }
+        return null;
+    }
 
-                        /**
-                         * @param string $name
-                         * @param mixed $value
-                         */
-                        public function __set($name, $value): void {
-                        }
-                    }
+    /**
+     * @param string $name
+     * @param mixed $value
+     */
+    public function __set($name, $value): void {
+    }
+}
 
-                    $a = new A();
-                    $a->foo = new SomeOtherPropertyType();
+$a = new A();
+$a->foo = new SomeOtherPropertyType();
 ===expect===
 InvalidPropertyAssignmentValue
 ===ignore===

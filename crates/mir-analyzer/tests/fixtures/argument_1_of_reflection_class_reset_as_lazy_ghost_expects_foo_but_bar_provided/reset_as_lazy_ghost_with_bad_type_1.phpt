@@ -2,10 +2,10 @@
 resetAsLazyGhostWithBadType_1
 ===file===
 <?php
-                    class Foo {}
-                    class Bar {}
-                    $reflectionClass = new ReflectionClass(Foo::class);
-                    $reflectionClass->resetAsLazyGhost(new Bar, function (Foo $foo) {});
+class Foo {}
+class Bar {}
+$reflectionClass = new ReflectionClass(Foo::class);
+$reflectionClass->resetAsLazyGhost(new Bar, function (Foo $foo) {});
 ===expect===
 Argument 1 of ReflectionClass::resetAsLazyGhost expects Foo, but Bar provided
 ===ignore===

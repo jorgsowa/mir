@@ -2,9 +2,9 @@
 preventImplementingClass
 ===file===
 <?php
-                    class Foo {}
+class Foo {}
 
-                    class Bar implements Foo {}
+class Bar implements Foo {}
 ===expect===
 UndefinedInterface
 ===ignore===

@@ -2,9 +2,9 @@
 nullablePropertyAssignment
 ===file===
 <?php
-                    $a = null;
+$a = null;
 
-                    $a->foo = "hello";
+$a->foo = "hello";
 ===expect===
 NullPropertyAssignment
 ===ignore===

@@ -2,21 +2,21 @@
 SKIPPED-switchManyGetClassWithRepetitionWithProperLineNumber
 ===file===
 <?php
-                    class A {}
-                    class B extends A {}
-                    class C extends A {}
-                    class D extends A {}
+class A {}
+class B extends A {}
+class C extends A {}
+class D extends A {}
 
-                    function foo(A $a) : void {
-                        switch(get_class($a)) {
-                            case B::class:
-                            case C::class:
-                            case B::class:
-                            case C::class:
-                            case D::class:
-                                echo "goodbye";
-                        }
-                    }
+function foo(A $a) : void {
+    switch(get_class($a)) {
+        case B::class:
+        case C::class:
+        case B::class:
+        case C::class:
+        case D::class:
+            echo "goodbye";
+    }
+}
 ===expect===
 RedundantCondition
 ===ignore===

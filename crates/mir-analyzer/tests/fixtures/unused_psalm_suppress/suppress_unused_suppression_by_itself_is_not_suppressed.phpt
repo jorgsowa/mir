@@ -2,13 +2,13 @@
 suppressUnusedSuppressionByItselfIsNotSuppressed
 ===file===
 <?php
-                    class Foo {
-                        /**
-                         * @psalm-suppress UnusedPsalmSuppress
-                         */
-                        public string $bar = "baz";
-                    }
-                
+class Foo {
+    /**
+     * @psalm-suppress UnusedPsalmSuppress
+     */
+    public string $bar = "baz";
+}
+
 ===expect===
 UnusedPsalmSuppress
 ===ignore===

@@ -2,8 +2,8 @@
 attributeInvalidTargetParameter
 ===file===
 <?php
-                    function foo(#[Attribute] string $_bar): void {}
-                
+function foo(#[Attribute] string $_bar): void {}
+
 ===expect===
 InvalidAttribute
 ===ignore===

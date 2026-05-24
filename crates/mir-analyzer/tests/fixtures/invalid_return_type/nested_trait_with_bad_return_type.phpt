@@ -2,19 +2,19 @@
 nestedTraitWithBadReturnType
 ===file===
 <?php
-                    trait A {
-                        public function foo() : string {
-                            return 5;
-                        }
-                    }
+trait A {
+    public function foo() : string {
+        return 5;
+    }
+}
 
-                    trait B {
-                        use A;
-                    }
+trait B {
+    use A;
+}
 
-                    class C {
-                        use B;
-                    }
+class C {
+    use B;
+}
 ===expect===
 InvalidReturnType
 ===ignore===

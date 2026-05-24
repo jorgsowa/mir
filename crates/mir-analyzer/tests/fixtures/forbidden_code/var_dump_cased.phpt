@@ -2,7 +2,7 @@
 varDumpCased
 ===file===
 <?php
-                    vAr_dUMp("hello");
+vAr_dUMp("hello");
 ===expect===
 ForbiddenCode
 ===ignore===

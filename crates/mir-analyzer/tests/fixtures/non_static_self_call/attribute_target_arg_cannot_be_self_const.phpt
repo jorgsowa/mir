@@ -2,12 +2,12 @@
 attributeTargetArgCannotBeSelfConst
 ===file===
 <?php
-                    #[Attribute(self::BAR)]
-                    class Foo
-                    {
-                        public const BAR = 1;
-                    }
-                
+#[Attribute(self::BAR)]
+class Foo
+{
+    public const BAR = 1;
+}
+
 ===expect===
 NonStaticSelfCall
 ===ignore===

@@ -2,13 +2,13 @@
 abstractInterfaceImplementsWithSubclass
 ===file===
 <?php
-                    interface I {
-                        public function fnc() : void;
-                    }
+interface I {
+    public function fnc() : void;
+}
 
-                    abstract class A implements I {}
+abstract class A implements I {}
 
-                    class B extends A {}
+class B extends A {}
 ===expect===
 UnimplementedInterfaceMethod
 ===ignore===

@@ -2,12 +2,12 @@
 deprecatedClassStringConstant
 ===file===
 <?php
-                    /**
-                     * @deprecated
-                     */
-                    class Foo {}
+/**
+ * @deprecated
+ */
+class Foo {}
 
-                    echo Foo::class;
+echo Foo::class;
 ===expect===
 DeprecatedClass
 ===ignore===

@@ -2,7 +2,7 @@
 unusedClass
 ===file===
 <?php
-                    final class A { }
+final class A { }
 ===expect===
 UnusedClass
 ===ignore===

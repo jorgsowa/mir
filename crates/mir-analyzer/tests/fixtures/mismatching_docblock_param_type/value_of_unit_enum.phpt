@@ -2,17 +2,17 @@
 valueOfUnitEnum
 ===file===
 <?php
-                    enum Foo
-                    {
-                        case Foo;
-                        case Bar;
-                    }
+    enum Foo
+    {
+        case Foo;
+        case Bar;
+    }
 
-                    /** @param value-of<Foo> $arg */
-                    function foobar(string $arg): void {}
-                '
-                // TODO turn this into an InvalidDocblock with a better error message. This is difficult because it
-                // has to happen after scanning has finished, otherwise the class might not have been scanned yet.
+    /** @param value-of<Foo> $arg */
+    function foobar(string $arg): void {}
+'
+// TODO turn this into an InvalidDocblock with a better error message. This is difficult because it
+// has to happen after scanning has finished, otherwise the class might not have been scanned yet.
 ===expect===
 MismatchingDocblockParamType
 ===ignore===

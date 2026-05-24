@@ -2,19 +2,19 @@
 redefinedTraitMethodInSubclass
 ===file===
 <?php
-                    trait T {
-                        public function fooFoo(): void {
-                        }
-                    }
+trait T {
+    public function fooFoo(): void {
+    }
+}
 
-                    class B {
-                        use T;
-                    }
+class B {
+    use T;
+}
 
-                    class C extends B {
-                        public function fooFoo(string $a): void {
-                        }
-                    }
+class C extends B {
+    public function fooFoo(string $a): void {
+    }
+}
 ===expect===
 MethodSignatureMismatch
 ===ignore===

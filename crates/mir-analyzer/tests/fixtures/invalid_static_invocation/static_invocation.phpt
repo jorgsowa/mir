@@ -2,11 +2,11 @@
 staticInvocation
 ===file===
 <?php
-                    class Foo {
-                        public function barBar(): void {}
-                    }
+class Foo {
+    public function barBar(): void {}
+}
 
-                    Foo::barBar();
+Foo::barBar();
 ===expect===
 InvalidStaticInvocation
 ===ignore===

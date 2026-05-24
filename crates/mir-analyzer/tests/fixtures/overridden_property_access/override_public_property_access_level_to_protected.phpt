@@ -2,15 +2,15 @@
 overridePublicPropertyAccessLevelToProtected
 ===file===
 <?php
-                    class A {
-                        /** @var string|null */
-                        public $foo;
-                    }
+class A {
+    /** @var string|null */
+    public $foo;
+}
 
-                    class B extends A {
-                        /** @var string|null */
-                        protected $foo;
-                    }
+class B extends A {
+    /** @var string|null */
+    protected $foo;
+}
 ===expect===
 OverriddenPropertyAccess
 ===ignore===

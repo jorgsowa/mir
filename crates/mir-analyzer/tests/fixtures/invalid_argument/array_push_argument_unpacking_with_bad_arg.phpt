@@ -2,12 +2,12 @@
 arrayPushArgumentUnpackingWithBadArg
 ===file===
 <?php
-                    $a = [];
-                    $b = "hello";
+$a = [];
+$b = "hello";
 
-                    $a[] = "foo";
+$a[] = "foo";
 
-                    array_push($a, ...$b);
+array_push($a, ...$b);
 ===expect===
 InvalidArgument
 ===ignore===

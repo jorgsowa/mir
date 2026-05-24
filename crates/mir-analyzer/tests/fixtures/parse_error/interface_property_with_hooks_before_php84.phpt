@@ -2,9 +2,9 @@
 interfacePropertyWithHooksBeforePhp84
 ===file===
 <?php
-                    interface A {
-                        public string $value { get; }
-                    }
+interface A {
+    public string $value { get; }
+}
 ===expect===
 ParseError
 ===ignore===

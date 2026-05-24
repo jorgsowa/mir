@@ -2,17 +2,17 @@
 badArrayProperty
 ===file===
 <?php
-                    class A {}
+class A {}
 
-                    class B {}
+class B {}
 
-                    class C {
-                        /** @var array<B> */
-                        public $bb;
-                    }
+class C {
+    /** @var array<B> */
+    public $bb;
+}
 
-                    $c = new C;
-                    $c->bb = [new A, new B];
+$c = new C;
+$c->bb = [new A, new B];
 ===expect===
 InvalidPropertyAssignmentValue
 ===ignore===

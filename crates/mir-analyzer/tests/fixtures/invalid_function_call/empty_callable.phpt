@@ -2,8 +2,8 @@
 emptyCallable
 ===file===
 <?php
-                    $a = "";
-                    $a();
+$a = "";
+$a();
 ===expect===
 InvalidFunctionCall
 ===ignore===

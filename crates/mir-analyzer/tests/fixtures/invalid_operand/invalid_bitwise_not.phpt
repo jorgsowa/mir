@@ -2,7 +2,7 @@
 invalidBitwiseNot
 ===file===
 <?php
-                    $a = ~new stdClass;
+$a = ~new stdClass;
 ===expect===
 InvalidOperand
 ===ignore===

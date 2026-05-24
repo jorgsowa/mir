@@ -2,12 +2,12 @@
 invalidPrivateClassConstFetch
 ===file===
 <?php
-                    class A
-                    {
-                        private const IS_PRIVATE = 1;
-                    }
+class A
+{
+    private const IS_PRIVATE = 1;
+}
 
-                    echo A::IS_PRIVATE;
+echo A::IS_PRIVATE;
 ===expect===
 InaccessibleClassConstant
 ===ignore===

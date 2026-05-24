@@ -2,11 +2,11 @@
 arrayFilterBadArgs
 ===file===
 <?php
-                    function foo(int $i) : bool {
-                      return true;
-                    }
+function foo(int $i) : bool {
+  return true;
+}
 
-                    array_filter(["hello"], "foo");
+array_filter(["hello"], "foo");
 ===expect===
 InvalidScalarArgument
 ===ignore===
