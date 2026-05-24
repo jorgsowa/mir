@@ -209,14 +209,21 @@ impl CallAnalyzer {
         // reference so the named function is not flagged as dead code.
         // Note: 'helper' always resolves to \helper (global) — no namespace
         // fallback applies to runtime callable strings.
+        let mut call_user_func_string_arg = false;
         if matches!(
             resolved_fn_name.as_str(),
             "call_user_func" | "call_user_func_array"
         ) {
             if let Some(arg) = call.args.first() {
                 if let ExprKind::String(name) = &arg.value.kind {
-                    let fqn = name.as_ref().strip_prefix('\\').unwrap_or(name.as_ref());
-                    let here = crate::db::Fqcn::from_str(ea.db, fqn);
+                    call_user_func_string_arg = true;
+                    // Always look in global namespace (with explicit backslash prefix)
+                    let fqn = if name.as_ref().starts_with('\\') {
+                        name.as_ref().to_string()
+                    } else {
+                        format!("\\{}", name.as_ref())
+                    };
+                    let here = crate::db::Fqcn::from_str(ea.db, &fqn);
                     let canonical_fqn: Option<Arc<str>> =
                         crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
                     if let Some(canonical_fqn) = canonical_fqn {
@@ -441,11 +448,15 @@ impl CallAnalyzer {
                 }
             }
         }
-        ea.emit(
-            IssueKind::UndefinedFunction { name: fn_name },
-            Severity::Error,
-            span,
-        );
+        // Don't emit UndefinedFunction if call_user_func/call_user_func_array with string arg
+        // - string args are runtime callable names that may not exist at compile time
+        if !call_user_func_string_arg {
+            ea.emit(
+                IssueKind::UndefinedFunction { name: fn_name },
+                Severity::Error,
+                span,
+            );
+        }
         Union::mixed()
     }
 }

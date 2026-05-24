@@ -8,12 +8,12 @@ use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessEx
 use std::sync::Arc;
 
 fn is_valid_class_name_type(ty: &Union) -> bool {
-    // Class names must be strings or class-string types.
-    // Mixed is allowed since it's already imprecise.
+    // Class names must be strings or class-string types only.
+    // Mixed is not allowed - must be explicit string or class-string.
     ty.contains(|t| {
         matches!(
             t,
-            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_) | Atomic::TMixed
+            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_)
         )
     })
 }

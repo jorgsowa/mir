@@ -362,7 +362,13 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
             }
 
             // Validate callable and class-string arguments
-            validate_callable_argument(ea, param_ty, &arg_ty, arg_span);
+            // Skip validation for call_user_func/call_user_func_array first argument
+            // since it may be a runtime callable name that doesn't exist at compile time
+            let skip_validation =
+                matches!(fn_name, "call_user_func" | "call_user_func_array") && arg_idx == 0;
+            if !skip_validation {
+                validate_callable_argument(ea, param_ty, &arg_ty, arg_span);
+            }
             validate_class_string_argument(ea, param_ty, &arg_ty, arg_span);
             validate_callable_type(ea, param_ty, &arg_ty, arg_span);
 
