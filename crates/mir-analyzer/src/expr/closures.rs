@@ -1,8 +1,10 @@
 use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_union};
 use super::ExpressionAnalyzer;
 use crate::context::Context;
+use crate::stmt::widen_for_check;
+use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Symbol, Union};
-use php_ast::owned::{ArrowFunctionExpr, ClosureExpr};
+use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind};
 use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -161,6 +163,33 @@ impl<'a> ExpressionAnalyzer<'a> {
             if !arrow_ctx.vars.contains_key(name) {
                 std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(*name, ty.clone());
                 std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(*name);
+            }
+        }
+
+        // Check @mir-check directives in the arrow function body.
+        // If the body is parenthesized, look for docblocks before the inner expression.
+        let check_target = match &af.body.kind {
+            ExprKind::Parenthesized(inner) => inner.as_ref(),
+            _ => &af.body,
+        };
+        if let Some(doc) =
+            crate::parser::find_preceding_docblock(self.source, check_target.span.start)
+        {
+            let checks = crate::parser::DocblockParser::parse(&doc).mir_checks;
+            for (var_name, expected_str) in checks {
+                let expected = crate::parser::docblock::parse_type_string(&expected_str);
+                let actual = widen_for_check(arrow_ctx.get_var(&var_name));
+                if expected.to_string() != actual.to_string() {
+                    self.emit(
+                        IssueKind::TypeCheckMismatch {
+                            var: var_name,
+                            expected: expected.to_string(),
+                            actual: actual.to_string(),
+                        },
+                        Severity::Error,
+                        check_target.span,
+                    );
+                }
             }
         }
 

@@ -491,14 +491,13 @@ impl<'a> StatementsAnalyzer<'a> {
 
 /// Widen literal types to their base scalar type for `@mir-check` comparisons.
 /// `TLiteralInt(42)` → `TInt`, `TLiteralString("s")` → `TString`, etc.
-fn widen_for_check(u: Union) -> Union {
+pub(crate) fn widen_for_check(u: Union) -> Union {
     let mut out = Union::empty();
     for atomic in u.types {
         let widened = match atomic {
             Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => Atomic::TInt,
             Atomic::TLiteralString(_) => Atomic::TString,
             Atomic::TLiteralFloat(_, _) => Atomic::TFloat,
-            Atomic::TTrue | Atomic::TFalse => Atomic::TBool,
             other => other,
         };
         out.add_type(widened);

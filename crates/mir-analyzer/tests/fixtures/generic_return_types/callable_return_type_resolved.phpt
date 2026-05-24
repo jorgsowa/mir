@@ -14,8 +14,7 @@ function test(): void {
     /** @var Registry<Service> $reg */
     $reg = new Registry();
     $resolver = $reg->resolver();
-    /** @mir-check $resolver is callable():Service */
     $resolver()->undefinedMethod();
 }
 ===expect===
-UndefinedMethod@16:4: Method Service::undefinedMethod() does not exist
+UndefinedMethod@14:4: Method Service::undefinedMethod() does not exist
