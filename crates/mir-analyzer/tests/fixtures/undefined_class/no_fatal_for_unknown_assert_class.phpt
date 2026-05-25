@@ -13,7 +13,7 @@ class Bar implements Foo {
 /**
  * @param mixed $value
  * @param class-string $type
- * @psalm-assert SomeUndefinedClass $value
+ * @assert SomeUndefinedClass $value
  */
 function assertInstanceOf($value, string $type): void {
     // some code

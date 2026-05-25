@@ -3,7 +3,7 @@ inheritSealedMethodsWithStatic
 ===file===
 <?php
 /**
- * @psalm-seal-methods
+ * @seal-methods
  */
 class A {
     public static function __callStatic(string $method, array $args) {}

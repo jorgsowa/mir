@@ -5,7 +5,7 @@ undefinedStaticPropertyAssignment
 class A {
     public static function barBar(): void
     {
-        /** @psalm-suppress UndefinedPropertyFetch */
+        /** @suppress UndefinedPropertyFetch */
         self::$foo = 5;
     }
 }

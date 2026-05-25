@@ -10,7 +10,7 @@ function generator2() : Generator {
 }
 
 /**
- * @psalm-suppress InvalidNullableReturnType
+ * @suppress InvalidNullableReturnType
  */
 function notagenerator() : Generator {
     if (rand(0, 1)) {

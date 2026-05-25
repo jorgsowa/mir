@@ -2,7 +2,7 @@
 useOfGlobalMakesFunctionImpure
 ===file===
 <?php
-/** @psalm-pure */
+/** @pure */
 function addCumulative(int $left) : int {
     /** @var int */
     global $i;

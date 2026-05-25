@@ -3,7 +3,7 @@ constructor
 ===file===
 <?php
 /**
- * @psalm-consistent-constructor
+ * @consistent-constructor
  */
 class C {
     public function __construct() {}

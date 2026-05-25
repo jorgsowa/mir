@@ -12,7 +12,7 @@ final class ArrayList
 {
     /**
      * @template A
-     * @psalm-if-this-is ArrayList<Option<A>>
+     * @if-this-is ArrayList<Option<A>>
      * @return ArrayList<A>
      */
     public function compact(): ArrayList

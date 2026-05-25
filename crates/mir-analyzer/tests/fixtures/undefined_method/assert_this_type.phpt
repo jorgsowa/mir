@@ -4,7 +4,7 @@ assertThisType
 <?php
 class Type {
     /**
-     * @psalm-assert FooType $this
+     * @assert FooType $this
      */
     public function isFoo() : bool {
         if (!$this instanceof FooType) {

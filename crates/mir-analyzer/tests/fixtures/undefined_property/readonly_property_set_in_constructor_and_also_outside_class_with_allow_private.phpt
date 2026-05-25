@@ -5,7 +5,7 @@ readonlyPropertySetInConstructorAndAlsoOutsideClassWithAllowPrivate
 class A {
     /**
      * @readonly
-     * @psalm-allow-private-mutation
+     * @allow-private-mutation
      */
     public string $bar;
 

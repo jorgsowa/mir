@@ -5,7 +5,7 @@ intRangeNotContained
 /**
  * @param int<1,12> $a
  * @return int<-1, 11>
- * @psalm-suppress InvalidReturnStatement
+ * @suppress InvalidReturnStatement
  */
 function scope(int $a){
     return $a;

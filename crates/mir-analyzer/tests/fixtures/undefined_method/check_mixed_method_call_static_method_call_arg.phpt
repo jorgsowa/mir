@@ -5,7 +5,7 @@ checkMixedMethodCallStaticMethodCallArg
 class B {}
 /** @param mixed $a */
 function foo($a) : void {
-    /** @psalm-suppress MixedMethodCall */
+    /** @suppress MixedMethodCall */
     $a->bar(B::bat());
 }
 ===expect===

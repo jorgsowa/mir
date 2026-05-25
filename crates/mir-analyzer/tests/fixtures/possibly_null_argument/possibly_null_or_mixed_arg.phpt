@@ -13,8 +13,8 @@ function takesString(string $s) : void {}
 
 function takesA(?A $a) : void {
     /**
-     * @psalm-suppress PossiblyNullPropertyFetch
-     * @psalm-suppress MixedArgument
+     * @suppress PossiblyNullPropertyFetch
+     * @suppress MixedArgument
      */
     takesString($a->foo);
 }

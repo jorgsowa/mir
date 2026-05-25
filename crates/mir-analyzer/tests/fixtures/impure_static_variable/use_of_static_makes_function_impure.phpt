@@ -2,7 +2,7 @@
 useOfStaticMakesFunctionImpure
 ===file===
 <?php
-/** @psalm-pure */
+/** @pure */
 function addCumulative(int $left) : int {
     /** @var int */
     static $i = 0;

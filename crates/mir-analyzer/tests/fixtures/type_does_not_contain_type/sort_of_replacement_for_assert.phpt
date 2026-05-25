@@ -6,7 +6,7 @@ namespace Bar;
 
 /**
  * @param mixed $_b
- * @psalm-assert true $_b
+ * @assert true $_b
  */
 function myAssert($_b) : void {
     if ($_b !== true) {

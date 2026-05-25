@@ -3,7 +3,7 @@ impureGlobalImmutable
 ===file===
 <?php
 /**
- * @psalm-immutable
+ * @immutable
  */
 class A {
     /**

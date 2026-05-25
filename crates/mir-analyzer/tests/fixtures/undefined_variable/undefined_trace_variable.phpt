@@ -2,7 +2,7 @@
 undefinedTraceVariable
 ===file===
 <?php
-/** @psalm-trace $b */
+/** @trace $b */
 echo 1;
 ===expect===
 UndefinedTrace

@@ -8,7 +8,7 @@ class Foo
 }
 
 /**
- * @psalm-assert-if-true !null $foo->bar
+ * @assert-if-true !null $foo->bar
  */
 function assertBarNotNull(Foo $foo): bool
 {

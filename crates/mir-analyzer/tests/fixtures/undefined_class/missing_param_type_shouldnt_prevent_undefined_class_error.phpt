@@ -2,7 +2,7 @@
 missingParamTypeShouldntPreventUndefinedClassError
 ===file===
 <?php
-/** @psalm-suppress MissingParamType */
+/** @suppress MissingParamType */
 function foo($s = Foo::BAR) : void {}
 ===expect===
 UnusedParam@3:14: Parameter $s is never used

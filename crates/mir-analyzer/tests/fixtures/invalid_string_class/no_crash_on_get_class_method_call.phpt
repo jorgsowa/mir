@@ -4,7 +4,7 @@ noCrashOnGetClassMethodCall
 <?php
 class User {
     /**
-     * @psalm-suppress MixedArgument
+     * @suppress MixedArgument
      */
     public function give(): void{
         /** @var mixed */

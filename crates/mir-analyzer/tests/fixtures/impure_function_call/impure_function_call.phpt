@@ -3,14 +3,14 @@ ImpureFunctionCall
 ===file===
 <?php
 /**
- * @psalm-template T
+ * @template T
  *
- * @psalm-param array<int, T> $values
- * @psalm-param (callable(T): numeric) $num_func
+ * @param array<int, T> $values
+ * @param (callable(T): numeric) $num_func
  *
- * @psalm-return null|T
+ * @return null|T
  *
- * @psalm-pure
+ * @pure
  */
 function max_by(array $values, callable $num_func)
 {

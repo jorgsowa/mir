@@ -5,7 +5,7 @@ canCreateObjectWithNoExternalMutationsFail
 class Counter {
     private int $count = 0;
 
-    /** @psalm-mutation-free */
+    /** @mutation-free */
     public function __construct(int $count) {
         $this->count = $count;
     }
@@ -15,7 +15,7 @@ class Counter {
     }
 }
 
-/** @psalm-pure */
+/** @pure */
 function makesACounter(int $i) : Counter {
     $c = new Counter($i);
     $c->increment();

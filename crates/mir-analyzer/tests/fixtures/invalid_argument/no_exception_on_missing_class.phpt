@@ -2,7 +2,7 @@
 noExceptionOnMissingClass
 ===file===
 <?php
-/** @psalm-suppress UndefinedClass */
+/** @suppress UndefinedClass */
 class A
 {
     /** @var class-string<Foo> */

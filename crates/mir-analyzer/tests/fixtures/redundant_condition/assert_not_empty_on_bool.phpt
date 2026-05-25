@@ -4,7 +4,7 @@ assertNotEmptyOnBool
 <?php
 /**
  * @param mixed $value
- * @psalm-assert !empty $value
+ * @assert !empty $value
  */
 function assertNotEmpty($value) : void {}
 

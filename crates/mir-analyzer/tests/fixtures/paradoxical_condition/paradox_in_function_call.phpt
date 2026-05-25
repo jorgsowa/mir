@@ -2,9 +2,9 @@
 paradoxInFunctionCall
 ===file===
 <?php
-/** @psalm-return 1|2|3 */
+/** @return 1|2|3 */
 function foo() {
-    /** @psalm-var 1|2|3 $bar */
+    /** @var 1|2|3 $bar */
     $bar = rand(1, 3);
     return $bar;
 }

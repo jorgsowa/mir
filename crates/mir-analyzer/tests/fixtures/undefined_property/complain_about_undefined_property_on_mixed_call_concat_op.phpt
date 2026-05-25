@@ -4,7 +4,7 @@ complainAboutUndefinedPropertyOnMixedCallConcatOp
 <?php
 class A {
     /**
-     * @psalm-suppress MixedMethodCall
+     * @suppress MixedMethodCall
      */
     public function foo(object $a) : void {
         $a->bar("bat" . $this->baz);

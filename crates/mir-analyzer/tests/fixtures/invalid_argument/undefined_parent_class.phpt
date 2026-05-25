@@ -3,7 +3,7 @@ undefinedParentClass
 ===file===
 <?php
 /**
- * @psalm-suppress UndefinedClass
+ * @suppress UndefinedClass
  */
 class B extends A {}
 

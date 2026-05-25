@@ -4,8 +4,8 @@ assertScalarAndEmpty
 <?php
 /**
  * @param mixed $value
- * @psalm-assert scalar $value
- * @psalm-assert !empty $value
+ * @assert scalar $value
+ * @assert !empty $value
  */
 function assertScalarNotEmpty($value) : void {}
 

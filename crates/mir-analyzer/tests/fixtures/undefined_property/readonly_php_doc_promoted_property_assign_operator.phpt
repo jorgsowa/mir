@@ -7,7 +7,7 @@ final class A
 {
     public function __construct(
         /**
-         * @psalm-readonly
+         * @readonly
          */
         private string $string,
     ) {

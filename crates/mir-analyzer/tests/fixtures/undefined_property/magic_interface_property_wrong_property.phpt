@@ -4,7 +4,7 @@ magicInterfacePropertyWrongProperty
 <?php
 /**
  * @property-read string $foo
- * @psalm-seal-properties
+ * @seal-properties
  */
 interface GetterSetter {
     /** @return mixed */
@@ -13,7 +13,7 @@ interface GetterSetter {
     public function __set(string $key, $value) : void;
 }
 
-/** @psalm-suppress NoInterfaceProperties */
+/** @suppress NoInterfaceProperties */
 function getBar(GetterSetter $o) : string {
     return $o->bar;
 }

@@ -9,7 +9,7 @@ implicitCastWithStrictTypes
                         }
                     }
 
-                    /** @psalm-mutation-free */
+                    /** @mutation-free */
                     function fooFoo(string $b): void {}
                     fooFoo(new A());
 ===expect===

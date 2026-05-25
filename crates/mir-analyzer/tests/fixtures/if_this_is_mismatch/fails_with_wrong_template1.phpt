@@ -18,7 +18,7 @@ class a {
         $this->data = $data;
     }
     /**
-     * @psalm-if-this-is a<int>
+     * @if-this-is a<int>
      */
     public function test(): void {
     }

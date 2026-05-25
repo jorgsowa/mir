@@ -3,10 +3,10 @@ impureCallableArgument
 ===file===
 <?php
 /**
- * @psalm-param array<int, int> $values
- * @psalm-param pure-callable(int):int $num_func
+ * @param array<int, int> $values
+ * @param pure-callable(int):int $num_func
  *
- * @psalm-pure
+ * @pure
  */
 function max_by(array $values, callable $num_func) : ?int {
     $max = null;

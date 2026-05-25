@@ -3,7 +3,7 @@ magicSetterUndefinedProperty
 ===file===
 <?php
 /**
- * @psalm-seal-properties
+ * @seal-properties
  */
 class A {
     public function __get(string $name): ?string {

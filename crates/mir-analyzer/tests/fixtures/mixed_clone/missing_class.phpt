@@ -3,13 +3,13 @@ missingClass
 ===file===
 <?php
 /**
- * @psalm-suppress UndefinedDocblockClass
- * @psalm-suppress InvalidReturnType
+ * @suppress UndefinedDocblockClass
+ * @suppress InvalidReturnType
  * @return Editable
  */
 function get() {}
 
-/** @psalm-suppress UndefinedDocblockClass */
+/** @suppress UndefinedDocblockClass */
 clone get();
 ===expect===
 InvalidClone

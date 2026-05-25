@@ -5,7 +5,7 @@ undefinedClassOneLineWithLineAfter
 class A {
     public function b() {
         /**
-         * @psalm-suppress UndefinedClass
+         * @suppress UndefinedClass
          */
         new B();
         new C();

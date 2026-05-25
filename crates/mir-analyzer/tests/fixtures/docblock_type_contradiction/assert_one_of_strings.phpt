@@ -3,7 +3,7 @@ assertOneOfStrings
 ===file===
 <?php
 /**
- * @psalm-assert "a"|"b" $s
+ * @assert "a"|"b" $s
  */
 function foo(string $s) : void {}
 

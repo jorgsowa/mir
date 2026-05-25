@@ -6,7 +6,7 @@ interface Location {
     public function getId(): int;
 }
 
-/** @psalm-immutable */
+/** @immutable */
 interface Application {
     public function getLocation(): ?Location;
 }

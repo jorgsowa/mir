@@ -14,7 +14,7 @@ class User {
  * @param array{id: int, name: string} $data
  */
 function processUserDataInvalid(array $data) : User {
-    /** @psalm-suppress MixedArgument */
+    /** @suppress MixedArgument */
     return new User(...$data);
 }
 ===expect===

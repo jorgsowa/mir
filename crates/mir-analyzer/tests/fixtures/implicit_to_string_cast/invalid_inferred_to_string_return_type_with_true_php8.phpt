@@ -4,7 +4,7 @@ invalidInferredToStringReturnTypeWithTruePhp8
 <?php
 class A {
     function __toString() {
-        /** @psalm-suppress InvalidReturnStatement */
+        /** @suppress InvalidReturnStatement */
         return true;
     }
 }

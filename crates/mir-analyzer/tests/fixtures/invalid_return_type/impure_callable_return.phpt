@@ -3,11 +3,11 @@ impureCallableReturn
 ===file===
 <?php
 /**
- * @psalm-pure
+ * @pure
  * @return pure-callable():int
  */
 function foo(): callable {
-    /** @psalm-suppress ImpureFunctionCall */
+    /** @suppress ImpureFunctionCall */
     return function() {
         echo "bar";
         return 1;

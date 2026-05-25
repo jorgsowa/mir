@@ -11,7 +11,7 @@ class A {
 
 /** 
  * @param string|int $b
- * @psalm-mutation-free 
+ * @mutation-free 
  */
 function fooFoo($b): void {}
 fooFoo(new A());

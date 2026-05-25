@@ -2,7 +2,7 @@
 useOfGlobalsMakesFunctionImpure
 ===file===
 <?php
-/** @psalm-pure */
+/** @pure */
 function addCumulativeGlobals(int $left) : int {
     $GLOBALS["i"] ??= 0;
     $GLOBALS["i"] += $left;

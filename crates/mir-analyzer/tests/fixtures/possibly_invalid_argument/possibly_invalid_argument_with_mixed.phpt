@@ -3,8 +3,8 @@ possiblyInvalidArgumentWithMixed
 ===file===
 <?php declare(strict_types=1);
 /**
- * @psalm-suppress MissingParamType
- * @psalm-suppress MixedArgument
+ * @suppress MissingParamType
+ * @suppress MixedArgument
  */
 function foo($a) : void {
     if (rand(0, 1)) {

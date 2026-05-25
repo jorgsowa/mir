@@ -3,7 +3,7 @@ undefinedClassOneLineInFileAfter
 ===file===
 <?php
 /**
- * @psalm-suppress UndefinedClass
+ * @suppress UndefinedClass
  */
 new B();
 new C();

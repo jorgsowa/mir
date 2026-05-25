@@ -26,7 +26,7 @@ class Foo
     /**
      * @param string $name
      * @param mixed $val
-     * @psalm-if-this-is Foo<Unfrozen>
+     * @if-this-is Foo<Unfrozen>
      * @return void
      */
     public function set($name, $val) {}

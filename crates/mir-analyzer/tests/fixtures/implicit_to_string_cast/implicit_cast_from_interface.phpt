@@ -6,7 +6,7 @@ interface I {
     public function __toString();
 }
 
-/** @psalm-mutation-free */
+/** @mutation-free */
 function takesString(string $str): void { }
 
 function takesI(I $i): void

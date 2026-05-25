@@ -3,7 +3,7 @@ consistentNamesConstructor
 ===file===
 <?php
 /**
- * @psalm-consistent-constructor
+ * @consistent-constructor
  */
 class A
 {

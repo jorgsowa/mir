@@ -8,7 +8,7 @@ class C {
     const A = "bat";
     const B = "baz";
 }
-/** @psalm-param "foo"|"bar"|C::A|C::B $s */
+/** @param "foo"|"bar"|C::A|C::B $s */
 function foo($s) : void {}
 foo("for");
 ===expect===

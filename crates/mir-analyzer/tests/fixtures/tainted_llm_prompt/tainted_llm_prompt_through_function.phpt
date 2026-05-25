@@ -3,7 +3,7 @@ taintedLlmPromptThroughFunction
 ===file===
 <?php
 class LlmAgent {
-    /** @psalm-taint-sink llm_prompt $prompt */
+    /** @taint-sink llm_prompt $prompt */
     public function prompt(string $prompt): string {
         return "";
     }

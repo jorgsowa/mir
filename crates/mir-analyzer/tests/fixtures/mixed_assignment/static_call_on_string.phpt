@@ -8,7 +8,7 @@ class A {
     }
 }
 $foo = "A";
-/** @psalm-suppress InvalidStringClass */
+/** @suppress InvalidStringClass */
 $b = $foo::bar();
 ===expect===
 MixedAssignment

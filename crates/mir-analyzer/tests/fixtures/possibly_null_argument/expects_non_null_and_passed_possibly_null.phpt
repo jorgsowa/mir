@@ -7,7 +7,7 @@ expectsNonNullAndPassedPossiblyNull
  */
 function foo($mixed, $mixed_or_null): void {
     /**
-     * @psalm-suppress MixedArgument
+     * @suppress MixedArgument
      */
     new Exception($mixed_or_null);
 }

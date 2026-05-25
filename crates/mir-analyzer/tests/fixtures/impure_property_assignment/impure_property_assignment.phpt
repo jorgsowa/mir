@@ -8,7 +8,7 @@ class A {
     public int $a = 5;
 }
 
-/** @psalm-pure */
+/** @pure */
 function filterOdd(int $i, A $a) : ?int {
     $a->a = $i;
 

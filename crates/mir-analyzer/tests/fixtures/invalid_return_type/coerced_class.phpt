@@ -19,7 +19,7 @@ class NullableBug {
      * @return ?NullableClass
      */
     public function returns_nullable_class() {
-        /** @psalm-suppress ArgumentTypeCoercion */
+        /** @suppress ArgumentTypeCoercion */
         return self::mock("NullableClass");
     }
 }

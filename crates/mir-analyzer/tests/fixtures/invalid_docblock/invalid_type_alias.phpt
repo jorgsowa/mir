@@ -5,7 +5,7 @@ invalidTypeAlias
 namespace Barrr;
 
 /**
- * @psalm-type CoolType = A|B>
+ * @type CoolType = A|B>
  */
 
 class A {}

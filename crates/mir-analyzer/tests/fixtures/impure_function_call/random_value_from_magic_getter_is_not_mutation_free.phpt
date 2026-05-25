@@ -6,7 +6,7 @@ randomValueFromMagicGetterIsNotMutationFree
  * @property int<1, 10> $b
  */
 class A {
-    /** @psalm-mutation-free */
+    /** @mutation-free */
     public function __get(string $key)
     {
         if ($key === "b") {
@@ -24,7 +24,7 @@ class A {
 
 $a = new A;
 
-/** @psalm-assert-if-true =1 $arg->b */
+/** @assert-if-true =1 $arg->b */
 function assertBIsOne(A $arg): bool
 {
     return $arg->b === 1;

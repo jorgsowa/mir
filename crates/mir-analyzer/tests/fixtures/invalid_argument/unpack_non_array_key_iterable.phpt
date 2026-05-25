@@ -2,7 +2,7 @@
 unpackNonArrayKeyIterable
 ===file===
 <?php
-/** @psalm-suppress UnusedParam */
+/** @suppress UnusedParam */
 function foo(string ...$args): void {}
 
 /** @var Iterator<float, string> */

@@ -12,7 +12,7 @@ class A {
     }
 }
 
-/** @psalm-pure */
+/** @pure */
 function filterOdd(int $i, A $a) : ?int {
     $a->foo();
 

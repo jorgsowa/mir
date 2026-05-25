@@ -2,7 +2,7 @@
 traceVariables
 ===file===
 <?php
-/** @psalm-trace $a $b */
+/** @trace $a $b */
 $a = getmypid();
 $b = getmypid();
 ===expect===

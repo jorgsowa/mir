@@ -11,7 +11,7 @@ $foo = null;
 $foo =
     /**
      * @param mixed $bar
-     * @psalm-suppress MixedFunctionCall
+     * @suppress MixedFunctionCall
      */
     function ($bar) use (&$foo): string
     {

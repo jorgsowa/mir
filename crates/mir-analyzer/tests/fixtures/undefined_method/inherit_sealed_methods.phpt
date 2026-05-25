@@ -3,7 +3,7 @@ inheritSealedMethods
 ===file===
 <?php
 /**
- * @psalm-seal-methods
+ * @seal-methods
  */
 class A {
     public function __call(string $method, array $args) {}

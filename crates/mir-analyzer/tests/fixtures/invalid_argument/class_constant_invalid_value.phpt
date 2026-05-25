@@ -7,7 +7,7 @@ namespace NS {
     class C {}
     class D {};
     class F {};
-    /** @psalm-param C::class|D::class|E::class $s */
+    /** @param C::class|D::class|E::class $s */
     function foo(string $s) : void {}
     foo(F::class);
 }

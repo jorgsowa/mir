@@ -14,7 +14,7 @@ class B {
     }
 }
 
-/** @psalm-pure */
+/** @pure */
 function filterOdd(int $i, A $a) : ?int {
     $b = new B($a);
 

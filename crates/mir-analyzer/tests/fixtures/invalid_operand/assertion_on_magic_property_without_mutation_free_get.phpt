@@ -12,7 +12,7 @@ class A {
 
 $a = new A;
 
-/** @psalm-assert-if-true  string $arg->b */
+/** @assert-if-true  string $arg->b */
 function assertString(A $arg): bool {return $arg->b !== null;}
 
 if (assertString($a)) {

@@ -4,7 +4,7 @@ invalidUnionAssertion
 <?php
 interface I {
     /**
-     * @psalm-assert null|!ExpectedType $value
+     * @assert null|!ExpectedType $value
      */
     public static function foo($value);
 }

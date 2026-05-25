@@ -3,7 +3,7 @@ noNamedArgumentsUnpackIterable
 ===file===
 <?php
 /**
- * @psalm-suppress UnusedParam
+ * @suppress UnusedParam
  * @no-named-arguments
  */
 function foo(int $arg1, int $arg2): void {}

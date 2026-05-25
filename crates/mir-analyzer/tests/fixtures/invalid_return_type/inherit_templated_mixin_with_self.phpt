@@ -7,19 +7,19 @@ inheritTemplatedMixinWithSelf
  */
 class Mixin {
     /**
-     * @psalm-var T
+     * @var T
      */
     private $var;
 
     /**
-     * @psalm-param T $var
+     * @param T $var
      */
     public function __construct ($var) {
         $this->var = $var;
     }
 
     /**
-     * @psalm-return T
+     * @return T
      */
     public function type() {
         return $this->var;
@@ -45,7 +45,7 @@ abstract class Foo {
 abstract class FooChild extends Foo{}
 
 /**
- * @psalm-suppress MissingConstructor
+ * @suppress MissingConstructor
  */
 final class FooGrandChild extends FooChild {}
 

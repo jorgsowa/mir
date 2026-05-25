@@ -5,7 +5,7 @@ assertIfTrueMethodCall
 class C {
     /**
      * @param mixed $p
-     * @psalm-assert-if-true int $p
+     * @assert-if-true int $p
      */
     public function isInt($p): bool {
         return is_int($p);

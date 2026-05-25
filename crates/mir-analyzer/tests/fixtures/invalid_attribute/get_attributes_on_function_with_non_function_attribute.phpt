@@ -7,7 +7,7 @@ class Attr {}
 
 function foo(): void {}
 
-/** @psalm-suppress InvalidArgument */
+/** @suppress InvalidArgument */
 $r = new ReflectionFunction("foo");
 $r->getAttributes(Attr::class);
 

@@ -6,7 +6,7 @@ class A {
     /** @var string|null */
     public $a;
 
-    /** @psalm-assert-if-true string $this->a */
+    /** @assert-if-true string $this->a */
     function hasA() {
         return is_string($this->a);
     }

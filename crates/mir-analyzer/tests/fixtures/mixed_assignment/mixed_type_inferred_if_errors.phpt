@@ -8,7 +8,7 @@ class A {}
  */
 function foo($a): void {
     /**
-     * @psalm-suppress PossiblyInvalidClone
+     * @suppress PossiblyInvalidClone
      */
     $cloned = clone $a;
 }

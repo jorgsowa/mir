@@ -4,7 +4,7 @@ readonlyPublicPropertySetInConstructorAndAlsoOutsideClass
 <?php
 class A {
     /**
-     * @psalm-readonly-allow-private-mutation
+     * @readonly-allow-private-mutation
      */
     public string $bar;
 

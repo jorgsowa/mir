@@ -4,7 +4,7 @@ byrefVarSetsPossible
 <?php
 /**
  * @param mixed $a
- * @psalm-param-out int $a
+ * @param-out int $a
  */
 function takesByRef(&$a) : void {
     $a = 5;
