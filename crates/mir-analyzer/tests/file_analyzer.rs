@@ -98,51 +98,18 @@ fn ensure_all_stubs_is_idempotent() {
     );
 }
 
-/// Essential-only loading covers Core / standard / SPL / date but skips
-/// less-common extensions like gd. The skipped stubs are loadable on demand.
-#[test]
-fn essential_stubs_loaded_count_is_smaller_than_full_set() {
-    let essential = AnalysisSession::new(PhpVersion::LATEST);
-    essential.ensure_essential_stubs();
-    let essential_count = essential.loaded_stub_count();
-
-    let full = AnalysisSession::new(PhpVersion::LATEST);
-    full.ensure_all_stubs();
-    let full_count = full.loaded_stub_count();
-
-    assert!(
-        essential_count < full_count,
-        "essentials ({essential_count}) should be a strict subset of all stubs ({full_count})"
-    );
-    // The curated essentials list is 25 of ~120 files; sanity-bound the ratio.
-    assert!(
-        essential_count * 3 < full_count,
-        "essentials ({essential_count}) should be a small fraction of all stubs ({full_count}); \
-         if this asserts the curated list grew unintentionally"
-    );
-
-    // Both must cover universally-used built-ins.
-    for name in ["strlen", "array_map", "count"] {
-        assert!(
-            essential.contains_function(name),
-            "essentials must define {name}()"
-        );
-    }
-}
-
 /// `ensure_stub_for_function` lazily loads exactly the stub containing the
-/// requested function — no more, no less. After essentials, the gd extension
-/// is unloaded; requesting `imagecreate` brings in the gd stub on demand.
+/// requested function — no more, no less. On a fresh session nothing is loaded
+/// yet; requesting `imagecreate` brings in the gd stub on demand.
 #[test]
 fn ensure_stub_for_function_lazy_loads_extension() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs();
     let baseline = session.loaded_stub_count();
 
-    // gd is not part of the essentials.
+    // Nothing loaded yet on a fresh session.
     assert!(
         !session.contains_function("imagecreate"),
-        "imagecreate() must not be loaded after essentials-only init"
+        "imagecreate() must not be loaded on a fresh session"
     );
 
     let was_known = session.ensure_stub_for_function("imagecreate");
@@ -206,13 +173,11 @@ function encode(array $data): string {
          Undefined* diagnostics fire; got: {undefined:?}"
     );
 
-    // Sanity: stubs beyond the curated essentials must have been pulled in.
-    // Essentials are 25 stub files; auto-discovery here loads at least gd,
-    // Reflection, and json on top.
+    // Sanity: at least the gd, Reflection, and json stubs must have been pulled in.
     let count = session.loaded_stub_count();
     assert!(
-        count > 25,
-        "expected more than just essentials (25) to be loaded; got {count}"
+        count >= 3,
+        "expected at least gd, Reflection, and json stubs to be loaded; got {count}"
     );
 }
 
@@ -422,7 +387,6 @@ function caller(): void {
 #[test]
 fn ensure_stub_for_unknown_symbol_returns_false() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs();
     let before = session.loaded_stub_count();
 
     assert!(!session.ensure_stub_for_function("definitely_not_a_php_builtin_xyz123"));

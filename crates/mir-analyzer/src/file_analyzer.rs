@@ -73,7 +73,6 @@ impl<'a> FileAnalyzer<'a> {
         source_map: &SourceMap,
     ) -> FileAnalysis {
         crate::metrics::record_file_analysis();
-        self.session.ensure_essential_stubs();
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());
 
@@ -135,8 +134,6 @@ impl<'a> BatchFileAnalyzer<'a> {
     /// Each rayon worker gets its own cloned database snapshot, so concurrent
     /// analysis proceeds without lock contention on the session.
     pub fn analyze_batch(&self, files: Vec<ParsedFile>) -> Vec<(Arc<str>, FileAnalysis)> {
-        self.session.ensure_essential_stubs();
-
         // First pass: collect all ASTs and auto-discover stubs.
         files.iter().for_each(|file| {
             self.session.ensure_stubs_for_ast(&file.program);

@@ -144,11 +144,6 @@ fn perf_analysis_full_report() {
     let session_new = t0.elapsed();
     print_row("AnalysisSession::new + psr4", session_new, "");
 
-    let t0 = Instant::now();
-    session.ensure_essential_stubs();
-    let essentials = t0.elapsed();
-    print_row("ensure_essential_stubs", essentials, "~25 / 120 stubs");
-
     // Pick a representative file to "open"
     let open_path = root.join("src/Illuminate/Auth/Events/Login.php");
     let open_source = std::fs::read_to_string(&open_path).unwrap_or_else(|_| "<?php\n".to_string());
@@ -159,7 +154,7 @@ fn perf_analysis_full_report() {
     let ingest_one = t0.elapsed();
     print_row("ingest_file(open file)", ingest_one, "Login.php");
 
-    let total_lazy = session_new + essentials + ingest_one;
+    let total_lazy = session_new + ingest_one;
     print_row("─ TOTAL", total_lazy, "user can interact NOW");
 
     let speedup = total_eager.as_secs_f64() / total_lazy.as_secs_f64();

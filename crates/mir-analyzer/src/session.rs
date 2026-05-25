@@ -207,17 +207,14 @@ impl AnalysisSession {
         self.psr4.as_deref()
     }
 
-    /// Load only the curated set of essential stubs (Core, standard, SPL,
-    /// date) plus any configured user stubs. About 25 of 120 stub files;
-    /// covers types and functions used by virtually all PHP code.
+    /// Deprecated — stub loading is now fully lazy per-AST.
     ///
-    /// Other extension stubs (Reflection, gd, openssl, …) can be brought in
-    /// on demand via [`Self::ensure_stubs_for_ast`] when user code references
-    /// them. Idempotent — already-loaded stubs are skipped.
+    /// This is an alias for [`Self::ensure_all_stubs`] kept for API
+    /// compatibility. Internal analysis paths use [`Self::prepare_ast_for_analysis`]
+    /// which loads only the stubs referenced by the file under analysis.
+    #[deprecated(note = "use ensure_all_stubs() or ensure_stubs_for_ast() instead")]
     pub fn ensure_essential_stubs(&self) {
-        self.db
-            .ingest_stub_paths(crate::stubs::ESSENTIAL_STUB_PATHS, self.php_version);
-        self.ensure_user_stubs_loaded();
+        self.ensure_all_stubs();
     }
 
     /// Load every embedded PHP stub plus any configured user stubs.

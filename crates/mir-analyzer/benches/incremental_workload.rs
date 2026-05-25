@@ -391,7 +391,7 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.bench_function("essential_only", |b| {
         b.iter(|| {
             let session = AnalysisSession::new(PhpVersion::LATEST);
-            session.ensure_essential_stubs();
+            session.ensure_all_stubs();
             session.loaded_stub_count()
         });
     });
@@ -410,7 +410,7 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.bench_function("essential_plus_a_few_lazy", |b| {
         b.iter(|| {
             let session = AnalysisSession::new(PhpVersion::LATEST);
-            session.ensure_essential_stubs();
+            session.ensure_all_stubs();
             let _ = session.ensure_stub_for_function("imagecreate"); // gd
             let _ = session.ensure_stub_for_function("openssl_encrypt"); // openssl
             let _ = session.ensure_stub_for_function("json_encode"); // json
@@ -570,7 +570,7 @@ fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
 
     let measure = |label: &str| -> Duration {
         let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-        session.ensure_essential_stubs();
+        session.ensure_all_stubs();
         let start = std::time::Instant::now();
         for (file, src) in &sources {
             session.ingest_file(file.clone(), src.clone());

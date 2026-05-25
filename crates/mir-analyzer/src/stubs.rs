@@ -35,42 +35,6 @@ include!(concat!(env!("OUT_DIR"), "/stub_files.rs"));
 // `STUB_CLASS_INDEX`, `STUB_CONST_INDEX`. See build.rs for details.
 include!(concat!(env!("OUT_DIR"), "/phpstorm_builtin_fns.rs"));
 
-/// Hand-curated list of stub file paths that virtually all PHP code depends
-/// on. Loaded eagerly by [`crate::AnalysisSession::ensure_essential_stubs`];
-/// other extension stubs are loaded on demand when user code references symbols
-/// that resolve into them.
-///
-/// Coverage: `Core` (Throwable, ArrayAccess, …), `standard` (str_*/array_*/…),
-/// `SPL` (Iterator, ArrayObject, …), `date` (DateTime). 25 of 120 stub files —
-/// roughly an 80% reduction in cold-start work.
-pub(crate) static ESSENTIAL_STUB_PATHS: &[&str] = &[
-    "stubs/Core/Core.php",
-    "stubs/Core/Core_c.php",
-    "stubs/Core/Core_d.php",
-    "stubs/SPL/SPL.php",
-    "stubs/SPL/SPL_c1.php",
-    "stubs/SPL/SPL_f.php",
-    "stubs/date/date.php",
-    "stubs/date/date_c.php",
-    "stubs/date/date_d.php",
-    "stubs/standard/_standard_manual.php",
-    "stubs/standard/_types.php",
-    "stubs/standard/basic.php",
-    "stubs/standard/password.php",
-    "stubs/standard/standard_0.php",
-    "stubs/standard/standard_1.php",
-    "stubs/standard/standard_10.php",
-    "stubs/standard/standard_2.php",
-    "stubs/standard/standard_3.php",
-    "stubs/standard/standard_4.php",
-    "stubs/standard/standard_5.php",
-    "stubs/standard/standard_6.php",
-    "stubs/standard/standard_7.php",
-    "stubs/standard/standard_8.php",
-    "stubs/standard/standard_9.php",
-    "stubs/standard/standard_defines.php",
-];
-
 /// Look up the embedded stub file content for a virtual path (e.g.
 /// `"stubs/standard/standard_0.php"`). Returns `None` if the path isn't part
 /// of the embedded set.
