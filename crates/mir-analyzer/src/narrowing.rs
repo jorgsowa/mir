@@ -470,7 +470,10 @@ fn narrow_or_isset_true(
                 let original_vars: Vec<_> = vars
                     .iter()
                     .filter_map(|var_expr| {
-                        extract_var_name(var_expr).map(|name| (name.clone(), ctx.get_var(&name)))
+                        extract_var_name(var_expr).map(|name| {
+                            let was_assigned = ctx.var_is_defined(&name);
+                            (name.clone(), ctx.get_var(&name), was_assigned)
+                        })
                     })
                     .collect();
 
@@ -488,8 +491,13 @@ fn narrow_or_isset_true(
                 narrow_from_condition(right, ctx, true, db, file);
 
                 // Restore original variable states for if-body context
-                for (var_name, original_type) in original_vars {
-                    ctx.set_var(&var_name, original_type);
+                for (var_name, original_type, was_assigned) in original_vars {
+                    let sym = mir_types::Name::from(var_name.as_str());
+                    std::sync::Arc::make_mut(&mut ctx.vars)
+                        .insert(sym, std::sync::Arc::new(original_type));
+                    if !was_assigned {
+                        std::sync::Arc::make_mut(&mut ctx.assigned_vars).remove(&sym);
+                    }
                 }
             }
         }
