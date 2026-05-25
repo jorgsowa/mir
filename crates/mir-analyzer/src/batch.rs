@@ -659,7 +659,7 @@ impl AnalysisSession {
     /// Mirrors the old `ProjectAnalyzer::re_analyze_file` cache-aware path.
     /// Use [`Self::analyze_dependents_of`] for LSP-style per-file flows that
     /// don't need batch options.
-    pub fn re_analyze_file_batch(
+    pub fn re_analyze_file(
         &self,
         file_path: &str,
         new_content: &str,

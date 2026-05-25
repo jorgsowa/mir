@@ -43,7 +43,7 @@ fn old_path_issues_for(
     use mir_analyzer::{AnalysisSession, BatchOptions};
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_all_stubs_loaded();
+    session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture.php");
@@ -87,7 +87,7 @@ fn new_path_issues_for(fn_name: &str, source: &str) -> Vec<mir_issues::Issue> {
     // Mirror AnalysisSession setup minimally: ingest stubs so resolution works.
     use mir_analyzer::{AnalysisSession, BatchOptions};
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_all_stubs_loaded();
+    session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture.php");

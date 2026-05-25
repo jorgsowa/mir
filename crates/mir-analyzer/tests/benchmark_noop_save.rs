@@ -101,7 +101,7 @@ class User {
 #[ignore]
 fn benchmark_no_op_file_save() {
     let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("app/Http/Controllers/UserController.php");
     let source: Arc<str> = Arc::from(PHP_CODE);
@@ -215,7 +215,7 @@ fn benchmark_no_op_file_save() {
 fn verify_no_op_correctness() {
     // Verify that no-op file saves produce identical results
     let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("test_file.php");
     let source: Arc<str> =

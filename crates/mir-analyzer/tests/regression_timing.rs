@@ -38,7 +38,7 @@ fn time_analyze_paths_repeats() {
     let mut times = Vec::new();
     for i in 1..=3 {
         let session = AnalysisSession::new(PhpVersion::LATEST);
-        session.ensure_all_stubs_loaded();
+        session.ensure_all_stubs();
         let t = Instant::now();
         let _ = session.analyze_paths(&project_files, &BatchOptions::new());
         let elapsed = t.elapsed();

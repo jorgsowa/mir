@@ -324,7 +324,7 @@ fn main() {
             );
         }
 
-        session.ensure_all_stubs_loaded();
+        session.ensure_all_stubs();
 
         if !vendor_files.is_empty() {
             if !cli.quiet {
@@ -485,7 +485,7 @@ fn main() {
     }
 
     // Load type stubs first (needed before collect_types_only)
-    session.ensure_all_stubs_loaded();
+    session.ensure_all_stubs();
 
     // Collect types from ignore_dirs (vendor) for Pass 1 — no error reporting there.
     if !ignore_dirs.is_empty() {

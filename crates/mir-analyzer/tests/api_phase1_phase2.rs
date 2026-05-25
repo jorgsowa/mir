@@ -19,7 +19,7 @@ use mir_analyzer::{AnalysisSession, PhpVersion, Symbol, SymbolLookupError};
 #[test]
 fn hover_returns_real_info_for_function() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let file: Arc<str> = Arc::from("test.php");
     let source: Arc<str> = Arc::from(
@@ -90,7 +90,7 @@ fn document_symbols_returns_hierarchical_tree() {
     use mir_analyzer::symbol::DocumentSymbolKind;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let file: Arc<str> = Arc::from("hierarchy.php");
     let source: Arc<str> = Arc::from(
@@ -128,7 +128,7 @@ fn document_symbols_returns_hierarchical_tree() {
 #[test]
 fn references_to_takes_typed_symbol() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let file: Arc<str> = Arc::from("refs.php");
     let source: Arc<str> = Arc::from(
@@ -236,7 +236,7 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let file: Arc<str> = Arc::from("bridge.php");
     let source: Arc<str> = Arc::from(
@@ -380,7 +380,7 @@ fn analyze_dependents_of_runs_in_parallel() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     // base.php defines Base. dep_a.php and dep_b.php extend Base.
     let base: Arc<str> = Arc::from("base.php");
@@ -457,7 +457,7 @@ fn analyze_dependents_of_tracks_bare_fqn_new() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let service: Arc<str> = Arc::from("service.php");
     let consumer: Arc<str> = Arc::from("consumer.php");
@@ -494,7 +494,7 @@ fn analyze_dependents_of_tracks_bare_fqn_static_call() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let helper: Arc<str> = Arc::from("helper.php");
     let caller: Arc<str> = Arc::from("caller.php");
@@ -531,7 +531,7 @@ fn dependency_graph_includes_unused_param_type_hint() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let service: Arc<str> = Arc::from("service.php");
     let consumer: Arc<str> = Arc::from("consumer.php");
@@ -597,7 +597,7 @@ fn dependent_files(session: &AnalysisSession, file: &str) -> std::collections::H
 #[test]
 fn analyze_dependents_of_after_definition_deleted() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let foo: Arc<str> = Arc::from("Foo.php");
     let bar: Arc<str> = Arc::from("Bar.php");
@@ -636,7 +636,7 @@ fn analyze_dependents_of_after_definition_deleted() {
 #[test]
 fn analyze_dependents_of_after_definition_renamed() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let foo: Arc<str> = Arc::from("Foo.php");
     let bar: Arc<str> = Arc::from("Bar.php");
@@ -667,7 +667,7 @@ fn analyze_dependents_of_after_definition_renamed() {
 #[test]
 fn analyze_dependents_of_after_definition_moved() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let a: Arc<str> = Arc::from("A.php");
     let b: Arc<str> = Arc::from("B.php");
@@ -709,7 +709,7 @@ fn analyze_dependents_of_after_definition_moved() {
 #[test]
 fn analyze_dependents_of_after_definition_readded() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let foo: Arc<str> = Arc::from("Foo.php");
     let bar: Arc<str> = Arc::from("Bar.php");
@@ -748,7 +748,7 @@ fn analyze_dependents_of_transitive_after_delete() {
     //   - B.php must appear (direct stale dependent)
     //   - C.php must appear (transitive via structural dep on B)
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
 
     let a: Arc<str> = Arc::from("A.php");
     let b: Arc<str> = Arc::from("B.php");

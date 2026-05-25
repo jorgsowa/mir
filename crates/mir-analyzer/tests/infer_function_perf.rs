@@ -47,7 +47,7 @@ fn measure_infer_function_timings() {
     // Set up a session, run the existing batch path once so workspace state
     // is populated for both paths.
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_all_stubs_loaded();
+    session.ensure_all_stubs();
     let t_full_walk = {
         let t = Instant::now();
         let _ = session.analyze_paths(std::slice::from_ref(&path), &BatchOptions::new());

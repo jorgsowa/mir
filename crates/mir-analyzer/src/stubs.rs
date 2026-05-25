@@ -36,7 +36,7 @@ include!(concat!(env!("OUT_DIR"), "/stub_files.rs"));
 include!(concat!(env!("OUT_DIR"), "/phpstorm_builtin_fns.rs"));
 
 /// Hand-curated list of stub file paths that virtually all PHP code depends
-/// on. Loaded eagerly by [`crate::AnalysisSession::ensure_essential_stubs_loaded`];
+/// on. Loaded eagerly by [`crate::AnalysisSession::ensure_essential_stubs`];
 /// other extension stubs are loaded on demand when user code references symbols
 /// that resolve into them.
 ///

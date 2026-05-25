@@ -188,7 +188,7 @@ mod tests {
         // This test bypasses the fixture runner's file-path filter to verify the
         // fix directly on the DeadCodeAnalyzer output.
         let session = AnalysisSession::new(PhpVersion::LATEST);
-        session.ensure_all_stubs_loaded();
+        session.ensure_all_stubs();
         let db = session.snapshot_db();
         let issues = DeadCodeAnalyzer::new(&db).analyze();
         let builtin_false_positives: Vec<_> = issues

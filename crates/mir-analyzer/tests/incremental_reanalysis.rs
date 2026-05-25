@@ -40,7 +40,7 @@ fn re_analyze_file_picks_up_new_error() {
     // Now re-analyze the same file with content that calls an undefined function
     let file_path = file_a.to_string_lossy().to_string();
     let new_content = "<?php\nfunction test(): void { nonexistent_func(); }\n";
-    let result2 = analyzer.re_analyze_file_batch(&file_path, new_content, &BatchOptions::new());
+    let result2 = analyzer.re_analyze_file(&file_path, new_content, &BatchOptions::new());
 
     let undef_fn_count2 = result2
         .issues
@@ -88,8 +88,7 @@ fn re_analyze_file_removes_old_definitions() {
     // Now change A.php: rename the method from bar() to baz()
     let file_path_a = file_a.to_string_lossy().to_string();
     let new_content_a = "<?php\nclass Foo { public function baz(): void {} }\n";
-    let _result2 =
-        analyzer.re_analyze_file_batch(&file_path_a, new_content_a, &BatchOptions::new());
+    let _result2 = analyzer.re_analyze_file(&file_path_a, new_content_a, &BatchOptions::new());
 
     // Verify the old method bar() is gone and baz() exists
     assert!(
@@ -127,7 +126,7 @@ fn re_analyze_file_fixes_error() {
     let file_path = file_a.to_string_lossy().to_string();
     let new_content =
         "<?php\nfunction missing_fn(): void {}\nfunction test(): void { missing_fn(); }\n";
-    let result2 = analyzer.re_analyze_file_batch(&file_path, new_content, &BatchOptions::new());
+    let result2 = analyzer.re_analyze_file(&file_path, new_content, &BatchOptions::new());
 
     let undef_count2 = result2
         .issues
@@ -177,7 +176,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     );
 
     // Re-analyze with identical content — must hit the cache.
-    let result2 = analyzer.re_analyze_file_batch(&file_path, content, &BatchOptions::new());
+    let result2 = analyzer.re_analyze_file(&file_path, content, &BatchOptions::new());
 
     let undef_count2 = result2
         .issues
@@ -237,7 +236,7 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
     // Re-analyze Handler.php with a trivial body change (adds a comment).
     let handler_src2 = "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\n\
         function handle(): void { $e = new Entity(); /* re-analyzed */ }\n";
-    let result2 = analyzer.re_analyze_file_batch(
+    let result2 = analyzer.re_analyze_file(
         handler.to_string_lossy().as_ref(),
         handler_src2,
         &BatchOptions::new(),
@@ -289,7 +288,7 @@ fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
     // Re-analyze the same file with a trivial body change.  The priming sweep
     // must repopulate bar.inferred_return_type before foo is analyzed.
     let content2 = "<?php\nfunction bar() { return 'hello'; }\nfunction foo(): string { return bar(); /* re-analyzed */ }\n";
-    let result2 = analyzer.re_analyze_file_batch(&file_path, content2, &BatchOptions::new());
+    let result2 = analyzer.re_analyze_file(&file_path, content2, &BatchOptions::new());
 
     let issues2: Vec<_> = result2
         .issues

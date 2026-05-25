@@ -23,7 +23,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
         let pre_diverges = ctx.diverges;
 
-        let mut then_ctx = ctx.fork();
+        let mut then_ctx = ctx.branch();
         narrow_from_condition(&if_stmt.condition, &mut then_ctx, true, self.db, &self.file);
         let then_unreachable_from_narrowing = then_ctx.diverges;
         if !then_ctx.diverges {
@@ -32,7 +32,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let mut elseif_ctxs: Vec<Context> = vec![];
         for elseif in if_stmt.elseif_branches.iter() {
-            let mut pre_elseif = ctx.fork();
+            let mut pre_elseif = ctx.branch();
             narrow_from_condition(
                 &if_stmt.condition,
                 &mut pre_elseif,
@@ -63,7 +63,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     self.span_to_location(elseif.condition.span);
                 let elseif_cond_type = self
                     .expr_analyzer(ctx)
-                    .analyze(&elseif.condition, &mut ctx.fork());
+                    .analyze(&elseif.condition, &mut ctx.branch());
                 self.issues.add(
                     mir_issues::Issue::new(
                         IssueKind::RedundantCondition {
@@ -92,7 +92,7 @@ impl<'a> StatementsAnalyzer<'a> {
             elseif_ctxs.push(branch_ctx);
         }
 
-        let mut else_ctx = ctx.fork();
+        let mut else_ctx = ctx.branch();
         narrow_from_condition(
             &if_stmt.condition,
             &mut else_ctx,
@@ -139,7 +139,7 @@ impl<'a> StatementsAnalyzer<'a> {
         self.expr_analyzer(ctx).analyze(&w.condition, ctx);
         let pre = ctx.clone();
 
-        let mut entry = ctx.fork();
+        let mut entry = ctx.branch();
         narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
 
         let post = self.analyze_loop_widened(
@@ -156,7 +156,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
     pub(super) fn analyze_dowhile_stmt(&mut self, dw: &DoWhileStmt, ctx: &mut Context) {
         let pre = ctx.clone();
-        let entry = ctx.fork();
+        let entry = ctx.branch();
         // Do-while always executes at least once (body before condition check)
         let post = self.analyze_loop_widened(
             &pre,
@@ -175,7 +175,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.expr_analyzer(ctx).analyze(init, ctx);
         }
         let pre = ctx.clone();
-        let mut entry = ctx.fork();
+        let mut entry = ctx.branch();
         for cond in f.condition.iter() {
             self.expr_analyzer(&entry).analyze(cond, &mut entry);
         }
@@ -216,7 +216,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let pre = ctx.clone();
-        let mut entry = ctx.fork();
+        let mut entry = ctx.branch();
 
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
@@ -272,7 +272,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let mut case_results: Vec<Context> = Vec::new();
         for case in sw.cases.iter() {
-            let mut case_ctx = pre_ctx.fork();
+            let mut case_ctx = pre_ctx.branch();
             if let Some(val) = &case.value {
                 if switch_on_true {
                     narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
@@ -345,7 +345,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
     pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut Context) {
         let pre_ctx = ctx.clone();
-        let mut try_ctx = ctx.fork();
+        let mut try_ctx = ctx.branch();
         self.analyze_stmts(&tc.body, &mut try_ctx);
 
         let catch_base = Context::merge_branches(&pre_ctx, try_ctx.clone(), None);

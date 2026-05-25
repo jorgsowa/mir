@@ -355,8 +355,10 @@ impl Context {
         Arc::make_mut(&mut self.possibly_assigned_vars).remove(&sym);
     }
 
-    /// Fork this context for a branch (e.g. the `if` branch).
-    pub fn fork(&self) -> Context {
+    /// Clone this context to analyze a conditional branch (`if`, `elseif`,
+    /// `else`, `case`, ternary arm, …). The returned context can be mutated
+    /// independently and later reconciled via [`Self::merge_branches`].
+    pub fn branch(&self) -> Context {
         self.clone()
     }
 

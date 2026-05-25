@@ -107,7 +107,7 @@ fn split_vendor_project(root: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
 /// cached results.
 fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[PathBuf]) {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    analyzer.ensure_all_stubs_loaded();
+    analyzer.ensure_all_stubs();
     analyzer.collect_types_only(vendor_files);
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
 }
@@ -145,7 +145,7 @@ fn bench_full_analysis(c: &mut Criterion) {
     {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST);
         checkpoint_alloc("after new analyzer");
-        analyzer.ensure_all_stubs_loaded();
+        analyzer.ensure_all_stubs();
         checkpoint_alloc("after load_stubs");
         analyzer.collect_types_only(&vendor_files);
         checkpoint_alloc("after collect_types_only (vendor)");
@@ -174,7 +174,7 @@ fn bench_full_analysis(c: &mut Criterion) {
             b.iter(|| {
                 pool.install(|| {
                     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-                    analyzer.ensure_all_stubs_loaded();
+                    analyzer.ensure_all_stubs();
                     analyzer.collect_types_only(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new())
                 })
@@ -233,7 +233,7 @@ fn bench_reanalysis(c: &mut Criterion) {
         {
             let analyzer =
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
-            analyzer.ensure_all_stubs_loaded();
+            analyzer.ensure_all_stubs();
             analyzer.collect_types_only(&vendor_files);
             let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
         }
@@ -248,7 +248,7 @@ fn bench_reanalysis(c: &mut Criterion) {
         {
             let analyzer =
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
-            analyzer.ensure_all_stubs_loaded();
+            analyzer.ensure_all_stubs();
             analyzer.collect_types_only(&vendor_files);
             let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
         }
@@ -286,7 +286,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                 |_| {
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
-                    analyzer.ensure_all_stubs_loaded();
+                    analyzer.ensure_all_stubs();
                     analyzer.collect_types_only(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new())
                 },
@@ -307,7 +307,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                 |_| {
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
-                    analyzer.ensure_all_stubs_loaded();
+                    analyzer.ensure_all_stubs();
                     analyzer.collect_types_only(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new())
                 },
@@ -353,7 +353,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         std::fs::write(&model_path, format!("{original}\n// memory-check")).unwrap();
         let mem_analyzer =
             AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
-        mem_analyzer.ensure_all_stubs_loaded();
+        mem_analyzer.ensure_all_stubs();
         mem_analyzer.collect_types_only(&vendor_files);
         reset_alloc_counters();
         let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new());
@@ -366,7 +366,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         std::fs::write(&leaf_path, format!("{original}\n// memory-check")).unwrap();
         let mem_analyzer =
             AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
-        mem_analyzer.ensure_all_stubs_loaded();
+        mem_analyzer.ensure_all_stubs();
         mem_analyzer.collect_types_only(&vendor_files);
         reset_alloc_counters();
         let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new());
@@ -402,7 +402,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                         .unwrap();
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
-                    analyzer.ensure_all_stubs_loaded();
+                    analyzer.ensure_all_stubs();
                     analyzer.collect_types_only(&vendor_files);
                     analyzer
                 },
@@ -422,7 +422,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                         .unwrap();
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
-                    analyzer.ensure_all_stubs_loaded();
+                    analyzer.ensure_all_stubs();
                     analyzer.collect_types_only(&vendor_files);
                     analyzer
                 },
@@ -455,7 +455,7 @@ fn bench_vendor_collection(c: &mut Criterion) {
     reset_alloc_counters();
     {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-        analyzer.ensure_all_stubs_loaded();
+        analyzer.ensure_all_stubs();
         analyzer.collect_types_only(&vendor_files);
     }
     print_alloc_stats("vendor_collection/laravel");
@@ -468,7 +468,7 @@ fn bench_vendor_collection(c: &mut Criterion) {
     group.bench_function("laravel", |b| {
         b.iter(|| {
             let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-            analyzer.ensure_all_stubs_loaded();
+            analyzer.ensure_all_stubs();
             analyzer.collect_types_only(&vendor_files)
         });
     });
@@ -491,7 +491,7 @@ fn bench_vendor_collection_detailed(_c: &mut Criterion) {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     checkpoint_alloc("After analyzer::new()");
 
-    analyzer.ensure_all_stubs_loaded();
+    analyzer.ensure_all_stubs();
     checkpoint_alloc("After load_stubs()");
 
     analyzer.collect_types_only(&vendor_files);
@@ -542,7 +542,7 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     checkpoint_alloc("After analyzer::new()");
 
-    analyzer.ensure_all_stubs_loaded();
+    analyzer.ensure_all_stubs();
     checkpoint_alloc("After load_stubs()");
 
     analyzer.collect_types_only(&vendor_files);
@@ -568,7 +568,7 @@ fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
     reset_alloc_counters();
     {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-        analyzer.ensure_all_stubs_loaded();
+        analyzer.ensure_all_stubs();
         checkpoint_alloc("After load_stubs()");
 
         // Just loading and parsing files (no ingestion yet)
@@ -605,7 +605,7 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     let cold_start = std::time::Instant::now();
     {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-        analyzer.ensure_all_stubs_loaded();
+        analyzer.ensure_all_stubs();
         analyzer.collect_types_only(&vendor_files);
     }
     let cold = cold_start.elapsed();
@@ -623,7 +623,7 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     let warm_start = std::time::Instant::now();
     let (hits, misses) = {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-        analyzer.ensure_all_stubs_loaded();
+        analyzer.ensure_all_stubs();
         analyzer.collect_types_only(&vendor_files);
         analyzer.stub_cache_stats()
     };

@@ -82,19 +82,19 @@ function greet(): string {
     );
 }
 
-/// `ensure_stubs_loaded` is idempotent; calling it many times must be cheap
+/// `ensure_all_stubs` is idempotent; calling it many times must be cheap
 /// and must not double-load stubs (would corrupt the codebase).
 #[test]
-fn ensure_stubs_loaded_is_idempotent() {
+fn ensure_all_stubs_is_idempotent() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_stubs_loaded();
-    session.ensure_stubs_loaded();
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
+    session.ensure_all_stubs();
+    session.ensure_all_stubs();
 
     // After loading, a built-in like strlen() should be known.
     assert!(
         session.contains_function("strlen"),
-        "strlen() must be loaded after ensure_stubs_loaded"
+        "strlen() must be loaded after ensure_all_stubs"
     );
 }
 
@@ -103,11 +103,11 @@ fn ensure_stubs_loaded_is_idempotent() {
 #[test]
 fn essential_stubs_loaded_count_is_smaller_than_full_set() {
     let essential = AnalysisSession::new(PhpVersion::LATEST);
-    essential.ensure_essential_stubs_loaded();
+    essential.ensure_essential_stubs();
     let essential_count = essential.loaded_stub_count();
 
     let full = AnalysisSession::new(PhpVersion::LATEST);
-    full.ensure_all_stubs_loaded();
+    full.ensure_all_stubs();
     let full_count = full.loaded_stub_count();
 
     assert!(
@@ -136,7 +136,7 @@ fn essential_stubs_loaded_count_is_smaller_than_full_set() {
 #[test]
 fn ensure_stub_for_function_lazy_loads_extension() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
     let baseline = session.loaded_stub_count();
 
     // gd is not part of the essentials.
@@ -422,7 +422,7 @@ function caller(): void {
 #[test]
 fn ensure_stub_for_unknown_symbol_returns_false() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
     let before = session.loaded_stub_count();
 
     assert!(!session.ensure_stub_for_function("definitely_not_a_php_builtin_xyz123"));
@@ -502,7 +502,7 @@ fn invalidate_file_releases_all_per_file_state() {
     // Stubs are now registered as SourceFiles too (so the pull path can
     // see PHP built-ins). Count the stub baseline up front and assert
     // against the delta rather than absolute count.
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
     let stub_count = session.tracked_file_count();
 
     session.ingest_file(base.clone(), Arc::from("<?php\nclass Base {}\n"));

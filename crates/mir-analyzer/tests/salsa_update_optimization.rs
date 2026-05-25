@@ -41,7 +41,7 @@ class User {
 "#;
 
     let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("app/UserRepository.php");
     let source: Arc<str> = Arc::from(php_code);
@@ -110,7 +110,7 @@ function getData(): stdClass {
 "#;
 
     let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("helpers.php");
 
@@ -155,7 +155,7 @@ fn verify_file_definitions_update_equality() {
     use std::sync::Arc;
 
     let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("test.php");
     let source: Arc<str> = Arc::from("<?php\nclass A {}\n");

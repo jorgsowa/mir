@@ -8,7 +8,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let cond_ty = self.analyze(&t.condition, ctx);
         match &t.then_expr {
             Some(then_expr) => {
-                let mut then_ctx = ctx.fork();
+                let mut then_ctx = ctx.branch();
                 crate::narrowing::narrow_from_condition(
                     &t.condition,
                     &mut then_ctx,
@@ -18,7 +18,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
                 let then_ty = self.analyze(then_expr, &mut then_ctx);
 
-                let mut else_ctx = ctx.fork();
+                let mut else_ctx = ctx.branch();
                 crate::narrowing::narrow_from_condition(
                     &t.condition,
                     &mut else_ctx,
@@ -75,7 +75,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let mut result = Union::empty();
         for arm in m.arms.iter() {
-            let mut arm_ctx = ctx.fork();
+            let mut arm_ctx = ctx.branch();
             // Always analyze conditions to check for undefined classes and get types
             let mut arm_ty = Union::empty();
             if let Some(conditions) = &arm.conditions {

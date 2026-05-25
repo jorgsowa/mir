@@ -108,7 +108,7 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
     // --- Cold session: ingest both files, populating the cache. --------
     {
         let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-        session.ensure_essential_stubs_loaded();
+        session.ensure_essential_stubs();
         session.ingest_file(a_path.clone(), a_src.clone());
         session.ingest_file(b_path.clone(), b_src.clone());
 
@@ -121,7 +121,7 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
 
     // --- Warm session: same content -> every cache lookup must hit. ---
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    session2.ensure_essential_stubs_loaded();
+    session2.ensure_essential_stubs();
     session2.ingest_file(a_path.clone(), a_src.clone());
     session2.ingest_file(b_path.clone(), b_src.clone());
 
@@ -159,7 +159,7 @@ fn cache_miss_after_content_change() {
 
     {
         let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-        session.ensure_essential_stubs_loaded();
+        session.ensure_essential_stubs();
         session.ingest_file(a_arc.clone(), v1);
         // v1: v1() exists, v2() doesn't.
         assert!(session
@@ -177,7 +177,7 @@ fn cache_miss_after_content_change() {
         std::sync::Arc::from(std::fs::read_to_string(&a_path).unwrap().as_str());
 
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    session2.ensure_essential_stubs_loaded();
+    session2.ensure_essential_stubs();
     session2.ingest_file(a_arc.clone(), v2);
 
     // The new content must produce the new symbol; the stale cache entry

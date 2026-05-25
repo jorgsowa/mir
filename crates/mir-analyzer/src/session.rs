@@ -231,24 +231,14 @@ impl AnalysisSession {
         self.psr4.as_deref()
     }
 
-    /// Load every PHP built-in stub plus any configured user stubs.
-    ///
-    /// **Deprecated**: prefer [`Self::ensure_all_stubs_loaded`] (explicit
-    /// "comprehensive") or [`Self::ensure_essential_stubs_loaded`] (fast
-    /// cold-start with auto-discovery on demand).
-    #[doc(hidden)]
-    pub fn ensure_stubs_loaded(&self) {
-        self.ensure_all_stubs_loaded();
-    }
-
     /// Load only the curated set of essential stubs (Core, standard, SPL,
     /// date) plus any configured user stubs. About 25 of 120 stub files;
     /// covers types and functions used by virtually all PHP code.
     ///
     /// Other extension stubs (Reflection, gd, openssl, …) can be brought in
-    /// on demand via [`Self::ensure_stubs_for_symbol`] when user code
-    /// references them. Idempotent — already-loaded stubs are skipped.
-    pub fn ensure_essential_stubs_loaded(&self) {
+    /// on demand via [`Self::ensure_stubs_for_ast`] when user code references
+    /// them. Idempotent — already-loaded stubs are skipped.
+    pub fn ensure_essential_stubs(&self) {
         self.shared_db
             .ingest_stub_paths(crate::stubs::ESSENTIAL_STUB_PATHS, self.php_version);
         self.ensure_user_stubs_loaded();
@@ -257,7 +247,7 @@ impl AnalysisSession {
     /// Load every embedded PHP stub plus any configured user stubs.
     /// Use for batch tools (CLI, full project analysis) where comprehensive
     /// symbol coverage matters more than cold-start latency.
-    pub fn ensure_all_stubs_loaded(&self) {
+    pub fn ensure_all_stubs(&self) {
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
         self.shared_db.ingest_stub_paths(&paths, self.php_version);
         self.ensure_user_stubs_loaded();
@@ -329,7 +319,7 @@ impl AnalysisSession {
     /// a referenced built-in. Cost is sub-millisecond per file.
     ///
     /// Fast path: if every embedded stub is already loaded (e.g. after a
-    /// batch tool called [`Self::ensure_all_stubs_loaded`]), the source scan
+    /// batch tool called [`Self::ensure_all_stubs`]), the source scan
     /// is skipped entirely.
     pub fn ensure_stubs_for_source(&self, source: &str) {
         // Cheap check first: skip the scan entirely when we already know we
@@ -472,7 +462,7 @@ impl AnalysisSession {
     /// state in the codebase. (Without this, long-running sessions would
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
-        self.ensure_stubs_loaded();
+        self.ensure_all_stubs();
 
         // Snapshot symbols defined before clearing — O(symbols_in_file) with forward index.
         let old_symbols: HashSet<Arc<str>> = {

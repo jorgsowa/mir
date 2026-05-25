@@ -105,7 +105,7 @@ fn warm_project_analyzer(
     project_files: &[PathBuf],
 ) -> AnalysisSession {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    analyzer.ensure_all_stubs_loaded();
+    analyzer.ensure_all_stubs();
     analyzer.collect_types_only(vendor_files);
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
     analyzer
@@ -129,7 +129,7 @@ fn warm_session(
 ) -> AnalysisSession {
     let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
     // Vendor files: HIGH durability (stable within session).
     let vendor_pairs: Vec<(Arc<str>, Arc<str>)> = vendor_files
         .iter()
@@ -193,7 +193,7 @@ fn bench_single_file_edit(c: &mut Criterion) {
                     format!("{original}\n// edit {counter}\n")
                 },
                 |new_content| {
-                    analyzer.re_analyze_file_batch(&target_str, &new_content, &BatchOptions::new())
+                    analyzer.re_analyze_file(&target_str, &new_content, &BatchOptions::new())
                 },
                 BatchSize::LargeInput,
             );
@@ -285,7 +285,7 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                     format!("{original}\n// edit {counter}\n")
                 },
                 |new_content| {
-                    analyzer.re_analyze_file_batch(&target_str, &new_content, &BatchOptions::new())
+                    analyzer.re_analyze_file(&target_str, &new_content, &BatchOptions::new())
                 },
                 BatchSize::LargeInput,
             );
@@ -391,7 +391,7 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.bench_function("essential_only", |b| {
         b.iter(|| {
             let session = AnalysisSession::new(PhpVersion::LATEST);
-            session.ensure_essential_stubs_loaded();
+            session.ensure_essential_stubs();
             session.loaded_stub_count()
         });
     });
@@ -399,7 +399,7 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.bench_function("all_stubs", |b| {
         b.iter(|| {
             let session = AnalysisSession::new(PhpVersion::LATEST);
-            session.ensure_all_stubs_loaded();
+            session.ensure_all_stubs();
             session.loaded_stub_count()
         });
     });
@@ -410,7 +410,7 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.bench_function("essential_plus_a_few_lazy", |b| {
         b.iter(|| {
             let session = AnalysisSession::new(PhpVersion::LATEST);
-            session.ensure_essential_stubs_loaded();
+            session.ensure_essential_stubs();
             let _ = session.ensure_stub_for_function("imagecreate"); // gd
             let _ = session.ensure_stub_for_function("openssl_encrypt"); // openssl
             let _ = session.ensure_stub_for_function("json_encode"); // json
@@ -570,7 +570,7 @@ fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
 
     let measure = |label: &str| -> Duration {
         let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-        session.ensure_essential_stubs_loaded();
+        session.ensure_essential_stubs();
         let start = std::time::Instant::now();
         for (file, src) in &sources {
             session.ingest_file(file.clone(), src.clone());

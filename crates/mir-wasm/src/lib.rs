@@ -51,9 +51,7 @@ impl Playground {
             self.php_version = version;
         }
         let opts = BatchOptions::new();
-        let result = self
-            .session
-            .re_analyze_file_batch("<playground>", source, &opts);
+        let result = self.session.re_analyze_file("<playground>", source, &opts);
         let issues: Vec<WasmIssue> = result
             .issues
             .iter()
@@ -75,6 +73,6 @@ impl Playground {
 
 fn make_session(version: PhpVersion) -> AnalysisSession {
     let session = AnalysisSession::new(version);
-    session.ensure_all_stubs_loaded();
+    session.ensure_all_stubs();
     session
 }

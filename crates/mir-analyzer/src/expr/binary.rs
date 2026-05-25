@@ -21,7 +21,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             B::BooleanAnd | B::LogicalAnd | B::BooleanOr | B::LogicalOr
         ) {
             let _left_ty = self.analyze(&b.left, ctx);
-            let mut right_ctx = ctx.fork();
+            let mut right_ctx = ctx.branch();
             let is_and = matches!(b.op, B::BooleanAnd | B::LogicalAnd);
             crate::narrowing::narrow_from_condition(
                 &b.left,

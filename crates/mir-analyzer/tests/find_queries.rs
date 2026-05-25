@@ -168,11 +168,11 @@ fn find_class_like_resolves_php_builtin_via_stub_resolver() {
     }
     // Empty user resolver + automatic stub-aware wrap from
     // `with_class_resolver`. The stub resolver maps "ArrayObject" →
-    // its bundled stub path; `ensure_stubs_loaded` registers that path
+    // its bundled stub path; `ensure_all_stubs` registers that path
     // as a SourceFile so `find_class_like` finds it.
     let session =
         AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(Arc::new(EmptyResolver));
-    session.ensure_stubs_loaded();
+    session.ensure_all_stubs();
 
     let db = session.snapshot_db();
     let fqcn = Fqcn::new(&db, Symbol::new("ArrayObject"));

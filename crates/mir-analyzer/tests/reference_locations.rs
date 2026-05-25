@@ -235,7 +235,7 @@ fn re_analyze_removes_stale_reference_locations() {
     );
 
     // Re-analyze with content that no longer calls helper()
-    analyzer.re_analyze_file_batch(
+    analyzer.re_analyze_file(
         &file_str,
         "<?php\nfunction helper(): void {}\nfunction caller(): void {}\n",
         &BatchOptions::new(),
@@ -372,7 +372,7 @@ fn compact_index_survives_re_analyze() {
     );
 
     // Re-analyze without the call — compact index must be expanded, stale entry removed.
-    analyzer.re_analyze_file_batch(
+    analyzer.re_analyze_file(
         &file_str,
         "<?php\nfunction helper(): void {}\nfunction caller(): void {}\n",
         &BatchOptions::new(),

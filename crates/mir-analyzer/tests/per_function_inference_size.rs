@@ -52,7 +52,7 @@ fn measure_per_function_inference_size() {
 
     let t_start = std::time::Instant::now();
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_all_stubs_loaded();
+    session.ensure_all_stubs();
     let result = session.analyze_paths(&all_files, &BatchOptions::new());
     let elapsed = t_start.elapsed();
     eprintln!("Analysis completed in {:?}", elapsed);

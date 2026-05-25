@@ -111,13 +111,9 @@ fn perf_analysis_full_report() {
     print_row("AnalysisSession::new(PhpVersion::LATEST)", init_time, "");
 
     let t0 = Instant::now();
-    analyzer.ensure_all_stubs_loaded();
+    analyzer.ensure_all_stubs();
     let stubs_time = t0.elapsed();
-    print_row(
-        "ensure_all_stubs_loaded() (all 120)",
-        stubs_time,
-        "one-time cost",
-    );
+    print_row("ensure_all_stubs() (all 120)", stubs_time, "one-time cost");
 
     let t0 = Instant::now();
     let _result = analyzer.analyze_paths(&src_files, &BatchOptions::new());
@@ -149,13 +145,9 @@ fn perf_analysis_full_report() {
     print_row("AnalysisSession::new + psr4", session_new, "");
 
     let t0 = Instant::now();
-    session.ensure_essential_stubs_loaded();
+    session.ensure_essential_stubs();
     let essentials = t0.elapsed();
-    print_row(
-        "ensure_essential_stubs_loaded",
-        essentials,
-        "~25 / 120 stubs",
-    );
+    print_row("ensure_essential_stubs", essentials, "~25 / 120 stubs");
 
     // Pick a representative file to "open"
     let open_path = root.join("src/Illuminate/Auth/Events/Login.php");
