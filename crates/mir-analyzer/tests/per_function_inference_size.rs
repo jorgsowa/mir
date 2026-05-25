@@ -75,11 +75,11 @@ fn measure_per_function_inference_size() {
     let n_ref_locs = db.all_reference_location_pairs().len();
     let n_symbols = result.symbols.len();
 
-    // ---------- size of one Issue / RefLoc / Union ----------
+    // ---------- size of one Issue / RefLoc / Type ----------
     // Issue = 168, IssueKind = 104, Location = 32 (measured separately)
     let sizeof_issue = std::mem::size_of::<mir_issues::Issue>();
     let sizeof_refloc = std::mem::size_of::<mir_analyzer::db::RefLoc>();
-    let sizeof_union = std::mem::size_of::<mir_types::Union>();
+    let sizeof_union = std::mem::size_of::<mir_types::Type>();
 
     // ---------- per-function estimates ----------
     let issues_per_fn = n_issues as f64 / n_callables.max(1) as f64;
@@ -89,7 +89,7 @@ fn measure_per_function_inference_size() {
     // FunctionInferenceResult would carry:
     //   - Vec<Issue>  (issues emitted by this fn body)
     //   - Vec<RefLoc> (references in this fn body)
-    //   - Union       (inferred return type)
+    //   - Type       (inferred return type)
     //   - Arc header + Vec headers + salsa storage overhead (~64 bytes)
     let avg_issues_bytes = issues_per_fn * sizeof_issue as f64;
     let avg_refs_bytes = refs_per_fn * sizeof_refloc as f64;

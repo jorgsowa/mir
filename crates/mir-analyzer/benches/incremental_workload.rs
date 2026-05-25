@@ -20,10 +20,8 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
-use mir_analyzer::{
-    discover_files, AnalysisSession, BatchOptions, FileAnalyzer, PhpVersion, Symbol,
-};
-use mir_types::Symbol as MirSymbol;
+use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, FileAnalyzer, Name, PhpVersion};
+use mir_types::Name as MirSymbol;
 use salsa::Cancelled;
 use tempfile::TempDir;
 
@@ -141,7 +139,7 @@ fn warm_session(
             ))
         })
         .collect();
-    session.set_stable_workspace_files(vendor_pairs);
+    session.set_vendor_files(vendor_pairs);
     // Project files: LOW durability (may be edited).
     for path in project_files.iter() {
         if let Ok(src) = std::fs::read_to_string(path) {
@@ -359,7 +357,7 @@ fn bench_read_query_latency(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     group.bench_function("project_analyzer_symbol_location", |b| {
-        b.iter(|| analyzer.definition_of(&Symbol::class("Illuminate\\Database\\Eloquent\\Model")));
+        b.iter(|| analyzer.definition_of(&Name::class("Illuminate\\Database\\Eloquent\\Model")));
     });
 
     let cache_b: TempDir = tempfile::tempdir().unwrap();
@@ -503,7 +501,7 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
                                 let s_ref = &s;
                                 let _ = Cancelled::catch(std::panic::AssertUnwindSafe(|| {
                                     std::hint::black_box(
-                                        s_ref.definition_of(&Symbol::class(target_class)),
+                                        s_ref.definition_of(&Name::class(target_class)),
                                     )
                                 }));
                             }

@@ -1,13 +1,13 @@
 /// Compact representation of simple types for use in `FnParam` inside `TCallable`/`TClosure`.
 ///
 /// Most parameters in vendor code are simple scalar types (string, int, bool, mixed, etc.).
-/// Instead of storing full `Union` structs (176 bytes), we use this enum where:
+/// Instead of storing full `Type` structs (176 bytes), we use this enum where:
 /// - Simple scalars are stored inline (1 byte discriminant)
-/// - Complex types are boxed (pointer to Union)
+/// - Complex types are boxed (pointer to Type)
 ///
 /// This reduces the size of `mir_types::atomic::FnParam::ty` from ~176 bytes to ~8-16 bytes.
 use crate::atomic::Atomic;
-use crate::union::Union;
+use crate::union::Type;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -22,12 +22,12 @@ pub enum SimpleType {
     Void,
     Never,
     /// Complex types (multi-union, type args, etc.) are boxed.
-    Complex(Box<Union>),
+    Complex(Box<Type>),
 }
 
 impl SimpleType {
-    /// Convert a Union into a SimpleType, boxing complex types.
-    pub fn from_union(u: Union) -> Self {
+    /// Convert a Type into a SimpleType, boxing complex types.
+    pub fn from_union(u: Type) -> Self {
         // Simple scalar: single atomic, no flags.
         if !u.possibly_undefined && !u.from_docblock && u.types.len() == 1 {
             match &u.types[0] {
@@ -45,17 +45,17 @@ impl SimpleType {
         Self::Complex(Box::new(u))
     }
 
-    /// Convert back to a Union.
-    pub fn to_union(&self) -> Union {
+    /// Convert back to a Type.
+    pub fn to_union(&self) -> Type {
         match self {
-            Self::String => Union::string(),
-            Self::Int => Union::int(),
-            Self::Float => Union::float(),
-            Self::Bool => Union::bool(),
-            Self::Mixed => Union::mixed(),
-            Self::Null => Union::null(),
-            Self::Void => Union::void(),
-            Self::Never => Union::never(),
+            Self::String => Type::string(),
+            Self::Int => Type::int(),
+            Self::Float => Type::float(),
+            Self::Bool => Type::bool(),
+            Self::Mixed => Type::mixed(),
+            Self::Null => Type::null(),
+            Self::Void => Type::void(),
+            Self::Never => Type::never(),
             Self::Complex(u) => *u.clone(),
         }
     }
@@ -65,8 +65,8 @@ impl SimpleType {
         !matches!(self, Self::Complex(_))
     }
 
-    /// Get as a Union reference if Complex, or None if simple.
-    pub fn as_complex(&self) -> Option<&Union> {
+    /// Get as a Type reference if Complex, or None if simple.
+    pub fn as_complex(&self) -> Option<&Type> {
         match self {
             Self::Complex(u) => Some(u),
             _ => None,
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn simple_scalar_roundtrip() {
-        let u = Union::string();
+        let u = Type::string();
         let s = SimpleType::from_union(u.clone());
         assert_eq!(s, SimpleType::String);
         assert_eq!(s.to_union(), u);
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn nullable_scalar_is_complex() {
-        let u = Union::nullable(Atomic::TString);
+        let u = Type::nullable(Atomic::TString);
         let s = SimpleType::from_union(u.clone());
         assert_eq!(s, SimpleType::Complex(Box::new(u.clone())));
         assert_eq!(s.to_union(), u);

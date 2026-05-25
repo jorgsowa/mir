@@ -5,12 +5,12 @@ use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::Union;
+use mir_types::Type;
 
-use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
 use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
-use crate::symbol::SymbolKind;
+use crate::symbol::ReferenceKind;
 
 use super::args::{
     check_args, check_method_visibility, expr_can_be_passed_by_reference_owned,
@@ -34,7 +34,7 @@ pub(super) struct ResolvedMethod {
     pub(super) is_internal: bool,
     pub(super) params: Vec<FnParam>,
     pub(super) template_params: Vec<TemplateParam>,
-    pub(super) return_ty_raw: Union,
+    pub(super) return_ty_raw: Type,
     pub(super) throws: Arc<[Arc<str>]>,
 }
 
@@ -63,7 +63,7 @@ pub(super) fn resolve_method_from_db(
             .clone()
             .or(inferred)
             .map(|t| (*t).clone())
-            .unwrap_or_else(Union::mixed);
+            .unwrap_or_else(Type::mixed);
 
         return Some(ResolvedMethod {
             owner_fqcn,
@@ -85,15 +85,15 @@ impl CallAnalyzer {
     pub fn analyze_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
         call: &MethodCallExpr,
-        ctx: &mut Context,
+        ctx: &mut FlowState,
         span: Span,
         nullsafe: bool,
-    ) -> Union {
+    ) -> Type {
         let obj_ty = ea.analyze(&call.object, ctx);
 
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),
-            _ => return Union::mixed(),
+            _ => return Type::mixed(),
         };
 
         // Always analyze arguments — even when the receiver is null/mixed and we
@@ -125,7 +125,7 @@ impl CallAnalyzer {
                     Severity::Error,
                     span,
                 );
-                return Union::mixed();
+                return Type::mixed();
             } else {
                 ea.emit(
                     IssueKind::PossiblyNullMethodCall {
@@ -152,11 +152,11 @@ impl CallAnalyzer {
                     span,
                 );
             }
-            return Union::mixed();
+            return Type::mixed();
         }
 
         let receiver = obj_ty.remove_null();
-        let mut result = Union::empty();
+        let mut result = Type::empty();
 
         for atomic in &receiver.types {
             match atomic {
@@ -196,7 +196,7 @@ impl CallAnalyzer {
                     ));
                 }
                 mir_types::Atomic::TIntersection { parts } => {
-                    let mut intersection_result = Union::empty();
+                    let mut intersection_result = Type::empty();
                     let mut found_method = false;
                     for part in parts.iter() {
                         for inner_atomic in &part.types {
@@ -252,7 +252,7 @@ impl CallAnalyzer {
         }
 
         let final_ty = if result.is_empty() {
-            Union::mixed()
+            Type::mixed()
         } else {
             result
         };
@@ -261,7 +261,7 @@ impl CallAnalyzer {
             if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
                 ea.record_symbol(
                     call.method.span,
-                    SymbolKind::MethodCall {
+                    ReferenceKind::MethodCall {
                         class: Arc::from(fqcn.as_ref()),
                         method: Arc::from(method_name),
                     },
@@ -279,15 +279,15 @@ impl CallAnalyzer {
 #[allow(clippy::too_many_arguments)]
 fn resolve_method_return<'a>(
     ea: &mut ExpressionAnalyzer<'a>,
-    ctx: &Context,
+    ctx: &FlowState,
     call: &MethodCallExpr,
     span: Span,
     method_name: &str,
     fqcn: &Arc<str>,
-    receiver_type_params: &[Union],
-    arg_types: &[Union],
+    receiver_type_params: &[Type],
+    arg_types: &[Type],
     arg_spans: &[Span],
-) -> Union {
+) -> Type {
     let method_name_lower = method_name.to_lowercase();
     let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower);
 
@@ -455,14 +455,15 @@ fn resolve_method_return<'a>(
         } else {
             ret_raw
         }
-    } else if crate::db::type_exists(ea.db, fqcn) && !crate::db::has_unknown_ancestor(ea.db, fqcn) {
+    } else if crate::db::class_exists(ea.db, fqcn) && !crate::db::has_unknown_ancestor(ea.db, fqcn)
+    {
         let (is_interface, is_abstract) = crate::db::class_kind(ea.db, fqcn)
             .map(|k| (k.is_interface, k.is_abstract))
             .unwrap_or((false, false));
         // Check for __call in the full inheritance chain (not just direct methods)
         let has_call_magic = crate::db::has_method_in_chain(ea.db, fqcn, "__call");
         if is_interface || is_abstract || has_call_magic {
-            Union::mixed()
+            Type::mixed()
         } else {
             ea.emit(
                 IssueKind::UndefinedMethod {
@@ -472,9 +473,9 @@ fn resolve_method_return<'a>(
                 Severity::Error,
                 span,
             );
-            Union::mixed()
+            Type::mixed()
         }
     } else {
-        Union::mixed()
+        Type::mixed()
     }
 }

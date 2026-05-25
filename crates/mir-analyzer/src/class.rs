@@ -10,7 +10,7 @@
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
-use mir_codebase::storage::{Location as StorageLocation, Visibility};
+use mir_codebase::storage::Visibility;
 use mir_issues::{Issue, IssueKind, Location};
 
 use crate::db::{class_ancestors, MirDatabase};
@@ -81,7 +81,7 @@ impl<'a> ClassAnalyzer<'a> {
             let Some(class) = crate::db::find_class_like(self.db, here) else {
                 continue;
             };
-            let location: Option<StorageLocation> = class.location().cloned();
+            let location: Option<Location> = class.location().cloned();
             let parent_fqcn: Option<Arc<str>> = class.parent().cloned();
             let is_abstract = class.is_abstract();
 
@@ -181,7 +181,7 @@ impl<'a> ClassAnalyzer<'a> {
     fn check_abstract_methods_implemented(
         &self,
         fqcn: &Arc<str>,
-        cls_location: Option<&StorageLocation>,
+        cls_location: Option<&Location>,
         issues: &mut Vec<Issue>,
     ) {
         // Walk every ancestor class and collect abstract methods
@@ -235,7 +235,7 @@ impl<'a> ClassAnalyzer<'a> {
     fn check_interface_methods_implemented(
         &self,
         fqcn: &Arc<str>,
-        cls_location: Option<&StorageLocation>,
+        cls_location: Option<&Location>,
         issues: &mut Vec<Issue>,
     ) {
         // Collect all interfaces (direct + from ancestors)
@@ -302,7 +302,7 @@ impl<'a> ClassAnalyzer<'a> {
     fn check_overrides(
         &self,
         fqcn: &Arc<str>,
-        _cls_location: Option<&StorageLocation>,
+        _cls_location: Option<&Location>,
         issues: &mut Vec<Issue>,
     ) {
         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
@@ -523,14 +523,14 @@ impl<'a> ClassAnalyzer<'a> {
     /// Returns true if the type contains template params or class-strings with unknown types.
     /// Used to suppress MethodSignatureMismatch on generic parent return types.
     /// Checks recursively into array key/value types.
-    fn return_type_has_template(&self, ty: &mir_types::Union) -> bool {
+    fn return_type_has_template(&self, ty: &mir_types::Type) -> bool {
         use mir_types::Atomic;
         ty.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
-            Atomic::TClassString(Some(inner)) => !crate::db::type_exists(self.db, inner.as_ref()),
+            Atomic::TClassString(Some(inner)) => !crate::db::class_exists(self.db, inner.as_ref()),
             Atomic::TNamedObject { fqcn, type_params } => {
                 // Bare name with no namespace separator is likely a template param
-                (!fqcn.contains('\\') && !crate::db::type_exists(self.db, fqcn.as_ref()))
+                (!fqcn.contains('\\') && !crate::db::class_exists(self.db, fqcn.as_ref()))
                     // Also check if any type params are templates
                     || type_params.iter().any(|tp| self.return_type_has_template(tp))
             }
@@ -548,7 +548,7 @@ impl<'a> ClassAnalyzer<'a> {
     /// at any level (including inside array key/value types).
     /// Named-object subtyping requires codebase inheritance lookup, so we skip
     /// the simple structural check for these.
-    fn type_has_named_objects(ty: &mir_types::Union) -> bool {
+    fn type_has_named_objects(ty: &mir_types::Type) -> bool {
         use mir_types::Atomic;
         ty.types.iter().any(|a| match a {
             Atomic::TNamedObject { .. } => true,
@@ -564,7 +564,7 @@ impl<'a> ClassAnalyzer<'a> {
 
     /// Returns true if the type contains TSelf or TStaticObject (late-static types).
     /// These are always considered compatible with their bound class type.
-    fn type_has_self_or_static(&self, ty: &mir_types::Union) -> bool {
+    fn type_has_self_or_static(&self, ty: &mir_types::Type) -> bool {
         use mir_types::Atomic;
         ty.types
             .iter()
@@ -575,7 +575,7 @@ impl<'a> ClassAnalyzer<'a> {
     /// object types (named/self/static/parent), null, void, never, and class-string variants.
     /// Unions that also contain scalar atoms (int, string, …) are not fully handled there
     /// and must fall back to the skip path (G5 gap).
-    fn type_has_only_object_atoms(&self, ty: &mir_types::Union) -> bool {
+    fn type_has_only_object_atoms(&self, ty: &mir_types::Type) -> bool {
         use mir_types::Atomic;
         ty.types.iter().all(|a| {
             matches!(
@@ -646,9 +646,8 @@ impl<'a> ClassAnalyzer<'a> {
 
                     if let Some(offender) = offender {
                         let here = crate::db::Fqcn::from_str(self.db, offender.as_ref());
-                        let location: Option<StorageLocation> =
-                            crate::db::find_class_like(self.db, here)
-                                .and_then(|c| c.location().cloned());
+                        let location: Option<Location> = crate::db::find_class_like(self.db, here)
+                            .and_then(|c| c.location().cloned());
                         let loc = issue_location(
                             location.as_ref(),
                             offender,
@@ -827,7 +826,7 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
 /// Falls back to a dummy location using the FQCN as the file path when no
 /// Location is stored.
 fn issue_location(
-    storage_loc: Option<&mir_codebase::storage::Location>,
+    storage_loc: Option<&mir_types::Location>,
     fqcn: &Arc<str>,
     _source: Option<&str>,
 ) -> Location {
@@ -851,7 +850,7 @@ fn issue_location(
 
 /// Extract the first line of source text covered by `storage_loc` as a snippet.
 fn extract_snippet(
-    storage_loc: Option<&mir_codebase::storage::Location>,
+    storage_loc: Option<&mir_types::Location>,
     sources: &HashMap<Arc<str>, &str>,
 ) -> Option<String> {
     let loc = storage_loc?;

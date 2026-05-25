@@ -4,11 +4,11 @@ use php_ast::owned::{ExprKind, StaticDynMethodCallExpr, StaticMethodCallExpr};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
-use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
-use crate::symbol::SymbolKind;
+use crate::flow_state::FlowState;
+use crate::symbol::ReferenceKind;
 
 use super::args::{
     check_args, expr_can_be_passed_by_reference_owned, spread_element_type,
@@ -25,7 +25,7 @@ fn extract_namespace(fqcn: &str) -> Option<&str> {
     }
 }
 
-fn is_valid_class_name_type(ty: &Union) -> bool {
+fn is_valid_class_name_type(ty: &Type) -> bool {
     // Class names must be strings or class-string types.
     // Mixed is allowed since it's already imprecise.
     ty.contains(|t| {
@@ -40,12 +40,12 @@ impl CallAnalyzer {
     pub fn analyze_static_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
         call: &StaticMethodCallExpr,
-        ctx: &mut Context,
+        ctx: &mut FlowState,
         span: Span,
-    ) -> Union {
+    ) -> Type {
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),
-            _ => return Union::mixed(),
+            _ => return Type::mixed(),
         };
 
         let fqcn = match &call.class.kind {
@@ -62,13 +62,13 @@ impl CallAnalyzer {
                         call.class.span,
                     );
                 }
-                return Union::mixed();
+                return Type::mixed();
             }
         };
 
         let fqcn = resolve_static_class(&fqcn, ctx);
 
-        let arg_types: Vec<Union> = call
+        let arg_types: Vec<Type> = call
             .args
             .iter()
             .map(|arg| {
@@ -86,7 +86,7 @@ impl CallAnalyzer {
         let method_name_lower = method_name.to_lowercase();
 
         // Check if trying to call static method on an interface (not allowed)
-        if crate::db::type_exists(ea.db, &fqcn) {
+        if crate::db::class_exists(ea.db, &fqcn) {
             let here = crate::db::Fqcn::from_str(ea.db, fqcn_arc.as_ref());
             let is_interface = crate::db::find_class_like(ea.db, here)
                 .map(|c| c.is_interface())
@@ -97,7 +97,7 @@ impl CallAnalyzer {
                     Severity::Error,
                     call.class.span,
                 );
-                return Union::mixed();
+                return Type::mixed();
             }
         }
 
@@ -168,14 +168,14 @@ impl CallAnalyzer {
             let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
             ea.record_symbol(
                 call.method.span,
-                SymbolKind::StaticCall {
+                ReferenceKind::StaticCall {
                     class: fqcn_arc,
                     method: Arc::from(method_name),
                 },
                 ret.clone(),
             );
             ret
-        } else if crate::db::type_exists(ea.db, &fqcn)
+        } else if crate::db::class_exists(ea.db, &fqcn)
             && !crate::db::has_unknown_ancestor(ea.db, &fqcn)
         {
             let is_abstract = crate::db::class_kind(ea.db, &fqcn)
@@ -184,7 +184,7 @@ impl CallAnalyzer {
             // Check for __callStatic in the full inheritance chain (not just direct methods)
             let has_callstatic_magic = crate::db::has_method_in_chain(ea.db, &fqcn, "__callstatic");
             if is_abstract || has_callstatic_magic {
-                Union::mixed()
+                Type::mixed()
             } else {
                 ea.emit(
                     IssueKind::UndefinedMethod {
@@ -194,9 +194,9 @@ impl CallAnalyzer {
                     Severity::Error,
                     span,
                 );
-                Union::mixed()
+                Type::mixed()
             }
-        } else if !crate::db::type_exists(ea.db, &fqcn)
+        } else if !crate::db::class_exists(ea.db, &fqcn)
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
         {
             ea.emit(
@@ -204,25 +204,25 @@ impl CallAnalyzer {
                 Severity::Error,
                 call.class.span,
             );
-            Union::mixed()
+            Type::mixed()
         } else {
-            Union::mixed()
+            Type::mixed()
         }
     }
 
     pub fn analyze_static_dyn_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
         call: &StaticDynMethodCallExpr,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         for arg in call.args.iter() {
             ea.analyze(&arg.value, ctx);
         }
-        Union::mixed()
+        Type::mixed()
     }
 }
 
-fn resolve_static_class(name: &str, ctx: &Context) -> String {
+fn resolve_static_class(name: &str, ctx: &FlowState) -> String {
     match name.to_lowercase().as_str() {
         "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
         "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),

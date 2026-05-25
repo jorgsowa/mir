@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{Assertion, AssertionKind, FnParam, TemplateParam};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Name, Type};
 
-use crate::context::Context;
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
 use crate::generic::{check_template_bounds, infer_template_bindings};
-use crate::symbol::SymbolKind;
+use crate::symbol::ReferenceKind;
 use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 
 use super::args::{
@@ -25,7 +25,7 @@ struct ResolvedFn {
     params: Vec<FnParam>,
     template_params: Vec<TemplateParam>,
     assertions: Vec<Assertion>,
-    return_ty_raw: Union,
+    return_ty_raw: Type,
     throws: Arc<[Arc<str>]>,
 }
 
@@ -39,7 +39,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             .clone()
             .or(inferred)
             .map(|t| (*t).clone())
-            .unwrap_or_else(Union::mixed);
+            .unwrap_or_else(Type::mixed);
         return Some(ResolvedFn {
             fqn: f.fqn.clone(),
             deprecated: f.deprecated.clone(),
@@ -57,9 +57,9 @@ impl CallAnalyzer {
     pub fn analyze_function_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
         call: &FunctionCallExpr,
-        ctx: &mut Context,
+        ctx: &mut FlowState,
         span: Span,
-    ) -> Union {
+    ) -> Type {
         let fn_name = match &call.name.kind {
             ExprKind::Identifier(name) => name.as_ref().to_string(),
             _ => {
@@ -111,7 +111,7 @@ impl CallAnalyzer {
                         _ => {}
                     }
                 }
-                return Union::mixed();
+                return Type::mixed();
             }
         };
 
@@ -138,7 +138,7 @@ impl CallAnalyzer {
             .unwrap_or(fn_name);
         let resolved_fn_name: String = {
             let imports = ea.db.file_imports(&ea.file);
-            let qualified = if let Some(imported) = imports.get(&Symbol::new(fn_name.as_str())) {
+            let qualified = if let Some(imported) = imports.get(&Name::new(fn_name.as_str())) {
                 imported.as_str().to_string()
             } else if fn_name.contains('\\') {
                 crate::db::resolve_name(ea.db, &ea.file, &fn_name)
@@ -173,7 +173,7 @@ impl CallAnalyzer {
                             if let ExprKind::Variable(name) = &arg.value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
                                 if !ctx.var_is_defined(var_name) {
-                                    ctx.set_var(var_name, Union::mixed());
+                                    ctx.set_var(var_name, Type::mixed());
                                 }
                             }
                         }
@@ -181,7 +181,7 @@ impl CallAnalyzer {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
                             if !ctx.var_is_defined(var_name) {
-                                ctx.set_var(var_name, Union::mixed());
+                                ctx.set_var(var_name, Type::mixed());
                             }
                         }
                     }
@@ -246,7 +246,7 @@ impl CallAnalyzer {
         if fn_name == "compact" {
             for arg in call.args.iter() {
                 if let ExprKind::String(name) = &arg.value.kind {
-                    ctx.read_vars.insert(mir_types::Symbol::from(name.as_ref()));
+                    ctx.read_vars.insert(mir_types::Name::from(name.as_ref()));
                 }
             }
         }
@@ -328,13 +328,13 @@ impl CallAnalyzer {
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
-                                ctx.set_var(var_name, Union::mixed());
+                                ctx.set_var(var_name, Type::mixed());
                             }
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
-                            ctx.set_var(var_name, Union::mixed());
+                            ctx.set_var(var_name, Type::mixed());
                         }
                     }
                 }
@@ -415,7 +415,7 @@ impl CallAnalyzer {
 
             ea.record_symbol(
                 call.name.span,
-                SymbolKind::FunctionCall(resolved.fqn.clone()),
+                ReferenceKind::FunctionCall(resolved.fqn.clone()),
                 return_ty.clone(),
             );
             return return_ty;
@@ -440,11 +440,11 @@ impl CallAnalyzer {
                         .php_version
                         .includes_symbol(doc.since.as_deref(), doc.removed.as_deref())
                     {
-                        return Union::mixed();
+                        return Type::mixed();
                     }
                 } else {
                     // No docblock found; assume the function is available (conservative).
-                    return Union::mixed();
+                    return Type::mixed();
                 }
             }
         }
@@ -457,7 +457,7 @@ impl CallAnalyzer {
                 span,
             );
         }
-        Union::mixed()
+        Type::mixed()
     }
 }
 

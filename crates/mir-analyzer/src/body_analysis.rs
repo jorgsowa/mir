@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_issues::Issue;
-use mir_types::{Symbol, Union};
+use mir_types::{Name, Type};
 use parking_lot::Mutex;
 
 use crate::db::{resolve_name, MirDatabase};
@@ -15,8 +15,8 @@ use crate::symbol::ResolvedSymbol;
 
 #[derive(Clone)]
 pub(crate) struct InferredTypes {
-    pub(crate) functions: Vec<(Arc<str>, Union)>,
-    pub(crate) methods: Vec<(Arc<str>, Arc<str>, Union)>,
+    pub(crate) functions: Vec<(Arc<str>, Type)>,
+    pub(crate) methods: Vec<(Arc<str>, Arc<str>, Type)>,
 }
 
 /// Look up `(params, return_ty, template_params, throws)` for a method via
@@ -28,7 +28,7 @@ fn method_chain_signature(
     method_name: &str,
 ) -> (
     Arc<[mir_codebase::storage::FnParam]>,
-    Option<Union>,
+    Option<Type>,
     Vec<mir_codebase::storage::TemplateParam>,
     Arc<[Arc<str>]>,
 ) {
@@ -79,7 +79,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
     params
         .iter()
         .map(|p| mir_codebase::FnParam {
-            name: Symbol::new(p.name.as_deref().unwrap_or("")),
+            name: Name::new(p.name.as_deref().unwrap_or("")),
             ty: None,
             has_default: p.default.is_some(),
             is_variadic: p.variadic,
@@ -128,14 +128,14 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or_else(|arc| arc.lock().clone())
     }
 
-    fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Union) {
+    fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Type) {
         if self.inference_only {
             let mut types = self.inferred_types.lock();
             types.functions.push((fqn.clone(), inferred.clone()));
         }
     }
 
-    fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Union) {
+    fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Type) {
         if self.inference_only {
             let mut types = self.inferred_types.lock();
             types
@@ -295,11 +295,11 @@ impl<'a> BodyAnalyzer<'a> {
         // inference-only sweep only primes function/method return types; top-
         // level diagnostics and references are produced by the main sweep.
         if !self.inference_only {
-            use crate::context::Context;
+            use crate::flow_state::FlowState;
             use crate::stmt::StatementsAnalyzer;
             use mir_issues::IssueBuffer;
 
-            let mut ctx = Context::new();
+            let mut ctx = FlowState::new();
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.db,
@@ -452,11 +452,11 @@ impl<'a> BodyAnalyzer<'a> {
 
         // Analyze top-level executable statements in global scope.
         {
-            use crate::context::Context;
+            use crate::flow_state::FlowState;
             use crate::stmt::StatementsAnalyzer;
             use mir_issues::IssueBuffer;
 
-            let mut ctx = Context::new();
+            let mut ctx = FlowState::new();
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
                 self.db,
@@ -520,7 +520,7 @@ impl<'a> BodyAnalyzer<'a> {
         if let Some(hint) = &decl.return_type {
             self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
         }
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -564,7 +564,7 @@ impl<'a> BodyAnalyzer<'a> {
             ),
         };
 
-        let mut ctx = Context::for_method_with_templates(
+        let mut ctx = FlowState::for_method_with_templates(
             &params,
             return_ty,
             declared_throws,
@@ -620,7 +620,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
     ) -> crate::db::FunctionInferenceResult {
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -689,7 +689,7 @@ impl<'a> BodyAnalyzer<'a> {
             ),
         };
 
-        let mut ctx = Context::for_method_with_templates(
+        let mut ctx = FlowState::for_method_with_templates(
             &params,
             return_ty,
             declared_throws,
@@ -741,7 +741,7 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -817,7 +817,7 @@ impl<'a> BodyAnalyzer<'a> {
                     self.php_version,
                     self.inference_only,
                 );
-                let mut default_ctx = Context::new();
+                let mut default_ctx = FlowState::new();
                 default_ctx.self_fqcn = Some(Arc::from(fqcn));
                 default_ctx.parent_fqcn = parent_fqcn.clone();
                 default_ctx.static_fqcn = Some(Arc::from(fqcn));
@@ -838,7 +838,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method_chain_signature(self.db, fqcn, method_name);
 
             let is_ctor = method_name == "__construct";
-            let mut ctx = Context::for_method_with_templates(
+            let mut ctx = FlowState::for_method_with_templates(
                 &params,
                 return_ty,
                 declared_throws,
@@ -888,7 +888,7 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -938,7 +938,7 @@ impl<'a> BodyAnalyzer<'a> {
             ),
         };
 
-        let mut ctx = Context::for_function(
+        let mut ctx = FlowState::for_function(
             &params,
             return_ty,
             declared_throws,
@@ -993,7 +993,7 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -1069,7 +1069,7 @@ impl<'a> BodyAnalyzer<'a> {
                     self.php_version,
                     self.inference_only,
                 );
-                let mut default_ctx = Context::new();
+                let mut default_ctx = FlowState::new();
                 default_ctx.self_fqcn = Some(Arc::from(fqcn));
                 default_ctx.parent_fqcn = parent_fqcn.clone();
                 default_ctx.static_fqcn = Some(Arc::from(fqcn));
@@ -1090,7 +1090,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method_chain_signature(self.db, fqcn, method_name);
 
             let is_ctor = method_name == "__construct";
-            let mut ctx = Context::for_method(
+            let mut ctx = FlowState::for_method(
                 &params,
                 return_ty,
                 declared_throws,
@@ -1144,8 +1144,7 @@ impl<'a> BodyAnalyzer<'a> {
             return;
         };
         let trait_list: Vec<Arc<str>> = class.class_traits().to_vec();
-        let trait_locs: Vec<(Arc<str>, mir_codebase::storage::Location)> =
-            class.trait_use_locations().to_vec();
+        let trait_locs: Vec<(Arc<str>, mir_types::Location)> = class.trait_use_locations().to_vec();
         let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, here).0;
 
         for trait_fqcn in trait_list.iter() {
@@ -1260,7 +1259,7 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -1298,7 +1297,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method_chain_signature(self.db, fqcn, method_name);
 
             let is_ctor = method_name == "__construct";
-            let mut ctx = Context::for_method(
+            let mut ctx = FlowState::for_method(
                 &params,
                 return_ty,
                 declared_throws,
@@ -1345,7 +1344,7 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::context::Context;
+        use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
@@ -1383,7 +1382,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method_chain_signature(self.db, fqcn, method_name);
 
             let is_ctor = method_name == "__construct";
-            let mut ctx = Context::for_method(
+            let mut ctx = FlowState::for_method(
                 &params,
                 return_ty,
                 declared_throws,
@@ -1504,7 +1503,7 @@ impl<'a> BodyAnalyzer<'a> {
 
 /// Seed `ctx.var_locations` for function/method parameters using their AST spans.
 fn seed_param_locations(
-    ctx: &mut crate::context::Context,
+    ctx: &mut crate::flow_state::FlowState,
     ast_params: &[php_ast::owned::Param],
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
@@ -1520,11 +1519,11 @@ fn seed_param_locations(
     }
 }
 
-pub fn merge_return_types(return_types: &[Union]) -> Union {
+pub fn merge_return_types(return_types: &[Type]) -> Type {
     if return_types.is_empty() {
-        return Union::single(mir_types::Atomic::TVoid);
+        return Type::single(mir_types::Atomic::TVoid);
     }
-    return_types.iter().fold(Union::empty(), |mut acc, t| {
+    return_types.iter().fold(Type::empty(), |mut acc, t| {
         acc.merge_with(t);
         acc
     })

@@ -16,7 +16,7 @@ use std::sync::Arc;
 use mir_codebase::storage::{
     ClassDef, ConstantDef, EnumDef, FunctionDef, InterfaceDef, MethodDef, PropertyDef, TraitDef,
 };
-use mir_types::Symbol;
+use mir_types::Name;
 
 use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile};
 
@@ -177,7 +177,7 @@ impl ClassLike {
     }
 
     /// Source location of the declaration.
-    pub fn location(&self) -> Option<&mir_codebase::storage::Location> {
+    pub fn location(&self) -> Option<&mir_types::Location> {
         match self {
             ClassLike::Class(c) => c.location.as_ref(),
             ClassLike::Interface(i) => i.location.as_ref(),
@@ -205,7 +205,7 @@ impl ClassLike {
     }
 
     /// For backed enums: the scalar type they map to.
-    pub fn enum_scalar_type(&self) -> Option<&mir_types::Union> {
+    pub fn enum_scalar_type(&self) -> Option<&mir_types::Type> {
         match self {
             ClassLike::Enum(e) => e.scalar_type.as_ref(),
             _ => None,
@@ -221,7 +221,7 @@ impl ClassLike {
     }
 
     /// `@extends Parent<T1, T2>` type args (class only).
-    pub fn extends_type_args(&self) -> &[mir_types::Union] {
+    pub fn extends_type_args(&self) -> &[mir_types::Type] {
         match self {
             ClassLike::Class(c) => &c.extends_type_args,
             _ => &[],
@@ -229,7 +229,7 @@ impl ClassLike {
     }
 
     /// `@implements Iface<T1, T2>` type args (class only).
-    pub fn implements_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Union>)] {
+    pub fn implements_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Type>)] {
         match self {
             ClassLike::Class(c) => &c.implements_type_args,
             _ => &[],
@@ -237,7 +237,7 @@ impl ClassLike {
     }
 
     /// Per-`use SomeTrait;` declaration locations (class + trait).
-    pub fn trait_use_locations(&self) -> &[(Arc<str>, mir_codebase::storage::Location)] {
+    pub fn trait_use_locations(&self) -> &[(Arc<str>, mir_types::Location)] {
         match self {
             ClassLike::Class(c) => &c.trait_use_locations,
             _ => &[],
@@ -357,13 +357,13 @@ pub fn function_in_file<'db>(
 }
 
 /// Locate a global constant `fqn` defined in `file`. Returns
-/// `Option<Arc<Union>>` where `Union` is its inferred type.
+/// `Option<Arc<Type>>` where `Type` is its inferred type.
 #[salsa::tracked]
 pub fn global_constant_in_file<'db>(
     db: &'db dyn MirDatabase,
     file: SourceFile,
     fqn: Fqcn<'db>,
-) -> Option<Arc<mir_types::Union>> {
+) -> Option<Arc<mir_types::Type>> {
     let defs = collect_file_definitions(db, file);
     let target = fqn.name(db);
     defs.slice
@@ -428,7 +428,7 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     // O(1) HashMap lookup in the workspace symbol index, then a per-(file, idx)
     // salsa-memoized fetch of the Arc<Storage>.
     //
-    // `Symbol::ascii_lowercase` is memoized — first call per unique FQCN
+    // `Name::ascii_lowercase` is memoized — first call per unique FQCN
     // allocates the lowercase string and interns it; subsequent calls hit a
     // process-global DashMap. The hot body-analysis path becomes alloc-free after
     // warmup.
@@ -463,7 +463,7 @@ pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Ar
 pub fn find_global_constant<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
-) -> Option<Arc<mir_types::Union>> {
+) -> Option<Arc<mir_types::Type>> {
     use crate::db::SymbolLoc;
     let key = fqn.name(db);
     let index = crate::db::workspace_index(db);
@@ -508,7 +508,7 @@ pub fn find_method_in_class<'db>(
                 fqcn: e.fqcn.clone(),
                 name: Arc::from(method_name),
                 params: Arc::from([].as_ref()),
-                return_type: Some(Arc::new(mir_types::Union::mixed())),
+                return_type: Some(Arc::new(mir_types::Type::mixed())),
                 inferred_return_type: None,
                 visibility: mir_codebase::storage::Visibility::Public,
                 is_static: true,
@@ -565,7 +565,7 @@ pub fn find_class_constant_in_class<'db>(
         if let Some(case) = e.cases.get(name) {
             return Some(mir_codebase::storage::ConstantDef {
                 name: case.name.clone(),
-                ty: mir_types::Union::mixed(),
+                ty: mir_types::Type::mixed(),
                 visibility: None,
                 is_final: false,
                 location: case.location.clone(),
@@ -597,7 +597,7 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
 
     while let Some(name) = queue.pop_front() {
         order.push(name.clone());
-        let here = Fqcn::new(db, Symbol::new(name.as_ref()));
+        let here = Fqcn::new(db, Name::new(name.as_ref()));
         if let Some(class) = find_class_like(db, here) {
             for parent in class.ancestor_fqcns() {
                 if visited.insert(parent.clone()) {
@@ -614,7 +614,7 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
 /// `name`?". Used for magic-method dispatch checks (`__call`, `__callstatic`,
 /// `__toString`, `__invoke`, `__get`, …) where callers only need a boolean.
 pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool {
-    let here = Fqcn::new(db, Symbol::new(fqcn));
+    let here = Fqcn::new(db, Name::new(fqcn));
     find_method_in_chain(db, here, name).is_some()
 }
 
@@ -628,7 +628,7 @@ pub fn find_method_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
+        let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
         if let Some(m) = find_method_in_class(db, here, name) {
             return Some((ancestor.clone(), m));
         }
@@ -654,10 +654,10 @@ fn find_method_in_mixins<'db>(
         if !visited.insert(mixin_fqcn.clone()) {
             continue;
         }
-        let mixin_here = Fqcn::new(db, Symbol::new(mixin_fqcn.as_ref()));
+        let mixin_here = Fqcn::new(db, Name::new(mixin_fqcn.as_ref()));
         // Walk the mixin's full inheritance chain.
         for ancestor in class_ancestors_by_fqcn(db, mixin_here).iter() {
-            let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
+            let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
             if let Some(m) = find_method_in_class(db, here, name) {
                 return Some((ancestor.clone(), m));
             }
@@ -679,7 +679,7 @@ pub fn find_property_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, PropertyDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
+        let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
         if let Some(p) = find_property_in_class(db, here, name) {
             return Some((ancestor.clone(), p));
         }
@@ -728,7 +728,7 @@ pub fn find_class_constant_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, ConstantDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
+        let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
         if let Some(c) = find_class_constant_in_class(db, here, name) {
             return Some((ancestor.clone(), c));
         }

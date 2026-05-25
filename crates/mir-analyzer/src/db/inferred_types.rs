@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use mir_types::Union;
+use mir_types::Type;
 
 use crate::db::{MirDatabase, SymbolLoc};
 
@@ -17,9 +17,9 @@ use crate::db::{MirDatabase, SymbolLoc};
 /// calls [`crate::db::infer_file_return_types`] on that file. Salsa
 /// memoizes both queries, so repeated lookups for the same function are free.
 /// Returns `None` when the function is unknown or not in the workspace index.
-pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Union>> {
+pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Type>> {
     let idx = crate::db::workspace_index(db);
-    let key = mir_types::Symbol::new(fqn).ascii_lowercase();
+    let key = mir_types::Name::new(fqn).ascii_lowercase();
     let sf = match idx.functions.get(&key)? {
         SymbolLoc::Function { file, .. } => *file,
         _ => return None,
@@ -38,9 +38,9 @@ pub fn inferred_method_return_type_demand(
     db: &dyn MirDatabase,
     fqcn: &str,
     method_name_lower: &str,
-) -> Option<Arc<Union>> {
+) -> Option<Arc<Type>> {
     let idx = crate::db::workspace_index(db);
-    let key = mir_types::Symbol::new(fqcn).ascii_lowercase();
+    let key = mir_types::Name::new(fqcn).ascii_lowercase();
     let sf = match idx.class_like.get(&key)? {
         SymbolLoc::Class { file, .. }
         | SymbolLoc::Interface { file, .. }

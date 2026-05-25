@@ -1,8 +1,8 @@
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Name, Type};
 use php_ast::owned::{Expr, ExprKind};
 
-pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
-    let mut result = Union::empty();
+pub fn widen_array_with_value(current: &Type, new_value: &Type) -> Type {
+    let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
     let mut found_array = false;
@@ -14,13 +14,13 @@ pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
                     all_values.merge_with(&prop.ty);
                 }
                 result.add_type(Atomic::TArray {
-                    key: Box::new(Union::mixed()),
+                    key: Box::new(Type::mixed()),
                     value: Box::new(all_values),
                 });
                 found_array = true;
             }
             Atomic::TArray { key, value } => {
-                let merged = Union::merge(value, new_value);
+                let merged = Type::merge(value, new_value);
                 result.add_type(Atomic::TArray {
                     key: key.clone(),
                     value: Box::new(merged),
@@ -28,14 +28,14 @@ pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
                 found_array = true;
             }
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                let merged = Union::merge(value, new_value);
+                let merged = Type::merge(value, new_value);
                 result.add_type(Atomic::TList {
                     value: Box::new(merged),
                 });
                 found_array = true;
             }
             Atomic::TMixed => {
-                return Union::mixed();
+                return Type::mixed();
             }
             other => {
                 result.add_type(other.clone());
@@ -48,9 +48,9 @@ pub fn widen_array_with_value(current: &Union, new_value: &Union) -> Union {
     result
 }
 
-pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
+pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
     if left.is_mixed() || right.is_mixed() {
-        return Union::mixed();
+        return Type::mixed();
     }
 
     let left_is_array = left.contains(|t| {
@@ -77,9 +77,9 @@ pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
         let merged_left = if left_is_array {
             left.clone()
         } else {
-            Union::single(Atomic::TArray {
-                key: Box::new(Union::single(Atomic::TMixed)),
-                value: Box::new(Union::mixed()),
+            Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TMixed)),
+                value: Box::new(Type::mixed()),
             })
         };
         return merged_left;
@@ -89,11 +89,11 @@ pub fn infer_arithmetic(left: &Union, right: &Union) -> Union {
     let right_is_float =
         right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
     if left_is_float || right_is_float {
-        Union::single(Atomic::TFloat)
+        Type::single(Atomic::TFloat)
     } else if left.contains(|t| t.is_int()) && right.contains(|t| t.is_int()) {
-        Union::single(Atomic::TInt)
+        Type::single(Atomic::TInt)
     } else {
-        let mut u = Union::empty();
+        let mut u = Type::empty();
         u.add_type(Atomic::TInt);
         u.add_type(Atomic::TFloat);
         u
@@ -144,7 +144,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
                 .map(|h| crate::parser::type_from_hint_owned(h, self_fqcn))
                 .map(|u| resolve_named_objects_in_union(u, db, file));
             mir_codebase::FnParam {
-                name: Symbol::new(name_str),
+                name: Name::new(name_str),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default: p.default.is_some(),
                 is_variadic: p.variadic,
@@ -156,10 +156,10 @@ pub(crate) fn ast_params_to_fn_params_resolved(
 }
 
 pub(crate) fn resolve_named_objects_in_union(
-    union: Union,
+    union: Type,
     db: &dyn crate::db::MirDatabase,
     file: &str,
-) -> Union {
+) -> Type {
     let from_docblock = union.from_docblock;
     let possibly_undefined = union.possibly_undefined;
     let types: Vec<Atomic> = union
@@ -176,7 +176,7 @@ pub(crate) fn resolve_named_objects_in_union(
             other => other,
         })
         .collect();
-    let mut result = Union::from_vec(types);
+    let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result.possibly_undefined = possibly_undefined;
     result
@@ -192,8 +192,8 @@ pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
 }
 
 pub(crate) fn property_assign_compatible(
-    value_ty: &Union,
-    prop_ty: &Union,
+    value_ty: &Type,
+    prop_ty: &Type,
     db: &dyn crate::db::MirDatabase,
 ) -> bool {
     if value_ty.is_subtype_of_simple(prop_ty) {

@@ -514,11 +514,11 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
     // Print struct sizes for optimization profiling
     use mir_codebase::storage::FnParam as CodebaseFnParam;
     use mir_types::atomic::Atomic;
-    use mir_types::union::Union;
+    use mir_types::union::Type;
     eprintln!("  [struct sizes]");
     eprintln!(
-        "    size_of::<Union>()                    = {} bytes",
-        std::mem::size_of::<Union>()
+        "    size_of::<Type>()                    = {} bytes",
+        std::mem::size_of::<Type>()
     );
     eprintln!(
         "    size_of::<Atomic>()                   = {} bytes",
@@ -529,12 +529,12 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
         std::mem::size_of::<CodebaseFnParam>()
     );
     eprintln!(
-        "    size_of::<Option<Union>>()            = {} bytes",
-        std::mem::size_of::<Option<Union>>()
+        "    size_of::<Option<Type>>()            = {} bytes",
+        std::mem::size_of::<Option<Type>>()
     );
     eprintln!(
-        "    size_of::<Option<Arc<Union>>>()       = {} bytes",
-        std::mem::size_of::<Option<std::sync::Arc<Union>>>()
+        "    size_of::<Option<Arc<Type>>>()       = {} bytes",
+        std::mem::size_of::<Option<std::sync::Arc<Type>>>()
     );
     eprintln!();
 

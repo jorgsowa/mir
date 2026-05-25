@@ -4,8 +4,8 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use crate::symbol::Symbol;
-use crate::Union;
+use crate::symbol::Name;
+use crate::Type;
 
 // ---------------------------------------------------------------------------
 // FnParam — used inside callable/closure atomics
@@ -13,7 +13,7 @@ use crate::Union;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FnParam {
-    pub name: Symbol,
+    pub name: Name,
     /// Parameter type stored as SimpleType for compact representation.
     /// Most params are simple scalars (string, int, etc.) and fit inline.
     pub ty: Option<crate::compact::SimpleType>,
@@ -45,8 +45,8 @@ pub enum Variance {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TemplateParam {
-    pub name: Symbol,
-    pub bound: Option<Union>,
+    pub name: Name,
+    pub bound: Option<Type>,
     pub variance: Variance,
 }
 
@@ -80,7 +80,7 @@ impl Ord for ArrayKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KeyedProperty {
-    pub ty: Union,
+    pub ty: Type,
     pub optional: bool,
 }
 
@@ -98,7 +98,7 @@ pub enum Atomic {
     /// `callable-string` — a string containing a callable name
     TCallableString,
     /// `class-string` or `class-string<T>`
-    TClassString(Option<Symbol>),
+    TClassString(Option<Name>),
     /// `non-empty-string`
     TNonEmptyString,
     /// `numeric-string`
@@ -149,39 +149,39 @@ pub enum Atomic {
     TObject,
     /// `ClassName` / `ClassName<T1, T2>` — specific named class/interface
     TNamedObject {
-        fqcn: Symbol,
+        fqcn: Name,
         /// Resolved generic type arguments (e.g. `Collection<int>`)
-        type_params: Arc<[Union]>,
+        type_params: Arc<[Type]>,
     },
     /// `static` — late static binding type; resolved to calling class at call site
-    TStaticObject { fqcn: Symbol },
+    TStaticObject { fqcn: Name },
     /// `self` — the class in whose body the type appears
-    TSelf { fqcn: Symbol },
+    TSelf { fqcn: Name },
     /// `parent` — the parent class
-    TParent { fqcn: Symbol },
+    TParent { fqcn: Name },
 
     // --- Callables ---
     /// `callable` or `callable(T): R`
     TCallable {
         params: Option<Vec<FnParam>>,
-        return_type: Option<Box<Union>>,
+        return_type: Option<Box<Type>>,
     },
     /// `Closure` or `Closure(T): R` — more specific than TCallable
     TClosure {
         params: Vec<FnParam>,
-        return_type: Box<Union>,
-        this_type: Option<Box<Union>>,
+        return_type: Box<Type>,
+        this_type: Option<Box<Type>>,
     },
 
     // --- Arrays ---
     /// `array` or `array<K, V>`
-    TArray { key: Box<Union>, value: Box<Union> },
+    TArray { key: Box<Type>, value: Box<Type> },
     /// `list<T>` — integer-keyed sequential array (keys 0, 1, 2, …)
-    TList { value: Box<Union> },
+    TList { value: Box<Type> },
     /// `non-empty-array<K, V>`
-    TNonEmptyArray { key: Box<Union>, value: Box<Union> },
+    TNonEmptyArray { key: Box<Type>, value: Box<Type> },
     /// `non-empty-list<T>`
-    TNonEmptyList { value: Box<Union> },
+    TNonEmptyList { value: Box<Type> },
     /// `array{key: T, ...}` — shape / keyed array
     TKeyedArray {
         properties: IndexMap<ArrayKey, KeyedProperty>,
@@ -194,16 +194,16 @@ pub enum Atomic {
     // --- Generics / meta-types ---
     /// `T` — a template type parameter
     TTemplateParam {
-        name: Symbol,
-        as_type: Box<Union>,
+        name: Name,
+        as_type: Box<Type>,
         /// The entity (class or function FQN) that declared this template
-        defining_entity: Symbol,
+        defining_entity: Name,
     },
     /// `(T is string ? A : B)` — conditional type
     TConditional {
-        subject: Box<Union>,
-        if_true: Box<Union>,
-        if_false: Box<Union>,
+        subject: Box<Type>,
+        if_true: Box<Type>,
+        if_false: Box<Type>,
     },
 
     // --- Special object strings ---
@@ -216,14 +216,11 @@ pub enum Atomic {
 
     // --- Enum cases ---
     /// `EnumName::CaseName` — a specific enum case literal
-    TLiteralEnumCase {
-        enum_fqcn: Symbol,
-        case_name: Symbol,
-    },
+    TLiteralEnumCase { enum_fqcn: Name, case_name: Name },
 
     // --- Intersection ---
     /// `A&B&C` — PHP 8.1+ pure intersection type
-    TIntersection { parts: Arc<[Union]> },
+    TIntersection { parts: Arc<[Type]> },
 }
 
 impl Atomic {

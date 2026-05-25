@@ -8,16 +8,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// Backed by the process-global [`ustr`] interner: equal string values share a
 /// single heap allocation.  Equality is pointer-based (O(1)) rather than
-/// content-based (O(n)).  `Symbol` is `Copy` — cloning is a pointer copy, not a
+/// content-based (O(n)).  `Name` is `Copy` — cloning is a pointer copy, not a
 /// refcount increment.
 ///
 /// ## Serde
 /// Serialised as a plain string; deserialised by interning the string value.
 /// Round-trips transparently through `bincode` / `serde_json`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Symbol(ustr::Ustr);
+pub struct Name(ustr::Ustr);
 
-impl Symbol {
+impl Name {
     #[inline]
     pub fn new(s: &str) -> Self {
         Self(ustr::ustr(s))
@@ -28,7 +28,7 @@ impl Symbol {
         self.0.as_str()
     }
 
-    /// ASCII-lowercased twin of this symbol, memoized.
+    /// ASCII-lowercased twin of this name, memoized.
     ///
     /// PHP class and function names are case-insensitive for resolution, so
     /// every workspace symbol-index lookup needs the lowercase form. The
@@ -37,7 +37,7 @@ impl Symbol {
     ///
     /// This caches `self → lowercase(self)` in a process-global DashMap so
     /// every unique identifier is lowercased at most once. The result is
-    /// itself a `Symbol`, so downstream HashMap lookups become `u64`-keyed
+    /// itself a `Name`, so downstream HashMap lookups become `u64`-keyed
     /// (`ustr::Ustr` equality is pointer-eq, not content-eq).
     ///
     /// Fast path: if `self` is already all-lowercase, returns `self`
@@ -50,13 +50,13 @@ impl Symbol {
             std::sync::OnceLock::new();
         let cache = CACHE.get_or_init(dashmap::DashMap::default);
         if let Some(v) = cache.get(&self.0) {
-            return Symbol(*v);
+            return Name(*v);
         }
         // `to_ascii_lowercase` allocates but only on first sight of this
-        // symbol; subsequent calls return from the cache.
+        // name; subsequent calls return from the cache.
         let lowered = ustr::ustr(&self.as_str().to_ascii_lowercase());
         cache.insert(self.0, lowered);
-        Symbol(lowered)
+        Name(lowered)
     }
 }
 
@@ -64,37 +64,37 @@ impl Symbol {
 // Conversions
 // ---------------------------------------------------------------------------
 
-impl From<&str> for Symbol {
+impl From<&str> for Name {
     #[inline]
     fn from(s: &str) -> Self {
         Self::new(s)
     }
 }
 
-impl From<String> for Symbol {
+impl From<String> for Name {
     #[inline]
     fn from(s: String) -> Self {
         Self::new(&s)
     }
 }
 
-impl From<Arc<str>> for Symbol {
+impl From<Arc<str>> for Name {
     #[inline]
     fn from(s: Arc<str>) -> Self {
         Self::new(&s)
     }
 }
 
-impl From<Symbol> for String {
+impl From<Name> for String {
     #[inline]
-    fn from(s: Symbol) -> String {
+    fn from(s: Name) -> String {
         s.as_str().to_string()
     }
 }
 
-impl From<Symbol> for Arc<str> {
+impl From<Name> for Arc<str> {
     #[inline]
-    fn from(s: Symbol) -> Arc<str> {
+    fn from(s: Name) -> Arc<str> {
         Arc::from(s.as_str())
     }
 }
@@ -103,7 +103,7 @@ impl From<Symbol> for Arc<str> {
 // Deref + AsRef
 // ---------------------------------------------------------------------------
 
-impl std::ops::Deref for Symbol {
+impl std::ops::Deref for Name {
     type Target = str;
     #[inline]
     fn deref(&self) -> &str {
@@ -111,7 +111,7 @@ impl std::ops::Deref for Symbol {
     }
 }
 
-impl AsRef<str> for Symbol {
+impl AsRef<str> for Name {
     #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
@@ -122,37 +122,37 @@ impl AsRef<str> for Symbol {
 // Comparisons
 // ---------------------------------------------------------------------------
 
-impl PartialEq<str> for Symbol {
+impl PartialEq<str> for Name {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<Symbol> for str {
+impl PartialEq<Name> for str {
     #[inline]
-    fn eq(&self, other: &Symbol) -> bool {
+    fn eq(&self, other: &Name) -> bool {
         self == other.as_str()
     }
 }
 
-impl PartialEq<String> for Symbol {
+impl PartialEq<String> for Name {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other.as_str()
     }
 }
 
-impl PartialEq<Arc<str>> for Symbol {
+impl PartialEq<Arc<str>> for Name {
     #[inline]
     fn eq(&self, other: &Arc<str>) -> bool {
         self.as_str() == other.as_ref()
     }
 }
 
-impl PartialEq<Symbol> for Arc<str> {
+impl PartialEq<Name> for Arc<str> {
     #[inline]
-    fn eq(&self, other: &Symbol) -> bool {
+    fn eq(&self, other: &Name) -> bool {
         self.as_ref() == other.as_str()
     }
 }
@@ -161,15 +161,15 @@ impl PartialEq<Symbol> for Arc<str> {
 // Display / Debug
 // ---------------------------------------------------------------------------
 
-impl fmt::Display for Symbol {
+impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl fmt::Debug for Symbol {
+impl fmt::Debug for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Symbol({:?})", self.as_str())
+        write!(f, "Name({:?})", self.as_str())
     }
 }
 
@@ -177,13 +177,13 @@ impl fmt::Debug for Symbol {
 // Serde
 // ---------------------------------------------------------------------------
 
-impl Serialize for Symbol {
+impl Serialize for Name {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-impl<'de> Deserialize<'de> for Symbol {
+impl<'de> Deserialize<'de> for Name {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         // Use `Cow<str>` instead of `&str` so this round-trips through both
         // borrowable formats (`serde_json`, `bincode::deserialize(&bytes)`)

@@ -1,15 +1,15 @@
 /// Type narrowing — refines variable types based on conditional expressions.
 ///
 /// Given a condition expression and a branch direction (true/false), this
-/// module updates the `Context` to narrow variable types accordingly.
+/// module updates the `FlowState` to narrow variable types accordingly.
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
 use mir_codebase::storage::AssertionKind;
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
-use crate::context::Context;
 use crate::db::MirDatabase;
+use crate::flow_state::FlowState;
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -18,7 +18,7 @@ use crate::db::MirDatabase;
 /// Narrow the types in `ctx` as if `expr` evaluates to `is_true`.
 pub fn narrow_from_condition(
     expr: &php_ast::owned::Expr,
-    ctx: &mut Context,
+    ctx: &mut FlowState,
     is_true: bool,
     db: &dyn MirDatabase,
     file: &str,
@@ -229,7 +229,7 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars)
-                            .insert(mir_types::Symbol::from(var_name.as_str()));
+                            .insert(mir_types::Name::from(var_name.as_str()));
                     }
                 }
             }
@@ -298,7 +298,7 @@ pub fn narrow_from_condition(
 
 fn apply_docblock_assertions(
     call: &php_ast::owned::FunctionCallExpr,
-    ctx: &mut Context,
+    ctx: &mut FlowState,
     is_true: bool,
     db: &dyn MirDatabase,
     file: &str,
@@ -359,7 +359,7 @@ fn apply_docblock_assertions(
 fn narrow_or_instanceof_true(
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
-    ctx: &mut Context,
+    ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
 ) {
@@ -420,7 +420,7 @@ fn narrow_or_instanceof_true(
             if !class_names.is_empty() {
                 let current = ctx.get_var(&vn);
                 // Narrow to the union of all instanceof types: take union of narrow_instanceof results
-                let mut narrowed = Union::empty();
+                let mut narrowed = Type::empty();
                 for cn in &class_names {
                     let n = narrow_instanceof_preserving_subtypes(
                         &current,
@@ -457,7 +457,7 @@ fn narrow_or_instanceof_true(
 fn narrow_or_isset_true(
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
-    ctx: &mut Context,
+    ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
 ) {
@@ -480,7 +480,7 @@ fn narrow_or_isset_true(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars)
-                            .insert(mir_types::Symbol::from(var_name.as_str()));
+                            .insert(mir_types::Name::from(var_name.as_str()));
                     }
                 }
 
@@ -497,21 +497,21 @@ fn narrow_or_isset_true(
 }
 
 fn narrow_instanceof_preserving_subtypes(
-    current: &Union,
+    current: &Type,
     class_name: &str,
     db: &dyn MirDatabase,
-    template_param_names: &rustc_hash::FxHashSet<mir_types::Symbol>,
-) -> Union {
+    template_param_names: &rustc_hash::FxHashSet<mir_types::Name>,
+) -> Type {
     let narrowed_ty = Atomic::TNamedObject {
         fqcn: class_name.into(),
         type_params: mir_types::union::empty_type_params(),
     };
 
     if current.is_empty() || current.is_mixed() {
-        return Union::single(narrowed_ty);
+        return Type::single(narrowed_ty);
     }
 
-    let mut result = Union::empty();
+    let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
 
@@ -545,13 +545,13 @@ fn narrow_instanceof_preserving_subtypes(
     }
 
     if result.is_empty() {
-        Union::single(narrowed_ty)
+        Type::single(narrowed_ty)
     } else {
         result
     }
 }
 
-fn filter_out_instanceof_match(current: &Union, class_name: &str, db: &dyn MirDatabase) -> Union {
+fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDatabase) -> Type {
     current.filter(|t| match t {
         Atomic::TNamedObject { fqcn, .. }
         | Atomic::TSelf { fqcn }
@@ -570,10 +570,10 @@ fn named_object_matches_instanceof(fqcn: &str, class_name: &str, db: &dyn MirDat
 /// If `mark_diverges` is true and the narrowed type is empty (the current type
 /// can never satisfy the constraint), the branch is marked unreachable.
 fn set_narrowed(
-    ctx: &mut Context,
+    ctx: &mut FlowState,
     name: &str,
-    current: &Union,
-    narrowed: Union,
+    current: &Type,
+    narrowed: Type,
     mark_diverges: bool,
 ) {
     if !narrowed.is_empty() {
@@ -583,7 +583,7 @@ fn set_narrowed(
     }
 }
 
-fn narrow_var_null(ctx: &mut Context, name: &str, is_null: bool) {
+fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_null {
         current.narrow_to_null()
@@ -593,7 +593,7 @@ fn narrow_var_null(ctx: &mut Context, name: &str, is_null: bool) {
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
-fn narrow_var_bool(ctx: &mut Context, name: &str, value: bool, is_value: bool) {
+fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_value {
         if value {
@@ -609,7 +609,7 @@ fn narrow_var_bool(ctx: &mut Context, name: &str, value: bool, is_value: bool) {
     set_narrowed(ctx, name, &current, narrowed, false);
 }
 
-fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true: bool) {
+fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_true: bool) {
     let current = ctx.get_var(var_name);
     let narrowed = match fn_name.to_lowercase().as_str() {
         "is_string" => {
@@ -742,7 +742,7 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
         // UndefinedMethod; the concrete type is unresolvable without knowing the method arg)
         "method_exists" | "property_exists" => {
             if is_true {
-                Union::single(Atomic::TObject)
+                Type::single(Atomic::TObject)
             } else {
                 current.clone()
             }
@@ -752,7 +752,7 @@ fn narrow_from_type_fn(ctx: &mut Context, fn_name: &str, var_name: &str, is_true
     set_narrowed(ctx, var_name, &current, narrowed, true);
 }
 
-fn narrow_var_literal_string(ctx: &mut Context, name: &str, value: &str, is_value: bool) {
+fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_value {
         current.filter(|t| match t {
@@ -766,7 +766,7 @@ fn narrow_var_literal_string(ctx: &mut Context, name: &str, value: &str, is_valu
     set_narrowed(ctx, name, &current, narrowed, false);
 }
 
-fn narrow_var_literal_int(ctx: &mut Context, name: &str, value: i64, is_value: bool) {
+fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_value {
         current.filter(|t| match t {
@@ -781,7 +781,7 @@ fn narrow_var_literal_int(ctx: &mut Context, name: &str, value: i64, is_value: b
 }
 
 fn narrow_var_to_literal_enum_case(
-    ctx: &mut Context,
+    ctx: &mut FlowState,
     name: &str,
     enum_fqcn: &str,
     case_name: &str,
@@ -789,7 +789,7 @@ fn narrow_var_to_literal_enum_case(
 ) {
     let current = ctx.get_var(name);
     let narrowed = if is_case {
-        Union::single(Atomic::TLiteralEnumCase {
+        Type::single(Atomic::TLiteralEnumCase {
             enum_fqcn: enum_fqcn.into(),
             case_name: case_name.into(),
         })
@@ -803,20 +803,20 @@ fn narrow_var_to_literal_enum_case(
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
-fn narrow_var_to_class_string(ctx: &mut Context, name: &str, fqcn: &str, is_class: bool) {
+fn narrow_var_to_class_string(ctx: &mut FlowState, name: &str, fqcn: &str, is_class: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_class {
-        Union::single(Atomic::TClassString(Some(mir_types::Symbol::from(fqcn))))
+        Type::single(Atomic::TClassString(Some(mir_types::Name::from(fqcn))))
     } else {
         current.filter(|t| !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn))
     };
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
-fn narrow_var_to_specific_class(ctx: &mut Context, name: &str, fqcn: &str, is_exact_class: bool) {
+fn narrow_var_to_specific_class(ctx: &mut FlowState, name: &str, fqcn: &str, is_exact_class: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_exact_class {
-        Union::single(Atomic::TNamedObject {
+        Type::single(Atomic::TNamedObject {
             fqcn: fqcn.into(),
             type_params: mir_types::union::empty_type_params(),
         })
@@ -893,16 +893,16 @@ fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
-// Extension methods on Union used only in narrowing
+// Extension methods on Type used only in narrowing
 // ---------------------------------------------------------------------------
 
 trait UnionNarrowExt {
-    fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Union;
+    fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Type;
 }
 
-impl UnionNarrowExt for Union {
-    fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Union {
-        let mut result = Union::empty();
+impl UnionNarrowExt for Type {
+    fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Type {
+        let mut result = Type::empty();
         result.possibly_undefined = self.possibly_undefined;
         result.from_docblock = self.from_docblock;
         for atomic in &self.types {

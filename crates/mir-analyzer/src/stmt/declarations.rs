@@ -1,11 +1,11 @@
 use super::StatementsAnalyzer;
-use crate::context::Context;
-use mir_types::Symbol;
+use crate::flow_state::FlowState;
+use mir_types::Name;
 use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl};
 use std::sync::Arc;
 
 impl<'a> StatementsAnalyzer<'a> {
-    pub(crate) fn analyze_function_decl_stmt(&mut self, decl: &FunctionDecl, ctx: &mut Context) {
+    pub(crate) fn analyze_function_decl_stmt(&mut self, decl: &FunctionDecl, ctx: &mut FlowState) {
         for p in decl.params.iter() {
             if let Some(default) = &p.default {
                 let mut ea = self.expr_analyzer(ctx);
@@ -16,7 +16,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Look up the function in the database to get resolved parameter types
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         let resolve_fn =
-            |fqn: &str| -> Option<(Vec<mir_codebase::FnParam>, Option<mir_types::Union>)> {
+            |fqn: &str| -> Option<(Vec<mir_codebase::FnParam>, Option<mir_types::Type>)> {
                 let db = self.db;
                 let here = crate::db::Fqcn::from_str(db, fqn);
                 crate::db::find_function(db, here).map(|f| {
@@ -35,7 +35,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Symbol::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -53,7 +53,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Symbol::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -65,7 +65,7 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         };
 
-        let mut fn_ctx = Context::for_function(
+        let mut fn_ctx = FlowState::for_function(
             &params,
             return_ty,
             Arc::from([]),
@@ -88,7 +88,7 @@ impl<'a> StatementsAnalyzer<'a> {
         sa.analyze_stmts(&decl.body, &mut fn_ctx);
     }
 
-    pub(crate) fn analyze_class_decl_stmt(&mut self, decl: &ClassDecl, ctx: &mut Context) {
+    pub(crate) fn analyze_class_decl_stmt(&mut self, decl: &ClassDecl, ctx: &mut FlowState) {
         let class_name = decl
             .name
             .as_ref()
@@ -132,7 +132,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .params
                     .iter()
                     .map(|p| mir_codebase::FnParam {
-                        name: Symbol::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                        name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
@@ -143,7 +143,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 (ast_params, None)
             };
             let is_ctor = method_name == "__construct";
-            let mut method_ctx = Context::for_method(
+            let mut method_ctx = FlowState::for_method(
                 &params,
                 return_ty,
                 Arc::from([]),

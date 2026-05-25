@@ -9,12 +9,12 @@ mod tests {
 
     #[test]
     fn mirdb_constructs() {
-        let _db = MirDb::default();
+        let _db = MirDbStorage::default();
     }
 
     #[test]
     fn source_file_input_roundtrip() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(&db, Arc::from("/tmp/test.php"), Arc::from("<?php echo 1;"));
         assert_eq!(file.path(&db).as_ref(), "/tmp/test.php");
         assert_eq!(file.text(&db).as_ref(), "<?php echo 1;");
@@ -22,7 +22,7 @@ mod tests {
 
     #[test]
     fn collect_file_definitions_basic() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let src = Arc::from("<?php class Foo {}");
         let file = SourceFile::new(&db, Arc::from("/tmp/foo.php"), src);
         let defs = collect_file_definitions(&db, file);
@@ -33,7 +33,7 @@ mod tests {
 
     #[test]
     fn collect_file_definitions_memoized() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/memo.php"),
@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     fn analyze_file_accumulates_parse_errors() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/parse_err.php"),
@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn analyze_file_clean_input_accumulates_nothing() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/clean.php"),
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn infer_function_returns_some_for_existing_free_fn() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_existing.php"),
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn infer_function_returns_none_for_unknown_fn() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_unknown.php"),
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn infer_function_memoized_on_repeat_call() {
-        let db = MirDb::default();
+        let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/infer_fn_memo.php"),
@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn collect_file_definitions_recomputes_on_change() {
         use salsa::Setter as _;
-        let mut db = MirDb::default();
+        let mut db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
             Arc::from("/tmp/memo2.php"),

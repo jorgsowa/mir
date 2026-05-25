@@ -1,4 +1,4 @@
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Name, Type};
 use rustc_hash::FxHashMap;
 
 pub(super) fn resolve_name(
@@ -41,37 +41,37 @@ pub(super) fn resolve_type_name(
     full_qualify: bool,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Symbol {
+) -> Name {
     let stripped = name.trim_start_matches('\\');
     let first_part = stripped.split('\\').next().unwrap_or(stripped);
     if use_aliases.contains_key(first_part) {
         return resolve_alias_only(stripped, use_aliases).as_str().into();
     }
     if stripped.contains('\\') {
-        return Symbol::from(stripped);
+        return Name::from(stripped);
     }
     if full_qualify {
         resolve_name(stripped, namespace, use_aliases)
             .as_str()
             .into()
     } else {
-        Symbol::from(stripped)
+        Name::from(stripped)
     }
 }
 
 pub(super) fn resolve_union_inner(
-    union: Union,
+    union: Type,
     full_qualify: bool,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Union {
+) -> Type {
     let from_docblock = union.from_docblock;
     let types: Vec<Atomic> = union
         .types
         .into_iter()
         .map(|a| resolve_atomic_inner(a, full_qualify, namespace, use_aliases))
         .collect();
-    let mut result = Union::from_vec(types);
+    let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result
 }
@@ -142,8 +142,8 @@ pub(super) fn resolve_atomic_inner(
     }
 }
 
-pub(super) fn fill_self_static_parent(union: Union, class_fqcn: &str) -> Union {
-    let mut result = Union::empty();
+pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
+    let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = union.from_docblock;
     for a in union.types {
@@ -165,33 +165,33 @@ pub(super) fn fill_self_static_parent(union: Union, class_fqcn: &str) -> Union {
 }
 
 pub(super) fn resolve_union(
-    union: Union,
+    union: Type,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Union {
+) -> Type {
     resolve_union_inner(union, true, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_doc(
-    union: Union,
+    union: Type,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Union {
+) -> Type {
     resolve_union_inner(union, false, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_doc_with_aliases(
-    union: Union,
-    aliases: &FxHashMap<String, Union>,
+    union: Type,
+    aliases: &FxHashMap<String, Type>,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Union {
+) -> Type {
     if aliases.is_empty() {
         return resolve_union_doc(union, namespace, use_aliases);
     }
 
     let from_docblock = union.from_docblock;
-    let mut result = Union::empty();
+    let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = from_docblock;
 
@@ -217,9 +217,9 @@ pub(super) fn resolve_union_doc_with_aliases(
 }
 
 pub(super) fn resolve_union_opt(
-    opt: Option<Union>,
+    opt: Option<Type>,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
-) -> Option<Union> {
+) -> Option<Type> {
     opt.map(|u| resolve_union(u, namespace, use_aliases))
 }

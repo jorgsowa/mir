@@ -1,16 +1,16 @@
 use super::ExpressionAnalyzer;
-use crate::context::Context;
+use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::owned::{ArrayAccessExpr, ArrayElement, Expr, ExprKind};
 use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_array(&mut self, elements: &[ArrayElement], ctx: &mut Context) -> Union {
+    pub(super) fn analyze_array(&mut self, elements: &[ArrayElement], ctx: &mut FlowState) -> Type {
         use mir_types::atomic::{ArrayKey, KeyedProperty};
 
         if elements.is_empty() {
-            return Union::single(Atomic::TKeyedArray {
+            return Type::single(Atomic::TKeyedArray {
                 properties: indexmap::IndexMap::new(),
                 is_open: false,
                 is_list: true,
@@ -69,7 +69,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         if can_be_keyed {
-            return Union::single(Atomic::TKeyedArray {
+            return Type::single(Atomic::TKeyedArray {
                 properties: keyed_props,
                 is_open: false,
                 is_list,
@@ -77,8 +77,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         // Fallback: generic TArray
-        let mut all_value_types = Union::empty();
-        let mut key_union = Union::empty();
+        let mut all_value_types = Type::empty();
+        let mut key_union = Type::empty();
         let mut has_unpack = false;
         for elem in elements.iter() {
             let value_ty = self.analyze(&elem.value, ctx);
@@ -106,15 +106,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         if has_unpack {
-            return Union::single(Atomic::TArray {
-                key: Box::new(Union::single(Atomic::TMixed)),
-                value: Box::new(Union::mixed()),
+            return Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TMixed)),
+                value: Box::new(Type::mixed()),
             });
         }
         if key_union.is_empty() {
             key_union.add_type(Atomic::TInt);
         }
-        Union::single(Atomic::TArray {
+        Type::single(Atomic::TArray {
             key: Box::new(key_union),
             value: Box::new(all_value_types),
         })
@@ -124,8 +124,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         aa: &ArrayAccessExpr,
         expr: &Expr,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let arr_ty = self.analyze(&aa.array, ctx);
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
@@ -143,7 +143,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         if arr_ty.contains(|t| matches!(t, Atomic::TNull)) && arr_ty.is_single() {
             self.emit(IssueKind::NullArrayAccess, Severity::Error, expr.span);
-            return Union::mixed();
+            return Type::mixed();
         }
         if arr_ty.is_nullable() {
             self.emit(
@@ -170,12 +170,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             return prop.ty.clone();
                         }
                     }
-                    let mut result = Union::empty();
+                    let mut result = Type::empty();
                     for prop in properties.values() {
                         result.merge_with(&prop.ty);
                     }
                     return if result.types.is_empty() {
-                        Union::mixed()
+                        Type::mixed()
                     } else {
                         result
                     };
@@ -187,11 +187,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return *value.clone();
                 }
                 Atomic::TString | Atomic::TLiteralString(_) => {
-                    return Union::single(Atomic::TString);
+                    return Type::single(Atomic::TString);
                 }
                 _ => {}
             }
         }
-        Union::mixed()
+        Type::mixed()
     }
 }

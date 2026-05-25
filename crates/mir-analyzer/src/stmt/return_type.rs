@@ -1,4 +1,4 @@
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Name, Type};
 
 use crate::db::{extends_or_implements, MirDatabase};
 
@@ -9,14 +9,14 @@ use crate::db::{extends_or_implements, MirDatabase};
 /// Returns true if `actual` is compatible with `declared` considering class
 /// hierarchy, self/static resolution, and short-name vs FQCN mismatches.
 pub(crate) fn named_object_return_compatible(
-    actual: &Union,
-    declared: &Union,
+    actual: &Type,
+    declared: &Type,
     db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
     actual.types.iter().all(|actual_atom| {
         // Extract the actual FQCN — handles TNamedObject, TSelf, TStaticObject, TParent
-        let actual_fqcn: &Symbol = match actual_atom {
+        let actual_fqcn: &Name = match actual_atom {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } => fqcn,
             Atomic::TStaticObject { fqcn } => fqcn,
@@ -56,7 +56,7 @@ pub(crate) fn named_object_return_compatible(
 
         declared.types.iter().any(|declared_atom| {
             // Extract declared FQCN — also handle self/static/parent in declared type
-            let declared_fqcn: &Symbol = match declared_atom {
+            let declared_fqcn: &Name = match declared_atom {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,
@@ -129,8 +129,8 @@ pub(crate) fn named_object_return_compatible(
 /// declared variance. Simpler than the arg-checking version — uses only structural subtyping
 /// since we don't have access to ExpressionAnalyzer here.
 fn return_type_params_compatible(
-    actual_params: &[Union],
-    declared_params: &[Union],
+    actual_params: &[Type],
+    declared_params: &[Type],
     template_params: &[mir_codebase::storage::TemplateParam],
 ) -> bool {
     if actual_params.len() != declared_params.len() {
@@ -176,7 +176,7 @@ fn return_type_params_compatible(
 }
 
 /// Returns true if the union recursively contains a `TTemplateParam` anywhere.
-fn union_contains_template(u: &Union) -> bool {
+fn union_contains_template(u: &Type) -> bool {
     u.types.iter().any(|a| match a {
         Atomic::TTemplateParam { .. } => true,
         Atomic::TNamedObject { type_params, .. } => type_params.iter().any(union_contains_template),
@@ -194,7 +194,7 @@ fn union_contains_template(u: &Union) -> bool {
 ///
 /// Concrete generic instantiations like `Result<string, void>` are NOT bailed on — their
 /// type arguments are concrete and `named_object_return_compatible` handles them.
-pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabase) -> bool {
+pub(super) fn declared_return_has_template(declared: &Type, db: &dyn MirDatabase) -> bool {
     declared.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
         // Skip when the named class doesn't exist in the codebase (e.g. type aliases
@@ -205,7 +205,7 @@ pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabas
         // substitution context we don't have at the return-site.
         Atomic::TNamedObject { fqcn, type_params } => {
             type_params.iter().any(union_contains_template)
-                || !crate::db::type_exists(db, fqcn.as_ref())
+                || !crate::db::class_exists(db, fqcn.as_ref())
                 || crate::db::class_kind(db, fqcn.as_ref()).is_some_and(|k| k.is_interface)
         }
         Atomic::TArray { value, .. }
@@ -214,7 +214,7 @@ pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabas
         | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !crate::db::type_exists(db, fqcn.as_ref())
+                !fqcn.contains('\\') && !crate::db::class_exists(db, fqcn.as_ref())
             }
             _ => false,
         }),
@@ -222,10 +222,10 @@ pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabas
     })
 }
 
-/// Resolve all TNamedObject FQCNs in a Union using the codebase's file-level imports/namespace.
+/// Resolve all TNamedObject FQCNs in a Type using the codebase's file-level imports/namespace.
 /// Used to fix up `@var` annotation types that were parsed without namespace context.
-pub(super) fn resolve_union_for_file(union: Union, db: &dyn MirDatabase, file: &str) -> Union {
-    let mut result = Union::empty();
+pub(super) fn resolve_union_for_file(union: Type, db: &dyn MirDatabase, file: &str) -> Type {
+    let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = union.from_docblock;
     for atomic in union.types {
@@ -278,13 +278,13 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
 /// Returns true if both actual and declared are array/list types whose value types are
 /// compatible with FQCN resolution (to avoid short-name vs FQCN mismatches in return types).
 pub(super) fn return_arrays_compatible(
-    actual: &Union,
-    declared: &Union,
+    actual: &Type,
+    declared: &Type,
     db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
     actual.types.iter().all(|a_atomic| {
-        let act_val: &Union = match a_atomic {
+        let act_val: &Type = match a_atomic {
             Atomic::TArray { value, .. }
             | Atomic::TNonEmptyArray { value, .. }
             | Atomic::TList { value }
@@ -294,7 +294,7 @@ pub(super) fn return_arrays_compatible(
         };
 
         declared.types.iter().any(|d_atomic| {
-            let dec_val: &Union = match d_atomic {
+            let dec_val: &Type = match d_atomic {
                 Atomic::TArray { value, .. }
                 | Atomic::TNonEmptyArray { value, .. }
                 | Atomic::TList { value }
@@ -317,19 +317,19 @@ pub(super) fn return_arrays_compatible(
                     }
                     _ => {}
                 }
-                let av_fqcn: &Symbol = match av {
+                let av_fqcn: &Name = match av {
                     Atomic::TNamedObject { fqcn, .. } => fqcn,
                     Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => fqcn,
                     Atomic::TClosure { .. } => return true,
-                    _ => return Union::single(av.clone()).is_subtype_of_simple(dec_val),
+                    _ => return Type::single(av.clone()).is_subtype_of_simple(dec_val),
                 };
                 dec_val.types.iter().any(|dv| {
-                    let dv_fqcn: &Symbol = match dv {
+                    let dv_fqcn: &Name = match dv {
                         Atomic::TNamedObject { fqcn, .. } => fqcn,
                         Atomic::TClosure { .. } => return true,
                         _ => return false,
                     };
-                    if !dv_fqcn.contains('\\') && !crate::db::type_exists(db, dv_fqcn.as_ref()) {
+                    if !dv_fqcn.contains('\\') && !crate::db::class_exists(db, dv_fqcn.as_ref()) {
                         return true; // template param wildcard
                     }
                     let res_dec = crate::db::resolve_name(db, file, dv_fqcn.as_ref());

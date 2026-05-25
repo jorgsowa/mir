@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{Location, TemplateParam};
+use mir_codebase::storage::TemplateParam;
 use mir_issues::Issue;
-use mir_types::{Symbol, Union};
+use mir_types::{Location, Name, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::*;
@@ -28,7 +28,7 @@ pub fn class_kind(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
     })
 }
 
-pub fn type_exists(db: &dyn MirDatabase, fqcn: &str) -> bool {
+pub fn class_exists(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     crate::db::find_class_like(db, here).is_some()
 }
@@ -56,14 +56,14 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     if name.contains('\\') {
         if let Some(imports) = (!name.starts_with('\\')).then(|| db.file_imports(file)) {
             if let Some((first, rest)) = name.split_once('\\') {
-                if let Some(base) = imports.get(&Symbol::new(first)) {
+                if let Some(base) = imports.get(&Name::new(first)) {
                     return format!("{}\\{rest}", base.as_str());
                 }
             }
         }
         // If the name is already a known FQCN (e.g. stored in TNamedObject by a prior
         // resolution step), return it unchanged to avoid double-prepending the namespace.
-        if type_exists(db, name) {
+        if class_exists(db, name) {
             return name.to_string();
         }
         // Qualified name not yet in the DB (PSR-4 lazy-load will fire after this call):
@@ -75,7 +75,7 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     }
 
     let imports = db.file_imports(file);
-    if let Some(fqcn) = imports.get(&Symbol::new(name)) {
+    if let Some(fqcn) = imports.get(&Name::new(name)) {
         return fqcn.as_str().to_string();
     }
     // Case-insensitive fallback: PHP class names are case-insensitive for
@@ -102,8 +102,8 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
 /// Walk the parent chain collecting template bindings from `@extends` type
 /// args. For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`,
 /// returns `{ T → User }` where `T` is `BaseRepo`'s declared template parameter.
-pub fn inherited_template_bindings(db: &dyn MirDatabase, fqcn: &str) -> FxHashMap<Symbol, Union> {
-    let mut bindings: FxHashMap<Symbol, Union> = FxHashMap::default();
+pub fn inherited_template_bindings(db: &dyn MirDatabase, fqcn: &str) -> FxHashMap<Name, Type> {
+    let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     let mut current: Arc<str> = Arc::from(fqcn);
     loop {
@@ -139,7 +139,7 @@ pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::class_ancestors_by_fqcn(db, here)
         .iter()
         .skip(1) // self
-        .any(|ancestor| !type_exists(db, ancestor))
+        .any(|ancestor| !class_exists(db, ancestor))
 }
 
 pub fn member_location(db: &dyn MirDatabase, fqcn: &str, member_name: &str) -> Option<Location> {
@@ -199,23 +199,23 @@ pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) 
 /// Equality is pointer identity — salsa uses it to decide whether
 /// downstream queries need re-running after a re-parse.
 #[derive(Clone)]
-pub struct ParsedFile(pub Arc<php_rs_parser::ParseResult>);
+pub struct TrackedParseResult(pub Arc<php_rs_parser::ParseResult>);
 
-impl std::fmt::Debug for ParsedFile {
+impl std::fmt::Debug for TrackedParseResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ParsedFile").finish()
+        f.debug_tuple("TrackedParseResult").finish()
     }
 }
 
-impl PartialEq for ParsedFile {
+impl PartialEq for TrackedParseResult {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl Eq for ParsedFile {}
+impl Eq for TrackedParseResult {}
 
-unsafe impl salsa::Update for ParsedFile {
+unsafe impl salsa::Update for TrackedParseResult {
     unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
         let old = unsafe { &mut *old_ptr };
         if *old == new_val {
@@ -242,9 +242,9 @@ unsafe impl salsa::Update for ParsedFile {
 /// the working set is small. Without the cap, parsing 12k files would
 /// pin ~1–4 GB of owned AST for the whole session.
 #[salsa::tracked(lru = 256)]
-pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> ParsedFile {
+pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult {
     let text = file.text(db);
-    ParsedFile(Arc::new(php_rs_parser::parse(text.as_ref())))
+    TrackedParseResult(Arc::new(php_rs_parser::parse(text.as_ref())))
 }
 
 // collect_file_definitions tracked query (S1)
@@ -361,11 +361,11 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 
 // File-level inferred-type Salsa query
 
-type MethodInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Union>>;
+type MethodInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Type>>;
 
 #[derive(Clone, Debug)]
 pub struct InferredFileTypes {
-    pub functions: Arc<FxHashMap<Arc<str>, Arc<Union>>>,
+    pub functions: Arc<FxHashMap<Arc<str>, Arc<Type>>>,
     pub methods: Arc<MethodInferMap>,
 }
 
@@ -452,13 +452,13 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     driver.analyze_bodies(&parsed.program, path, text.as_ref(), &parsed.source_map);
     let inferred = driver.take_inferred_types();
 
-    let mut functions: FxHashMap<Arc<str>, Arc<Union>> =
+    let mut functions: FxHashMap<Arc<str>, Arc<Type>> =
         FxHashMap::with_capacity_and_hasher(inferred.functions.len(), Default::default());
     for (fqn, ty) in inferred.functions {
         functions.insert(fqn, Arc::new(ty));
     }
 
-    let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Union>> =
+    let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
         FxHashMap::with_capacity_and_hasher(inferred.methods.len(), Default::default());
     for (fqcn, name, ty) in inferred.methods {
         let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {

@@ -5,14 +5,14 @@ use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
 
 // Pure-db lookups, named without the `_db_or_codebase` suffix now that
 // the codebase fallback is gone (S5-PR12).
 fn type_exists(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    crate::db::type_exists(ea.db, fqcn)
+    crate::db::class_exists(ea.db, fqcn)
 }
 
 fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
@@ -32,7 +32,7 @@ fn class_template_params(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> Vec<Templat
 pub struct CheckArgsParams<'a> {
     pub fn_name: &'a str,
     pub params: &'a [FnParam],
-    pub arg_types: &'a [Union],
+    pub arg_types: &'a [Type],
     pub arg_spans: &'a [Span],
     pub arg_names: &'a [Option<String>],
     pub arg_can_be_byref: &'a [bool],
@@ -58,8 +58,8 @@ pub fn check_constructor_args(
 
 /// For a spread (`...`) argument, return the union of value types across all array atomics.
 /// E.g. `array<int, int>` → `int`, `list<string>` → `string`, `mixed` → `mixed`.
-pub fn spread_element_type(arr_ty: &Union) -> Union {
-    let mut result = Union::empty();
+pub fn spread_element_type(arr_ty: &Type) -> Type {
+    let mut result = Type::empty();
     for atomic in arr_ty.types.iter() {
         match atomic {
             Atomic::TArray { value, .. }
@@ -77,31 +77,31 @@ pub fn spread_element_type(arr_ty: &Union) -> Union {
                     }
                 }
             }
-            _ => return Union::mixed(),
+            _ => return Type::mixed(),
         }
     }
     if result.types.is_empty() {
-        Union::mixed()
+        Type::mixed()
     } else {
         result
     }
 }
 
 /// Replace `TStaticObject` / `TSelf` in a method's return type with the actual receiver FQCN.
-pub(crate) fn substitute_static_in_return(ret: Union, receiver_fqcn: &Arc<str>) -> Union {
+pub(crate) fn substitute_static_in_return(ret: Type, receiver_fqcn: &Arc<str>) -> Type {
     let from_docblock = ret.from_docblock;
     let types: Vec<Atomic> = ret
         .types
         .into_iter()
         .map(|a| match a {
             Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
-                fqcn: Symbol::from(receiver_fqcn.as_ref()),
+                fqcn: Name::from(receiver_fqcn.as_ref()),
                 type_params: mir_types::union::empty_type_params(),
             },
             other => other,
         })
         .collect();
-    let mut result = Union::from_vec(types);
+    let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result
 }
@@ -111,7 +111,7 @@ pub(crate) fn check_method_visibility(
     visibility: Visibility,
     owner_fqcn: &Arc<str>,
     method_name: &Arc<str>,
-    ctx: &crate::context::Context,
+    ctx: &crate::flow_state::FlowState,
     span: Span,
 ) {
     match visibility {
@@ -194,8 +194,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
 
     let variadic_index = params.iter().position(|p| p.is_variadic);
     let max_positional = variadic_index.unwrap_or(params.len());
-    let mut param_to_arg: Vec<Option<(Union, Span, usize)>> = vec![None; params.len()];
-    let mut arg_bindings: Vec<(usize, Union, Span, usize)> = Vec::new();
+    let mut param_to_arg: Vec<Option<(Type, Span, usize)>> = vec![None; params.len()];
+    let mut arg_bindings: Vec<(usize, Type, Span, usize)> = Vec::new();
     let mut positional = 0usize;
     let mut seen_named = false;
     let mut has_shape_error = false;
@@ -321,7 +321,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
 
         if let Some(raw_param_ty) = &param.ty {
             let param_ty_owned;
-            let param_ty: &Union = if param.is_variadic {
+            let param_ty: &Type = if param.is_variadic {
                 if let Some(elem_ty) = raw_param_ty.types.iter().find_map(|a| match a {
                     Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
                         Some(*value.clone())
@@ -446,7 +446,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                     && param_ty
                         .types
                         .iter()
-                        .any(|p| Union::single(p.clone()).is_subtype_of_simple(&arg_ty)))
+                        .any(|p| Type::single(p.clone()).is_subtype_of_simple(&arg_ty)))
                 && !arg_ty.remove_null().is_subtype_of_simple(param_ty)
                 && (arg_ty.remove_false().types.is_empty()
                     || !arg_ty.remove_false().is_subtype_of_simple(param_ty))
@@ -476,8 +476,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
 // ---------------------------------------------------------------------------
 
 fn invalid_argument_actual_type(
-    arg_ty: &Union,
-    param_ty: &Union,
+    arg_ty: &Type,
+    param_ty: &Type,
     ea: &ExpressionAnalyzer<'_>,
 ) -> String {
     if let Some(projected) = project_generic_ancestor_type(arg_ty, param_ty, ea) {
@@ -487,10 +487,10 @@ fn invalid_argument_actual_type(
 }
 
 fn project_generic_ancestor_type(
-    arg_ty: &Union,
-    param_ty: &Union,
+    arg_ty: &Type,
+    param_ty: &Type,
     ea: &ExpressionAnalyzer<'_>,
-) -> Option<Union> {
+) -> Option<Type> {
     if !arg_ty.is_single() {
         return None;
     }
@@ -524,7 +524,7 @@ fn project_generic_ancestor_type(
             continue;
         }
 
-        return Some(Union::single(Atomic::TNamedObject {
+        return Some(Type::single(Atomic::TNamedObject {
             fqcn: *param_fqcn,
             type_params: mir_types::union::vec_to_type_params(ancestor_args),
         }));
@@ -535,9 +535,9 @@ fn project_generic_ancestor_type(
 
 /// Returns true if every atomic in `arg` can be assigned to some atomic in `param`
 /// using codebase-aware class hierarchy checks.
-fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
+fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg.types.iter().all(|a_atomic| {
-        let arg_fqcn: &Symbol = match a_atomic {
+        let arg_fqcn: &Name = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
                 let is_trait =
@@ -603,7 +603,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
         }
 
         param.types.iter().any(|p_atomic| {
-            let param_fqcn: &Symbol = match p_atomic {
+            let param_fqcn: &Name = match p_atomic {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,
@@ -770,15 +770,15 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
 }
 
 /// Strict subtype check for generic type parameter positions (no coercion direction).
-fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
+fn strict_named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg.types.iter().all(|a_atomic| {
-        let arg_fqcn: &Symbol = match a_atomic {
+        let arg_fqcn: &Name = match a_atomic {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TNever => return true,
             _ => return false,
         };
         param.types.iter().any(|p_atomic| {
-            let param_fqcn: &Symbol = match p_atomic {
+            let param_fqcn: &Name = match p_atomic {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 _ => return false,
             };
@@ -796,8 +796,8 @@ fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyz
 
 /// Check generic type parameter compatibility according to declared variance.
 fn generic_type_params_compatible(
-    arg_params: &[Union],
-    param_params: &[Union],
+    arg_params: &[Type],
+    param_params: &[Type],
     template_params: &[mir_codebase::storage::TemplateParam],
     ea: &ExpressionAnalyzer<'_>,
 ) -> bool {
@@ -847,7 +847,7 @@ fn generic_ancestor_type_args(
     child: &str,
     ancestor: &str,
     ea: &ExpressionAnalyzer<'_>,
-) -> Option<Vec<Union>> {
+) -> Option<Vec<Type>> {
     let mut seen = std::collections::HashSet::new();
     generic_ancestor_type_args_inner(child, ancestor, ea, &mut seen)
 }
@@ -857,7 +857,7 @@ fn generic_ancestor_type_args_inner(
     ancestor: &str,
     ea: &ExpressionAnalyzer<'_>,
     seen: &mut std::collections::HashSet<String>,
-) -> Option<Vec<Union>> {
+) -> Option<Vec<Type>> {
     if child == ancestor {
         return Some(vec![]);
     }
@@ -868,7 +868,7 @@ fn generic_ancestor_type_args_inner(
     let here = crate::db::Fqcn::from_str(ea.db, child);
     let cl = crate::db::find_class_like(ea.db, here)?;
     let parent = cl.parent().cloned();
-    let extends_type_args: Vec<Union> = cl.extends_type_args().to_vec();
+    let extends_type_args: Vec<Type> = cl.extends_type_args().to_vec();
     let implements_type_args = cl.implements_type_args();
 
     for (iface, args) in implements_type_args.iter() {
@@ -888,10 +888,10 @@ fn generic_ancestor_type_args_inner(
     }
 
     let parent_template_params = class_template_params(ea, parent.as_ref());
-    let bindings: FxHashMap<Symbol, Union> = parent_template_params
+    let bindings: FxHashMap<Name, Type> = parent_template_params
         .iter()
         .zip(extends_type_args.iter())
-        .map(|(tp, ty)| (Symbol::from(tp.name.as_ref()), ty.clone()))
+        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
         .collect();
 
     Some(
@@ -903,14 +903,14 @@ fn generic_ancestor_type_args_inner(
 }
 
 fn param_contains_template_or_unknown(
-    param_ty: &Union,
+    param_ty: &Type,
     ea: &ExpressionAnalyzer<'_>,
     template_params: &[TemplateParam],
 ) -> bool {
     let template_names: std::collections::HashSet<&str> =
         template_params.iter().map(|tp| tp.name.as_ref()).collect();
 
-    fn has_template_param(union: &Union, template_names: &std::collections::HashSet<&str>) -> bool {
+    fn has_template_param(union: &Type, template_names: &std::collections::HashSet<&str>) -> bool {
         union.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, type_params } => {
@@ -969,9 +969,9 @@ fn param_contains_template_or_unknown(
     })
 }
 
-fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
+fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|av| {
-        let av_fqcn: &Symbol = match av {
+        let av_fqcn: &Name = match av {
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => {
                 fqcn
@@ -981,7 +981,7 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
             | Atomic::TList { value }
             | Atomic::TNonEmptyList { value } => {
                 return param_ty.types.iter().any(|pv| {
-                    let pv_val: &Union = match pv {
+                    let pv_val: &Type = match pv {
                         Atomic::TArray { value, .. }
                         | Atomic::TNonEmptyArray { value, .. }
                         | Atomic::TList { value }
@@ -992,11 +992,11 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
                 });
             }
             Atomic::TKeyedArray { .. } => return true,
-            _ => return Union::single(av.clone()).is_subtype_of_simple(param_ty),
+            _ => return Type::single(av.clone()).is_subtype_of_simple(param_ty),
         };
 
         param_ty.types.iter().any(|pv| {
-            let pv_fqcn: &Symbol = match pv {
+            let pv_fqcn: &Name = match pv {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn }
                 | Atomic::TStaticObject { fqcn }
@@ -1017,9 +1017,9 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
     })
 }
 
-fn array_list_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_>) -> bool {
+fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|a_atomic| {
-        let arg_value: &Union = match a_atomic {
+        let arg_value: &Type = match a_atomic {
             Atomic::TArray { value, .. }
             | Atomic::TNonEmptyArray { value, .. }
             | Atomic::TList { value }
@@ -1029,7 +1029,7 @@ fn array_list_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyz
         };
 
         param_ty.types.iter().any(|p_atomic| {
-            let param_value: &Union = match p_atomic {
+            let param_value: &Type = match p_atomic {
                 Atomic::TArray { value, .. }
                 | Atomic::TNonEmptyArray { value, .. }
                 | Atomic::TList { value }
@@ -1045,8 +1045,8 @@ fn array_list_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyz
 /// Validate callable arguments: check that string callables reference existing functions/methods
 fn validate_callable_argument(
     ea: &mut ExpressionAnalyzer<'_>,
-    param_ty: &Union,
-    arg_ty: &Union,
+    param_ty: &Type,
+    arg_ty: &Type,
     arg_span: Span,
 ) {
     // Only validate if parameter is callable or documented as callable-string
@@ -1058,7 +1058,7 @@ fn validate_callable_argument(
         // Check for "ClassName::methodName" format
         if let Some((class_name, method_name)) = s.split_once("::") {
             let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
-            if !crate::db::type_exists(ea.db, &resolved_class) {
+            if !crate::db::class_exists(ea.db, &resolved_class) {
                 ea.emit(
                     IssueKind::UndefinedClass {
                         name: resolved_class,
@@ -1068,7 +1068,7 @@ fn validate_callable_argument(
                 );
             } else {
                 // Class exists, check if method exists
-                let here = crate::db::Fqcn::new(ea.db, Symbol::from(resolved_class.as_str()));
+                let here = crate::db::Fqcn::new(ea.db, Name::from(resolved_class.as_str()));
                 if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
                     ea.emit(
                         IssueKind::UndefinedMethod {
@@ -1099,8 +1099,8 @@ fn validate_callable_argument(
 /// Validate class-string arguments: check that string references existing classes
 fn validate_class_string_argument(
     ea: &mut ExpressionAnalyzer<'_>,
-    param_ty: &Union,
-    arg_ty: &Union,
+    param_ty: &Type,
+    arg_ty: &Type,
     arg_span: Span,
 ) {
     // Only validate if parameter is class-string
@@ -1114,7 +1114,7 @@ fn validate_class_string_argument(
 
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
         let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
-        if !crate::db::type_exists(ea.db, &resolved) {
+        if !crate::db::class_exists(ea.db, &resolved) {
             ea.emit(
                 IssueKind::UndefinedClass { name: resolved },
                 Severity::Error,
@@ -1127,8 +1127,8 @@ fn validate_class_string_argument(
 /// Validate callable type arguments: check that arrays are in valid [obj/class, "method"] format
 fn validate_callable_type(
     ea: &mut ExpressionAnalyzer<'_>,
-    param_ty: &Union,
-    arg_ty: &Union,
+    param_ty: &Type,
+    arg_ty: &Type,
     arg_span: Span,
 ) {
     // Only validate if parameter expects callable
@@ -1167,7 +1167,7 @@ fn validate_callable_type(
                             let resolved_class =
                                 crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref());
                             let here =
-                                crate::db::Fqcn::new(ea.db, Symbol::from(resolved_class.as_str()));
+                                crate::db::Fqcn::new(ea.db, Name::from(resolved_class.as_str()));
                             if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
                                 ea.emit(
                                     IssueKind::UndefinedMethod {

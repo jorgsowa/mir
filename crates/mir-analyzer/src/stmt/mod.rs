@@ -18,11 +18,11 @@ use crate::parser::docblock::parse_type_string;
 use php_ast::owned::StmtKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
-use crate::context::Context;
 use crate::db::MirDatabase;
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
 
@@ -34,12 +34,12 @@ use crate::symbol::ResolvedSymbol;
 struct VarAnnotation {
     /// `None` when no `$varname` was given — annotation applies to the statement's LHS.
     name: Option<String>,
-    ty: mir_types::Union,
+    ty: mir_types::Type,
 }
 
 /// Apply post-narrow: after `$x = expr()`, if the preceding `@var` names `$x`,
 /// override the inferred type with the annotated one.
-fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ctx: &mut Context) {
+fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ctx: &mut FlowState) {
     let Some(ref var_name) = annotation.name else {
         return;
     };
@@ -74,10 +74,10 @@ pub struct StatementsAnalyzer<'a> {
     pub php_version: PhpVersion,
     pub inference_only: bool,
     /// Accumulated inferred return types for the current function.
-    pub return_types: Vec<Union>,
+    pub return_types: Vec<Type>,
     /// Break-context stack: one entry per active loop nesting level.
     /// Each entry collects the context states at every `break` in that loop.
-    break_ctx_stack: Vec<Vec<Context>>,
+    break_ctx_stack: Vec<Vec<FlowState>>,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -106,7 +106,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut Context) {
+    pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
         for stmt in stmts.iter() {
             if ctx.diverges {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
@@ -138,7 +138,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_stmt(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut Context) {
+    pub fn analyze_stmt(&mut self, stmt: &php_ast::owned::Stmt, ctx: &mut FlowState) {
         let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
@@ -307,7 +307,7 @@ impl<'a> StatementsAnalyzer<'a> {
     // Helper: create a short-lived ExpressionAnalyzer borrowing our fields
     // -----------------------------------------------------------------------
 
-    pub(crate) fn expr_analyzer<'b>(&'b mut self, _ctx: &Context) -> ExpressionAnalyzer<'b>
+    pub(crate) fn expr_analyzer<'b>(&'b mut self, _ctx: &FlowState) -> ExpressionAnalyzer<'b>
     where
         'a: 'b,
     {
@@ -345,7 +345,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if matches!(resolved.as_str(), "self" | "static" | "parent") {
             return;
         }
-        if crate::db::type_exists(self.db, &resolved) {
+        if crate::db::class_exists(self.db, &resolved) {
             return;
         }
         let span = name.span;
@@ -416,7 +416,7 @@ impl<'a> StatementsAnalyzer<'a> {
     /// * `pre`   — context *before* the loop (used as the merge base)
     /// * `entry` — context on first iteration entry (may be narrowed / seeded)
     /// * `body`  — closure that analyses one loop iteration, receives `&mut Self`
-    ///   and `&mut Context` for the current iteration context
+    ///   and `&mut FlowState` for the current iteration context
     /// * `loop_guaranteed` — whether the loop is guaranteed to execute at least once
     ///
     /// Returns the post-loop context that merges:
@@ -424,13 +424,13 @@ impl<'a> StatementsAnalyzer<'a> {
     ///   - any contexts captured at `break` statements
     fn analyze_loop_widened<F>(
         &mut self,
-        pre: &Context,
-        entry: Context,
+        pre: &FlowState,
+        entry: FlowState,
         mut body: F,
         loop_guaranteed: bool,
-    ) -> Context
+    ) -> FlowState
     where
-        F: FnMut(&mut Self, &mut Context),
+        F: FnMut(&mut Self, &mut FlowState),
     {
         const MAX_ITERS: usize = 3;
 
@@ -446,7 +446,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut iter = current.clone();
             body(self, &mut iter);
 
-            let next = Context::merge_branches(pre, iter, None);
+            let next = FlowState::merge_branches(pre, iter, None);
 
             if vars_stabilized(&prev_vars, &next.vars) {
                 current = next;
@@ -465,7 +465,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Pop break contexts and merge them into the post-loop result
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
         for bctx in break_ctxs {
-            current = Context::merge_branches(pre, current, Some(bctx));
+            current = FlowState::merge_branches(pre, current, Some(bctx));
         }
 
         current
@@ -474,8 +474,8 @@ impl<'a> StatementsAnalyzer<'a> {
 
 /// Widen literal types to their base scalar type for `@mir-check` comparisons.
 /// `TLiteralInt(42)` → `TInt`, `TLiteralString("s")` → `TString`, etc.
-pub(crate) fn widen_for_check(u: Union) -> Union {
-    let mut out = Union::empty();
+pub(crate) fn widen_for_check(u: Type) -> Type {
+    let mut out = Type::empty();
     for atomic in u.types {
         let widened = match atomic {
             Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => Atomic::TInt,

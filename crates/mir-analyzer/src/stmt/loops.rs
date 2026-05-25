@@ -1,4 +1,4 @@
-use mir_types::{ArrayKey, Atomic, Symbol, Union};
+use mir_types::{ArrayKey, Atomic, Name, Type};
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 /// Returns true if a foreach loop over `arr_ty` is guaranteed to execute at least once.
 /// A loop is guaranteed to execute if the array is known to be non-empty.
-pub(super) fn loop_guaranteed_to_execute(arr_ty: &Union) -> bool {
+pub(super) fn loop_guaranteed_to_execute(arr_ty: &Type) -> bool {
     for atomic in &arr_ty.types {
         match atomic {
             // Non-empty array types guarantee at least one iteration
@@ -31,8 +31,8 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Union) -> bool {
 /// Returns true when every variable present in `prev` has the same type in
 /// `next`, indicating the fixed-point has been reached.
 pub(super) fn vars_stabilized(
-    prev: &rustc_hash::FxHashMap<Symbol, Arc<Union>>,
-    next: &rustc_hash::FxHashMap<Symbol, Arc<Union>>,
+    prev: &rustc_hash::FxHashMap<Name, Arc<Type>>,
+    next: &rustc_hash::FxHashMap<Name, Arc<Type>>,
 ) -> bool {
     if prev.len() != next.len() {
         return false;
@@ -51,8 +51,8 @@ pub(super) fn vars_stabilized(
 /// variables that are new in the loop (only in current, not in pre) won't be
 /// merged with null/undefined, since the loop will definitely assign them.
 pub(super) fn widen_unstable(
-    pre_vars: &rustc_hash::FxHashMap<Symbol, Arc<Union>>,
-    current_vars: &mut rustc_hash::FxHashMap<Symbol, Arc<Union>>,
+    pre_vars: &rustc_hash::FxHashMap<Name, Arc<Type>>,
+    current_vars: &mut rustc_hash::FxHashMap<Name, Arc<Type>>,
     loop_guaranteed: bool,
 ) {
     for (name, ty) in current_vars.iter_mut() {
@@ -77,9 +77,9 @@ pub(super) fn widen_unstable(
 // foreach key/value type inference
 // ---------------------------------------------------------------------------
 
-pub(super) fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
+pub(super) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
     if arr_ty.is_mixed() {
-        return (Union::mixed(), Union::mixed());
+        return (Type::mixed(), Type::mixed());
     }
     for atomic in &arr_ty.types {
         match atomic {
@@ -87,38 +87,34 @@ pub(super) fn infer_foreach_types(arr_ty: &Union) -> (Union, Union) {
                 return (*key.clone(), *value.clone());
             }
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                return (Union::single(Atomic::TInt), *value.clone());
+                return (Type::single(Atomic::TInt), *value.clone());
             }
             Atomic::TKeyedArray { properties, .. } => {
-                let mut keys = Union::empty();
-                let mut values = Union::empty();
+                let mut keys = Type::empty();
+                let mut values = Type::empty();
                 for (k, prop) in properties {
                     let key_atomic = match k {
                         ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
                         ArrayKey::Int(i) => Atomic::TLiteralInt(*i),
                     };
-                    keys.merge_with(&Union::single(key_atomic));
+                    keys.merge_with(&Type::single(key_atomic));
                     values.merge_with(&prop.ty);
                 }
                 // Empty keyed array (e.g. `$arr = []` before push) — treat both as
-                // mixed to avoid propagating Union::empty() as a variable type.
-                let keys = if keys.is_empty() {
-                    Union::mixed()
-                } else {
-                    keys
-                };
+                // mixed to avoid propagating Type::empty() as a variable type.
+                let keys = if keys.is_empty() { Type::mixed() } else { keys };
                 let values = if values.is_empty() {
-                    Union::mixed()
+                    Type::mixed()
                 } else {
                     values
                 };
                 return (keys, values);
             }
             Atomic::TString => {
-                return (Union::single(Atomic::TInt), Union::single(Atomic::TString));
+                return (Type::single(Atomic::TInt), Type::single(Atomic::TString));
             }
             _ => {}
         }
     }
-    (Union::mixed(), Union::mixed())
+    (Type::mixed(), Type::mixed())
 }

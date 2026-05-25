@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use mir_types::Symbol;
+use mir_types::Name;
 
 use mir_analyzer::db::{
     class_ancestors_by_fqcn, class_in_file, find_class_constant_in_chain,
@@ -52,7 +52,7 @@ fn class_in_file_finds_class_after_set_file_text_only() {
     let db = session.snapshot_db();
     let sf = mir_analyzer::db::MirDatabase::lookup_source_file(&db, "/proj/Foo.php")
         .expect("source file must be registered after set_file_text");
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     let class = class_in_file(&db, sf, fqcn);
     assert!(
         class.is_some(),
@@ -73,7 +73,7 @@ fn function_in_file_finds_function_after_set_file_text_only() {
     let db = session.snapshot_db();
     let sf = mir_analyzer::db::MirDatabase::lookup_source_file(&db, "/proj/helpers.php")
         .expect("source file must be registered");
-    let fqn = Fqcn::new(&db, Symbol::new("App\\greet"));
+    let fqn = Fqcn::new(&db, Name::new("App\\greet"));
     let func = function_in_file(&db, sf, fqn);
     assert!(
         func.is_some(),
@@ -95,7 +95,7 @@ fn find_class_like_combines_resolution_and_extraction() {
     );
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     let result = find_class_like(&db, fqcn);
     match result {
         Some(ClassLike::Class(c)) => {
@@ -115,7 +115,7 @@ fn find_class_like_returns_interface_kind() {
     );
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\HasFoo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\HasFoo"));
     assert!(matches!(
         find_class_like(&db, fqcn),
         Some(ClassLike::Interface(_))
@@ -132,7 +132,7 @@ fn find_function_finds_via_resolver() {
     );
 
     let db = session.snapshot_db();
-    let fqn = Fqcn::new(&db, Symbol::new("App\\greet"));
+    let fqn = Fqcn::new(&db, Name::new("App\\greet"));
     let func = find_function(&db, fqn);
     assert!(
         func.is_some(),
@@ -149,7 +149,7 @@ fn find_returns_none_when_file_not_registered() {
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     assert!(find_class_like(&db, fqcn).is_none());
 }
 
@@ -175,7 +175,7 @@ fn find_class_like_resolves_php_builtin_via_stub_resolver() {
     session.ensure_all_stubs();
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("ArrayObject"));
+    let fqcn = Fqcn::new(&db, Name::new("ArrayObject"));
     let found = find_class_like(&db, fqcn);
     assert!(
         found.is_some(),
@@ -196,7 +196,7 @@ fn find_returns_class_from_set_file_text() {
     );
 
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("Foo"));
     assert!(
         find_class_like(&db, fqcn).is_some(),
         "class registered via set_file_text must be findable"
@@ -208,7 +208,7 @@ fn find_returns_none_for_unregistered_class() {
     // A class that was never registered in any way must return None.
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("NeverRegistered"));
+    let fqcn = Fqcn::new(&db, Name::new("NeverRegistered"));
     assert!(find_class_like(&db, fqcn).is_none());
 }
 
@@ -221,7 +221,7 @@ fn find_method_in_class_finds_own_method() {
         Arc::from("<?php\nnamespace App;\nclass Foo { public function bar(): void {} }\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     let m = find_method_in_class(&db, fqcn, "bar");
     assert!(m.is_some(), "find_method_in_class must find App\\Foo::bar");
 }
@@ -235,7 +235,7 @@ fn find_method_in_class_is_case_insensitive() {
         Arc::from("<?php\nnamespace App;\nclass Foo { public function camelCase(): void {} }\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     assert!(find_method_in_class(&db, fqcn, "camelcase").is_some());
     assert!(find_method_in_class(&db, fqcn, "CamelCase").is_some());
     assert!(find_method_in_class(&db, fqcn, "CAMELCASE").is_some());
@@ -250,7 +250,7 @@ fn find_property_in_class_finds_own_property() {
         Arc::from("<?php\nnamespace App;\nclass Foo { public string $name = ''; }\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     assert!(find_property_in_class(&db, fqcn, "name").is_some());
 }
 
@@ -263,7 +263,7 @@ fn find_class_constant_in_class_finds_own_constant() {
         Arc::from("<?php\nnamespace App;\nclass Foo { const ANSWER = 42; }\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Foo"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
     assert!(find_class_constant_in_class(&db, fqcn, "ANSWER").is_some());
 }
 
@@ -287,7 +287,7 @@ fn class_ancestors_walks_parent_chain() {
         Arc::from("<?php\nnamespace App;\nclass Leaf extends Mid {}\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Leaf"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Leaf"));
     let ancestors = class_ancestors_by_fqcn(&db, fqcn);
     let names: Vec<&str> = ancestors.iter().map(|s| s.as_ref()).collect();
     assert_eq!(names, vec!["App\\Leaf", "App\\Mid", "App\\Base"]);
@@ -308,7 +308,7 @@ fn find_method_in_chain_finds_inherited_method() {
         Arc::from("<?php\nnamespace App;\nclass Child extends Base {}\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Child"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Child"));
     let (declared_in, _m) = find_method_in_chain(&db, fqcn, "inherited")
         .expect("find_method_in_chain must walk to App\\Base");
     assert_eq!(declared_in.as_ref(), "App\\Base");
@@ -329,7 +329,7 @@ fn find_property_in_chain_finds_inherited_property() {
         Arc::from("<?php\nnamespace App;\nclass Child extends Base {}\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Child"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Child"));
     let (declared_in, _p) = find_property_in_chain(&db, fqcn, "name")
         .expect("find_property_in_chain must walk to App\\Base");
     assert_eq!(declared_in.as_ref(), "App\\Base");
@@ -350,7 +350,7 @@ fn find_class_constant_in_chain_finds_inherited_constant() {
         Arc::from("<?php\nnamespace App;\nclass Child extends Base {}\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\Child"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\Child"));
     let (declared_in, _c) = find_class_constant_in_chain(&db, fqcn, "ANSWER")
         .expect("find_class_constant_in_chain must walk to App\\Base");
     assert_eq!(declared_in.as_ref(), "App\\Base");
@@ -374,7 +374,7 @@ fn ancestor_walk_handles_cycles() {
         Arc::from("<?php\nnamespace App;\nclass B extends A {}\n"),
     );
     let db = session.snapshot_db();
-    let fqcn = Fqcn::new(&db, Symbol::new("App\\A"));
+    let fqcn = Fqcn::new(&db, Name::new("App\\A"));
     let ancestors = class_ancestors_by_fqcn(&db, fqcn);
     assert_eq!(ancestors.len(), 2, "cycle must terminate after 2 entries");
     let names: Vec<&str> = ancestors.iter().map(|s| s.as_ref()).collect();

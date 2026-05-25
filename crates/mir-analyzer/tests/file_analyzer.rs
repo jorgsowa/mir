@@ -203,13 +203,13 @@ function build(): Greeter { return new Greeter(); }
 
     // Resolve "Greeter" by name — caller doesn't need to know its position.
     let loc = session
-        .definition_of(&mir_analyzer::Symbol::class("Greeter"))
+        .definition_of(&mir_analyzer::Name::class("Greeter"))
         .expect("Greeter must resolve");
     assert_eq!(loc.file.as_ref(), file.as_ref());
     assert!(loc.line >= 1, "expected a real source line; got {loc:?}");
 
     // Member resolution.
-    let greet_loc = session.definition_of(&mir_analyzer::Symbol::method("Greeter", "greet"));
+    let greet_loc = session.definition_of(&mir_analyzer::Name::method("Greeter", "greet"));
     assert!(greet_loc.is_ok(), "Greeter::greet() must resolve");
 
     // Sanity: at least one ClassReference symbol got recorded so symbol_at
@@ -217,7 +217,8 @@ function build(): Greeter { return new Greeter(); }
     let any_class_ref = analysis.symbols.iter().any(|s| {
         matches!(
             s.kind,
-            mir_analyzer::SymbolKind::ClassReference(_) | mir_analyzer::SymbolKind::FunctionCall(_)
+            mir_analyzer::ReferenceKind::ClassReference(_)
+                | mir_analyzer::ReferenceKind::FunctionCall(_)
         )
     });
     assert!(any_class_ref, "expected at least one resolved symbol");
@@ -227,7 +228,7 @@ function build(): Greeter { return new Greeter(); }
 /// level declaration in the file with its kind.
 #[test]
 fn document_symbols_lists_file_declarations() {
-    use mir_analyzer::DocumentSymbolKind;
+    use mir_analyzer::DeclarationKind;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/outline.php");
@@ -241,16 +242,13 @@ function pet_count(): int { return 0; }
 
     let symbols = session.document_symbols(file.as_ref());
 
-    let by_name: std::collections::HashMap<&str, DocumentSymbolKind> =
+    let by_name: std::collections::HashMap<&str, DeclarationKind> =
         symbols.iter().map(|s| (s.name.as_ref(), s.kind)).collect();
 
-    assert_eq!(by_name.get("Cat"), Some(&DocumentSymbolKind::Class));
-    assert_eq!(by_name.get("Animal"), Some(&DocumentSymbolKind::Interface));
-    assert_eq!(by_name.get("Furry"), Some(&DocumentSymbolKind::Trait));
-    assert_eq!(
-        by_name.get("pet_count"),
-        Some(&DocumentSymbolKind::Function)
-    );
+    assert_eq!(by_name.get("Cat"), Some(&DeclarationKind::Class));
+    assert_eq!(by_name.get("Animal"), Some(&DeclarationKind::Interface));
+    assert_eq!(by_name.get("Furry"), Some(&DeclarationKind::Trait));
+    assert_eq!(by_name.get("pet_count"), Some(&DeclarationKind::Function));
 }
 
 /// `references_to` returns every recorded use of a symbol after Pass 2.
@@ -268,7 +266,7 @@ function caller(): string { return helper(); }
     let _ =
         FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
 
-    let refs = session.references_to(&mir_analyzer::Symbol::function("helper"));
+    let refs = session.references_to(&mir_analyzer::Name::function("helper"));
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "helper() must have at least one reference recorded in {file}; got {refs:?}"
@@ -300,7 +298,7 @@ target(); function target(): void {}
         .symbol_at(call_offset)
         .expect("expected a resolved symbol at the call site");
     assert!(
-        matches!(resolved.kind, mir_analyzer::SymbolKind::FunctionCall(_)),
+        matches!(resolved.kind, mir_analyzer::ReferenceKind::FunctionCall(_)),
         "expected FunctionCall kind; got {:?}",
         resolved.kind
     );
@@ -331,7 +329,7 @@ function caller(): string { return helper(); }
     let call = analysis
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, mir_analyzer::SymbolKind::FunctionCall(_)))
+        .find(|s| matches!(&s.kind, mir_analyzer::ReferenceKind::FunctionCall(_)))
         .expect("expected a FunctionCall symbol for helper()");
     let loc = mir_analyzer::location_from_span(call.span, file.clone(), src, &parsed.source_map);
 
@@ -520,7 +518,7 @@ function caller_v1() { foo(); }
         FileAnalyzer::new(&session).analyze(file.clone(), v1, &parsed.program, &parsed.source_map);
     }
 
-    let foo_refs_v1 = session.references_to(&mir_analyzer::Symbol::function("foo"));
+    let foo_refs_v1 = session.references_to(&mir_analyzer::Name::function("foo"));
     assert!(
         foo_refs_v1.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "v1 must record a foo() call from {file}; got {foo_refs_v1:?}"
@@ -538,12 +536,12 @@ function caller_v2() { bar(); }
         FileAnalyzer::new(&session).analyze(file.clone(), v2, &parsed.program, &parsed.source_map);
     }
 
-    let foo_refs_v2 = session.references_to(&mir_analyzer::Symbol::function("foo"));
+    let foo_refs_v2 = session.references_to(&mir_analyzer::Name::function("foo"));
     assert!(
         !foo_refs_v2.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "after re-ingest without foo(), no foo-reference should remain from {file}; got {foo_refs_v2:?}"
     );
-    let bar_refs_v2 = session.references_to(&mir_analyzer::Symbol::function("bar"));
+    let bar_refs_v2 = session.references_to(&mir_analyzer::Name::function("bar"));
     assert!(
         bar_refs_v2.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "after re-ingest with bar(), bar-reference must be present in {file}; got {bar_refs_v2:?}"

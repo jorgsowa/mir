@@ -63,11 +63,7 @@ class User {
     println!("   Symbols: {}", symbols_2.len());
 
     println!("\n✅ No-op ingest completed (fix is working)");
-    assert_eq!(
-        symbols_1.len(),
-        symbols_2.len(),
-        "Symbol count should match"
-    );
+    assert_eq!(symbols_1.len(), symbols_2.len(), "Name count should match");
 }
 
 #[test]

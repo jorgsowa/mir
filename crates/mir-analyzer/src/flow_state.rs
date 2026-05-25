@@ -1,25 +1,25 @@
-/// Analysis context — carries type state through statement/expression analysis.
+/// Analysis dataflow and lexical scope state — carries type state through statement/expression analysis.
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-use mir_types::{Symbol, Union};
+use mir_types::{Name, Type};
 
 // ---------------------------------------------------------------------------
-// Context
+// FlowState
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-pub struct Context {
+pub struct FlowState {
     /// Types of variables at this point in execution.
     /// Arc-wrapped for COW semantics: fork() is O(1); mutations trigger a copy only on first write.
-    /// Values are Arc<Union> so ptr_eq short-circuits merge_branches for unchanged vars.
-    pub vars: Arc<FxHashMap<Symbol, Arc<Union>>>,
+    /// Values are Arc<Type> so ptr_eq short-circuits merge_branches for unchanged vars.
+    pub vars: Arc<FxHashMap<Name, Arc<Type>>>,
 
     /// Variables that are definitely assigned at this point.
-    pub assigned_vars: Arc<FxHashSet<Symbol>>,
+    pub assigned_vars: Arc<FxHashSet<Name>>,
 
     /// Variables that *might* be assigned (e.g. only in one if branch).
-    pub possibly_assigned_vars: Arc<FxHashSet<Symbol>>,
+    pub possibly_assigned_vars: Arc<FxHashSet<Name>>,
 
     /// The class in whose body we are analysing (`self`).
     pub self_fqcn: Option<Arc<str>>,
@@ -31,7 +31,7 @@ pub struct Context {
     pub static_fqcn: Option<Arc<str>>,
 
     /// Declared return type for the current function/method.
-    pub fn_return_type: Option<Union>,
+    pub fn_return_type: Option<Type>,
 
     /// Declared exception types for the current function/method (@throws).
     pub fn_declared_throws: Arc<[Arc<str>]>,
@@ -50,21 +50,21 @@ pub struct Context {
 
     /// Variables that carry tainted (user-controlled) values at this point.
     /// Used by taint analysis (M19).
-    pub tainted_vars: FxHashSet<Symbol>,
+    pub tainted_vars: FxHashSet<Name>,
 
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection (M18).
-    pub read_vars: FxHashSet<Symbol>,
+    pub read_vars: FxHashSet<Name>,
 
     /// Names of function/method parameters in this scope (stripped of `$`).
     /// Used to exclude parameters from UnusedVariable detection.
     /// Arc-shared — set once at context construction, never mutated during analysis.
-    pub param_names: Arc<FxHashSet<Symbol>>,
+    pub param_names: Arc<FxHashSet<Name>>,
 
     /// Names of by-reference parameters in this scope (stripped of `$`).
     /// Assigning to these is externally observable, so it counts as usage.
     /// Arc-shared — set once at context construction, never mutated during analysis.
-    pub byref_param_names: Arc<FxHashSet<Symbol>>,
+    pub byref_param_names: Arc<FxHashSet<Name>>,
 
     /// Whether every execution path through this context has diverged
     /// (returned, thrown, or exited). Used to detect "all catch branches
@@ -74,15 +74,15 @@ pub struct Context {
 
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
-    pub var_locations: FxHashMap<Symbol, (u32, u16, u32, u16)>,
+    pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
 
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
     /// Arc-shared — set once at context construction, never mutated during analysis.
-    pub template_param_names: Arc<FxHashSet<Symbol>>,
+    pub template_param_names: Arc<FxHashSet<Name>>,
 }
 
-impl Context {
+impl FlowState {
     pub fn new() -> Self {
         let mut ctx = Self {
             vars: Arc::new(FxHashMap::default()),
@@ -113,8 +113,8 @@ impl Context {
                 "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
                 "GLOBALS",
             ] {
-                let sym = Symbol::from(*sg);
-                vars.insert(sym, Arc::new(mir_types::Union::mixed()));
+                let sym = Name::from(*sg);
+                vars.insert(sym, Arc::new(mir_types::Type::mixed()));
                 assigned.insert(sym);
             }
         }
@@ -125,7 +125,7 @@ impl Context {
     #[allow(clippy::too_many_arguments)]
     pub fn for_function(
         params: &[mir_codebase::FnParam],
-        return_type: Option<Union>,
+        return_type: Option<Type>,
         declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
         parent_fqcn: Option<Arc<str>>,
@@ -150,7 +150,7 @@ impl Context {
     #[allow(clippy::too_many_arguments)]
     pub fn for_method(
         params: &[mir_codebase::FnParam],
-        return_type: Option<Union>,
+        return_type: Option<Type>,
         declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
         parent_fqcn: Option<Arc<str>>,
@@ -177,7 +177,7 @@ impl Context {
     #[allow(clippy::too_many_arguments)]
     pub fn for_method_with_templates(
         params: &[mir_codebase::FnParam],
-        return_type: Option<Union>,
+        return_type: Option<Type>,
         declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
         parent_fqcn: Option<Arc<str>>,
@@ -197,15 +197,15 @@ impl Context {
         ctx.inside_constructor = inside_constructor;
 
         // Build local sets — wrap in Arc at the end (set-once, never mutated during analysis).
-        let mut template_param_names: FxHashSet<Symbol> = FxHashSet::default();
-        let mut param_names: FxHashSet<Symbol> = FxHashSet::default();
-        let mut byref_param_names: FxHashSet<Symbol> = FxHashSet::default();
+        let mut template_param_names: FxHashSet<Name> = FxHashSet::default();
+        let mut param_names: FxHashSet<Name> = FxHashSet::default();
+        let mut byref_param_names: FxHashSet<Name> = FxHashSet::default();
 
         // Build a map of template names to their bounds for parameter type resolution
-        let mut template_bounds_map: FxHashMap<Symbol, Union> = FxHashMap::default();
+        let mut template_bounds_map: FxHashMap<Name, Type> = FxHashMap::default();
         if let Some(templates) = template_params {
             for tp in templates {
-                let tp_sym = Symbol::from(tp.name.as_ref());
+                let tp_sym = Name::from(tp.name.as_ref());
                 template_param_names.insert(tp_sym);
                 if let Some(bound) = &tp.bound {
                     template_bounds_map.insert(tp_sym, bound.clone());
@@ -217,7 +217,7 @@ impl Context {
             let mut elem_ty =
                 p.ty.as_ref()
                     .map(|arc| (**arc).clone())
-                    .unwrap_or_else(Union::mixed);
+                    .unwrap_or_else(Type::mixed);
 
             // Resolve template references to their bounds
             // If the parameter type is a bare unqualified name matching a template parameter,
@@ -255,14 +255,14 @@ impl Context {
                 if already_collection {
                     elem_ty
                 } else {
-                    mir_types::Union::single(mir_types::Atomic::TList {
+                    mir_types::Type::single(mir_types::Atomic::TList {
                         value: Box::new(elem_ty),
                     })
                 }
             } else {
                 elem_ty
             };
-            let name = Symbol::from(p.name.as_ref().trim_start_matches('$'));
+            let name = Name::from(p.name.as_ref().trim_start_matches('$'));
             Arc::make_mut(&mut ctx.vars).insert(name, Arc::new(ty));
             Arc::make_mut(&mut ctx.assigned_vars).insert(name);
             param_names.insert(name);
@@ -275,11 +275,11 @@ impl Context {
         // resolved without hitting the mixed-receiver early-return guard.
         if !is_static {
             if let Some(fqcn) = self_fqcn {
-                let this_ty = mir_types::Union::single(mir_types::Atomic::TNamedObject {
-                    fqcn: mir_types::Symbol::from(fqcn.as_ref()),
+                let this_ty = mir_types::Type::single(mir_types::Atomic::TNamedObject {
+                    fqcn: mir_types::Name::from(fqcn.as_ref()),
                     type_params: mir_types::union::empty_type_params(),
                 });
-                let this_sym = Symbol::from("this");
+                let this_sym = Name::from("this");
                 Arc::make_mut(&mut ctx.vars).insert(this_sym, Arc::new(this_ty));
                 Arc::make_mut(&mut ctx.assigned_vars).insert(this_sym);
             }
@@ -293,42 +293,42 @@ impl Context {
     }
 
     /// Get the type of a variable. Returns `mixed` if not found.
-    pub fn get_var(&self, name: &str) -> Union {
-        let sym = Symbol::from(name.trim_start_matches('$'));
+    pub fn get_var(&self, name: &str) -> Type {
+        let sym = Name::from(name.trim_start_matches('$'));
         self.vars
             .get(&sym)
             .map(|a| (**a).clone())
-            .unwrap_or_else(Union::mixed)
+            .unwrap_or_else(Type::mixed)
     }
 
     /// Set the type of a variable and mark it as assigned.
-    pub fn set_var(&mut self, name: &str, ty: Union) {
-        let name = Symbol::from(name.trim_start_matches('$'));
+    pub fn set_var(&mut self, name: &str, ty: Type) {
+        let name = Name::from(name.trim_start_matches('$'));
         Arc::make_mut(&mut self.vars).insert(name, Arc::new(ty));
         Arc::make_mut(&mut self.assigned_vars).insert(name);
     }
 
     /// Check if a variable is definitely in scope.
     pub fn var_is_defined(&self, name: &str) -> bool {
-        let sym = Symbol::from(name.trim_start_matches('$'));
+        let sym = Name::from(name.trim_start_matches('$'));
         self.assigned_vars.contains(&sym)
     }
 
     /// Check if a variable might be defined (but not certainly).
     pub fn var_possibly_defined(&self, name: &str) -> bool {
-        let sym = Symbol::from(name.trim_start_matches('$'));
+        let sym = Name::from(name.trim_start_matches('$'));
         self.assigned_vars.contains(&sym) || self.possibly_assigned_vars.contains(&sym)
     }
 
     /// Mark a variable as carrying tainted (user-controlled) data.
     pub fn taint_var(&mut self, name: &str) {
-        let name = Symbol::from(name.trim_start_matches('$'));
+        let name = Name::from(name.trim_start_matches('$'));
         self.tainted_vars.insert(name);
     }
 
     /// Returns true if the variable is known to carry tainted data.
     pub fn is_tainted(&self, name: &str) -> bool {
-        let sym = Symbol::from(name.trim_start_matches('$'));
+        let sym = Name::from(name.trim_start_matches('$'));
         self.tainted_vars.contains(&sym)
     }
 
@@ -341,7 +341,7 @@ impl Context {
         line_end: u32,
         col_end: u16,
     ) {
-        let name = Symbol::from(name.trim_start_matches('$'));
+        let name = Name::from(name.trim_start_matches('$'));
         self.var_locations
             .entry(name)
             .or_insert((line, col_start, line_end, col_end));
@@ -349,7 +349,7 @@ impl Context {
 
     /// Remove a variable from the context (after `unset`).
     pub fn unset_var(&mut self, name: &str) {
-        let sym = Symbol::from(name.trim_start_matches('$'));
+        let sym = Name::from(name.trim_start_matches('$'));
         Arc::make_mut(&mut self.vars).remove(&sym);
         Arc::make_mut(&mut self.assigned_vars).remove(&sym);
         Arc::make_mut(&mut self.possibly_assigned_vars).remove(&sym);
@@ -358,7 +358,7 @@ impl Context {
     /// Clone this context to analyze a conditional branch (`if`, `elseif`,
     /// `else`, `case`, ternary arm, …). The returned context can be mutated
     /// independently and later reconciled via [`Self::merge_branches`].
-    pub fn branch(&self) -> Context {
+    pub fn branch(&self) -> FlowState {
         self.clone()
     }
 
@@ -367,7 +367,11 @@ impl Context {
     /// - vars present in both: merged union of types
     /// - vars present in only one branch: marked `possibly_undefined`
     /// - pre-existing vars from before the branch: preserved
-    pub fn merge_branches(pre: &Context, if_ctx: Context, else_ctx: Option<Context>) -> Context {
+    pub fn merge_branches(
+        pre: &FlowState,
+        if_ctx: FlowState,
+        else_ctx: Option<FlowState>,
+    ) -> FlowState {
         let else_ctx = else_ctx.unwrap_or_else(|| pre.clone());
 
         // If the then-branch always diverges, the code after the if runs only
@@ -394,7 +398,7 @@ impl Context {
         let mut result = pre.clone();
 
         // Collect all variable names from both branch contexts
-        let all_names: FxHashSet<Symbol> = if_ctx
+        let all_names: FxHashSet<Name> = if_ctx
             .vars
             .keys()
             .chain(else_ctx.vars.keys())
@@ -442,7 +446,7 @@ impl Context {
                                 }
                                 None => {
                                     let mut m = (**a).clone();
-                                    m.merge_with(&Union::mixed());
+                                    m.merge_with(&Type::mixed());
                                     Arc::new(m)
                                 }
                             };
@@ -465,7 +469,7 @@ impl Context {
                                     Arc::new(m)
                                 }
                                 None => {
-                                    let mut m = Union::mixed();
+                                    let mut m = Type::mixed();
                                     m.merge_with(b);
                                     Arc::new(m)
                                 }
@@ -514,7 +518,7 @@ impl Context {
     }
 }
 
-impl Default for Context {
+impl Default for FlowState {
     fn default() -> Self {
         Self::new()
     }

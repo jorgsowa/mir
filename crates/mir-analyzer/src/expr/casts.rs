@@ -1,7 +1,7 @@
 use super::ExpressionAnalyzer;
-use crate::context::Context;
+use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::ast::CastKind;
 use php_ast::owned::Expr;
 
@@ -10,8 +10,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         kind: &CastKind,
         inner: &Expr,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let inner_ty = self.analyze(inner, ctx);
         match kind {
             CastKind::Int => {
@@ -48,7 +48,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                Union::single(Atomic::TInt)
+                Type::single(Atomic::TInt)
             }
             CastKind::Float => {
                 // Check for RedundantCast when already float
@@ -87,7 +87,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                Union::single(Atomic::TFloat)
+                Type::single(Atomic::TFloat)
             }
             CastKind::String => {
                 // Check for RedundantCast when already string
@@ -121,7 +121,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                Union::single(Atomic::TString)
+                Type::single(Atomic::TString)
             }
             CastKind::Bool => {
                 // Check for RedundantCast when already bool
@@ -138,7 +138,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                Union::single(Atomic::TBool)
+                Type::single(Atomic::TBool)
             }
             CastKind::Array => {
                 // Check for RedundantCast when already array
@@ -163,13 +163,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                Union::single(Atomic::TArray {
-                    key: Box::new(Union::single(Atomic::TMixed)),
-                    value: Box::new(Union::mixed()),
+                Type::single(Atomic::TArray {
+                    key: Box::new(Type::single(Atomic::TMixed)),
+                    value: Box::new(Type::mixed()),
                 })
             }
-            CastKind::Object => Union::single(Atomic::TObject),
-            CastKind::Unset | CastKind::Void => Union::single(Atomic::TNull),
+            CastKind::Object => Type::single(Atomic::TObject),
+            CastKind::Unset | CastKind::Void => Type::single(Atomic::TNull),
         }
     }
 }

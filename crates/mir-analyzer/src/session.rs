@@ -3,7 +3,7 @@
 //! [`AnalysisSession`] owns the salsa database and per-session caches for a
 //! long-running analysis context shared across many per-file analyses. Reads
 //! clone the database under a brief lock, then run lock-free; writes hold the
-//! lock briefly to mutate canonical state. `MirDb::clone()` is cheap
+//! lock briefly to mutate canonical state. `MirDbStorage::clone()` is cheap
 //! (Arc-wrapped registries), so this pattern gives parallel readers without
 //! blocking on concurrent writes for longer than the clone itself.
 //!
@@ -21,7 +21,7 @@ use mir_codebase::{FileId, FileIdMap};
 use crate::analyzer_db::AnalyzerDb;
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
-use crate::db::{MirDatabase, MirDb, RefLoc};
+use crate::db::{MirDatabase, MirDbStorage, RefLoc};
 use crate::php_version::PhpVersion;
 
 /// Long-lived analysis context. Owns the salsa database and tracks which
@@ -168,7 +168,7 @@ impl AnalysisSession {
         ));
         self.psr4 = Some(map);
         self.resolver = Some(resolver.clone());
-        // Mirror into MirDb so salsa-tracked resolver queries
+        // Mirror into MirDbStorage so salsa-tracked resolver queries
         // (`db::resolve_fqcn_to_path`) see the same resolver and are
         // invalidated on swap.
         self.db.salsa.write().set_resolver(Some(resolver));
@@ -398,7 +398,7 @@ impl AnalysisSession {
     /// notice. Public consumers should use the typed query methods
     /// ([`Self::definition_of`], [`Self::hover`], etc.) instead.
     #[doc(hidden)]
-    pub fn snapshot_db(&self) -> MirDb {
+    pub fn snapshot_db(&self) -> MirDbStorage {
         self.db.snapshot_db()
     }
 
@@ -506,7 +506,7 @@ impl AnalysisSession {
     ///
     /// This is the LSP-friendly bulk-population entry point: after a workspace
     /// scan, callers can feed every discovered file's text to the session
-    /// cheaply (an Arc clone plus a HashMap insert per file). Symbol resolution
+    /// cheaply (an Arc clone plus a HashMap insert per file). Name resolution
     /// then happens on demand via [`Self::load_class`], which reads
     /// the file from disk through the configured [`crate::ClassResolver`] and
     /// runs definition collection lazily when a class FQCN actually needs to resolve.
@@ -526,7 +526,7 @@ impl AnalysisSession {
         self.evict_unresolvable_for_file(&file);
     }
 
-    /// Bulk-register stable vendor / library files with HIGH salsa durability.
+    /// Bulk-register vendor / library files with HIGH salsa durability.
     ///
     /// HIGH-durability files are not expected to change during the session.
     /// When a LOW-durability project file is edited, salsa can skip O(N)
@@ -534,7 +534,7 @@ impl AnalysisSession {
     /// `workspace_symbol_index` re-verification cost to O(project files only).
     ///
     /// Definition collection runs lazily on first symbol access; no parsing at call time.
-    pub fn set_stable_workspace_files<I>(&self, files: I)
+    pub fn set_vendor_files<I>(&self, files: I)
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
@@ -650,19 +650,19 @@ impl AnalysisSession {
     ///   (e.g. some stub-only declarations)
     pub fn definition_of(
         &self,
-        symbol: &crate::Symbol,
-    ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
+        symbol: &crate::Name,
+    ) -> Result<mir_types::Location, crate::SymbolLookupError> {
         // Trigger any necessary lazy-load mutations before snapshotting.
         match symbol {
-            crate::Symbol::Class(fqcn) => {
+            crate::Name::Class(fqcn) => {
                 let _ = self.load_class(fqcn.as_ref());
             }
-            crate::Symbol::Function(fqn) => {
+            crate::Name::Function(fqn) => {
                 let _ = self.load_class(fqn.as_ref());
             }
-            crate::Symbol::Method { class, .. }
-            | crate::Symbol::Property { class, .. }
-            | crate::Symbol::ClassConstant { class, .. } => {
+            crate::Name::Method { class, .. }
+            | crate::Name::Property { class, .. }
+            | crate::Name::ClassConstant { class, .. } => {
                 let _ = self.load_class(class.as_ref());
             }
             _ => {}
@@ -677,11 +677,11 @@ impl AnalysisSession {
     /// if a resolver could in principle map it.
     pub fn definition_of_cached(
         &self,
-        symbol: &crate::Symbol,
-    ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
+        symbol: &crate::Name,
+    ) -> Result<mir_types::Location, crate::SymbolLookupError> {
         let db = self.snapshot_db();
         match symbol {
-            crate::Symbol::Class(fqcn) => {
+            crate::Name::Class(fqcn) => {
                 let here = crate::db::Fqcn::from_str(&db, fqcn.as_ref());
                 let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
@@ -690,7 +690,7 @@ impl AnalysisSession {
                     .cloned()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
-            crate::Symbol::Function(fqn) => {
+            crate::Name::Function(fqn) => {
                 let here = crate::db::Fqcn::from_str(&db, fqn.as_ref());
                 let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
@@ -698,20 +698,20 @@ impl AnalysisSession {
                     .clone()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
-            crate::Symbol::Method { class, name }
-            | crate::Symbol::Property { class, name }
-            | crate::Symbol::ClassConstant { class, name } => {
+            crate::Name::Method { class, name }
+            | crate::Name::Property { class, name }
+            | crate::Name::ClassConstant { class, name } => {
                 crate::db::member_location(&db, class, name)
                     .ok_or(crate::SymbolLookupError::NotFound)
             }
-            crate::Symbol::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
+            crate::Name::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
         }
     }
 
     /// Hover information for a symbol: type, docstring, and definition location.
     ///
     /// Use [`crate::FileAnalysis::symbol_at`] to find the symbol at a cursor
-    /// position, then build a [`crate::Symbol`] from its `kind`. This method
+    /// position, then build a [`crate::Name`] from its `kind`. This method
     /// assembles the displayable hover data.
     ///
     /// **Side effects:** when `symbol`'s owning class isn't yet loaded, this
@@ -723,18 +723,18 @@ impl AnalysisSession {
     /// pieces aren't available.
     pub fn hover(
         &self,
-        symbol: &crate::Symbol,
+        symbol: &crate::Name,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
         // Trigger lazy loading for class-rooted symbols before snapshotting.
         // No-op when the class is already known; ensures inherited member
         // lookups have the chain present.
         match symbol {
-            crate::Symbol::Class(fqcn) => {
+            crate::Name::Class(fqcn) => {
                 self.load_class(fqcn.as_ref());
             }
-            crate::Symbol::Method { class, .. }
-            | crate::Symbol::Property { class, .. }
-            | crate::Symbol::ClassConstant { class, .. } => {
+            crate::Name::Method { class, .. }
+            | crate::Name::Property { class, .. }
+            | crate::Name::ClassConstant { class, .. } => {
                 // 10 mirrors the default depth used by reanalyze_dependents.
                 self.load_class_transitive(class.as_ref(), 10);
             }
@@ -747,12 +747,12 @@ impl AnalysisSession {
     /// [`crate::SourceProvider`]; consults only the already-loaded db.
     pub fn hover_cached(
         &self,
-        symbol: &crate::Symbol,
+        symbol: &crate::Name,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        use mir_types::{Atomic, Union};
+        use mir_types::{Atomic, Type};
         let db = self.snapshot_db();
         match symbol {
-            crate::Symbol::Function(fqn) => {
+            crate::Name::Function(fqn) => {
                 let here = crate::db::Fqcn::from_str(&db, fqn.as_ref());
                 let f = crate::db::find_function(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
@@ -760,7 +760,7 @@ impl AnalysisSession {
                     .return_type
                     .as_deref()
                     .cloned()
-                    .unwrap_or_else(Union::mixed);
+                    .unwrap_or_else(Type::mixed);
                 let docstring = f.docstring.as_ref().map(|s| s.to_string());
                 Ok(crate::HoverInfo {
                     ty,
@@ -768,7 +768,7 @@ impl AnalysisSession {
                     definition: f.location.clone(),
                 })
             }
-            crate::Symbol::Method { class, name } => {
+            crate::Name::Method { class, name } => {
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
                 let (_, m) = crate::db::find_method_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
@@ -776,7 +776,7 @@ impl AnalysisSession {
                     .return_type
                     .as_deref()
                     .cloned()
-                    .unwrap_or_else(Union::mixed);
+                    .unwrap_or_else(Type::mixed);
                 let docstring = m.docstring.as_ref().map(|s| s.to_string());
                 Ok(crate::HoverInfo {
                     ty,
@@ -784,12 +784,12 @@ impl AnalysisSession {
                     definition: m.location.clone(),
                 })
             }
-            crate::Symbol::Class(fqcn) => {
+            crate::Name::Class(fqcn) => {
                 let here = crate::db::Fqcn::from_str(&db, fqcn.as_ref());
                 let class = crate::db::find_class_like(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = Union::single(Atomic::TNamedObject {
-                    fqcn: mir_types::Symbol::from(fqcn.as_ref()),
+                let ty = Type::single(Atomic::TNamedObject {
+                    fqcn: mir_types::Name::from(fqcn.as_ref()),
                     type_params: mir_types::union::empty_type_params(),
                 });
                 Ok(crate::HoverInfo {
@@ -798,18 +798,18 @@ impl AnalysisSession {
                     definition: class.location().cloned(),
                 })
             }
-            crate::Symbol::Property { class, name } => {
+            crate::Name::Property { class, name } => {
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
                 let (_, p) = crate::db::find_property_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = p.ty.clone().unwrap_or_else(Union::mixed);
+                let ty = p.ty.clone().unwrap_or_else(Type::mixed);
                 Ok(crate::HoverInfo {
                     ty,
                     docstring: None,
                     definition: p.location.clone(),
                 })
             }
-            crate::Symbol::ClassConstant { class, name } => {
+            crate::Name::ClassConstant { class, name } => {
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
                 let (_, c) = crate::db::find_class_constant_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
@@ -819,7 +819,7 @@ impl AnalysisSession {
                     definition: c.location.clone(),
                 })
             }
-            crate::Symbol::GlobalConstant(fqn) => {
+            crate::Name::GlobalConstant(fqn) => {
                 let here = crate::db::Fqcn::from_str(&db, fqn.as_ref());
                 let ty = crate::db::find_global_constant(&db, here)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
@@ -834,7 +834,7 @@ impl AnalysisSession {
 
     /// Raw reference locations indexed by string symbol key, kept for tests
     /// that use the legacy stringly-typed API. Prefer [`Self::references_to`]
-    /// with a typed [`crate::Symbol`].
+    /// with a typed [`crate::Name`].
     #[doc(hidden)]
     pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
         use crate::db::MirDatabase;
@@ -844,8 +844,8 @@ impl AnalysisSession {
 
     /// Every recorded reference to `symbol` with its source location as a Range.
     /// Use [`crate::FileAnalysis::symbol_at`] to find the symbol at a cursor,
-    /// build a [`crate::Symbol`] from it, and pass it here.
-    pub fn references_to(&self, symbol: &crate::Symbol) -> Vec<(Arc<str>, crate::Range)> {
+    /// build a [`crate::Name`] from it, and pass it here.
+    pub fn references_to(&self, symbol: &crate::Name) -> Vec<(Arc<str>, crate::Range)> {
         let db = self.snapshot_db();
         let key = symbol.codebase_key();
         db.reference_locations(&key)
@@ -891,7 +891,7 @@ impl AnalysisSession {
     /// properties, and constants nested in `children`. Top-level functions
     /// and constants are returned with empty `children`.
     pub fn document_symbols(&self, file: &str) -> Vec<crate::symbol::DocumentSymbol> {
-        use crate::symbol::{DocumentSymbol, DocumentSymbolKind};
+        use crate::symbol::{DeclarationKind, DocumentSymbol};
 
         let db = self.snapshot_db();
         let Some(sf) = db.lookup_source_file(file) else {
@@ -910,7 +910,7 @@ impl AnalysisSession {
                 for (_, m) in methods.iter() {
                     out.push(DocumentSymbol {
                         name: m.name.clone(),
-                        kind: DocumentSymbolKind::Method,
+                        kind: DeclarationKind::Method,
                         location: m.location.clone(),
                         children: Vec::new(),
                     });
@@ -919,16 +919,16 @@ impl AnalysisSession {
                     for (_, p) in props.iter() {
                         out.push(DocumentSymbol {
                             name: p.name.clone(),
-                            kind: DocumentSymbolKind::Property,
+                            kind: DeclarationKind::Property,
                             location: p.location.clone(),
                             children: Vec::new(),
                         });
                     }
                 }
                 let const_kind = if is_enum {
-                    DocumentSymbolKind::EnumCase
+                    DeclarationKind::EnumCase
                 } else {
-                    DocumentSymbolKind::Constant
+                    DeclarationKind::Constant
                 };
                 for (_, c) in consts.iter() {
                     out.push(DocumentSymbol {
@@ -944,7 +944,7 @@ impl AnalysisSession {
         for c in defs.slice.classes.iter() {
             out.push(DocumentSymbol {
                 name: c.fqcn.clone(),
-                kind: DocumentSymbolKind::Class,
+                kind: DeclarationKind::Class,
                 location: c.location.clone(),
                 children: class_children(
                     &c.own_methods,
@@ -957,7 +957,7 @@ impl AnalysisSession {
         for i in defs.slice.interfaces.iter() {
             out.push(DocumentSymbol {
                 name: i.fqcn.clone(),
-                kind: DocumentSymbolKind::Interface,
+                kind: DeclarationKind::Interface,
                 location: i.location.clone(),
                 children: class_children(&i.own_methods, None, &i.own_constants, false),
             });
@@ -965,7 +965,7 @@ impl AnalysisSession {
         for t in defs.slice.traits.iter() {
             out.push(DocumentSymbol {
                 name: t.fqcn.clone(),
-                kind: DocumentSymbolKind::Trait,
+                kind: DeclarationKind::Trait,
                 location: t.location.clone(),
                 children: class_children(
                     &t.own_methods,
@@ -980,14 +980,14 @@ impl AnalysisSession {
             for (_, case) in e.cases.iter() {
                 children.push(DocumentSymbol {
                     name: case.name.clone(),
-                    kind: DocumentSymbolKind::EnumCase,
+                    kind: DeclarationKind::EnumCase,
                     location: case.location.clone(),
                     children: Vec::new(),
                 });
             }
             out.push(DocumentSymbol {
                 name: e.fqcn.clone(),
-                kind: DocumentSymbolKind::Enum,
+                kind: DeclarationKind::Enum,
                 location: e.location.clone(),
                 children,
             });
@@ -995,7 +995,7 @@ impl AnalysisSession {
         for f in defs.slice.functions.iter() {
             out.push(DocumentSymbol {
                 name: f.fqn.clone(),
-                kind: DocumentSymbolKind::Function,
+                kind: DeclarationKind::Function,
                 location: f.location.clone(),
                 children: Vec::new(),
             });
@@ -1003,7 +1003,7 @@ impl AnalysisSession {
         for (name, _) in defs.slice.constants.iter() {
             out.push(DocumentSymbol {
                 name: name.clone(),
-                kind: DocumentSymbolKind::Constant,
+                kind: DeclarationKind::Constant,
                 location: None,
                 children: Vec::new(),
             });
@@ -1022,7 +1022,7 @@ impl AnalysisSession {
     /// registered and active in the codebase.
     pub fn contains_class(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
-        crate::db::type_exists(&db, fqcn)
+        crate::db::class_exists(&db, fqcn)
     }
 
     /// Returns `true` if `class` has a method named `name` registered. Method
@@ -1315,7 +1315,7 @@ impl AnalysisSession {
     /// Use this to build workspace-wide views (outline, fuzzy search, etc.).
     /// Consumers implement their own search/match logic on top — the analyzer
     /// only exposes the iterator.
-    pub fn all_classes(&self) -> Vec<(Arc<str>, Option<mir_codebase::storage::Location>)> {
+    pub fn all_classes(&self) -> Vec<(Arc<str>, Option<mir_types::Location>)> {
         let db = self.snapshot_db();
         crate::db::workspace_classes(&db)
             .iter()
@@ -1329,7 +1329,7 @@ impl AnalysisSession {
 
     /// All global function FQNs currently known to the session, each paired
     /// with their declaration location when available.
-    pub fn all_functions(&self) -> Vec<(Arc<str>, Option<mir_codebase::storage::Location>)> {
+    pub fn all_functions(&self) -> Vec<(Arc<str>, Option<mir_types::Location>)> {
         let db = self.snapshot_db();
         crate::db::workspace_functions(&db)
             .iter()
@@ -1568,7 +1568,7 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
         }
     };
 
-    let extract_named_objects = |union: &mir_types::Union| {
+    let extract_named_objects = |union: &mir_types::Type| {
         union
             .types
             .iter()

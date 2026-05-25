@@ -156,7 +156,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
     }
 }
 
-fn location_from_storage(loc: &Option<mir_codebase::storage::Location>) -> Location {
+fn location_from_storage(loc: &Option<mir_types::Location>) -> Location {
     match loc {
         Some(l) => Location {
             file: l.file.clone(),

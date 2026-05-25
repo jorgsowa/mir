@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use mir_types::{Symbol, Union};
+use mir_types::{Location, Name, Type};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -9,97 +9,97 @@ use serde::{Deserialize, Serialize};
 // Interned common types for deduplication
 // ---------------------------------------------------------------------------
 
-/// Interned Union types for common parameter/property types.
+/// Interned Type types for common parameter/property types.
 /// Deduplicates allocations when thousands of parameters share types like `string`, `int`, etc.
 mod interned_types {
     use super::*;
     use std::sync::OnceLock;
 
-    fn intern_string() -> Arc<Union> {
-        Arc::new(Union::string())
+    fn intern_string() -> Arc<Type> {
+        Arc::new(Type::string())
     }
 
-    fn intern_int() -> Arc<Union> {
-        Arc::new(Union::int())
+    fn intern_int() -> Arc<Type> {
+        Arc::new(Type::int())
     }
 
-    fn intern_float() -> Arc<Union> {
-        Arc::new(Union::float())
+    fn intern_float() -> Arc<Type> {
+        Arc::new(Type::float())
     }
 
-    fn intern_bool() -> Arc<Union> {
-        Arc::new(Union::bool())
+    fn intern_bool() -> Arc<Type> {
+        Arc::new(Type::bool())
     }
 
-    fn intern_mixed() -> Arc<Union> {
-        Arc::new(Union::mixed())
+    fn intern_mixed() -> Arc<Type> {
+        Arc::new(Type::mixed())
     }
 
-    fn intern_null() -> Arc<Union> {
-        Arc::new(Union::null())
+    fn intern_null() -> Arc<Type> {
+        Arc::new(Type::null())
     }
 
-    fn intern_void() -> Arc<Union> {
-        Arc::new(Union::void())
+    fn intern_void() -> Arc<Type> {
+        Arc::new(Type::void())
     }
 
-    static STRING: OnceLock<Arc<Union>> = OnceLock::new();
-    static INT: OnceLock<Arc<Union>> = OnceLock::new();
-    static FLOAT: OnceLock<Arc<Union>> = OnceLock::new();
-    static BOOL: OnceLock<Arc<Union>> = OnceLock::new();
-    static MIXED: OnceLock<Arc<Union>> = OnceLock::new();
-    static NULL: OnceLock<Arc<Union>> = OnceLock::new();
-    static VOID: OnceLock<Arc<Union>> = OnceLock::new();
+    static STRING: OnceLock<Arc<Type>> = OnceLock::new();
+    static INT: OnceLock<Arc<Type>> = OnceLock::new();
+    static FLOAT: OnceLock<Arc<Type>> = OnceLock::new();
+    static BOOL: OnceLock<Arc<Type>> = OnceLock::new();
+    static MIXED: OnceLock<Arc<Type>> = OnceLock::new();
+    static NULL: OnceLock<Arc<Type>> = OnceLock::new();
+    static VOID: OnceLock<Arc<Type>> = OnceLock::new();
 
-    pub fn string() -> Arc<Union> {
+    pub fn string() -> Arc<Type> {
         STRING.get_or_init(intern_string).clone()
     }
 
-    pub fn int() -> Arc<Union> {
+    pub fn int() -> Arc<Type> {
         INT.get_or_init(intern_int).clone()
     }
 
-    pub fn float() -> Arc<Union> {
+    pub fn float() -> Arc<Type> {
         FLOAT.get_or_init(intern_float).clone()
     }
 
-    pub fn bool() -> Arc<Union> {
+    pub fn bool() -> Arc<Type> {
         BOOL.get_or_init(intern_bool).clone()
     }
 
-    pub fn mixed() -> Arc<Union> {
+    pub fn mixed() -> Arc<Type> {
         MIXED.get_or_init(intern_mixed).clone()
     }
 
-    pub fn null() -> Arc<Union> {
+    pub fn null() -> Arc<Type> {
         NULL.get_or_init(intern_null).clone()
     }
 
-    pub fn void() -> Arc<Union> {
+    pub fn void() -> Arc<Type> {
         VOID.get_or_init(intern_void).clone()
     }
 
-    /// Global content-keyed `Arc<Union>` interner. Any structurally-identical
-    /// Union is shared as a single Arc across the session.
+    /// Global content-keyed `Arc<Type>` interner. Any structurally-identical
+    /// Type is shared as a single Arc across the session.
     ///
     /// Why: PHP codebases re-declare a small set of type shapes thousands of
     /// times — `string|null` return types, `int` params, `array<string, mixed>`
     /// property types. Without interning, each declaration allocates its own
-    /// `Arc<Union>` plus the inline `SmallVec<[Atomic; 2]>` and any boxed
+    /// `Arc<Type>` plus the inline `SmallVec<[Atomic; 2]>` and any boxed
     /// `Atomic` payloads. With interning, only the first occurrence allocates.
     ///
     /// Trade-off: every `intern_or_wrap` call hashes + does one DashMap lookup.
-    /// Hashing a `Union` is cheap (SmallVec, small atomics) — measured cost is
+    /// Hashing a `Type` is cheap (SmallVec, small atomics) — measured cost is
     /// well below the alloc-savings benefit on real workloads.
-    static GLOBAL_UNION_INTERN: std::sync::OnceLock<dashmap::DashMap<Union, Arc<Union>>> =
+    static GLOBAL_UNION_INTERN: std::sync::OnceLock<dashmap::DashMap<Type, Arc<Type>>> =
         std::sync::OnceLock::new();
 
-    fn global_intern_table() -> &'static dashmap::DashMap<Union, Arc<Union>> {
+    fn global_intern_table() -> &'static dashmap::DashMap<Type, Arc<Type>> {
         GLOBAL_UNION_INTERN.get_or_init(dashmap::DashMap::default)
     }
 
-    /// Try to intern a Union if it matches a common type, otherwise wrap in Arc.
-    pub fn intern_or_wrap(union: Union) -> Arc<Union> {
+    /// Try to intern a Type if it matches a common type, otherwise wrap in Arc.
+    pub fn intern_or_wrap(union: Type) -> Arc<Type> {
         // Fast path 1: single-atomic scalar — covered by `OnceLock` constants.
         // Avoids any DashMap traffic for the most common case.
         if union.types.len() == 1 && !union.possibly_undefined && !union.from_docblock {
@@ -114,12 +114,12 @@ mod interned_types {
                 _ => {}
             }
         }
-        // Fast path 2: empty Union — also a common case (e.g. unresolved
+        // Fast path 2: empty Type — also a common case (e.g. unresolved
         // return type). Don't pollute the intern table with these.
         if union.types.is_empty() {
             return Arc::new(union);
         }
-        // Global path: dedup against any previously-seen identical Union.
+        // Global path: dedup against any previously-seen identical Type.
         let table = global_intern_table();
         if let Some(existing) = table.get(&union) {
             return Arc::clone(existing.value());
@@ -167,24 +167,24 @@ impl std::fmt::Display for Visibility {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateParam {
-    pub name: Symbol,
-    pub bound: Option<Union>,
+    pub name: Name,
+    pub bound: Option<Type>,
     /// The entity (class or function FQN) that declared this template param.
-    pub defining_entity: Symbol,
+    pub defining_entity: Name,
     pub variance: mir_types::Variance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FnParam {
-    pub name: Symbol,
-    /// Parameter type. Stored as `Option<Arc<Union>>` to enable deduplication of
+    pub name: Name,
+    /// Parameter type. Stored as `Option<Arc<Type>>` to enable deduplication of
     /// common types across parameters. Many parameters share types like `string`,
     /// `int`, `bool`, etc., so interning via Arc saves allocations.
     #[serde(
         deserialize_with = "deserialize_param_type",
         serialize_with = "serialize_param_type"
     )]
-    pub ty: Option<Arc<Union>>,
+    pub ty: Option<Arc<Type>>,
     /// Whether this parameter has a default value. During analysis, defaults are
     /// never used for their value — only for marking parameters as optional.
     pub has_default: bool,
@@ -207,15 +207,15 @@ impl std::hash::Hash for FnParam {
     }
 }
 
-// Serde helpers to transparently convert between Option<Union> and Option<Arc<Union>>
-fn deserialize_param_type<'de, D>(deserializer: D) -> Result<Option<Arc<Union>>, D::Error>
+// Serde helpers to transparently convert between Option<Type> and Option<Arc<Type>>
+fn deserialize_param_type<'de, D>(deserializer: D) -> Result<Option<Arc<Type>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    Option::<Union>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
+    Option::<Type>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
 }
 
-fn serialize_param_type<S>(value: &Option<Arc<Union>>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_param_type<S>(value: &Option<Arc<Type>>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -223,14 +223,14 @@ where
     opt.serialize(serializer)
 }
 
-fn deserialize_return_type<'de, D>(deserializer: D) -> Result<Option<Arc<Union>>, D::Error>
+fn deserialize_return_type<'de, D>(deserializer: D) -> Result<Option<Arc<Type>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    Option::<Union>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
+    Option::<Type>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
 }
 
-fn serialize_return_type<S>(value: &Option<Arc<Union>>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_return_type<S>(value: &Option<Arc<Type>>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -245,23 +245,23 @@ where
     Vec::<FnParam>::deserialize(deserializer).map(|v| Arc::from(v.into_boxed_slice()))
 }
 
-fn default_imports() -> Arc<FxHashMap<Symbol, Symbol>> {
+fn default_imports() -> Arc<FxHashMap<Name, Name>> {
     Arc::new(FxHashMap::default())
 }
 
-/// Deserialize imports map. Supports both new (Symbol-keyed) and legacy
+/// Deserialize imports map. Supports both new (Name-keyed) and legacy
 /// (String-keyed) on-disk formats — older `cache.bin` files have plain
 /// `HashMap<String, String>`. Either way, we intern at load time so the
-/// in-memory representation is always `Arc<FxHashMap<Symbol, Symbol>>`.
-fn deserialize_imports<'de, D>(deserializer: D) -> Result<Arc<FxHashMap<Symbol, Symbol>>, D::Error>
+/// in-memory representation is always `Arc<FxHashMap<Name, Name>>`.
+fn deserialize_imports<'de, D>(deserializer: D) -> Result<Arc<FxHashMap<Name, Name>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let raw = FxHashMap::<String, String>::deserialize(deserializer)?;
-    let mut out: FxHashMap<Symbol, Symbol> =
+    let mut out: FxHashMap<Name, Name> =
         FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
     for (k, v) in raw {
-        out.insert(Symbol::new(&k), Symbol::new(&v));
+        out.insert(Name::new(&k), Name::new(&v));
     }
     Ok(Arc::new(out))
 }
@@ -270,7 +270,7 @@ where
 /// caches written by this version remain compatible with readers that haven't
 /// been recompiled yet (and vice-versa).
 fn serialize_imports<S>(
-    value: &Arc<FxHashMap<Symbol, Symbol>>,
+    value: &Arc<FxHashMap<Name, Name>>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -291,48 +291,14 @@ where
     value.as_ref().serialize(serializer)
 }
 
-/// Helper to wrap Option<Union> in interned Arc<Union>.
-pub fn wrap_param_type(ty: Option<Union>) -> Option<Arc<Union>> {
+/// Helper to wrap Option<Type> in interned Arc<Type>.
+pub fn wrap_param_type(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
 }
 
-/// Helper to wrap return type Option<Union> in interned Arc<Union>.
-pub fn wrap_return_type(ty: Option<Union>) -> Option<Arc<Union>> {
+/// Helper to wrap return type Option<Type> in interned Arc<Type>.
+pub fn wrap_return_type(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
-}
-
-// ---------------------------------------------------------------------------
-// Location — file + pre-computed line/col span
-// ---------------------------------------------------------------------------
-
-/// Declaration location.
-///
-/// Columns are 0-based Unicode scalar value (code-point) counts, equivalent to
-/// LSP `utf-32` position encoding. Convert to UTF-16 code units at the LSP
-/// boundary for clients that do not advertise `utf-32` support.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Location {
-    pub file: Arc<str>,
-    /// 1-based start line.
-    pub line: u32,
-    /// 1-based end line (inclusive). Equal to `line` for single-line spans.
-    pub line_end: u32,
-    /// 0-based Unicode code-point column of the span start.
-    pub col_start: u16,
-    /// 0-based Unicode code-point column of the span end (exclusive).
-    pub col_end: u16,
-}
-
-impl Location {
-    pub fn new(file: Arc<str>, line: u32, line_end: u32, col_start: u16, col_end: u16) -> Self {
-        Self {
-            file,
-            line,
-            line_end,
-            col_start,
-            col_end,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +316,7 @@ pub enum AssertionKind {
 pub struct Assertion {
     pub kind: AssertionKind,
     pub param: Arc<str>,
-    pub ty: Union,
+    pub ty: Type,
 }
 
 // ---------------------------------------------------------------------------
@@ -367,15 +333,15 @@ pub struct MethodDef {
     )]
     pub params: Arc<[FnParam]>,
     /// Type from annotation (`@return` / native type hint). `None` means unannotated.
-    /// Stored as `Option<Arc<Union>>` to enable deduplication of common return types
+    /// Stored as `Option<Arc<Type>>` to enable deduplication of common return types
     /// (e.g., `void`, `string`, `mixed`, `bool`) across thousands of methods.
     #[serde(
         deserialize_with = "deserialize_return_type",
         serialize_with = "serialize_return_type"
     )]
-    pub return_type: Option<Arc<Union>>,
+    pub return_type: Option<Arc<Type>>,
     /// Type inferred from body analysis (filled in during pass 2).
-    pub inferred_return_type: Option<Union>,
+    pub inferred_return_type: Option<Type>,
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_abstract: bool,
@@ -399,7 +365,7 @@ pub struct MethodDef {
 }
 
 impl MethodDef {
-    pub fn effective_return_type(&self) -> Option<&Union> {
+    pub fn effective_return_type(&self) -> Option<&Type> {
         self.return_type
             .as_deref()
             .or(self.inferred_return_type.as_ref())
@@ -413,12 +379,12 @@ impl MethodDef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PropertyDef {
     pub name: Arc<str>,
-    pub ty: Option<Union>,
-    pub inferred_ty: Option<Union>,
+    pub ty: Option<Type>,
+    pub inferred_ty: Option<Type>,
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_readonly: bool,
-    pub default: Option<Union>,
+    pub default: Option<Type>,
     pub location: Option<Location>,
 }
 
@@ -429,7 +395,7 @@ pub struct PropertyDef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConstantDef {
     pub name: Arc<str>,
-    pub ty: Union,
+    pub ty: Type,
     pub visibility: Option<Visibility>,
     #[serde(default)]
     pub is_final: bool,
@@ -454,10 +420,10 @@ pub struct ClassDef {
     pub mixins: Vec<Arc<str>>,
     pub template_params: Vec<TemplateParam>,
     /// Type arguments from `@extends ParentClass<T1, T2>` — maps parent's template params to concrete types.
-    pub extends_type_args: Vec<Union>,
+    pub extends_type_args: Vec<Type>,
     /// Type arguments from `@implements Interface<T1, T2>`.
     #[serde(default)]
-    pub implements_type_args: Vec<(Arc<str>, Vec<Union>)>,
+    pub implements_type_args: Vec<(Arc<str>, Vec<Type>)>,
     pub is_abstract: bool,
     pub is_final: bool,
     pub is_readonly: bool,
@@ -471,7 +437,7 @@ pub struct ClassDef {
     pub trait_use_locations: Vec<(Arc<str>, Location)>,
     /// Type aliases declared on this class via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
-    pub type_aliases: FxHashMap<Arc<str>, Union>,
+    pub type_aliases: FxHashMap<Arc<str>, Type>,
     /// Raw import-type declarations (`(local_name, original_name, from_class)`) — resolved during finalization.
     #[serde(default)]
     pub pending_import_types: Vec<(Arc<str>, Arc<str>, Arc<str>)>,
@@ -540,7 +506,7 @@ pub struct TraitDef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnumCaseDef {
     pub name: Arc<str>,
-    pub value: Option<Union>,
+    pub value: Option<Type>,
     pub location: Option<Location>,
 }
 
@@ -548,7 +514,7 @@ pub struct EnumCaseDef {
 pub struct EnumDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
-    pub scalar_type: Option<Union>,
+    pub scalar_type: Option<Type>,
     pub interfaces: Vec<Arc<str>>,
     pub cases: IndexMap<Arc<str>, EnumCaseDef>,
     pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
@@ -570,13 +536,13 @@ pub struct FunctionDef {
     )]
     pub params: Arc<[FnParam]>,
     /// Type from annotation (`@return` / native type hint). `None` means unannotated.
-    /// Stored as `Option<Arc<Union>>` to enable deduplication of common return types.
+    /// Stored as `Option<Arc<Type>>` to enable deduplication of common return types.
     #[serde(
         deserialize_with = "deserialize_return_type",
         serialize_with = "serialize_return_type"
     )]
-    pub return_type: Option<Arc<Union>>,
-    pub inferred_return_type: Option<Union>,
+    pub return_type: Option<Arc<Type>>,
+    pub inferred_return_type: Option<Type>,
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
     pub throws: Vec<Arc<str>>,
@@ -590,7 +556,7 @@ pub struct FunctionDef {
 }
 
 impl FunctionDef {
-    pub fn effective_return_type(&self) -> Option<&Union> {
+    pub fn effective_return_type(&self) -> Option<&Type> {
         self.return_type
             .as_deref()
             .or(self.inferred_return_type.as_ref())
@@ -614,7 +580,7 @@ pub struct StubSlice {
     pub enums: Vec<Arc<EnumDef>>,
     pub functions: Vec<Arc<FunctionDef>>,
     #[serde(default)]
-    pub constants: Vec<(Arc<str>, Union)>,
+    pub constants: Vec<(Arc<str>, Type)>,
     /// Source file this slice was collected from. `None` for bundled stub slices
     /// that were pre-computed and are not tied to a specific on-disk file.
     #[serde(default)]
@@ -623,7 +589,7 @@ pub struct StubSlice {
     /// Populated by `DefinitionCollector`; ingested into the salsa db's
     /// `global_vars` table by `ingest_stub_slice` when `file` is `Some`.
     #[serde(default)]
-    pub global_vars: Vec<(Arc<str>, Union)>,
+    pub global_vars: Vec<(Arc<str>, Type)>,
     /// The first namespace declared in this file (e.g. `"App\\Service"`).
     /// Populated by `DefinitionCollector`; ingested into the salsa db's
     /// `file_namespaces` table by `ingest_stub_slice` when `file` is `Some`.
@@ -631,10 +597,10 @@ pub struct StubSlice {
     pub namespace: Option<Arc<str>>,
     /// `use` alias map for this file: alias → FQCN.
     ///
-    /// Stored as `Arc<FxHashMap<Symbol, Symbol>>` so that `file_imports()`
+    /// Stored as `Arc<FxHashMap<Name, Name>>` so that `file_imports()`
     /// returns a cheap Arc clone instead of deep-cloning the map on every
     /// `resolve_name` call (which fires once per symbol reference in
-    /// Pass 2). `Symbol` keys/values shrink each entry from ~108 bytes
+    /// Pass 2). `Name` keys/values shrink each entry from ~108 bytes
     /// (two `String` headers + two heap allocs averaging ~30 chars) to
     /// 16 bytes (two `Ustr` u64 handles); the global ustr interner holds
     /// one copy of each unique alias / FQCN string for the whole session.
@@ -643,7 +609,7 @@ pub struct StubSlice {
         serialize_with = "serialize_imports"
     )]
     #[serde(default = "default_imports")]
-    pub imports: Arc<FxHashMap<Symbol, Symbol>>,
+    pub imports: Arc<FxHashMap<Name, Name>>,
     /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
     /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.
     #[serde(skip)]

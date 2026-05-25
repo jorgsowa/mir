@@ -2,19 +2,19 @@
 //!
 //! Phase 1 (analyzer's job):
 //! - hover() returns real HoverInfo (no longer a stub)
-//! - Symbol enum for type-safe identity
+//! - Name enum for type-safe identity
 //! - Result types for lookups (NotFound vs NoSourceLocation)
 //! - Hierarchical DocumentSymbol (classes contain method/property children)
 //!
 //! Phase 2 (boundary fixes):
 //! - ProjectAnalyzer builder pattern
 //! - with_cache_dir() avoids Arc wrapping
-//! - SymbolKind::Variable uses Arc<str>
+//! - ReferenceKind::Variable uses Arc<str>
 //! - mir_codebase types re-exported
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, PhpVersion, Symbol, SymbolLookupError};
+use mir_analyzer::{AnalysisSession, Name, PhpVersion, SymbolLookupError};
 
 #[test]
 fn hover_returns_real_info_for_function() {
@@ -33,7 +33,7 @@ fn hover_returns_real_info_for_function() {
     session.ingest_file(file.clone(), source.clone());
 
     let hover = session
-        .hover(&Symbol::function("add"))
+        .hover(&Name::function("add"))
         .expect("add() should be resolvable");
 
     assert!(
@@ -58,16 +58,16 @@ fn hover_returns_real_info_for_function() {
 #[test]
 fn hover_returns_not_found_for_unknown_symbol() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    let result = session.hover(&Symbol::function("nonexistent_function_xyz"));
+    let result = session.hover(&Name::function("nonexistent_function_xyz"));
     assert_eq!(result.unwrap_err(), SymbolLookupError::NotFound);
 }
 
 #[test]
 fn symbol_method_normalizes_case() {
-    // PHP methods are case-insensitive — the Symbol enum should normalize.
-    let s1 = Symbol::method("Foo", "Bar");
-    let s2 = Symbol::method("Foo", "bar");
-    let s3 = Symbol::method("Foo", "BAR");
+    // PHP methods are case-insensitive — the Name enum should normalize.
+    let s1 = Name::method("Foo", "Bar");
+    let s2 = Name::method("Foo", "bar");
+    let s3 = Name::method("Foo", "BAR");
 
     assert_eq!(s1, s2);
     assert_eq!(s1, s3);
@@ -80,14 +80,14 @@ fn definition_of_returns_result_with_distinct_errors() {
 
     // Class never registered → NotFound
     let err = session
-        .definition_of(&Symbol::class("CompletelyMadeUp"))
+        .definition_of(&Name::class("CompletelyMadeUp"))
         .unwrap_err();
     assert_eq!(err, SymbolLookupError::NotFound);
 }
 
 #[test]
 fn document_symbols_returns_hierarchical_tree() {
-    use mir_analyzer::symbol::DocumentSymbolKind;
+    use mir_analyzer::symbol::DeclarationKind;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -111,16 +111,16 @@ fn document_symbols_returns_hierarchical_tree() {
         .find(|s| s.name.as_ref() == "Container")
         .expect("Container class should be in document symbols");
 
-    assert_eq!(container.kind, DocumentSymbolKind::Class);
+    assert_eq!(container.kind, DeclarationKind::Class);
     assert!(
         !container.children.is_empty(),
         "Class should have children (methods, properties, constants)"
     );
 
     // Should contain methods, property, constant
-    let kinds: Vec<DocumentSymbolKind> = container.children.iter().map(|c| c.kind).collect();
+    let kinds: Vec<DeclarationKind> = container.children.iter().map(|c| c.kind).collect();
     assert!(
-        kinds.contains(&DocumentSymbolKind::Method),
+        kinds.contains(&DeclarationKind::Method),
         "Should have at least one method child, got: {kinds:?}"
     );
 }
@@ -149,8 +149,8 @@ fn references_to_takes_typed_symbol() {
         &parsed.source_map,
     );
 
-    // New typed API: pass Symbol::function, not &str
-    let refs = session.references_to(&Symbol::function("helper"));
+    // New typed API: pass Name::function, not &str
+    let refs = session.references_to(&Name::function("helper"));
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "Should find references to helper in {}",
@@ -184,11 +184,11 @@ fn analysis_session_with_cache_dir() {
 
 #[test]
 fn symbol_kind_variable_uses_arc_str() {
-    use mir_analyzer::symbol::SymbolKind;
+    use mir_analyzer::symbol::ReferenceKind;
 
-    let kind = SymbolKind::Variable(Arc::from("count"));
+    let kind = ReferenceKind::Variable(Arc::from("count"));
     match kind {
-        SymbolKind::Variable(name) => {
+        ReferenceKind::Variable(name) => {
             // Arc<str> can be compared via as_ref()
             assert_eq!(name.as_ref(), "count");
         }
@@ -232,7 +232,7 @@ fn contains_function_class_method_typed_queries() {
 
 #[test]
 fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
-    use mir_analyzer::symbol::SymbolKind;
+    use mir_analyzer::symbol::ReferenceKind;
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
@@ -258,16 +258,16 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
     let helper_call = analysis
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(name) if name.as_ref() == "helper"))
+        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(name) if name.as_ref() == "helper"))
         .expect("should record helper() call in caller body");
 
     let typed_symbol = helper_call
         .to_symbol()
-        .expect("FunctionCall should convert to Symbol");
+        .expect("FunctionCall should convert to Name");
 
-    assert_eq!(typed_symbol, Symbol::function("helper"));
+    assert_eq!(typed_symbol, Name::function("helper"));
 
-    // The typed Symbol can be passed directly to references_to
+    // The typed Name can be passed directly to references_to
     let refs = session.references_to(&typed_symbol);
     assert!(refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()));
 }

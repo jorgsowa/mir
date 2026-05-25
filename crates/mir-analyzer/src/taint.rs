@@ -8,10 +8,10 @@
 /// the appropriate `TaintedHtml`, `TaintedSql`, or `TaintedShell` issue is emitted.
 use php_ast::owned::{Expr, ExprKind, StringPart};
 
-use crate::context::Context;
+use crate::flow_state::FlowState;
 
 // ---------------------------------------------------------------------------
-// Superglobal names (without the $ prefix, as stored in Context::vars)
+// Superglobal names (without the $ prefix, as stored in FlowState::vars)
 // ---------------------------------------------------------------------------
 
 pub const SUPERGLOBALS: &[&str] = &[
@@ -59,14 +59,14 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
 // ---------------------------------------------------------------------------
 
 /// Returns `true` if the expression could carry tainted data, given the
-/// current `Context` taint state.
+/// current `FlowState` taint state.
 ///
 /// This is a conservative over-approximation:
 /// - Any reference to a superglobal (or an array offset thereof) is tainted.
 /// - Any variable that was previously marked tainted in `ctx.tainted_vars` is tainted.
 /// - Binary string-concat or arithmetic on tainted operands propagates taint.
 /// - Interpolated strings are tainted if any embedded variable is tainted.
-pub fn is_expr_tainted(expr: &Expr, ctx: &Context) -> bool {
+pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
     match &expr.kind {
         ExprKind::Variable(name) => {
             let n = name.trim_start_matches('$');

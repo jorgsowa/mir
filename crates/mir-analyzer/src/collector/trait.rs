@@ -1,7 +1,7 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use mir_codebase::storage::{ConstantDef, PropertyDef, TemplateParam, TraitDef};
-use mir_types::Union;
+use mir_types::Type;
 use php_ast::owned::{ClassMemberKind, TraitDecl};
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -67,7 +67,7 @@ impl<'a> DefinitionCollector<'a> {
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: p.is_readonly,
-                                    default: p.default.as_ref().map(|_| Union::mixed()),
+                                    default: p.default.as_ref().map(|_| Type::mixed()),
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -137,7 +137,7 @@ impl<'a> DefinitionCollector<'a> {
                         Arc::from(const_name),
                         ConstantDef {
                             name: Arc::from(const_name),
-                            ty: Union::mixed(),
+                            ty: Type::mixed(),
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),

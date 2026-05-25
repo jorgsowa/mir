@@ -21,6 +21,18 @@ pub struct Location {
     pub col_end: u16,
 }
 
+impl Location {
+    pub fn new(file: Arc<str>, line: u32, line_end: u32, col_start: u16, col_end: u16) -> Self {
+        Self {
+            file,
+            line,
+            line_end,
+            col_start,
+            col_end,
+        }
+    }
+}
+
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}:{}", self.file, self.line, self.col_start)

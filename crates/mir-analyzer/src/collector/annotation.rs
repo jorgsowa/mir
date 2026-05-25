@@ -1,11 +1,11 @@
 use mir_codebase::storage::{Assertion, AssertionKind};
 use mir_issues::{Issue, IssueKind};
-use mir_types::Union;
+use mir_types::Type;
 use std::sync::Arc;
 
 pub(super) fn build_assertions(
     doc: &crate::parser::ParsedDocblock,
-    resolve_union_doc_fn: impl Fn(Union) -> Union,
+    resolve_union_doc_fn: impl Fn(Type) -> Type,
 ) -> Vec<Assertion> {
     let mut assertions = Vec::new();
     assertions.extend(doc.assertions.iter().map(|(param, ty)| Assertion {

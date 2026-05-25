@@ -7,7 +7,7 @@ use super::return_type::{
 use super::StatementsAnalyzer;
 
 use mir_issues::{IssueKind, Location};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::owned::{Expr, StaticVar};
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -19,7 +19,7 @@ impl<'a> StatementsAnalyzer<'a> {
         &mut self,
         opt_expr: &Option<Box<Expr>>,
         stmt_span: php_ast::Span,
-        ctx: &mut crate::context::Context,
+        ctx: &mut crate::flow_state::FlowState,
     ) {
         if let Some(expr) = opt_expr {
             let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
@@ -94,7 +94,7 @@ impl<'a> StatementsAnalyzer<'a> {
             }
             self.return_types.push(ret_ty);
         } else {
-            self.return_types.push(Union::single(Atomic::TVoid));
+            self.return_types.push(Type::single(Atomic::TVoid));
             // Bare `return;` from a non-void declared function is an error.
             if let Some(declared) = &ctx.fn_return_type.clone() {
                 if !declared.is_void() && !declared.is_mixed() {
@@ -131,7 +131,7 @@ impl<'a> StatementsAnalyzer<'a> {
         &mut self,
         expr: &Expr,
         stmt_span: php_ast::Span,
-        ctx: &mut crate::context::Context,
+        ctx: &mut crate::flow_state::FlowState,
     ) {
         let thrown_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
         // Validate that the thrown type extends Throwable
@@ -155,7 +155,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         || crate::db::has_unknown_ancestor(self.db, &resolved)
                         || crate::db::has_unknown_ancestor(self.db, fqcn)
                         // Suppress if class is not in codebase at all (could be extension class)
-                        || (!crate::db::type_exists(self.db, &resolved) && !crate::db::type_exists(self.db, fqcn));
+                        || (!crate::db::class_exists(self.db, &resolved) && !crate::db::class_exists(self.db, fqcn));
                     if !is_throwable {
                         let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                         self.issues.add(mir_issues::Issue::new(
@@ -172,7 +172,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         ));
                     } else {
                         // Check if thrown exception is covered by @throws declarations
-                        let thrown_fqcn = if crate::db::type_exists(self.db, &resolved) {
+                        let thrown_fqcn = if crate::db::class_exists(self.db, &resolved) {
                             &resolved
                         } else {
                             fqcn.as_ref()
@@ -236,7 +236,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         ));
                     } else {
                         // Check if thrown exception is covered by @throws declarations
-                        let thrown_fqcn = if crate::db::type_exists(self.db, &resolved) {
+                        let thrown_fqcn = if crate::db::class_exists(self.db, &resolved) {
                             &resolved
                         } else {
                             fqcn.as_ref()
@@ -293,13 +293,13 @@ impl<'a> StatementsAnalyzer<'a> {
     // Break
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_break_stmt(&mut self, ctx: &mut crate::context::Context) {
+    pub(super) fn analyze_break_stmt(&mut self, ctx: &mut crate::flow_state::FlowState) {
         // Save the context at the break point so the post-loop context
         // accounts for this early-exit path.
         if let Some(break_ctxs) = self.break_ctx_stack.last_mut() {
             break_ctxs.push(ctx.clone());
         }
-        // Context after an unconditional break is dead; don't continue
+        // FlowState after an unconditional break is dead; don't continue
         // emitting issues for code after this point.
         ctx.diverges = true;
     }
@@ -308,7 +308,7 @@ impl<'a> StatementsAnalyzer<'a> {
     // Continue
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_continue_stmt(&mut self, ctx: &mut crate::context::Context) {
+    pub(super) fn analyze_continue_stmt(&mut self, ctx: &mut crate::flow_state::FlowState) {
         // continue goes back to the loop condition — no context to save,
         // the widening pass already re-analyses the body.
         ctx.diverges = true;
@@ -321,7 +321,7 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_unset_stmt(
         &mut self,
         vars: &[php_ast::owned::Expr],
-        ctx: &mut crate::context::Context,
+        ctx: &mut crate::flow_state::FlowState,
     ) {
         for var in vars.iter() {
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
@@ -337,10 +337,10 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_static_var_stmt(
         &mut self,
         vars: &[StaticVar],
-        ctx: &mut crate::context::Context,
+        ctx: &mut crate::flow_state::FlowState,
     ) {
         for sv in vars.iter() {
-            let ty = Union::mixed(); // static vars are indeterminate on entry
+            let ty = Type::mixed(); // static vars are indeterminate on entry
             let name_str = sv.name.as_deref().unwrap_or("").to_string();
             let name = name_str.trim_start_matches('$');
             ctx.set_var(name, ty);
@@ -357,7 +357,7 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_global_stmt(
         &mut self,
         vars: &[php_ast::owned::Expr],
-        ctx: &mut crate::context::Context,
+        ctx: &mut crate::flow_state::FlowState,
     ) {
         for var in vars.iter() {
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
@@ -365,10 +365,10 @@ impl<'a> StatementsAnalyzer<'a> {
                 let ty = self
                     .db
                     .global_var_type(var_name)
-                    .unwrap_or_else(Union::mixed);
+                    .unwrap_or_else(Type::mixed);
                 ctx.set_var(var_name, ty);
                 std::sync::Arc::make_mut(&mut ctx.byref_param_names)
-                    .insert(mir_types::Symbol::from(var_name));
+                    .insert(mir_types::Name::from(var_name));
                 let (line, col_start) = self.offset_to_line_col(var.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(var.span.end);
                 ctx.record_var_location(var_name, line, col_start, line_end, col_end);
@@ -383,7 +383,7 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_declare_stmt(
         &mut self,
         d: &php_ast::owned::DeclareStmt,
-        ctx: &mut crate::context::Context,
+        ctx: &mut crate::flow_state::FlowState,
     ) {
         for (name, _val) in d.directives.iter() {
             if name.as_ref() == "strict_types" {

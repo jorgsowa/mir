@@ -1,11 +1,11 @@
 use super::StatementsAnalyzer;
-use crate::context::Context;
+use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use mir_issues::IssueKind;
 use php_ast::owned::{Expr, ExprKind};
 
 impl<'a> StatementsAnalyzer<'a> {
-    pub(super) fn analyze_expression_stmt(&mut self, expr: &Expr, ctx: &mut Context) {
+    pub(super) fn analyze_expression_stmt(&mut self, expr: &Expr, ctx: &mut FlowState) {
         let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
         if expr_ty.is_never() {
             ctx.diverges = true;
@@ -25,7 +25,7 @@ impl<'a> StatementsAnalyzer<'a> {
         &mut self,
         exprs: &[Expr],
         stmt_span: php_ast::Span,
-        ctx: &mut Context,
+        ctx: &mut FlowState,
     ) {
         for expr in exprs.iter() {
             let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
@@ -62,7 +62,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
-    fn check_echo_implicit_to_string_cast(&mut self, ty: &mir_types::Union, span: php_ast::Span) {
+    fn check_echo_implicit_to_string_cast(&mut self, ty: &mir_types::Type, span: php_ast::Span) {
         for atomic in &ty.types {
             if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
                 let fqcn_str = fqcn.as_ref();

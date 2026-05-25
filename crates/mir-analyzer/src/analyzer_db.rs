@@ -16,13 +16,13 @@ use crate::db::MirDatabase;
 use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 
-use crate::db::MirDb;
+use crate::db::MirDbStorage;
 use crate::php_version::PhpVersion;
 
 /// Newtype that allows `RwLock<MirDbRw>` in `AnalyzerDb`.
 ///
 /// SAFETY: Under the *read* lock only these operations are performed on the
-/// shared `&MirDb`:
+/// shared `&MirDbStorage`:
 ///
 ///   1. `clone()` — increments `Arc` refcounts; allocates a fresh `ZalsaLocal`
 ///      for the clone without touching the original `ZalsaLocal`.
@@ -38,19 +38,19 @@ use crate::php_version::PhpVersion;
 /// Callers MUST NOT call Salsa input-field getters (e.g. `node.text(db)`,
 /// `node.is_interface(db)`) on a shared `&MirDbRw` under the read lock —
 /// those write to `ZalsaLocal`. Use `snapshot_db()` for all other reads.
-pub(crate) struct MirDbRw(MirDb);
+pub(crate) struct MirDbRw(MirDbStorage);
 
 unsafe impl Sync for MirDbRw {}
 
 impl std::ops::Deref for MirDbRw {
-    type Target = MirDb;
-    fn deref(&self) -> &MirDb {
+    type Target = MirDbStorage;
+    fn deref(&self) -> &MirDbStorage {
         &self.0
     }
 }
 
 impl std::ops::DerefMut for MirDbRw {
-    fn deref_mut(&mut self) -> &mut MirDb {
+    fn deref_mut(&mut self) -> &mut MirDbStorage {
         &mut self.0
     }
 }
@@ -58,7 +58,7 @@ impl std::ops::DerefMut for MirDbRw {
 /// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
 /// AnalysisSession, providing a common point for their database operations.
 pub struct AnalyzerDb {
-    /// Salsa database (source file handles live inside MirDb.source_files).
+    /// Salsa database (source file handles live inside MirDbStorage.source_files).
     /// RwLock: multiple concurrent snapshot_db() reads; exclusive for writes.
     pub(crate) salsa: RwLock<MirDbRw>,
     /// Stubs that have been ingested (for idempotency).
@@ -73,7 +73,7 @@ pub struct AnalyzerDb {
 
 impl AnalyzerDb {
     pub fn new() -> Self {
-        let mut db = MirDb::default();
+        let mut db = MirDbStorage::default();
         // Pre-create the WorkspaceRevision salsa input so workspace_symbol_index
         // always reads it and salsa properly invalidates it on first file add.
         // Without this, querying workspace_symbol_index before any file is
@@ -111,7 +111,7 @@ impl AnalyzerDb {
     /// Acquire a cheap clone of the salsa db for read-only queries.
     /// Multiple callers may snapshot concurrently; the read lock is held
     /// only for the duration of the clone.
-    pub fn snapshot_db(&self) -> MirDb {
+    pub fn snapshot_db(&self) -> MirDbStorage {
         let guard = self.salsa.read();
         (**guard).clone()
     }

@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion, Psr4Map, Symbol};
+use mir_analyzer::{AnalysisSession, BatchOptions, Name, PhpVersion, Psr4Map};
 
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel")
@@ -201,7 +201,7 @@ fn perf_analysis_full_report() {
     let mut samples_held: Vec<Duration> = Vec::with_capacity(EDIT_ITERS as usize);
     for i in 0..EDIT_ITERS {
         let _snapshot_held = session
-            .definition_of(&Symbol::class("Illuminate\\Auth\\Events\\Login"))
+            .definition_of(&Name::class("Illuminate\\Auth\\Events\\Login"))
             .ok(); // snapshot lifetime-bound to this iteration
         let new_src = format!("{open_source}\n// held-edit {i}\n");
         let t0 = Instant::now();

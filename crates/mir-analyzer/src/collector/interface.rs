@@ -1,7 +1,7 @@
 use super::DefinitionCollector;
 use crate::parser::name_to_string_owned;
 use mir_codebase::storage::{ConstantDef, InterfaceDef, TemplateParam};
-use mir_types::Union;
+use mir_types::Type;
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -83,7 +83,7 @@ impl<'a> DefinitionCollector<'a> {
                         Arc::from(const_name),
                         ConstantDef {
                             name: Arc::from(const_name),
-                            ty: Union::mixed(),
+                            ty: Type::mixed(),
                             visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),

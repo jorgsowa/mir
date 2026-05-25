@@ -10,7 +10,7 @@ mod common;
 
 use std::path::PathBuf;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion, Symbol};
+use mir_analyzer::{AnalysisSession, BatchOptions, Name, PhpVersion};
 
 use self::common::{create_temp_dir, write_file};
 
@@ -114,7 +114,7 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
 
         // Sanity-check that the cold session sees the symbols.
         let def = session
-            .definition_of(&Symbol::class("App\\A"))
+            .definition_of(&Name::class("App\\A"))
             .expect("App\\A defined in cold session");
         assert_eq!(def.file.as_ref(), a_path.as_ref());
     }
@@ -132,11 +132,11 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
     // instead: a hit returns the slice that the original collector
     // produced, and ingestion must place the same symbols.
     let def = session2
-        .definition_of(&Symbol::class("App\\A"))
+        .definition_of(&Name::class("App\\A"))
         .expect("App\\A must still be defined in warm session");
     assert_eq!(def.file.as_ref(), a_path.as_ref());
     let def_b = session2
-        .definition_of(&Symbol::class("App\\B"))
+        .definition_of(&Name::class("App\\B"))
         .expect("App\\B must be defined in warm session");
     assert_eq!(def_b.file.as_ref(), b_path.as_ref());
 }
@@ -162,9 +162,7 @@ fn cache_miss_after_content_change() {
         session.ensure_all_stubs();
         session.ingest_file(a_arc.clone(), v1);
         // v1: v1() exists, v2() doesn't.
-        assert!(session
-            .definition_of(&Symbol::method("App\\A", "v1"))
-            .is_ok());
+        assert!(session.definition_of(&Name::method("App\\A", "v1")).is_ok());
     }
 
     // Edit the file to rename v1 -> v2 and re-ingest in a fresh session.
@@ -184,14 +182,14 @@ fn cache_miss_after_content_change() {
     // must not have been served.
     assert!(
         session2
-            .definition_of(&Symbol::method("App\\A", "v2"))
+            .definition_of(&Name::method("App\\A", "v2"))
             .is_ok(),
         "renamed method v2 must appear after content change"
     );
     // v1 should no longer be defined.
     assert!(
         session2
-            .definition_of(&Symbol::method("App\\A", "v1"))
+            .definition_of(&Name::method("App\\A", "v1"))
             .is_err(),
         "old method v1 must not survive a content change"
     );

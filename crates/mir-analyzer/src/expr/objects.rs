@@ -1,13 +1,13 @@
 use super::helpers::extract_string_from_expr;
 use super::ExpressionAnalyzer;
-use crate::context::Context;
-use crate::symbol::SymbolKind;
+use crate::flow_state::FlowState;
+use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
-fn is_valid_class_name_type(ty: &Union) -> bool {
+fn is_valid_class_name_type(ty: &Type) -> bool {
     // Class names must be strings or class-string types only.
     // Mixed is not allowed - must be explicit string or class-string.
     ty.contains(|t| {
@@ -44,8 +44,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         n: &NewExpr,
         call_span: php_ast::Span,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let mut arg_types = crate::call::ARG_TYPES_BUF
             .with(|b| b.borrow_mut().take())
             .unwrap_or_default();
@@ -85,7 +85,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .unwrap_or_else(|| Arc::from(resolved.as_str())),
                     _ => Arc::from(resolved.as_str()),
                 };
-                let type_exists = crate::db::type_exists(self.db, fqcn.as_ref());
+                let type_exists = crate::db::class_exists(self.db, fqcn.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") && !type_exists {
                     self.emit(
                         IssueKind::UndefinedClass {
@@ -147,13 +147,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         *g = Some(arg_types);
                     }
                 });
-                let ty = Union::single(Atomic::TNamedObject {
-                    fqcn: mir_types::Symbol::from(fqcn.as_ref()),
+                let ty = Type::single(Atomic::TNamedObject {
+                    fqcn: mir_types::Name::from(fqcn.as_ref()),
                     type_params: mir_types::union::empty_type_params(),
                 });
                 self.record_symbol(
                     n.class.span,
-                    SymbolKind::ClassReference(fqcn.clone()),
+                    ReferenceKind::ClassReference(fqcn.clone()),
                     ty.clone(),
                 );
                 if !self.inference_only {
@@ -201,7 +201,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
-                Union::single(Atomic::TObject)
+                Type::single(Atomic::TObject)
             }
         };
         class_ty
@@ -211,8 +211,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         pa: &PropertyAccessExpr,
         expr_span: php_ast::Span,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let obj_ty = self.analyze(&pa.object, ctx);
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
@@ -225,7 +225,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Severity::Error,
                 expr_span,
             );
-            return Union::mixed();
+            return Type::mixed();
         }
         if obj_ty.is_nullable() {
             self.emit(
@@ -238,14 +238,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         if prop_name == "<dynamic>" {
-            return Union::mixed();
+            return Type::mixed();
         }
         let resolved = self.resolve_property_type(&obj_ty, &prop_name, pa.property.span);
         for atomic in &obj_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 self.record_symbol(
                     pa.property.span,
-                    SymbolKind::PropertyAccess {
+                    ReferenceKind::PropertyAccess {
                         class: Arc::from(fqcn.as_ref()),
                         property: Arc::from(prop_name.as_str()),
                     },
@@ -260,13 +260,13 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_nullsafe_property_access(
         &mut self,
         pa: &PropertyAccessExpr,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let obj_ty = self.analyze(&pa.object, ctx);
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
         if prop_name == "<dynamic>" {
-            return Union::mixed();
+            return Type::mixed();
         }
         let non_null_ty = obj_ty.remove_null();
         let mut prop_ty = self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span);
@@ -275,7 +275,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 self.record_symbol(
                     pa.property.span,
-                    SymbolKind::PropertyAccess {
+                    ReferenceKind::PropertyAccess {
                         class: Arc::from(fqcn.as_ref()),
                         property: Arc::from(prop_name.as_str()),
                     },
@@ -287,11 +287,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         prop_ty
     }
 
-    pub(super) fn analyze_static_property_access(&mut self, spa: &StaticAccessExpr) -> Union {
+    pub(super) fn analyze_static_property_access(&mut self, spa: &StaticAccessExpr) -> Type {
         if let ExprKind::Identifier(id) = &spa.class.kind {
             let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
             if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                && !crate::db::type_exists(self.db, &resolved)
+                && !crate::db::class_exists(self.db, &resolved)
             {
                 self.emit(
                     IssueKind::UndefinedClass { name: resolved },
@@ -300,20 +300,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             }
         }
-        Union::mixed()
+        Type::mixed()
     }
 
     pub(super) fn analyze_class_const_access(
         &mut self,
         cca: &StaticAccessExpr,
         expr_span: php_ast::Span,
-        ctx: &Context,
-    ) -> Union {
+        ctx: &FlowState,
+    ) -> Type {
         if expr_name_str(&cca.member) == Some("class") {
             let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                    if !crate::db::type_exists(self.db, &resolved) {
+                    if !crate::db::class_exists(self.db, &resolved) {
                         self.emit(
                             IssueKind::UndefinedClass {
                                 name: resolved.clone(),
@@ -333,16 +333,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                         });
                     }
                 }
-                Some(mir_types::Symbol::from(resolved.as_str()))
+                Some(mir_types::Name::from(resolved.as_str()))
             } else {
                 None
             };
-            return Union::single(Atomic::TClassString(fqcn));
+            return Type::single(Atomic::TClassString(fqcn));
         }
 
         let const_name = match expr_name_str(&cca.member) {
             Some(n) => n.to_string(),
-            None => return Union::mixed(),
+            None => return Type::mixed(),
         };
 
         let fqcn = match &cca.class.kind {
@@ -351,7 +351,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 match resolved.as_str() {
                     "self" | "static" => {
                         let Some(self_fqcn) = &ctx.self_fqcn else {
-                            return Union::mixed();
+                            return Type::mixed();
                         };
                         let exists = crate::db::class_constant_exists_in_chain(
                             self.db,
@@ -367,11 +367,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
-                        return Union::mixed();
+                        return Type::mixed();
                     }
                     "parent" => {
                         let Some(parent_fqcn) = &ctx.parent_fqcn else {
-                            return Union::mixed();
+                            return Type::mixed();
                         };
                         let exists = crate::db::class_constant_exists_in_chain(
                             self.db,
@@ -387,21 +387,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
-                        return Union::mixed();
+                        return Type::mixed();
                     }
                     _ => resolved,
                 }
             }
-            _ => return Union::mixed(),
+            _ => return Type::mixed(),
         };
 
-        if !crate::db::type_exists(self.db, &fqcn) {
+        if !crate::db::class_exists(self.db, &fqcn) {
             self.emit(
                 IssueKind::UndefinedClass { name: fqcn },
                 Severity::Error,
                 cca.class.span,
             );
-            return Union::mixed();
+            return Type::mixed();
         }
 
         if !self.inference_only {
@@ -425,27 +425,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                 expr_span,
             );
         }
-        Union::mixed()
+        Type::mixed()
     }
 
     pub(super) fn resolve_property_type(
         &mut self,
-        obj_ty: &Union,
+        obj_ty: &Type,
         prop_name: &str,
         span: php_ast::Span,
-    ) -> Union {
+    ) -> Type {
         for atomic in &obj_ty.types {
             match atomic {
                 Atomic::TNamedObject { fqcn, .. }
                     if crate::db::class_kind(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
-                    let prop_found: Option<Union> = crate::db::find_property_in_chain(
+                    let prop_found: Option<Type> = crate::db::find_property_in_chain(
                         self.db,
                         crate::db::Fqcn::new(self.db, *fqcn),
                         prop_name,
                     )
-                    .map(|(_, p)| p.ty.unwrap_or_else(Union::mixed));
+                    .map(|(_, p)| p.ty.unwrap_or_else(Type::mixed));
                     if let Some(ty) = prop_found {
                         if !self.inference_only {
                             let (line, col_start, col_end) = self.span_to_ref_loc(span);
@@ -471,13 +471,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             span,
                         );
                     }
-                    return Union::mixed();
+                    return Type::mixed();
                 }
                 Atomic::TNamedObject { fqcn, .. }
                     if crate::db::class_kind(self.db, fqcn.as_ref()).is_some_and(|k| k.is_enum) =>
                 {
                     match prop_name {
-                        "name" => return Union::single(Atomic::TNonEmptyString),
+                        "name" => return Type::single(Atomic::TNonEmptyString),
                         "value" => {
                             let here = crate::db::Fqcn::new(self.db, *fqcn);
                             if let Some(scalar_ty) = crate::db::find_class_like(self.db, here)
@@ -493,7 +493,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Severity::Warning,
                                 span,
                             );
-                            return Union::mixed();
+                            return Type::mixed();
                         }
                         _ => {
                             self.emit(
@@ -504,14 +504,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Severity::Warning,
                                 span,
                             );
-                            return Union::mixed();
+                            return Type::mixed();
                         }
                     }
                 }
-                Atomic::TMixed => return Union::mixed(),
+                Atomic::TMixed => return Type::mixed(),
                 _ => {}
             }
         }
-        Union::mixed()
+        Type::mixed()
     }
 }

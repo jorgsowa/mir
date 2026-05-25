@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use crate::db::MirDatabase;
-use mir_types::Symbol;
+use mir_types::Name;
 
 /// Singleton salsa input that anchors resolver-derived tracked queries on
 /// a revision counter. The actual `Arc<dyn ClassResolver>` lives off-db
@@ -35,16 +35,16 @@ pub struct ResolverConfig {
 /// equality is by ustr pointer (O(1)).
 #[salsa::interned]
 pub struct Fqcn<'db> {
-    pub name: Symbol,
+    pub name: Name,
 }
 
 impl<'db> Fqcn<'db> {
-    /// Convenience constructor: intern `name` as a [`Symbol`] and build the
-    /// [`Fqcn`] in one call. Replaces the `Fqcn::new(db, Symbol::new(name))`
+    /// Convenience constructor: intern `name` as a [`Name`] and build the
+    /// [`Fqcn`] in one call. Replaces the `Fqcn::new(db, Name::new(name))`
     /// pattern used ~30 times across the analyzer.
     #[inline]
     pub fn from_str(db: &'db dyn MirDatabase, name: &str) -> Self {
-        Self::new(db, Symbol::new(name))
+        Self::new(db, Name::new(name))
     }
 }
 
@@ -55,7 +55,7 @@ impl<'db> Fqcn<'db> {
 /// Reads the resolver side-channel via [`MirDatabase::current_resolver`]
 /// — that read is *not* salsa-tracked, but the revision anchor makes it
 /// correct as long as every resolver swap bumps the revision (enforced by
-/// `MirDb::set_resolver`).
+/// `MirDbStorage::set_resolver`).
 ///
 /// Returns `None` when no resolver is configured or the resolver couldn't
 /// map `fqcn`.

@@ -3,7 +3,7 @@
 use rustc_hash::FxHashMap;
 
 use mir_codebase::storage::{FnParam, TemplateParam};
-use mir_types::{atomic::ArrayKey, Atomic, Symbol, Union};
+use mir_types::{atomic::ArrayKey, Atomic, Name, Type};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -17,12 +17,12 @@ use mir_types::{atomic::ArrayKey, Atomic, Symbol, Union};
 pub fn infer_template_bindings(
     template_params: &[TemplateParam],
     params: &[FnParam],
-    arg_types: &[Union],
-) -> FxHashMap<Symbol, Union> {
-    let mut bindings: FxHashMap<Symbol, Union> = FxHashMap::default();
-    let template_names: std::collections::HashSet<Symbol> = template_params
+    arg_types: &[Type],
+) -> FxHashMap<Name, Type> {
+    let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
+    let template_names: std::collections::HashSet<Name> = template_params
         .iter()
-        .map(|tp| Symbol::from(tp.name.as_ref()))
+        .map(|tp| Name::from(tp.name.as_ref()))
         .collect();
 
     for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
@@ -35,8 +35,8 @@ pub fn infer_template_bindings(
     // (or mixed if no bound is declared).
     for tp in template_params {
         bindings
-            .entry(Symbol::from(tp.name.as_ref()))
-            .or_insert_with(|| tp.bound.clone().unwrap_or_else(Union::mixed));
+            .entry(Name::from(tp.name.as_ref()))
+            .or_insert_with(|| tp.bound.clone().unwrap_or_else(Type::mixed));
     }
 
     bindings
@@ -45,9 +45,9 @@ pub fn infer_template_bindings(
 /// Check that each binding satisfies the template's declared bound.
 /// Returns a list of `(template_name, inferred_type, bound)` for violations.
 pub fn check_template_bounds<'a>(
-    bindings: &'a FxHashMap<Symbol, Union>,
+    bindings: &'a FxHashMap<Name, Type>,
     template_params: &'a [TemplateParam],
-) -> Vec<(&'a Symbol, &'a Union, &'a Union)> {
+) -> Vec<(&'a Name, &'a Type, &'a Type)> {
     let mut violations = Vec::new();
     for tp in template_params {
         if let Some(bound) = &tp.bound {
@@ -73,12 +73,12 @@ pub fn check_template_bounds<'a>(
 /// supplies more, the extras are ignored.
 pub fn build_class_bindings(
     class_template_params: &[TemplateParam],
-    receiver_type_params: &[Union],
-) -> FxHashMap<Symbol, Union> {
+    receiver_type_params: &[Type],
+) -> FxHashMap<Name, Type> {
     class_template_params
         .iter()
         .zip(receiver_type_params.iter())
-        .map(|(tp, ty)| (Symbol::from(tp.name.as_ref()), ty.clone()))
+        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
         .collect()
 }
 
@@ -90,10 +90,10 @@ pub fn build_class_bindings(
 /// return `arg_ty` with the concrete atomics filtered out — what the template
 /// should actually bind to. Returns `None` when no filtering is needed.
 fn compute_template_residual(
-    param_ty: &Union,
-    arg_ty: &Union,
-    template_names: &std::collections::HashSet<Symbol>,
-) -> Option<Union> {
+    param_ty: &Type,
+    arg_ty: &Type,
+    template_names: &std::collections::HashSet<Name>,
+) -> Option<Type> {
     let mut has_template = false;
     let mut concrete: Vec<&Atomic> = Vec::new();
     for a in &param_ty.types {
@@ -106,7 +106,7 @@ fn compute_template_residual(
     if !has_template || concrete.is_empty() {
         return None;
     }
-    let mut residual = Union::empty();
+    let mut residual = Type::empty();
     residual.from_docblock = arg_ty.from_docblock;
     residual.possibly_undefined = arg_ty.possibly_undefined;
     for a in &arg_ty.types {
@@ -120,7 +120,7 @@ fn compute_template_residual(
     Some(residual)
 }
 
-fn is_template_atomic(a: &Atomic, template_names: &std::collections::HashSet<Symbol>) -> bool {
+fn is_template_atomic(a: &Atomic, template_names: &std::collections::HashSet<Name>) -> bool {
     match a {
         Atomic::TTemplateParam { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
@@ -156,12 +156,12 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
 /// function/method. Bare unqualified `TNamedObject` references whose fqcn is in
 /// that set are treated as template-param references — the docblock parser
 /// emits them that way because it lacks template context at parse time
-/// (mirrors the workaround in `Union::substitute_templates`).
+/// (mirrors the workaround in `Type::substitute_templates`).
 fn infer_from_pair(
-    param_ty: &Union,
-    arg_ty: &Union,
-    template_names: &std::collections::HashSet<Symbol>,
-    bindings: &mut FxHashMap<Symbol, Union>,
+    param_ty: &Type,
+    arg_ty: &Type,
+    template_names: &std::collections::HashSet<Name>,
+    bindings: &mut FxHashMap<Name, Type>,
 ) {
     // When the parameter is a union mixing template placeholders with concrete
     // atomics (e.g. `T|null` against `Bar|null`), the template should bind to
@@ -174,7 +174,7 @@ fn infer_from_pair(
             // Direct template placeholder: T → bind T = residual(arg_ty)
             Atomic::TTemplateParam { name, .. } => {
                 let bind = template_residual.as_ref().unwrap_or(arg_ty);
-                let entry = bindings.entry(*name).or_insert_with(Union::empty);
+                let entry = bindings.entry(*name).or_insert_with(Type::empty);
                 entry.merge_with(bind);
             }
 
@@ -188,8 +188,8 @@ fn infer_from_pair(
                             infer_from_pair(pv, av, template_names, bindings);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
-                            let mut key_union = Union::empty();
-                            let mut val_union = Union::empty();
+                            let mut key_union = Type::empty();
+                            let mut val_union = Type::empty();
                             for (k, prop) in properties {
                                 let key_atomic = match k {
                                     ArrayKey::String(_) => Atomic::TString,
@@ -228,7 +228,7 @@ fn infer_from_pair(
             } => {
                 if pp.is_empty() && !pfqcn.contains('\\') && template_names.contains(pfqcn) {
                     let bind = template_residual.as_ref().unwrap_or(arg_ty);
-                    let entry = bindings.entry(*pfqcn).or_insert_with(Union::empty);
+                    let entry = bindings.entry(*pfqcn).or_insert_with(Type::empty);
                     entry.merge_with(bind);
                     continue;
                 }

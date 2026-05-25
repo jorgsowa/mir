@@ -2,7 +2,7 @@ use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
 use mir_types::atomic::FnParam;
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
 
@@ -19,7 +19,7 @@ pub(crate) struct ParamInfo {
 /// - TIntersection: check parts for callable/closure types
 /// - Everything else: None (param list is unknown at compile time)
 pub(crate) fn extract_callable_params(
-    union: &Union,
+    union: &Type,
     ea: &ExpressionAnalyzer<'_>,
 ) -> Option<Vec<ParamInfo>> {
     for atomic in &union.types {
@@ -79,7 +79,7 @@ pub(crate) fn extract_callable_params(
 /// - TClosure, TCallable, TString, TLiteralString, TNull
 /// - TKeyedArray NOT marked as is_list (could be [$obj, 'method'] form)
 /// - Unknown/other types
-pub(crate) fn is_valid_callable_type(union: &Union) -> bool {
+pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
     for atomic in &union.types {
         match atomic {
             Atomic::TClosure { .. }
@@ -117,7 +117,7 @@ pub(crate) fn is_valid_callable_type(union: &Union) -> bool {
 /// Emits TooFewArguments/TooManyArguments if callback arity doesn't match.
 pub(crate) fn check_array_map_callback(
     ea: &mut ExpressionAnalyzer<'_>,
-    arg_types: &[Union],
+    arg_types: &[Type],
     arg_spans: &[Span],
 ) {
     if arg_types.is_empty() || arg_spans.is_empty() {
@@ -182,7 +182,7 @@ pub(crate) fn check_array_map_callback(
 /// - else/missing: 1 arg (value)
 pub(crate) fn check_array_filter_callback(
     ea: &mut ExpressionAnalyzer<'_>,
-    arg_types: &[Union],
+    arg_types: &[Type],
     arg_spans: &[Span],
 ) {
     if arg_types.len() < 2 || arg_spans.len() < 2 {
@@ -247,7 +247,7 @@ pub(crate) fn check_array_filter_callback(
 /// Validate array_reduce callback: arity must be >= 2 (carry, element).
 pub(crate) fn check_array_reduce_callback(
     ea: &mut ExpressionAnalyzer<'_>,
-    arg_types: &[Union],
+    arg_types: &[Type],
     arg_spans: &[Span],
 ) {
     if arg_types.len() < 2 || arg_spans.len() < 2 {
@@ -296,7 +296,7 @@ pub(crate) fn check_array_reduce_callback(
 pub(crate) fn check_sort_callback(
     ea: &mut ExpressionAnalyzer<'_>,
     fn_name: &str,
-    arg_types: &[Union],
+    arg_types: &[Type],
     arg_spans: &[Span],
 ) {
     if arg_types.len() < 2 || arg_spans.len() < 2 {
@@ -344,7 +344,7 @@ pub(crate) fn check_sort_callback(
 /// Emits InvalidArgument if the provided callable has more required params than expected.
 pub(crate) fn check_typed_callable_arg(
     ea: &mut ExpressionAnalyzer<'_>,
-    arg_ty: &Union,
+    arg_ty: &Type,
     expected_params: &[FnParam],
     arg_span: Span,
 ) {
@@ -374,7 +374,7 @@ pub(crate) fn check_typed_callable_arg(
 }
 
 /// Helper: extract a readable function name from union for diagnostic output.
-fn callback_name_for_diagnostic(callback_ty: &Union) -> String {
+fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {
         fn_name.to_string()
     } else {

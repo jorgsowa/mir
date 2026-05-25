@@ -34,7 +34,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_properties = indexmap::IndexMap::new();
         let mut own_constants = indexmap::IndexMap::new();
         let mut trait_uses: Vec<Arc<str>> = vec![];
-        let mut trait_use_locations: Vec<(Arc<str>, mir_codebase::storage::Location)> = vec![];
+        let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
 
         let class_doc =
             self.parse_docblock_from_node_or_preceding(decl.doc_comment.as_ref(), stmt_span.start);
@@ -71,7 +71,7 @@ impl<'a> DefinitionCollector<'a> {
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: decl.modifiers.is_readonly,
-                                    default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
+                                    default: p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -115,7 +115,7 @@ impl<'a> DefinitionCollector<'a> {
                         visibility: Self::convert_visibility(p.visibility),
                         is_static: p.is_static,
                         is_readonly: p.is_readonly || decl.modifiers.is_readonly,
-                        default: p.default.as_ref().map(|_| mir_types::Union::mixed()),
+                        default: p.default.as_ref().map(|_| mir_types::Type::mixed()),
                         location: Some(self.location(member.span.start, member.span.end)),
                     };
                     own_properties.insert(Arc::from(prop_name), prop);
@@ -137,7 +137,7 @@ impl<'a> DefinitionCollector<'a> {
                     let const_name = c.name.as_deref().unwrap_or_default();
                     let constant = ConstantDef {
                         name: Arc::from(const_name),
-                        ty: mir_types::Union::mixed(),
+                        ty: mir_types::Type::mixed(),
                         visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                         is_final: c.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
@@ -175,7 +175,7 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
-        let extends_type_args: Vec<mir_types::Union> = class_doc
+        let extends_type_args: Vec<mir_types::Type> = class_doc
             .extends
             .as_ref()
             .and_then(|ty| {
@@ -192,7 +192,7 @@ impl<'a> DefinitionCollector<'a> {
             })
             .unwrap_or_default();
 
-        let implements_type_args: Vec<(Arc<str>, Vec<mir_types::Union>)> = class_doc
+        let implements_type_args: Vec<(Arc<str>, Vec<mir_types::Type>)> = class_doc
             .implements
             .iter()
             .filter_map(|ty| {

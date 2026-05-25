@@ -4,19 +4,19 @@ use smallvec::SmallVec;
 use std::sync::{Arc, OnceLock};
 
 use crate::atomic::Atomic;
-use crate::symbol::Symbol;
+use crate::symbol::Name;
 
-/// Returns a cached empty `Arc<[Union]>` for `type_params` / `parts` fields.
+/// Returns a cached empty `Arc<[Type]>` for `type_params` / `parts` fields.
 /// Re-uses a single Arc allocation so all empty parameter lists share one
 /// control block instead of allocating one per TNamedObject construction.
-pub fn empty_type_params() -> Arc<[Union]> {
-    static EMPTY: OnceLock<Arc<[Union]>> = OnceLock::new();
-    EMPTY.get_or_init(|| Arc::from([] as [Union; 0])).clone()
+pub fn empty_type_params() -> Arc<[Type]> {
+    static EMPTY: OnceLock<Arc<[Type]>> = OnceLock::new();
+    EMPTY.get_or_init(|| Arc::from([] as [Type; 0])).clone()
 }
 
-/// Convert a `Vec<Union>` to `Arc<[Union]>`, using the cached empty Arc when
+/// Convert a `Vec<Type>` to `Arc<[Type]>`, using the cached empty Arc when
 /// the vec is empty to avoid an allocation for the common no-generic case.
-pub fn vec_to_type_params(v: Vec<Union>) -> Arc<[Union]> {
+pub fn vec_to_type_params(v: Vec<Type>) -> Arc<[Type]> {
     if v.is_empty() {
         empty_type_params()
     } else {
@@ -28,19 +28,19 @@ pub fn vec_to_type_params(v: Vec<Union>) -> Arc<[Union]> {
 pub type AtomicVec = SmallVec<[Atomic; 2]>;
 
 // ---------------------------------------------------------------------------
-// Union — the primary type carrier
+// Type — the primary type carrier
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Union {
+pub struct Type {
     pub types: AtomicVec,
     /// The variable holding this type may not be initialized at this point.
     pub possibly_undefined: bool,
-    /// This union originated from a docblock annotation rather than inference.
+    /// This type originated from a docblock annotation rather than inference.
     pub from_docblock: bool,
 }
 
-impl Union {
+impl Type {
     // --- Constructors -------------------------------------------------------
 
     pub fn empty() -> Self {
@@ -253,24 +253,24 @@ impl Union {
     // --- Narrowing -----------------------------------------------------------
 
     /// Remove `null` from the union (e.g. after a null check).
-    pub fn remove_null(&self) -> Union {
+    pub fn remove_null(&self) -> Type {
         self.filter(|t| !matches!(t, Atomic::TNull))
     }
 
     /// Remove `false` from the union.
-    pub fn remove_false(&self) -> Union {
+    pub fn remove_false(&self) -> Type {
         self.filter(|t| !matches!(t, Atomic::TFalse | Atomic::TBool))
     }
 
     /// Remove both `null` and `false` from the union (core type without nullable/falsy variants).
-    pub fn core_type(&self) -> Union {
+    pub fn core_type(&self) -> Type {
         self.remove_null().remove_false()
     }
 
     /// Keep only truthy atomics (e.g. after `if ($x)`).
-    pub fn narrow_to_truthy(&self) -> Union {
+    pub fn narrow_to_truthy(&self) -> Type {
         if self.is_mixed() {
-            return Union::mixed();
+            return Type::mixed();
         }
         let narrowed = self.filter(|t| t.can_be_truthy());
         // Remove specific falsy literals from string/int
@@ -283,9 +283,9 @@ impl Union {
     }
 
     /// Keep only falsy atomics (e.g. after `if (!$x)`).
-    pub fn narrow_to_falsy(&self) -> Union {
+    pub fn narrow_to_falsy(&self) -> Type {
         if self.is_mixed() {
-            return Union::from_vec(vec![
+            return Type::from_vec(vec![
                 Atomic::TNull,
                 Atomic::TFalse,
                 Atomic::TLiteralInt(0),
@@ -300,7 +300,7 @@ impl Union {
     /// The instanceof check guarantees the value IS an instance of `class`, so we
     /// replace any object / mixed constituents with the specific named object.  Scalar
     /// constituents are dropped (they can never satisfy instanceof).
-    pub fn narrow_instanceof(&self, class: &str) -> Union {
+    pub fn narrow_instanceof(&self, class: &str) -> Type {
         let narrowed_ty = Atomic::TNamedObject {
             fqcn: class.into(),
             type_params: empty_type_params(),
@@ -313,28 +313,28 @@ impl Union {
             )
         });
         if has_object || self.is_empty() {
-            Union::single(narrowed_ty)
+            Type::single(narrowed_ty)
         } else {
             // Pure scalars — instanceof is always false here, but return the class
             // defensively so callers don't see an empty union.
-            Union::single(narrowed_ty)
+            Type::single(narrowed_ty)
         }
     }
 
     /// Narrow as if `is_string($x)` is true.
-    pub fn narrow_to_string(&self) -> Union {
+    pub fn narrow_to_string(&self) -> Type {
         self.filter(|t| t.is_string() || matches!(t, Atomic::TMixed | Atomic::TScalar))
     }
 
     /// Narrow as if `is_int($x)` is true.
-    pub fn narrow_to_int(&self) -> Union {
+    pub fn narrow_to_int(&self) -> Type {
         self.filter(|t| {
             t.is_int() || matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric)
         })
     }
 
     /// Narrow as if `is_float($x)` is true.
-    pub fn narrow_to_float(&self) -> Union {
+    pub fn narrow_to_float(&self) -> Type {
         self.filter(|t| {
             matches!(
                 t,
@@ -348,7 +348,7 @@ impl Union {
     }
 
     /// Narrow as if `is_bool($x)` is true.
-    pub fn narrow_to_bool(&self) -> Union {
+    pub fn narrow_to_bool(&self) -> Type {
         self.filter(|t| {
             matches!(
                 t,
@@ -358,27 +358,27 @@ impl Union {
     }
 
     /// Narrow as if `is_null($x)` is true.
-    pub fn narrow_to_null(&self) -> Union {
+    pub fn narrow_to_null(&self) -> Type {
         self.filter(|t| matches!(t, Atomic::TNull | Atomic::TMixed))
     }
 
     /// Narrow as if `is_array($x)` is true.
-    pub fn narrow_to_array(&self) -> Union {
+    pub fn narrow_to_array(&self) -> Type {
         self.filter(|t| t.is_array() || matches!(t, Atomic::TMixed))
     }
 
     /// Narrow as if `is_object($x)` is true.
-    pub fn narrow_to_object(&self) -> Union {
+    pub fn narrow_to_object(&self) -> Type {
         self.filter(|t| t.is_object() || matches!(t, Atomic::TMixed))
     }
 
     /// Narrow as if `is_callable($x)` is true.
-    pub fn narrow_to_callable(&self) -> Union {
+    pub fn narrow_to_callable(&self) -> Type {
         self.filter(|t| t.is_callable() || matches!(t, Atomic::TMixed))
     }
 
     /// Narrow as if `is_scalar($x)` is true (int | string | float | bool).
-    pub fn narrow_to_scalar(&self) -> Union {
+    pub fn narrow_to_scalar(&self) -> Type {
         self.filter(|t| {
             matches!(
                 t,
@@ -400,20 +400,20 @@ impl Union {
 
     /// Narrow as if `is_iterable($x)` is true (array | Traversable).
     /// For simplicity, this narrows to arrays or objects (can't easily verify interfaces).
-    pub fn narrow_to_iterable(&self) -> Union {
+    pub fn narrow_to_iterable(&self) -> Type {
         self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
     }
 
     /// Narrow as if `is_countable($x)` is true (array | Countable).
     /// For simplicity, this narrows to arrays or objects (can't easily verify Countable interface).
-    pub fn narrow_to_countable(&self) -> Union {
+    pub fn narrow_to_countable(&self) -> Type {
         self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
     }
 
     /// Narrow as if `is_resource($x)` is true.
     /// Note: No TResource atomic type exists in the type system; this is a no-op.
     /// Resources are declining in modern PHP and not actively tracked.
-    pub fn narrow_to_resource(&self) -> Union {
+    pub fn narrow_to_resource(&self) -> Type {
         // No resource type in the system; just return mixed (allows any type)
         self.filter(|t| matches!(t, Atomic::TMixed))
     }
@@ -422,7 +422,7 @@ impl Union {
 
     /// Merge two unions at a branch join point (e.g. after if/else).
     /// The result is the union of all types in both.
-    pub fn merge(a: &Union, b: &Union) -> Union {
+    pub fn merge(a: &Type, b: &Type) -> Type {
         // Fast path: b is empty — nothing to add.
         if b.types.is_empty() {
             let mut result = a.clone();
@@ -443,7 +443,7 @@ impl Union {
         }
         // Fast path: b contains mixed — result collapses to mixed.
         if b.types.iter().any(|t| matches!(t, Atomic::TMixed)) {
-            return Union {
+            return Type {
                 types: smallvec::smallvec![Atomic::TMixed],
                 possibly_undefined: a.possibly_undefined || b.possibly_undefined,
                 from_docblock: a.from_docblock || b.from_docblock,
@@ -455,7 +455,7 @@ impl Union {
     }
 
     /// Merge `other` into `self` in-place (avoids cloning `self`).
-    pub fn merge_with(&mut self, other: &Union) {
+    pub fn merge_with(&mut self, other: &Type) {
         if self.types.iter().any(|t| matches!(t, Atomic::TMixed)) {
             self.possibly_undefined |= other.possibly_undefined;
             return;
@@ -475,7 +475,7 @@ impl Union {
     /// Intersect with another union: keep only types present in `other`, widening
     /// where `self` contains `mixed` (which is compatible with everything).
     /// Used for match-arm subject narrowing.
-    pub fn intersect_with(&self, other: &Union) -> Union {
+    pub fn intersect_with(&self, other: &Type) -> Type {
         if self.is_mixed() {
             return other.clone();
         }
@@ -483,7 +483,7 @@ impl Union {
             return self.clone();
         }
         // Keep atomics from self that are also in other (by equality or subtype)
-        let mut result = Union::empty();
+        let mut result = Type::empty();
         for a in &self.types {
             for b in &other.types {
                 if a == b || atomic_subtype(a, b) || atomic_subtype(b, a) {
@@ -493,7 +493,7 @@ impl Union {
             }
         }
         if result.is_empty() {
-            Union::never()
+            Type::never()
         } else {
             result
         }
@@ -502,11 +502,11 @@ impl Union {
     // --- Template substitution ----------------------------------------------
 
     /// Replace template param references with their resolved types.
-    pub fn substitute_templates(&self, bindings: &FxHashMap<Symbol, Union>) -> Union {
+    pub fn substitute_templates(&self, bindings: &FxHashMap<Name, Type>) -> Type {
         if bindings.is_empty() {
             return self.clone();
         }
-        let mut result = Union::empty();
+        let mut result = Type::empty();
         result.possibly_undefined = self.possibly_undefined;
         result.from_docblock = self.from_docblock;
         for atomic in &self.types {
@@ -633,7 +633,7 @@ impl Union {
                             continue;
                         }
                     }
-                    let new_params: Vec<Union> = type_params
+                    let new_params: Vec<Type> = type_params
                         .iter()
                         .map(|p| p.substitute_templates(bindings))
                         .collect();
@@ -655,7 +655,7 @@ impl Union {
     /// Returns true if every atomic in `self` is a subtype of some atomic in `other`.
     /// Does not require a Codebase (no inheritance check); use the codebase-aware
     /// version in mir-analyzer for full checks.
-    pub fn is_subtype_of_simple(&self, other: &Union) -> bool {
+    pub fn is_subtype_of_simple(&self, other: &Type) -> bool {
         if other.is_mixed() {
             return true;
         }
@@ -669,8 +669,8 @@ impl Union {
 
     // --- Utilities ----------------------------------------------------------
 
-    fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Union {
-        let mut result = Union::empty();
+    fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Type {
+        let mut result = Type::empty();
         result.possibly_undefined = self.possibly_undefined;
         result.from_docblock = self.from_docblock;
         for atomic in &self.types {
@@ -700,7 +700,7 @@ impl Union {
 
 fn substitute_in_fn_param(
     p: &crate::atomic::FnParam,
-    bindings: &FxHashMap<Symbol, Union>,
+    bindings: &FxHashMap<Name, Type>,
 ) -> crate::atomic::FnParam {
     crate::atomic::FnParam {
         name: p.name,
@@ -921,28 +921,28 @@ mod tests {
 
     #[test]
     fn single_is_single() {
-        let u = Union::single(Atomic::TString);
+        let u = Type::single(Atomic::TString);
         assert!(u.is_single());
         assert!(!u.is_nullable());
     }
 
     #[test]
     fn nullable_has_null() {
-        let u = Union::nullable(Atomic::TString);
+        let u = Type::nullable(Atomic::TString);
         assert!(u.is_nullable());
         assert_eq!(u.types.len(), 2);
     }
 
     #[test]
     fn add_type_deduplicates() {
-        let mut u = Union::single(Atomic::TString);
+        let mut u = Type::single(Atomic::TString);
         u.add_type(Atomic::TString);
         assert_eq!(u.types.len(), 1);
     }
 
     #[test]
     fn add_type_literal_subsumed_by_base() {
-        let mut u = Union::single(Atomic::TInt);
+        let mut u = Type::single(Atomic::TInt);
         u.add_type(Atomic::TLiteralInt(42));
         assert_eq!(u.types.len(), 1);
         assert!(matches!(u.types[0], Atomic::TInt));
@@ -950,7 +950,7 @@ mod tests {
 
     #[test]
     fn add_type_base_widens_literals() {
-        let mut u = Union::single(Atomic::TLiteralInt(1));
+        let mut u = Type::single(Atomic::TLiteralInt(1));
         u.add_type(Atomic::TLiteralInt(2));
         u.add_type(Atomic::TInt);
         assert_eq!(u.types.len(), 1);
@@ -959,7 +959,7 @@ mod tests {
 
     #[test]
     fn mixed_subsumes_everything() {
-        let mut u = Union::single(Atomic::TString);
+        let mut u = Type::single(Atomic::TString);
         u.add_type(Atomic::TMixed);
         assert_eq!(u.types.len(), 1);
         assert!(u.is_mixed());
@@ -967,7 +967,7 @@ mod tests {
 
     #[test]
     fn remove_null() {
-        let u = Union::nullable(Atomic::TString);
+        let u = Type::nullable(Atomic::TString);
         let narrowed = u.remove_null();
         assert!(!narrowed.is_nullable());
         assert_eq!(narrowed.types.len(), 1);
@@ -975,7 +975,7 @@ mod tests {
 
     #[test]
     fn narrow_to_truthy_removes_null_false() {
-        let mut u = Union::empty();
+        let mut u = Type::empty();
         u.add_type(Atomic::TString);
         u.add_type(Atomic::TNull);
         u.add_type(Atomic::TFalse);
@@ -986,42 +986,42 @@ mod tests {
 
     #[test]
     fn merge_combines_types() {
-        let a = Union::single(Atomic::TString);
-        let b = Union::single(Atomic::TInt);
-        let merged = Union::merge(&a, &b);
+        let a = Type::single(Atomic::TString);
+        let b = Type::single(Atomic::TInt);
+        let merged = Type::merge(&a, &b);
         assert_eq!(merged.types.len(), 2);
     }
 
     #[test]
     fn subtype_literal_int_under_int() {
-        let sub = Union::single(Atomic::TLiteralInt(5));
-        let sup = Union::single(Atomic::TInt);
+        let sub = Type::single(Atomic::TLiteralInt(5));
+        let sup = Type::single(Atomic::TInt);
         assert!(sub.is_subtype_of_simple(&sup));
     }
 
     #[test]
     fn subtype_never_is_bottom() {
-        let never = Union::never();
-        let string = Union::single(Atomic::TString);
+        let never = Type::never();
+        let string = Type::single(Atomic::TString);
         assert!(never.is_subtype_of_simple(&string));
     }
 
     #[test]
     fn subtype_everything_under_mixed() {
-        let string = Union::single(Atomic::TString);
-        let mixed = Union::mixed();
+        let string = Type::single(Atomic::TString);
+        let mixed = Type::mixed();
         assert!(string.is_subtype_of_simple(&mixed));
     }
 
     #[test]
     fn template_substitution() {
         let mut bindings = FxHashMap::default();
-        bindings.insert(Symbol::new("T"), Union::single(Atomic::TString));
+        bindings.insert(Name::new("T"), Type::single(Atomic::TString));
 
-        let tmpl = Union::single(Atomic::TTemplateParam {
-            name: Symbol::new("T"),
-            as_type: Box::new(Union::mixed()),
-            defining_entity: Symbol::new("MyClass"),
+        let tmpl = Type::single(Atomic::TTemplateParam {
+            name: Name::new("T"),
+            as_type: Box::new(Type::mixed()),
+            defining_entity: Name::new("MyClass"),
         });
 
         let resolved = tmpl.substitute_templates(&bindings);
@@ -1032,12 +1032,12 @@ mod tests {
     #[test]
     fn intersection_is_object() {
         let parts = vec![
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("Iterator"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("Iterator"),
                 type_params: empty_type_params(),
             }),
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("Countable"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("Countable"),
                 type_params: empty_type_params(),
             }),
         ];
@@ -1052,16 +1052,16 @@ mod tests {
     #[test]
     fn intersection_display_two_parts() {
         let parts = vec![
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("Iterator"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("Iterator"),
                 type_params: empty_type_params(),
             }),
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("Countable"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("Countable"),
                 type_params: empty_type_params(),
             }),
         ];
-        let u = Union::single(Atomic::TIntersection {
+        let u = Type::single(Atomic::TIntersection {
             parts: vec_to_type_params(parts),
         });
         assert_eq!(format!("{u}"), "Iterator&Countable");
@@ -1070,20 +1070,20 @@ mod tests {
     #[test]
     fn intersection_display_three_parts() {
         let parts = vec![
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("A"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("A"),
                 type_params: empty_type_params(),
             }),
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("B"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("B"),
                 type_params: empty_type_params(),
             }),
-            Union::single(Atomic::TNamedObject {
-                fqcn: Symbol::new("C"),
+            Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("C"),
                 type_params: empty_type_params(),
             }),
         ];
-        let u = Union::single(Atomic::TIntersection {
+        let u = Type::single(Atomic::TIntersection {
             parts: vec_to_type_params(parts),
         });
         assert_eq!(format!("{u}"), "A&B&C");
@@ -1093,17 +1093,17 @@ mod tests {
     fn intersection_in_nullable_union_display() {
         let intersection = Atomic::TIntersection {
             parts: vec_to_type_params(vec![
-                Union::single(Atomic::TNamedObject {
-                    fqcn: Symbol::new("Iterator"),
+                Type::single(Atomic::TNamedObject {
+                    fqcn: Name::new("Iterator"),
                     type_params: empty_type_params(),
                 }),
-                Union::single(Atomic::TNamedObject {
-                    fqcn: Symbol::new("Countable"),
+                Type::single(Atomic::TNamedObject {
+                    fqcn: Name::new("Countable"),
                     type_params: empty_type_params(),
                 }),
             ]),
         };
-        let mut u = Union::single(intersection);
+        let mut u = Type::single(intersection);
         u.add_type(Atomic::TNull);
         assert!(u.is_nullable());
         assert!(u.contains(|t| matches!(t, Atomic::TIntersection { .. })));
@@ -1111,23 +1111,23 @@ mod tests {
 
     // --- substitute_templates coverage for previously-missing arms ----------
 
-    fn t_param(name: &str) -> Union {
-        Union::single(Atomic::TTemplateParam {
-            name: Symbol::new(name),
-            as_type: Box::new(Union::mixed()),
-            defining_entity: Symbol::new("Fn"),
+    fn t_param(name: &str) -> Type {
+        Type::single(Atomic::TTemplateParam {
+            name: Name::new(name),
+            as_type: Box::new(Type::mixed()),
+            defining_entity: Name::new("Fn"),
         })
     }
 
-    fn bindings_t_string() -> FxHashMap<Symbol, Union> {
+    fn bindings_t_string() -> FxHashMap<Name, Type> {
         let mut b = FxHashMap::default();
-        b.insert(Symbol::new("T"), Union::single(Atomic::TString));
+        b.insert(Name::new("T"), Type::single(Atomic::TString));
         b
     }
 
     #[test]
     fn substitute_non_empty_array_key_and_value() {
-        let ty = Union::single(Atomic::TNonEmptyArray {
+        let ty = Type::single(Atomic::TNonEmptyArray {
             key: Box::new(t_param("T")),
             value: Box::new(t_param("T")),
         });
@@ -1142,7 +1142,7 @@ mod tests {
 
     #[test]
     fn substitute_non_empty_list_value() {
-        let ty = Union::single(Atomic::TNonEmptyList {
+        let ty = Type::single(Atomic::TNonEmptyList {
             value: Box::new(t_param("T")),
         });
         let result = ty.substitute_templates(&bindings_t_string());
@@ -1171,7 +1171,7 @@ mod tests {
                 optional: true,
             },
         );
-        let ty = Union::single(Atomic::TKeyedArray {
+        let ty = Type::single(Atomic::TKeyedArray {
             properties: props,
             is_open: true,
             is_list: false,
@@ -1201,9 +1201,9 @@ mod tests {
     #[test]
     fn substitute_callable_params_and_return() {
         use crate::atomic::FnParam;
-        let ty = Union::single(Atomic::TCallable {
+        let ty = Type::single(Atomic::TCallable {
             params: Some(vec![FnParam {
-                name: Symbol::new("x"),
+                name: Name::new("x"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 default: None,
                 is_variadic: false,
@@ -1230,7 +1230,7 @@ mod tests {
     #[test]
     fn substitute_callable_bare_no_panic() {
         // callable with no params/return — must not panic and must pass through unchanged
-        let ty = Union::single(Atomic::TCallable {
+        let ty = Type::single(Atomic::TCallable {
             params: None,
             return_type: None,
         });
@@ -1247,9 +1247,9 @@ mod tests {
     #[test]
     fn substitute_closure_params_return_and_this() {
         use crate::atomic::FnParam;
-        let ty = Union::single(Atomic::TClosure {
+        let ty = Type::single(Atomic::TClosure {
             params: vec![FnParam {
-                name: Symbol::new("a"),
+                name: Name::new("a"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 default: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 is_variadic: true,
@@ -1286,10 +1286,10 @@ mod tests {
 
     #[test]
     fn substitute_conditional_all_branches() {
-        let ty = Union::single(Atomic::TConditional {
+        let ty = Type::single(Atomic::TConditional {
             subject: Box::new(t_param("T")),
             if_true: Box::new(t_param("T")),
-            if_false: Box::new(Union::single(Atomic::TInt)),
+            if_false: Box::new(Type::single(Atomic::TInt)),
         });
         let result = ty.substitute_templates(&bindings_t_string());
         let Atomic::TConditional {
@@ -1307,10 +1307,10 @@ mod tests {
 
     #[test]
     fn substitute_intersection_parts() {
-        let ty = Union::single(Atomic::TIntersection {
+        let ty = Type::single(Atomic::TIntersection {
             parts: vec_to_type_params(vec![
-                Union::single(Atomic::TNamedObject {
-                    fqcn: Symbol::new("Countable"),
+                Type::single(Atomic::TNamedObject {
+                    fqcn: Name::new("Countable"),
                     type_params: empty_type_params(),
                 }),
                 t_param("T"),
@@ -1327,7 +1327,7 @@ mod tests {
 
     #[test]
     fn substitute_no_template_params_identity() {
-        let ty = Union::single(Atomic::TInt);
+        let ty = Type::single(Atomic::TInt);
         let result = ty.substitute_templates(&bindings_t_string());
         assert!(matches!(result.types[0], Atomic::TInt));
     }

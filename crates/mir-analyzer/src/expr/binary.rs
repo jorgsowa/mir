@@ -1,8 +1,8 @@
 use super::helpers::infer_arithmetic;
 use super::ExpressionAnalyzer;
-use crate::context::Context;
+use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{BinaryExpr, ExprKind};
 use php_ast::Span;
@@ -13,8 +13,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         b: &BinaryExpr,
         _span: Span,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         use BinaryOp as B;
         if matches!(
             b.op,
@@ -42,7 +42,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).insert(*name);
                 }
             }
-            return Union::single(Atomic::TBool);
+            return Type::single(Atomic::TBool);
         }
 
         if b.op == B::Instanceof {
@@ -51,7 +51,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                    if !crate::db::type_exists(self.db, &fqcn) {
+                    if !crate::db::class_exists(self.db, &fqcn) {
                         self.emit(
                             IssueKind::UndefinedClass { name: resolved },
                             Severity::Error,
@@ -70,7 +70,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-            return Union::single(Atomic::TBool);
+            return Type::single(Atomic::TBool);
         }
 
         let left_ty = self.analyze(&b.left, ctx);
@@ -87,7 +87,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             BinaryOp::Concat => {
                 self.check_implicit_to_string_cast(&left_ty, b.left.span);
                 self.check_implicit_to_string_cast(&right_ty, b.right.span);
-                Union::single(Atomic::TString)
+                Type::single(Atomic::TString)
             }
 
             BinaryOp::Equal
@@ -97,9 +97,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::Less
             | BinaryOp::Greater
             | BinaryOp::LessOrEqual
-            | BinaryOp::GreaterOrEqual => Union::single(Atomic::TBool),
+            | BinaryOp::GreaterOrEqual => Type::single(Atomic::TBool),
 
-            BinaryOp::Spaceship => Union::single(Atomic::TIntRange {
+            BinaryOp::Spaceship => Type::single(Atomic::TIntRange {
                 min: Some(-1),
                 max: Some(1),
             }),
@@ -108,20 +108,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::BooleanOr
             | BinaryOp::LogicalAnd
             | BinaryOp::LogicalOr
-            | BinaryOp::LogicalXor => Union::single(Atomic::TBool),
+            | BinaryOp::LogicalXor => Type::single(Atomic::TBool),
 
             BinaryOp::BitwiseAnd
             | BinaryOp::BitwiseOr
             | BinaryOp::BitwiseXor
             | BinaryOp::ShiftLeft
-            | BinaryOp::ShiftRight => Union::single(Atomic::TInt),
+            | BinaryOp::ShiftRight => Type::single(Atomic::TInt),
 
             BinaryOp::Pipe => right_ty,
-            BinaryOp::Instanceof => Union::single(Atomic::TBool),
+            BinaryOp::Instanceof => Type::single(Atomic::TBool),
         }
     }
 
-    fn check_implicit_to_string_cast(&mut self, ty: &Union, span: Span) {
+    fn check_implicit_to_string_cast(&mut self, ty: &Type, span: Span) {
         for atomic in &ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let fqcn_str = fqcn.as_ref();

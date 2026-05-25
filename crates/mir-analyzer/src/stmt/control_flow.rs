@@ -5,11 +5,11 @@ use php_ast::owned::{
 };
 
 use mir_issues::{Issue, IssueKind, Location};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
-use crate::context::Context;
 use crate::db;
 use crate::expr::{extract_destructure_vars, extract_simple_var};
+use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use crate::parser;
 
@@ -17,7 +17,7 @@ use super::loops::infer_foreach_types;
 use super::StatementsAnalyzer;
 
 impl<'a> StatementsAnalyzer<'a> {
-    pub(super) fn analyze_if_stmt(&mut self, if_stmt: &IfStmt, ctx: &mut Context) {
+    pub(super) fn analyze_if_stmt(&mut self, if_stmt: &IfStmt, ctx: &mut FlowState) {
         let pre_ctx = ctx.clone();
 
         let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
@@ -30,7 +30,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
         }
 
-        let mut elseif_ctxs: Vec<Context> = vec![];
+        let mut elseif_ctxs: Vec<FlowState> = vec![];
         for elseif in if_stmt.elseif_branches.iter() {
             let mut pre_elseif = ctx.branch();
             narrow_from_condition(
@@ -129,13 +129,13 @@ impl<'a> StatementsAnalyzer<'a> {
             );
         }
 
-        *ctx = Context::merge_branches(&pre_ctx, then_ctx, Some(else_ctx));
+        *ctx = FlowState::merge_branches(&pre_ctx, then_ctx, Some(else_ctx));
         for ec in elseif_ctxs {
-            *ctx = Context::merge_branches(&pre_ctx, ec, Some(ctx.clone()));
+            *ctx = FlowState::merge_branches(&pre_ctx, ec, Some(ctx.clone()));
         }
     }
 
-    pub(super) fn analyze_while_stmt(&mut self, w: &WhileStmt, ctx: &mut Context) {
+    pub(super) fn analyze_while_stmt(&mut self, w: &WhileStmt, ctx: &mut FlowState) {
         self.expr_analyzer(ctx).analyze(&w.condition, ctx);
         let pre = ctx.clone();
 
@@ -154,7 +154,7 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = post;
     }
 
-    pub(super) fn analyze_dowhile_stmt(&mut self, dw: &DoWhileStmt, ctx: &mut Context) {
+    pub(super) fn analyze_dowhile_stmt(&mut self, dw: &DoWhileStmt, ctx: &mut FlowState) {
         let pre = ctx.clone();
         let entry = ctx.branch();
         // Do-while always executes at least once (body before condition check)
@@ -170,7 +170,7 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = post;
     }
 
-    pub(super) fn analyze_for_stmt(&mut self, f: &ForStmt, ctx: &mut Context) {
+    pub(super) fn analyze_for_stmt(&mut self, f: &ForStmt, ctx: &mut FlowState) {
         for init in f.init.iter() {
             self.expr_analyzer(ctx).analyze(init, ctx);
         }
@@ -201,7 +201,7 @@ impl<'a> StatementsAnalyzer<'a> {
         &mut self,
         fe: &ForeachStmt,
         stmt_span: php_ast::Span,
-        ctx: &mut Context,
+        ctx: &mut FlowState,
     ) {
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types(&arr_ty);
@@ -229,7 +229,7 @@ impl<'a> StatementsAnalyzer<'a> {
             entry.set_var(vname.as_str(), value_ty.clone());
         } else {
             for vname in &value_destructure_vars {
-                entry.set_var(vname, Union::mixed());
+                entry.set_var(vname, Type::mixed());
             }
         }
 
@@ -247,7 +247,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     iter.set_var(vname.as_str(), value_ty.clone());
                 } else {
                     for vname in &value_destructure_vars {
-                        iter.set_var(vname, Union::mixed());
+                        iter.set_var(vname, Type::mixed());
                     }
                 }
                 sa.analyze_stmt(&fe.body, iter);
@@ -257,7 +257,7 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = post;
     }
 
-    pub(super) fn analyze_switch_stmt(&mut self, sw: &SwitchStmt, ctx: &mut Context) {
+    pub(super) fn analyze_switch_stmt(&mut self, sw: &SwitchStmt, ctx: &mut FlowState) {
         let _subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
         let subject_var: Option<String> = match &sw.expr.kind {
             ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
@@ -270,7 +270,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let has_default = sw.cases.iter().any(|c| c.value.is_none());
 
-        let mut case_results: Vec<Context> = Vec::new();
+        let mut case_results: Vec<FlowState> = Vec::new();
         for case in sw.cases.iter() {
             let mut case_ctx = pre_ctx.branch();
             if let Some(val) = &case.value {
@@ -278,16 +278,16 @@ impl<'a> StatementsAnalyzer<'a> {
                     narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
                 } else if let Some(ref var_name) = subject_var {
                     let narrow_ty = match &val.kind {
-                        ExprKind::Int(n) => Some(Union::single(Atomic::TLiteralInt(*n))),
+                        ExprKind::Int(n) => Some(Type::single(Atomic::TLiteralInt(*n))),
                         ExprKind::String(s) => {
-                            Some(Union::single(Atomic::TLiteralString(Arc::from(&**s))))
+                            Some(Type::single(Atomic::TLiteralString(Arc::from(&**s))))
                         }
-                        ExprKind::Bool(b) => Some(Union::single(if *b {
+                        ExprKind::Bool(b) => Some(Type::single(if *b {
                             Atomic::TTrue
                         } else {
                             Atomic::TFalse
                         })),
-                        ExprKind::Null => Some(Union::single(Atomic::TNull)),
+                        ExprKind::Null => Some(Type::single(Atomic::TNull)),
                         _ => None,
                     };
                     if let Some(narrowed) = narrow_ty {
@@ -311,7 +311,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let mut all_cases_diverge = true;
-        let mut fallthrough_ctxs: Vec<Context> = Vec::new();
+        let mut fallthrough_ctxs: Vec<FlowState> = Vec::new();
         for (i, case_ctx) in case_results.into_iter().enumerate() {
             if !effective_diverges[i] {
                 all_cases_diverge = false;
@@ -334,23 +334,23 @@ impl<'a> StatementsAnalyzer<'a> {
         };
 
         for bctx in break_ctxs {
-            merged = Context::merge_branches(&pre_ctx, bctx, Some(merged));
+            merged = FlowState::merge_branches(&pre_ctx, bctx, Some(merged));
         }
         for fctx in fallthrough_ctxs {
-            merged = Context::merge_branches(&pre_ctx, fctx, Some(merged));
+            merged = FlowState::merge_branches(&pre_ctx, fctx, Some(merged));
         }
 
         *ctx = merged;
     }
 
-    pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut Context) {
+    pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut FlowState) {
         let pre_ctx = ctx.clone();
         let mut try_ctx = ctx.branch();
         self.analyze_stmts(&tc.body, &mut try_ctx);
 
-        let catch_base = Context::merge_branches(&pre_ctx, try_ctx.clone(), None);
+        let catch_base = FlowState::merge_branches(&pre_ctx, try_ctx.clone(), None);
 
-        let mut non_diverging_catches: Vec<Context> = vec![];
+        let mut non_diverging_catches: Vec<FlowState> = vec![];
         for catch in tc.catches.iter() {
             let mut catch_ctx = catch_base.clone();
             for catch_ty in catch.types.iter() {
@@ -374,9 +374,9 @@ impl<'a> StatementsAnalyzer<'a> {
             }
             if let Some(var) = &catch.var {
                 let exc_ty = if catch.types.is_empty() {
-                    Union::single(Atomic::TObject)
+                    Type::single(Atomic::TObject)
                 } else {
-                    let mut u = Union::empty();
+                    let mut u = Type::empty();
                     for catch_ty in catch.types.iter() {
                         let raw = parser::name_to_string_owned(catch_ty);
                         let resolved = db::resolve_name(self.db, &self.file, &raw);
@@ -406,7 +406,7 @@ impl<'a> StatementsAnalyzer<'a> {
         } else {
             let mut r = try_ctx;
             for catch_ctx in non_diverging_catches {
-                r = Context::merge_branches(&pre_ctx, r, Some(catch_ctx));
+                r = FlowState::merge_branches(&pre_ctx, r, Some(catch_ctx));
             }
             r
         };

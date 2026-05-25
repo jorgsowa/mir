@@ -1,5 +1,5 @@
 // crates/mir-analyzer/src/type_env.rs
-use mir_types::{Symbol, Union};
+use mir_types::{Name, Type};
 use std::sync::Arc;
 
 /// Identifies a single analysis scope within a project.
@@ -9,23 +9,23 @@ pub enum ScopeId {
     Method { class: Arc<str>, method: Arc<str> },
 }
 
-/// Variable type environment for one scope — the stable public view of Context.vars.
+/// Variable type environment for one scope — the stable public view of FlowState.vars.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct TypeEnv {
     #[allow(dead_code)]
-    vars: Arc<rustc_hash::FxHashMap<Symbol, Arc<Union>>>,
+    vars: Arc<rustc_hash::FxHashMap<Name, Arc<Type>>>,
 }
 
 impl TypeEnv {
-    pub(crate) fn new(vars: Arc<rustc_hash::FxHashMap<Symbol, Arc<Union>>>) -> Self {
+    pub(crate) fn new(vars: Arc<rustc_hash::FxHashMap<Name, Arc<Type>>>) -> Self {
         Self { vars }
     }
 
     /// Returns the inferred type of `$name`, or `None` if the variable was not tracked.
     #[allow(dead_code)]
-    pub fn get_var(&self, name: &str) -> Option<&Union> {
-        let sym = Symbol::from(name);
+    pub fn get_var(&self, name: &str) -> Option<&Type> {
+        let sym = Name::from(name);
         self.vars.get(&sym).map(|arc| arc.as_ref())
     }
 

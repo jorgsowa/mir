@@ -1,11 +1,11 @@
 // Integration tests for definition position lookups (mir#78).
 //
 // After analysis, the codebase should store definition locations for all
-// top-level symbols and class members, accessible via the typed Symbol API.
+// top-level symbols and class members, accessible via the typed Name API.
 
 mod common;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion, Symbol, SymbolLookupError};
+use mir_analyzer::{AnalysisSession, BatchOptions, Name, PhpVersion, SymbolLookupError};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
 
@@ -19,7 +19,7 @@ fn definition_of_finds_class() {
     analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     let loc = analyzer
-        .definition_of(&Symbol::class("Foo"))
+        .definition_of(&Name::class("Foo"))
         .expect("should find location for class Foo");
     assert_eq!(loc.file.as_ref(), file_str.as_str());
 }
@@ -37,7 +37,7 @@ fn definition_of_finds_function() {
     analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
-        analyzer.definition_of(&Symbol::function("my_func")).is_ok(),
+        analyzer.definition_of(&Name::function("my_func")).is_ok(),
         "should find location for function my_func"
     );
 }
@@ -55,7 +55,7 @@ fn definition_of_finds_interface() {
     analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
-        analyzer.definition_of(&Symbol::class("Renderable")).is_ok(),
+        analyzer.definition_of(&Name::class("Renderable")).is_ok(),
         "should find location for interface"
     );
 }
@@ -73,9 +73,7 @@ fn definition_of_finds_method() {
     analyzer.analyze_paths(&[file], &BatchOptions::new());
 
     assert!(
-        analyzer
-            .definition_of(&Symbol::method("Bar", "baz"))
-            .is_ok(),
+        analyzer.definition_of(&Name::method("Bar", "baz")).is_ok(),
         "should find location for method Bar::baz"
     );
 }
@@ -94,7 +92,7 @@ fn definition_of_finds_property() {
 
     assert!(
         analyzer
-            .definition_of(&Symbol::property("Qux", "name"))
+            .definition_of(&Name::property("Qux", "name"))
             .is_ok(),
         "should find location for property Qux::$name"
     );
@@ -105,13 +103,13 @@ fn definition_of_returns_not_found_for_unknown() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     assert_eq!(
         analyzer
-            .definition_of(&Symbol::class("NonExistent"))
+            .definition_of(&Name::class("NonExistent"))
             .unwrap_err(),
         SymbolLookupError::NotFound
     );
     assert_eq!(
         analyzer
-            .definition_of(&Symbol::method("NonExistent", "foo"))
+            .definition_of(&Name::method("NonExistent", "foo"))
             .unwrap_err(),
         SymbolLookupError::NotFound
     );

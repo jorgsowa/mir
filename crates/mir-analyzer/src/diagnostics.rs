@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::db::{resolve_name, type_exists, MirDatabase};
+use crate::db::{class_exists, resolve_name, MirDatabase};
 use crate::php_version::PhpVersion;
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ pub(crate) fn check_type_hint_classes(
                 return;
             }
             let resolved = resolve_name(db, file.as_ref(), &name_str);
-            if !type_exists(db, &resolved) {
+            if !class_exists(db, &resolved) {
                 // Soft-fallback: build-time stub index recognises this class
                 // as a PHP built-in → assume lazy-stub timing rather than
                 // user error. See call/function.rs for the parallel path.
@@ -202,7 +202,7 @@ fn check_name_class_with_context(
 ) {
     let name_str = crate::parser::name_to_string_owned(name);
     let resolved = resolve_name(db, file.as_ref(), &name_str);
-    if !type_exists(db, &resolved) {
+    if !class_exists(db, &resolved) {
         // Soft-fallback: see call/function.rs for the rationale.
         // However, don't suppress if the class is version-filtered.
         if let Some(stub_path) = crate::stubs::stub_path_for_class(&resolved) {
@@ -304,7 +304,7 @@ pub(crate) fn check_expr_for_undefined_classes(
         if let ExprKind::Identifier(class_name) = &cca.class.kind {
             let name_str = class_name.to_string();
             let resolved = resolve_name(db, file.as_ref(), &name_str);
-            if !type_exists(db, &resolved) {
+            if !class_exists(db, &resolved) {
                 let (line, col_start) =
                     offset_to_line_col(source, cca.class.span.start, source_map);
                 let (line_end, col_end) =
@@ -345,7 +345,7 @@ const MAGIC_METHODS_WITH_RUNTIME_PARAMS: &[&str] = &[
 
 pub(crate) fn emit_unused_params(
     params: &[mir_codebase::FnParam],
-    ctx: &crate::context::Context,
+    ctx: &crate::flow_state::FlowState,
     method_name: &str,
     file: &Arc<str>,
     issues: &mut Vec<mir_issues::Issue>,
@@ -355,7 +355,7 @@ pub(crate) fn emit_unused_params(
     }
     for p in params {
         let name = p.name.as_ref().trim_start_matches('$');
-        let name_sym = mir_types::Symbol::from(name);
+        let name_sym = mir_types::Name::from(name);
         if !ctx.read_vars.contains(&name_sym) {
             let (line, col_start, line_end, col_end) = ctx
                 .var_locations
@@ -382,7 +382,7 @@ pub(crate) fn emit_unused_params(
 }
 
 pub(crate) fn emit_unused_variables(
-    ctx: &crate::context::Context,
+    ctx: &crate::flow_state::FlowState,
     file: &Arc<str>,
     issues: &mut Vec<mir_issues::Issue>,
 ) {

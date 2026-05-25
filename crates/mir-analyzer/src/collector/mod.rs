@@ -16,11 +16,11 @@ use php_ast::owned::{Program, StmtKind};
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use crate::php_version::PhpVersion;
 use mir_codebase::storage::{
-    wrap_return_type, Assertion, FnParam, Location, MethodDef, PropertyDef, StubSlice,
-    TemplateParam, Visibility,
+    wrap_return_type, Assertion, FnParam, MethodDef, PropertyDef, StubSlice, TemplateParam,
+    Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Location, Name, Type};
 
 mod annotation;
 mod class;
@@ -38,8 +38,8 @@ pub(crate) static SCALAR_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static COMPLEX_PARAM_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static PARAM_WITH_DEFAULT: AtomicUsize = AtomicUsize::new(0);
 
-/// Check if a Union is a simple scalar type (for profiling).
-fn is_simple_scalar(u: &Union) -> bool {
+/// Check if a Type is a simple scalar type (for profiling).
+fn is_simple_scalar(u: &Type) -> bool {
     if u.possibly_undefined || u.from_docblock || u.types.len() != 1 {
         return false;
     }
@@ -80,29 +80,29 @@ pub(crate) fn print_collector_stats() {
 
 /// Infer the type of a constant value from its AST expression (owned AST).
 /// This handles literal values like integers, strings, etc. used in define().
-fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Union> {
+fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Type> {
     use php_ast::ast::UnaryPrefixOp;
 
     match expr_kind {
-        php_ast::owned::ExprKind::Int(i) => Some(Union::single(Atomic::TLiteralInt(*i))),
+        php_ast::owned::ExprKind::Int(i) => Some(Type::single(Atomic::TLiteralInt(*i))),
         php_ast::owned::ExprKind::String(s) => {
-            Some(Union::single(Atomic::TLiteralString(Arc::from(&**s))))
+            Some(Type::single(Atomic::TLiteralString(Arc::from(&**s))))
         }
-        php_ast::owned::ExprKind::Float(_f) => Some(Union::single(Atomic::TFloat)),
-        php_ast::owned::ExprKind::Bool(_b) => Some(Union::single(Atomic::TBool)),
-        php_ast::owned::ExprKind::Null => Some(Union::single(Atomic::TNull)),
+        php_ast::owned::ExprKind::Float(_f) => Some(Type::single(Atomic::TFloat)),
+        php_ast::owned::ExprKind::Bool(_b) => Some(Type::single(Atomic::TBool)),
+        php_ast::owned::ExprKind::Null => Some(Type::single(Atomic::TNull)),
         // For unary expressions like -1, try to evaluate them
         php_ast::owned::ExprKind::UnaryPrefix(u) => match u.op {
             UnaryPrefixOp::Negate => {
                 if let php_ast::owned::ExprKind::Int(i) = &u.operand.kind {
-                    Some(Union::single(Atomic::TLiteralInt(-i)))
+                    Some(Type::single(Atomic::TLiteralInt(-i)))
                 } else {
                     None
                 }
             }
             UnaryPrefixOp::Plus => {
                 if let php_ast::owned::ExprKind::Int(i) = &u.operand.kind {
-                    Some(Union::single(Atomic::TLiteralInt(*i)))
+                    Some(Type::single(Atomic::TLiteralInt(*i)))
                 } else {
                     None
                 }
@@ -204,16 +204,13 @@ impl<'a> DefinitionCollector<'a> {
         }
         if !self.accumulated_imports.is_empty() {
             // Convert collector's String-keyed map into the storage shape:
-            // Arc<FxHashMap<Symbol, Symbol>>. `Symbol::new` interns each string
+            // Arc<FxHashMap<Name, Name>>. `Name::new` interns each string
             // via the global ustr pool once per unique alias/FQCN.
             let raw = std::mem::take(&mut self.accumulated_imports);
-            let mut interned: FxHashMap<mir_types::Symbol, mir_types::Symbol> =
+            let mut interned: FxHashMap<mir_types::Name, mir_types::Name> =
                 FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
             for (alias, fqcn) in raw {
-                interned.insert(
-                    mir_types::Symbol::new(&alias),
-                    mir_types::Symbol::new(&fqcn),
-                );
+                interned.insert(mir_types::Name::new(&alias), mir_types::Name::new(&fqcn));
             }
             self.slice.imports = Arc::new(interned);
         }
@@ -235,27 +232,27 @@ impl<'a> DefinitionCollector<'a> {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
     }
 
-    fn resolve_type_name(&self, name: &str, full_qualify: bool) -> mir_types::Symbol {
+    fn resolve_type_name(&self, name: &str, full_qualify: bool) -> mir_types::Name {
         resolution::resolve_type_name(name, full_qualify, &self.namespace, &self.use_aliases)
     }
 
-    fn fill_self_static_parent(union: Union, class_fqcn: &str) -> Union {
+    fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
         resolution::fill_self_static_parent(union, class_fqcn)
     }
 
-    fn resolve_union(&self, union: Union) -> Union {
+    fn resolve_union(&self, union: Type) -> Type {
         resolution::resolve_union(union, &self.namespace, &self.use_aliases)
     }
 
-    fn resolve_union_doc(&self, union: Union) -> Union {
+    fn resolve_union_doc(&self, union: Type) -> Type {
         resolution::resolve_union_doc(union, &self.namespace, &self.use_aliases)
     }
 
     fn resolve_union_doc_with_aliases(
         &self,
-        union: Union,
-        aliases: &FxHashMap<String, Union>,
-    ) -> Union {
+        union: Type,
+        aliases: &FxHashMap<String, Type>,
+    ) -> Type {
         resolution::resolve_union_doc_with_aliases(
             union,
             aliases,
@@ -264,18 +261,18 @@ impl<'a> DefinitionCollector<'a> {
         )
     }
 
-    fn resolve_union_opt(&self, opt: Option<Union>) -> Option<Union> {
+    fn resolve_union_opt(&self, opt: Option<Type>) -> Option<Type> {
         resolution::resolve_union_opt(opt, &self.namespace, &self.use_aliases)
     }
 
     fn resolve_union_doc_with_templates(
         &self,
-        union: Union,
+        union: Type,
         template_names: &std::collections::HashSet<String>,
         defining_entity: &str,
         template_params: &[TemplateParam],
-    ) -> Union {
-        let mut result = Union::empty();
+    ) -> Type {
+        let mut result = Type::empty();
         result.possibly_undefined = union.possibly_undefined;
         result.from_docblock = union.from_docblock;
         for atomic in union.types {
@@ -288,7 +285,7 @@ impl<'a> DefinitionCollector<'a> {
                         .iter()
                         .find(|tp| tp.name.as_ref() == fqcn.as_ref())
                         .and_then(|tp| tp.bound.clone())
-                        .unwrap_or_else(Union::mixed);
+                        .unwrap_or_else(Type::mixed);
 
                     // This is a template parameter reference
                     result.add_type(mir_types::Atomic::TTemplateParam {
@@ -298,7 +295,7 @@ impl<'a> DefinitionCollector<'a> {
                     });
                 }
                 _ => {
-                    let resolved_union = self.resolve_union_doc(Union::single(atomic.clone()));
+                    let resolved_union = self.resolve_union_doc(Type::single(atomic.clone()));
                     for resolved_atomic in resolved_union.types {
                         result.add_type(resolved_atomic);
                     }
@@ -354,7 +351,7 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Union> {
+    fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Type> {
         let mut aliases = FxHashMap::default();
         for alias in &doc.type_aliases {
             if alias.name.is_empty() || alias.type_expr.is_empty() {
@@ -390,7 +387,7 @@ impl<'a> DefinitionCollector<'a> {
     fn add_docblock_members(
         &self,
         doc: &crate::parser::ParsedDocblock,
-        aliases: &FxHashMap<String, Union>,
+        aliases: &FxHashMap<String, Type>,
         class_fqcn: &str,
         own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodDef>>,
         own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyDef>,
@@ -452,7 +449,7 @@ impl<'a> DefinitionCollector<'a> {
                         Some(self.resolve_union_doc_with_aliases(parsed, aliases))
                     };
                     FnParam {
-                        name: Symbol::new(p.name.as_str()),
+                        name: Name::new(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
                         has_default: p.is_optional,
                         is_variadic: p.is_variadic,
@@ -639,7 +636,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                     } else {
                         Arc::from(name_str)
                     };
-                    self.slice.constants.push((fqn, Union::mixed()));
+                    self.slice.constants.push((fqn, Type::mixed()));
                 }
             }
 
@@ -671,7 +668,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                                             .args
                                             .get(1)
                                             .and_then(|arg| infer_const_value(&arg.value.kind))
-                                            .unwrap_or(Union::mixed());
+                                            .unwrap_or(Type::mixed());
                                         self.slice.constants.push((fqn, const_type));
                                     }
                                 }
@@ -693,7 +690,7 @@ impl<'a> DefinitionCollector<'a> {
         m: &php_ast::owned::MethodDecl,
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
-        aliases: Option<&FxHashMap<String, Union>>,
+        aliases: Option<&FxHashMap<String, Type>>,
     ) -> Option<MethodDef> {
         let doc = m
             .doc_comment
@@ -743,7 +740,7 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             params.push(FnParam {
-                name: Symbol::new(param_name),
+                name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 has_default,
                 is_variadic: p.variadic,
@@ -873,14 +870,14 @@ mod tests {
         let imports = &slice.imports;
         assert_eq!(
             imports
-                .get(&mir_types::Symbol::new("Entity"))
+                .get(&mir_types::Name::new("Entity"))
                 .map(|s| s.as_str()),
             Some("App\\Model\\Entity"),
             "collect_slice must capture plain use import"
         );
         assert_eq!(
             imports
-                .get(&mir_types::Symbol::new("Repo"))
+                .get(&mir_types::Name::new("Repo"))
                 .map(|s| s.as_str()),
             Some("App\\Repository\\EntityRepo"),
             "collect_slice must capture aliased use import"

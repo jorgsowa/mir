@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use mir_types::Union;
+use mir_types::Type;
 use php_ast::Span;
 
 /// A single resolved symbol observed during body analysis.
@@ -18,9 +18,9 @@ pub struct ResolvedSymbol {
     /// Byte-offset span in the source file.
     pub span: Span,
     /// What kind of symbol this is.
-    pub kind: SymbolKind,
+    pub kind: ReferenceKind,
     /// The resolved type at this location.
-    pub resolved_type: Union,
+    pub resolved_type: Type,
 }
 
 impl ResolvedSymbol {
@@ -36,34 +36,38 @@ impl ResolvedSymbol {
     /// Prefer [`Self::to_symbol`] for type-safe access.
     pub fn codebase_key(&self) -> Option<String> {
         match &self.kind {
-            SymbolKind::MethodCall { class, method } | SymbolKind::StaticCall { class, method } => {
+            ReferenceKind::MethodCall { class, method }
+            | ReferenceKind::StaticCall { class, method } => {
                 Some(format!("{}::{}", class, method.to_lowercase()))
             }
-            SymbolKind::PropertyAccess { class, property } => Some(format!("{class}::{property}")),
-            SymbolKind::FunctionCall(fqn) => Some(fqn.to_string()),
-            SymbolKind::ClassReference(fqcn) => Some(fqcn.to_string()),
-            SymbolKind::Variable(_) => None,
+            ReferenceKind::PropertyAccess { class, property } => {
+                Some(format!("{class}::{property}"))
+            }
+            ReferenceKind::FunctionCall(fqn) => Some(fqn.to_string()),
+            ReferenceKind::ClassReference(fqcn) => Some(fqcn.to_string()),
+            ReferenceKind::Variable(_) => None,
         }
     }
 
-    /// Convert this `ResolvedSymbol` to a typed [`crate::Symbol`] for use with
+    /// Convert this `ResolvedSymbol` to a typed [`crate::Name`] for use with
     /// [`crate::AnalysisSession::definition_of`], [`crate::AnalysisSession::references_to`],
     /// or [`crate::AnalysisSession::hover`].
     ///
     /// Returns `None` for kinds that don't map to a codebase-level symbol
     /// (currently only `Variable` — local variables aren't tracked in the
     /// codebase symbol table).
-    pub fn to_symbol(&self) -> Option<crate::Symbol> {
+    pub fn to_symbol(&self) -> Option<crate::Name> {
         match &self.kind {
-            SymbolKind::MethodCall { class, method } | SymbolKind::StaticCall { class, method } => {
-                Some(crate::Symbol::method(class.clone(), method.as_ref()))
+            ReferenceKind::MethodCall { class, method }
+            | ReferenceKind::StaticCall { class, method } => {
+                Some(crate::Name::method(class.clone(), method.as_ref()))
             }
-            SymbolKind::PropertyAccess { class, property } => {
-                Some(crate::Symbol::property(class.clone(), property.clone()))
+            ReferenceKind::PropertyAccess { class, property } => {
+                Some(crate::Name::property(class.clone(), property.clone()))
             }
-            SymbolKind::FunctionCall(fqn) => Some(crate::Symbol::function(fqn.clone())),
-            SymbolKind::ClassReference(fqcn) => Some(crate::Symbol::class(fqcn.clone())),
-            SymbolKind::Variable(_) => None,
+            ReferenceKind::FunctionCall(fqn) => Some(crate::Name::function(fqn.clone())),
+            ReferenceKind::ClassReference(fqcn) => Some(crate::Name::class(fqcn.clone())),
+            ReferenceKind::Variable(_) => None,
         }
     }
 }
@@ -81,11 +85,11 @@ pub struct DocumentSymbol {
     /// constants; short name for members nested inside a class.
     pub name: Arc<str>,
     /// Coarse kind suitable for icon / severity selection in outlines.
-    pub kind: DocumentSymbolKind,
+    pub kind: DeclarationKind,
     /// Source location of the declaration (file + 1-based lines, 0-based
     /// columns). `None` only for synthetic stub-only definitions that don't
     /// have a recorded source span.
-    pub location: Option<mir_codebase::storage::Location>,
+    pub location: Option<mir_types::Location>,
     /// For container symbols (Class, Interface, Trait, Enum), the nested
     /// methods, properties, and constants declared on this type. Empty for
     /// leaf kinds (Function, Constant, etc.).
@@ -95,7 +99,7 @@ pub struct DocumentSymbol {
 /// Coarse declaration kind used by [`DocumentSymbol`]. Maps onto outline-style
 /// symbol kinds in any consumer protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocumentSymbolKind {
+pub enum DeclarationKind {
     Class,
     Interface,
     Trait,
@@ -107,9 +111,9 @@ pub enum DocumentSymbolKind {
     EnumCase,
 }
 
-/// The kind of symbol that was resolved.
+/// The kind of symbol reference that was resolved.
 #[derive(Debug, Clone)]
-pub enum SymbolKind {
+pub enum ReferenceKind {
     /// A variable reference (`$foo`).
     Variable(Arc<str>),
     /// An instance method call (`$obj->method()`).

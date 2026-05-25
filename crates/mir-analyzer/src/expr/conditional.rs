@@ -1,10 +1,10 @@
 use super::ExpressionAnalyzer;
-use crate::context::Context;
-use mir_types::Union;
+use crate::flow_state::FlowState;
+use mir_types::Type;
 use php_ast::owned::{ExprKind, MatchExpr, NullCoalesceExpr, TernaryExpr};
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_ternary(&mut self, t: &TernaryExpr, ctx: &mut Context) -> Union {
+    pub(super) fn analyze_ternary(&mut self, t: &TernaryExpr, ctx: &mut FlowState) -> Type {
         let cond_ty = self.analyze(&t.condition, ctx);
         match &t.then_expr {
             Some(then_expr) => {
@@ -52,8 +52,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_null_coalesce(
         &mut self,
         nc: &NullCoalesceExpr,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let left_ty = self.analyze(&nc.left, ctx);
         let right_ty = self.analyze(&nc.right, ctx);
         let non_null_left = left_ty.remove_null();
@@ -66,18 +66,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_match(&mut self, m: &MatchExpr, ctx: &mut Context) -> Union {
+    pub(super) fn analyze_match(&mut self, m: &MatchExpr, ctx: &mut FlowState) -> Type {
         let subject_ty = self.analyze(&m.subject, ctx);
         let subject_var = match &m.subject.kind {
             ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
             _ => None,
         };
 
-        let mut result = Union::empty();
+        let mut result = Type::empty();
         for arm in m.arms.iter() {
             let mut arm_ctx = ctx.branch();
             // Always analyze conditions to check for undefined classes and get types
-            let mut arm_ty = Union::empty();
+            let mut arm_ty = Type::empty();
             if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
                     let cond_ty = self.analyze(cond, ctx);
@@ -112,7 +112,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         if result.is_empty() {
-            Union::mixed()
+            Type::mixed()
         } else {
             result
         }

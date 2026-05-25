@@ -8,13 +8,13 @@ pub mod cache;
 pub(crate) mod call;
 pub(crate) mod class;
 pub(crate) mod collector;
-pub(crate) mod context;
 #[doc(hidden)]
 pub mod db;
 pub(crate) mod dead_code;
 pub(crate) mod diagnostics;
 pub(crate) mod expr;
 pub mod file_analyzer;
+pub(crate) mod flow_state;
 pub(crate) mod generic;
 #[doc(hidden)]
 pub mod metrics;
@@ -22,6 +22,7 @@ pub(crate) mod narrowing;
 #[doc(hidden)]
 pub mod parser;
 pub mod php_version;
+pub mod prelude;
 pub mod session;
 pub mod source_provider;
 pub(crate) mod stmt;
@@ -86,7 +87,7 @@ pub struct Range {
 /// case-insensitive — this prevents a class of correctness bugs where
 /// callers pass mixed-case names and get empty results.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Symbol {
+pub enum Name {
     /// A class, interface, trait, or enum (FQCN).
     Class(std::sync::Arc<str>),
     /// A global function (FQN).
@@ -110,11 +111,11 @@ pub enum Symbol {
     GlobalConstant(std::sync::Arc<str>),
 }
 
-impl Symbol {
+impl Name {
     /// Construct a method symbol. Normalizes `name` to lowercase since PHP
     /// methods are case-insensitive.
     pub fn method(class: impl Into<std::sync::Arc<str>>, name: &str) -> Self {
-        Symbol::Method {
+        Name::Method {
             class: class.into(),
             name: std::sync::Arc::from(name.to_ascii_lowercase()),
         }
@@ -122,12 +123,12 @@ impl Symbol {
 
     /// Construct a class symbol.
     pub fn class(fqcn: impl Into<std::sync::Arc<str>>) -> Self {
-        Symbol::Class(fqcn.into())
+        Name::Class(fqcn.into())
     }
 
     /// Construct a function symbol.
     pub fn function(fqn: impl Into<std::sync::Arc<str>>) -> Self {
-        Symbol::Function(fqn.into())
+        Name::Function(fqn.into())
     }
 
     /// Construct a property symbol.
@@ -135,7 +136,7 @@ impl Symbol {
         class: impl Into<std::sync::Arc<str>>,
         name: impl Into<std::sync::Arc<str>>,
     ) -> Self {
-        Symbol::Property {
+        Name::Property {
             class: class.into(),
             name: name.into(),
         }
@@ -146,7 +147,7 @@ impl Symbol {
         class: impl Into<std::sync::Arc<str>>,
         name: impl Into<std::sync::Arc<str>>,
     ) -> Self {
-        Symbol::ClassConstant {
+        Name::ClassConstant {
             class: class.into(),
             name: name.into(),
         }
@@ -154,19 +155,19 @@ impl Symbol {
 
     /// Construct a global constant symbol.
     pub fn global_constant(fqn: impl Into<std::sync::Arc<str>>) -> Self {
-        Symbol::GlobalConstant(fqn.into())
+        Name::GlobalConstant(fqn.into())
     }
 
     /// The codebase lookup key for this symbol (used internally for the
     /// reference-locations index). Stable across releases.
     pub fn codebase_key(&self) -> String {
         match self {
-            Symbol::Class(fqcn) => fqcn.to_string(),
-            Symbol::Function(fqn) => fqn.to_string(),
-            Symbol::Method { class, name } => format!("{class}::{name}"),
-            Symbol::Property { class, name } => format!("{class}::{name}"),
-            Symbol::ClassConstant { class, name } => format!("{class}::{name}"),
-            Symbol::GlobalConstant(fqn) => fqn.to_string(),
+            Name::Class(fqcn) => fqcn.to_string(),
+            Name::Function(fqn) => fqn.to_string(),
+            Name::Method { class, name } => format!("{class}::{name}"),
+            Name::Property { class, name } => format!("{class}::{name}"),
+            Name::ClassConstant { class, name } => format!("{class}::{name}"),
+            Name::GlobalConstant(fqn) => fqn.to_string(),
         }
     }
 }
@@ -242,7 +243,7 @@ pub struct HoverInfo {
     /// Docstring / documentation comment for the symbol (if available).
     pub docstring: Option<String>,
     /// Source location of the symbol's definition.
-    pub definition: Option<mir_codebase::storage::Location>,
+    pub definition: Option<mir_types::Location>,
 }
 
 /// File dependency graph: tracks which files depend on which other files.
@@ -315,11 +316,11 @@ impl DependencyGraph {
 
 pub mod symbol;
 pub use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
-pub use mir_issues::{Issue, IssueKind, Location, Severity};
-pub use mir_types::Union as Type;
+pub use mir_issues::{Issue, IssueKind, Severity};
+pub use mir_types::Type;
 
 /// Convert a parser [`php_ast::Span`] (byte-offset range) into a
-/// [`mir_codebase::storage::Location`] (file path + 1-based line range +
+/// [`mir_types::Location`] (file path + 1-based line range +
 /// 0-based codepoint columns) using `source` and the parser's `source_map`.
 ///
 /// This is the canonical way for consumers to translate body-analysis result spans
@@ -332,14 +333,14 @@ pub fn location_from_span(
     file: std::sync::Arc<str>,
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
-) -> mir_codebase::storage::Location {
+) -> mir_types::Location {
     let (line, col_start) = diagnostics::offset_to_line_col(source, span.start, source_map);
     let (line_end, col_end) = if span.start < span.end {
         diagnostics::offset_to_line_col(source, span.end, source_map)
     } else {
         (line, col_start)
     };
-    mir_codebase::storage::Location {
+    mir_types::Location {
         file,
         line,
         line_end,
@@ -347,7 +348,7 @@ pub fn location_from_span(
         col_end: col_end.max(col_start.saturating_add(1)),
     }
 }
-pub use symbol::{DocumentSymbol, DocumentSymbolKind, ResolvedSymbol, SymbolKind};
+pub use symbol::{DeclarationKind, DocumentSymbol, ReferenceKind, ResolvedSymbol};
 
 pub mod composer;
 pub use composer::{ComposerError, Psr4Map};

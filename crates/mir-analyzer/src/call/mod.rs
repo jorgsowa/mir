@@ -13,6 +13,6 @@ pub struct CallAnalyzer;
 // reentrant calls (foo(bar(baz()))) detect they can't borrow the same buffer
 // and fall back to a fresh allocation.
 thread_local! {
-    pub(crate) static ARG_TYPES_BUF: std::cell::RefCell<Option<Vec<mir_types::Union>>> =
+    pub(crate) static ARG_TYPES_BUF: std::cell::RefCell<Option<Vec<mir_types::Type>>> =
         const { std::cell::RefCell::new(Some(Vec::new())) };
 }

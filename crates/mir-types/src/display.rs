@@ -1,9 +1,9 @@
 use std::fmt;
 
 use crate::atomic::Atomic;
-use crate::union::Union;
+use crate::union::Type;
 
-impl fmt::Display for Union {
+impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.types.is_empty() {
             return write!(f, "never");
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn unbounded_int_range_in_union_displays_as_int() {
-        let mut u = Union::empty();
+        let mut u = Type::empty();
         u.add_type(Atomic::TIntRange {
             min: None,
             max: None,

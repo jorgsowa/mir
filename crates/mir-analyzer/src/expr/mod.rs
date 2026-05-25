@@ -1,15 +1,15 @@
-/// Expression analyzer — infers the `Union` type of any PHP expression.
+/// Expression analyzer — infers the `Type` type of any PHP expression.
 use std::sync::Arc;
 
 use php_ast::owned::ExprKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
-use crate::context::Context;
 use crate::db::MirDatabase;
+use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
-use crate::symbol::{ResolvedSymbol, SymbolKind};
+use crate::symbol::{ReferenceKind, ResolvedSymbol};
 
 mod arrays;
 mod assignment;
@@ -72,7 +72,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     /// Record a resolved symbol.
-    pub fn record_symbol(&mut self, span: php_ast::Span, kind: SymbolKind, resolved_type: Union) {
+    pub fn record_symbol(&mut self, span: php_ast::Span, kind: ReferenceKind, resolved_type: Type) {
         self.symbols.push(ResolvedSymbol {
             file: self.file.clone(),
             span,
@@ -81,7 +81,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         });
     }
 
-    pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut Context) -> Union {
+    pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
         match &expr.kind {
             // --- Literals ---------------------------------------------------
             ExprKind::Int(_)
@@ -97,10 +97,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
                     }
                 }
-                Union::single(Atomic::TString)
+                Type::single(Atomic::TString)
             }
-            ExprKind::Nowdoc { .. } => Union::single(Atomic::TString),
-            ExprKind::ShellExec(_) => Union::single(Atomic::TString),
+            ExprKind::Nowdoc { .. } => Type::single(Atomic::TString),
+            ExprKind::ShellExec(_) => Type::single(Atomic::TString),
 
             // --- Variables --------------------------------------------------
             ExprKind::Variable(name) => self.analyze_variable(name.as_ref(), expr, ctx),
@@ -145,7 +145,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.analyze(e, ctx);
                 }
                 self.suppress_undefined_errors = old_suppress;
-                Union::single(Atomic::TBool)
+                Type::single(Atomic::TBool)
             }
             ExprKind::Empty(inner) => {
                 // empty() doesn't error on undefined variables — it checks if they're defined.
@@ -153,14 +153,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.suppress_undefined_errors = true;
                 self.analyze(inner, ctx);
                 self.suppress_undefined_errors = old_suppress;
-                Union::single(Atomic::TBool)
+                Type::single(Atomic::TBool)
             }
 
             // --- print ------------------------------------------------------
             ExprKind::Print(inner) => {
                 let expr_ty = self.analyze(inner, ctx);
                 self.check_interpolation_implicit_to_string_cast(&expr_ty, inner.span);
-                Union::single(Atomic::TLiteralInt(1))
+                Type::single(Atomic::TLiteralInt(1))
             }
 
             // --- clone ------------------------------------------------------
@@ -195,7 +195,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.inference_only,
                 );
                 sa.analyze_class_decl_stmt(anon, ctx);
-                Union::single(Atomic::TObject)
+                Type::single(Atomic::TObject)
             }
 
             // --- Property access -------------------------------------------
@@ -207,8 +207,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ClassConstAccess(cca) => self.analyze_class_const_access(cca, expr.span, ctx),
 
-            ExprKind::ClassConstAccessDynamic { .. } => Union::mixed(),
-            ExprKind::StaticPropertyAccessDynamic { .. } => Union::mixed(),
+            ExprKind::ClassConstAccessDynamic { .. } => Type::mixed(),
+            ExprKind::StaticPropertyAccessDynamic { .. } => Type::mixed(),
 
             // --- Method calls ----------------------------------------------
             ExprKind::MethodCall(mc) => {
@@ -237,7 +237,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ArrowFunction(af) => self.analyze_arrow_function(af, ctx),
 
-            ExprKind::CallableCreate(_) => Union::single(Atomic::TCallable {
+            ExprKind::CallableCreate(_) => Type::single(Atomic::TCallable {
                 params: None,
                 return_type: None,
             }),
@@ -248,7 +248,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Throw as expression (PHP 8) --------------------------------
             ExprKind::ThrowExpr(e) => {
                 self.analyze(e, ctx);
-                Union::single(Atomic::TNever)
+                Type::single(Atomic::TNever)
             }
 
             // --- Yield -----------------------------------------------------
@@ -260,13 +260,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Include/require --------------------------------------------
             ExprKind::Include(_, inner) => {
                 self.analyze(inner, ctx);
-                Union::mixed()
+                Type::mixed()
             }
 
             // --- Eval -------------------------------------------------------
             ExprKind::Eval(inner) => {
                 self.analyze(inner, ctx);
-                Union::mixed()
+                Type::mixed()
             }
 
             // --- Exit -------------------------------------------------------
@@ -275,14 +275,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.analyze(e, ctx);
                 }
                 ctx.diverges = true;
-                Union::single(Atomic::TNever)
+                Type::single(Atomic::TNever)
             }
 
             // --- Error node (parse error placeholder) ----------------------
-            ExprKind::Error => Union::mixed(),
+            ExprKind::Error => Type::mixed(),
 
             // --- Omitted array slot (e.g. [, $b] destructuring) ------------
-            ExprKind::Omit => Union::single(Atomic::TNull),
+            ExprKind::Omit => Type::single(Atomic::TNull),
         }
     }
 
@@ -330,7 +330,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return;
                 }
                 let resolved = crate::db::resolve_name(self.db, &self.file, &name_str);
-                if !crate::db::type_exists(self.db, &resolved) {
+                if !crate::db::class_exists(self.db, &resolved) {
                     self.emit(
                         IssueKind::UndefinedClass { name: resolved },
                         Severity::Error,
@@ -383,7 +383,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.issues.add(issue);
     }
 
-    fn check_interpolation_implicit_to_string_cast(&mut self, ty: &Union, span: php_ast::Span) {
+    fn check_interpolation_implicit_to_string_cast(&mut self, ty: &Type, span: php_ast::Span) {
         for atomic in &ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let fqcn_str = fqcn.as_ref();

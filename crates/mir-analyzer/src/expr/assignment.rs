@@ -3,9 +3,9 @@ use super::helpers::{
     widen_array_with_value,
 };
 use super::ExpressionAnalyzer;
-use crate::context::Context;
+use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::ast::AssignOp;
 use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
@@ -15,8 +15,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         a: &AssignExpr,
         expr_span: Span,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         let rhs_tainted = crate::taint::is_expr_tainted(&a.value, ctx);
         let rhs_ty = self.analyze(&a.value, ctx);
         if rhs_ty.is_never() {
@@ -34,12 +34,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             AssignOp::Concat => {
                 if let Some(var_name) = extract_simple_var(&a.target) {
-                    ctx.set_var(&var_name, Union::single(Atomic::TString));
+                    ctx.set_var(&var_name, Type::single(Atomic::TString));
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                 }
-                Union::single(Atomic::TString)
+                Type::single(Atomic::TString)
             }
             AssignOp::Plus
             | AssignOp::Minus
@@ -59,7 +59,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             AssignOp::Coalesce => {
                 let lhs_ty = self.analyze(&a.target, ctx);
-                let merged = Union::merge(&lhs_ty.remove_null(), &rhs_ty);
+                let merged = Type::merge(&lhs_ty.remove_null(), &rhs_ty);
                 if let Some(var_name) = extract_simple_var(&a.target) {
                     ctx.set_var(&var_name, merged.clone());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
@@ -70,12 +70,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             _ => {
                 if let Some(var_name) = extract_simple_var(&a.target) {
-                    ctx.set_var(&var_name, Union::mixed());
+                    ctx.set_var(&var_name, Type::mixed());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                 }
-                Union::mixed()
+                Type::mixed()
             }
         }
     }
@@ -83,14 +83,14 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn assign_to_target(
         &mut self,
         target: &Expr,
-        ty: Union,
-        ctx: &mut Context,
+        ty: Type,
+        ctx: &mut FlowState,
         span: Span,
     ) {
         match &target.kind {
             ExprKind::Variable(name) => {
                 let name_str = name.trim_start_matches('$').to_string();
-                let name_sym = mir_types::Symbol::from(name_str.as_str());
+                let name_sym = mir_types::Name::from(name_str.as_str());
                 if ctx.byref_param_names.contains(&name_sym) {
                     ctx.read_vars.insert(name_sym);
                 }
@@ -121,7 +121,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                let value_ty: Union = ty
+                let value_ty: Type = ty
                     .types
                     .iter()
                     .find_map(|a| match a {
@@ -131,7 +131,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         | Atomic::TNonEmptyList { value } => Some(*value.clone()),
                         _ => None,
                     })
-                    .unwrap_or_else(Union::mixed);
+                    .unwrap_or_else(Type::mixed);
                 for elem in elements.iter() {
                     self.assign_to_target(&elem.value, value_ty.clone(), ctx, span);
                 }
@@ -143,7 +143,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
                             let here = crate::db::Fqcn::new(db, *fqcn);
-                            let prop_info: Option<(bool, Option<Union>)> =
+                            let prop_info: Option<(bool, Option<Type>)> =
                                 crate::db::find_property_in_class(db, here, &prop_name)
                                     .map(|p| (p.is_readonly, p.ty.clone()));
                             if let Some((is_readonly, prop_ty)) = prop_info {
@@ -189,11 +189,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ExprKind::Variable(name) => {
                             let name_str = name.trim_start_matches('$');
                             if !ctx.var_is_defined(name_str) {
-                                let name_sym = mir_types::Symbol::from(name_str);
+                                let name_sym = mir_types::Name::from(name_str);
                                 std::sync::Arc::make_mut(&mut ctx.vars).insert(
                                     name_sym,
-                                    std::sync::Arc::new(Union::single(Atomic::TArray {
-                                        key: Box::new(Union::mixed()),
+                                    std::sync::Arc::new(Type::single(Atomic::TArray {
+                                        key: Box::new(Type::mixed()),
                                         value: Box::new(ty.clone()),
                                     })),
                                 );
@@ -223,7 +223,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::VariableVariable(inner) => {
                 if let Some(var_name) = extract_simple_var(inner) {
                     ctx.read_vars
-                        .insert(mir_types::Symbol::from(var_name.as_str()));
+                        .insert(mir_types::Name::from(var_name.as_str()));
                     let var_ty = ctx.get_var(&var_name);
                     for atomic in &var_ty.types {
                         if let Atomic::TLiteralString(accessed_var_name) = atomic {

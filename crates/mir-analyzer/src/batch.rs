@@ -18,12 +18,12 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use mir_issues::Issue;
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 
 use crate::body_analysis::BodyAnalyzer;
 use crate::cache::hash_content;
 use crate::db::{
-    collect_file_definitions, FileDefinitions, MirDatabase, MirDb, RefLoc, SourceFile,
+    collect_file_definitions, FileDefinitions, MirDatabase, MirDbStorage, RefLoc, SourceFile,
 };
 use crate::php_version::PhpVersion;
 use crate::session::AnalysisSession;
@@ -150,7 +150,7 @@ impl AnalysisSession {
 
     fn type_exists(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
-        crate::db::type_exists(&db, fqcn)
+        crate::db::class_exists(&db, fqcn)
     }
 
     fn collect_and_ingest_source(
@@ -849,7 +849,7 @@ impl AnalysisSession {
 pub fn analyze_source(source: &str) -> AnalysisResult {
     let php_version = PhpVersion::LATEST;
     let file: Arc<str> = Arc::from("<source>");
-    let mut db = MirDb::default();
+    let mut db = MirDbStorage::default();
     db.set_php_version(Arc::from(php_version.to_string().as_str()));
     crate::stubs::load_stubs_for_version(&mut db, php_version);
     let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
@@ -966,7 +966,7 @@ fn collect_class_referenced_fqcns(class: &crate::db::ClassLike, out: &mut Vec<St
     }
 }
 
-fn collect_fqcns_in_union(u: &Union, out: &mut Vec<String>) {
+fn collect_fqcns_in_union(u: &Type, out: &mut Vec<String>) {
     for atom in u.types.iter() {
         collect_fqcns_in_atomic(atom, out);
     }
@@ -1080,7 +1080,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         }
     }
 
-    let extract_named_objects = |union: &mir_types::Union| {
+    let extract_named_objects = |union: &mir_types::Type| {
         union
             .types
             .iter()

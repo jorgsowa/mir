@@ -1,14 +1,14 @@
 use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_union};
 use super::ExpressionAnalyzer;
-use crate::context::Context;
+use crate::flow_state::FlowState;
 use crate::stmt::widen_for_check;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{Atomic, Name, Type};
 use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind};
 use std::sync::Arc;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_closure(&mut self, c: &ClosureExpr, ctx: &mut Context) -> Union {
+    pub(super) fn analyze_closure(&mut self, c: &ClosureExpr, ctx: &mut FlowState) -> Type {
         for param in c.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_type_hint(hint);
@@ -30,7 +30,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
             .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
 
-        let mut closure_ctx = crate::context::Context::for_function(
+        let mut closure_ctx = crate::flow_state::FlowState::for_function(
             &params,
             return_ty_hint.clone(),
             Arc::from([]),
@@ -67,7 +67,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 closure_ctx.taint_var(name);
             }
             // Mark the captured variable as read in the parent context
-            ctx.read_vars.insert(mir_types::Symbol::from(name));
+            ctx.read_vars.insert(mir_types::Name::from(name));
         }
 
         let mut sa = crate::stmt::StatementsAnalyzer::new(
@@ -95,13 +95,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         let closure_params: Vec<mir_types::atomic::FnParam> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
-                name: Symbol::from(p.name.as_ref()),
+                name: Name::from(p.name.as_ref()),
                 ty: p
                     .ty
                     .as_ref()
                     .map(|arc| mir_types::SimpleType::from_union((**arc).clone())),
                 default: if p.has_default {
-                    Some(mir_types::SimpleType::from_union(Union::mixed()))
+                    Some(mir_types::SimpleType::from_union(Type::mixed()))
                 } else {
                     None
                 },
@@ -111,12 +111,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             })
             .collect();
 
-        Union::single(Atomic::TClosure {
+        Type::single(Atomic::TClosure {
             params: closure_params,
             return_type: Box::new(return_ty),
             this_type: ctx.self_fqcn.clone().map(|f| {
-                Box::new(Union::single(Atomic::TNamedObject {
-                    fqcn: Symbol::from(f.as_ref()),
+                Box::new(Type::single(Atomic::TNamedObject {
+                    fqcn: Name::from(f.as_ref()),
                     type_params: mir_types::union::empty_type_params(),
                 }))
             }),
@@ -126,8 +126,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_arrow_function(
         &mut self,
         af: &ArrowFunctionExpr,
-        ctx: &mut Context,
-    ) -> Union {
+        ctx: &mut FlowState,
+    ) -> Type {
         for param in af.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_type_hint(hint);
@@ -149,7 +149,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
             .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
 
-        let mut arrow_ctx = crate::context::Context::for_function(
+        let mut arrow_ctx = crate::flow_state::FlowState::for_function(
             &params,
             return_ty_hint.clone(),
             Arc::from([]),
@@ -202,13 +202,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         let closure_params: Vec<mir_types::atomic::FnParam> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
-                name: Symbol::from(p.name.as_ref()),
+                name: Name::from(p.name.as_ref()),
                 ty: p
                     .ty
                     .as_ref()
                     .map(|arc| mir_types::SimpleType::from_union((**arc).clone())),
                 default: if p.has_default {
-                    Some(mir_types::SimpleType::from_union(Union::mixed()))
+                    Some(mir_types::SimpleType::from_union(Type::mixed()))
                 } else {
                     None
                 },
@@ -218,15 +218,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             })
             .collect();
 
-        Union::single(Atomic::TClosure {
+        Type::single(Atomic::TClosure {
             params: closure_params,
             return_type: Box::new(return_ty),
             this_type: if af.is_static {
                 None
             } else {
                 ctx.self_fqcn.clone().map(|f| {
-                    Box::new(Union::single(Atomic::TNamedObject {
-                        fqcn: Symbol::from(f.as_ref()),
+                    Box::new(Type::single(Atomic::TNamedObject {
+                        fqcn: Name::from(f.as_ref()),
                         type_params: mir_types::union::empty_type_params(),
                     }))
                 })

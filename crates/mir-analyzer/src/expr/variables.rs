@@ -2,14 +2,19 @@ use std::sync::Arc;
 
 use super::helpers::extract_simple_var;
 use super::ExpressionAnalyzer;
-use crate::context::Context;
-use crate::symbol::SymbolKind;
+use crate::flow_state::FlowState;
+use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Union};
+use mir_types::{Atomic, Type};
 use php_ast::owned::Expr;
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_variable(&mut self, name: &str, expr: &Expr, ctx: &mut Context) -> Union {
+    pub(super) fn analyze_variable(
+        &mut self,
+        name: &str,
+        expr: &Expr,
+        ctx: &mut FlowState,
+    ) -> Type {
         let name_str = name.trim_start_matches('$');
         if !ctx.var_is_defined(name_str) {
             // isset() and empty() don't error on undefined variables
@@ -41,41 +46,41 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         }
-        ctx.read_vars.insert(mir_types::Symbol::from(name_str));
+        ctx.read_vars.insert(mir_types::Name::from(name_str));
         let ty = if name_str == "this" && !ctx.var_is_defined("this") {
-            Union::never()
+            Type::never()
         } else {
             ctx.get_var(name_str)
         };
         self.record_symbol(
             expr.span,
-            SymbolKind::Variable(Arc::from(name_str)),
+            ReferenceKind::Variable(Arc::from(name_str)),
             ty.clone(),
         );
         ty
     }
 
-    pub(super) fn analyze_variable_variable(&mut self, inner: &Expr, ctx: &mut Context) -> Union {
+    pub(super) fn analyze_variable_variable(&mut self, inner: &Expr, ctx: &mut FlowState) -> Type {
         let inner_ty = self.analyze(inner, ctx);
         if let Some(var_name) = extract_simple_var(inner) {
             ctx.read_vars
-                .insert(mir_types::Symbol::from(var_name.as_str()));
+                .insert(mir_types::Name::from(var_name.as_str()));
             for atomic in &inner_ty.types {
                 if let Atomic::TLiteralString(accessed_var_name) = atomic {
                     ctx.read_vars
-                        .insert(mir_types::Symbol::from(accessed_var_name.as_ref()));
+                        .insert(mir_types::Name::from(accessed_var_name.as_ref()));
                 }
             }
         }
-        Union::mixed()
+        Type::mixed()
     }
 
     pub(super) fn analyze_identifier(
         &mut self,
         name: &str,
         expr: &Expr,
-        _ctx: &mut Context,
-    ) -> Union {
+        _ctx: &mut FlowState,
+    ) -> Type {
         let name_str: &str = name;
         let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
         let ns_qualified = self
@@ -83,7 +88,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .file_namespace(self.file.as_ref())
             .map(|ns| format!("{}\\{}", ns, name_str));
 
-        let resolve_pull = |fqn: &str| -> Option<mir_types::Union> {
+        let resolve_pull = |fqn: &str| -> Option<mir_types::Type> {
             let here = crate::db::Fqcn::from_str(self.db, fqn);
             crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
         };
@@ -103,7 +108,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Severity::Error,
                 expr.span,
             );
-            Union::mixed()
+            Type::mixed()
         }
     }
 }

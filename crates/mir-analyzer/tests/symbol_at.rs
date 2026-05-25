@@ -6,7 +6,7 @@
 
 mod common;
 
-use mir_analyzer::symbol::SymbolKind;
+use mir_analyzer::symbol::ReferenceKind;
 use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
@@ -31,7 +31,7 @@ fn symbol_at_finds_function_call() {
         .expect("symbol_at should find a symbol at the greet() call");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"),
+        matches!(&sym.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"),
         "expected FunctionCall(greet), got {:?}",
         sym.kind
     );
@@ -76,7 +76,7 @@ fn symbol_at_matches_at_span_start() {
     let sym_recorded = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"))
         .expect("FunctionCall(greet) must be recorded");
     let span_start = sym_recorded.span.start;
 
@@ -84,7 +84,7 @@ fn symbol_at_matches_at_span_start() {
     let sym = result
         .symbol_at(file_str, span_start)
         .expect("symbol_at should find symbol at span.start");
-    assert!(matches!(&sym.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"));
+    assert!(matches!(&sym.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"));
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn symbol_at_matches_at_last_byte_of_span() {
     let sym_recorded = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"))
         .expect("FunctionCall(greet) must be recorded");
     // span.end is exclusive, so span.end - 1 is the last byte inside the span
     let last_byte = sym_recorded.span.end - 1;
@@ -108,7 +108,7 @@ fn symbol_at_matches_at_last_byte_of_span() {
     let sym = result
         .symbol_at(file_str, last_byte)
         .expect("symbol_at should find symbol at span.end - 1");
-    assert!(matches!(&sym.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"));
+    assert!(matches!(&sym.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn symbol_at_returns_none_one_past_span_end() {
     let sym_recorded = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"))
         .expect("FunctionCall(greet) must be recorded");
     // span.end is the first byte after the span — no symbol should cover it
     // (the '(' character follows, which has no symbol)
@@ -174,7 +174,7 @@ fn symbol_at_isolates_symbols_by_file() {
         .iter()
         .filter(|s| {
             s.file.as_ref() == file_a_str
-                && matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "run")
+                && matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "run")
         })
         .collect();
     let in_b: Vec<_> = result
@@ -182,7 +182,7 @@ fn symbol_at_isolates_symbols_by_file() {
         .iter()
         .filter(|s| {
             s.file.as_ref() == file_b_str
-                && matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "run")
+                && matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "run")
         })
         .collect();
 
@@ -233,7 +233,7 @@ fn symbol_at_finds_this_method_call() {
         .expect("symbol_at should resolve $this->helper() (issue #191)");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "helper"),
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "helper"),
         "expected MethodCall(helper) for $this->helper(), got {:?}",
         sym.kind
     );
@@ -257,7 +257,7 @@ fn symbol_at_finds_this_property_access() {
         .expect("symbol_at should resolve $this->count");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
+        matches!(&sym.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
         "expected PropertyAccess(count) for $this->count, got {:?}",
         sym.kind
     );
@@ -319,7 +319,7 @@ fn symbol_at_this_in_non_static_closure() {
         .expect("symbol_at should resolve $this->helper() inside a non-static closure");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "helper"),
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "helper"),
         "expected MethodCall(helper) inside closure, got {:?}",
         sym.kind
     );
@@ -347,7 +347,7 @@ fn symbol_at_returns_innermost_symbol() {
         .expect("symbol_at should find a symbol at the run() call");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run"),
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "run"),
         "expected MethodCall(run) as the innermost symbol, got {:?}",
         sym.kind
     );
@@ -369,7 +369,7 @@ fn codebase_key_for_function_call_matches_reference_index() {
     let sym = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"))
         .expect("FunctionCall(greet) must be recorded");
 
     let key = sym
@@ -395,7 +395,7 @@ fn codebase_key_for_method_call_is_lowercased() {
     let sym = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "Run"))
+        .find(|s| matches!(&s.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "Run"))
         .expect("MethodCall(Run) must be recorded");
 
     let key = sym.codebase_key().unwrap();
@@ -422,7 +422,7 @@ fn codebase_key_for_static_call_matches_reference_index() {
         .symbols
         .iter()
         .find(|s| {
-            matches!(&s.kind, SymbolKind::StaticCall { method, .. } if method.as_ref() == "square")
+            matches!(&s.kind, ReferenceKind::StaticCall { method, .. } if method.as_ref() == "square")
         })
         .expect("StaticCall(square) must be recorded");
 
@@ -447,7 +447,7 @@ fn codebase_key_for_property_access_matches_reference_index() {
         .symbols
         .iter()
         .find(|s| {
-            matches!(&s.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "count")
+            matches!(&s.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "count")
         })
         .expect("PropertyAccess(count) must be recorded");
 
@@ -471,7 +471,7 @@ fn codebase_key_for_class_reference_matches_reference_index() {
     let sym = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::ClassReference(n) if n.as_ref() == "Widget"))
+        .find(|s| matches!(&s.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Widget"))
         .expect("ClassReference(Widget) must be recorded");
 
     let key = sym.codebase_key().unwrap();
@@ -491,7 +491,7 @@ fn codebase_key_for_variable_is_none() {
     let sym = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::Variable(n) if n.as_ref() == "n"))
+        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == "n"))
         .expect("Variable(n) must be recorded for the $n read in return");
 
     assert!(
@@ -545,7 +545,7 @@ fn symbol_at_function_call_span_is_identifier_only() {
     let sym_recorded = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet"))
+        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"))
         .expect("FunctionCall(greet) must be recorded");
 
     // span should cover only "greet" (5 bytes), not the full "greet()" call
@@ -564,7 +564,7 @@ fn symbol_at_function_call_span_is_identifier_only() {
             s.file.as_ref() == file_str
                 && s.span.start <= past_name
                 && past_name < s.span.end
-                && matches!(&s.kind, SymbolKind::FunctionCall(n) if n.as_ref() == "greet")
+                && matches!(&s.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet")
         })
         .count();
     assert_eq!(found, 0, "cursor at '(' must not match the function symbol");
@@ -584,7 +584,7 @@ fn symbol_at_method_call_span_is_identifier_only() {
     let sym_recorded = result
         .symbols
         .iter()
-        .find(|s| matches!(&s.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run"))
+        .find(|s| matches!(&s.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "run"))
         .expect("MethodCall(run) must be recorded");
 
     // span should cover only "run" (3 bytes), not "run()" or "$s->run()"
@@ -603,7 +603,7 @@ fn symbol_at_method_call_span_is_identifier_only() {
             s.file.as_ref() == file_str
                 && s.span.start <= past_name
                 && past_name < s.span.end
-                && matches!(&s.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run")
+                && matches!(&s.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "run")
         })
         .count();
     assert_eq!(found, 0, "cursor at '(' must not match the method symbol");
@@ -624,7 +624,7 @@ fn symbol_at_static_call_span_is_identifier_only() {
         .symbols
         .iter()
         .find(
-            |s| matches!(&s.kind, SymbolKind::StaticCall { method, .. } if method.as_ref() == "sq"),
+            |s| matches!(&s.kind, ReferenceKind::StaticCall { method, .. } if method.as_ref() == "sq"),
         )
         .expect("StaticCall(sq) must be recorded");
 
@@ -644,7 +644,7 @@ fn symbol_at_static_call_span_is_identifier_only() {
             s.file.as_ref() == file_str
                 && s.span.start <= past_name
                 && past_name < s.span.end
-                && matches!(&s.kind, SymbolKind::StaticCall { method, .. } if method.as_ref() == "sq")
+                && matches!(&s.kind, ReferenceKind::StaticCall { method, .. } if method.as_ref() == "sq")
         })
         .count();
     assert_eq!(
@@ -670,7 +670,7 @@ fn symbol_at_finds_property_access() {
         .expect("symbol_at should find a symbol at $c->count");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
+        matches!(&sym.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
         "expected PropertyAccess(count), got {:?}",
         sym.kind
     );
@@ -704,7 +704,7 @@ fn symbol_at_finds_nullsafe_property_access() {
         .expect("symbol_at should find a symbol at $b?->val");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::PropertyAccess { property, .. } if property.as_ref() == "val"),
+        matches!(&sym.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "val"),
         "expected PropertyAccess(val) for nullsafe access, got {:?}",
         sym.kind
     );
@@ -737,7 +737,7 @@ fn symbol_at_finds_nullsafe_method_call() {
         .expect("symbol_at should find a symbol at $s?->run()");
 
     assert!(
-        matches!(&sym.kind, SymbolKind::MethodCall { method, .. } if method.as_ref() == "run"),
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "run"),
         "expected MethodCall(run) for nullsafe call, got {:?}",
         sym.kind
     );

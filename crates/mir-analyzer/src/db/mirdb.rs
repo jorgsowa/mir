@@ -5,18 +5,18 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_codebase::StubSlice;
-use mir_types::{Symbol, Union};
+use mir_types::{Name, Type};
 
 use super::*;
 
-// MirDb concrete database
+// MirDbStorage concrete database
 
 /// Concrete in-process Salsa database.
 ///
 /// `Clone` is required for parallel batch analysis: salsa's supported
 /// pattern for sharing a db across threads is to give each worker its
 /// own clone (each clone gets a fresh `ZalsaLocal`, sharing the
-/// underlying memoization storage).  Sharing `&MirDb` across threads is
+/// underlying memoization storage).  Sharing `&MirDbStorage` across threads is
 /// **not** supported because `salsa::Database: Send` (not `Sync`).
 type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
 /// Forward index: file path → set of symbol keys that file references.
@@ -33,7 +33,7 @@ type SymbolReferencers = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 /// After the parallel phase the owner calls `take_pending_ref_locs` and commits
 /// the batch serially via `commit_reference_locations_batch`.
 ///
-/// The custom `Clone` impl returns a *new empty buffer* so that each `MirDb`
+/// The custom `Clone` impl returns a *new empty buffer* so that each `MirDbStorage`
 /// worker clone starts fresh — we do NOT propagate one clone's pending entries
 /// to another worker.
 #[derive(Default)]
@@ -47,7 +47,7 @@ impl Clone for PendingRefLocs {
 
 #[salsa::db]
 #[derive(Clone)]
-pub struct MirDb {
+pub struct MirDbStorage {
     storage: salsa::Storage<Self>,
     /// Public symbol key → reference locations.
     reference_locations: ReferenceLocations,
@@ -109,7 +109,7 @@ pub struct MirDb {
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
-/// `parking_lot::RwLock` so `MirDb::clone()` (cheap for parallel readers)
+/// `parking_lot::RwLock` so `MirDbStorage::clone()` (cheap for parallel readers)
 /// shares one slot rather than copying.
 #[derive(Default)]
 struct ResolverState {
@@ -121,7 +121,7 @@ struct ResolverState {
     resolver: Option<Arc<dyn crate::ClassResolver>>,
 }
 
-impl Default for MirDb {
+impl Default for MirDbStorage {
     fn default() -> Self {
         let mut db = Self {
             storage: salsa::Storage::default(),
@@ -145,10 +145,10 @@ impl Default for MirDb {
 }
 
 #[salsa::db]
-impl salsa::Database for MirDb {}
+impl salsa::Database for MirDbStorage {}
 
 #[salsa::db]
-impl MirDatabase for MirDb {
+impl MirDatabase for MirDbStorage {
     fn php_version_str(&self) -> Arc<str> {
         self.php_version.read().clone()
     }
@@ -161,7 +161,7 @@ impl MirDatabase for MirDb {
             .clone()
     }
 
-    fn file_imports(&self, file: &str) -> Arc<HashMap<Symbol, Symbol>> {
+    fn file_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
         let Some(sf) = self.source_files.get(file).copied() else {
             return Arc::new(HashMap::default());
         };
@@ -169,7 +169,7 @@ impl MirDatabase for MirDb {
         Arc::clone(&crate::db::collect_file_definitions(self, sf).slice.imports)
     }
 
-    fn global_var_type(&self, name: &str) -> Option<Union> {
+    fn global_var_type(&self, name: &str) -> Option<Type> {
         crate::db::workspace_global_vars(self).0.get(name).cloned()
     }
 
@@ -186,8 +186,8 @@ impl MirDatabase for MirDb {
 
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
         let idx = crate::db::workspace_symbol_index(self);
-        let lower = Symbol::new(symbol).ascii_lowercase();
-        let case_sensitive = Symbol::new(symbol);
+        let lower = Name::new(symbol).ascii_lowercase();
+        let case_sensitive = Name::new(symbol);
         // Class-like and function keys are case-folded (PHP semantics).
         // Constants are case-sensitive, so tried last without lowercasing.
         // Global variables are not indexed here — they are not FQCNs and
@@ -382,7 +382,7 @@ impl MirDatabase for MirDb {
     }
 }
 
-impl MirDb {
+impl MirDbStorage {
     /// Wire a disk-backed stub cache into this db so `collect_file_definitions`
     /// can skip reparsing on cache hits. Called by `AnalyzerDb::with_cache_dir`.
     pub fn set_stub_cache(&self, cache: Arc<crate::stub_cache::StubSliceCache>) {
@@ -422,9 +422,9 @@ impl MirDb {
         let files = self.all_source_files();
         let user_stub_files = self.user_stub_source_files();
 
-        let mut class_like: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
-        let mut functions: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
-        let mut constants: FxHashMap<Symbol, SymbolLoc> = FxHashMap::default();
+        let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut new_snapshots: FxHashMap<SourceFile, FileDeclarations> = FxHashMap::default();
 
         // Immutable borrow scope: collect declarations from all files.
@@ -676,7 +676,7 @@ impl MirDb {
         self.source_files.keys().cloned().collect()
     }
 
-    /// Reset `file`'s reference-location index before re-analysis. Symbol
+    /// Reset `file`'s reference-location index before re-analysis. Name
     /// data itself is derived lazily from `collect_file_definitions` and
     /// doesn't need explicit clearing.
     pub fn remove_file_definitions(&mut self, file: &str) {

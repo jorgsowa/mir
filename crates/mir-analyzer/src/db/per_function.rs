@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use mir_issues::Issue;
-use mir_types::Union;
+use mir_types::Type;
 
 use super::*;
 
@@ -31,7 +31,7 @@ use super::*;
 pub struct FunctionInferenceResult {
     pub issues: Vec<Issue>,
     pub ref_locs: Vec<RefLoc>,
-    pub return_type: Option<Union>,
+    pub return_type: Option<Type>,
 }
 
 impl PartialEq for FunctionInferenceResult {

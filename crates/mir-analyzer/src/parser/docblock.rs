@@ -1,4 +1,4 @@
-use mir_types::{ArrayKey, Atomic, Union, Variance};
+use mir_types::{ArrayKey, Atomic, Type, Variance};
 /// Docblock parser — delegates to `phpdoc_parser` for tag extraction,
 /// then converts tags into mir's `ParsedDocblock` with resolved types.
 use std::sync::Arc;
@@ -413,27 +413,27 @@ pub struct DocImportType {
 #[derive(Debug, Default, Clone)]
 pub struct ParsedDocblock {
     /// `@param Type $name`
-    pub params: Vec<(String, Union)>,
+    pub params: Vec<(String, Type)>,
     /// `@return Type`
-    pub return_type: Option<Union>,
+    pub return_type: Option<Type>,
     /// `@var Type` or `@var Type $name` — type and optional variable name
-    pub var_type: Option<Union>,
+    pub var_type: Option<Type>,
     /// Optional variable name from `@var Type $name`
     pub var_name: Option<String>,
     /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
-    pub templates: Vec<(String, Option<Union>, Variance)>,
+    pub templates: Vec<(String, Option<Type>, Variance)>,
     /// `@extends ClassName<T>`
-    pub extends: Option<Union>,
+    pub extends: Option<Type>,
     /// `@implements InterfaceName<T>`
-    pub implements: Vec<Union>,
+    pub implements: Vec<Type>,
     /// `@throws ClassName`
     pub throws: Vec<String>,
     /// `@psalm-assert Type $var`
-    pub assertions: Vec<(String, Union)>,
+    pub assertions: Vec<(String, Type)>,
     /// `@psalm-assert-if-true Type $var`
-    pub assertions_if_true: Vec<(String, Union)>,
+    pub assertions_if_true: Vec<(String, Type)>,
     /// `@psalm-assert-if-false Type $var`
-    pub assertions_if_false: Vec<(String, Union)>,
+    pub assertions_if_false: Vec<(String, Type)>,
     /// `@psalm-suppress IssueName`
     pub suppressed_issues: Vec<String>,
     pub is_deprecated: bool,
@@ -481,7 +481,7 @@ impl ParsedDocblock {
     /// Uses the **last** match so that `@psalm-param` / `@phpstan-param` (which
     /// php-rs-parser maps to the same `Param` variant as `@param`) overrides a
     /// preceding plain `@param` annotation.
-    pub fn get_param_type(&self, name: &str) -> Option<&Union> {
+    pub fn get_param_type(&self, name: &str) -> Option<&Type> {
         let name = name.trim_start_matches('$');
         self.params
             .iter()
@@ -494,10 +494,10 @@ impl ParsedDocblock {
 // Type string parser
 // ---------------------------------------------------------------------------
 
-/// Parse a PHPDoc type expression string into a `Union`.
+/// Parse a PHPDoc type expression string into a `Type`.
 /// Handles: `string`, `int|null`, `array<string>`, `list<int>`,
 /// `ClassName`, `?string` (nullable), `string[]` (array shorthand).
-pub fn parse_type_string(s: &str) -> Union {
+pub fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
 
     // Nullable shorthand: `?Type`
@@ -516,11 +516,11 @@ pub fn parse_type_string(s: &str) -> Union {
         }
     }
 
-    // Union: `A|B|C`
+    // Type: `A|B|C`
     if s.contains('|') && !is_inside_generics(s) {
         let parts = split_union(s);
         if parts.len() > 1 {
-            let mut u = Union::empty();
+            let mut u = Type::empty();
             for part in parts {
                 for atomic in parse_type_string(&part).types {
                     u.add_type(atomic);
@@ -532,8 +532,8 @@ pub fn parse_type_string(s: &str) -> Union {
 
     // Intersection: `A&B&C` — PHP 8.1+ pure intersection type
     if s.contains('&') && !is_inside_generics(s) {
-        let parts: Vec<Union> = s.split('&').map(|p| parse_type_string(p.trim())).collect();
-        return Union::single(Atomic::TIntersection {
+        let parts: Vec<Type> = s.split('&').map(|p| parse_type_string(p.trim())).collect();
+        return Type::single(Atomic::TIntersection {
             parts: mir_types::union::vec_to_type_params(parts),
         });
     }
@@ -541,8 +541,8 @@ pub fn parse_type_string(s: &str) -> Union {
     // Array shorthand: `Type[]` or `Type[][]`
     if let Some(value_str) = s.strip_suffix("[]") {
         let value = parse_type_string(value_str);
-        return Union::single(Atomic::TArray {
-            key: Box::new(Union::single(Atomic::TInt)),
+        return Type::single(Atomic::TArray {
+            key: Box::new(Type::single(Atomic::TInt)),
             value: Box::new(value),
         });
     }
@@ -576,56 +576,56 @@ pub fn parse_type_string(s: &str) -> Union {
 
     // Keywords
     match s.to_lowercase().as_str() {
-        "string" => Union::single(Atomic::TString),
-        "non-empty-string" => Union::single(Atomic::TNonEmptyString),
-        "numeric-string" => Union::single(Atomic::TNumericString),
-        "class-string" => Union::single(Atomic::TClassString(None)),
-        "int" | "integer" => Union::single(Atomic::TInt),
-        "positive-int" => Union::single(Atomic::TPositiveInt),
-        "negative-int" => Union::single(Atomic::TNegativeInt),
-        "non-negative-int" => Union::single(Atomic::TNonNegativeInt),
-        "float" | "double" => Union::single(Atomic::TFloat),
-        "bool" | "boolean" => Union::single(Atomic::TBool),
-        "true" => Union::single(Atomic::TTrue),
-        "false" => Union::single(Atomic::TFalse),
-        "null" => Union::single(Atomic::TNull),
-        "void" => Union::single(Atomic::TVoid),
-        "never" | "never-return" | "no-return" | "never-returns" => Union::single(Atomic::TNever),
-        "mixed" => Union::single(Atomic::TMixed),
-        "object" => Union::single(Atomic::TObject),
-        "array" => Union::single(Atomic::TArray {
-            key: Box::new(Union::single(Atomic::TMixed)),
-            value: Box::new(Union::mixed()),
+        "string" => Type::single(Atomic::TString),
+        "non-empty-string" => Type::single(Atomic::TNonEmptyString),
+        "numeric-string" => Type::single(Atomic::TNumericString),
+        "class-string" => Type::single(Atomic::TClassString(None)),
+        "int" | "integer" => Type::single(Atomic::TInt),
+        "positive-int" => Type::single(Atomic::TPositiveInt),
+        "negative-int" => Type::single(Atomic::TNegativeInt),
+        "non-negative-int" => Type::single(Atomic::TNonNegativeInt),
+        "float" | "double" => Type::single(Atomic::TFloat),
+        "bool" | "boolean" => Type::single(Atomic::TBool),
+        "true" => Type::single(Atomic::TTrue),
+        "false" => Type::single(Atomic::TFalse),
+        "null" => Type::single(Atomic::TNull),
+        "void" => Type::single(Atomic::TVoid),
+        "never" | "never-return" | "no-return" | "never-returns" => Type::single(Atomic::TNever),
+        "mixed" => Type::single(Atomic::TMixed),
+        "object" => Type::single(Atomic::TObject),
+        "array" => Type::single(Atomic::TArray {
+            key: Box::new(Type::single(Atomic::TMixed)),
+            value: Box::new(Type::mixed()),
         }),
-        "list" => Union::single(Atomic::TList {
-            value: Box::new(Union::mixed()),
+        "list" => Type::single(Atomic::TList {
+            value: Box::new(Type::mixed()),
         }),
-        "callable" => Union::single(Atomic::TCallable {
+        "callable" => Type::single(Atomic::TCallable {
             params: None,
             return_type: None,
         }),
-        "callable-string" => Union::single(Atomic::TCallableString),
-        "iterable" => Union::single(Atomic::TArray {
-            key: Box::new(Union::single(Atomic::TMixed)),
-            value: Box::new(Union::mixed()),
+        "callable-string" => Type::single(Atomic::TCallableString),
+        "iterable" => Type::single(Atomic::TArray {
+            key: Box::new(Type::single(Atomic::TMixed)),
+            value: Box::new(Type::mixed()),
         }),
-        "scalar" => Union::single(Atomic::TScalar),
-        "numeric" => Union::single(Atomic::TNumeric),
+        "scalar" => Type::single(Atomic::TScalar),
+        "numeric" => Type::single(Atomic::TNumeric),
         "array-key" => {
-            let mut u = Union::single(Atomic::TInt);
+            let mut u = Type::single(Atomic::TInt);
             u.add_type(Atomic::TString);
             u
         }
-        "resource" => Union::mixed(), // treat as mixed
+        "resource" => Type::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
-        "static" => Union::single(Atomic::TStaticObject {
-            fqcn: mir_types::Symbol::from(""),
+        "static" => Type::single(Atomic::TStaticObject {
+            fqcn: mir_types::Name::from(""),
         }),
-        "self" | "$this" => Union::single(Atomic::TSelf {
-            fqcn: mir_types::Symbol::from(""),
+        "self" | "$this" => Type::single(Atomic::TSelf {
+            fqcn: mir_types::Name::from(""),
         }),
-        "parent" => Union::single(Atomic::TParent {
-            fqcn: mir_types::Symbol::from(""),
+        "parent" => Type::single(Atomic::TParent {
+            fqcn: mir_types::Name::from(""),
         }),
 
         // Named class
@@ -637,9 +637,9 @@ pub fn parse_type_string(s: &str) -> Union {
         {
             // Integer literal: `1`, `-42`, `0` etc.
             if let Ok(n) = s.parse::<i64>() {
-                return Union::single(Atomic::TLiteralInt(n));
+                return Type::single(Atomic::TLiteralInt(n));
             }
-            Union::single(Atomic::TNamedObject {
+            Type::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(s).into(),
                 type_params: mir_types::union::empty_type_params(),
             })
@@ -648,9 +648,9 @@ pub fn parse_type_string(s: &str) -> Union {
         // Negative integer literal: `-1`, `-42` — starts with `-`, not caught by alphanumeric check
         _ if s.starts_with('-') && s.len() > 1 && s[1..].chars().all(|c| c.is_ascii_digit()) => {
             if let Ok(n) = s.parse::<i64>() {
-                Union::single(Atomic::TLiteralInt(n))
+                Type::single(Atomic::TLiteralInt(n))
             } else {
-                Union::mixed()
+                Type::mixed()
             }
         }
 
@@ -659,14 +659,14 @@ pub fn parse_type_string(s: &str) -> Union {
             || (s.starts_with('"') && s.ends_with('"')) =>
         {
             let inner = &s[1..s.len() - 1];
-            Union::single(Atomic::TLiteralString(Arc::from(inner)))
+            Type::single(Atomic::TLiteralString(Arc::from(inner)))
         }
 
-        _ => Union::mixed(),
+        _ => Type::mixed(),
     }
 }
 
-fn parse_generic(name: &str, inner: &str) -> Union {
+fn parse_generic(name: &str, inner: &str) -> Type {
     match name.to_lowercase().as_str() {
         "array" => {
             let params = split_generics(inner);
@@ -676,12 +676,12 @@ fn parse_generic(name: &str, inner: &str) -> Union {
                     parse_type_string(params[1].trim()),
                 ),
                 1 => (
-                    Union::single(Atomic::TInt),
+                    Type::single(Atomic::TInt),
                     parse_type_string(params[0].trim()),
                 ),
-                _ => (Union::single(Atomic::TInt), Union::mixed()),
+                _ => (Type::single(Atomic::TInt), Type::mixed()),
             };
-            Union::single(Atomic::TArray {
+            Type::single(Atomic::TArray {
                 key: Box::new(key),
                 value: Box::new(value),
             })
@@ -689,11 +689,11 @@ fn parse_generic(name: &str, inner: &str) -> Union {
         "list" | "non-empty-list" => {
             let value = parse_type_string(inner.trim());
             if name.to_lowercase().starts_with("non-empty") {
-                Union::single(Atomic::TNonEmptyList {
+                Type::single(Atomic::TNonEmptyList {
                     value: Box::new(value),
                 })
             } else {
-                Union::single(Atomic::TList {
+                Type::single(Atomic::TList {
                     value: Box::new(value),
                 })
             }
@@ -706,12 +706,12 @@ fn parse_generic(name: &str, inner: &str) -> Union {
                     parse_type_string(params[1].trim()),
                 ),
                 1 => (
-                    Union::single(Atomic::TInt),
+                    Type::single(Atomic::TInt),
                     parse_type_string(params[0].trim()),
                 ),
-                _ => (Union::single(Atomic::TInt), Union::mixed()),
+                _ => (Type::single(Atomic::TInt), Type::mixed()),
             };
-            Union::single(Atomic::TNonEmptyArray {
+            Type::single(Atomic::TNonEmptyArray {
                 key: Box::new(key),
                 value: Box::new(value),
             })
@@ -721,30 +721,30 @@ fn parse_generic(name: &str, inner: &str) -> Union {
             let value = match params.len() {
                 n if n >= 2 => parse_type_string(params[1].trim()),
                 1 => parse_type_string(params[0].trim()),
-                _ => Union::mixed(),
+                _ => Type::mixed(),
             };
-            Union::single(Atomic::TArray {
-                key: Box::new(Union::single(Atomic::TMixed)),
+            Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TMixed)),
                 value: Box::new(value),
             })
         }
-        "class-string" => Union::single(Atomic::TClassString(Some(
+        "class-string" => Type::single(Atomic::TClassString(Some(
             normalize_fqcn(inner.trim()).into(),
         ))),
         "int" => {
             // int<min, max>
-            Union::single(Atomic::TIntRange {
+            Type::single(Atomic::TIntRange {
                 min: None,
                 max: None,
             })
         }
         // Named class with type params
         _ => {
-            let params: Vec<Union> = split_generics(inner)
+            let params: Vec<Type> = split_generics(inner)
                 .iter()
                 .map(|p| parse_type_string(p.trim()))
                 .collect();
-            Union::single(Atomic::TNamedObject {
+            Type::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(name).into(),
                 type_params: mir_types::union::vec_to_type_params(params),
             })
@@ -752,7 +752,7 @@ fn parse_generic(name: &str, inner: &str) -> Union {
     }
 }
 
-fn parse_keyed_array(inner: &str, is_list: bool) -> Union {
+fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     use mir_types::atomic::KeyedProperty;
     let mut properties: IndexMap<ArrayKey, KeyedProperty> = IndexMap::new();
     let mut is_open = false;
@@ -813,14 +813,14 @@ fn parse_keyed_array(inner: &str, is_list: bool) -> Union {
         }
     }
 
-    Union::single(Atomic::TKeyedArray {
+    Type::single(Atomic::TKeyedArray {
         properties,
         is_open,
         is_list,
     })
 }
 
-fn parse_callable_syntax(s: &str) -> Option<Union> {
+fn parse_callable_syntax(s: &str) -> Option<Type> {
     let s = s.trim_start_matches('\\');
     let lower = s.to_lowercase();
     let is_closure = lower.starts_with("closure");
@@ -865,13 +865,13 @@ fn parse_callable_syntax(s: &str) -> Option<Union> {
         })
         .collect();
     if is_closure {
-        Some(Union::single(Atomic::TClosure {
+        Some(Type::single(Atomic::TClosure {
             params,
-            return_type: return_type.unwrap_or_else(|| Box::new(Union::single(Atomic::TVoid))),
+            return_type: return_type.unwrap_or_else(|| Box::new(Type::single(Atomic::TVoid))),
             this_type: None,
         }))
     } else {
-        Some(Union::single(Atomic::TCallable {
+        Some(Type::single(Atomic::TCallable {
             params: Some(params),
             return_type,
         }))
@@ -1107,7 +1107,7 @@ fn is_inside_generics(s: &str) -> bool {
 }
 
 /// Parses `$param is TypeName ? TrueType : FalseType` into a `TConditional`.
-fn parse_conditional_type(s: &str) -> Option<Union> {
+fn parse_conditional_type(s: &str) -> Option<Type> {
     if !s.starts_with('$') {
         return None;
     }
@@ -1119,7 +1119,7 @@ fn parse_conditional_type(s: &str) -> Option<Union> {
     let colon_pos = find_char_at_depth(rest, ':')?;
     let true_str = rest[..colon_pos].trim();
     let false_str = rest[colon_pos + 1..].trim();
-    Some(Union::single(Atomic::TConditional {
+    Some(Type::single(Atomic::TConditional {
         subject: Box::new(parse_type_string(subject_str)),
         if_true: Box::new(parse_type_string(true_str)),
         if_false: Box::new(parse_type_string(false_str)),
