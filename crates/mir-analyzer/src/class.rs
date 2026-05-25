@@ -311,7 +311,7 @@ impl<'a> ClassAnalyzer<'a> {
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
-        let own_methods: Vec<(Arc<str>, Arc<mir_codebase::storage::MethodStorage>)> = class
+        let own_methods: Vec<(Arc<str>, Arc<mir_codebase::storage::MethodDef>)> = class
             .own_methods()
             .iter()
             .map(|(k, m)| (k.clone(), m.clone()))

@@ -51,7 +51,7 @@ pub struct AnalysisSession {
     file_id_map: Arc<RwLock<FileIdMap>>,
     /// In-memory reverse dependency map: target_file → set of files that
     /// depend on it. Always maintained (not gated on disk cache presence),
-    /// enabling `analyze_dependents_of` and `dependency_graph()` without a
+    /// enabling `reanalyze_dependents` and `dependency_graph()` without a
     /// disk cache. Updated in `ingest_file` and `invalidate_file`.
     reverse_dep_map: Arc<RwLock<HashMap<FileId, HashSet<FileId>>>>,
     /// Tracks symbols that were previously defined in a file but have since
@@ -738,7 +738,7 @@ impl AnalysisSession {
             crate::Symbol::Method { class, .. }
             | crate::Symbol::Property { class, .. }
             | crate::Symbol::ClassConstant { class, .. } => {
-                // 10 mirrors the default depth used by analyze_dependents_of.
+                // 10 mirrors the default depth used by reanalyze_dependents.
                 self.load_class_transitive(class.as_ref(), 10);
             }
             _ => {}
@@ -878,7 +878,7 @@ impl AnalysisSession {
     ///
     /// Circular-inheritance checks always run against the full workspace graph
     /// regardless of the `files` filter — a cycle is a workspace-wide problem.
-    pub fn class_issues_for(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
+    pub fn class_issues(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
         let db = self.snapshot_db();
         let file_set: HashSet<Arc<str>> = files.iter().cloned().collect();
         let file_data: Vec<(Arc<str>, Arc<str>)> = files
@@ -904,11 +904,9 @@ impl AnalysisSession {
         let mut out: Vec<DocumentSymbol> = Vec::new();
 
         let class_children =
-            |methods: &indexmap::IndexMap<Arc<str>, Arc<mir_codebase::storage::MethodStorage>>,
-             props: Option<
-                &indexmap::IndexMap<Arc<str>, mir_codebase::storage::PropertyStorage>,
-            >,
-             consts: &indexmap::IndexMap<Arc<str>, mir_codebase::storage::ConstantStorage>,
+            |methods: &indexmap::IndexMap<Arc<str>, Arc<mir_codebase::storage::MethodDef>>,
+             props: Option<&indexmap::IndexMap<Arc<str>, mir_codebase::storage::PropertyDef>>,
+             consts: &indexmap::IndexMap<Arc<str>, mir_codebase::storage::ConstantDef>,
              is_enum: bool|
              -> Vec<DocumentSymbol> {
                 let mut out: Vec<DocumentSymbol> = Vec::new();
@@ -1216,7 +1214,7 @@ impl AnalysisSession {
     /// source are silently skipped (returns the analyzable subset).
     ///
     /// Cross-file inferred return types are resolved on demand via salsa.
-    pub fn analyze_dependents_of(&self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
+    pub fn reanalyze_dependents(&self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
         use rayon::prelude::*;
 
         // Phase 1: compute dependents + gather their sources outside the
@@ -1393,7 +1391,7 @@ impl AnalysisSession {
     /// (imports, class hierarchy, type hints); does not include bare FQN body
     /// references recorded during body analysis. For full fidelity, use
     /// `dependency_graph().transitive_dependents()` after body analysis is complete.
-    pub fn structural_dependents_of(&self, file: &str) -> Vec<String> {
+    pub fn structural_dependents(&self, file: &str) -> Vec<String> {
         let Some(start_id) = self.file_id_map.read().get(file) else {
             return Vec::new();
         };

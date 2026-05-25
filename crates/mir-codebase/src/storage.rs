@@ -354,11 +354,11 @@ pub struct Assertion {
 }
 
 // ---------------------------------------------------------------------------
-// MethodStorage
+// MethodDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MethodStorage {
+pub struct MethodDef {
     pub name: Arc<str>,
     pub fqcn: Arc<str>,
     #[serde(
@@ -398,7 +398,7 @@ pub struct MethodStorage {
     pub is_virtual: bool,
 }
 
-impl MethodStorage {
+impl MethodDef {
     pub fn effective_return_type(&self) -> Option<&Union> {
         self.return_type
             .as_deref()
@@ -407,11 +407,11 @@ impl MethodStorage {
 }
 
 // ---------------------------------------------------------------------------
-// PropertyStorage
+// PropertyDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PropertyStorage {
+pub struct PropertyDef {
     pub name: Arc<str>,
     pub ty: Option<Union>,
     pub inferred_ty: Option<Union>,
@@ -423,11 +423,11 @@ pub struct PropertyStorage {
 }
 
 // ---------------------------------------------------------------------------
-// ConstantStorage
+// ConstantDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ConstantStorage {
+pub struct ConstantDef {
     pub name: Arc<str>,
     pub ty: Union,
     pub visibility: Option<Visibility>,
@@ -437,19 +437,19 @@ pub struct ConstantStorage {
 }
 
 // ---------------------------------------------------------------------------
-// ClassStorage
+// ClassDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ClassStorage {
+pub struct ClassDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
     pub parent: Option<Arc<str>>,
     pub interfaces: Vec<Arc<str>>,
     pub traits: Vec<Arc<str>>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
-    pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
-    pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
+    pub own_properties: IndexMap<Arc<str>, PropertyDef>,
+    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
     #[serde(default)]
     pub mixins: Vec<Arc<str>>,
     pub template_params: Vec<TemplateParam>,
@@ -477,8 +477,8 @@ pub struct ClassStorage {
     pub pending_import_types: Vec<(Arc<str>, Arc<str>, Arc<str>)>,
 }
 
-impl ClassStorage {
-    pub fn get_method(&self, name: &str) -> Option<&MethodStorage> {
+impl ClassDef {
+    pub fn get_method(&self, name: &str) -> Option<&MethodDef> {
         // PHP method names are case-insensitive; caller should pass lowercase name.
         // Only searches own_methods — inherited method resolution is done by
         // `db::lookup_method_in_chain`.
@@ -490,37 +490,37 @@ impl ClassStorage {
         })
     }
 
-    pub fn get_property(&self, name: &str) -> Option<&PropertyStorage> {
+    pub fn get_property(&self, name: &str) -> Option<&PropertyDef> {
         self.own_properties.get(name)
     }
 }
 
 // ---------------------------------------------------------------------------
-// InterfaceStorage
+// InterfaceDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct InterfaceStorage {
+pub struct InterfaceDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
     pub extends: Vec<Arc<str>>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
-    pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
+    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
     pub template_params: Vec<TemplateParam>,
     pub location: Option<Location>,
 }
 
 // ---------------------------------------------------------------------------
-// TraitStorage
+// TraitDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TraitStorage {
+pub struct TraitDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
-    pub own_properties: IndexMap<Arc<str>, PropertyStorage>,
-    pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
+    pub own_properties: IndexMap<Arc<str>, PropertyDef>,
+    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
     pub template_params: Vec<TemplateParam>,
     /// Traits used by this trait (`use OtherTrait;` inside a trait body).
     pub traits: Vec<Arc<str>>,
@@ -534,34 +534,34 @@ pub struct TraitStorage {
 }
 
 // ---------------------------------------------------------------------------
-// EnumStorage
+// EnumDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct EnumCaseStorage {
+pub struct EnumCaseDef {
     pub name: Arc<str>,
     pub value: Option<Union>,
     pub location: Option<Location>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct EnumStorage {
+pub struct EnumDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
     pub scalar_type: Option<Union>,
     pub interfaces: Vec<Arc<str>>,
-    pub cases: IndexMap<Arc<str>, EnumCaseStorage>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodStorage>>,
-    pub own_constants: IndexMap<Arc<str>, ConstantStorage>,
+    pub cases: IndexMap<Arc<str>, EnumCaseDef>,
+    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
+    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
     pub location: Option<Location>,
 }
 
 // ---------------------------------------------------------------------------
-// FunctionStorage
+// FunctionDef
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FunctionStorage {
+pub struct FunctionDef {
     pub fqn: Arc<str>,
     pub short_name: Arc<str>,
     #[serde(
@@ -589,7 +589,7 @@ pub struct FunctionStorage {
     pub docstring: Option<Arc<str>>,
 }
 
-impl FunctionStorage {
+impl FunctionDef {
     pub fn effective_return_type(&self) -> Option<&Union> {
         self.return_type
             .as_deref()
@@ -608,11 +608,11 @@ impl FunctionStorage {
 /// `MirDatabase::ingest_stub_slice`.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StubSlice {
-    pub classes: Vec<Arc<ClassStorage>>,
-    pub interfaces: Vec<Arc<InterfaceStorage>>,
-    pub traits: Vec<Arc<TraitStorage>>,
-    pub enums: Vec<Arc<EnumStorage>>,
-    pub functions: Vec<Arc<FunctionStorage>>,
+    pub classes: Vec<Arc<ClassDef>>,
+    pub interfaces: Vec<Arc<InterfaceDef>>,
+    pub traits: Vec<Arc<TraitDef>>,
+    pub enums: Vec<Arc<EnumDef>>,
+    pub functions: Vec<Arc<FunctionDef>>,
     #[serde(default)]
     pub constants: Vec<(Arc<str>, Union)>,
     /// Source file this slice was collected from. `None` for bundled stub slices

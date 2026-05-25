@@ -656,7 +656,7 @@ impl AnalysisSession {
     /// Re-analyze a single file (definition collection + body analysis) within the batch context.
     ///
     /// Mirrors the old `ProjectAnalyzer::re_analyze_file` cache-aware path.
-    /// Use [`Self::analyze_dependents_of`] for LSP-style per-file flows that
+    /// Use [`Self::reanalyze_dependents`] for LSP-style per-file flows that
     /// don't need batch options.
     pub fn re_analyze_file(
         &self,

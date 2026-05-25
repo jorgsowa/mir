@@ -16,7 +16,7 @@ use php_ast::owned::{Program, StmtKind};
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use crate::php_version::PhpVersion;
 use mir_codebase::storage::{
-    wrap_return_type, Assertion, FnParam, Location, MethodStorage, PropertyStorage, StubSlice,
+    wrap_return_type, Assertion, FnParam, Location, MethodDef, PropertyDef, StubSlice,
     TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
@@ -392,8 +392,8 @@ impl<'a> DefinitionCollector<'a> {
         doc: &crate::parser::ParsedDocblock,
         aliases: &FxHashMap<String, Union>,
         class_fqcn: &str,
-        own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodStorage>>,
-        own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyStorage>,
+        own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodDef>>,
+        own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyDef>,
         location: Option<Location>,
     ) {
         for prop in &doc.properties {
@@ -409,7 +409,7 @@ impl<'a> DefinitionCollector<'a> {
             };
             own_properties.insert(
                 Arc::from(prop.name.as_str()),
-                PropertyStorage {
+                PropertyDef {
                     name: Arc::from(prop.name.as_str()),
                     ty,
                     inferred_ty: None,
@@ -463,7 +463,7 @@ impl<'a> DefinitionCollector<'a> {
                 .collect();
             own_methods.insert(
                 key,
-                Arc::new(MethodStorage {
+                Arc::new(MethodDef {
                     name: Arc::from(method.name.as_str()),
                     fqcn: Arc::from(class_fqcn),
                     params,
@@ -694,7 +694,7 @@ impl<'a> DefinitionCollector<'a> {
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
         aliases: Option<&FxHashMap<String, Union>>,
-    ) -> Option<MethodStorage> {
+    ) -> Option<MethodDef> {
         let doc = m
             .doc_comment
             .as_ref()
@@ -795,7 +795,7 @@ impl<'a> DefinitionCollector<'a> {
             .collect();
 
         let method_name = m.name.as_deref().unwrap_or_default();
-        Some(MethodStorage {
+        Some(MethodDef {
             name: Arc::from(method_name),
             fqcn: class_fqcn.into(),
             params: Arc::from(params.into_boxed_slice()),

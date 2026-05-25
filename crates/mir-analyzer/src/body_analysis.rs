@@ -51,9 +51,9 @@ fn lookup_function_node_for_decl(
     db: &dyn MirDatabase,
     file: &str,
     fn_name: &str,
-) -> Option<(Arc<str>, Arc<mir_codebase::storage::FunctionStorage>)> {
+) -> Option<(Arc<str>, Arc<mir_codebase::storage::FunctionDef>)> {
     let qualified = resolve_name_via_db(db, file, fn_name);
-    let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::storage::FunctionStorage>> {
+    let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::storage::FunctionDef>> {
         crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn))
     };
     if let Some(f) = try_lookup(qualified.as_str()) {

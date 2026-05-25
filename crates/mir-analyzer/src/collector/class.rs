@@ -1,7 +1,7 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::storage::{ConstantStorage, PropertyStorage, TemplateParam};
-use mir_codebase::ClassStorage;
+use mir_codebase::storage::{ConstantDef, PropertyDef, TemplateParam};
+use mir_codebase::ClassDef;
 use mir_types::Atomic;
 use php_ast::owned::{ClassDecl, ClassMemberKind};
 use std::ops::ControlFlow;
@@ -64,7 +64,7 @@ impl<'a> DefinitionCollector<'a> {
                                         .as_ref()
                                         .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                                 );
-                                let prop = PropertyStorage {
+                                let prop = PropertyDef {
                                     name: Arc::from(param_name),
                                     ty,
                                     inferred_ty: None,
@@ -104,7 +104,7 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let prop_name = p.name.as_deref().unwrap_or_default();
-                    let prop = PropertyStorage {
+                    let prop = PropertyDef {
                         name: Arc::from(prop_name),
                         ty: self.resolve_union_opt(
                             p.type_hint
@@ -135,7 +135,7 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let const_name = c.name.as_deref().unwrap_or_default();
-                    let constant = ConstantStorage {
+                    let constant = ConstantDef {
                         name: Arc::from(const_name),
                         ty: mir_types::Union::mixed(),
                         visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
@@ -210,7 +210,7 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
-        let storage = ClassStorage {
+        let storage = ClassDef {
             fqcn: fqcn.clone().into(),
             short_name: short_name.into(),
             parent,

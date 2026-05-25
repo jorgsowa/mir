@@ -1,6 +1,6 @@
 use super::DefinitionCollector;
 use crate::parser::name_to_string_owned;
-use mir_codebase::storage::{ConstantStorage, InterfaceStorage, TemplateParam};
+use mir_codebase::storage::{ConstantDef, InterfaceDef, TemplateParam};
 use mir_types::Union;
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;
@@ -81,7 +81,7 @@ impl<'a> DefinitionCollector<'a> {
                     let const_name = c.name.as_deref().unwrap_or_default();
                     own_constants.insert(
                         Arc::from(const_name),
-                        ConstantStorage {
+                        ConstantDef {
                             name: Arc::from(const_name),
                             ty: Union::mixed(),
                             visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
@@ -107,7 +107,7 @@ impl<'a> DefinitionCollector<'a> {
 
         self.slice
             .interfaces
-            .push(std::sync::Arc::new(InterfaceStorage {
+            .push(std::sync::Arc::new(InterfaceDef {
                 fqcn: fqcn.into(),
                 short_name: Arc::from(interface_name.as_str()),
                 extends,

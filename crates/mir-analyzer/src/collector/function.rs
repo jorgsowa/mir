@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{wrap_return_type, FnParam, FunctionStorage, TemplateParam};
+use mir_codebase::storage::{wrap_return_type, FnParam, FunctionDef, TemplateParam};
 use mir_types::Symbol;
 
 use super::DefinitionCollector;
@@ -138,7 +138,7 @@ impl DefinitionCollector<'_> {
             Some(Arc::from(doc.description.as_str()))
         };
 
-        let storage = FunctionStorage {
+        let storage = FunctionDef {
             fqn: fqn.clone().into(),
             short_name: short_name.into(),
             params: Arc::from(params.into_boxed_slice()),

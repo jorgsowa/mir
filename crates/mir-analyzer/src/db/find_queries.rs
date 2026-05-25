@@ -14,8 +14,7 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::{
-    ClassStorage, ConstantStorage, EnumStorage, FunctionStorage, InterfaceStorage, MethodStorage,
-    PropertyStorage, TraitStorage,
+    ClassDef, ConstantDef, EnumDef, FunctionDef, InterfaceDef, MethodDef, PropertyDef, TraitDef,
 };
 use mir_types::Symbol;
 
@@ -26,10 +25,10 @@ use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabas
 /// covers `class` / `interface` / `trait` / `enum`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ClassLike {
-    Class(Arc<ClassStorage>),
-    Interface(Arc<InterfaceStorage>),
-    Trait(Arc<TraitStorage>),
-    Enum(Arc<EnumStorage>),
+    Class(Arc<ClassDef>),
+    Interface(Arc<InterfaceDef>),
+    Trait(Arc<TraitDef>),
+    Enum(Arc<EnumDef>),
 }
 
 impl ClassLike {
@@ -80,7 +79,7 @@ impl ClassLike {
 
     /// Own methods (does not include inherited). Class / interface / trait
     /// / enum all carry these (interfaces hold abstract method signatures).
-    pub fn own_methods(&self) -> &indexmap::IndexMap<Arc<str>, Arc<MethodStorage>> {
+    pub fn own_methods(&self) -> &indexmap::IndexMap<Arc<str>, Arc<MethodDef>> {
         match self {
             ClassLike::Class(c) => &c.own_methods,
             ClassLike::Interface(i) => &i.own_methods,
@@ -91,7 +90,7 @@ impl ClassLike {
 
     /// Own properties. Interfaces don't have properties, so we return an
     /// empty map for them (avoids match callers having to special-case).
-    pub fn own_properties(&self) -> Option<&indexmap::IndexMap<Arc<str>, PropertyStorage>> {
+    pub fn own_properties(&self) -> Option<&indexmap::IndexMap<Arc<str>, PropertyDef>> {
         match self {
             ClassLike::Class(c) => Some(&c.own_properties),
             ClassLike::Trait(t) => Some(&t.own_properties),
@@ -100,7 +99,7 @@ impl ClassLike {
     }
 
     /// Own constants.
-    pub fn own_constants(&self) -> &indexmap::IndexMap<Arc<str>, ConstantStorage> {
+    pub fn own_constants(&self) -> &indexmap::IndexMap<Arc<str>, ConstantDef> {
         match self {
             ClassLike::Class(c) => &c.own_constants,
             ClassLike::Interface(i) => &i.own_constants,
@@ -283,7 +282,7 @@ pub fn class_in_file<'db>(
     db: &'db dyn MirDatabase,
     file: SourceFile,
     fqcn: Fqcn<'db>,
-) -> Option<Arc<ClassStorage>> {
+) -> Option<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
     let target = fqcn.name(db);
     defs.slice
@@ -299,7 +298,7 @@ pub fn interface_in_file<'db>(
     db: &'db dyn MirDatabase,
     file: SourceFile,
     fqcn: Fqcn<'db>,
-) -> Option<Arc<InterfaceStorage>> {
+) -> Option<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
     let target = fqcn.name(db);
     defs.slice
@@ -315,7 +314,7 @@ pub fn trait_in_file<'db>(
     db: &'db dyn MirDatabase,
     file: SourceFile,
     fqcn: Fqcn<'db>,
-) -> Option<Arc<TraitStorage>> {
+) -> Option<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
     let target = fqcn.name(db);
     defs.slice
@@ -331,7 +330,7 @@ pub fn enum_in_file<'db>(
     db: &'db dyn MirDatabase,
     file: SourceFile,
     fqcn: Fqcn<'db>,
-) -> Option<Arc<EnumStorage>> {
+) -> Option<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
     let target = fqcn.name(db);
     defs.slice
@@ -347,7 +346,7 @@ pub fn function_in_file<'db>(
     db: &'db dyn MirDatabase,
     file: SourceFile,
     fqn: Fqcn<'db>,
-) -> Option<Arc<FunctionStorage>> {
+) -> Option<Arc<FunctionDef>> {
     let defs = collect_file_definitions(db, file);
     let target = fqn.name(db);
     defs.slice
@@ -387,11 +386,7 @@ pub fn global_constant_in_file<'db>(
 /// Salsa-tracked per-(file, idx) class storage. One memo entry per distinct
 /// class ever queried; subsequent calls return the same Arc cheaply.
 #[salsa::tracked]
-pub fn class_storage_at(
-    db: &dyn MirDatabase,
-    file: SourceFile,
-    idx: u32,
-) -> Option<Arc<ClassStorage>> {
+pub fn class_storage_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.classes.get(idx as usize).cloned()
 }
@@ -401,27 +396,19 @@ pub fn interface_storage_at(
     db: &dyn MirDatabase,
     file: SourceFile,
     idx: u32,
-) -> Option<Arc<InterfaceStorage>> {
+) -> Option<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.interfaces.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
-pub fn trait_storage_at(
-    db: &dyn MirDatabase,
-    file: SourceFile,
-    idx: u32,
-) -> Option<Arc<TraitStorage>> {
+pub fn trait_storage_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.traits.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
-pub fn enum_storage_at(
-    db: &dyn MirDatabase,
-    file: SourceFile,
-    idx: u32,
-) -> Option<Arc<EnumStorage>> {
+pub fn enum_storage_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.enums.get(idx as usize).cloned()
 }
@@ -431,7 +418,7 @@ pub fn function_storage_at(
     db: &dyn MirDatabase,
     file: SourceFile,
     idx: u32,
-) -> Option<Arc<FunctionStorage>> {
+) -> Option<Arc<FunctionDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.functions.get(idx as usize).cloned()
 }
@@ -465,10 +452,7 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
 
 /// Composite: resolve `fqn` to its defining file, then locate the
 /// function within it.
-pub fn find_function<'db>(
-    db: &'db dyn MirDatabase,
-    fqn: Fqcn<'db>,
-) -> Option<Arc<FunctionStorage>> {
+pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
     use crate::db::SymbolLoc;
     let key = fqn.name(db).ascii_lowercase();
     let index = crate::db::workspace_index(db);
@@ -508,7 +492,7 @@ pub fn find_method_in_class<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
-) -> Option<Arc<MethodStorage>> {
+) -> Option<Arc<MethodDef>> {
     let class = find_class_like(db, fqcn)?;
     if let Some(m) = class.own_methods().iter().find_map(|(k, v)| {
         if k.as_ref().eq_ignore_ascii_case(name) {
@@ -524,7 +508,7 @@ pub fn find_method_in_class<'db>(
         let lower = name.to_ascii_lowercase();
         let is_backed = e.scalar_type.is_some();
         let synth = |method_name: &str| {
-            Arc::new(mir_codebase::storage::MethodStorage {
+            Arc::new(mir_codebase::storage::MethodDef {
                 fqcn: e.fqcn.clone(),
                 name: Arc::from(method_name),
                 params: Arc::from([].as_ref()),
@@ -563,27 +547,27 @@ pub fn find_property_in_class<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
-) -> Option<PropertyStorage> {
+) -> Option<PropertyDef> {
     let class = find_class_like(db, fqcn)?;
     class.own_properties()?.get(name).cloned()
 }
 
 /// Locate a class constant named `name` on the class `fqcn`'s **own**
 /// constants only. For enums, also checks cases (which the collector stores
-/// separately in `EnumStorage.cases`, not in `own_constants`).
+/// separately in `EnumDef.cases`, not in `own_constants`).
 pub fn find_class_constant_in_class<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
-) -> Option<ConstantStorage> {
+) -> Option<ConstantDef> {
     let class = find_class_like(db, fqcn)?;
     if let Some(c) = class.own_constants().get(name) {
         return Some(c.clone());
     }
-    // Enum cases live in EnumStorage.cases, not own_constants.
+    // Enum cases live in EnumDef.cases, not own_constants.
     if let ClassLike::Enum(e) = &class {
         if let Some(case) = e.cases.get(name) {
-            return Some(mir_codebase::storage::ConstantStorage {
+            return Some(mir_codebase::storage::ConstantDef {
                 name: case.name.clone(),
                 ty: mir_types::Union::mixed(),
                 visibility: None,
@@ -646,7 +630,7 @@ pub fn find_method_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
-) -> Option<(Arc<str>, Arc<MethodStorage>)> {
+) -> Option<(Arc<str>, Arc<MethodDef>)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
         if let Some(m) = find_method_in_class(db, here, name) {
@@ -663,7 +647,7 @@ fn find_method_in_mixins<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
     visited: &mut std::collections::HashSet<Arc<str>>,
-) -> Option<(Arc<str>, Arc<MethodStorage>)> {
+) -> Option<(Arc<str>, Arc<MethodDef>)> {
     let class = find_class_like(db, fqcn)?;
     for m in class.mixins() {
         let mixin_fqcn: Arc<str> = if let Some(pos) = m.find('<') {
@@ -697,7 +681,7 @@ pub fn find_property_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
-) -> Option<(Arc<str>, PropertyStorage)> {
+) -> Option<(Arc<str>, PropertyDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
         if let Some(p) = find_property_in_class(db, here, name) {
@@ -746,7 +730,7 @@ pub fn find_class_constant_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
     name: &str,
-) -> Option<(Arc<str>, ConstantStorage)> {
+) -> Option<(Arc<str>, ConstantDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = Fqcn::new(db, Symbol::new(ancestor.as_ref()));
         if let Some(c) = find_class_constant_in_class(db, here, name) {

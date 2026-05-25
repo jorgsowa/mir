@@ -1,6 +1,6 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::storage::{ConstantStorage, PropertyStorage, TemplateParam, TraitStorage};
+use mir_codebase::storage::{ConstantDef, PropertyDef, TemplateParam, TraitDef};
 use mir_types::Union;
 use php_ast::owned::{ClassMemberKind, TraitDecl};
 use std::ops::ControlFlow;
@@ -60,7 +60,7 @@ impl<'a> DefinitionCollector<'a> {
                                         .as_ref()
                                         .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                                 );
-                                let prop = PropertyStorage {
+                                let prop = PropertyDef {
                                     name: Arc::from(param_name),
                                     ty,
                                     inferred_ty: None,
@@ -102,7 +102,7 @@ impl<'a> DefinitionCollector<'a> {
                     let prop_name = p.name.as_deref().unwrap_or_default();
                     own_properties.insert(
                         Arc::from(prop_name),
-                        PropertyStorage {
+                        PropertyDef {
                             name: Arc::from(prop_name),
                             ty: self.resolve_union_opt(
                                 p.type_hint
@@ -135,7 +135,7 @@ impl<'a> DefinitionCollector<'a> {
                     let const_name = c.name.as_deref().unwrap_or_default();
                     own_constants.insert(
                         Arc::from(const_name),
-                        ConstantStorage {
+                        ConstantDef {
                             name: Arc::from(const_name),
                             ty: Union::mixed(),
                             visibility: None,
@@ -173,7 +173,7 @@ impl<'a> DefinitionCollector<'a> {
             .map(|s| self.resolve_type_name(s.as_str(), true).into())
             .collect();
 
-        self.slice.traits.push(std::sync::Arc::new(TraitStorage {
+        self.slice.traits.push(std::sync::Arc::new(TraitDef {
             fqcn: fqcn.into(),
             short_name: Arc::from(trait_name.as_str()),
             own_methods,

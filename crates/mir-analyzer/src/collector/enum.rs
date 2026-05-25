@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{ConstantStorage, EnumCaseStorage};
+use mir_codebase::storage::{ConstantDef, EnumCaseDef};
 use mir_types::Union;
 use php_ast::owned::EnumMemberKind;
 
@@ -43,7 +43,7 @@ impl DefinitionCollector<'_> {
                     let case_name = c.name.as_deref().unwrap_or_default();
                     cases.insert(
                         Arc::from(case_name),
-                        EnumCaseStorage {
+                        EnumCaseDef {
                             name: Arc::from(case_name),
                             value: c.value.as_ref().map(|_| Union::mixed()),
                             location: Some(self.location(member.span.start, member.span.end)),
@@ -64,7 +64,7 @@ impl DefinitionCollector<'_> {
                     let const_name = c.name.as_deref().unwrap_or_default();
                     own_constants.insert(
                         Arc::from(const_name),
-                        ConstantStorage {
+                        ConstantDef {
                             name: Arc::from(const_name),
                             ty: Union::mixed(),
                             visibility: None,
@@ -90,7 +90,7 @@ impl DefinitionCollector<'_> {
 
         self.slice
             .enums
-            .push(std::sync::Arc::new(mir_codebase::EnumStorage {
+            .push(std::sync::Arc::new(mir_codebase::EnumDef {
                 fqcn: fqcn.into(),
                 short_name: Arc::from(enum_name.as_str()),
                 scalar_type,

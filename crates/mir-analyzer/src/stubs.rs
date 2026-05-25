@@ -527,7 +527,7 @@ mod tests {
     fn stub_function_for(
         version: PhpVersion,
         name: &str,
-    ) -> Option<std::sync::Arc<mir_codebase::FunctionStorage>> {
+    ) -> Option<std::sync::Arc<mir_codebase::FunctionDef>> {
         builtin_stub_slices_for_version(version)
             .into_iter()
             .flat_map(|slice| slice.functions.into_iter())
@@ -537,7 +537,7 @@ mod tests {
     fn stub_class_for(
         version: PhpVersion,
         name: &str,
-    ) -> Option<std::sync::Arc<mir_codebase::ClassStorage>> {
+    ) -> Option<std::sync::Arc<mir_codebase::ClassDef>> {
         builtin_stub_slices_for_version(version)
             .into_iter()
             .flat_map(|slice| slice.classes.into_iter())
