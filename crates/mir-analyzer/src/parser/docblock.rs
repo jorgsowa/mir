@@ -509,10 +509,15 @@ pub fn parse_type_string(s: &str) -> Type {
     }
 
     // Conditional type: `($param is TypeName ? TrueType : FalseType)`
+    // Parenthesized type: `(A&B)|null` — strip outer parens and recurse.
     if s.starts_with('(') && s.ends_with(')') {
         let inner = s[1..s.len() - 1].trim();
         if let Some(conditional) = parse_conditional_type(inner) {
             return conditional;
+        }
+        // Strip balanced outer parens: verify depth doesn't go negative before the end.
+        if is_balanced_parens(s) {
+            return parse_type_string(inner);
         }
     }
 
@@ -530,12 +535,16 @@ pub fn parse_type_string(s: &str) -> Type {
         }
     }
 
-    // Intersection: `A&B&C` — PHP 8.1+ pure intersection type
+    // Intersection: `A&B&C` — PHP 8.1+ pure intersection type.
+    // Use a depth-aware split so `&` inside generics (e.g. `array<K,V>`) is not broken.
     if s.contains('&') && !is_inside_generics(s) {
-        let parts: Vec<Type> = s.split('&').map(|p| parse_type_string(p.trim())).collect();
-        return Type::single(Atomic::TIntersection {
-            parts: mir_types::union::vec_to_type_params(parts),
-        });
+        let parts = split_intersection(s);
+        if parts.len() > 1 {
+            let parts: Vec<Type> = parts.iter().map(|p| parse_type_string(p.trim())).collect();
+            return Type::single(Atomic::TIntersection {
+                parts: mir_types::union::vec_to_type_params(parts),
+            });
+        }
     }
 
     // Array shorthand: `Type[]` or `Type[][]`
@@ -1065,6 +1074,61 @@ fn split_union(s: &str) -> Vec<String> {
         parts.push(current.trim().to_string());
     }
     parts
+}
+
+/// Depth-aware split on `&` — does not break `&` inside `<>`, `()`, or `{}`.
+fn split_intersection(s: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut current = String::new();
+    for ch in s.chars() {
+        match ch {
+            '<' | '(' | '{' => {
+                depth += 1;
+                current.push(ch);
+            }
+            '>' | ')' | '}' => {
+                depth -= 1;
+                current.push(ch);
+            }
+            '&' if depth == 0 => {
+                parts.push(current.trim().to_string());
+                current = String::new();
+            }
+            _ => current.push(ch),
+        }
+    }
+    if !current.trim().is_empty() {
+        parts.push(current.trim().to_string());
+    }
+    parts
+}
+
+/// Returns true when `s` starts with `(` and ends with `)` and those two
+/// characters are a matched pair (i.e. the depth never goes below 1 before
+/// the final character).
+fn is_balanced_parens(s: &str) -> bool {
+    if !s.starts_with('(') || !s.ends_with(')') {
+        return false;
+    }
+    let mut depth = 0i32;
+    let chars: Vec<char> = s.chars().collect();
+    let last = chars.len() - 1;
+    for (i, ch) in chars.iter().enumerate() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                // If depth reaches 0 before the last char, the outer parens
+                // are not a single balanced pair (e.g. `(A)(B)`).
+                if depth == 0 && i < last {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0
 }
 
 fn split_generics(s: &str) -> Vec<String> {

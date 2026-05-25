@@ -983,22 +983,26 @@ fn param_contains_template_or_unknown(
                     return true; // template part — forgiven
                 }
                 // Concrete part: arg_ty must satisfy it via extends/implements.
+                // Also flatten TIntersection in arg_ty (e.g. Box<string>&Taggable as arg).
                 part.types.iter().all(|part_atomic| {
                     let part_fqcn = match part_atomic {
                         Atomic::TNamedObject { fqcn, .. } => fqcn,
                         _ => return true,
                     };
-                    arg_ty.types.iter().any(|arg_atomic| {
-                        let arg_fqcn = match arg_atomic {
-                            Atomic::TNamedObject { fqcn, .. } => fqcn,
-                            _ => return false,
-                        };
+                    let arg_satisfies = |arg_fqcn: &Name| {
                         arg_fqcn == part_fqcn
                             || crate::db::extends_or_implements(
                                 ea.db,
                                 arg_fqcn.as_ref(),
                                 part_fqcn.as_ref(),
                             )
+                    };
+                    arg_ty.types.iter().any(|arg_atomic| match arg_atomic {
+                        Atomic::TNamedObject { fqcn, .. } => arg_satisfies(fqcn),
+                        Atomic::TIntersection { parts: arg_parts } => arg_parts
+                            .iter()
+                            .any(|ap| ap.types.iter().any(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if arg_satisfies(fqcn)))),
+                        _ => false,
                     })
                 })
             })
