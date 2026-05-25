@@ -86,6 +86,57 @@ mod tests {
     }
 
     #[test]
+    fn infer_function_returns_some_for_existing_free_fn() {
+        let db = MirDb::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_fn_existing.php"),
+            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+        );
+        let _ = collect_file_definitions(&db, file);
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        let result = infer_function(&db, file, Arc::from("foo"), input);
+        assert!(result.is_some(), "expected infer_function to locate `foo`");
+        let r = result.unwrap();
+        assert!(
+            r.return_type.is_some(),
+            "free fn should produce a return type"
+        );
+    }
+
+    #[test]
+    fn infer_function_returns_none_for_unknown_fn() {
+        let db = MirDb::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_fn_unknown.php"),
+            Arc::from("<?php function foo(): void {}"),
+        );
+        let _ = collect_file_definitions(&db, file);
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        let result = infer_function(&db, file, Arc::from("not_a_fn"), input);
+        assert!(result.is_none(), "missing function should yield None");
+    }
+
+    #[test]
+    fn infer_function_memoized_on_repeat_call() {
+        let db = MirDb::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_fn_memo.php"),
+            Arc::from("<?php function foo(): string { return \"hi\"; }"),
+        );
+        let _ = collect_file_definitions(&db, file);
+        let input = AnalyzeFileInput::new(&db, Arc::from("8.2"));
+        let r1 = infer_function(&db, file, Arc::from("foo"), input).unwrap();
+        let r2 = infer_function(&db, file, Arc::from("foo"), input).unwrap();
+        assert!(
+            Arc::ptr_eq(&r1, &r2),
+            "unchanged file + fqn must reuse the memoized Arc<FunctionInferenceResult>"
+        );
+    }
+
+    #[test]
     fn collect_file_definitions_recomputes_on_change() {
         use salsa::Setter as _;
         let mut db = MirDb::default();

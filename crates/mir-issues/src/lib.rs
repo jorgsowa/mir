@@ -981,7 +981,7 @@ impl IssueKind {
 // Issue
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Issue {
     pub kind: IssueKind,
     pub severity: Severity,

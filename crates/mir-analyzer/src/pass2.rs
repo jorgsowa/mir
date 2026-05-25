@@ -601,6 +601,136 @@ impl<'a> Pass2Driver<'a> {
         }
     }
 
+    /// Pure entry point: run the same analysis as [`Self::analyze_fn_decl`] for
+    /// one function decl, but return the result instead of mutating
+    /// caller-owned buffers. Used by the `infer_function` salsa tracked query.
+    ///
+    /// `ResolvedSymbol`s observed during the walk are intentionally dropped —
+    /// symbols are re-walked on demand to keep the cache small.
+    ///
+    /// **Constraint:** this method drains `db.take_pending_ref_locs()` at entry
+    /// to isolate the refs produced by this call. Don't invoke from a context
+    /// where the same db handle has already-staged pending refs you care
+    /// about — they will be discarded. The intended caller is the
+    /// `infer_function` tracked query, which holds its own db handle per call.
+    pub(crate) fn analyze_fn_decl_pure(
+        &self,
+        decl: &php_ast::owned::FunctionDecl,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+    ) -> crate::db::FunctionInferenceResult {
+        use crate::context::Context;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        // Clear any previously-staged refs on this db handle so we capture
+        // only what this function's walk produces.
+        let _ = self.db.take_pending_ref_locs();
+
+        let mut issues: Vec<Issue> = Vec::new();
+        let mut discarded_symbols: Vec<ResolvedSymbol> = Vec::new();
+
+        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
+        for param in decl.params.iter() {
+            if let Some(hint) = &param.type_hint {
+                self.check_and_record_type_hint_classes(
+                    hint,
+                    file,
+                    source,
+                    source_map,
+                    &mut issues,
+                );
+            }
+            if let Some(default_expr) = &param.default {
+                check_expr_for_undefined_classes(
+                    default_expr,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    &mut issues,
+                    self.php_version,
+                );
+            }
+        }
+        if let Some(hint) = &decl.return_type {
+            self.check_and_record_type_hint_classes(hint, file, source, source_map, &mut issues);
+        }
+
+        let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        #[allow(clippy::type_complexity)]
+        let (params, return_ty, template_params, declared_throws): (
+            Arc<[mir_codebase::FnParam]>,
+            _,
+            Vec<_>,
+            Arc<[Arc<str>]>,
+        ) = match &resolved {
+            Some((_, storage))
+                if storage.params.len() == decl.params.len()
+                    && storage
+                        .params
+                        .iter()
+                        .zip(decl.params.iter())
+                        .all(|(cp, ap)| ap.name.as_deref().unwrap_or("") == cp.name.as_ref()) =>
+            {
+                (
+                    Arc::clone(&storage.params),
+                    storage.return_type.as_deref().cloned(),
+                    storage.template_params.clone(),
+                    Arc::from(storage.throws.as_slice()),
+                )
+            }
+            _ => (
+                Arc::from(ast_derived_fn_params(&decl.params)),
+                None,
+                vec![],
+                Arc::from([]),
+            ),
+        };
+
+        let mut ctx = Context::for_method_with_templates(
+            &params,
+            return_ty,
+            declared_throws,
+            None,
+            None,
+            None,
+            false,
+            false,
+            true,
+            Some(&template_params),
+        );
+        seed_param_locations(&mut ctx, &decl.params, source, source_map);
+
+        let mut buf = IssueBuffer::new();
+        let mut sa = StatementsAnalyzer::new(
+            self.db,
+            file.clone(),
+            source,
+            source_map,
+            &mut buf,
+            &mut discarded_symbols,
+            self.php_version,
+            self.inference_only,
+        );
+        sa.analyze_stmts(&decl.body, &mut ctx);
+        let inferred = merge_return_types(&sa.return_types);
+        drop(sa);
+
+        emit_unused_params(&params, &ctx, "", file, &mut issues);
+        emit_unused_variables(&ctx, file, &mut issues);
+        issues.extend(buf.into_issues());
+
+        let ref_locs = self.db.take_pending_ref_locs();
+
+        crate::db::FunctionInferenceResult {
+            issues,
+            ref_locs,
+            return_type: Some(inferred),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn analyze_class_decl(
         &self,

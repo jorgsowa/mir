@@ -150,6 +150,7 @@ pub use self::inferred_types::{
 #[allow(unused_imports)]
 pub use self::mirdb::MirDb;
 pub use self::nodes::*;
+pub use self::per_function::{infer_function, FunctionInferenceResult};
 pub use self::queries::{
     class_constant_exists_in_chain, class_kind_via_db, class_template_params_via_db,
     collect_file_definitions, collect_file_definitions_uncached, constant_exists_via_db,
@@ -172,6 +173,7 @@ mod find_queries;
 mod inferred_types;
 mod mirdb;
 mod nodes;
+mod per_function;
 mod queries;
 mod reference_locations;
 mod resolver;
