@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::db::{resolve_name_via_db, type_exists_via_db, MirDatabase};
+use crate::db::{resolve_name, type_exists, MirDatabase};
 use crate::php_version::PhpVersion;
 
 // ---------------------------------------------------------------------------
@@ -50,8 +50,8 @@ pub(crate) fn check_type_hint_classes(
             if is_pseudo_type(&name_str) {
                 return;
             }
-            let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
-            if !type_exists_via_db(db, &resolved) {
+            let resolved = resolve_name(db, file.as_ref(), &name_str);
+            if !type_exists(db, &resolved) {
                 // Soft-fallback: build-time stub index recognises this class
                 // as a PHP built-in → assume lazy-stub timing rather than
                 // user error. See call/function.rs for the parallel path.
@@ -132,7 +132,7 @@ fn collect_type_hint_class_refs_inner(
             if is_pseudo_type(&name_str) {
                 return;
             }
-            let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
+            let resolved = resolve_name(db, file.as_ref(), &name_str);
             out.push((Arc::from(resolved.as_str()), hint.span));
         }
         TypeHintKind::Nullable(inner) => {
@@ -201,8 +201,8 @@ fn check_name_class_with_context(
     is_extends: bool,
 ) {
     let name_str = crate::parser::name_to_string_owned(name);
-    let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
-    if !type_exists_via_db(db, &resolved) {
+    let resolved = resolve_name(db, file.as_ref(), &name_str);
+    if !type_exists(db, &resolved) {
         // Soft-fallback: see call/function.rs for the rationale.
         // However, don't suppress if the class is version-filtered.
         if let Some(stub_path) = crate::stubs::stub_path_for_class(&resolved) {
@@ -303,8 +303,8 @@ pub(crate) fn check_expr_for_undefined_classes(
         // Check for undefined class in ::CONSTANT or ::class
         if let ExprKind::Identifier(class_name) = &cca.class.kind {
             let name_str = class_name.to_string();
-            let resolved = resolve_name_via_db(db, file.as_ref(), &name_str);
-            if !type_exists_via_db(db, &resolved) {
+            let resolved = resolve_name(db, file.as_ref(), &name_str);
+            if !type_exists(db, &resolved) {
                 let (line, col_start) =
                     offset_to_line_col(source, cca.class.span.start, source_map);
                 let (line_end, col_end) =

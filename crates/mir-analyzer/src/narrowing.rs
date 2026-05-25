@@ -84,7 +84,7 @@ pub fn narrow_from_condition(
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
-                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
@@ -92,7 +92,7 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
-                    let fqcn = crate::db::resolve_name_via_db(db, file, class_name_str.as_ref());
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
@@ -179,7 +179,7 @@ pub fn narrow_from_condition(
             if let Some(var_name) = extract_var_name(&b.left) {
                 if let Some(raw_name) = extract_class_name(&b.right, ctx.self_fqcn.as_deref()) {
                     // Resolve the short name to its FQCN using file imports
-                    let class_name = crate::db::resolve_name_via_db(db, file, &raw_name);
+                    let class_name = crate::db::resolve_name(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
                     let narrowed = if is_true {
                         narrow_instanceof_preserving_subtypes(
@@ -313,7 +313,7 @@ fn apply_docblock_assertions(
         crate::db::find_function(db, here).is_some()
     };
     let resolved_fn_name = {
-        let qualified = crate::db::resolve_name_via_db(db, file, &fn_name);
+        let qualified = crate::db::resolve_name(db, file, &fn_name);
         if fn_active(qualified.as_str()) {
             qualified
         } else if fn_active(fn_name.as_str()) {
@@ -383,7 +383,7 @@ fn narrow_or_instanceof_true(
                     extract_var_name(&b.left),
                     extract_class_name(&b.right, self_fqcn),
                 ) {
-                    let resolved = crate::db::resolve_name_via_db(db, file, &cn);
+                    let resolved = crate::db::resolve_name(db, file, &cn);
                     match var_name {
                         None => {
                             *var_name = Some(vn);
@@ -562,7 +562,7 @@ fn filter_out_instanceof_match(current: &Union, class_name: &str, db: &dyn MirDa
 }
 
 fn named_object_matches_instanceof(fqcn: &str, class_name: &str, db: &dyn MirDatabase) -> bool {
-    fqcn == class_name || crate::db::extends_or_implements_via_db(db, fqcn, class_name)
+    fqcn == class_name || crate::db::extends_or_implements(db, fqcn, class_name)
 }
 
 /// Apply a pre-computed narrowed type to a variable.
@@ -856,7 +856,7 @@ fn extract_enum_case(
 ) -> Option<(String, String)> {
     if let ExprKind::StaticPropertyAccess(spa) = &expr.kind {
         if let Some(enum_short_name) = extract_class_name(&spa.class, self_fqcn) {
-            let enum_fqcn = crate::db::resolve_name_via_db(db, file, &enum_short_name);
+            let enum_fqcn = crate::db::resolve_name(db, file, &enum_short_name);
             if let ExprKind::Identifier(case_name) = &spa.member.kind {
                 return Some((enum_fqcn, case_name.to_string()));
             }
@@ -876,7 +876,7 @@ fn extract_class_const_fqcn(
         return None;
     }
     let short = extract_class_name(&cca.class, self_fqcn)?;
-    Some(crate::db::resolve_name_via_db(db, file, &short))
+    Some(crate::db::resolve_name(db, file, &short))
 }
 
 fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {

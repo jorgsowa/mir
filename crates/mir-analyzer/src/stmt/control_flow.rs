@@ -357,7 +357,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.check_name_undefined_class(catch_ty);
                 if !self.inference_only {
                     let raw = parser::name_to_string_owned(catch_ty);
-                    let resolved = db::resolve_name_via_db(self.db, &self.file, &raw);
+                    let resolved = db::resolve_name(self.db, &self.file, &raw);
                     if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                         let span = catch_ty.span;
                         let (line, col_start) = self.offset_to_line_col(span.start);
@@ -379,7 +379,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     let mut u = Union::empty();
                     for catch_ty in catch.types.iter() {
                         let raw = parser::name_to_string_owned(catch_ty);
-                        let resolved = db::resolve_name_via_db(self.db, &self.file, &raw);
+                        let resolved = db::resolve_name(self.db, &self.file, &raw);
                         u.add_type(Atomic::TNamedObject {
                             fqcn: resolved.into(),
                             type_params: mir_types::union::empty_type_params(),

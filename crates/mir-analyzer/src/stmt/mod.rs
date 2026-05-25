@@ -341,11 +341,11 @@ impl<'a> StatementsAnalyzer<'a> {
     /// Emit `UndefinedClass` for a `Name` AST node if the resolved class does not exist.
     fn check_name_undefined_class(&mut self, name: &php_ast::owned::Name) {
         let raw = crate::parser::name_to_string_owned(name);
-        let resolved = crate::db::resolve_name_via_db(self.db, &self.file, &raw);
+        let resolved = crate::db::resolve_name(self.db, &self.file, &raw);
         if matches!(resolved.as_str(), "self" | "static" | "parent") {
             return;
         }
-        if crate::db::type_exists_via_db(self.db, &resolved) {
+        if crate::db::type_exists(self.db, &resolved) {
             return;
         }
         let span = name.span;

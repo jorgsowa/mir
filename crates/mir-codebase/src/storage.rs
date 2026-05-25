@@ -633,7 +633,7 @@ pub struct StubSlice {
     ///
     /// Stored as `Arc<FxHashMap<Symbol, Symbol>>` so that `file_imports()`
     /// returns a cheap Arc clone instead of deep-cloning the map on every
-    /// `resolve_name_via_db` call (which fires once per symbol reference in
+    /// `resolve_name` call (which fires once per symbol reference in
     /// Pass 2). `Symbol` keys/values shrink each entry from ~108 bytes
     /// (two `String` headers + two heap allocs averaging ~30 chars) to
     /// 16 bytes (two `Ustr` u64 handles); the global ustr interner holds

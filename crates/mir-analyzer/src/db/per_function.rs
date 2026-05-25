@@ -77,7 +77,7 @@ fn find_function_decl<'a>(
         if name.is_empty() {
             return false;
         }
-        let resolved = crate::db::resolve_name_via_db(db, file, name);
+        let resolved = crate::db::resolve_name(db, file, name);
         resolved == target_fqn
     }
     for stmt in program.stmts.iter() {

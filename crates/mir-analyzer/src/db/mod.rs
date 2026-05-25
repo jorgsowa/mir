@@ -23,7 +23,7 @@ pub trait MirDatabase: salsa::Database {
     ///
     /// Cheap to call: returns a cloned `Arc` of the underlying map stored
     /// inside the file's `StubSlice`, not a deep clone of the entries. body-analysis
-    /// `resolve_name_via_db` calls this on every symbol reference.
+    /// `resolve_name` calls this on every symbol reference.
     fn file_imports(&self, file: &str) -> Arc<FxHashMap<Symbol, Symbol>>;
 
     /// Return the known type for a PHP global variable.
@@ -152,11 +152,10 @@ pub use self::mirdb::MirDb;
 pub use self::nodes::*;
 pub use self::per_function::{infer_function, FunctionInferenceResult};
 pub use self::queries::{
-    class_constant_exists_in_chain, class_kind_via_db, class_template_params_via_db,
-    collect_file_definitions, collect_file_definitions_uncached, constant_exists_via_db,
-    extends_or_implements_via_db, function_exists_via_db, has_unknown_ancestor_via_db,
-    infer_file_return_types, inherited_template_bindings_via_db, is_unchecked_exception_via_db,
-    member_location_via_db, parse_file, resolve_name_via_db, type_exists_via_db, ClassKind,
+    class_constant_exists_in_chain, class_kind, class_template_params, collect_file_definitions,
+    collect_file_definitions_uncached, constant_exists, extends_or_implements, function_exists,
+    has_unknown_ancestor, infer_file_return_types, inherited_template_bindings,
+    is_unchecked_exception, member_location, parse_file, resolve_name, type_exists, ClassKind,
     InferredFileTypes, ParsedFile,
 };
 pub use self::reference_locations::*;

@@ -329,8 +329,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ) {
                     return;
                 }
-                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, &name_str);
-                if !crate::db::type_exists_via_db(self.db, &resolved) {
+                let resolved = crate::db::resolve_name(self.db, &self.file, &name_str);
+                if !crate::db::type_exists(self.db, &resolved) {
                     self.emit(
                         IssueKind::UndefinedClass { name: resolved },
                         Severity::Error,
@@ -388,7 +388,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let fqcn_str = fqcn.as_ref();
                 if !crate::db::has_method_in_chain(self.db, fqcn_str, "__toString")
-                    && !crate::db::extends_or_implements_via_db(self.db, fqcn_str, "Stringable")
+                    && !crate::db::extends_or_implements(self.db, fqcn_str, "Stringable")
                 {
                     self.emit(
                         IssueKind::ImplicitToStringCast {

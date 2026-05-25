@@ -141,7 +141,7 @@ impl CallAnalyzer {
             let qualified = if let Some(imported) = imports.get(&Symbol::new(fn_name.as_str())) {
                 imported.as_str().to_string()
             } else if fn_name.contains('\\') {
-                crate::db::resolve_name_via_db(ea.db, &ea.file, &fn_name)
+                crate::db::resolve_name(ea.db, &ea.file, &fn_name)
             } else if let Some(ns) = ea.db.file_namespace(&ea.file) {
                 format!("{}\\{}", ns, fn_name)
             } else {
@@ -390,14 +390,14 @@ impl CallAnalyzer {
 
             // Check inter-procedural throws: if callee declares @throws, check if caller covers them.
             // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
-            // PHP convention — see [`is_unchecked_exception_via_db`].
+            // PHP convention — see [`is_unchecked_exception`].
             for callee_throw in resolved.throws.iter() {
-                if crate::db::is_unchecked_exception_via_db(ea.db, callee_throw.as_ref()) {
+                if crate::db::is_unchecked_exception(ea.db, callee_throw.as_ref()) {
                     continue;
                 }
                 if !ctx.fn_declared_throws.iter().any(|declared| {
                     declared.as_ref() == callee_throw.as_ref()
-                        || crate::db::extends_or_implements_via_db(
+                        || crate::db::extends_or_implements(
                             ea.db,
                             callee_throw.as_ref(),
                             declared.as_ref(),

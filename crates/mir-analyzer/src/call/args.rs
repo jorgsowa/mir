@@ -12,15 +12,15 @@ use crate::expr::ExpressionAnalyzer;
 // Pure-db lookups, named without the `_db_or_codebase` suffix now that
 // the codebase fallback is gone (S5-PR12).
 fn type_exists(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    crate::db::type_exists_via_db(ea.db, fqcn)
+    crate::db::type_exists(ea.db, fqcn)
 }
 
 fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
-    crate::db::class_kind_via_db(ea.db, fqcn).is_some_and(|k| k.is_interface)
+    crate::db::class_kind(ea.db, fqcn).is_some_and(|k| k.is_interface)
 }
 
 fn class_template_params(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> Vec<TemplateParam> {
-    crate::db::class_template_params_via_db(ea.db, fqcn)
+    crate::db::class_template_params(ea.db, fqcn)
         .map(|tps| tps.to_vec())
         .unwrap_or_default()
 }
@@ -117,15 +117,11 @@ pub(crate) fn check_method_visibility(
     match visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
-            let from_trait = crate::db::class_kind_via_db(ea.db, owner_fqcn.as_ref())
-                .is_some_and(|k| k.is_trait);
+            let from_trait =
+                crate::db::class_kind(ea.db, owner_fqcn.as_ref()).is_some_and(|k| k.is_trait);
             let allowed = caller_fqcn == owner_fqcn.as_ref()
                 || (from_trait
-                    && crate::db::extends_or_implements_via_db(
-                        ea.db,
-                        caller_fqcn,
-                        owner_fqcn.as_ref(),
-                    ));
+                    && crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref()));
             if !allowed {
                 ea.emit(
                     IssueKind::UndefinedMethod {
@@ -150,11 +146,7 @@ pub(crate) fn check_method_visibility(
                 );
             } else {
                 let allowed = caller_fqcn == owner_fqcn.as_ref()
-                    || crate::db::extends_or_implements_via_db(
-                        ea.db,
-                        caller_fqcn,
-                        owner_fqcn.as_ref(),
-                    );
+                    || crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref());
                 if !allowed {
                     ea.emit(
                         IssueKind::UndefinedMethod {
@@ -512,7 +504,7 @@ fn project_generic_ancestor_type(
         Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => fqcn,
         _ => return None,
     };
-    let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
+    let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
 
     for param_atomic in &param_ty.types {
         let (param_fqcn, param_type_params) = match param_atomic {
@@ -523,7 +515,7 @@ fn project_generic_ancestor_type(
             continue;
         }
 
-        let resolved_param = crate::db::resolve_name_via_db(ea.db, &ea.file, param_fqcn.as_ref());
+        let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
         let ancestor_args = generic_ancestor_type_args(arg_fqcn.as_ref(), &resolved_param, ea)
             .or_else(|| generic_ancestor_type_args(&resolved_arg, &resolved_param, ea))
             .or_else(|| generic_ancestor_type_args(arg_fqcn.as_ref(), param_fqcn.as_ref(), ea))
@@ -549,7 +541,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             Atomic::TNamedObject { fqcn, .. } => fqcn,
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
                 let is_trait =
-                    crate::db::class_kind_via_db(ea.db, fqcn.as_ref()).is_some_and(|k| k.is_trait);
+                    crate::db::class_kind(ea.db, fqcn.as_ref()).is_some_and(|k| k.is_trait);
                 if is_trait {
                     return true;
                 }
@@ -576,7 +568,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     Atomic::TClassString(None) | Atomic::TString => true,
                     Atomic::TClassString(Some(param_cls)) => {
                         arg_cls == param_cls
-                            || crate::db::extends_or_implements_via_db(
+                            || crate::db::extends_or_implements(
                                 ea.db,
                                 arg_cls.as_ref(),
                                 param_cls.as_ref(),
@@ -602,7 +594,7 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             .iter()
             .any(|p| matches!(p, Atomic::TCallable { .. }))
         {
-            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
             if crate::db::has_method_in_chain(ea.db, &resolved_arg, "__invoke")
                 || crate::db::has_method_in_chain(ea.db, arg_fqcn.as_ref(), "__invoke")
             {
@@ -618,9 +610,8 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 Atomic::TParent { fqcn } => fqcn,
                 _ => return false,
             };
-            let resolved_param =
-                crate::db::resolve_name_via_db(ea.db, &ea.file, param_fqcn.as_ref());
-            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
+            let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
 
             let is_same_class = resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
@@ -648,17 +639,13 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
             }
 
             let arg_extends_param =
-                crate::db::extends_or_implements_via_db(ea.db, arg_fqcn.as_ref(), &resolved_param)
-                    || crate::db::extends_or_implements_via_db(
+                crate::db::extends_or_implements(ea.db, arg_fqcn.as_ref(), &resolved_param)
+                    || crate::db::extends_or_implements(
                         ea.db,
                         arg_fqcn.as_ref(),
                         param_fqcn.as_ref(),
                     )
-                    || crate::db::extends_or_implements_via_db(
-                        ea.db,
-                        &resolved_arg,
-                        &resolved_param,
-                    );
+                    || crate::db::extends_or_implements(ea.db, &resolved_arg, &resolved_param);
 
             if arg_extends_param {
                 let param_type_params = match p_atomic {
@@ -694,13 +681,9 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                 return true;
             }
 
-            if crate::db::extends_or_implements_via_db(ea.db, param_fqcn.as_ref(), &resolved_arg)
-                || crate::db::extends_or_implements_via_db(
-                    ea.db,
-                    param_fqcn.as_ref(),
-                    arg_fqcn.as_ref(),
-                )
-                || crate::db::extends_or_implements_via_db(ea.db, &resolved_param, &resolved_arg)
+            if crate::db::extends_or_implements(ea.db, param_fqcn.as_ref(), &resolved_arg)
+                || crate::db::extends_or_implements(ea.db, param_fqcn.as_ref(), arg_fqcn.as_ref())
+                || crate::db::extends_or_implements(ea.db, &resolved_param, &resolved_arg)
             {
                 let param_type_params = match p_atomic {
                     Atomic::TNamedObject { type_params, .. } => &type_params[..],
@@ -722,15 +705,12 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     }
                     let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn.as_ref());
                     if short_name == target
-                        && (crate::db::extends_or_implements_via_db(
-                            ea.db,
-                            fqcn.as_ref(),
-                            &resolved_param,
-                        ) || crate::db::extends_or_implements_via_db(
-                            ea.db,
-                            fqcn.as_ref(),
-                            param_fqcn.as_ref(),
-                        ))
+                        && (crate::db::extends_or_implements(ea.db, fqcn.as_ref(), &resolved_param)
+                            || crate::db::extends_or_implements(
+                                ea.db,
+                                fqcn.as_ref(),
+                                param_fqcn.as_ref(),
+                            ))
                     {
                         return true;
                     }
@@ -754,12 +734,12 @@ fn named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyzer<'_>)
                     .cloned()
                     .collect();
                 let compatible = class_fqcns.iter().any(|cls_fqcn| {
-                    crate::db::extends_or_implements_via_db(ea.db, cls_fqcn.as_ref(), iface_fqcn)
-                        && (crate::db::extends_or_implements_via_db(
+                    crate::db::extends_or_implements(ea.db, cls_fqcn.as_ref(), iface_fqcn)
+                        && (crate::db::extends_or_implements(
                             ea.db,
                             cls_fqcn.as_ref(),
                             param_fqcn.as_ref(),
-                        ) || crate::db::extends_or_implements_via_db(
+                        ) || crate::db::extends_or_implements(
                             ea.db,
                             cls_fqcn.as_ref(),
                             &resolved_param,
@@ -802,23 +782,14 @@ fn strict_named_object_subtype(arg: &Union, param: &Union, ea: &ExpressionAnalyz
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 _ => return false,
             };
-            let resolved_param =
-                crate::db::resolve_name_via_db(ea.db, &ea.file, param_fqcn.as_ref());
-            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, arg_fqcn.as_ref());
+            let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
             resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
                 || resolved_arg == param_fqcn.as_ref()
-                || crate::db::extends_or_implements_via_db(
-                    ea.db,
-                    arg_fqcn.as_ref(),
-                    &resolved_param,
-                )
-                || crate::db::extends_or_implements_via_db(
-                    ea.db,
-                    arg_fqcn.as_ref(),
-                    param_fqcn.as_ref(),
-                )
-                || crate::db::extends_or_implements_via_db(ea.db, &resolved_arg, &resolved_param)
+                || crate::db::extends_or_implements(ea.db, arg_fqcn.as_ref(), &resolved_param)
+                || crate::db::extends_or_implements(ea.db, arg_fqcn.as_ref(), param_fqcn.as_ref())
+                || crate::db::extends_or_implements(ea.db, &resolved_arg, &resolved_param)
         })
     })
 }
@@ -1035,13 +1006,13 @@ fn union_compatible(arg_ty: &Union, param_ty: &Union, ea: &ExpressionAnalyzer<'_
             if !pv_fqcn.contains('\\') && !type_exists(ea, pv_fqcn.as_ref()) {
                 return true;
             }
-            let resolved_param = crate::db::resolve_name_via_db(ea.db, &ea.file, pv_fqcn.as_ref());
-            let resolved_arg = crate::db::resolve_name_via_db(ea.db, &ea.file, av_fqcn.as_ref());
+            let resolved_param = crate::db::resolve_name(ea.db, &ea.file, pv_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, av_fqcn.as_ref());
             resolved_param == resolved_arg
-                || crate::db::extends_or_implements_via_db(ea.db, av_fqcn.as_ref(), &resolved_param)
-                || crate::db::extends_or_implements_via_db(ea.db, &resolved_arg, &resolved_param)
-                || crate::db::extends_or_implements_via_db(ea.db, pv_fqcn.as_ref(), &resolved_arg)
-                || crate::db::extends_or_implements_via_db(ea.db, &resolved_param, &resolved_arg)
+                || crate::db::extends_or_implements(ea.db, av_fqcn.as_ref(), &resolved_param)
+                || crate::db::extends_or_implements(ea.db, &resolved_arg, &resolved_param)
+                || crate::db::extends_or_implements(ea.db, pv_fqcn.as_ref(), &resolved_arg)
+                || crate::db::extends_or_implements(ea.db, &resolved_param, &resolved_arg)
         })
     })
 }
@@ -1086,8 +1057,8 @@ fn validate_callable_argument(
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
         // Check for "ClassName::methodName" format
         if let Some((class_name, method_name)) = s.split_once("::") {
-            let resolved_class = crate::db::resolve_name_via_db(ea.db, &ea.file, class_name);
-            if !crate::db::type_exists_via_db(ea.db, &resolved_class) {
+            let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
+            if !crate::db::type_exists(ea.db, &resolved_class) {
                 ea.emit(
                     IssueKind::UndefinedClass {
                         name: resolved_class,
@@ -1142,8 +1113,8 @@ fn validate_class_string_argument(
     }
 
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
-        let resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, s.as_ref());
-        if !crate::db::type_exists_via_db(ea.db, &resolved) {
+        let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
+        if !crate::db::type_exists(ea.db, &resolved) {
             ea.emit(
                 IssueKind::UndefinedClass { name: resolved },
                 Severity::Error,
@@ -1194,7 +1165,7 @@ fn validate_callable_type(
                     for obj_atomic in &obj_prop.ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = obj_atomic {
                             let resolved_class =
-                                crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn.as_ref());
+                                crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref());
                             let here =
                                 crate::db::Fqcn::new(ea.db, Symbol::from(resolved_class.as_str()));
                             if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {

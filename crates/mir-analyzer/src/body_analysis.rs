@@ -5,7 +5,7 @@ use mir_issues::Issue;
 use mir_types::{Symbol, Union};
 use parking_lot::Mutex;
 
-use crate::db::{resolve_name_via_db, MirDatabase};
+use crate::db::{resolve_name, MirDatabase};
 use crate::diagnostics::{
     check_expr_for_undefined_classes, check_name_class, check_type_hint_classes,
     collect_type_hint_class_refs, emit_unused_params, emit_unused_variables,
@@ -52,7 +52,7 @@ fn lookup_function_node_for_decl(
     file: &str,
     fn_name: &str,
 ) -> Option<(Arc<str>, Arc<mir_codebase::storage::FunctionDef>)> {
-    let qualified = resolve_name_via_db(db, file, fn_name);
+    let qualified = resolve_name(db, file, fn_name);
     let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::storage::FunctionDef>> {
         crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn))
     };
@@ -752,7 +752,7 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or("<anonymous>")
             .to_string();
         let class_name = class_name_owned.as_str();
-        let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
+        let resolved = resolve_name(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
@@ -1004,7 +1004,7 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or("<anonymous>")
             .to_string();
         let class_name = class_name_owned.as_str();
-        let resolved = resolve_name_via_db(self.db, file.as_ref(), class_name);
+        let resolved = resolve_name(self.db, file.as_ref(), class_name);
         let fqcn: &str = &resolved;
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
@@ -1264,8 +1264,7 @@ impl<'a> BodyAnalyzer<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved =
-            resolve_name_via_db(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
+        let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {
@@ -1350,8 +1349,7 @@ impl<'a> BodyAnalyzer<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        let resolved =
-            resolve_name_via_db(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
+        let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
         for member in decl.members.iter() {

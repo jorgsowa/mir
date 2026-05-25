@@ -49,9 +49,7 @@ impl CallAnalyzer {
         };
 
         let fqcn = match &call.class.kind {
-            ExprKind::Identifier(name) => {
-                crate::db::resolve_name_via_db(ea.db, &ea.file, name.as_ref())
-            }
+            ExprKind::Identifier(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
             _ => {
                 let ty = ea.analyze(&call.class, ctx);
                 // Check if the expression could evaluate to a valid class name
@@ -88,7 +86,7 @@ impl CallAnalyzer {
         let method_name_lower = method_name.to_lowercase();
 
         // Check if trying to call static method on an interface (not allowed)
-        if crate::db::type_exists_via_db(ea.db, &fqcn) {
+        if crate::db::type_exists(ea.db, &fqcn) {
             let here = crate::db::Fqcn::from_str(ea.db, fqcn_arc.as_ref());
             let is_interface = crate::db::find_class_like(ea.db, here)
                 .map(|c| c.is_interface())
@@ -177,10 +175,10 @@ impl CallAnalyzer {
                 ret.clone(),
             );
             ret
-        } else if crate::db::type_exists_via_db(ea.db, &fqcn)
-            && !crate::db::has_unknown_ancestor_via_db(ea.db, &fqcn)
+        } else if crate::db::type_exists(ea.db, &fqcn)
+            && !crate::db::has_unknown_ancestor(ea.db, &fqcn)
         {
-            let is_abstract = crate::db::class_kind_via_db(ea.db, &fqcn)
+            let is_abstract = crate::db::class_kind(ea.db, &fqcn)
                 .map(|k| k.is_abstract)
                 .unwrap_or(false);
             // Check for __callStatic in the full inheritance chain (not just direct methods)
@@ -198,7 +196,7 @@ impl CallAnalyzer {
                 );
                 Union::mixed()
             }
-        } else if !crate::db::type_exists_via_db(ea.db, &fqcn)
+        } else if !crate::db::type_exists(ea.db, &fqcn)
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
         {
             ea.emit(

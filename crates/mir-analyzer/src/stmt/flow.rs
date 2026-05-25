@@ -138,24 +138,24 @@ impl<'a> StatementsAnalyzer<'a> {
         for atomic in &thrown_ty.types {
             match atomic {
                 mir_types::Atomic::TNamedObject { fqcn, .. } => {
-                    let resolved = crate::db::resolve_name_via_db(self.db, &self.file, fqcn);
+                    let resolved = crate::db::resolve_name(self.db, &self.file, fqcn);
                     let is_throwable = resolved == "Throwable"
                         || resolved == "Exception"
                         || resolved == "Error"
                         || fqcn.as_ref() == "Throwable"
                         || fqcn.as_ref() == "Exception"
                         || fqcn.as_ref() == "Error"
-                        || crate::db::extends_or_implements_via_db(self.db, &resolved, "Throwable")
-                        || crate::db::extends_or_implements_via_db(self.db, &resolved, "Exception")
-                        || crate::db::extends_or_implements_via_db(self.db, &resolved, "Error")
-                        || crate::db::extends_or_implements_via_db(self.db, fqcn, "Throwable")
-                        || crate::db::extends_or_implements_via_db(self.db, fqcn, "Exception")
-                        || crate::db::extends_or_implements_via_db(self.db, fqcn, "Error")
+                        || crate::db::extends_or_implements(self.db, &resolved, "Throwable")
+                        || crate::db::extends_or_implements(self.db, &resolved, "Exception")
+                        || crate::db::extends_or_implements(self.db, &resolved, "Error")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Throwable")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Exception")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Error")
                         // Suppress if class has unknown ancestors (might be Throwable)
-                        || crate::db::has_unknown_ancestor_via_db(self.db, &resolved)
-                        || crate::db::has_unknown_ancestor_via_db(self.db, fqcn)
+                        || crate::db::has_unknown_ancestor(self.db, &resolved)
+                        || crate::db::has_unknown_ancestor(self.db, fqcn)
                         // Suppress if class is not in codebase at all (could be extension class)
-                        || (!crate::db::type_exists_via_db(self.db, &resolved) && !crate::db::type_exists_via_db(self.db, fqcn));
+                        || (!crate::db::type_exists(self.db, &resolved) && !crate::db::type_exists(self.db, fqcn));
                     if !is_throwable {
                         let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                         self.issues.add(mir_issues::Issue::new(
@@ -172,15 +172,15 @@ impl<'a> StatementsAnalyzer<'a> {
                         ));
                     } else {
                         // Check if thrown exception is covered by @throws declarations
-                        let thrown_fqcn = if crate::db::type_exists_via_db(self.db, &resolved) {
+                        let thrown_fqcn = if crate::db::type_exists(self.db, &resolved) {
                             &resolved
                         } else {
                             fqcn.as_ref()
                         };
-                        if !crate::db::is_unchecked_exception_via_db(self.db, thrown_fqcn)
+                        if !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
                             && !ctx.fn_declared_throws.iter().any(|declared| {
                                 declared.as_ref() == thrown_fqcn
-                                    || crate::db::extends_or_implements_via_db(
+                                    || crate::db::extends_or_implements(
                                         self.db,
                                         thrown_fqcn,
                                         declared.as_ref(),
@@ -208,18 +208,18 @@ impl<'a> StatementsAnalyzer<'a> {
                 mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
                 | mir_types::Atomic::TParent { fqcn } => {
-                    let resolved = crate::db::resolve_name_via_db(self.db, &self.file, fqcn);
+                    let resolved = crate::db::resolve_name(self.db, &self.file, fqcn);
                     let is_throwable = resolved == "Throwable"
                         || resolved == "Exception"
                         || resolved == "Error"
-                        || crate::db::extends_or_implements_via_db(self.db, &resolved, "Throwable")
-                        || crate::db::extends_or_implements_via_db(self.db, &resolved, "Exception")
-                        || crate::db::extends_or_implements_via_db(self.db, &resolved, "Error")
-                        || crate::db::extends_or_implements_via_db(self.db, fqcn, "Throwable")
-                        || crate::db::extends_or_implements_via_db(self.db, fqcn, "Exception")
-                        || crate::db::extends_or_implements_via_db(self.db, fqcn, "Error")
-                        || crate::db::has_unknown_ancestor_via_db(self.db, &resolved)
-                        || crate::db::has_unknown_ancestor_via_db(self.db, fqcn);
+                        || crate::db::extends_or_implements(self.db, &resolved, "Throwable")
+                        || crate::db::extends_or_implements(self.db, &resolved, "Exception")
+                        || crate::db::extends_or_implements(self.db, &resolved, "Error")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Throwable")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Exception")
+                        || crate::db::extends_or_implements(self.db, fqcn, "Error")
+                        || crate::db::has_unknown_ancestor(self.db, &resolved)
+                        || crate::db::has_unknown_ancestor(self.db, fqcn);
                     if !is_throwable {
                         let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                         self.issues.add(mir_issues::Issue::new(
@@ -236,15 +236,15 @@ impl<'a> StatementsAnalyzer<'a> {
                         ));
                     } else {
                         // Check if thrown exception is covered by @throws declarations
-                        let thrown_fqcn = if crate::db::type_exists_via_db(self.db, &resolved) {
+                        let thrown_fqcn = if crate::db::type_exists(self.db, &resolved) {
                             &resolved
                         } else {
                             fqcn.as_ref()
                         };
-                        if !crate::db::is_unchecked_exception_via_db(self.db, thrown_fqcn)
+                        if !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
                             && !ctx.fn_declared_throws.iter().any(|declared| {
                                 declared.as_ref() == thrown_fqcn
-                                    || crate::db::extends_or_implements_via_db(
+                                    || crate::db::extends_or_implements(
                                         self.db,
                                         thrown_fqcn,
                                         declared.as_ref(),

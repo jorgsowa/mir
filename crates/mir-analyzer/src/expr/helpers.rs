@@ -167,7 +167,7 @@ pub(crate) fn resolve_named_objects_in_union(
         .into_iter()
         .map(|a| match a {
             Atomic::TNamedObject { fqcn, type_params } => {
-                let resolved = crate::db::resolve_name_via_db(db, file, fqcn.as_ref());
+                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
                 Atomic::TNamedObject {
                     fqcn: resolved.into(),
                     type_params,
@@ -208,11 +208,7 @@ pub(crate) fn property_assign_compatible(
                 fqcn: prop_fqcn, ..
             } => {
                 arg_fqcn == prop_fqcn
-                    || crate::db::extends_or_implements_via_db(
-                        db,
-                        arg_fqcn.as_ref(),
-                        prop_fqcn.as_ref(),
-                    )
+                    || crate::db::extends_or_implements(db, arg_fqcn.as_ref(), prop_fqcn.as_ref())
             }
             Atomic::TObject | Atomic::TMixed => true,
             _ => false,

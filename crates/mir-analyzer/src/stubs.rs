@@ -507,9 +507,7 @@ pub fn is_builtin_function(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{
-        constant_exists_via_db, function_exists_via_db, type_exists_via_db, MirDatabase, MirDb,
-    };
+    use crate::db::{constant_exists, function_exists, type_exists, MirDatabase, MirDb};
 
     fn stubs_codebase() -> MirDb {
         let mut db = MirDb::default();
@@ -569,7 +567,7 @@ mod tests {
 
     fn assert_fn(cb: &MirDb, name: &str) {
         assert!(
-            function_exists_via_db(cb, name),
+            function_exists(cb, name),
             "expected stub for `{name}` to be registered"
         );
     }
@@ -730,21 +728,21 @@ mod tests {
 
     fn assert_cls(cb: &MirDb, name: &str) {
         assert!(
-            type_exists_via_db(cb, name),
+            type_exists(cb, name),
             "expected stub class `{name}` to be registered"
         );
     }
 
     fn assert_iface(cb: &MirDb, name: &str) {
         assert!(
-            type_exists_via_db(cb, name),
+            type_exists(cb, name),
             "expected stub interface `{name}` to be registered"
         );
     }
 
     fn assert_const(cb: &MirDb, name: &str) {
         assert!(
-            constant_exists_via_db(cb, name),
+            constant_exists(cb, name),
             "expected stub constant `{name}` to be registered"
         );
     }
@@ -849,11 +847,11 @@ mod tests {
         // `UndefinedFunction: Function Restore_Error_Handler() is not defined`
         // on mixed-case calls of built-ins.
         let cb = stubs_codebase();
-        assert!(function_exists_via_db(&cb, "strlen"));
-        assert!(function_exists_via_db(&cb, "STRLEN"));
-        assert!(function_exists_via_db(&cb, "StrLen"));
-        assert!(function_exists_via_db(&cb, "Restore_Error_Handler"));
-        assert!(function_exists_via_db(&cb, "RESTORE_ERROR_HANDLER"));
+        assert!(function_exists(&cb, "strlen"));
+        assert!(function_exists(&cb, "STRLEN"));
+        assert!(function_exists(&cb, "StrLen"));
+        assert!(function_exists(&cb, "Restore_Error_Handler"));
+        assert!(function_exists(&cb, "RESTORE_ERROR_HANDLER"));
     }
 
     #[test]
@@ -862,10 +860,10 @@ mod tests {
         // resolve to `ArrayObject`. Regression for `UndefinedClass` on
         // lower- or upper-cased built-in class references.
         let cb = stubs_codebase();
-        assert!(type_exists_via_db(&cb, "ArrayObject"));
-        assert!(type_exists_via_db(&cb, "arrayobject"));
-        assert!(type_exists_via_db(&cb, "ARRAYOBJECT"));
-        assert!(type_exists_via_db(&cb, "ArrayOBJECT"));
+        assert!(type_exists(&cb, "ArrayObject"));
+        assert!(type_exists(&cb, "arrayobject"));
+        assert!(type_exists(&cb, "ARRAYOBJECT"));
+        assert!(type_exists(&cb, "ArrayOBJECT"));
     }
 
     #[test]
@@ -874,9 +872,9 @@ mod tests {
         // Make sure the case-insensitivity fix for functions/classes did not
         // leak into constants.
         let cb = stubs_codebase();
-        assert!(constant_exists_via_db(&cb, "PHP_INT_MAX"));
-        assert!(!constant_exists_via_db(&cb, "php_int_max"));
-        assert!(!constant_exists_via_db(&cb, "Php_Int_Max"));
+        assert!(constant_exists(&cb, "PHP_INT_MAX"));
+        assert!(!constant_exists(&cb, "php_int_max"));
+        assert!(!constant_exists(&cb, "Php_Int_Max"));
     }
 
     #[test]

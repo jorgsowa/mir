@@ -1,6 +1,6 @@
 use mir_types::{Atomic, Symbol, Union};
 
-use crate::db::{extends_or_implements_via_db, MirDatabase};
+use crate::db::{extends_or_implements, MirDatabase};
 
 // ---------------------------------------------------------------------------
 // Named-object return type compatibility check
@@ -38,11 +38,7 @@ pub(crate) fn named_object_return_compatible(
                     Atomic::TClassString(None) => true,
                     Atomic::TClassString(Some(declared_cls)) => {
                         actual_cls == declared_cls
-                            || extends_or_implements_via_db(
-                                db,
-                                actual_cls.as_ref(),
-                                declared_cls.as_ref(),
-                            )
+                            || extends_or_implements(db, actual_cls.as_ref(), declared_cls.as_ref())
                     }
                     Atomic::TString => true,
                     _ => false,
@@ -68,8 +64,8 @@ pub(crate) fn named_object_return_compatible(
                 _ => return false,
             };
 
-            let resolved_declared = crate::db::resolve_name_via_db(db, file, declared_fqcn.as_ref());
-            let resolved_actual = crate::db::resolve_name_via_db(db, file, actual_fqcn.as_ref());
+            let resolved_declared = crate::db::resolve_name(db, file, declared_fqcn.as_ref());
+            let resolved_actual = crate::db::resolve_name(db, file, actual_fqcn.as_ref());
 
             // Self/static always compatible with the class itself
             if matches!(
@@ -79,15 +75,15 @@ pub(crate) fn named_object_return_compatible(
                     || actual_fqcn.as_ref() == declared_fqcn.as_ref()
                     || actual_fqcn.as_ref() == resolved_declared.as_str()
                     || resolved_actual.as_str() == declared_fqcn.as_ref()
-                    || extends_or_implements_via_db(db, actual_fqcn.as_ref(), &resolved_declared)
-                    || extends_or_implements_via_db(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
-                    || extends_or_implements_via_db(db, &resolved_actual, &resolved_declared)
-                    || extends_or_implements_via_db(db, &resolved_actual, declared_fqcn.as_ref())
+                    || extends_or_implements(db, actual_fqcn.as_ref(), &resolved_declared)
+                    || extends_or_implements(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
+                    || extends_or_implements(db, &resolved_actual, &resolved_declared)
+                    || extends_or_implements(db, &resolved_actual, declared_fqcn.as_ref())
                     // static(X) is compatible with declared Y if Y extends X
                     // (because when called on Y, static = Y which satisfies declared Y)
-                    || extends_or_implements_via_db(db, &resolved_declared, actual_fqcn.as_ref())
-                    || extends_or_implements_via_db(db, &resolved_declared, &resolved_actual)
-                    || extends_or_implements_via_db(db, declared_fqcn.as_ref(), actual_fqcn.as_ref()))
+                    || extends_or_implements(db, &resolved_declared, actual_fqcn.as_ref())
+                    || extends_or_implements(db, &resolved_declared, &resolved_actual)
+                    || extends_or_implements(db, declared_fqcn.as_ref(), actual_fqcn.as_ref()))
             {
                 return true;
             }
@@ -108,7 +104,7 @@ pub(crate) fn named_object_return_compatible(
                     _ => &[],
                 };
                 if !actual_type_params.is_empty() || !declared_type_params.is_empty() {
-                    let class_tps = crate::db::class_template_params_via_db(db, &resolved_declared)
+                    let class_tps = crate::db::class_template_params(db, &resolved_declared)
                         .map(|tps| tps.to_vec())
                         .unwrap_or_default();
                     return return_type_params_compatible(
@@ -121,10 +117,10 @@ pub(crate) fn named_object_return_compatible(
             }
 
             // Inheritance check
-            extends_or_implements_via_db(db, actual_fqcn.as_ref(), &resolved_declared)
-                || extends_or_implements_via_db(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
-                || extends_or_implements_via_db(db, &resolved_actual, &resolved_declared)
-                || extends_or_implements_via_db(db, &resolved_actual, declared_fqcn.as_ref())
+            extends_or_implements(db, actual_fqcn.as_ref(), &resolved_declared)
+                || extends_or_implements(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
+                || extends_or_implements(db, &resolved_actual, &resolved_declared)
+                || extends_or_implements(db, &resolved_actual, declared_fqcn.as_ref())
         })
     })
 }
@@ -209,8 +205,8 @@ pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabas
         // substitution context we don't have at the return-site.
         Atomic::TNamedObject { fqcn, type_params } => {
             type_params.iter().any(union_contains_template)
-                || !crate::db::type_exists_via_db(db, fqcn.as_ref())
-                || crate::db::class_kind_via_db(db, fqcn.as_ref()).is_some_and(|k| k.is_interface)
+                || !crate::db::type_exists(db, fqcn.as_ref())
+                || crate::db::class_kind(db, fqcn.as_ref()).is_some_and(|k| k.is_interface)
         }
         Atomic::TArray { value, .. }
         | Atomic::TList { value }
@@ -218,7 +214,7 @@ pub(super) fn declared_return_has_template(declared: &Union, db: &dyn MirDatabas
         | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !crate::db::type_exists_via_db(db, fqcn.as_ref())
+                !fqcn.contains('\\') && !crate::db::type_exists(db, fqcn.as_ref())
             }
             _ => false,
         }),
@@ -251,14 +247,14 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
             if !is_resolvable_class_name(fqcn.as_ref()) {
                 return Atomic::TNamedObject { fqcn, type_params };
             }
-            let resolved = crate::db::resolve_name_via_db(db, file, fqcn.as_ref());
+            let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
             Atomic::TNamedObject {
                 fqcn: resolved.into(),
                 type_params,
             }
         }
         Atomic::TClassString(Some(cls)) => {
-            let resolved = crate::db::resolve_name_via_db(db, file, cls.as_ref());
+            let resolved = crate::db::resolve_name(db, file, cls.as_ref());
             Atomic::TClassString(Some(resolved.into()))
         }
         Atomic::TList { value } => Atomic::TList {
@@ -314,11 +310,7 @@ pub(super) fn return_arrays_compatible(
                             Atomic::TClassString(None) | Atomic::TString => true,
                             Atomic::TClassString(Some(dv_cls)) => {
                                 av_cls == dv_cls
-                                    || extends_or_implements_via_db(
-                                        db,
-                                        av_cls.as_ref(),
-                                        dv_cls.as_ref(),
-                                    )
+                                    || extends_or_implements(db, av_cls.as_ref(), dv_cls.as_ref())
                             }
                             _ => false,
                         });
@@ -337,16 +329,14 @@ pub(super) fn return_arrays_compatible(
                         Atomic::TClosure { .. } => return true,
                         _ => return false,
                     };
-                    if !dv_fqcn.contains('\\')
-                        && !crate::db::type_exists_via_db(db, dv_fqcn.as_ref())
-                    {
+                    if !dv_fqcn.contains('\\') && !crate::db::type_exists(db, dv_fqcn.as_ref()) {
                         return true; // template param wildcard
                     }
-                    let res_dec = crate::db::resolve_name_via_db(db, file, dv_fqcn.as_ref());
-                    let res_act = crate::db::resolve_name_via_db(db, file, av_fqcn.as_ref());
+                    let res_dec = crate::db::resolve_name(db, file, dv_fqcn.as_ref());
+                    let res_act = crate::db::resolve_name(db, file, av_fqcn.as_ref());
                     res_dec == res_act
-                        || extends_or_implements_via_db(db, av_fqcn.as_ref(), &res_dec)
-                        || extends_or_implements_via_db(db, &res_act, &res_dec)
+                        || extends_or_implements(db, av_fqcn.as_ref(), &res_dec)
+                        || extends_or_implements(db, &res_act, &res_dec)
                 })
             })
         })

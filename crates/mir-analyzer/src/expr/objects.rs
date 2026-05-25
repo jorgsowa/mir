@@ -72,7 +72,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let class_ty = match &n.class.kind {
             ExprKind::Identifier(name) => {
-                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, name.as_ref());
+                let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = match resolved.as_str() {
                     "self" | "static" => ctx
                         .self_fqcn
@@ -85,7 +85,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .unwrap_or_else(|| Arc::from(resolved.as_str())),
                     _ => Arc::from(resolved.as_str()),
                 };
-                let type_exists = crate::db::type_exists_via_db(self.db, fqcn.as_ref());
+                let type_exists = crate::db::type_exists(self.db, fqcn.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") && !type_exists {
                     self.emit(
                         IssueKind::UndefinedClass {
@@ -289,9 +289,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     pub(super) fn analyze_static_property_access(&mut self, spa: &StaticAccessExpr) -> Union {
         if let ExprKind::Identifier(id) = &spa.class.kind {
-            let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+            let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
             if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                && !crate::db::type_exists_via_db(self.db, &resolved)
+                && !crate::db::type_exists(self.db, &resolved)
             {
                 self.emit(
                     IssueKind::UndefinedClass { name: resolved },
@@ -311,9 +311,9 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Union {
         if expr_name_str(&cca.member) == Some("class") {
             let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
-                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+                let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                    if !crate::db::type_exists_via_db(self.db, &resolved) {
+                    if !crate::db::type_exists(self.db, &resolved) {
                         self.emit(
                             IssueKind::UndefinedClass {
                                 name: resolved.clone(),
@@ -347,7 +347,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let fqcn = match &cca.class.kind {
             ExprKind::Identifier(id) => {
-                let resolved = crate::db::resolve_name_via_db(self.db, &self.file, id.as_ref());
+                let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 match resolved.as_str() {
                     "self" | "static" => {
                         let Some(self_fqcn) = &ctx.self_fqcn else {
@@ -358,7 +358,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self_fqcn,
                             &const_name,
                         );
-                        if !exists && !crate::db::has_unknown_ancestor_via_db(self.db, self_fqcn) {
+                        if !exists && !crate::db::has_unknown_ancestor(self.db, self_fqcn) {
                             self.emit(
                                 IssueKind::UndefinedConstant {
                                     name: format!("{self_fqcn}::{const_name}"),
@@ -378,8 +378,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             parent_fqcn,
                             &const_name,
                         );
-                        if !exists && !crate::db::has_unknown_ancestor_via_db(self.db, parent_fqcn)
-                        {
+                        if !exists && !crate::db::has_unknown_ancestor(self.db, parent_fqcn) {
                             self.emit(
                                 IssueKind::UndefinedConstant {
                                     name: format!("{parent_fqcn}::{const_name}"),
@@ -396,7 +395,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => return Union::mixed(),
         };
 
-        if !crate::db::type_exists_via_db(self.db, &fqcn) {
+        if !crate::db::type_exists(self.db, &fqcn) {
             self.emit(
                 IssueKind::UndefinedClass { name: fqcn },
                 Severity::Error,
@@ -417,7 +416,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
-        if !const_exists && !crate::db::has_unknown_ancestor_via_db(self.db, &fqcn) {
+        if !const_exists && !crate::db::has_unknown_ancestor(self.db, &fqcn) {
             self.emit(
                 IssueKind::UndefinedConstant {
                     name: format!("{fqcn}::{const_name}"),
@@ -438,7 +437,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         for atomic in &obj_ty.types {
             match atomic {
                 Atomic::TNamedObject { fqcn, .. }
-                    if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
+                    if crate::db::class_kind(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
                     let prop_found: Option<Union> = crate::db::find_property_in_chain(
@@ -460,7 +459,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                         return ty;
                     }
-                    if !crate::db::has_unknown_ancestor_via_db(self.db, fqcn.as_ref())
+                    if !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())
                         && !crate::db::has_method_in_chain(self.db, fqcn.as_ref(), "__get")
                     {
                         self.emit(
@@ -475,8 +474,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Union::mixed();
                 }
                 Atomic::TNamedObject { fqcn, .. }
-                    if crate::db::class_kind_via_db(self.db, fqcn.as_ref())
-                        .is_some_and(|k| k.is_enum) =>
+                    if crate::db::class_kind(self.db, fqcn.as_ref()).is_some_and(|k| k.is_enum) =>
                 {
                     match prop_name {
                         "name" => return Union::single(Atomic::TNonEmptyString),

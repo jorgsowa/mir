@@ -150,7 +150,7 @@ impl AnalysisSession {
 
     fn type_exists(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
-        crate::db::type_exists_via_db(&db, fqcn)
+        crate::db::type_exists(&db, fqcn)
     }
 
     fn collect_and_ingest_source(

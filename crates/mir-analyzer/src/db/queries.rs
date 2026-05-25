@@ -17,7 +17,7 @@ pub struct ClassKind {
     pub is_abstract: bool,
 }
 
-pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
+pub fn class_kind(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     let class = crate::db::find_class_like(db, here)?;
     Some(ClassKind {
@@ -28,22 +28,22 @@ pub fn class_kind_via_db(db: &dyn MirDatabase, fqcn: &str) -> Option<ClassKind> 
     })
 }
 
-pub fn type_exists_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
+pub fn type_exists(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     crate::db::find_class_like(db, here).is_some()
 }
 
-pub fn function_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
+pub fn function_exists(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqn);
     crate::db::find_function(db, here).is_some()
 }
 
-pub fn constant_exists_via_db(db: &dyn MirDatabase, fqn: &str) -> bool {
+pub fn constant_exists(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqn);
     crate::db::find_global_constant(db, here).is_some()
 }
 
-pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> String {
+pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     if name.starts_with('\\') {
         return name.trim_start_matches('\\').to_string();
     }
@@ -63,7 +63,7 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
         }
         // If the name is already a known FQCN (e.g. stored in TNamedObject by a prior
         // resolution step), return it unchanged to avoid double-prepending the namespace.
-        if type_exists_via_db(db, name) {
+        if type_exists(db, name) {
             return name.to_string();
         }
         // Qualified name not yet in the DB (PSR-4 lazy-load will fire after this call):
@@ -93,10 +93,7 @@ pub fn resolve_name_via_db(db: &dyn MirDatabase, file: &str, name: &str) -> Stri
     name.to_string()
 }
 
-pub fn class_template_params_via_db(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-) -> Option<Arc<[TemplateParam]>> {
+pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[TemplateParam]>> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     let class = crate::db::find_class_like(db, here)?;
     Some(Arc::from(class.template_params().to_vec()))
@@ -105,10 +102,7 @@ pub fn class_template_params_via_db(
 /// Walk the parent chain collecting template bindings from `@extends` type
 /// args. For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`,
 /// returns `{ T → User }` where `T` is `BaseRepo`'s declared template parameter.
-pub fn inherited_template_bindings_via_db(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-) -> FxHashMap<Symbol, Union> {
+pub fn inherited_template_bindings(db: &dyn MirDatabase, fqcn: &str) -> FxHashMap<Symbol, Union> {
     let mut bindings: FxHashMap<Symbol, Union> = FxHashMap::default();
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     let mut current: Arc<str> = Arc::from(fqcn);
@@ -126,7 +120,7 @@ pub fn inherited_template_bindings_via_db(
         };
         let extends_type_args = class.extends_type_args();
         if !extends_type_args.is_empty() {
-            if let Some(parent_tps) = class_template_params_via_db(db, parent.as_ref()) {
+            if let Some(parent_tps) = class_template_params(db, parent.as_ref()) {
                 for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
                     bindings.entry(tp.name).or_insert_with(|| ty.clone());
                 }
@@ -137,7 +131,7 @@ pub fn inherited_template_bindings_via_db(
     bindings
 }
 
-pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
+pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     if crate::db::find_class_like(db, here).is_none() {
         return false;
@@ -145,14 +139,10 @@ pub fn has_unknown_ancestor_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::class_ancestors_by_fqcn(db, here)
         .iter()
         .skip(1) // self
-        .any(|ancestor| !type_exists_via_db(db, ancestor))
+        .any(|ancestor| !type_exists(db, ancestor))
 }
 
-pub fn member_location_via_db(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-    member_name: &str,
-) -> Option<Location> {
+pub fn member_location(db: &dyn MirDatabase, fqcn: &str, member_name: &str) -> Option<Location> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     if let Some((_, storage)) = crate::db::find_method_in_chain(db, here, member_name) {
         if let Some(loc) = storage.location.clone() {
@@ -177,7 +167,7 @@ pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_na
     crate::db::find_class_constant_in_chain(db, here, const_name).is_some()
 }
 
-pub fn extends_or_implements_via_db(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
+pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
     if child == ancestor {
         return true;
     }
@@ -505,7 +495,7 @@ pub(crate) fn collect_accumulated_issues(
     all_issues
 }
 
-pub fn is_unchecked_exception_via_db(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    extends_or_implements_via_db(db, fqcn, "RuntimeException")
-        || extends_or_implements_via_db(db, fqcn, "LogicException")
+pub fn is_unchecked_exception(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    extends_or_implements(db, fqcn, "RuntimeException")
+        || extends_or_implements(db, fqcn, "LogicException")
 }

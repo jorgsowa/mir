@@ -59,7 +59,7 @@ impl ClassLike {
     ///
     /// `@mixin` FQCNs are intentionally excluded here — they are handled by
     /// `find_method_in_chain` via a separate cycle-safe walk so they don't
-    /// affect `has_unknown_ancestor_via_db` checks.
+    /// affect `has_unknown_ancestor` checks.
     pub fn ancestor_fqcns(&self) -> Vec<Arc<str>> {
         match self {
             ClassLike::Class(c) => {
@@ -625,7 +625,7 @@ pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool
 /// Walk the inheritance chain of `fqcn` and return the first method
 /// matching `name` (case-insensitive PHP semantics), along with the FQCN
 /// of the class that declared it. Also searches `@mixin` classes via a
-/// separate cycle-safe walk so they don't pollute `has_unknown_ancestor_via_db`.
+/// separate cycle-safe walk so they don't pollute `has_unknown_ancestor`.
 pub fn find_method_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,

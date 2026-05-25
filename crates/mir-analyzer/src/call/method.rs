@@ -164,7 +164,7 @@ impl CallAnalyzer {
                     fqcn,
                     type_params: receiver_type_params,
                 } => {
-                    let fqcn_resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
+                    let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     result.merge_with(&resolve_method_return(
                         ea,
@@ -181,7 +181,7 @@ impl CallAnalyzer {
                 mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
                 | mir_types::Atomic::TParent { fqcn } => {
-                    let fqcn_resolved = crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
+                    let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     result.merge_with(&resolve_method_return(
                         ea,
@@ -205,8 +205,7 @@ impl CallAnalyzer {
                                 type_params: receiver_type_params,
                             } = inner_atomic
                             {
-                                let fqcn_resolved =
-                                    crate::db::resolve_name_via_db(ea.db, &ea.file, fqcn);
+                                let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
                                 let resolved_arc = Arc::from(fqcn_resolved.as_str());
                                 if crate::db::has_method_in_chain(ea.db, &resolved_arc, method_name)
                                 {
@@ -353,11 +352,11 @@ fn resolve_method_return<'a>(
             .collect();
         // Build class-level template bindings before arg-checking so we can substitute
         // template params (e.g. T → int from Box<int>) into param types.
-        let class_tps = crate::db::class_template_params_via_db(ea.db, fqcn)
+        let class_tps = crate::db::class_template_params(ea.db, fqcn)
             .map(|tps| tps.to_vec())
             .unwrap_or_default();
         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
-        for (k, v) in crate::db::inherited_template_bindings_via_db(ea.db, fqcn) {
+        for (k, v) in crate::db::inherited_template_bindings(ea.db, fqcn) {
             bindings.entry(k).or_insert(v);
         }
 
@@ -428,14 +427,14 @@ fn resolve_method_return<'a>(
 
         // Check inter-procedural throws: if callee declares @throws, check if caller covers them.
         // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
-        // PHP convention — see [`is_unchecked_exception_via_db`].
+        // PHP convention — see [`is_unchecked_exception`].
         for callee_throw in resolved.throws.iter() {
-            if crate::db::is_unchecked_exception_via_db(ea.db, callee_throw.as_ref()) {
+            if crate::db::is_unchecked_exception(ea.db, callee_throw.as_ref()) {
                 continue;
             }
             if !ctx.fn_declared_throws.iter().any(|declared| {
                 declared.as_ref() == callee_throw.as_ref()
-                    || crate::db::extends_or_implements_via_db(
+                    || crate::db::extends_or_implements(
                         ea.db,
                         callee_throw.as_ref(),
                         declared.as_ref(),
@@ -456,10 +455,8 @@ fn resolve_method_return<'a>(
         } else {
             ret_raw
         }
-    } else if crate::db::type_exists_via_db(ea.db, fqcn)
-        && !crate::db::has_unknown_ancestor_via_db(ea.db, fqcn)
-    {
-        let (is_interface, is_abstract) = crate::db::class_kind_via_db(ea.db, fqcn)
+    } else if crate::db::type_exists(ea.db, fqcn) && !crate::db::has_unknown_ancestor(ea.db, fqcn) {
+        let (is_interface, is_abstract) = crate::db::class_kind(ea.db, fqcn)
             .map(|k| (k.is_interface, k.is_abstract))
             .unwrap_or((false, false));
         // Check for __call in the full inheritance chain (not just direct methods)

@@ -169,8 +169,8 @@ impl AnalysisSession {
         self.psr4 = Some(map);
         self.resolver = Some(resolver.clone());
         // Mirror into MirDb so salsa-tracked resolver queries
-        // (`db::resolve_fqcn_to_path`, Phase 2) see the same resolver and
-        // are invalidated on swap.
+        // (`db::resolve_fqcn_to_path`) see the same resolver and are
+        // invalidated on swap.
         self.db.salsa.write().set_resolver(Some(resolver));
         self
     }
@@ -377,7 +377,7 @@ impl AnalysisSession {
         let resolved: Vec<String> = {
             let db = self.snapshot_db();
             refs.into_iter()
-                .map(|raw| crate::db::resolve_name_via_db(&db, file, &raw))
+                .map(|raw| crate::db::resolve_name(&db, file, &raw))
                 .collect()
         };
         for fqcn in resolved {
@@ -704,7 +704,7 @@ impl AnalysisSession {
             crate::Symbol::Method { class, name }
             | crate::Symbol::Property { class, name }
             | crate::Symbol::ClassConstant { class, name } => {
-                crate::db::member_location_via_db(&db, class, name)
+                crate::db::member_location(&db, class, name)
                     .ok_or(crate::SymbolLookupError::NotFound)
             }
             crate::Symbol::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
@@ -1018,14 +1018,14 @@ impl AnalysisSession {
     /// the codebase. Case-insensitive lookup with optional leading backslash.
     pub fn contains_function(&self, fqn: &str) -> bool {
         let db = self.snapshot_db();
-        crate::db::function_exists_via_db(&db, fqn)
+        crate::db::function_exists(&db, fqn)
     }
 
     /// Returns `true` if a class / interface / trait / enum with `fqcn` is
     /// registered and active in the codebase.
     pub fn contains_class(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
-        crate::db::type_exists_via_db(&db, fqcn)
+        crate::db::type_exists(&db, fqcn)
     }
 
     /// Returns `true` if `class` has a method named `name` registered. Method
@@ -1679,7 +1679,7 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 /// AST visitor that collects class FQCN references for PSR-4 preloading.
 /// Captures identifiers from `new X`, static calls / property / constant
 /// access, type hints, and `instanceof`. Does *not* normalize via PSR-4 /
-/// imports — callers run the raw string through `resolve_name_via_db`.
+/// imports — callers run the raw string through `resolve_name`.
 fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String> {
     use php_ast::ast::BinaryOp;
     use php_ast::owned::visitor::{

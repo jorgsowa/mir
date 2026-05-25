@@ -11,7 +11,7 @@ use super::*;
 // extended interfaces + their ancestors (for an interface).
 //
 // Empty for enums and traits — by design; consumers handling those kinds
-// go through `extends_or_implements_via_db` or `trait_provides_method`
+// go through `extends_or_implements` or `trait_provides_method`
 // directly.
 
 fn ancestors_initial<'db>(
