@@ -386,13 +386,13 @@ pub fn global_constant_in_file<'db>(
 /// Salsa-tracked per-(file, idx) class storage. One memo entry per distinct
 /// class ever queried; subsequent calls return the same Arc cheaply.
 #[salsa::tracked]
-pub fn class_storage_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<ClassDef>> {
+pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.classes.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
-pub fn interface_storage_at(
+pub fn interface_def_at(
     db: &dyn MirDatabase,
     file: SourceFile,
     idx: u32,
@@ -402,19 +402,19 @@ pub fn interface_storage_at(
 }
 
 #[salsa::tracked]
-pub fn trait_storage_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<TraitDef>> {
+pub fn trait_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.traits.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
-pub fn enum_storage_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<EnumDef>> {
+pub fn enum_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
     defs.slice.enums.get(idx as usize).cloned()
 }
 
 #[salsa::tracked]
-pub fn function_storage_at(
+pub fn function_def_at(
     db: &dyn MirDatabase,
     file: SourceFile,
     idx: u32,
@@ -436,16 +436,12 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     let index = crate::db::workspace_index(db);
     let loc = index.class_like.get(&key).copied()?;
     match loc {
-        SymbolLoc::Class { file, idx } => {
-            class_storage_at(db, file, idx as u32).map(ClassLike::Class)
-        }
+        SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32).map(ClassLike::Class),
         SymbolLoc::Interface { file, idx } => {
-            interface_storage_at(db, file, idx as u32).map(ClassLike::Interface)
+            interface_def_at(db, file, idx as u32).map(ClassLike::Interface)
         }
-        SymbolLoc::Trait { file, idx } => {
-            trait_storage_at(db, file, idx as u32).map(ClassLike::Trait)
-        }
-        SymbolLoc::Enum { file, idx } => enum_storage_at(db, file, idx as u32).map(ClassLike::Enum),
+        SymbolLoc::Trait { file, idx } => trait_def_at(db, file, idx as u32).map(ClassLike::Trait),
+        SymbolLoc::Enum { file, idx } => enum_def_at(db, file, idx as u32).map(ClassLike::Enum),
         SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => None,
     }
 }
@@ -459,7 +455,7 @@ pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Ar
     let SymbolLoc::Function { file, idx } = index.functions.get(&key).copied()? else {
         return None;
     };
-    function_storage_at(db, file, idx as u32)
+    function_def_at(db, file, idx as u32)
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate a global
