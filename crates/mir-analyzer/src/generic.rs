@@ -428,6 +428,9 @@ fn infer_from_pair(
                 }
             }
 
+            // TConditional in param position is intentionally unsupported —
+            // binding a template from a conditional type requires a constraint
+            // solver that doesn't exist here.
             _ => {}
         }
     }
