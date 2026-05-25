@@ -34,7 +34,7 @@ class MyTest extends TestCase {
 
     public function setUp(): void {
         $prophecy = $this->prophesize(Foo::class);
-        /** @mir-check $prophecy is Prophecy\Prophecy\ObjectProphecy<object> */
+        /** @mir-check $prophecy is Prophecy\Prophecy\ObjectProphecy<Foo> */
         $this->prophecy = $prophecy;
     }
 }

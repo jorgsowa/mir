@@ -649,6 +649,21 @@ impl Type {
                         type_params: vec_to_type_params(new_params),
                     });
                 }
+                // class-string<T> → substitute T from bindings
+                Atomic::TClassString(Some(param_name)) => {
+                    if let Some(resolved) = bindings.get(param_name) {
+                        for r_atomic in &resolved.types {
+                            let cls_name = if let Atomic::TNamedObject { fqcn, .. } = r_atomic {
+                                Some(*fqcn)
+                            } else {
+                                None
+                            };
+                            result.add_type(Atomic::TClassString(cls_name));
+                        }
+                    } else {
+                        result.add_type(atomic.clone());
+                    }
+                }
                 _ => {
                     result.add_type(atomic.clone());
                 }

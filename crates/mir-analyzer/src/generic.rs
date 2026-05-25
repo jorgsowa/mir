@@ -3,7 +3,7 @@
 use rustc_hash::FxHashMap;
 
 use mir_codebase::storage::{FnParam, TemplateParam};
-use mir_types::{atomic::ArrayKey, Atomic, Name, Type};
+use mir_types::{atomic::ArrayKey, union::empty_type_params, Atomic, Name, Type};
 
 use crate::db::MirDatabase;
 
@@ -306,6 +306,124 @@ fn infer_from_pair(
                                 infer_from_pair(p_param, a_param, template_names, bindings);
                             }
                         }
+                    }
+                }
+            }
+
+            // Closure(T1, T2): R matched against Closure(t1, t2): r
+            Atomic::TClosure {
+                params: p_params,
+                return_type: p_ret,
+                ..
+            } => {
+                for a_atomic in &arg_ty.types {
+                    match a_atomic {
+                        Atomic::TClosure {
+                            params: a_params,
+                            return_type: a_ret,
+                            ..
+                        } => {
+                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
+                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
+                                    infer_from_pair(
+                                        &pt.to_union(),
+                                        &at.to_union(),
+                                        template_names,
+                                        bindings,
+                                    );
+                                }
+                            }
+                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                        }
+                        Atomic::TCallable {
+                            params: Some(a_params),
+                            return_type: Some(a_ret),
+                        } => {
+                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
+                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
+                                    infer_from_pair(
+                                        &pt.to_union(),
+                                        &at.to_union(),
+                                        template_names,
+                                        bindings,
+                                    );
+                                }
+                            }
+                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // callable(T1, T2): R matched against callable(t1, t2): r or Closure(...)
+            Atomic::TCallable {
+                params: Some(p_params),
+                return_type: Some(p_ret),
+            } => {
+                for a_atomic in &arg_ty.types {
+                    match a_atomic {
+                        Atomic::TCallable {
+                            params: Some(a_params),
+                            return_type: Some(a_ret),
+                        } => {
+                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
+                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
+                                    infer_from_pair(
+                                        &pt.to_union(),
+                                        &at.to_union(),
+                                        template_names,
+                                        bindings,
+                                    );
+                                }
+                            }
+                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                        }
+                        Atomic::TClosure {
+                            params: a_params,
+                            return_type: a_ret,
+                            ..
+                        } => {
+                            for (pp, ap) in p_params.iter().zip(a_params.iter()) {
+                                if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
+                                    infer_from_pair(
+                                        &pt.to_union(),
+                                        &at.to_union(),
+                                        template_names,
+                                        bindings,
+                                    );
+                                }
+                            }
+                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // A&B intersection — recurse each part against the full arg
+            Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    infer_from_pair(part, arg_ty, template_names, bindings);
+                }
+            }
+
+            // class-string<T> matched against class-string<SomeClass>
+            Atomic::TClassString(Some(param_name)) if template_names.contains(param_name) => {
+                for a_atomic in &arg_ty.types {
+                    let cls_ty = match a_atomic {
+                        Atomic::TClassString(Some(arg_cls)) => {
+                            Some(Type::single(Atomic::TNamedObject {
+                                fqcn: *arg_cls,
+                                type_params: empty_type_params(),
+                            }))
+                        }
+                        Atomic::TClassString(None) => Some(Type::single(Atomic::TObject)),
+                        _ => None,
+                    };
+                    if let Some(cls_ty) = cls_ty {
+                        let entry = bindings.entry(*param_name).or_insert_with(Type::empty);
+                        entry.merge_with(&cls_ty);
                     }
                 }
             }

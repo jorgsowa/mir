@@ -21,7 +21,7 @@ class Container {
 $factory = new WrapperFactory();
 $c = new Container();
 $wrapper = $factory->make(stdClass::class);
-/** @mir-check $wrapper is GenericWrapper<object> */
+/** @mir-check $wrapper is GenericWrapper<stdClass> */
 $c->bare = $wrapper;
 ===expect===
 UnusedParam@11:26: Parameter $cls is never used
