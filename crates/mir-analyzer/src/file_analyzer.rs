@@ -1,13 +1,13 @@
 //! Per-file analysis entry point for incremental analysis.
 //!
-//! [`FileAnalyzer`] runs single-pass Pass 2 against an [`AnalysisSession`] and
+//! [`FileAnalyzer`] runs single-pass body analysis against an [`AnalysisSession`] and
 //! returns issues + resolved symbols for one file. Unlike
 //! [`crate::ProjectAnalyzer::re_analyze_file`], it does **not** run the
-//! inference-only Pass 2 sweep — that's a batch concern. For cross-file
+//! inference-only body analysis sweep — that's a batch concern. For cross-file
 //! inferred return types, schedule a project-wide inference sweep on idle.
 //!
 //! Caller is responsible for parsing the file and passing owned AST.
-//! The session must already have Pass 1 state for any files whose definitions
+//! The session must already have definition collection state for any files whose definitions
 //! this analysis depends on; call [`AnalysisSession::ingest_file`] first.
 //!
 //! For batch multi-file analysis, use [`BatchFileAnalyzer::analyze_batch`]
@@ -47,7 +47,7 @@ impl FileAnalysis {
     }
 }
 
-/// Per-file Pass 2 analyzer bound to an [`AnalysisSession`]. Cheap to
+/// Per-file body analysis analyzer bound to an [`AnalysisSession`]. Cheap to
 /// construct — typically held transiently per analysis call.
 pub struct FileAnalyzer<'a> {
     session: &'a AnalysisSession,
@@ -58,12 +58,12 @@ impl<'a> FileAnalyzer<'a> {
         Self { session }
     }
 
-    /// Run Pass 2 against a db snapshot.
+    /// Run body analysis against a db snapshot.
     ///
-    /// Pass 2 runs against a cloned db snapshot — the lock is not held during
+    /// body analysis runs against a cloned db snapshot — the lock is not held during
     /// analysis, so concurrent edits and reads on the session proceed without
     /// blocking on this call. PSR-4-mapped classes referenced in the AST are
-    /// pre-loaded before Pass 2 so `find_class_like` resolves them in a single
+    /// pre-loaded before body analysis so `find_class_like` resolves them in a single
     /// pass via the salsa query graph.
     pub fn analyze(
         &self,

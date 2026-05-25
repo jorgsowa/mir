@@ -89,26 +89,6 @@ type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
 const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
 impl AnalysisSession {
-    /// Create a session reusing an existing [`AnalyzerDb`]. Internal API
-    /// used to keep a single db alive across session rebuilds.
-    #[doc(hidden)]
-    pub fn from_db(php_version: PhpVersion, db: Arc<AnalyzerDb>) -> Self {
-        Self {
-            db,
-            cache: None,
-            psr4: None,
-            resolver: None,
-            php_version,
-            user_stub_files: Vec::new(),
-            user_stub_dirs: Vec::new(),
-            file_id_map: Arc::new(RwLock::new(FileIdMap::new())),
-            reverse_dep_map: Arc::new(RwLock::new(HashMap::default())),
-            stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
-            unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
-            source_provider: Arc::new(crate::FsSourceProvider),
-        }
-    }
-
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
         Self {
@@ -135,11 +115,11 @@ impl AnalysisSession {
         self
     }
 
-    /// Attach a pre-built [`AnalysisCache`] (the Pass-2 issue cache) and
-    /// open a sibling Pass-1 [`StubSlice`] cache under the same root, so
+    /// Attach a pre-built [`AnalysisCache`] (the body-analysis issue cache) and
+    /// open a sibling definition [`StubSlice`] cache under the same root, so
     /// callers using this builder get the same speedup as `with_cache_dir`.
     ///
-    /// Rebuilds the shared database to attach the Pass-1 cache — call
+    /// Rebuilds the shared database to attach the definition cache — call
     /// **before** any file is ingested. A debug assertion catches misuse.
     ///
     /// [`StubSlice`]: mir_codebase::storage::StubSlice
@@ -157,8 +137,8 @@ impl AnalysisSession {
 
     /// Convenience: open a disk-backed cache at `cache_dir` and attach it.
     ///
-    /// Attaches both the Pass-2 issue cache ([`AnalysisCache`]) and the
-    /// Pass-1 [`StubSlice`] cache to the shared database. Builds a fresh
+    /// Attaches both the body-analysis issue cache ([`AnalysisCache`]) and the
+    /// definition [`StubSlice`] cache to the shared database. Builds a fresh
     /// [`AnalyzerDb`] internally — call **before** any file is ingested. A
     /// debug assertion catches misuse.
     ///
@@ -365,7 +345,7 @@ impl AnalysisSession {
     /// The current implementation reuses [`crate::diagnostics::collect_referenced_class_fqcns`]
     /// already used by the diagnostics pass. Missing classes are passed
     /// through [`Self::load_class_transitive`] so their inheritance
-    /// chain is also primed (Pass-2 reads parents/interfaces while
+    /// chain is also primed (body analysis reads parents/interfaces while
     /// resolving members).
     /// Returns true if this session has a configured class resolver
     /// (typically a PSR-4 / classmap autoloader chained with the stub
@@ -427,7 +407,7 @@ impl AnalysisSession {
 
     /// Commit a batch of reference locations from a db snapshot into the
     /// session's shared maps.  Called by [`crate::FileAnalyzer`] and
-    /// [`crate::BatchFileAnalyzer`] after parallel Pass 2 to flush the pending
+    /// [`crate::BatchFileAnalyzer`] after parallel body analysis to flush the pending
     /// buffers that accumulate in worker db clones.
     pub(crate) fn commit_ref_locs_batch(&self, locs: Vec<RefLoc>) {
         if locs.is_empty() {
@@ -447,7 +427,7 @@ impl AnalysisSession {
         f(&db)
     }
 
-    /// Pass 1 ingestion. Updates the file's source text in the salsa db,
+    /// definition-collection ingestion. Updates the file's source text in the salsa db,
     /// runs definition collection, and ingests the resulting stub slice.
     /// Triggers stub loading on first call. Also updates the cache's reverse-
     /// dependency graph for `file` so cross-file invalidation stays correct
@@ -525,16 +505,16 @@ impl AnalysisSession {
     }
 
     /// Register `source` as the text of `file` in the salsa input layer **without**
-    /// parsing or running Pass 1.
+    /// parsing or running definition collection.
     ///
     /// This is the LSP-friendly bulk-population entry point: after a workspace
     /// scan, callers can feed every discovered file's text to the session
     /// cheaply (an Arc clone plus a HashMap insert per file). Symbol resolution
     /// then happens on demand via [`Self::load_class`], which reads
     /// the file from disk through the configured [`crate::ClassResolver`] and
-    /// runs Pass 1 lazily when a class FQCN actually needs to resolve.
+    /// runs definition collection lazily when a class FQCN actually needs to resolve.
     ///
-    /// Contrast with [`Self::ingest_file`], which eagerly parses, runs Pass 1,
+    /// Contrast with [`Self::ingest_file`], which eagerly parses, runs definition collection,
     /// and populates the symbol index. Use `ingest_file` for files the user is
     /// actively editing (where in-memory text diverges from disk); use
     /// `set_file_text` for files known only through the workspace scan.
@@ -556,7 +536,7 @@ impl AnalysisSession {
     /// dependency verification for every HIGH-durability file, reducing
     /// `workspace_symbol_index` re-verification cost to O(project files only).
     ///
-    /// Pass 1 runs lazily on first symbol access; no parsing at call time.
+    /// Definition collection runs lazily on first symbol access; no parsing at call time.
     pub fn set_stable_workspace_files<I>(&self, files: I)
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
@@ -594,7 +574,7 @@ impl AnalysisSession {
     /// session.set_workspace_files(files);
     /// ```
     /// After this call, every file's source text is known to salsa. No
-    /// parsing has happened yet — Pass 1 runs per file on the first
+    /// parsing has happened yet — Definition collection runs per file on the first
     /// `load_class` that needs to consult it.
     pub fn set_workspace_files<I>(&self, files: I)
     where
@@ -1214,7 +1194,7 @@ impl AnalysisSession {
 
     /// Retrieve the source text the session has registered for `file`, if
     /// any. Returns `None` when the file has never been ingested. Used by
-    /// the parallel re-analysis path to re-feed dependents to Pass 2 without
+    /// the parallel re-analysis path to re-feed dependents to body analysis without
     /// the caller having to track sources independently.
     pub fn source_of(&self, file: &str) -> Option<Arc<str>> {
         let db = self.snapshot_db();
@@ -1259,7 +1239,7 @@ impl AnalysisSession {
 
         // Phase 2: parallel parse + analyze. Each rayon worker gets its own
         // database snapshot via FileAnalyzer; writes are isolated to the
-        // session's canonical db (none happen here since we only run Pass 2).
+        // session's canonical db (none happen here since we only run body analysis).
         with_source
             .into_par_iter()
             .map(|(file, source)| {
@@ -1409,10 +1389,10 @@ impl AnalysisSession {
     ///
     /// O(D) where D is the number of transitive dependents — faster than
     /// [`Self::dependency_graph().transitive_dependents()`] which rebuilds the
-    /// full graph on every call. Only covers Pass 1 structural dependencies
+    /// full graph on every call. Only covers structural dependencies from definition collection
     /// (imports, class hierarchy, type hints); does not include bare FQN body
-    /// references recorded during Pass 2. For full fidelity, use
-    /// `dependency_graph().transitive_dependents()` after Pass 2 is complete.
+    /// references recorded during body analysis. For full fidelity, use
+    /// `dependency_graph().transitive_dependents()` after body analysis is complete.
     pub fn structural_dependents_of(&self, file: &str) -> Vec<String> {
         let Some(start_id) = self.file_id_map.read().get(file) else {
             return Vec::new();
@@ -1493,11 +1473,11 @@ impl AnalysisSession {
             }
         }
 
-        // Merge Pass 1 structural deps from the incremental reverse_dep_map.
-        // dependency_graph() above only captures Pass 2 bare-FQN references;
+        // Merge structural deps from definition collection from the incremental reverse_dep_map.
+        // dependency_graph() above only captures bare-FQN references recorded during body analysis;
         // the reverse_dep_map covers imports, class hierarchy (extends/implements/use),
         // and type-hint-only references that never appear in file_referenced_symbols.
-        // Together they give a complete picture without requiring Pass 2 on every file.
+        // Together they give a complete picture without requiring body analysis on every file.
         {
             let id_map = self.file_id_map.read();
             let rev = self.reverse_dep_map.read();
@@ -1685,7 +1665,7 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
         }
     }
 
-    // Also track bare-FQN references recorded during Pass 2 (new \Foo(), \Foo::method(),
+    // Also track bare-FQN references recorded during body analysis (new \Foo(), \Foo::method(),
     // \foo()) that do not appear in use-import statements.
     for symbol_key in db.file_referenced_symbols(file) {
         let lookup: &str = match symbol_key.split_once("::") {

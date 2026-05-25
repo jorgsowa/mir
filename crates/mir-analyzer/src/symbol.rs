@@ -1,4 +1,4 @@
-//! Per-expression resolved symbol data, retained from Pass 2.
+//! Per-expression resolved symbol data, retained from body analysis.
 //!
 //! The static analyzer already resolves types for every expression during
 //! analysis but historically discarded the intermediate state.  This module
@@ -10,7 +10,7 @@ use std::sync::Arc;
 use mir_types::Union;
 use php_ast::Span;
 
-/// A single resolved symbol observed during Pass 2.
+/// A single resolved symbol observed during body analysis.
 #[derive(Debug, Clone)]
 pub struct ResolvedSymbol {
     /// Absolute path of the file this symbol was found in.

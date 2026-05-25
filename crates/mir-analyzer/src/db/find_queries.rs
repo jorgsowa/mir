@@ -382,7 +382,7 @@ pub fn global_constant_in_file<'db>(
 /// this from a tracked context are correctly invalidated when either the
 /// resolver or the defining file's text changes. No prior `ingest_file`
 /// call is required: the file's text must be registered (via
-/// `set_file_text` or `set_workspace_files`), but Pass-1 collection
+/// `set_file_text` or `set_workspace_files`), but definition-collection collection
 /// happens on demand inside salsa.
 /// Salsa-tracked per-(file, idx) class storage. One memo entry per distinct
 /// class ever queried; subsequent calls return the same Arc cheaply.
@@ -443,7 +443,7 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     //
     // `Symbol::ascii_lowercase` is memoized — first call per unique FQCN
     // allocates the lowercase string and interns it; subsequent calls hit a
-    // process-global DashMap. The hot Pass-2 path becomes alloc-free after
+    // process-global DashMap. The hot body-analysis path becomes alloc-free after
     // warmup.
     let key = fqcn.name(db).ascii_lowercase();
     let index = crate::db::workspace_index(db);

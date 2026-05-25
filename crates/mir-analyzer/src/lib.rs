@@ -322,7 +322,7 @@ pub use mir_types::Union as Type;
 /// [`mir_codebase::storage::Location`] (file path + 1-based line range +
 /// 0-based codepoint columns) using `source` and the parser's `source_map`.
 ///
-/// This is the canonical way for consumers to translate Pass-2 result spans
+/// This is the canonical way for consumers to translate body-analysis result spans
 /// (e.g. [`crate::symbol::ResolvedSymbol::span`]) into source locations they
 /// can hand to their own protocol layer. Consumers that need different
 /// position semantics (LSP UTF-16 code units, byte offsets, etc.) translate

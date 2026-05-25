@@ -21,7 +21,7 @@ use mir_types::Union;
 
 use super::*;
 
-/// Output of [`infer_function`]: everything Pass-2 produces for one free function
+/// Output of [`infer_function`]: everything body-analysis produces for one free function
 /// that we want salsa to memoize.
 ///
 /// Notably excludes [`crate::symbol::ResolvedSymbol`]s — those are intentionally
@@ -107,7 +107,7 @@ fn find_function_decl<'a>(
 
 /// Per-function inference tracked query.
 ///
-/// Runs Pass-2 analysis on the single function `fn_fqn` declared in `file`.
+/// Runs body-analysis analysis on the single function `fn_fqn` declared in `file`.
 /// Returns memoized issues + reference-locations + inferred return type.
 /// Returns `None` only when the function declaration can't be located in the
 /// file's AST (e.g. fn_fqn does not refer to a function declared in this file).

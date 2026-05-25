@@ -1,6 +1,6 @@
-//! Demand-driven inferred return type lookups for Pass 2.
+//! Demand-driven inferred return type lookups for body analysis.
 //!
-//! Pass-2 callers use [`inferred_function_return_type_demand`] /
+//! body-analysis callers use [`inferred_function_return_type_demand`] /
 //! [`inferred_method_return_type_demand`] to resolve cross-file inferred
 //! return types on demand via the salsa query graph.  No pre-committed
 //! singleton is needed.

@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
-/// Pass 1 — Definition collector.
+/// definition collection — Definition collector.
 ///
 /// Visits every top-level declaration in the AST and produces a `StubSlice`
 /// containing class, function, and constant signatures. No type inference
@@ -843,7 +843,7 @@ mod tests {
     // produce correct diagnostics, the slice must carry the same namespace and
     // import data that project.rs collects via its separate AST walk. If either
     // field is missing from the slice, StatementsAnalyzer receives empty maps
-    // during Pass 2 and emits false UndefinedClass diagnostics for use-aliased
+    // during body analysis and emits false UndefinedClass diagnostics for use-aliased
     // or same-namespace classes.
 
     #[test]
@@ -865,7 +865,7 @@ mod tests {
     fn collect_slice_captures_use_imports() {
         // All `use` imports (plain and aliased) must end up in slice.imports so
         // that file_imports() can derive them via collect_file_definitions and
-        // Pass 2 can resolve short names like `new Entity()` correctly.
+        // body analysis can resolve short names like `new Entity()` correctly.
         let slice = parse_and_collect_slice(
             "src/Handler.php",
             "<?php\nnamespace App\\Service;\nuse App\\Model\\Entity;\nuse App\\Repository\\EntityRepo as Repo;\nclass Handler {}\n",

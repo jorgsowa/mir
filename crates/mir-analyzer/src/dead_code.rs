@@ -1,6 +1,6 @@
 /// Dead-code detector (M18).
 ///
-/// After Pass 2 has recorded all method/property/function references into the
+/// After body analysis has recorded all method/property/function references into the
 /// codebase, this analyzer walks every class and reports:
 ///
 /// - `UnusedMethod`   — private method that is never called

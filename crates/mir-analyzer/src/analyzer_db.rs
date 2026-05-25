@@ -65,7 +65,7 @@ pub struct AnalyzerDb {
     pub(crate) loaded_stubs: Mutex<HashSet<&'static str>>,
     /// Whether user stubs have been ingested.
     pub(crate) user_stubs_loaded: std::sync::atomic::AtomicBool,
-    /// Optional Pass-1 disk cache. When `Some`, `collect_and_ingest_file`
+    /// Optional definition-collection disk cache. When `Some`, `collect_and_ingest_file`
     /// (the per-file LSP path) consults the cache before parsing and writes
     /// back on misses. Wired in by [`Self::with_cache_dir`].
     pub(crate) stub_cache: Option<Arc<crate::stub_cache::StubSliceCache>>,
@@ -88,7 +88,7 @@ impl AnalyzerDb {
         }
     }
 
-    /// Attach a persistent Pass-1 cache stored under `cache_dir`. Future
+    /// Attach a persistent definition cache stored under `cache_dir`. Future
     /// calls to [`Self::collect_and_ingest_file`] will consult the cache
     /// before parsing and write back on misses. The target PHP version is
     /// passed per call so the same cache directory remains usable across
@@ -225,7 +225,7 @@ impl AnalyzerDb {
         // ---- Phase 0: cache lookup before parsing --------------------------
         // On a hit, we avoid the arena alloc, parse, and definition-collection
         // walk entirely — the dominant cost on cold sessions. Parse-error
-        // issues aren't cached (they're reported through Pass 2 anyway for
+        // issues aren't cached (they're reported through body analysis anyway for
         // project files), so a hit returns an empty issues list.
 
         // Always compute the content hash — needed for both cache paths and

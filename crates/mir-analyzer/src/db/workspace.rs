@@ -100,7 +100,7 @@ pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
 // WorkspaceSymbolIndex — Phase 6 hot-path lookup map.
 //
 // One salsa-tracked query builds a comprehensive FQCN → storage map across
-// every registered SourceFile. Pass-2 takes the `Arc<...>` once and reads
+// every registered SourceFile. body-analysis takes the `Arc<...>` once and reads
 // O(1) thereafter, bypassing the 3-4-deep nested tracked-query stack the
 // previous design paid for every method/class lookup.
 //
@@ -258,7 +258,7 @@ pub struct WorkspaceSymbolIndexSingleton {
 pub struct WorkspaceSymbolIndex {
     /// Class / interface / trait / enum FQCN (lowercased Symbol) → location.
     ///
-    /// Keys are `Symbol` rather than `String` so lookups from the Pass-2 hot
+    /// Keys are `Symbol` rather than `String` so lookups from the body-analysis hot
     /// path are u64 pointer-eq comparisons instead of byte-by-byte string
     /// hashes — and so the caller doesn't have to allocate a `String` to do
     /// the lookup. The lowercased symbol is computed once at index-build

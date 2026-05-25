@@ -178,7 +178,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
-    /// Pass 2: walk all function/method bodies in one file, return issues, and
+    /// body analysis: walk all function/method bodies in one file, return issues, and
     /// write inferred return types back to the codebase.
     pub(crate) fn analyze_bodies(
         &self,

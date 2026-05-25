@@ -22,7 +22,7 @@ pub trait MirDatabase: salsa::Database {
     /// Return this file's `use` alias map.
     ///
     /// Cheap to call: returns a cloned `Arc` of the underlying map stored
-    /// inside the file's `StubSlice`, not a deep clone of the entries. Pass-2
+    /// inside the file's `StubSlice`, not a deep clone of the entries. body-analysis
     /// `resolve_name_via_db` calls this on every symbol reference.
     fn file_imports(&self, file: &str) -> Arc<FxHashMap<Symbol, Symbol>>;
 
@@ -53,7 +53,7 @@ pub trait MirDatabase: salsa::Database {
 
     /// Drain pending reference locations staged on this db handle.
     ///
-    /// Pass 2 routes each `record_reference_location` call through a
+    /// body analysis routes each `record_reference_location` call through a
     /// per-clone staging buffer; consumers (rayon orchestrators, the
     /// `analyze_file` tracked query) drain via this trait method so the
     /// underlying `MirDb` doesn't need to be named.

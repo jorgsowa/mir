@@ -28,7 +28,7 @@ type FileReferences = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 type SymbolReferencers = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
 
 /// Per-clone staging buffer for reference locations recorded during a parallel
-/// Pass 2 worker.  `record_reference_location` pushes here instead of directly
+/// body analysis worker.  `record_reference_location` pushes here instead of directly
 /// into the shared `Arc<Mutex<...>>` maps, eliminating cross-thread contention.
 /// After the parallel phase the owner calls `take_pending_ref_locs` and commits
 /// the batch serially via `commit_reference_locations_batch`.

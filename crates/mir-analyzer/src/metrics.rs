@@ -2,7 +2,7 @@
 //!
 //! Captures data we need to decide whether the pull-based refactor
 //! (Phases 3–5 of `sequential-popping-parasol.md`) is justified: how often
-//! `FileAnalyzer`'s post-Pass-2 retry loop iterates, how much time each
+//! `FileAnalyzer`'s post-body-analysis retry loop iterates, how much time each
 //! iteration costs, and how many lazy loads it triggers.
 //!
 //! When `MIR_TIMING` is unset the counters are no-ops (an `AtomicBool` check
@@ -27,7 +27,7 @@ fn enabled() -> bool {
 pub struct Counters {
     /// Number of `FileAnalyzer::analyze` invocations.
     pub file_analyses: AtomicU64,
-    /// Number of Pass-2 invocations summed across all analyses. Equals
+    /// Number of body-analysis invocations summed across all analyses. Equals
     /// `file_analyses` if the retry loop never iterated.
     pub body_analysis_runs: AtomicU64,
     /// Iterations of the retry loop (`file_analyzer.rs`'s
@@ -38,7 +38,7 @@ pub struct Counters {
     pub lazy_loads_attempted: AtomicU64,
     /// Lazy loads that resolved to a class (the call returned `Some`).
     pub lazy_loads_resolved: AtomicU64,
-    /// Total Pass-2 wall time in microseconds.
+    /// Total body-analysis wall time in microseconds.
     pub body_analysis_micros: AtomicU64,
 
     /// `collect_and_ingest_file` calls that hit the on-disk stub cache.
@@ -61,7 +61,7 @@ pub struct Counters {
     pub ll_fail_source_unreadable: AtomicU64,
     /// Resolver mapped, source read, but after `ingest_file` the class is
     /// still not present in the index. Most interesting bucket — points at
-    /// FQCN normalization mismatch, Pass-1 collection gap, or
+    /// FQCN normalization mismatch, definition-collection collection gap, or
     /// resolver-points-at-wrong-file.
     pub ll_fail_ingest_then_missing: AtomicU64,
 }
@@ -207,7 +207,7 @@ fn render_samples() -> String {
     out
 }
 
-/// RAII scope guard for measuring Pass-2 wall time. Drop emits the record.
+/// RAII scope guard for measuring body-analysis wall time. Drop emits the record.
 pub struct BodyAnalysisScope {
     start: Option<Instant>,
 }

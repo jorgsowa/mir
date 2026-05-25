@@ -277,10 +277,10 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             StmtKind::Interface(_) | StmtKind::Trait(_) | StmtKind::Enum(_) => {
-                // Interfaces/traits/enums are collected in Pass 1 — skip here
+                // Interfaces/traits/enums are collected in definition collection — skip here
             }
 
-            // ---- Namespace / use (at file level, already handled in Pass 1) --
+            // ---- Namespace / use (at file level, already handled in definition collection) --
             StmtKind::Namespace(_) | StmtKind::Use(_) | StmtKind::Const(_) => {}
 
             // ---- Inert --------------------------------------------------------

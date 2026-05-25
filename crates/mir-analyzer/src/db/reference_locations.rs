@@ -75,7 +75,7 @@ pub struct AnalyzeFileInput {
 
 // S4 Step 3: Lazy inferred-type queries
 //
-// These tracked queries compute inferred return types on-demand during Pass 2.
+// These tracked queries compute inferred return types on-demand during body analysis.
 // When `BodyAnalyzer` encounters a function/method call, it reads the inferred
 // type via these queries instead of from a pre-computed buffer.
 //
@@ -115,7 +115,7 @@ pub(crate) fn collect_accumulated_issues(
 /// Tracked-query skeleton for `analyze_file`.
 ///
 /// **Current behavior (S4 step 2):** parses the file, emits parse-error issues,
-/// and calls Pass 2 to analyze function/method bodies. Issues and reference
+/// and calls body analysis to analyze function/method bodies. Issues and reference
 /// locations are emitted via `IssueAccumulator` and `RefLocAccumulator`.
 ///
 /// Inferred return types are resolved on demand via `inferred_function_return_type_demand`
@@ -155,7 +155,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
             IssueAccumulator(issue).accumulate(db);
         }
 
-        // Drain reference locations that Pass 2 staged in this db's pending
+        // Drain reference locations that body analysis staged in this db's pending
         // buffer and emit each via the accumulator. The shared
         // reference_locations map is intentionally NOT mutated from inside
         // the tracked query — consumers (`collect_accumulated_issues`,

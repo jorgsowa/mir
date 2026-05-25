@@ -2,7 +2,7 @@
 ///
 /// Cache key: file path.  Cache validity: BLAKE3 hash of file content.
 /// If the content hash matches what was stored, the cached issues are returned
-/// and Pass 2 analysis is skipped for that file.
+/// and body analysis analysis is skipped for that file.
 ///
 /// Internally, path strings are mapped to compact [`FileId`] integers so the
 /// hot-path lookups (`get` / `put`) hash a `u32` instead of a full path string.
@@ -38,7 +38,7 @@ pub fn hash_content(content: &str) -> String {
 struct CacheEntry {
     content_hash: String,
     issues: Vec<Issue>,
-    /// Reference locations recorded during Pass 2: (symbol_key, line, col_start, col_end).
+    /// Reference locations recorded during body analysis: (symbol_key, line, col_start, col_end).
     /// Stored so that cache hits can replay symbol_reference_locations without re-running
     /// analyze_bodies.
     #[serde(default)]
@@ -55,7 +55,7 @@ struct CacheFile {
     #[serde(default)]
     entries: HashMap<String, CacheEntry>,
     /// Reverse dependency graph: defining_file → [files that depend on it].
-    /// Persisted so that the next run can invalidate dependents before Pass 1.
+    /// Persisted so that the next run can invalidate dependents before definition collection.
     #[serde(default)]
     reverse_deps: HashMap<String, HashSet<String>>,
 }
@@ -120,7 +120,7 @@ impl AnalysisCache {
     }
 
     /// Directory the cache was opened from. Useful for callers that want to
-    /// open a sibling cache (e.g. the Pass-1 `StubSliceCache`) under the
+    /// open a sibling cache (e.g. the definition-collection `StubSliceCache`) under the
     /// same root.
     pub fn cache_dir(&self) -> &Path {
         &self.cache_dir
@@ -145,7 +145,7 @@ impl AnalysisCache {
 
     /// Store `issues` and `reference_locations` for `file_path` with the given
     /// `content_hash`. `reference_locations` is a list of
-    /// `(symbol_key, line, col_start, col_end)` recorded during Pass 2.
+    /// `(symbol_key, line, col_start, col_end)` recorded during body analysis.
     pub fn put(
         &self,
         file_path: &str,
@@ -205,7 +205,7 @@ impl AnalysisCache {
         }
     }
 
-    /// Replace the reverse dependency graph (called after each Pass 1).
+    /// Replace the reverse dependency graph (called after each definition collection).
     pub fn set_reverse_deps(&self, deps: HashMap<String, HashSet<String>>) {
         let mut id_map = self.file_id_map.lock();
         let converted: HashMap<FileId, HashSet<FileId>> = deps
