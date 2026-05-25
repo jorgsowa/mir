@@ -10,5 +10,3 @@ function my_helper(string $s): void { undeclared_call(); }
 <?php
 function test(): void { my_helper('hello'); }
 ===expect===
-===ignore===
-TODO

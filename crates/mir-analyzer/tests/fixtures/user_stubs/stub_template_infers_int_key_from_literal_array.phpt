@@ -9,7 +9,7 @@ suppress=UnusedVariable,UnusedFunction
  * @template TKey of array-key
  * @template TValue
  * @param array<TKey, TValue> $array
- * @phpstan-return list<TKey>
+ * @return list<TKey>
  */
 function array_key_list(array $array): array {}
 ===file:App.php===
@@ -17,5 +17,6 @@ function array_key_list(array $array): array {}
 function test(): void {
     $keys = array_key_list([0 => 'a', 1 => 'b']);
     /** @mir-check $keys is list<int> */
+    $_ = $keys;
 }
 ===expect===

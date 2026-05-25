@@ -1,8 +1,7 @@
 ===description===
-stub with @template TKey returns list<TKey> inferred from typed array<string, int> parameter
+passing array<object, mixed> to @template TKey of array-key violates the bound
 ===config===
 stub_file=stubs/helpers.php
-suppress=UnusedVariable,UnusedFunction
 ===file:stubs/helpers.php===
 <?php
 /**
@@ -14,12 +13,9 @@ suppress=UnusedVariable,UnusedFunction
 function array_key_list(array $array): array {}
 ===file:App.php===
 <?php
-/**
- * @param array<string, int> $arr
- */
+/** @param array<object, int> $arr */
 function test(array $arr): void {
-    $keys = array_key_list($arr);
-    /** @mir-check $keys is list<string> */
-    $_ = $keys;
+    array_key_list($arr);
 }
 ===expect===
+App.php: InvalidTemplateParam@4:5: Template type 'TKey' inferred as 'object' does not satisfy bound 'int|string'

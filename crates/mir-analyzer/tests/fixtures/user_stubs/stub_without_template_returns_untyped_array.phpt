@@ -1,16 +1,10 @@
 ===description===
-stub with @template TKey returns list<TKey> inferred as list<string> from string-keyed literal array
+stub without @template annotations returns array<mixed, mixed>, not a typed list
 ===config===
 stub_file=stubs/helpers.php
 suppress=UnusedVariable,UnusedFunction
 ===file:stubs/helpers.php===
 <?php
-/**
- * @template TKey of array-key
- * @template TValue
- * @param array<TKey, TValue> $array
- * @return list<TKey>
- */
 function array_key_list(array $array): array {}
 ===file:App.php===
 <?php
@@ -20,3 +14,4 @@ function test(): void {
     $_ = $keys;
 }
 ===expect===
+App.php: TypeCheckMismatch@5:5: Type of $keys is expected to be list<string>, got array<mixed, mixed>

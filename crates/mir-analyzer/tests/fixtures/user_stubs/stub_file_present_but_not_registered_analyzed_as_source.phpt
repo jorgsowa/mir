@@ -1,7 +1,7 @@
 ===description===
-stub with @template TKey returns list<TKey> inferred from typed array<string, int> parameter
+a helpers file present on disk but not registered via stub_file= is analyzed as a
+regular source file — its symbols are available but its body is checked for errors
 ===config===
-stub_file=stubs/helpers.php
 suppress=UnusedVariable,UnusedFunction
 ===file:stubs/helpers.php===
 <?php
@@ -23,3 +23,4 @@ function test(array $arr): void {
     $_ = $keys;
 }
 ===expect===
+helpers.php: UnusedParam@8:25: Parameter $array is never used

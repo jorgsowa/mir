@@ -1,5 +1,5 @@
 ===description===
-stub with @template TKey returns list<TKey> inferred from typed array<string, int> parameter
+stub using wrong template variable in return type produces a mismatched list type
 ===config===
 stub_file=stubs/helpers.php
 suppress=UnusedVariable,UnusedFunction
@@ -9,7 +9,7 @@ suppress=UnusedVariable,UnusedFunction
  * @template TKey of array-key
  * @template TValue
  * @param array<TKey, TValue> $array
- * @return list<TKey>
+ * @return list<TValue>
  */
 function array_key_list(array $array): array {}
 ===file:App.php===
@@ -23,3 +23,4 @@ function test(array $arr): void {
     $_ = $keys;
 }
 ===expect===
+App.php: TypeCheckMismatch@8:5: Type of $keys is expected to be list<string>, got list<int>
