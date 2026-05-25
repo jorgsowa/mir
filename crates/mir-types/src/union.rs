@@ -180,6 +180,26 @@ impl Union {
             return;
         }
 
+        // Simplify trivial conditional types: (X is ? T : T) → T
+        let atomic = if let Atomic::TConditional {
+            subject: _,
+            if_true,
+            if_false,
+        } = &atomic
+        {
+            if if_true == if_false {
+                // Both branches are identical, so the conditional is meaningless.
+                // Extract all types from the constant branch and add them individually.
+                for t in &if_true.types {
+                    self.add_type(t.clone());
+                }
+                return;
+            }
+            atomic
+        } else {
+            atomic
+        };
+
         // Avoid exact duplicates.
         if self.types.contains(&atomic) {
             return;
@@ -775,6 +795,21 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // TNamedObject(X) satisfies self(X) / static(X) with same FQCN
         (Atomic::TNamedObject { fqcn: a, .. }, Atomic::TSelf { fqcn: b }) => a == b,
         (Atomic::TNamedObject { fqcn: a, .. }, Atomic::TStaticObject { fqcn: b }) => a == b,
+        // Bare generic accepts parameterized form: ObjectProphecy accepts ObjectProphecy<T>
+        // (sup has empty type_params, sub has any type_params with same FQCN)
+        (
+            Atomic::TNamedObject {
+                fqcn: sub_fqcn,
+                type_params: sub_params,
+            },
+            Atomic::TNamedObject {
+                fqcn: sup_fqcn,
+                type_params: sup_params,
+            },
+        ) => {
+            sub_fqcn == sup_fqcn
+                && (sup_params.is_empty() || sub_params.is_empty() || sub_params == sup_params)
+        }
 
         // Literal int widens to float in PHP
         (Atomic::TLiteralInt(_), Atomic::TFloat) => true,
