@@ -18,11 +18,11 @@ use parking_lot::RwLock;
 
 use mir_codebase::{FileId, FileIdMap};
 
+use crate::analyzer_db::AnalyzerDb;
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
 use crate::db::{MirDatabase, MirDb, RefLoc};
 use crate::php_version::PhpVersion;
-use crate::shared_db::SharedDb;
 
 /// Long-lived analysis context. Owns the salsa database and tracks which
 /// stubs have been loaded.
@@ -32,7 +32,7 @@ use crate::shared_db::SharedDb;
 /// [`Self::with_db_mut`].
 pub struct AnalysisSession {
     /// Shared database management (salsa, file registry, stub tracking).
-    pub(crate) shared_db: Arc<SharedDb>,
+    pub(crate) db: Arc<AnalyzerDb>,
     pub(crate) cache: Option<Arc<AnalysisCache>>,
     /// PSR-4 / Composer autoload map. Retained alongside `resolver` so the
     /// `psr4()` accessor can still return a typed `Psr4Map` for callers that
@@ -89,13 +89,12 @@ type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
 const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
 impl AnalysisSession {
-    /// Create a session reusing an existing [`SharedDb`]. Internal API used
-    /// by the legacy `ProjectAnalyzer` shim so a single db survives across
-    /// session rebuilds when callers mutate config fields.
+    /// Create a session reusing an existing [`AnalyzerDb`]. Internal API
+    /// used to keep a single db alive across session rebuilds.
     #[doc(hidden)]
-    pub fn from_shared_db(php_version: PhpVersion, shared_db: Arc<SharedDb>) -> Self {
+    pub fn from_db(php_version: PhpVersion, db: Arc<AnalyzerDb>) -> Self {
         Self {
-            shared_db,
+            db,
             cache: None,
             psr4: None,
             resolver: None,
@@ -113,7 +112,7 @@ impl AnalysisSession {
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
         Self {
-            shared_db: Arc::new(SharedDb::new()),
+            db: Arc::new(AnalyzerDb::new()),
             cache: None,
             psr4: None,
             resolver: None,
@@ -146,12 +145,12 @@ impl AnalysisSession {
     /// [`StubSlice`]: mir_codebase::storage::StubSlice
     pub fn with_cache(mut self, cache: Arc<AnalysisCache>) -> Self {
         debug_assert_eq!(
-            self.shared_db.source_file_count(),
+            self.db.source_file_count(),
             0,
             "AnalysisSession::with_cache must be called before any file is ingested"
         );
         let dir = cache.cache_dir().to_path_buf();
-        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(&dir));
+        self.db = Arc::new(AnalyzerDb::new().with_cache_dir(&dir));
         self.cache = Some(cache);
         self
     }
@@ -160,17 +159,17 @@ impl AnalysisSession {
     ///
     /// Attaches both the Pass-2 issue cache ([`AnalysisCache`]) and the
     /// Pass-1 [`StubSlice`] cache to the shared database. Builds a fresh
-    /// [`SharedDb`] internally — call **before** any file is ingested. A
+    /// [`AnalyzerDb`] internally — call **before** any file is ingested. A
     /// debug assertion catches misuse.
     ///
     /// [`StubSlice`]: mir_codebase::storage::StubSlice
     pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
         debug_assert_eq!(
-            self.shared_db.source_file_count(),
+            self.db.source_file_count(),
             0,
             "AnalysisSession::with_cache_dir must be called before any file is ingested"
         );
-        self.shared_db = Arc::new(SharedDb::new().with_cache_dir(cache_dir));
+        self.db = Arc::new(AnalyzerDb::new().with_cache_dir(cache_dir));
         self.cache = Some(Arc::new(AnalysisCache::open(cache_dir)));
         self
     }
@@ -192,7 +191,7 @@ impl AnalysisSession {
         // Mirror into MirDb so salsa-tracked resolver queries
         // (`db::resolve_fqcn_to_path`, Phase 2) see the same resolver and
         // are invalidated on swap.
-        self.shared_db.salsa.write().set_resolver(Some(resolver));
+        self.db.salsa.write().set_resolver(Some(resolver));
         self
     }
 
@@ -205,10 +204,7 @@ impl AnalysisSession {
             resolver,
             Arc::new(crate::StubClassResolver),
         ));
-        self.shared_db
-            .salsa
-            .write()
-            .set_resolver(Some(wrapped.clone()));
+        self.db.salsa.write().set_resolver(Some(wrapped.clone()));
         self.resolver = Some(wrapped);
         self
     }
@@ -239,7 +235,7 @@ impl AnalysisSession {
     /// on demand via [`Self::ensure_stubs_for_ast`] when user code references
     /// them. Idempotent — already-loaded stubs are skipped.
     pub fn ensure_essential_stubs(&self) {
-        self.shared_db
+        self.db
             .ingest_stub_paths(crate::stubs::ESSENTIAL_STUB_PATHS, self.php_version);
         self.ensure_user_stubs_loaded();
     }
@@ -249,7 +245,7 @@ impl AnalysisSession {
     /// symbol coverage matters more than cold-start latency.
     pub fn ensure_all_stubs(&self) {
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
-        self.shared_db.ingest_stub_paths(&paths, self.php_version);
+        self.db.ingest_stub_paths(&paths, self.php_version);
         self.ensure_user_stubs_loaded();
     }
 
@@ -263,7 +259,7 @@ impl AnalysisSession {
     pub fn ensure_stub_for_function(&self, name: &str) -> bool {
         match crate::stubs::stub_path_for_function(name) {
             Some(path) => {
-                self.shared_db.ingest_stub_paths(&[path], self.php_version);
+                self.db.ingest_stub_paths(&[path], self.php_version);
                 true
             }
             None => false,
@@ -279,7 +275,7 @@ impl AnalysisSession {
     pub fn ensure_stub_for_class(&self, fqcn: &str) -> bool {
         match crate::stubs::stub_path_for_class(fqcn) {
             Some(path) => {
-                self.shared_db.ingest_stub_paths(&[path], self.php_version);
+                self.db.ingest_stub_paths(&[path], self.php_version);
                 true
             }
             None => false,
@@ -293,7 +289,7 @@ impl AnalysisSession {
     pub fn ensure_stub_for_constant(&self, name: &str) -> bool {
         match crate::stubs::stub_path_for_constant(name) {
             Some(path) => {
-                self.shared_db.ingest_stub_paths(&[path], self.php_version);
+                self.db.ingest_stub_paths(&[path], self.php_version);
                 true
             }
             None => false,
@@ -303,7 +299,7 @@ impl AnalysisSession {
     /// Number of distinct embedded stubs currently ingested into the session.
     /// Useful for diagnostics and bench reporting.
     pub fn loaded_stub_count(&self) -> usize {
-        self.shared_db.loaded_stubs.lock().len()
+        self.db.loaded_stubs.lock().len()
     }
 
     /// Auto-discover and ingest the embedded stubs needed to cover every
@@ -326,7 +322,7 @@ impl AnalysisSession {
         // have everything. Avoids a ~50-500µs source walk on every analyze
         // call in batch / warm-session scenarios.
         {
-            let loaded = self.shared_db.loaded_stubs.lock();
+            let loaded = self.db.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
                 return;
             }
@@ -335,7 +331,7 @@ impl AnalysisSession {
         if paths.is_empty() {
             return;
         }
-        self.shared_db.ingest_stub_paths(&paths, self.php_version);
+        self.db.ingest_stub_paths(&paths, self.php_version);
     }
 
     /// Discover and ingest stubs by walking the parsed AST of a PHP file.
@@ -349,7 +345,7 @@ impl AnalysisSession {
     /// Idempotent and skips the scan if all stubs are already loaded.
     pub fn ensure_stubs_for_ast(&self, program: &php_ast::owned::Program) {
         {
-            let loaded = self.shared_db.loaded_stubs.lock();
+            let loaded = self.db.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
                 return;
             }
@@ -358,7 +354,7 @@ impl AnalysisSession {
         if paths.is_empty() {
             return;
         }
-        self.shared_db.ingest_stub_paths(&paths, self.php_version);
+        self.db.ingest_stub_paths(&paths, self.php_version);
     }
 
     /// Scan a parsed AST for class references and lazy-load any that are
@@ -413,7 +409,7 @@ impl AnalysisSession {
     }
 
     fn ensure_user_stubs_loaded(&self) {
-        self.shared_db
+        self.db
             .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
     }
 
@@ -426,7 +422,7 @@ impl AnalysisSession {
     /// ([`Self::definition_of`], [`Self::hover`], etc.) instead.
     #[doc(hidden)]
     pub fn snapshot_db(&self) -> MirDb {
-        self.shared_db.snapshot_db()
+        self.db.snapshot_db()
     }
 
     /// Commit a batch of reference locations from a db snapshot into the
@@ -437,7 +433,7 @@ impl AnalysisSession {
         if locs.is_empty() {
             return;
         }
-        let guard = self.shared_db.salsa.read();
+        let guard = self.db.salsa.read();
         guard.commit_reference_locations_batch(locs);
     }
 
@@ -466,21 +462,21 @@ impl AnalysisSession {
 
         // Snapshot symbols defined before clearing — O(symbols_in_file) with forward index.
         let old_symbols: HashSet<Arc<str>> = {
-            let guard = self.shared_db.salsa.read();
+            let guard = self.db.salsa.read();
             guard.file_defined_symbols(file.as_ref())
         };
 
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
         }
         let _file_defs =
-            self.shared_db
+            self.db
                 .collect_and_ingest_file(file.clone(), source.as_ref(), self.php_version);
 
         // Snapshot symbols after ingesting — O(symbols_in_file).
         let new_symbols: HashSet<Arc<str>> = {
-            let guard = self.shared_db.salsa.read();
+            let guard = self.db.salsa.read();
             guard.file_defined_symbols(file.as_ref())
         };
 
@@ -517,7 +513,7 @@ impl AnalysisSession {
         // PartialEq on FileDeclarations returns equal → no rebuild → the
         // HIGH-durability singleton dep short-circuits in O(1)).
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             if guard.workspace_symbol_index_singleton().is_some() {
                 if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
                     if guard.file_declarations_changed(sf) {
@@ -547,7 +543,7 @@ impl AnalysisSession {
     /// resolve if its defining file is among the newly-registered set.
     pub fn set_file_text(&self, file: Arc<str>, source: Arc<str>) {
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             guard.upsert_source_file(file.clone(), source);
         }
         self.evict_unresolvable_for_file(&file);
@@ -565,7 +561,7 @@ impl AnalysisSession {
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
-        let mut guard = self.shared_db.salsa.write();
+        let mut guard = self.db.salsa.write();
         for (file, source) in files {
             guard.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
         }
@@ -584,10 +580,7 @@ impl AnalysisSession {
     /// ingested (end of workspace warm-up). Also called automatically by
     /// [`Self::ingest_file`] when a file's declared names change.
     pub fn rebuild_workspace_symbol_index(&self) {
-        self.shared_db
-            .salsa
-            .write()
-            .rebuild_workspace_symbol_index();
+        self.db.salsa.write().rebuild_workspace_symbol_index();
     }
 
     /// Bulk variant of [`Self::set_file_text`]. Acquires the salsa write lock
@@ -608,7 +601,7 @@ impl AnalysisSession {
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
         let registered_paths: Vec<Arc<str>> = {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             files
                 .into_iter()
                 .map(|(file, source)| {
@@ -633,7 +626,7 @@ impl AnalysisSession {
     /// remove the salsa input handle — call this for full cleanup.)
     pub fn invalidate_file(&self, file: &str) {
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file);
             guard.remove_source_file(file);
         }
@@ -654,7 +647,7 @@ impl AnalysisSession {
     /// Number of files currently tracked in this session's salsa input set.
     /// Stable across reads; useful for diagnostics and memory bounds checks.
     pub fn tracked_file_count(&self) -> usize {
-        let guard = self.shared_db.salsa.read();
+        let guard = self.db.salsa.read();
         guard.source_file_count()
     }
 

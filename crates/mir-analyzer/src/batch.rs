@@ -138,7 +138,7 @@ impl AnalysisSession {
     /// to this session. `(0, 0)` when no cache is configured.
     #[doc(hidden)]
     pub fn stub_cache_stats(&self) -> (u64, u64) {
-        match self.shared_db.stub_cache.as_deref() {
+        match self.db.stub_cache.as_deref() {
             Some(c) => (c.hits(), c.misses()),
             None => (0, 0),
         }
@@ -159,8 +159,7 @@ impl AnalysisSession {
         src: &str,
         php_version: PhpVersion,
     ) -> FileDefinitions {
-        self.shared_db
-            .collect_and_ingest_file(file, src, php_version)
+        self.db.collect_and_ingest_file(file, src, php_version)
     }
 
     /// Load the configured PHP version + built-in stubs + user stubs into
@@ -171,20 +170,20 @@ impl AnalysisSession {
         // registered — collect_file_definitions reads it for @since/@removed filtering.
         {
             let version_str = Arc::from(php_version.to_string().as_str());
-            self.shared_db.salsa.write().set_php_version(version_str);
+            self.db.salsa.write().set_php_version(version_str);
         }
 
         // Built-in stubs for the configured PHP version.
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
-        self.shared_db.ingest_stub_paths(&paths, php_version);
+        self.db.ingest_stub_paths(&paths, php_version);
 
         // User-configured stubs.
-        self.shared_db
+        self.db
             .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
 
         // Ensure a resolver is configured so pull-path lookups can map
         // built-in FQCNs to the stub VFS paths registered above.
-        let mut guard = self.shared_db.salsa.write();
+        let mut guard = self.db.salsa.write();
         if guard.current_resolver().is_none() {
             let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::StubClassResolver);
             guard.set_resolver(Some(resolver));
@@ -242,7 +241,7 @@ impl AnalysisSession {
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             for parsed in &parsed_files {
                 guard.upsert_source_file(parsed.file.clone(), parsed.source.clone());
             }
@@ -293,7 +292,7 @@ impl AnalysisSession {
         // Prime the in-process parse cache so the pre-warm loop below avoids
         // re-parsing every project file through collect_file_definitions.
         {
-            let guard = self.shared_db.salsa.read();
+            let guard = self.db.salsa.read();
             for (defs, hash, has_hard_parse_errors) in &file_defs {
                 if !*has_hard_parse_errors {
                     guard.prime_parse_cache(*hash, Arc::clone(&defs.slice));
@@ -317,11 +316,11 @@ impl AnalysisSession {
         // ---- Pre-warm collect_file_definitions for project files -------------
         {
             let db_prewarm = {
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 (**guard).clone()
             };
             let project_source_files: Vec<SourceFile> = {
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 parsed_files
                     .iter()
                     .filter_map(|p| (**guard).lookup_source_file(&p.file))
@@ -342,7 +341,7 @@ impl AnalysisSession {
         // ---- Build reverse dep graph and persist it for the next run ---------
         if let Some(cache) = &self.cache {
             let db_snapshot = {
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 (**guard).clone()
             };
             let rev = build_reverse_deps(&db_snapshot);
@@ -354,7 +353,7 @@ impl AnalysisSession {
             file_data.iter().map(|(f, _)| f.clone()).collect();
         {
             let class_db = {
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 (**guard).clone()
             };
             let class_issues =
@@ -366,7 +365,7 @@ impl AnalysisSession {
         let _t_class_checks = _t0.elapsed();
 
         let db_main = {
-            let guard = self.shared_db.salsa.read();
+            let guard = self.db.salsa.read();
             (**guard).clone()
         };
 
@@ -427,7 +426,7 @@ impl AnalysisSession {
             all_ref_locs.extend(ref_locs);
         }
         {
-            let guard = self.shared_db.salsa.read();
+            let guard = self.db.salsa.read();
             guard.commit_reference_locations_batch(all_ref_locs);
         }
 
@@ -477,7 +476,7 @@ impl AnalysisSession {
 
         // ---- Build workspace symbol index singleton -------------------------
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             guard.rebuild_workspace_symbol_index();
         }
 
@@ -617,7 +616,7 @@ impl AnalysisSession {
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
             let db_full = {
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 (**guard).clone()
             };
 
@@ -648,7 +647,7 @@ impl AnalysisSession {
                 reanalysis_ref_locs.extend(ref_locs);
             }
             {
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 guard.commit_reference_locations_batch(reanalysis_ref_locs);
             }
         }
@@ -672,7 +671,7 @@ impl AnalysisSession {
             let h = hash_content(new_content);
             if let Some((mut issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
-                let guard = self.shared_db.salsa.read();
+                let guard = self.db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
                 guard.commit_pending_to_maps();
                 opts.apply(&mut issues);
@@ -683,12 +682,12 @@ impl AnalysisSession {
         let file: Arc<str> = Arc::from(file_path);
 
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file_path);
         }
 
         let file_defs = {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             let salsa_file = guard.upsert_source_file(file.clone(), Arc::from(new_content));
             collect_file_definitions(&**guard, salsa_file)
         };
@@ -696,7 +695,7 @@ impl AnalysisSession {
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             if guard.workspace_symbol_index_singleton().is_some() {
                 if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
                     if guard.file_declarations_changed(sf) {
@@ -707,7 +706,7 @@ impl AnalysisSession {
         }
 
         let symbols = {
-            let guard = self.shared_db.salsa.write();
+            let guard = self.db.salsa.write();
 
             let parsed = php_rs_parser::parse(new_content);
 
@@ -768,7 +767,7 @@ impl AnalysisSession {
                 let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                 let src: Arc<str> = Arc::from(src);
                 let hash = hash_source(&src);
-                let cached = self.shared_db.stub_cache.as_ref().and_then(|c| {
+                let cached = self.db.stub_cache.as_ref().and_then(|c| {
                     let mut slice = c.get(&file, &hash, php_v)?;
                     prepare_for_ingest(&mut slice);
                     Some(slice)
@@ -784,7 +783,7 @@ impl AnalysisSession {
         let _t_read = _t0.elapsed();
 
         let source_files: Vec<SourceFile> = {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             entries
                 .iter()
                 .map(|e| {
@@ -799,10 +798,10 @@ impl AnalysisSession {
         let _t_reg = _t0.elapsed();
 
         let db_pass1 = {
-            let guard = self.shared_db.salsa.read();
+            let guard = self.db.salsa.read();
             (**guard).clone()
         };
-        let stub_cache = self.shared_db.stub_cache.clone();
+        let stub_cache = self.db.stub_cache.clone();
         let prepared: Vec<mir_codebase::storage::StubSlice> = entries
             .into_par_iter()
             .zip(source_files.into_par_iter())
@@ -836,7 +835,7 @@ impl AnalysisSession {
         }
 
         {
-            let mut guard = self.shared_db.salsa.write();
+            let mut guard = self.db.salsa.write();
             guard.rebuild_workspace_symbol_index();
         }
 

@@ -59,14 +59,14 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
     );
 
     // collect_definitions fires for vendor — for analyze(), the stub cache
-    // is consulted inside SharedDb::collect_and_ingest_file (used by
+    // is consulted inside AnalyzerDb::collect_and_ingest_file (used by
     // re_analyze_file). The cold run writes through the project Pass 1
     // path that bypasses the cache, so hits are typically 0 here. That's
     // expected: the next test asserts the warm-cache path.
     let (cold_hits, _cold_misses) = cold.stub_cache_stats();
     drop(cold);
 
-    // --- Warm: re-run via re_analyze_file to exercise the SharedDb cache.
+    // --- Warm: re-run via re_analyze_file to exercise the AnalyzerDb cache.
     // The cache was populated during cold's lazy-loading of dependents,
     // so this run should observe hits. Even if re_analyze_file produces
     // no hits the assertion below catches regressions: cold and warm
@@ -89,7 +89,7 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
 
 #[test]
 fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
-    // The LSP path (`AnalysisSession::ingest_file` -> SharedDb::collect_and_ingest_file)
+    // The LSP path (`AnalysisSession::ingest_file` -> AnalyzerDb::collect_and_ingest_file)
     // is where the persistent Pass-1 cache actually fires. We populate the
     // cache in a first session, drop it, then open a second session over
     // the same dir and verify (a) cache hits happen and (b) symbols are
@@ -125,7 +125,7 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
     session2.ingest_file(a_path.clone(), a_src.clone());
     session2.ingest_file(b_path.clone(), b_src.clone());
 
-    // We can't reach into AnalysisSession's SharedDb directly, but the
+    // We can't reach into AnalysisSession's AnalyzerDb directly, but the
     // cache hits are the only thing that explains identical symbol state
     // arriving in this session without a re-parse — the warm sweep would
     // otherwise be observably indistinguishable. So verify symbol parity

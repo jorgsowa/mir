@@ -1,5 +1,6 @@
 use rustc_hash::FxHashMap;
 
+pub(crate) mod analyzer_db;
 pub mod batch;
 pub(crate) mod body_analysis;
 #[doc(hidden)]
@@ -22,7 +23,6 @@ pub(crate) mod narrowing;
 pub mod parser;
 pub mod php_version;
 pub mod session;
-pub(crate) mod shared_db;
 pub mod source_provider;
 pub(crate) mod stmt;
 #[doc(hidden)]

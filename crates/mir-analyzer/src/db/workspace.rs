@@ -298,7 +298,7 @@ unsafe impl salsa::Update for WorkspaceSymbolIndex {
 ///
 /// In batch mode the singleton is always populated by
 /// `MirDb::rebuild_workspace_symbol_index`. The fallback exists for unit
-/// tests that build a db directly without going through `SharedDb`.
+/// tests that build a db directly without going through `AnalyzerDb`.
 pub fn workspace_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     if let Some(s) = db.workspace_symbol_index_singleton() {
         s.index(db)
@@ -310,7 +310,7 @@ pub fn workspace_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
 #[salsa::tracked]
 pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     // workspace_revision() is always Some — init_workspace_revision() is called
-    // at SharedDb::new() so this query always reads the revision and salsa can
+    // at AnalyzerDb::new() so this query always reads the revision and salsa can
     // properly invalidate it when files are added or removed.
     let rev = db
         .workspace_revision()

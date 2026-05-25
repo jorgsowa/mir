@@ -81,7 +81,7 @@ pub struct MirDb {
     /// Set once before any analysis begins; read by `collect_file_definitions`
     /// to filter `@since`/`@removed` stub symbols.
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
-    /// Optional disk-backed definition cache. Shared with `SharedDb::stub_cache`
+    /// Optional disk-backed definition cache. Shared with `AnalyzerDb::stub_cache`
     /// so `collect_file_definitions` can consult it directly without going
     /// through `collect_and_ingest_file`.
     stub_cache: Arc<parking_lot::RwLock<Option<Arc<crate::stub_cache::StubSliceCache>>>>,
@@ -384,7 +384,7 @@ impl MirDatabase for MirDb {
 
 impl MirDb {
     /// Wire a disk-backed stub cache into this db so `collect_file_definitions`
-    /// can skip reparsing on cache hits. Called by `SharedDb::with_cache_dir`.
+    /// can skip reparsing on cache hits. Called by `AnalyzerDb::with_cache_dir`.
     pub fn set_stub_cache(&self, cache: Arc<crate::stub_cache::StubSliceCache>) {
         *self.stub_cache.write() = Some(cache);
     }

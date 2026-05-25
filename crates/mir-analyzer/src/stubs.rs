@@ -359,7 +359,7 @@ pub(crate) fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
 /// supplement built-ins (e.g. framework-specific classes, IDE helpers).
 #[allow(dead_code)]
 pub(crate) fn load_user_stubs(_db: &mut MirDb, files: &[PathBuf], dirs: &[PathBuf]) {
-    // No-op: user stub registration now happens through shared_db::ingest_user_stubs
+    // No-op: user stub registration now happens through db::ingest_user_stubs
     // which registers SourceFile inputs directly for the pull-based salsa path.
     let _ = user_stub_slices(files, dirs);
 }

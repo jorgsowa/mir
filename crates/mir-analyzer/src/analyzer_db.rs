@@ -19,7 +19,7 @@ use rayon::prelude::*;
 use crate::db::MirDb;
 use crate::php_version::PhpVersion;
 
-/// Newtype that allows `RwLock<MirDbRw>` in `SharedDb`.
+/// Newtype that allows `RwLock<MirDbRw>` in `AnalyzerDb`.
 ///
 /// SAFETY: Under the *read* lock only these operations are performed on the
 /// shared `&MirDb`:
@@ -57,7 +57,7 @@ impl std::ops::DerefMut for MirDbRw {
 
 /// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
 /// AnalysisSession, providing a common point for their database operations.
-pub struct SharedDb {
+pub struct AnalyzerDb {
     /// Salsa database (source file handles live inside MirDb.source_files).
     /// RwLock: multiple concurrent snapshot_db() reads; exclusive for writes.
     pub(crate) salsa: RwLock<MirDbRw>,
@@ -71,7 +71,7 @@ pub struct SharedDb {
     pub(crate) stub_cache: Option<Arc<crate::stub_cache::StubSliceCache>>,
 }
 
-impl SharedDb {
+impl AnalyzerDb {
     pub fn new() -> Self {
         let mut db = MirDb::default();
         // Pre-create the WorkspaceRevision salsa input so workspace_symbol_index
@@ -353,7 +353,7 @@ impl SharedDb {
     }
 }
 
-impl Default for SharedDb {
+impl Default for AnalyzerDb {
     fn default() -> Self {
         Self::new()
     }
