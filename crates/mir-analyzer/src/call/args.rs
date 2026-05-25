@@ -437,8 +437,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 && !param_ty.is_mixed()
                 && !arg_ty.is_mixed()
                 && !named_object_subtype(&arg_ty, param_ty, ea)
-                && !param_contains_template_or_unknown(param_ty, ea, template_params)
-                && !param_contains_template_or_unknown(&arg_ty, ea, template_params)
+                && !param_contains_template_or_unknown(param_ty, &arg_ty, ea, template_params)
+                && !param_contains_template_or_unknown(&arg_ty, &arg_ty, ea, template_params)
                 && !array_list_compatible(&arg_ty, param_ty, ea)
                 && !(arg_ty.is_single() && param_ty.is_subtype_of_simple(&arg_ty))
                 && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_of_simple(&arg_ty))
@@ -904,6 +904,7 @@ fn generic_ancestor_type_args_inner(
 
 fn param_contains_template_or_unknown(
     param_ty: &Type,
+    arg_ty: &Type,
     ea: &ExpressionAnalyzer<'_>,
     template_params: &[TemplateParam],
 ) -> bool {
@@ -965,9 +966,43 @@ fn param_contains_template_or_unknown(
             }
             _ => false,
         }),
-        Atomic::TIntersection { parts } => parts
-            .iter()
-            .any(|part| has_template_param(part, &template_names)),
+        // For A&B intersections containing a template, only suppress the
+        // InvalidArgument if the arg satisfies all the concrete (non-template)
+        // parts. If a concrete part is violated (e.g. arg doesn't implement
+        // Taggable), the error is a true positive and should still fire.
+        Atomic::TIntersection { parts } => {
+            let has_template = parts
+                .iter()
+                .any(|part| has_template_param(part, &template_names));
+            if !has_template {
+                return false;
+            }
+            // Check that every concrete (non-template) part is satisfied by arg_ty.
+            parts.iter().all(|part| {
+                if has_template_param(part, &template_names) {
+                    return true; // template part — forgiven
+                }
+                // Concrete part: arg_ty must satisfy it via extends/implements.
+                part.types.iter().all(|part_atomic| {
+                    let part_fqcn = match part_atomic {
+                        Atomic::TNamedObject { fqcn, .. } => fqcn,
+                        _ => return true,
+                    };
+                    arg_ty.types.iter().any(|arg_atomic| {
+                        let arg_fqcn = match arg_atomic {
+                            Atomic::TNamedObject { fqcn, .. } => fqcn,
+                            _ => return false,
+                        };
+                        arg_fqcn == part_fqcn
+                            || crate::db::extends_or_implements(
+                                ea.db,
+                                arg_fqcn.as_ref(),
+                                part_fqcn.as_ref(),
+                            )
+                    })
+                })
+            })
+        }
         _ => false,
     })
 }
