@@ -22,5 +22,6 @@ $b = new Box();
 // Box extends Base which implements Taggable — satisfies the concrete part
 $val = extract($b);
 /** @mir-check $val is string */
+echo $val;
 ===expect===
 UnusedParam@14:18: Parameter $item is never used

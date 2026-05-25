@@ -20,5 +20,6 @@ $b = new Box();
 
 $val = extract($b);
 /** @mir-check $val is string */
+echo $val;
 ===expect===
 UnusedParam@13:18: Parameter $item is never used

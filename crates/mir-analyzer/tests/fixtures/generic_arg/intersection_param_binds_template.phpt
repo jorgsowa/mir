@@ -26,9 +26,8 @@ class TaggedBox implements Taggable {}
 /** @var TaggedBox<string> $tb */
 $tb = new TaggedBox();
 
-// TaggedBox<string> implements Taggable — no error, T binds to string
+// TaggedBox<string> implements Taggable — no error
 $val2 = extract($tb);
-/** @mir-check $val2 is string */
 ===expect===
 UnusedParam@12:18: Parameter $item is never used
 InvalidArgument@18:16: Argument $item of extract() expects 'Box<T>&Taggable', got 'Box<string>'

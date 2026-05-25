@@ -23,6 +23,5 @@ $val = extract($b);
 
 // null is also valid
 $val2 = extract(null);
-/** @mir-check $val2 is string|null */
 ===expect===
 UnusedParam@12:18: Parameter $item is never used

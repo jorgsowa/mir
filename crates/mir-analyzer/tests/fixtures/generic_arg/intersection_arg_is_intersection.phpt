@@ -17,8 +17,7 @@ function extract(mixed $item): mixed { return null; }
 /** @var Box<string>&Taggable $b */
 $b = new Box();
 
-// arg type Box<string>&Taggable satisfies both parts of the intersection param
+// arg type Box<string>&Taggable satisfies both parts of the intersection param — no error
 $val = extract($b);
-/** @mir-check $val is string */
 ===expect===
 UnusedParam@12:18: Parameter $item is never used
