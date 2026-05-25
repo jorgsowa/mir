@@ -237,10 +237,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ArrowFunction(af) => self.analyze_arrow_function(af, ctx),
 
-            ExprKind::CallableCreate(_) => Type::single(Atomic::TCallable {
-                params: None,
-                return_type: None,
-            }),
+            ExprKind::CallableCreate(cc) => self.callable_create_type(cc),
 
             // --- Match expression ------------------------------------------
             ExprKind::Match(m) => self.analyze_match(m, ctx),
@@ -295,14 +292,56 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     /// Convert an AST span to `(line, col_start, col_end)` for reference recording.
+    fn callable_create_type(&self, cc: &php_ast::owned::CallableCreateExpr) -> Type {
+        use php_ast::owned::CallableCreateKind;
+        if let CallableCreateKind::Function(name_expr) = &cc.kind {
+            if let ExprKind::Identifier(name) = &name_expr.kind {
+                let fqn = name.as_ref();
+                let db = self.db;
+                let here = crate::db::Fqcn::from_str(db, fqn);
+                if let Some(f) = crate::db::find_function(db, here) {
+                    let return_ty = f
+                        .return_type
+                        .as_deref()
+                        .cloned()
+                        .unwrap_or_else(Type::mixed);
+                    let params: Vec<mir_types::atomic::FnParam> = f
+                        .params
+                        .iter()
+                        .map(|p| mir_types::atomic::FnParam {
+                            name: mir_types::Name::from(p.name.as_ref()),
+                            ty: p
+                                .ty
+                                .as_deref()
+                                .cloned()
+                                .map(mir_types::compact::SimpleType::from_union),
+                            default: if p.has_default {
+                                Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
+                            } else {
+                                None
+                            },
+                            is_variadic: p.is_variadic,
+                            is_byref: p.is_byref,
+                            is_optional: p.is_optional,
+                        })
+                        .collect();
+                    return Type::single(Atomic::TClosure {
+                        params,
+                        return_type: Box::new(return_ty),
+                        this_type: None,
+                    });
+                }
+            }
+        }
+        Type::single(Atomic::TCallable {
+            params: None,
+            return_type: None,
+        })
+    }
+
     pub(crate) fn span_to_ref_loc(&self, span: php_ast::Span) -> (u32, u16, u16) {
         let (line, col_start) = self.offset_to_line_col(span.start);
-        let end_off = (span.end as usize).min(self.source.len());
-        let end_line_start = self.source[..end_off]
-            .rfind('\n')
-            .map(|p| p + 1)
-            .unwrap_or(0);
-        let col_end = self.source[end_line_start..end_off].chars().count() as u16;
+        let (_, col_end) = self.offset_to_line_col(span.end);
         (line, col_start, col_end)
     }
 
