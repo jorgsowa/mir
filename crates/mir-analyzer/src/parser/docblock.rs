@@ -611,6 +611,11 @@ pub fn parse_type_string(s: &str) -> Union {
         }),
         "scalar" => Union::single(Atomic::TScalar),
         "numeric" => Union::single(Atomic::TNumeric),
+        "array-key" => {
+            let mut u = Union::single(Atomic::TInt);
+            u.add_type(Atomic::TString);
+            u
+        }
         "resource" => Union::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
         "static" => Union::single(Atomic::TStaticObject {

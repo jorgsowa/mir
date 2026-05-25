@@ -3,7 +3,7 @@
 use rustc_hash::FxHashMap;
 
 use mir_codebase::storage::{FnParam, TemplateParam};
-use mir_types::{Atomic, Symbol, Union};
+use mir_types::{atomic::ArrayKey, Atomic, Symbol, Union};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -178,7 +178,7 @@ fn infer_from_pair(
                 entry.merge_with(bind);
             }
 
-            // array<K, V> matched against array<k_ty, v_ty>
+            // array<K, V> matched against array<k_ty, v_ty> or array{...}
             Atomic::TArray { key: pk, value: pv } => {
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
@@ -186,6 +186,22 @@ fn infer_from_pair(
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
                             infer_from_pair(pk, ak, template_names, bindings);
                             infer_from_pair(pv, av, template_names, bindings);
+                        }
+                        Atomic::TKeyedArray { properties, .. } => {
+                            let mut key_union = Union::empty();
+                            let mut val_union = Union::empty();
+                            for (k, prop) in properties {
+                                let key_atomic = match k {
+                                    ArrayKey::String(_) => Atomic::TString,
+                                    ArrayKey::Int(_) => Atomic::TInt,
+                                };
+                                key_union.add_type(key_atomic);
+                                val_union.merge_with(&prop.ty);
+                            }
+                            if !key_union.types.is_empty() {
+                                infer_from_pair(pk, &key_union, template_names, bindings);
+                                infer_from_pair(pv, &val_union, template_names, bindings);
+                            }
                         }
                         _ => {}
                     }
