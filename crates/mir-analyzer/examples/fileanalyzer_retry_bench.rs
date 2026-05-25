@@ -101,7 +101,7 @@ fn main() {
         };
         let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
         // FileAnalyzer::analyze's documented contract: the session must have
-        // Pass-1 state for the file. Without this, `resolve_name_via_db`
+        // Pass-1 state for the file. Without this, `resolve_name`
         // can't see the file's `use` aliases, and Pass-2 emits
         // UndefinedClass with the unqualified shorthand the user wrote.
         // Mimics the LSP's didOpen / didChange flow.
