@@ -36,6 +36,47 @@ fn is_valid_class_name_type(ty: &Type) -> bool {
     })
 }
 
+fn is_object_atomic(t: &Atomic) -> bool {
+    matches!(
+        t,
+        Atomic::TObject
+            | Atomic::TNamedObject { .. }
+            | Atomic::TStaticObject { .. }
+            | Atomic::TSelf { .. }
+            | Atomic::TParent { .. }
+            | Atomic::TIntersection { .. }
+            | Atomic::TNull
+    )
+}
+
+/// If `ty` is a uniform single-class object type (possibly nullable), return
+/// its FQCN so the static call can be resolved against it.  Returns `None`
+/// for `object`, multi-class unions, or any non-object/non-null type component.
+///
+/// `$this::method()` and `$obj::method()` use LSB semantics at runtime; we
+/// approximate here with the declared class, which is correct in the common
+/// case and never produces a false positive.  Null is skipped — null safety
+/// on `::` is a separate concern from class-string validity.
+fn extract_object_fqcn(ty: &Type) -> Option<String> {
+    let mut result: Option<String> = None;
+    for atom in ty.types.iter() {
+        let fqcn_str = match atom {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TParent { fqcn } => fqcn.to_string(),
+            Atomic::TNull => continue, // nullable object: skip null, resolve against class
+            _ => return None,
+        };
+        match &result {
+            None => result = Some(fqcn_str),
+            Some(existing) if *existing == fqcn_str => {}
+            _ => return None,
+        }
+    }
+    result
+}
+
 impl CallAnalyzer {
     pub fn analyze_static_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
@@ -52,17 +93,31 @@ impl CallAnalyzer {
             ExprKind::Identifier(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
             _ => {
                 let ty = ea.analyze(&call.class, ctx);
-                // Check if the expression could evaluate to a valid class name
-                if !is_valid_class_name_type(&ty) {
-                    ea.emit(
-                        IssueKind::InvalidStringClass {
-                            actual: ty.to_string(),
-                        },
-                        Severity::Warning,
-                        call.class.span,
-                    );
+                // $obj::method() / $this::method(): resolve against the object's class
+                if let Some(fqcn) = extract_object_fqcn(&ty) {
+                    if ty.is_nullable() {
+                        ea.emit(
+                            IssueKind::PossiblyNullMethodCall {
+                                method: method_name.to_string(),
+                            },
+                            Severity::Info,
+                            call.class.span,
+                        );
+                    }
+                    fqcn
+                } else {
+                    // All-object unions (Foo|Bar, object) are valid PHP — skip error
+                    if !is_valid_class_name_type(&ty) && !ty.types.iter().all(is_object_atomic) {
+                        ea.emit(
+                            IssueKind::InvalidStringClass {
+                                actual: ty.to_string(),
+                            },
+                            Severity::Warning,
+                            call.class.span,
+                        );
+                    }
+                    return Type::mixed();
                 }
-                return Type::mixed();
             }
         };
 

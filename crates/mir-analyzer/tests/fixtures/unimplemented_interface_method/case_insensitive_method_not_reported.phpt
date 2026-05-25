@@ -2,10 +2,10 @@
 case insensitive method not reported
 ===file===
 <?php
-interface Serializable {
+interface HasFooBar {
     public function fooBar(): void;
 }
-class Impl implements Serializable {
+class Impl implements HasFooBar {
     public function fooBar(): void {}
 }
 ===expect===
