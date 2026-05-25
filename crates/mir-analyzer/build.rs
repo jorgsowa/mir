@@ -140,8 +140,7 @@ fn main() {
 /// loading code in `crate::stubs` can resolve a name → path → embedded
 /// content in two `O(log n)` lookups.
 fn generate_builtin_fn_names(manifest_dir: &Path, out_dir: &Path) {
-    let stubs_root = manifest_dir.join("phpstorm-stubs");
-    let map_path = stubs_root.join("PhpStormStubsMap.php");
+    let map_path = manifest_dir.join("stubs").join("PhpStormStubsMap.php");
     let out_path = out_dir.join("phpstorm_builtin_fns.rs");
 
     if !map_path.exists() {
