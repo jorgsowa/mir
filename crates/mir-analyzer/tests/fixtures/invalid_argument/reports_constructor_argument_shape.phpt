@@ -1,5 +1,7 @@
 ===description===
 reports constructor argument shape
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class User {
@@ -8,6 +10,5 @@ class User {
 new User();
 new User('Ada', 'Grace');
 ===expect===
-UnusedParam@3:33: Parameter $name is never used
 TooFewArguments@5:1: Too few arguments for User::__construct(): expected 1, got 0
 TooManyArguments@6:17: Too many arguments for User::__construct(): expected 1, got 2

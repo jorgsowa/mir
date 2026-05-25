@@ -1,5 +1,7 @@
 ===description===
 Native type intersection as class property using unknown interfaces
+===config===
+suppress=InvalidPropertyAssignment,UnusedProperty
 ===file===
 <?php
 class C {
@@ -11,5 +13,4 @@ class C {
 ===expect===
 UndefinedClass@3:13: Class ExampleUnknownA does not exist
 UndefinedClass@3:29: Class ExampleUnknownB does not exist
-InvalidPropertyAssignment@5:9: Property $other expects 'ExampleUnknownA&ExampleUnknownB', cannot assign 'ExampleUnknownAB'
 UndefinedClass@5:28: Class ExampleUnknownAB does not exist

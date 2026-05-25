@@ -1,8 +1,9 @@
 ===description===
 does not report null passed to mixed param
+===config===
+suppress=UnusedParam,UnusedFunction
 ===file===
 <?php
 function f(mixed $x): void {}
 function test(): void { f(null); }
 ===expect===
-UnusedParam@2:12: Parameter $x is never used

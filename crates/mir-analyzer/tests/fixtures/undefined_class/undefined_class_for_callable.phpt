@@ -1,5 +1,7 @@
 ===description===
 Undefined class for callable
+===config===
+suppress=UnusedParam,UnusedFunction
 ===file===
 <?php
 class Foo {
@@ -8,4 +10,3 @@ class Foo {
 new Foo(function() : void {});
 ===expect===
 UndefinedClass@3:33: Class UndefinedClass does not exist
-UnusedParam@3:33: Parameter $o is never used

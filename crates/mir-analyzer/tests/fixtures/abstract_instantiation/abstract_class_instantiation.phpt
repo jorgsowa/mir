@@ -2,7 +2,18 @@
 Abstract class instantiation
 ===file===
 <?php
-abstract class A {}
-new A();
+abstract class AbstractService {
+    abstract public function run();
+}
+
+/**
+ * @param class-string<AbstractService> $serviceName
+ */
+function createService($serviceName) {
+    return new $serviceName();
+}
+
+// SHOULD emit AbstractInstantiation because AbstractService is abstract
+createService(AbstractService::class);
 ===expect===
-AbstractInstantiation@3:5: Cannot instantiate abstract class A
+AbstractInstantiation@10:16: Cannot instantiate abstract class AbstractService

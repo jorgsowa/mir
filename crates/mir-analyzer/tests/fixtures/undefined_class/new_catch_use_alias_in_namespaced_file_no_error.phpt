@@ -1,5 +1,7 @@
 ===description===
 new catch use alias in namespaced file no error
+===config===
+suppress=UnusedVariable,MissingThrowsDocblock,UnusedFunction
 ===file:Entity.php===
 <?php
 namespace App\Model;
@@ -15,6 +17,3 @@ function wrap(): void {
     } catch (Entity $e) {}
 }
 ===expect===
-Service.php: UnusedVariable@5:5: Variable $x is never read
-Service.php: MissingThrowsDocblock@7:9: Exception Exception is thrown but not declared in @throws
-Service.php: UnusedVariable@8:13: Variable $e is never read

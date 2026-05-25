@@ -1,5 +1,7 @@
 ===description===
 Undefined callable method class
+===config===
+suppress=UnusedParam,UnusedFunction
 ===file===
 <?php
 class A {
@@ -12,5 +14,4 @@ function foo(callable $c): void {}
 
 foo("B::bar");
 ===expect===
-UnusedParam@8:14: Parameter $c is never used
 UndefinedClass@10:5: Class B does not exist

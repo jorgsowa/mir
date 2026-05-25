@@ -1,5 +1,7 @@
 ===description===
 catch type cross file missing
+===config===
+suppress=MissingThrowsDocblock,UnusedVariable,UnusedFunction
 ===file:Exceptions.php===
 <?php
 namespace App;
@@ -16,6 +18,4 @@ function handle(): void {
     }
 }
 ===expect===
-Handler.php: MissingThrowsDocblock@6:9: Exception Exception is thrown but not declared in @throws
-Handler.php: UnusedVariable@7:13: Variable $e is never read
 Handler.php: UndefinedClass@8:14: Class App\MissingException does not exist

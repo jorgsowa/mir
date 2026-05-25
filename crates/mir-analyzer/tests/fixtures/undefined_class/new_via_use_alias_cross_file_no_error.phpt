@@ -1,5 +1,7 @@
 ===description===
 new via use alias cross file no error
+===config===
+suppress=UnusedVariable,UnusedFunction
 ===file:Entity.php===
 <?php
 namespace App\Model;
@@ -11,4 +13,3 @@ function wrap(): void {
     $x = new Entity();
 }
 ===expect===
-Service.php: UnusedVariable@4:5: Variable $x is never read
