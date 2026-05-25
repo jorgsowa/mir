@@ -251,7 +251,7 @@ fn perf_analysis_full_report() {
             continue;
         }
         let t0 = Instant::now();
-        let loaded = session.lazy_load_class(target);
+        let loaded = session.load_class(target).is_loaded();
         let took = t0.elapsed();
         print_row(
             &format!("lazy_load {target}"),

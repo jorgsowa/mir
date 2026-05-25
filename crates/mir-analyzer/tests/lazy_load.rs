@@ -316,19 +316,12 @@ fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
     );
 }
 
-/// Phase 1: negative cache for `lookup_class_or_load`.
+/// Negative cache for `load_class`.
 ///
-/// `lookup_class_or_load_resolves_without_explicit_ingest` would be the
-/// natural sibling, but it would re-cover ground already validated by
-/// `lazy_loads_parent_class_from_psr4` above (which exercises the same
-/// `lazy_load_class` chain that `lookup_class_or_load` wraps), and adds
-/// only the negative-cache layer on top.
-///
-/// The negative cache must be cleared when a file is ingested, so a
-/// previously-missing class becomes resolvable once its defining file
-/// shows up.
+/// The cache must be cleared when a file is ingested, so a previously-missing
+/// class becomes resolvable once its defining file shows up.
 #[test]
-fn lookup_class_or_load_negative_cache_clears_on_ingest() {
+fn load_class_negative_cache_clears_on_ingest() {
     use mir_analyzer::{AnalysisSession, PhpVersion};
 
     let root = create_temp_dir("negcache_clear");
@@ -337,7 +330,7 @@ fn lookup_class_or_load_negative_cache_clears_on_ingest() {
     let session = AnalysisSession::new(PhpVersion::new(8, 2)).with_psr4(psr4);
 
     // First miss populates the negative cache.
-    assert!(!session.lookup_class_or_load("App\\LateArrival"));
+    assert!(!session.load_class("App\\LateArrival").is_loaded());
 
     // Now the file appears and is explicitly ingested.
     let src = "<?php\nnamespace App;\nclass LateArrival {}\n";
@@ -354,7 +347,7 @@ fn lookup_class_or_load_negative_cache_clears_on_ingest() {
 
     // The previously-cached negative result must not block the lookup.
     assert!(
-        session.lookup_class_or_load("App\\LateArrival"),
+        session.load_class("App\\LateArrival").is_loaded(),
         "negative cache should have been invalidated on ingest"
     );
 }

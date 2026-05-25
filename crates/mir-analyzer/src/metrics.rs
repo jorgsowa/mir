@@ -34,7 +34,7 @@ pub struct Counters {
     /// `MAX_LAZY_LOAD_ITERATIONS` block) that actually executed.
     pub retry_iterations: AtomicU64,
     /// Lazy loads attempted (one per unresolved FQCN passed to
-    /// `lookup_class_or_load_transitive`).
+    /// `load_class_transitive`).
     pub lazy_loads_attempted: AtomicU64,
     /// Lazy loads that resolved to a class (the call returned `Some`).
     pub lazy_loads_resolved: AtomicU64,
@@ -46,7 +46,7 @@ pub struct Counters {
     /// `collect_and_ingest_file` calls that missed and had to parse.
     pub stub_cache_misses: AtomicU64,
 
-    // Failure-bucket counts for `AnalysisSession::lazy_load_class`. Sum of
+    // Failure-bucket counts for `AnalysisSession::load_class`. Sum of
     // these three == `lazy_loads_attempted - lazy_loads_resolved` (the
     // total failure count). Diagnoses *why* lazy-load fails on real
     // workloads — drives the Phase 3 decision in `docs/perf-baseline.md`.
@@ -125,7 +125,7 @@ pub fn record_stub_cache_miss() {
     }
 }
 
-/// Reason for a `lazy_load_class` failure. Variants align 1:1 with the
+/// Reason for a `load_class` failure. Variants align 1:1 with the
 /// `ll_fail_*` counters; see [`Counters`] for semantics.
 #[derive(Copy, Clone, Debug)]
 pub enum LazyLoadFailure {

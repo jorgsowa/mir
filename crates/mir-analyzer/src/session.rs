@@ -64,7 +64,7 @@ pub struct AnalysisSession {
     /// The set may contain symbols with no current referencers; those are
     /// harmless — the `symbol_referencers_of` lookup returns empty.
     stale_defined_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
-    /// Negative cache: FQCNs that `lookup_class_or_load` already failed on.
+    /// Negative cache: FQCNs that `load_class` already failed on.
     /// The value is the resolver-mapped path (when known) so eviction on
     /// `set_file_text` / `ingest_file` is a path equality check rather than
     /// re-running the resolver per entry. `None` means the resolver itself
@@ -177,7 +177,7 @@ impl AnalysisSession {
 
     /// Attach a Composer autoload map (PSR-4, PSR-0, classmap, files).
     /// Sets the same map as the active [`crate::ClassResolver`] so
-    /// [`Self::lazy_load_class`] works out of the box.
+    /// [`Self::load_class`] works out of the box.
     pub fn with_psr4(mut self, map: Arc<Psr4Map>) -> Self {
         let user_resolver: Arc<dyn crate::ClassResolver> = map.clone();
         // Wrap with stub awareness so `find_class_like` / `resolve_fqcn_to_path`
@@ -378,7 +378,7 @@ impl AnalysisSession {
     ///
     /// The current implementation reuses [`crate::diagnostics::collect_referenced_class_fqcns`]
     /// already used by the diagnostics pass. Missing classes are passed
-    /// through [`Self::lazy_load_class_transitive`] so their inheritance
+    /// through [`Self::load_class_transitive`] so their inheritance
     /// chain is also primed (Pass-2 reads parents/interfaces while
     /// resolving members).
     /// Returns true if this session has a configured class resolver
@@ -418,7 +418,7 @@ impl AnalysisSession {
             if self.contains_class(&fqcn) {
                 continue;
             }
-            let _ = self.lazy_load_class(&fqcn);
+            let _ = self.load_class(&fqcn);
         }
     }
 
@@ -544,7 +544,7 @@ impl AnalysisSession {
     /// This is the LSP-friendly bulk-population entry point: after a workspace
     /// scan, callers can feed every discovered file's text to the session
     /// cheaply (an Arc clone plus a HashMap insert per file). Symbol resolution
-    /// then happens on demand via [`Self::lookup_class_or_load`], which reads
+    /// then happens on demand via [`Self::load_class`], which reads
     /// the file from disk through the configured [`crate::ClassResolver`] and
     /// runs Pass 1 lazily when a class FQCN actually needs to resolve.
     ///
@@ -612,7 +612,7 @@ impl AnalysisSession {
     /// ```
     /// After this call, every file's source text is known to salsa. No
     /// parsing has happened yet — Pass 1 runs per file on the first
-    /// `lookup_class_or_load` that needs to consult it.
+    /// `load_class` that needs to consult it.
     pub fn set_workspace_files<I>(&self, files: I)
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
@@ -680,7 +680,7 @@ impl AnalysisSession {
     ///
     /// **Side effects:** if the symbol isn't yet known, this may invoke the
     /// configured [`crate::SourceProvider`] to fault in additional files and
-    /// mutate the salsa input set. Use [`Self::definition_of_loaded`] for a
+    /// mutate the salsa input set. Use [`Self::definition_of_cached`] for a
     /// pure variant that only consults already-loaded state.
     ///
     /// Returns:
@@ -695,19 +695,19 @@ impl AnalysisSession {
         // Trigger any necessary lazy-load mutations before snapshotting.
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                let _ = self.lazy_load_class(fqcn.as_ref());
+                let _ = self.load_class(fqcn.as_ref());
             }
             crate::Symbol::Function(fqn) => {
-                let _ = self.lazy_load_class(fqn.as_ref());
+                let _ = self.load_class(fqn.as_ref());
             }
             crate::Symbol::Method { class, .. }
             | crate::Symbol::Property { class, .. }
             | crate::Symbol::ClassConstant { class, .. } => {
-                let _ = self.lazy_load_class(class.as_ref());
+                let _ = self.load_class(class.as_ref());
             }
             _ => {}
         }
-        self.definition_of_loaded(symbol)
+        self.definition_of_cached(symbol)
     }
 
     /// Pure variant of [`Self::definition_of`]. Never invokes the
@@ -715,7 +715,7 @@ impl AnalysisSession {
     /// only against state already loaded by `set_file_text` / `ingest_file`.
     /// Returns `Err(NotFound)` when the symbol isn't in the loaded set, even
     /// if a resolver could in principle map it.
-    pub fn definition_of_loaded(
+    pub fn definition_of_cached(
         &self,
         symbol: &crate::Symbol,
     ) -> Result<mir_codebase::storage::Location, crate::SymbolLookupError> {
@@ -756,7 +756,7 @@ impl AnalysisSession {
     ///
     /// **Side effects:** when `symbol`'s owning class isn't yet loaded, this
     /// may invoke the configured [`crate::SourceProvider`] to fault in
-    /// dependencies. Use [`Self::hover_loaded`] for a pure variant.
+    /// dependencies. Use [`Self::hover_cached`] for a pure variant.
     ///
     /// Returns `Err(NotFound)` if the symbol doesn't exist. May still return
     /// `Ok` with `docstring: None` or `definition: None` if those specific
@@ -770,21 +770,22 @@ impl AnalysisSession {
         // lookups have the chain present.
         match symbol {
             crate::Symbol::Class(fqcn) => {
-                self.lookup_class_or_load(fqcn.as_ref());
+                self.load_class(fqcn.as_ref());
             }
             crate::Symbol::Method { class, .. }
             | crate::Symbol::Property { class, .. }
             | crate::Symbol::ClassConstant { class, .. } => {
-                self.lookup_class_or_load_transitive(class.as_ref());
+                // 10 mirrors the default depth used by analyze_dependents_of.
+                self.load_class_transitive(class.as_ref(), 10);
             }
             _ => {}
         }
-        self.hover_loaded(symbol)
+        self.hover_cached(symbol)
     }
 
     /// Pure variant of [`Self::hover`]. Never invokes the
     /// [`crate::SourceProvider`]; consults only the already-loaded db.
-    pub fn hover_loaded(
+    pub fn hover_cached(
         &self,
         symbol: &crate::Symbol,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
@@ -1073,38 +1074,51 @@ impl AnalysisSession {
         crate::db::has_method_in_chain(&db, class, name)
     }
 
-    /// Try to resolve `fqcn` via PSR-4 and ingest the mapped file, returning
-    /// a detailed outcome distinguishing "already there" from "freshly loaded".
-    pub fn lazy_load_class_with_outcome(&self, fqcn: &str) -> crate::LazyLoadOutcome {
+    /// Resolve `fqcn` via the configured [`crate::ClassResolver`] and ingest
+    /// the mapped file. The session keeps a negative cache so repeated calls
+    /// for an unresolvable name don't re-hit the resolver; the cache is
+    /// invalidated on any [`Self::ingest_file`] / [`Self::invalidate_file`].
+    ///
+    /// This is the LSP-friendly entry point: the analyzer never touches
+    /// `vendor/` on its own, but consumers can ask it to resolve individual
+    /// symbols on demand. Designed to be called when a diagnostic would
+    /// otherwise report `UndefinedClass`.
+    ///
+    /// Returns a [`crate::LoadOutcome`] distinguishing
+    /// already-loaded / freshly-loaded / not-resolvable. Use
+    /// [`crate::LoadOutcome::is_loaded`] when only success matters.
+    pub fn load_class(&self, fqcn: &str) -> crate::LoadOutcome {
         if self.contains_class(fqcn) {
-            return crate::LazyLoadOutcome::AlreadyLoaded;
+            return crate::LoadOutcome::AlreadyLoaded;
         }
-        if self.lazy_load_class(fqcn) {
-            crate::LazyLoadOutcome::Loaded
+        if self.unresolvable_fqcns.read().contains_key(fqcn) {
+            return crate::LoadOutcome::NotResolvable;
+        }
+        if self.try_resolve_and_ingest(fqcn) {
+            crate::LoadOutcome::Loaded
         } else {
-            crate::LazyLoadOutcome::NotResolvable
+            // Cache the failure with the resolver-mapped path (if any) so
+            // future file edits can selectively evict.
+            let resolved_path: Option<Arc<str>> = self
+                .resolver
+                .as_ref()
+                .and_then(|r| r.resolve(fqcn))
+                .map(|p| Arc::from(p.to_string_lossy().as_ref()));
+            let key: Arc<str> = Arc::from(fqcn);
+            let mut cache = self.unresolvable_fqcns.write();
+            if cache.len() >= UNRESOLVABLE_CACHE_CAP {
+                cache.clear();
+            }
+            cache.insert(key, resolved_path);
+            crate::LoadOutcome::NotResolvable
         }
     }
 
-    /// Try to resolve `fqcn` via the configured [`crate::ClassResolver`] and
-    /// ingest the mapped file.
-    ///
-    /// This is the LSP-friendly lazy-load entry point: the analyzer never
-    /// touches `vendor/` on its own, but consumers can ask it to resolve
-    /// individual symbols on demand. Designed to be called when a diagnostic
-    /// would otherwise report `UndefinedClass`.
-    ///
-    /// Returns `true` if either the class is already known or a matching
-    /// file was found and successfully ingested. Returns `false` if:
-    /// - No resolver is configured (neither `with_psr4` nor `with_class_resolver` called),
-    /// - The resolver can't map `fqcn` to a file,
-    /// - The file can't be read, or
-    /// - The file parsed but did not define `fqcn`.
-    pub fn lazy_load_class(&self, fqcn: &str) -> bool {
+    /// Inner load path: resolver lookup + ingest, no caching. Returns `true`
+    /// iff `fqcn` ends up registered. Failure buckets are recorded for
+    /// telemetry.
+    fn try_resolve_and_ingest(&self, fqcn: &str) -> bool {
         use crate::metrics::{record_lazy_load_failure, LazyLoadFailure};
-        if self.contains_class(fqcn) {
-            return true;
-        }
         let Some(resolver) = &self.resolver else {
             record_lazy_load_failure(LazyLoadFailure::NoResolver, fqcn);
             return false;
@@ -1145,7 +1159,7 @@ impl AnalysisSession {
     /// Walks at most `max_depth` levels (default in batch analysis is 10).
     /// Returns the number of classes successfully loaded (not counting
     /// `fqcn` itself if it was already present).
-    pub fn lazy_load_class_transitive(&self, fqcn: &str, max_depth: usize) -> usize {
+    pub fn load_class_transitive(&self, fqcn: &str, max_depth: usize) -> usize {
         if self.resolver.is_none() {
             return 0;
         }
@@ -1163,7 +1177,7 @@ impl AnalysisSession {
                     continue;
                 }
                 let was_present = self.contains_class(&name);
-                let resolved = self.lazy_load_class(&name);
+                let resolved = self.load_class(&name).is_loaded();
                 if resolved && !was_present {
                     loaded += 1;
                     // Walk the new class's parent / interfaces / traits via pull.
@@ -1213,67 +1227,6 @@ impl AnalysisSession {
             Some(p) => !registered.contains(p.as_ref()),
             None => true,
         });
-    }
-
-    /// Resolve `fqcn` to a source file, lazy-loading via the configured
-    /// [`crate::ClassResolver`] if it isn't already registered.
-    ///
-    /// This is the recommended entry point for callers (LSP, Pass 2 diagnostic
-    /// emission) that want "does this class exist anywhere in the workspace?"
-    /// semantics without enumerating dependencies upfront. The fast path is a
-    /// single DashMap lookup; the slow path runs only on miss and is itself
-    /// negative-cached so repeated lookups for genuinely-missing names don't
-    /// re-hit the resolver. The negative cache is invalidated on any
-    /// [`Self::ingest_file`] / [`Self::invalidate_file`] call.
-    ///
-    /// Returns `None` if the class is not registered AND the resolver can't
-    /// map `fqcn` to a readable file that defines it.
-    /// Returns `true` if `fqcn` is resolvable (already loaded or lazily
-    /// loaded on this call). Returns `false` if resolution fails.
-    pub fn lookup_class_or_load(&self, fqcn: &str) -> bool {
-        if self.contains_class(fqcn) {
-            return true;
-        }
-        if self.unresolvable_fqcns.read().contains_key(fqcn) {
-            return false;
-        }
-        if !self.lazy_load_class(fqcn) {
-            // Cache the failure with the resolver-mapped path (if any) so
-            // future file edits can selectively evict.
-            let resolved_path: Option<Arc<str>> = self
-                .resolver
-                .as_ref()
-                .and_then(|r| r.resolve(fqcn))
-                .map(|p| Arc::from(p.to_string_lossy().as_ref()));
-            let key: Arc<str> = Arc::from(fqcn);
-            let mut cache = self.unresolvable_fqcns.write();
-            if cache.len() >= UNRESOLVABLE_CACHE_CAP {
-                cache.clear();
-            }
-            cache.insert(key, resolved_path);
-            return false;
-        }
-        true
-    }
-
-    /// Like [`Self::lookup_class_or_load`] but additionally walks the
-    /// inheritance chain (parent + interfaces + traits) so subsequent
-    /// member-lookup queries on the returned node have the full chain loaded.
-    pub fn lookup_class_or_load_transitive(&self, fqcn: &str) -> bool {
-        if !self.lookup_class_or_load(fqcn) {
-            return false;
-        }
-        // 10 mirrors the default depth used by analyze_dependents_of.
-        self.lazy_load_class_transitive(fqcn, 10);
-        true
-    }
-
-    /// Returns `true` if `fqn` is a known global function. No resolver-driven
-    /// slow path: functions are not name-mapped to files by PSR-4.
-    pub fn lookup_function_or_load(&self, fqn: &str) -> bool {
-        let db = self.snapshot_db();
-        let here = crate::db::Fqcn::from_str(&db, fqn);
-        crate::db::find_function(&db, here).is_some()
     }
 
     /// Retrieve the source text the session has registered for `file`, if
@@ -1393,7 +1346,7 @@ impl AnalysisSession {
             // Use the transitive walker with a small depth so we pick up
             // parent classes / interfaces needed for member resolution, but
             // don't recursively pull in the entire vendor tree.
-            loaded += self.lazy_load_class_transitive(&fqcn, 2);
+            loaded += self.load_class_transitive(&fqcn, 2);
         }
         loaded
     }

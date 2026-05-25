@@ -273,8 +273,8 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
 }
 
 #[test]
-fn lazy_load_class_with_custom_resolver() {
-    use mir_analyzer::{ClassResolver, LazyLoadOutcome};
+fn load_class_with_custom_resolver() {
+    use mir_analyzer::{ClassResolver, LoadOutcome};
     use std::path::PathBuf;
 
     // Custom resolver that maps any FQCN to a temp file we write.
@@ -302,13 +302,13 @@ fn lazy_load_class_with_custom_resolver() {
     assert!(!session.contains_class("ResolvedByCustom"));
 
     // First call: should load via resolver
-    let outcome = session.lazy_load_class_with_outcome("ResolvedByCustom");
-    assert_eq!(outcome, LazyLoadOutcome::Loaded);
+    let outcome = session.load_class("ResolvedByCustom");
+    assert_eq!(outcome, LoadOutcome::Loaded);
     assert!(session.contains_class("ResolvedByCustom"));
 
     // Second call: already loaded
-    let outcome = session.lazy_load_class_with_outcome("ResolvedByCustom");
-    assert_eq!(outcome, LazyLoadOutcome::AlreadyLoaded);
+    let outcome = session.load_class("ResolvedByCustom");
+    assert_eq!(outcome, LoadOutcome::AlreadyLoaded);
 
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -416,12 +416,12 @@ fn analyze_dependents_of_runs_in_parallel() {
 }
 
 #[test]
-fn lazy_load_class_not_resolvable_without_resolver() {
-    use mir_analyzer::LazyLoadOutcome;
+fn load_class_not_resolvable_without_resolver() {
+    use mir_analyzer::LoadOutcome;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
-    let outcome = session.lazy_load_class_with_outcome("Some\\Unknown\\Class");
-    assert_eq!(outcome, LazyLoadOutcome::NotResolvable);
+    let outcome = session.load_class("Some\\Unknown\\Class");
+    assert_eq!(outcome, LoadOutcome::NotResolvable);
 }
 
 #[test]

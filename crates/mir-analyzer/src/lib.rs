@@ -182,9 +182,9 @@ pub enum SymbolLookupError {
     NoSourceLocation,
 }
 
-/// Result of a lazy-load attempt.
+/// Outcome of a [`AnalysisSession::load_class`] attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LazyLoadOutcome {
+pub enum LoadOutcome {
     /// The symbol was already present in the session; no work performed.
     AlreadyLoaded,
     /// The symbol was resolved by the configured [`ClassResolver`] and the
@@ -194,6 +194,14 @@ pub enum LazyLoadOutcome {
     /// file, or the resolved file could not be read / did not define the
     /// requested symbol.
     NotResolvable,
+}
+
+impl LoadOutcome {
+    /// `true` when the symbol is now present in the session (whether it was
+    /// already there or just freshly loaded).
+    pub fn is_loaded(self) -> bool {
+        !matches!(self, LoadOutcome::NotResolvable)
+    }
 }
 
 /// Pluggable strategy for mapping a fully-qualified class name to the file
