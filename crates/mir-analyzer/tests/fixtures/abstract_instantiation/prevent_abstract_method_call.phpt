@@ -1,5 +1,5 @@
 ===description===
-preventAbstractMethodCall
+Prevent abstract method call
 ===file===
 <?php
 abstract class Base {

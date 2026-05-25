@@ -1,5 +1,5 @@
 ===description===
-methodwithDash
+Methodwith dash
 ===file===
 <?php
 /**

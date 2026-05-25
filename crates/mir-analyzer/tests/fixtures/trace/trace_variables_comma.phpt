@@ -1,5 +1,5 @@
 ===description===
-traceVariablesComma
+Trace variables comma
 ===file===
 <?php
 /** @trace $a, $b */

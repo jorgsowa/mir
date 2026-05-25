@@ -1,5 +1,5 @@
 ===description===
-invalidToStringReturnType
+Invalid to string return type
 ===file===
 <?php
 class A {

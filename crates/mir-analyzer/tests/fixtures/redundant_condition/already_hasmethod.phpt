@@ -1,5 +1,5 @@
 ===description===
-alreadyHasmethod
+Already hasmethod
 ===file===
 <?php
 class A {

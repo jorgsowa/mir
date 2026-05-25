@@ -1,5 +1,5 @@
 ===description===
-resourceCannotBeCoercedToString
+Resource cannot be coerced to string
 ===file===
 <?php
 /** @mutation-free */

@@ -1,5 +1,5 @@
 ===description===
-dateTimeNullFirstArg
+Date time null first arg
 ===file===
 <?php
 $date = new DateTime(null);

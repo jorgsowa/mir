@@ -1,5 +1,5 @@
 ===description===
-breakWithoutSettingVar
+Break without setting var
 ===file===
 <?php
 function foo(int $i) : void {

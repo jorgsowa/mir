@@ -1,5 +1,5 @@
 ===description===
-mismatchingReturnTypes
+Mismatching return types
 ===file===
 <?php
 interface I1 {

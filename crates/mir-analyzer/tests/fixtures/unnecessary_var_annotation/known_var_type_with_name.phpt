@@ -1,5 +1,5 @@
 ===description===
-knownVarTypeWithName
+Known var type with name
 ===file===
 <?php
 function foo() : string {

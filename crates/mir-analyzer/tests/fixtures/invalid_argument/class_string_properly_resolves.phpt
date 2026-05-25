@@ -1,5 +1,5 @@
 ===description===
-classStringProperlyResolves
+Class string properly resolves
 ===file===
 <?php
 class ConfigRegistry {

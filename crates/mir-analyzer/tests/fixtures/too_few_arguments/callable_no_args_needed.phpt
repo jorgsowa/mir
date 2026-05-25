@@ -1,5 +1,5 @@
 ===description===
-callableNoArgsNeeded
+Callable no args needed
 ===file===
 <?php
 /**

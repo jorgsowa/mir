@@ -1,5 +1,5 @@
 ===description===
-traitMethodMadePrivate
+Trait method made private
 ===file===
 <?php
 trait T {

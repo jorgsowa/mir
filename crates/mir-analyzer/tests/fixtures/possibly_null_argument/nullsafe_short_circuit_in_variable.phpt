@@ -1,5 +1,5 @@
 ===description===
-nullsafeShortCircuitInVariable
+Nullsafe short circuit in variable
 ===file===
 <?php
 interface Bar {

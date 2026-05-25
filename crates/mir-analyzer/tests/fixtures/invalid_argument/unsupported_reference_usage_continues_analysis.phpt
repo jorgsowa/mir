@@ -1,5 +1,5 @@
 ===description===
-unsupportedReferenceUsageContinuesAnalysis
+Unsupported reference usage continues analysis
 ===file===
 <?php
 /** @var array<string, string> */

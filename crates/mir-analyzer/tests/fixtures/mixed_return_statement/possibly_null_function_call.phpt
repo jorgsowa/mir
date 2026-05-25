@@ -1,5 +1,5 @@
 ===description===
-possiblyNullFunctionCall
+Possibly null function call
 ===file===
 <?php
 /**

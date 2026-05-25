@@ -1,5 +1,5 @@
 ===description===
-nullablePropertyAssignment
+Nullable property assignment
 ===file===
 <?php
 $a = null;

@@ -1,5 +1,5 @@
 ===description===
-doesNotImplementAnything
+Does not implement anything
 ===file===
 <?php
 use ImplementationRequirementsTraitImposesImplementationRequirements;

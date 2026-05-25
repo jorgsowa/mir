@@ -1,5 +1,5 @@
 ===description===
-undefinedVariableStaticCall
+Undefined variable static call
 ===file===
 <?php
 $foo::bar();

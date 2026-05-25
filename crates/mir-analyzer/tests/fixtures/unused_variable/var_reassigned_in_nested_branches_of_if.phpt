@@ -1,5 +1,5 @@
 ===description===
-varReassignedInNestedBranchesOfIf
+Var reassigned in nested branches of if
 ===file===
 <?php
 $a = "foo";

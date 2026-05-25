@@ -1,5 +1,5 @@
 ===description===
-traitReturnTypeMismatch
+Trait return type mismatch
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-readonlyPropertyAssignOperator
+Readonly property assign operator
 ===file===
 <?php
 class Test {

@@ -1,5 +1,5 @@
 ===description===
-onlyImplementsOneRequirement
+Only implements one requirement
 ===file===
 <?php
 use ImplementationRequirementsTraitImposesImplementationRequirements;

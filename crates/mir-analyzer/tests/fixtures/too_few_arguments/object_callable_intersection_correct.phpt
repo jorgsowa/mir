@@ -1,5 +1,5 @@
 ===description===
-objectCallableIntersectionCorrect
+Object callable intersection correct
 ===file===
 <?php
 /**

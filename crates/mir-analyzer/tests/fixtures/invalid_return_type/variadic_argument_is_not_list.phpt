@@ -1,5 +1,5 @@
 ===description===
-variadicArgumentIsNotList
+Variadic argument is not list
 ===file===
 <?php
 /** @return list<int> */

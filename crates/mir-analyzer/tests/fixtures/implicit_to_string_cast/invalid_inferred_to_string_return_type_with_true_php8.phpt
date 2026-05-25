@@ -1,5 +1,5 @@
 ===description===
-invalidInferredToStringReturnTypeWithTruePhp8
+Invalid inferred to string return type with true php8
 ===file===
 <?php
 class A {

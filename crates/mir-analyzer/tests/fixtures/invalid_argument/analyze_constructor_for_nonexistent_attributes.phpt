@@ -1,5 +1,5 @@
 ===description===
-analyzeConstructorForNonexistentAttributes
+Analyze constructor for nonexistent attributes
 ===file===
 <?php
 class Foo

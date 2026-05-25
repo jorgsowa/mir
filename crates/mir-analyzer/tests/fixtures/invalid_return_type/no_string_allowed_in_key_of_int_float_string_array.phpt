@@ -1,5 +1,5 @@
 ===description===
-noStringAllowedInKeyOfIntFloatStringArray
+No string allowed in key of int float string array
 ===file===
 <?php
 /**

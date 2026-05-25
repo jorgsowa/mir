@@ -1,5 +1,5 @@
 ===description===
-noInstanceCallAsStatic
+No instance call as static
 ===file===
 <?php
 class C {

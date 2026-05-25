@@ -1,5 +1,5 @@
 ===description===
-returnsTypedClosureWithBadParamType
+Returns typed closure with bad param type
 ===file===
 <?php
 /**

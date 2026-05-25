@@ -1,5 +1,5 @@
 ===description===
-callableClassLiteralStringMethodOtherClassContextStaticNonPublic
+Callable class literal string method other class context static non public
 ===file===
 <?php
 class Foo {

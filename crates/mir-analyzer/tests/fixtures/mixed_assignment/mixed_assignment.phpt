@@ -1,5 +1,5 @@
 ===description===
-mixedAssignment
+Mixed assignment
 ===file===
 <?php
 /** @var mixed */

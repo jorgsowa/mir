@@ -1,5 +1,5 @@
 ===description===
-impureConstructorCall
+Impure constructor call
 ===file===
 <?php
 namespace Bar;

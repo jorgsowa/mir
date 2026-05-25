@@ -1,5 +1,5 @@
 ===description===
-invalidArgumentCallableWithoutArgsUnion
+Invalid argument callable without args union
 ===file===
 <?php
 function foo(int $a): void {}

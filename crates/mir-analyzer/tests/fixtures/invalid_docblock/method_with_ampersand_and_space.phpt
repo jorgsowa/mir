@@ -1,5 +1,5 @@
 ===description===
-methodWithAmpersandAndSpace
+Method with ampersand and space
 ===file===
 <?php
 /**

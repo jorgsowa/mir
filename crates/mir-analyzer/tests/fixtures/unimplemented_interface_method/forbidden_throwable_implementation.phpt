@@ -1,5 +1,5 @@
 ===description===
-forbiddenThrowableImplementation
+Forbidden throwable implementation
 ===file===
 <?php
 class C implements Throwable {}

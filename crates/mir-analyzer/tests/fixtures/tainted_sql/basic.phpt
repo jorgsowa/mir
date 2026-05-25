@@ -1,5 +1,5 @@
 ===description===
-basic
+Basic
 ===file===
 <?php
 function run_query(mysqli $db): void {

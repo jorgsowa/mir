@@ -1,5 +1,5 @@
 ===description===
-possiblyNullReferenceInInvokedCall
+Possibly null reference in invoked call
 ===file===
 <?php
 interface Location {

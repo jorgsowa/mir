@@ -1,5 +1,5 @@
 ===description===
-loopSetIfNullWithBreakWithoutReference
+Loop set if null with break without reference
 ===file===
 <?php
 $a = null;

@@ -1,5 +1,5 @@
 ===description===
-closureInvalidArg
+Closure invalid arg
 ===file===
 <?php
 /** @param Closure(int): string $c */

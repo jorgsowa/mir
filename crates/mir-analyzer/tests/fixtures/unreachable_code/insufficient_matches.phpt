@@ -1,5 +1,5 @@
 ===description===
-insufficientMatches
+Insufficient matches
 ===file===
 <?php
 enum Suit {

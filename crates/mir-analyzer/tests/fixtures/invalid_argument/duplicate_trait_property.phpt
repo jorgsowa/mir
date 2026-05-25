@@ -1,5 +1,5 @@
 ===description===
-duplicateTraitProperty
+Duplicate trait property
 ===file===
 <?php
 trait T {

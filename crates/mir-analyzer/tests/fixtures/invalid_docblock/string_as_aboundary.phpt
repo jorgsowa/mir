@@ -1,5 +1,5 @@
 ===description===
-stringAsABoundary
+String as a boundary
 ===file===
 <?php
 /**

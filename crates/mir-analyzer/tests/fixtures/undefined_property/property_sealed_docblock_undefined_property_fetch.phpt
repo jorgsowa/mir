@@ -1,5 +1,5 @@
 ===description===
-propertySealedDocblockUndefinedPropertyFetch
+Property sealed docblock undefined property fetch
 ===file===
 <?php
 /**

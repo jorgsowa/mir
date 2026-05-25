@@ -1,5 +1,5 @@
 ===description===
-contradictoryReferenceConstraints
+Contradictory reference constraints
 ===file===
 <?php
 class A {

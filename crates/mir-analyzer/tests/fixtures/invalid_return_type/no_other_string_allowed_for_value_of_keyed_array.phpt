@@ -1,5 +1,5 @@
 ===description===
-noOtherStringAllowedForValueOfKeyedArray
+No other string allowed for value of keyed array
 ===file===
 <?php
 /**

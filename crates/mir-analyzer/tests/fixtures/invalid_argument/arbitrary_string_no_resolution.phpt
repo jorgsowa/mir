@@ -1,5 +1,5 @@
 ===description===
-arbitraryStringNoResolution
+Arbitrary string no resolution
 ===file===
 <?php
 // A plain string literal that happens to match a function name

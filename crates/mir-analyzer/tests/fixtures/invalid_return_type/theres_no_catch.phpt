@@ -1,5 +1,5 @@
 ===description===
-theresNoCatch
+Theres no catch
 ===file===
 <?php
 function missing_return() : bool {

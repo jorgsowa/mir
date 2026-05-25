@@ -1,5 +1,5 @@
 ===description===
-impureCallableReturn
+Impure callable return
 ===file===
 <?php
 /**

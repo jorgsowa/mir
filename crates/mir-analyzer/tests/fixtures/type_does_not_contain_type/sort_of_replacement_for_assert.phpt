@@ -1,5 +1,5 @@
 ===description===
-sortOfReplacementForAssert
+Sort of replacement for assert
 ===file===
 <?php
 namespace Bar;

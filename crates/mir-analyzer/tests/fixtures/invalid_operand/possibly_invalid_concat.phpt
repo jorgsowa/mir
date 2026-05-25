@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidConcat
+Possibly invalid concat
 ===file===
 <?php
 $b = rand(0, 1) ? [] : "hello";

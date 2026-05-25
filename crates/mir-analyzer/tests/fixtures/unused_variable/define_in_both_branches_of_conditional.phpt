@@ -1,5 +1,5 @@
 ===description===
-defineInBothBranchesOfConditional
+Define in both branches of conditional
 ===file===
 <?php
 $i = null;

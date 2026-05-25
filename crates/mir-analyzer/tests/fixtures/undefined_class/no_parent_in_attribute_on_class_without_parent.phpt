@@ -1,5 +1,5 @@
 ===description===
-noParentInAttributeOnClassWithoutParent
+No parent in attribute on class without parent
 ===file===
 <?php
 #[Attribute]

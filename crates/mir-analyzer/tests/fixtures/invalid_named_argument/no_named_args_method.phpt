@@ -1,5 +1,5 @@
 ===description===
-noNamedArgsMethod
+No named args method
 ===file===
 <?php
 class CustomerData

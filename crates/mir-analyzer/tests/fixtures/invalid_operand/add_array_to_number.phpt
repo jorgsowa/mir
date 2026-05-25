@@ -1,5 +1,5 @@
 ===description===
-addArrayToNumber
+Add array to number
 ===file===
 <?php
 $a = [1] + 1;

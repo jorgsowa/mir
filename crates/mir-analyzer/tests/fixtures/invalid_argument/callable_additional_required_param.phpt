@@ -1,5 +1,5 @@
 ===description===
-callableAdditionalRequiredParam
+Callable additional required param
 ===file===
 <?php
 /**

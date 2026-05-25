@@ -1,5 +1,5 @@
 ===description===
-ifInBothBranchesWithoutReference
+If in both branches without reference
 ===file===
 <?php
 $a = 5;

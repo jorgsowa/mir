@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidArrayAccess
+Possibly invalid array access
 ===file===
 <?php
 $a = rand(0, 10) > 5 ? 5 : ["hello"];

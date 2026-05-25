@@ -1,5 +1,5 @@
 ===description===
-implicitCast
+Implicit cast
 ===file===
 <?php
 class A {

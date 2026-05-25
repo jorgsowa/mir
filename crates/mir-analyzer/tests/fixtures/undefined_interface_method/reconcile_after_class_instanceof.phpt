@@ -1,5 +1,5 @@
 ===description===
-reconcileAfterClassInstanceof
+Reconcile after class instanceof
 ===file===
 <?php
 interface Base {}

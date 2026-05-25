@@ -1,5 +1,5 @@
 ===description===
-arrayReduceInvalidClosureTooFewArgs
+Array reduce invalid closure too few args
 ===file===
 <?php
 $arr = [2, 3, 4, 5];

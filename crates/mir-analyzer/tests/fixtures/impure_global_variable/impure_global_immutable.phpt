@@ -1,5 +1,5 @@
 ===description===
-impureGlobalImmutable
+Impure global immutable
 ===file===
 <?php
 /**

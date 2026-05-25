@@ -1,5 +1,5 @@
 ===description===
-usePositionalArgAfterNamed
+Use positional arg after named
 ===file===
 <?php
 final class Person

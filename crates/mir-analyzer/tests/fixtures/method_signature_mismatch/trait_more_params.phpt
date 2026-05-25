@@ -1,5 +1,5 @@
 ===description===
-traitMoreParams
+Trait more params
 ===file===
 <?php
 class A {

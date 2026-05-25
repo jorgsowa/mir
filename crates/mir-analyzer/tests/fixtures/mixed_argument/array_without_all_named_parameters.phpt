@@ -1,5 +1,5 @@
 ===description===
-arrayWithoutAllNamedParameters
+Array without all named parameters
 ===file===
 <?php
 class User {

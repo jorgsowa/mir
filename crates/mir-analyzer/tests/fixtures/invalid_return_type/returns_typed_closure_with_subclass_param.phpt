@@ -1,5 +1,5 @@
 ===description===
-returnsTypedClosureWithSubclassParam
+Returns typed closure with subclass param
 ===file===
 <?php
 class A {}

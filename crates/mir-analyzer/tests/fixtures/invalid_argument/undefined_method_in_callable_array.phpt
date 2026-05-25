@@ -1,5 +1,5 @@
 ===description===
-undefinedMethodInCallableArray
+Undefined method in callable array
 ===file===
 <?php
 class Handler {

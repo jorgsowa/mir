@@ -1,5 +1,5 @@
 ===description===
-newLazyGhostWithBadType
+New lazy ghost with bad type
 ===file===
 <?php
 class Foo {}

@@ -1,5 +1,5 @@
 ===description===
-noCrashOnGetClassMethodCall
+No crash on get class method call
 ===file===
 <?php
 class User {

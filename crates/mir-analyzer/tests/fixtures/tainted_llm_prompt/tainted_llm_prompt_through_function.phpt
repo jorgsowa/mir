@@ -1,5 +1,5 @@
 ===description===
-taintedLlmPromptThroughFunction
+Tainted llm prompt through function
 ===file===
 <?php
 class LlmAgent {

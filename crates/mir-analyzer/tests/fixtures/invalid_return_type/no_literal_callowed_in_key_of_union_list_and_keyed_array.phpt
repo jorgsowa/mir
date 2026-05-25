@@ -1,5 +1,5 @@
 ===description===
-noLiteralCAllowedInKeyOfUnionListAndKeyedArray
+No literal c allowed in key of union list and keyed array
 ===file===
 <?php
 /**

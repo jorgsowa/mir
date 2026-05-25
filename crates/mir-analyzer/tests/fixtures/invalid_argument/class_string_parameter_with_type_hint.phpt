@@ -1,5 +1,5 @@
 ===description===
-classStringParameterWithTypeHint
+Class string parameter with type hint
 ===file===
 <?php
 class Service {

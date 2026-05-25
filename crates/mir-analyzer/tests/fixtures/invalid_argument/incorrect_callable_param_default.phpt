@@ -1,5 +1,5 @@
 ===description===
-incorrectCallableParamDefault
+Incorrect callable param default
 ===file===
 <?php
 class A {

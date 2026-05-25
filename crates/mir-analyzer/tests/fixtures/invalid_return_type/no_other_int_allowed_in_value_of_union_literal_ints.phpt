@@ -1,5 +1,5 @@
 ===description===
-noOtherIntAllowedInValueOfUnionLiteralInts
+No other int allowed in value of union literal ints
 ===file===
 <?php
 /**

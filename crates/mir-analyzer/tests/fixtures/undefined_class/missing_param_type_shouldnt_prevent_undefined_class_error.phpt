@@ -1,5 +1,5 @@
 ===description===
-missingParamTypeShouldntPreventUndefinedClassError
+Missing param type shouldnt prevent undefined class error
 ===file===
 <?php
 /** @suppress MissingParamType */

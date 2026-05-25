@@ -1,5 +1,5 @@
 ===description===
-functionWithVar
+Function with var
 ===file===
 <?php
 function test() {

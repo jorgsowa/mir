@@ -1,5 +1,5 @@
 ===description===
-classConstantInvalidValue
+Class constant invalid value
 ===file===
 <?php
 namespace NS {

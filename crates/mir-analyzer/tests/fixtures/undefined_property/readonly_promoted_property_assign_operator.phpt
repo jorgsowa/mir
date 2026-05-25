@@ -1,5 +1,5 @@
 ===description===
-readonlyPromotedPropertyAssignOperator
+Readonly promoted property assign operator
 ===file===
 <?php
 class A {

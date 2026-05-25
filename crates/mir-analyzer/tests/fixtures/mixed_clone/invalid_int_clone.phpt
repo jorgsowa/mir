@@ -1,5 +1,5 @@
 ===description===
-invalidIntClone
+Invalid int clone
 ===file===
 <?php
 $a = 5;

@@ -1,5 +1,5 @@
 ===description===
-invalidExtendsAnnotatedFinalClass
+Invalid extends annotated final class
 ===file===
 <?php
 

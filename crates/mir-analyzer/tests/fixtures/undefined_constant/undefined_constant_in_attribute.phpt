@@ -1,5 +1,5 @@
 ===description===
-undefinedConstantInAttribute
+Undefined constant in attribute
 ===file===
 <?php
 #[Attribute]

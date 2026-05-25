@@ -1,5 +1,5 @@
 ===description===
-varReassignedInBothBranchesOfIf
+Var reassigned in both branches of if
 ===file===
 <?php
 $a = "foo";

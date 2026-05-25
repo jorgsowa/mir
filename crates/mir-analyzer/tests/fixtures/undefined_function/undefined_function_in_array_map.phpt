@@ -1,5 +1,5 @@
 ===description===
-undefinedFunctionInArrayMap
+Undefined function in array map
 ===file===
 <?php
 array_map(

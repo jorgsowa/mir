@@ -1,5 +1,5 @@
 ===description===
-annotationWithByRefParam
+Annotation with by ref param
 ===file===
 <?php
 class ParentClass {

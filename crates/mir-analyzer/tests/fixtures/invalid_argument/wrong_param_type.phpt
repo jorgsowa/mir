@@ -1,5 +1,5 @@
 ===description===
-wrongParamType
+Wrong param type
 ===file===
 <?php
 $take_string = function(string $s): string { return $s; };

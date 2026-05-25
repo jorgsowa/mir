@@ -1,5 +1,5 @@
 ===description===
-possiblyNullArrayAccess
+Possibly null array access
 ===file===
 <?php
 $a = rand(0, 1) ? [1, 2] : null;

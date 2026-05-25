@@ -1,5 +1,5 @@
 ===description===
-taintedLlmPromptFromConcatenatedInput
+Tainted llm prompt from concatenated input
 ===file===
 <?php
 class LlmAgent {

@@ -1,5 +1,5 @@
 ===description===
-getAttributesOnClassConstantWithNonClassConstantAttribute
+Get attributes on class constant with non class constant attribute
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

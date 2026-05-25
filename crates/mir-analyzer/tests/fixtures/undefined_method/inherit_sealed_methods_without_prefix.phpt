@@ -1,5 +1,5 @@
 ===description===
-inheritSealedMethodsWithoutPrefix
+Inherit sealed methods without prefix
 ===file===
 <?php
 /**

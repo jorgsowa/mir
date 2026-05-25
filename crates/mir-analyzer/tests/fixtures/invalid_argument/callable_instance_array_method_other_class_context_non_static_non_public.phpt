@@ -1,5 +1,5 @@
 ===description===
-callableInstanceArrayMethodOtherClassContextNonStaticNonPublic
+Callable instance array method other class context non static non public
 ===file===
 <?php
 class Foo {

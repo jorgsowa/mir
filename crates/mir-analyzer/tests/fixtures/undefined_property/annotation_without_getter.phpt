@@ -1,5 +1,5 @@
 ===description===
-annotationWithoutGetter
+Annotation without getter
 ===file===
 <?php
 /**

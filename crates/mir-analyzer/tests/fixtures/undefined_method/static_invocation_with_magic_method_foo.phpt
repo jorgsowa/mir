@@ -1,5 +1,5 @@
 ===description===
-staticInvocationWithMagicMethodFoo
+Static invocation with magic method foo
 ===file===
 <?php
 /**

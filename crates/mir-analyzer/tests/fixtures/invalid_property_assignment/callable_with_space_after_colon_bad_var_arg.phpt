@@ -1,5 +1,5 @@
 ===description===
-callableWithSpaceAfterColonBadVarArg
+Callable with space after colon bad var arg
 ===file===
 <?php
 class C {

@@ -1,5 +1,5 @@
 ===description===
-referenceReuseDeclaredInElseif
+Reference reuse declared in elseif
 ===file===
 <?php
 /** @var array<int> */

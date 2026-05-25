@@ -1,5 +1,5 @@
 ===description===
-unchainedInferredInferredMutationFreeMethodCallDontMemoize
+Unchained inferred inferred mutation free method call dont memoize
 ===file===
 <?php
 class SomeClass {

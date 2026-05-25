@@ -1,5 +1,5 @@
 ===description===
-keyOfArrayLiteral
+Key of array literal
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-foreachNonEmptyMultipleTypes
+Foreach non empty multiple types
 ===file===
 <?php
 $items = [1]; // Non-empty literal array

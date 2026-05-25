@@ -1,5 +1,5 @@
 ===description===
-missingArrayOffsetAfterUnset
+Missing array offset after unset
 ===file===
 <?php
 $x = ["a" => "value", "b" => "value"];

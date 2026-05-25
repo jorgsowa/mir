@@ -1,5 +1,5 @@
 ===description===
-overwriteOrderedNamedParam
+Overwrite ordered named param
 ===file===
 <?php
 function test(int $param, int $param2): void {

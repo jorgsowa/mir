@@ -1,5 +1,5 @@
 ===description===
-deprecatedTrait
+Deprecated trait
 ===file===
 <?php
 /** @deprecated */

@@ -1,5 +1,5 @@
 ===description===
-referenceReuseDeeplyNested
+Reference reuse deeply nested
 ===file===
 <?php
 /** @var list<list<list<int>>> */

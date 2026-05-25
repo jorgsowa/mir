@@ -1,5 +1,5 @@
 ===description===
-variantDocblockProperties
+Variant docblock properties
 ===file===
 <?php
 class ParentClass

@@ -1,5 +1,5 @@
 ===description===
-foreachUnknownArraySize
+Foreach unknown array size
 ===file===
 <?php
 function getItems(): array {

@@ -1,5 +1,5 @@
 ===description===
-undefinedCallableFunction
+Undefined callable function
 ===file===
 <?php
 function foo(callable $c): void {}

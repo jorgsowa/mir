@@ -1,5 +1,5 @@
 ===description===
-missingParamType
+Missing param type
 ===file===
 <?php
 interface foo {

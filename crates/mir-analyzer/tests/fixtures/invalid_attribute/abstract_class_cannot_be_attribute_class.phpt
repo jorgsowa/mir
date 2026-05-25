@@ -1,5 +1,5 @@
 ===description===
-abstractClassCannotBeAttributeClass
+Abstract class cannot be attribute class
 ===file===
 <?php
 #[Attribute]

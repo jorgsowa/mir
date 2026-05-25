@@ -1,5 +1,5 @@
 ===description===
-stringLiteralAsFunctionName
+String literal as function name
 ===file===
 <?php
 // The issue: a TLiteralString("trim") should NOT be resolved via Fqcn::from_str

@@ -1,5 +1,5 @@
 ===description===
-checkCallableTypeArrayClassStringFirstArg
+Check callable type array class string first arg
 ===file===
 <?php
 /**

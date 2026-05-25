@@ -1,5 +1,5 @@
 ===description===
-paradoxInFunctionCall
+Paradox in function call
 ===file===
 <?php
 /** @return 1|2|3 */

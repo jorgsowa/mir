@@ -1,5 +1,5 @@
 ===description===
-preventPossiblyUndefinedVarInTry
+Prevent possibly undefined var in try
 ===file===
 <?php
 class Foo {

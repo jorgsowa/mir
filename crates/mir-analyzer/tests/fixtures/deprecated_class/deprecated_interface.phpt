@@ -1,5 +1,5 @@
 ===description===
-deprecatedInterface
+Deprecated interface
 ===file===
 <?php
 /** @deprecated */

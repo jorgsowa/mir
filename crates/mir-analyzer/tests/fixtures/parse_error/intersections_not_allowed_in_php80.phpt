@@ -1,5 +1,5 @@
 ===description===
-intersectionsNotAllowedInPHP80
+Intersections not allowed in p h p80
 ===file===
 <?php
 interface A {

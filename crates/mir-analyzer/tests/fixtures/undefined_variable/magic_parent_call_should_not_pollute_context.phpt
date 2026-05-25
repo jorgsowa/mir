@@ -1,5 +1,5 @@
 ===description===
-magicParentCallShouldNotPolluteContext
+Magic parent call should not pollute context
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-requireParam
+Require param
 ===file===
 <?php
 interface I {

@@ -1,5 +1,5 @@
 ===description===
-basic
+Basic
 ===file===
 <?php
 function takes_string(string $s): void { var_dump($s); }

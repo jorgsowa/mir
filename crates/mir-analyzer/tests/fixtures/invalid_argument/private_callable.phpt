@@ -1,5 +1,5 @@
 ===description===
-privateCallable
+Private callable
 ===file===
 <?php
 class Base  {

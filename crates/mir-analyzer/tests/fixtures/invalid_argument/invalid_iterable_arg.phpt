@@ -1,5 +1,5 @@
 ===description===
-invalidIterableArg
+Invalid iterable arg
 ===file===
 <?php
 /**

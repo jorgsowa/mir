@@ -1,5 +1,5 @@
 ===description===
-nativeTypeIntersectionAsClassPropertyUsingUnknownInterfaces
+Native type intersection as class property using unknown interfaces
 ===file===
 <?php
 class C {

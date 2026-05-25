@@ -1,5 +1,5 @@
 ===description===
-encapsedConcatWithStringCreatesString
+Encapsed concat with string creates string
 ===file===
 <?php
 /**

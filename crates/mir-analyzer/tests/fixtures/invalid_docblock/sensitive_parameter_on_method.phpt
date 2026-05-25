@@ -1,5 +1,5 @@
 ===description===
-sensitiveParameterOnMethod
+Sensitive parameter on method
 ===file===
 <?php
 

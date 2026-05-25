@@ -1,5 +1,5 @@
 ===description===
-catchWithNoReturnAndNoFinally
+Catch with no return and no finally
 ===file===
 <?php
 function foo() : bool {

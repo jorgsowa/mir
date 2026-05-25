@@ -1,5 +1,5 @@
 ===description===
-interfaceMissingAttribute
+Interface missing attribute
 ===file===
 <?php
 interface I {

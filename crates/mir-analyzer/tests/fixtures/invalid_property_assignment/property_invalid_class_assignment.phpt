@@ -1,5 +1,5 @@
 ===description===
-propertyInvalidClassAssignment
+Property invalid class assignment
 ===file===
 <?php
 namespace Bar;

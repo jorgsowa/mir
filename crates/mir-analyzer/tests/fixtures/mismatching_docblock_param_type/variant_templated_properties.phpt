@@ -1,5 +1,5 @@
 ===description===
-variantTemplatedProperties
+Variant templated properties
 ===file===
 <?php
 /**

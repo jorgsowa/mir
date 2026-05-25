@@ -1,5 +1,5 @@
 ===description===
-badArrayMapArrayCallable
+Bad array map array callable
 ===file===
 <?php
 class one { public function two(string $_p): void {} }

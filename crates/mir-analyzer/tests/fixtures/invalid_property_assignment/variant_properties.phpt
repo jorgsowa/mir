@@ -1,5 +1,5 @@
 ===description===
-variantProperties
+Variant properties
 ===file===
 <?php
 class ParentClass

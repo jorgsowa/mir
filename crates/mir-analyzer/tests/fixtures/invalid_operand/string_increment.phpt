@@ -1,5 +1,5 @@
 ===description===
-stringIncrement
+String increment
 ===file===
 <?php
 $a = "hello";

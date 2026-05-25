@@ -1,5 +1,5 @@
 ===description===
-psalmMagicInterfaceWrongPropertyWrite
+Psalm magic interface wrong property write
 ===file===
 <?php
 /**

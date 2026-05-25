@@ -1,5 +1,5 @@
 ===description===
-constructCallableFromClassStringArray
+Construct callable from class string array
 ===file===
 <?php
 interface Foo {

@@ -1,5 +1,5 @@
 ===description===
-possiblyBadAssignment
+Possibly bad assignment
 ===file===
 <?php
 class A {

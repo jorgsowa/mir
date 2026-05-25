@@ -1,5 +1,5 @@
 ===description===
-invalidGMPOperation
+Invalid g m p operation
 ===file===
 <?php
 $a = gmp_init(2);

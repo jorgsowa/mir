@@ -1,5 +1,5 @@
 ===description===
-switchInIf
+Switch in if
 ===file===
 <?php
 $a = 0;

@@ -1,5 +1,5 @@
 ===description===
-loopReassignedInIfAndContinueWithoutReference
+Loop reassigned in if and continue without reference
 ===file===
 <?php
 $a = 3;

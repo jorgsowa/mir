@@ -1,5 +1,5 @@
 ===description===
-getClassMissingClass
+Get class missing class
 ===file===
 <?php
 class A {}

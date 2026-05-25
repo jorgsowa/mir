@@ -1,5 +1,5 @@
 ===description===
-dontReportImplementerErrorOnAbstractTraitMethodTwice
+Dont report implementer error on abstract trait method twice
 ===file===
 <?php
 trait B {

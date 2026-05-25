@@ -1,5 +1,5 @@
 ===description===
-abstractInterfaceImplementsWithSubclass
+Abstract interface implements with subclass
 ===file===
 <?php
 interface I {

@@ -1,5 +1,5 @@
 ===description===
-badSuit
+Bad suit
 ===file===
 <?php
 enum Suit {

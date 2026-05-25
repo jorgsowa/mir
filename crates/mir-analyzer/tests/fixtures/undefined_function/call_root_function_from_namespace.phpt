@@ -1,5 +1,5 @@
 ===description===
-callRootFunctionFromNamespace
+Call root function from namespace
 ===file===
 <?php
 namespace {

@@ -1,5 +1,5 @@
 ===description===
-arrayFilterBothCallback
+Array filter both callback
 ===file===
 <?php
 /** @var array<string, float> $arg */

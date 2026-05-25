@@ -1,5 +1,5 @@
 ===description===
-throwWithReturnInOneCatchAndNoReference
+Throw with return in one catch and no reference
 ===file===
 <?php
 class E1 extends Exception {}

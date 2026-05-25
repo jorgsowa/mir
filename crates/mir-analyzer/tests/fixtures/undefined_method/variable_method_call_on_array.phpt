@@ -1,5 +1,5 @@
 ===description===
-variableMethodCallOnArray
+Variable method call on array
 ===file===
 <?php
 $arr = [];

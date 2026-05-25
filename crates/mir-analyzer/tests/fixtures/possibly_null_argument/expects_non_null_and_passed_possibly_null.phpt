@@ -1,5 +1,5 @@
 ===description===
-expectsNonNullAndPassedPossiblyNull
+Expects non null and passed possibly null
 ===file===
 <?php
 /**

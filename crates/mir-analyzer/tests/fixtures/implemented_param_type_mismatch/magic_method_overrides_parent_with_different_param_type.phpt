@@ -1,5 +1,5 @@
 ===description===
-magicMethodOverridesParentWithDifferentParamType
+Magic method overrides parent with different param type
 ===file===
 <?php
 class C {}

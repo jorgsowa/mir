@@ -1,5 +1,5 @@
 ===description===
-callableArityMismatch
+Callable arity mismatch
 ===file===
 <?php
 // Function with wrong arity

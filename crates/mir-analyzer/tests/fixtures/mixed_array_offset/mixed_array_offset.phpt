@@ -1,5 +1,5 @@
 ===description===
-mixedArrayOffset
+Mixed array offset
 ===file===
 <?php
 /** @var mixed */

@@ -1,5 +1,5 @@
 ===description===
-automaticInheritDoc
+Automatic inherit doc
 ===file===
 <?php
 class Y {

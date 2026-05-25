@@ -1,5 +1,5 @@
 ===description===
-assertThisType
+Assert this type
 ===file===
 <?php
 class Type {

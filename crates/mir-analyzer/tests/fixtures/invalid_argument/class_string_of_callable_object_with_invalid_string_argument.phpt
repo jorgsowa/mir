@@ -1,5 +1,5 @@
 ===description===
-classStringOfCallableObjectWithInvalidStringArgument
+Class string of callable object with invalid string argument
 ===file===
 <?php
 /**

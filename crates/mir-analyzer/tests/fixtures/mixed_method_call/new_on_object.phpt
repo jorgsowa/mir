@@ -1,5 +1,5 @@
 ===description===
-newOnObject
+New on object
 ===file===
 <?php
 function f(object $o): object

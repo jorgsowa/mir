@@ -1,5 +1,5 @@
 ===description===
-interfaceInstantiation
+Interface instantiation
 ===file===
 <?php
 interface myInterface{}

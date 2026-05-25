@@ -1,5 +1,5 @@
 ===description===
-varDumpCased
+Var dump cased
 ===file===
 <?php
 vAr_dUMp("hello");

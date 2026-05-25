@@ -1,5 +1,5 @@
 ===description===
-undefinedParentClass
+Undefined parent class
 ===file===
 <?php
 /**

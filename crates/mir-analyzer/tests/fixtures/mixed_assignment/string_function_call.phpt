@@ -1,5 +1,5 @@
 ===description===
-stringFunctionCall
+String function call
 ===file===
 <?php
 $bad_one = "hello";

@@ -1,5 +1,5 @@
 ===description===
-switchVarReassignedInAllBranches
+Switch var reassigned in all branches
 ===file===
 <?php
 $a = false;

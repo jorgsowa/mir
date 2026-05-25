@@ -1,5 +1,5 @@
 ===description===
-defaultAboveCaseThatBreaks
+Default above case that breaks
 ===file===
 <?php
 function foo(string $a) : string {

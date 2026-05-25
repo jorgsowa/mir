@@ -1,5 +1,5 @@
 ===description===
-classMethodParameterViolation
+Class method parameter violation
 ===file===
 <?php
 class A {

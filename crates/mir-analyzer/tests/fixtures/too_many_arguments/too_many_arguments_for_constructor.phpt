@@ -1,5 +1,5 @@
 ===description===
-tooManyArgumentsForConstructor
+Too many arguments for constructor
 ===file===
 <?php
 class A { }

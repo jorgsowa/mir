@@ -1,5 +1,5 @@
 ===description===
-missingReturnType
+Missing return type
 ===file===
 <?php
 interface foo {

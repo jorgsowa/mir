@@ -1,5 +1,5 @@
 ===description===
-cantCompareToSuitTwice
+Cant compare to suit twice
 ===file===
 <?php
 enum Suit {

@@ -1,5 +1,5 @@
 ===description===
-nonStaticSelfCallWithInstanceMethodFoo
+Non static self call with instance method foo
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-preventImplementingClass
+Prevent implementing class
 ===file===
 <?php
 class Foo {}

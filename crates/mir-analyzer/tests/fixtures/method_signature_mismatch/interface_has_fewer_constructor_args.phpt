@@ -1,5 +1,5 @@
 ===description===
-interfaceHasFewerConstructorArgs
+Interface has fewer constructor args
 ===file===
 <?php
 interface Foo {

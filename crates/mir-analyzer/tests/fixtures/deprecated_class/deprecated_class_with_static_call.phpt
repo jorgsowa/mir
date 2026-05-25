@@ -1,5 +1,5 @@
 ===description===
-deprecatedClassWithStaticCall
+Deprecated class with static call
 ===file===
 <?php
 /**

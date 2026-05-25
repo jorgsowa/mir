@@ -1,5 +1,5 @@
 ===description===
-referenceReuseDeclaredInFor
+Reference reuse declared in for
 ===file===
 <?php
 /** @var list<int> */

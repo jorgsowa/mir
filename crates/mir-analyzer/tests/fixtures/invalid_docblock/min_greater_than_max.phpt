@@ -1,5 +1,5 @@
 ===description===
-minGreaterThanMax
+Min greater than max
 ===file===
 <?php
 /**

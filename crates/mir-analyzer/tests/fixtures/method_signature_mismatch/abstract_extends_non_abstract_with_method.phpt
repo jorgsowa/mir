@@ -1,5 +1,5 @@
 ===description===
-abstractExtendsNonAbstractWithMethod
+Abstract extends non abstract with method
 ===file===
 <?php
 class A {

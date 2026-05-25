@@ -1,5 +1,5 @@
 ===description===
-annotationWithBadDocblock
+Annotation with bad docblock
 ===file===
 <?php
 class ParentClass {

@@ -1,5 +1,5 @@
 ===description===
-switchReturnTypeWithFallthroughAndConditionalBreak
+Switch return type with fallthrough and conditional break
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-invalidArrayCallable
+Invalid array callable
 ===file===
 <?php
 function foo(callable $callback) : void {

@@ -1,5 +1,5 @@
 ===description===
-detectRedundancyAfterLoopWithContinue
+Detect redundancy after loop with continue
 ===file===
 <?php
 $gap = null;

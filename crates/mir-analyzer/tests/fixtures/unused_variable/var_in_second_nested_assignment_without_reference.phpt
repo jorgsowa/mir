@@ -1,5 +1,5 @@
 ===description===
-varInSecondNestedAssignmentWithoutReference
+Var in second nested assignment without reference
 ===file===
 <?php
 if (rand(0, 1)) {

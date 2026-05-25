@@ -1,5 +1,5 @@
 ===description===
-inexistentCallableinCallableString
+Inexistent callablein callable string
 ===file===
 <?php
 /**

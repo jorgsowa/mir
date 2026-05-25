@@ -1,5 +1,5 @@
 ===description===
-loopAssignmentAfterReferenceWithBreakInIf
+Loop assignment after reference with break in if
 ===file===
 <?php
 $a = 0;

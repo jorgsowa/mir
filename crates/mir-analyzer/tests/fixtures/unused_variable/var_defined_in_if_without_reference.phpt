@@ -1,5 +1,5 @@
 ===description===
-varDefinedInIfWithoutReference
+Var defined in if without reference
 ===file===
 <?php
 $a = 5;

@@ -1,5 +1,5 @@
 ===description===
-noStringForValueOfIntList
+No string for value of int list
 ===file===
 <?php
 class A {

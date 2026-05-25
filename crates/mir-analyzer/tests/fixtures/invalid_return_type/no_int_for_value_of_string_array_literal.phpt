@@ -1,5 +1,5 @@
 ===description===
-noIntForValueOfStringArrayLiteral
+No int for value of string array literal
 ===file===
 <?php
 class A {

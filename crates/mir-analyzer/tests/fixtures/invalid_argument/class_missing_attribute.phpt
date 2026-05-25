@@ -1,5 +1,5 @@
 ===description===
-classMissingAttribute
+Class missing attribute
 ===file===
 <?php
 class C {

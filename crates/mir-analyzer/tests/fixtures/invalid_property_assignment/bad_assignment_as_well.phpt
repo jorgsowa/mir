@@ -1,5 +1,5 @@
 ===description===
-badAssignmentAsWell
+Bad assignment as well
 ===file===
 <?php
 $a = "hello";

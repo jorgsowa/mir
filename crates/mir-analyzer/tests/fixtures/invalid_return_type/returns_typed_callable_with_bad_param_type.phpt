@@ -1,5 +1,5 @@
 ===description===
-returnsTypedCallableWithBadParamType
+Returns typed callable with bad param type
 ===file===
 <?php
 /**

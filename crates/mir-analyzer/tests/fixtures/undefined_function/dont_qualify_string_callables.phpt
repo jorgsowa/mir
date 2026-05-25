@@ -1,5 +1,5 @@
 ===description===
-dontQualifyStringCallables
+Dont qualify string callables
 ===file===
 <?php
 namespace NS;

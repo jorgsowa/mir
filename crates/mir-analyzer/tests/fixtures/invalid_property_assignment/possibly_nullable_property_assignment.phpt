@@ -1,5 +1,5 @@
 ===description===
-possiblyNullablePropertyAssignment
+Possibly nullable property assignment
 ===file===
 <?php
 class Foo {

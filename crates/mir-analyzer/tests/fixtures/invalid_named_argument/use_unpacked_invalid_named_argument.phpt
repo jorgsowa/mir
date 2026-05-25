@@ -1,5 +1,5 @@
 ===description===
-useUnpackedInvalidNamedArgument
+Use unpacked invalid named argument
 ===file===
 <?php
 class CustomerData {

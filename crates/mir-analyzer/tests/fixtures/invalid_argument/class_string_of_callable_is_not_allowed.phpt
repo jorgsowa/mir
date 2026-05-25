@@ -1,5 +1,5 @@
 ===description===
-classStringOfCallableIsNotAllowed
+Class string of callable is not allowed
 ===file===
 <?php
 /**

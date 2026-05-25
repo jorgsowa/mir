@@ -1,5 +1,5 @@
 ===description===
-getClassExteriorArgStringType
+Get class exterior arg string type
 ===file===
 <?php
 /** @return void */

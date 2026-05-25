@@ -1,5 +1,5 @@
 ===description===
-noVisibilityInterfacePropertyWithHooks
+No visibility interface property with hooks
 ===file===
 <?php
 interface SomeInterface {

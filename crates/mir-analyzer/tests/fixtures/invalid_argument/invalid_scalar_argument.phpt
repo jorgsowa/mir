@@ -1,5 +1,5 @@
 ===description===
-invalidScalarArgument
+Invalid scalar argument
 ===file===
 <?php
 function fooFoo(int $a): void {}

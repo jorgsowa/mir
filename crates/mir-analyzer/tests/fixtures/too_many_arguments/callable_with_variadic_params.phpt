@@ -1,5 +1,5 @@
 ===description===
-callableWithVariadicParams
+Callable with variadic params
 ===file===
 <?php
 /**

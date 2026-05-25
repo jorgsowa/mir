@@ -1,5 +1,5 @@
 ===description===
-exitIsLikeThrow
+Exit is like throw
 ===file===
 <?php
 /**

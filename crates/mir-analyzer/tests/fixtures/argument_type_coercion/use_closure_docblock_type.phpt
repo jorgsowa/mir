@@ -1,5 +1,5 @@
 ===description===
-useClosureDocblockType
+Use closure docblock type
 ===file===
 <?php
 class A {}

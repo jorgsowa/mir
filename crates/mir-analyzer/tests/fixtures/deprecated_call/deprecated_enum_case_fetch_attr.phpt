@@ -1,5 +1,5 @@
 ===description===
-deprecatedEnumCaseFetchAttr
+Deprecated enum case fetch attr
 ===file===
 <?php
 enum Foo {

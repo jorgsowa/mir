@@ -1,5 +1,5 @@
 ===description===
-matchTrueImpossible
+Match true impossible
 ===file===
 <?php
 $foo = new stdClass();

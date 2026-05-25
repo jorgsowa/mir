@@ -1,5 +1,5 @@
 ===description===
-objectDoesntWorkIn71
+Object doesnt work in71
 ===file===
 <?php
 function foo(): object {

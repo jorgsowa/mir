@@ -1,5 +1,5 @@
 ===description===
-classRedefinition
+Class redefinition
 ===file===
 <?php
 class Foo {}

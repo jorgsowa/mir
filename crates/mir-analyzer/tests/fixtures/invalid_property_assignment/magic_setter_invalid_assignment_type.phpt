@@ -1,5 +1,5 @@
 ===description===
-magicSetterInvalidAssignmentType
+Magic setter invalid assignment type
 ===file===
 <?php
 /**

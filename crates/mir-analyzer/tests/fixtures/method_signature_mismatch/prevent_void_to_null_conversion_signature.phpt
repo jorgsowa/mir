@@ -1,5 +1,5 @@
 ===description===
-preventVoidToNullConversionSignature
+Prevent void to null conversion signature
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-noParent
+No parent
 ===file===
 <?php
 class C {

@@ -1,5 +1,5 @@
 ===description===
-failsWithWrongTemplate2
+Fails with wrong template2
 ===file===
 <?php
 class Frozen {}

@@ -1,5 +1,5 @@
 ===description===
-cannotOverrideFinalType
+Cannot override final type
 ===file===
 <?php
 class P {

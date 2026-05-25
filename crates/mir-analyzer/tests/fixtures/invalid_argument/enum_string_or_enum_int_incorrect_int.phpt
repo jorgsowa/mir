@@ -1,5 +1,5 @@
 ===description===
-enumStringOrEnumIntIncorrectInt
+Enum string or enum int incorrect int
 ===file===
 <?php
 namespace Ns;

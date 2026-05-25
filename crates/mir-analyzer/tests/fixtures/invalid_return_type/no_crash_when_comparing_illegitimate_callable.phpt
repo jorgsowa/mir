@@ -1,5 +1,5 @@
 ===description===
-noCrashWhenComparingIllegitimateCallable
+No crash when comparing illegitimate callable
 ===file===
 <?php
 class C {}

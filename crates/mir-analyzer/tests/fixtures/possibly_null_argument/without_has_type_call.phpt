@@ -1,5 +1,5 @@
 ===description===
-withoutHasTypeCall
+Without has type call
 ===file===
 <?php
 $method = new ReflectionMethod(stdClass::class);

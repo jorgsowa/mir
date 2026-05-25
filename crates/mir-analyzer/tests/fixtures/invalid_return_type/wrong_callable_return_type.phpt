@@ -1,5 +1,5 @@
 ===description===
-wrongCallableReturnType
+Wrong callable return type
 ===file===
 <?php
 $add_one = function(int $a): int {

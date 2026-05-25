@@ -1,5 +1,5 @@
 ===description===
-interfaceInstanceofAndTwoReturns
+Interface instanceof and two returns
 ===file===
 <?php
 interface A {}

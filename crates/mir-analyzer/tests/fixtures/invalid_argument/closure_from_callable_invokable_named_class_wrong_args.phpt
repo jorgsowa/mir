@@ -1,5 +1,5 @@
 ===description===
-closureFromCallableInvokableNamedClassWrongArgs
+Closure from callable invokable named class wrong args
 ===file===
 <?php
 namespace NS;

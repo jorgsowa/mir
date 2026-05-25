@@ -1,5 +1,5 @@
 ===description===
-classStringOfCallableObjectWillTriggerMixedMethodCall
+Class string of callable object will trigger mixed method call
 ===file===
 <?php
 /**

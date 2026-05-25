@@ -1,5 +1,5 @@
 ===description===
-undefinedClass
+Undefined class
 ===file===
 <?php
 (new Foo());

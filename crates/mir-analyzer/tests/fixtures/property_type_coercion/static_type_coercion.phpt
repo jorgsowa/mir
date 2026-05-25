@@ -1,5 +1,5 @@
 ===description===
-staticTypeCoercion
+Static type coercion
 ===file===
 <?php
 class A {

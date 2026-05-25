@@ -1,5 +1,5 @@
 ===description===
-invalidThisArgument
+Invalid this argument
 ===file===
 <?php
 $this = "hello";

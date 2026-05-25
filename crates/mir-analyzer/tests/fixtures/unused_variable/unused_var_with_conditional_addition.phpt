@@ -1,5 +1,5 @@
 ===description===
-unusedVarWithConditionalAddition
+Unused var with conditional addition
 ===file===
 <?php
 $a = 5;

@@ -1,5 +1,5 @@
 ===description===
-lessSpecificReturnStatement
+Less specific return statement
 ===file===
 <?php
 class A {}

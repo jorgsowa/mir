@@ -1,5 +1,5 @@
 ===description===
-readonlyPropertySetInConstructorAndAlsoOutsideClassWithAllowPrivate
+Readonly property set in constructor and also outside class with allow private
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-invalidArrayKeyType
+Invalid array key type
 ===file===
 <?php
 /**

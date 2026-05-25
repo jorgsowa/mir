@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidOperand
+Possibly invalid operand
 ===file===
 <?php
 $b = rand(0, 1) ? [] : 4;

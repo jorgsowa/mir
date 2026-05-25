@@ -1,5 +1,5 @@
 ===description===
-redefinedTraitMethodInSubclass
+Redefined trait method in subclass
 ===file===
 <?php
 trait T {

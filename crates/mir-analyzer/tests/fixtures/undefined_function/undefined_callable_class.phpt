@@ -1,5 +1,5 @@
 ===description===
-undefinedCallableClass
+Undefined callable class
 ===file===
 <?php
 class A {

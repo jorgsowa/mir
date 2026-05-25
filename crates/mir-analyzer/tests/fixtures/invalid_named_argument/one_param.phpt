@@ -1,5 +1,5 @@
 ===description===
-oneParam
+One param
 ===file===
 <?php
 interface I {

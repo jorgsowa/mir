@@ -1,5 +1,5 @@
 ===description===
-deprecatedClassWithExtends
+Deprecated class with extends
 ===file===
 <?php
 /**

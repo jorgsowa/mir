@@ -1,5 +1,5 @@
 ===description===
-deprecatedCloneMethodWithCall
+Deprecated clone method with call
 ===file===
 <?php
 class Foo {

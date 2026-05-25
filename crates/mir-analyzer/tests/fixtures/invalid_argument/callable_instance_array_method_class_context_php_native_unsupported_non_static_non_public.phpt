@@ -1,5 +1,5 @@
 ===description===
-callableInstanceArrayMethodClassContextPhpNativeUnsupportedNonStaticNonPublic
+Callable instance array method class context php native unsupported non static non public
 ===file===
 <?php
 class Foo {

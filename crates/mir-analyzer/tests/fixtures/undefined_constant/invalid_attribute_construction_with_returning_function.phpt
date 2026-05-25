@@ -1,5 +1,5 @@
 ===description===
-invalidAttributeConstructionWithReturningFunction
+Invalid attribute construction with returning function
 ===file===
 <?php
 enum Enumm

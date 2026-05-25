@@ -1,5 +1,5 @@
 ===description===
-plainStringNotFalsePositiveUndefinedClass
+Plain string not false positive undefined class
 ===file===
 <?php
 // This test demonstrates the fix for issue #5:

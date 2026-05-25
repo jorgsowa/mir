@@ -1,5 +1,5 @@
 ===description===
-continueIsNotBreak
+Continue is not break
 ===file===
 <?php
                     switch(2) {

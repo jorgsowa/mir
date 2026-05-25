@@ -1,5 +1,5 @@
 ===description===
-onlyDefinedValuesOfConstantList
+Only defined values of constant list
 ===file===
 <?php
 class A {

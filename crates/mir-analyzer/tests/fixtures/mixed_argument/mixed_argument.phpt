@@ -1,5 +1,5 @@
 ===description===
-mixedArgument
+Mixed argument
 ===file===
 <?php
 function fooFoo(int $a): void {}

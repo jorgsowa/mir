@@ -1,5 +1,5 @@
 ===description===
-attributeClassCannotHavePrivateConstructor
+Attribute class cannot have private constructor
 ===file===
 <?php
 #[Attribute]

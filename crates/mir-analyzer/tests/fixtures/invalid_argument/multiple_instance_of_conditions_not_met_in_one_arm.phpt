@@ -1,5 +1,5 @@
 ===description===
-multipleInstanceOfConditionsNotMetInOneArm
+Multiple instance of conditions not met in one arm
 ===file===
 <?php
 interface Foo {}

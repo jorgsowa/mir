@@ -1,5 +1,5 @@
 ===description===
-intersectionsNotAllowedWithUnions
+Intersections not allowed with unions
 ===file===
 <?php
 interface A {

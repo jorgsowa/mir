@@ -1,5 +1,5 @@
 ===description===
-assertScalarAndEmpty
+Assert scalar and empty
 ===file===
 <?php
 /**

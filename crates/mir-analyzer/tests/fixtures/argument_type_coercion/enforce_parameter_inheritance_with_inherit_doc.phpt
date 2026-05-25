@@ -1,5 +1,5 @@
 ===description===
-enforceParameterInheritanceWithInheritDoc
+Enforce parameter inheritance with inherit doc
 ===file===
 <?php
 class A {}

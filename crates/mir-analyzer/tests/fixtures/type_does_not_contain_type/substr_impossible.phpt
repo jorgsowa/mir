@@ -1,5 +1,5 @@
 ===description===
-substrImpossible
+Substr impossible
 ===file===
 <?php
 class HelloWorld

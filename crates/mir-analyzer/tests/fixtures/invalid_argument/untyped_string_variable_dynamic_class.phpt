@@ -1,5 +1,5 @@
 ===description===
-untypedStringVariableDynamicClass
+Untyped string variable dynamic class
 ===file===
 <?php
 class ValidClass {

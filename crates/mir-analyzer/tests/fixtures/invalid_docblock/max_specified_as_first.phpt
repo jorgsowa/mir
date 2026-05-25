@@ -1,5 +1,5 @@
 ===description===
-maxSpecifiedAsFirst
+Max specified as first
 ===file===
 <?php
 /**

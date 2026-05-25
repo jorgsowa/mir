@@ -1,5 +1,5 @@
 ===description===
-selfClassConstBadConst
+Self class const bad const
 ===file===
 <?php
 class A {

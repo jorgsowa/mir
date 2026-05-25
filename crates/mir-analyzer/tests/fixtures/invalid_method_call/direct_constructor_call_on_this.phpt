@@ -1,5 +1,5 @@
 ===description===
-directConstructorCallOnThis
+Direct constructor call on this
 ===file===
 <?php
 class A {

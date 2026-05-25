@@ -1,5 +1,5 @@
 ===description===
-preventStringDocblockType
+Prevent string docblock type
 ===file===
 <?php
 /**

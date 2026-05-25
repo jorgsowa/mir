@@ -1,5 +1,5 @@
 ===description===
-invalidGenericClone
+Invalid generic clone
 ===file===
 <?php
 /**

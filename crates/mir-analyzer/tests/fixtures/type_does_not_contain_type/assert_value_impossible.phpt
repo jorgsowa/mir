@@ -1,5 +1,5 @@
 ===description===
-assertValueImpossible
+Assert value impossible
 ===file===
 <?php
 /**

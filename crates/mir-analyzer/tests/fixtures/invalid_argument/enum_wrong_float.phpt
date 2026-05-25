@@ -1,5 +1,5 @@
 ===description===
-enumWrongFloat
+Enum wrong float
 ===file===
 <?php
 namespace Ns;

@@ -1,5 +1,5 @@
 ===description===
-magicSetterUndefinedProperty
+Magic setter undefined property
 ===file===
 <?php
 /**

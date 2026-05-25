@@ -1,5 +1,5 @@
 ===description===
-abstractReflectedClassMethod
+Abstract reflected class method
 ===file===
 <?php
 /**

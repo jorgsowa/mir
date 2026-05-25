@@ -1,5 +1,5 @@
 ===description===
-preventAbstractInstantiationDefiniteClass
+Prevent abstract instantiation definite class
 ===file===
 <?php
 abstract class A {}

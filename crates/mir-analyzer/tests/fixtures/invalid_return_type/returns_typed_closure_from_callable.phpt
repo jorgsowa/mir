@@ -1,5 +1,5 @@
 ===description===
-returnsTypedClosureFromCallable
+Returns typed closure from callable
 ===file===
 <?php
 class A {}

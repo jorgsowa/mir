@@ -1,5 +1,5 @@
 ===description===
-invalidNativeUnionArgument
+Invalid native union argument
 ===file===
 <?php
 function test(string|null $in): string|null {

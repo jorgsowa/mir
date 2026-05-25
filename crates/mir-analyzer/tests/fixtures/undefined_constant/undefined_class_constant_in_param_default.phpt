@@ -1,5 +1,5 @@
 ===description===
-undefinedClassConstantInParamDefault
+Undefined class constant in param default
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-thisInStaticArrowFunction
+This in static arrow function
 ===file===
 <?php
 class C {

@@ -1,5 +1,5 @@
 ===description===
-foreachInitialNull
+Foreach initial null
 ===file===
 <?php
 class Item {

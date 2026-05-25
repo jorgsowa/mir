@@ -1,5 +1,5 @@
 ===description===
-staticCallOnString
+Static call on string
 ===file===
 <?php
 class A {

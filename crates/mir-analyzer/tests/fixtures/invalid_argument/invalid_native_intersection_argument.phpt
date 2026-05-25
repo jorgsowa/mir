@@ -1,5 +1,5 @@
 ===description===
-invalidNativeIntersectionArgument
+Invalid native intersection argument
 ===file===
 <?php
 interface A {

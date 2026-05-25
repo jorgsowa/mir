@@ -1,5 +1,5 @@
 ===description===
-forgetAssertionAfterReferenceModification
+Forget assertion after reference modification
 ===file===
 <?php
 class Foo

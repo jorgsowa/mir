@@ -1,5 +1,5 @@
 ===description===
-minSpecifiedAsSecond
+Min specified as second
 ===file===
 <?php
 /**

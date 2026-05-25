@@ -1,5 +1,5 @@
 ===description===
-getterTypeInferringWithChange
+Getter type inferring with change
 ===file===
 <?php
 class A {

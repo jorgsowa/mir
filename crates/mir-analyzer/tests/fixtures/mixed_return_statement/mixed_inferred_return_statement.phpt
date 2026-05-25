@@ -1,5 +1,5 @@
 ===description===
-mixedInferredReturnStatement
+Mixed inferred return statement
 ===file===
 <?php
 function fooFoo(array $arr): string {

@@ -1,5 +1,5 @@
 ===description===
-publicUnusedMethod
+Public unused method
 ===file===
 <?php
 final class A {

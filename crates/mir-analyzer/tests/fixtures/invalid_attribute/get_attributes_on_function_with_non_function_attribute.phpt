@@ -1,5 +1,5 @@
 ===description===
-getAttributesOnFunctionWithNonFunctionAttribute
+Get attributes on function with non function attribute
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

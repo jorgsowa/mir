@@ -1,5 +1,5 @@
 ===description===
-badStaticAssignment
+Bad static assignment
 ===file===
 <?php
 class A {

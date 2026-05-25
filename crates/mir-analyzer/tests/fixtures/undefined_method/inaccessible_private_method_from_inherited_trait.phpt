@@ -1,5 +1,5 @@
 ===description===
-inaccessiblePrivateMethodFromInheritedTrait
+Inaccessible private method from inherited trait
 ===file===
 <?php
 trait T {

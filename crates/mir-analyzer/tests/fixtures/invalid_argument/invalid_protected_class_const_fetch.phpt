@@ -1,5 +1,5 @@
 ===description===
-invalidProtectedClassConstFetch
+Invalid protected class const fetch
 ===file===
 <?php
 class A

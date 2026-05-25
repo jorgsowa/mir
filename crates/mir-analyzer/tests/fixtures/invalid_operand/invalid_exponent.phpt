@@ -1,5 +1,5 @@
 ===description===
-invalidExponent
+Invalid exponent
 ===file===
 <?php
 $a = "x" ^ 1;

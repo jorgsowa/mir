@@ -1,5 +1,5 @@
 ===description===
-detectUnusedVariableInsideIfLoopWithEchoInside
+Detect unused variable inside if loop with echo inside
 ===file===
 <?php
 function foo() : void {

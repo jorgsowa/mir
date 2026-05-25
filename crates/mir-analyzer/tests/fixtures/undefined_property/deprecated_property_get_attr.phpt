@@ -1,5 +1,5 @@
 ===description===
-deprecatedPropertyGetAttr
+Deprecated property get attr
 ===file===
 <?php
 class A{

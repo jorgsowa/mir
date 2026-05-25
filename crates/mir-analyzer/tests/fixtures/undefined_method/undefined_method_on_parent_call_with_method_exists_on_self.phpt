@@ -1,5 +1,5 @@
 ===description===
-undefinedMethodOnParentCallWithMethodExistsOnSelf
+Undefined method on parent call with method exists on self
 ===file===
 <?php
 class A {}

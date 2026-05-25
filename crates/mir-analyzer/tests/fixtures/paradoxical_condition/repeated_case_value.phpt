@@ -1,5 +1,5 @@
 ===description===
-repeatedCaseValue
+Repeated case value
 ===file===
 <?php
 $a = rand(0, 1);

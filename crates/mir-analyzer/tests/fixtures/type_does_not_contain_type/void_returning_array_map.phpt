@@ -1,5 +1,5 @@
 ===description===
-voidReturningArrayMap
+Void returning array map
 ===file===
 <?php
 $arr = array_map(

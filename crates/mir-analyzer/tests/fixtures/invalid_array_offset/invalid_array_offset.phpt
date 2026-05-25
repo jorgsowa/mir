@@ -1,5 +1,5 @@
 ===description===
-invalidArrayOffset
+Invalid array offset
 ===file===
 <?php
 $x = ["a"];

@@ -1,5 +1,5 @@
 ===description===
-mixedGenericClone
+Mixed generic clone
 ===file===
 <?php
 /**

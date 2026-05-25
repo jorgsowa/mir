@@ -1,5 +1,5 @@
 ===description===
-explicitVariableKey
+Explicit variable key
 ===file===
 <?php
 /** @param list<int> $a */

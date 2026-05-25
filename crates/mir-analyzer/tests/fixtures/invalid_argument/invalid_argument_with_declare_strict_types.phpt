@@ -1,5 +1,5 @@
 ===description===
-invalidArgumentWithDeclareStrictTypes
+Invalid argument with declare strict types
 ===file===
 <?php declare(strict_types=1);
                     function fooFoo(int $a): void {}

@@ -1,5 +1,5 @@
 ===description===
-impossibleCaseValue
+Impossible case value
 ===file===
 <?php
 $a = rand(0, 1) ? "a" : "b";

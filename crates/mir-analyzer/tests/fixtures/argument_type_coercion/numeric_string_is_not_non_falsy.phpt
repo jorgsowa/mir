@@ -1,5 +1,5 @@
 ===description===
-numericStringIsNotNonFalsy
+Numeric string is not non falsy
 ===file===
 <?php
 /** @param non-falsy-string $arg */

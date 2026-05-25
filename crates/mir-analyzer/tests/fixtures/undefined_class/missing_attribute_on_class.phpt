@@ -1,5 +1,5 @@
 ===description===
-missingAttributeOnClass
+Missing attribute on class
 ===file===
 <?php
 use FooBarPure;

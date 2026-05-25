@@ -1,5 +1,5 @@
 ===description===
-preventExtendingInterface
+Prevent extending interface
 ===file===
 <?php
 interface Foo {}

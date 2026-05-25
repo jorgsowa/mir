@@ -1,5 +1,5 @@
 ===description===
-catchDoesNotReturn
+Catch does not return
 ===file===
 <?php
 function missing_return() : bool {

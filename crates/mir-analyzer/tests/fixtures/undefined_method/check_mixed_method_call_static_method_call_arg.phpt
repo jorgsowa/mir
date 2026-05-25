@@ -1,5 +1,5 @@
 ===description===
-checkMixedMethodCallStaticMethodCallArg
+Check mixed method call static method call arg
 ===file===
 <?php
 class B {}

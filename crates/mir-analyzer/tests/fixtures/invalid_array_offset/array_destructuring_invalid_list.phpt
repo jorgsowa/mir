@@ -1,5 +1,5 @@
 ===description===
-arrayDestructuringInvalidList
+Array destructuring invalid list
 ===file===
 <?php
 $a = 42;

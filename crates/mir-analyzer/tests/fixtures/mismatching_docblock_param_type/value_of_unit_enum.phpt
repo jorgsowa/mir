@@ -1,5 +1,5 @@
 ===description===
-valueOfUnitEnum
+Value of unit enum
 ===file===
 <?php
     enum Foo

@@ -1,5 +1,5 @@
 ===description===
-nonNullableSubclassParam
+Non nullable subclass param
 ===file===
 <?php
 class A {

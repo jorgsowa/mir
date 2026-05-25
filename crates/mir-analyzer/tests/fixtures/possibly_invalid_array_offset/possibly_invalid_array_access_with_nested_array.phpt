@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidArrayAccessWithNestedArray
+Possibly invalid array access with nested array
 ===file===
 <?php
 /**

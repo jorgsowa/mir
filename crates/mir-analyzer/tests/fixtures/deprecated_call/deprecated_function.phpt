@@ -1,5 +1,5 @@
 ===description===
-deprecatedFunction
+Deprecated function
 ===file===
 <?php
 /** @deprecated */

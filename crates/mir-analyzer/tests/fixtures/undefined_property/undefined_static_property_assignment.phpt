@@ -1,5 +1,5 @@
 ===description===
-undefinedStaticPropertyAssignment
+Undefined static property assignment
 ===file===
 <?php
 class A {

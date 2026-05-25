@@ -1,5 +1,5 @@
 ===description===
-staticInterfaceCall
+Static interface call
 ===file===
 <?php
 interface Foo {

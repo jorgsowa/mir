@@ -1,5 +1,5 @@
 ===description===
-notVisibleCloneMethodTrait
+Not visible clone method trait
 ===file===
 <?php
 trait a {

@@ -1,5 +1,5 @@
 ===description===
-forbidTemplateAnnotationOnClosure
+Forbid template annotation on closure
 ===file===
 <?php
 /** @template T */

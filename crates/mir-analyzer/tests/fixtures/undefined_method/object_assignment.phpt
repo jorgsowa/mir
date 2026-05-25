@@ -1,5 +1,5 @@
 ===description===
-objectAssignment
+Object assignment
 ===file===
 <?php
 class A {}

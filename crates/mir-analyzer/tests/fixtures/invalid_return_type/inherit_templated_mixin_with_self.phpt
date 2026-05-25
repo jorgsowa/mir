@@ -1,5 +1,5 @@
 ===description===
-inheritTemplatedMixinWithSelf
+Inherit templated mixin with self
 ===file===
 <?php
 /**

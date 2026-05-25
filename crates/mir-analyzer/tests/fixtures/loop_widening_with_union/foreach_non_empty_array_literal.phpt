@@ -1,5 +1,5 @@
 ===description===
-foreachNonEmptyArrayLiteral
+Foreach non empty array literal
 ===file===
 <?php
 class Item {

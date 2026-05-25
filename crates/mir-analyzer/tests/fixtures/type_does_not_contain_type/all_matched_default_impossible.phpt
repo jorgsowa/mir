@@ -1,5 +1,5 @@
 ===description===
-allMatchedDefaultImpossible
+All matched default impossible
 ===file===
 <?php
 function foo() : string {

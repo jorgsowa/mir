@@ -1,5 +1,5 @@
 ===description===
-arrayWithoutAllNamedParametersSuppressMixed
+Array without all named parameters suppress mixed
 ===file===
 <?php
 class User {

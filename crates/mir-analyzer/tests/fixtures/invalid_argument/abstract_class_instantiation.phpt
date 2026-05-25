@@ -1,5 +1,5 @@
 ===description===
-abstractClassInstantiation
+Abstract class instantiation
 ===file===
 <?php
 abstract class AbstractService {

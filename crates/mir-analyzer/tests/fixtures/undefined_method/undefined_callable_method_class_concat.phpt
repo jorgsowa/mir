@@ -1,5 +1,5 @@
 ===description===
-undefinedCallableMethodClassConcat
+Undefined callable method class concat
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-badArrayProperty
+Bad array property
 ===file===
 <?php
 class A {}

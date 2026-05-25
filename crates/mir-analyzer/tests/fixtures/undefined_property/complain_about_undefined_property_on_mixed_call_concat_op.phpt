@@ -1,5 +1,5 @@
 ===description===
-complainAboutUndefinedPropertyOnMixedCallConcatOp
+Complain about undefined property on mixed call concat op
 ===file===
 <?php
 class A {

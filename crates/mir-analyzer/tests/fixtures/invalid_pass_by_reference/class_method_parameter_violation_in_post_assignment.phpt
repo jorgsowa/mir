@@ -1,5 +1,5 @@
 ===description===
-classMethodParameterViolationInPostAssignment
+Class method parameter violation in post assignment
 ===file===
 <?php
 class A {

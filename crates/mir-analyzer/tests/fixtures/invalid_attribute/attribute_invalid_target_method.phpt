@@ -1,5 +1,5 @@
 ===description===
-attributeInvalidTargetMethod
+Attribute invalid target method
 ===file===
 <?php
 class Foo {

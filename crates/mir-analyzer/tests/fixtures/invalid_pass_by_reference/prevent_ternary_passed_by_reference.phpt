@@ -1,5 +1,5 @@
 ===description===
-preventTernaryPassedByReference
+Prevent ternary passed by reference
 ===file===
 <?php
 /**

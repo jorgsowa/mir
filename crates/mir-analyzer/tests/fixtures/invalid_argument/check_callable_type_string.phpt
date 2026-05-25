@@ -1,5 +1,5 @@
 ===description===
-checkCallableTypeString
+Check callable type string
 ===file===
 <?php
 /**

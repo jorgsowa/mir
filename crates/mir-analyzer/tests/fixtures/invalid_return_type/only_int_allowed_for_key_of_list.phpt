@@ -1,5 +1,5 @@
 ===description===
-onlyIntAllowedForKeyOfList
+Only int allowed for key of list
 ===file===
 <?php
 class A {

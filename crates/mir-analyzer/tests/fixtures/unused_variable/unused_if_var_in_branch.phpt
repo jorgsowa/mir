@@ -1,5 +1,5 @@
 ===description===
-unusedIfVarInBranch
+Unused if var in branch
 ===file===
 <?php
 if (rand(0, 1)) {

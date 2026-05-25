@@ -1,5 +1,5 @@
 ===description===
-tooFewArgumentsToAttributeConstructor
+Too few arguments to attribute constructor
 ===file===
 <?php
 namespace Foo;

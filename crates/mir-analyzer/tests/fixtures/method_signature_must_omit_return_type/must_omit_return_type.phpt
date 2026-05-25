@@ -1,5 +1,5 @@
 ===description===
-mustOmitReturnType
+Must omit return type
 ===file===
 <?php
 class A

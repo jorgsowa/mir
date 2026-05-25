@@ -1,5 +1,5 @@
 ===description===
-clearIssetContext
+Clear isset context
 ===file===
 <?php
 function greet(bool $arg): ?string

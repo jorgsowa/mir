@@ -1,5 +1,5 @@
 ===description===
-interfaceWithNoParent
+Interface with no parent
 ===file===
 <?php
 interface I {

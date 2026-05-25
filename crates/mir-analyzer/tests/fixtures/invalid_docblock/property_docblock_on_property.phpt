@@ -1,5 +1,5 @@
 ===description===
-propertyDocblockOnProperty
+Property docblock on property
 ===file===
 <?php
 class A {

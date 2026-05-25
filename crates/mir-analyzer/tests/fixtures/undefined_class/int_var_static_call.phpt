@@ -1,5 +1,5 @@
 ===description===
-intVarStaticCall
+Int var static call
 ===file===
 <?php
 $a = 5;

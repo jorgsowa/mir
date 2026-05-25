@@ -1,5 +1,5 @@
 ===description===
-undefinedCallableMethodArray
+Undefined callable method array
 ===file===
 <?php
 class A {

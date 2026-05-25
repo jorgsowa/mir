@@ -1,5 +1,5 @@
 ===description===
-invokeTypeMismatch
+Invoke type mismatch
 ===file===
 <?php
 class A {

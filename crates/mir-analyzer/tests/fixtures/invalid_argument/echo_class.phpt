@@ -1,5 +1,5 @@
 ===description===
-echoClass
+Echo class
 ===file===
 <?php
 class A {}

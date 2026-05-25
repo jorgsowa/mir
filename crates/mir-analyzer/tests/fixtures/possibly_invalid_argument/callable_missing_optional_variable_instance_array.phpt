@@ -1,5 +1,5 @@
 ===description===
-callableMissingOptionalVariableInstanceArray
+Callable missing optional variable instance array
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-exec
+Exec
 ===file===
 <?php
 shell_exec("rm -rf");

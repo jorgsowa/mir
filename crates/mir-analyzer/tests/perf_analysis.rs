@@ -292,10 +292,10 @@ fn perf_analysis_full_report() {
         print_row("ingest_file(Model.php)", ingest_base, "");
 
         let t0 = Instant::now();
-        let results = session.analyze_dependents_of(base_arc.as_ref());
+        let results = session.reanalyze_dependents(base_arc.as_ref());
         let dep_time = t0.elapsed();
         print_row(
-            "analyze_dependents_of",
+            "reanalyze_dependents",
             dep_time,
             &format!("{} dependents, parallel via rayon", results.len()),
         );

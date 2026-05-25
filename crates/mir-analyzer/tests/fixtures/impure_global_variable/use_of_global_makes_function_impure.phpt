@@ -1,5 +1,5 @@
 ===description===
-useOfGlobalMakesFunctionImpure
+Use of global makes function impure
 ===file===
 <?php
 /** @pure */

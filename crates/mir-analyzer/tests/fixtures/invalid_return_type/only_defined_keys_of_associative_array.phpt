@@ -1,5 +1,5 @@
 ===description===
-onlyDefinedKeysOfAssociativeArray
+Only defined keys of associative array
 ===file===
 <?php
 class A {

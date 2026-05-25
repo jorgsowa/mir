@@ -1,5 +1,5 @@
 ===description===
-nonStaticSelfCallWithMagicMethodFoo
+Non static self call with magic method foo
 ===file===
 <?php
 /**

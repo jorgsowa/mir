@@ -1,5 +1,5 @@
 ===description===
-randomValueFromMagicGetterIsNotMutationFree
+Random value from magic getter is not mutation free
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-literalStringAsIntArrayKey
+Literal string as int array key
 ===file===
 <?php
 class a {

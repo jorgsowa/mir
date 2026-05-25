@@ -1,5 +1,5 @@
 ===description===
-duplicateParam
+Duplicate param
 ===file===
 <?php
 /**

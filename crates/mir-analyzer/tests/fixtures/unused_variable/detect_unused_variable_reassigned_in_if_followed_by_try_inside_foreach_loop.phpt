@@ -1,5 +1,5 @@
 ===description===
-detectUnusedVariableReassignedInIfFollowedByTryInsideForeachLoop
+Detect unused variable reassigned in if followed by try inside foreach loop
 ===file===
 <?php
 $user_id = 0;

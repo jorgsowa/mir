@@ -1,5 +1,5 @@
 ===description===
-undefinedFunctionInDocblock
+Undefined function in docblock
 ===file===
 <?php
 /**

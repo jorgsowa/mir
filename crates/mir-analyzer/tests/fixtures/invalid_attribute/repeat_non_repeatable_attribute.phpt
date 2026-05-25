@@ -1,5 +1,5 @@
 ===description===
-repeatNonRepeatableAttribute
+Repeat non repeatable attribute
 ===file===
 <?php
 #[Attribute]

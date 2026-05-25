@@ -1,5 +1,5 @@
 ===description===
-getAttributesOnParameterWithNonParameterAttribute
+Get attributes on parameter with non parameter attribute
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

@@ -1,5 +1,5 @@
 ===description===
-validAnnotationWithInvalidVariadicCall
+Valid annotation with invalid variadic call
 ===file===
 <?php
 class ParentClass {

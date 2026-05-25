@@ -1,5 +1,5 @@
 ===description===
-prohibitCallableWithRequiredArg
+Prohibit callable with required arg
 ===file===
 <?php
 /**

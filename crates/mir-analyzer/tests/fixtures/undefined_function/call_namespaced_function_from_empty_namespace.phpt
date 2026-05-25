@@ -1,5 +1,5 @@
 ===description===
-callNamespacedFunctionFromEmptyNamespace
+Call namespaced function from empty namespace
 ===file===
 <?php
 namespace A {

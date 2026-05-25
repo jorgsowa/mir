@@ -1,5 +1,5 @@
 ===description===
-missingClass
+Missing class
 ===file===
 <?php
 /**

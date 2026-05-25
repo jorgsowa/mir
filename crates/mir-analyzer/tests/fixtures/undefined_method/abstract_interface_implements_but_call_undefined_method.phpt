@@ -1,5 +1,5 @@
 ===description===
-abstractInterfaceImplementsButCallUndefinedMethod
+Abstract interface implements but call undefined method
 ===file===
 <?php
 interface I {

@@ -1,5 +1,5 @@
 ===description===
-unsupportedReferenceUsageWithReferenceToArrayOffsetOfArrayOffset
+Unsupported reference usage with reference to array offset of array offset
 ===file===
 <?php
 /** @var array<string, string> */

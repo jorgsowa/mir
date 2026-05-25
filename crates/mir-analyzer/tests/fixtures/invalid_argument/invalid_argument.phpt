@@ -1,5 +1,5 @@
 ===description===
-invalidArgument
+Invalid argument
 ===file===
 <?php
 #[Attribute]

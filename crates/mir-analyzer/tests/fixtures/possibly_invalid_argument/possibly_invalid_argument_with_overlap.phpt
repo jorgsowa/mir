@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidArgumentWithOverlap
+Possibly invalid argument with overlap
 ===file===
 <?php
 class A {}

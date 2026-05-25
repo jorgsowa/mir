@@ -1,5 +1,5 @@
 ===description===
-detectMissingTemplateImplements
+Detect missing template implements
 ===file===
 <?php
 /** @template T */

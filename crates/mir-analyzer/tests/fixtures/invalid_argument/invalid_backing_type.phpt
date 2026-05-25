@@ -1,5 +1,5 @@
 ===description===
-invalidBackingType
+Invalid backing type
 ===file===
 <?php
 enum Status: array {}

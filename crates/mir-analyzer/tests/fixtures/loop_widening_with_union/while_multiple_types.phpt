@@ -1,5 +1,5 @@
 ===description===
-whileMultipleTypes
+While multiple types
 ===file===
 <?php
 $result = null;

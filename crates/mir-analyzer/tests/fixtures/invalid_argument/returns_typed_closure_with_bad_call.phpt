@@ -1,5 +1,5 @@
 ===description===
-returnsTypedClosureWithBadCall
+Returns typed closure with bad call
 ===file===
 <?php
 class A {}

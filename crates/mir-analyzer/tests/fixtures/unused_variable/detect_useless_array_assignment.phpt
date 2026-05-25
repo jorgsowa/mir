@@ -1,5 +1,5 @@
 ===description===
-detectUselessArrayAssignment
+Detect useless array assignment
 ===file===
 <?php
 function foo() : void {

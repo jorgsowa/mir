@@ -1,5 +1,5 @@
 ===description===
-emptyCallable
+Empty callable
 ===file===
 <?php
 $a = "";

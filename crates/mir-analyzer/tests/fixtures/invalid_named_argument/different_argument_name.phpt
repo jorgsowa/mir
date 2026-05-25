@@ -1,5 +1,5 @@
 ===description===
-differentArgumentName
+Different argument name
 ===file===
 <?php
 class A {

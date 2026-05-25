@@ -1,5 +1,5 @@
 ===description===
-invalidInterface
+Invalid interface
 ===file===
 <?php
 class C2 implements A { }

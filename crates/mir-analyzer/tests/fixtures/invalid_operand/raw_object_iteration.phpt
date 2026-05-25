@@ -1,5 +1,5 @@
 ===description===
-rawObjectIteration
+Raw object iteration
 ===file===
 <?php
 class A {

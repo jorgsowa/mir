@@ -1,5 +1,5 @@
 ===description===
-missingPropertyTypeWithConstructorInitConditionallySet
+Missing property type with constructor init conditionally set
 ===file===
 <?php
 class A {

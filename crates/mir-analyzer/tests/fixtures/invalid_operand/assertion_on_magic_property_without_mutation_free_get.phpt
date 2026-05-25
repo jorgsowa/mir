@@ -1,5 +1,5 @@
 ===description===
-assertionOnMagicPropertyWithoutMutationFreeGet
+Assertion on magic property without mutation free get
 ===file===
 <?php
 /**

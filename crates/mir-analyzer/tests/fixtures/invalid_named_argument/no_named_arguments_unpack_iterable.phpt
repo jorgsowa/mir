@@ -1,5 +1,5 @@
 ===description===
-noNamedArgumentsUnpackIterable
+No named arguments unpack iterable
 ===file===
 <?php
 /**

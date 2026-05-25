@@ -1,5 +1,5 @@
 ===description===
-assertInstanceOfMultipleInterfaces
+Assert instance of multiple interfaces
 ===file===
 <?php
 class A {

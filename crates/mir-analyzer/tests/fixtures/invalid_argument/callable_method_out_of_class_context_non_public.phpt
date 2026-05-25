@@ -1,5 +1,5 @@
 ===description===
-callableMethodOutOfClassContextNonPublic
+Callable method out of class context non public
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-loopWithSwitchDoesntReturnFirstCase
+Loop with switch doesnt return first case
 ===file===
 <?php
 function b(): int {

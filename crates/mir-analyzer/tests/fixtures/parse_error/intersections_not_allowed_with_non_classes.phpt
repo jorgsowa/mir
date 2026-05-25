@@ -1,5 +1,5 @@
 ===description===
-intersectionsNotAllowedWithNonClasses
+Intersections not allowed with non classes
 ===file===
 <?php
 interface A {

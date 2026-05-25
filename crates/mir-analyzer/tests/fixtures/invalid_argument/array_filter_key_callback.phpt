@@ -1,5 +1,5 @@
 ===description===
-arrayFilterKeyCallback
+Array filter key callback
 ===file===
 <?php
 /**

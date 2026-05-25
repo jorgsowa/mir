@@ -1,5 +1,5 @@
 ===description===
-invalidDocblockParamDefault
+Invalid docblock param default
 ===file===
 <?php
 /**

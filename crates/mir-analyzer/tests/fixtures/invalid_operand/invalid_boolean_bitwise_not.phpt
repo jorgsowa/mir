@@ -1,5 +1,5 @@
 ===description===
-invalidBooleanBitwiseNot
+Invalid boolean bitwise not
 ===file===
 <?php
 $a = ~true;

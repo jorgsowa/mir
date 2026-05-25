@@ -1,5 +1,5 @@
 ===description===
-mixinStaticCallShouldNotPolluteContext
+Mixin static call should not pollute context
 ===file===
 <?php
 /**

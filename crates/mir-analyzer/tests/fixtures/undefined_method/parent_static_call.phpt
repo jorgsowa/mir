@@ -1,5 +1,5 @@
 ===description===
-parentStaticCall
+Parent static call
 ===file===
 <?php
 class A {

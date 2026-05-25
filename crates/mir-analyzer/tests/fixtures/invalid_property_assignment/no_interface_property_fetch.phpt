@@ -1,5 +1,5 @@
 ===description===
-noInterfacePropertyFetch
+No interface property fetch
 ===file===
 <?php
 interface A { }

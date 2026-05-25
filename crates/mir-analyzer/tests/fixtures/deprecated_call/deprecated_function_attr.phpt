@@ -1,5 +1,5 @@
 ===description===
-deprecatedFunctionAttr
+Deprecated function attr
 ===file===
 <?php
 #[Deprecated]

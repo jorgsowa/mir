@@ -1,5 +1,5 @@
 ===description===
-getterAutomagicOverriddenWithAssertion
+Getter automagic overridden with assertion
 ===file===
 <?php
 class A {

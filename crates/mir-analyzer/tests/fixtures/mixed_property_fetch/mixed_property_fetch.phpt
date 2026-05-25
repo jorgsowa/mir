@@ -1,5 +1,5 @@
 ===description===
-mixedPropertyFetch
+Mixed property fetch
 ===file===
 <?php
 class Foo {

@@ -1,5 +1,5 @@
 ===description===
-undefinedMixinClass
+Undefined mixin class
 ===file===
 <?php
 /** @mixin B */

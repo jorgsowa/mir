@@ -1,5 +1,5 @@
 ===description===
-possiblyBadFetch
+Possibly bad fetch
 ===file===
 <?php
 $a = rand(0, 5) > 3 ? "hello" : new stdClass;

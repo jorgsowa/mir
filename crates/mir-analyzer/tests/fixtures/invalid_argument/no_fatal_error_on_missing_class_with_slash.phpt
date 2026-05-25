@@ -1,5 +1,5 @@
 ===description===
-noFatalErrorOnMissingClassWithSlash
+No fatal error on missing class with slash
 ===file===
 <?php
 class Func {

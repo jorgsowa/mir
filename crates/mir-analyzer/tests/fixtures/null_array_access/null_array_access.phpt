@@ -1,5 +1,5 @@
 ===description===
-nullArrayAccess
+Null array access
 ===file===
 <?php
 $a = null;

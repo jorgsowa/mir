@@ -1,5 +1,5 @@
 ===description===
-possiblyNullOrMixedArg
+Possibly null or mixed arg
 ===file===
 <?php
 class A {

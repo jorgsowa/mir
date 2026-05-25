@@ -1,5 +1,5 @@
 ===description===
-propertyWriteDocblockInvalidAssignment
+Property write docblock invalid assignment
 ===file===
 <?php
 /**

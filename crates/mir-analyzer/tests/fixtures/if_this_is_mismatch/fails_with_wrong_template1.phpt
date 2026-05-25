@@ -1,5 +1,5 @@
 ===description===
-failsWithWrongTemplate1
+Fails with wrong template1
 ===file===
 <?php
 

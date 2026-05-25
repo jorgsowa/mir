@@ -1,5 +1,5 @@
 ===description===
-fewerArguments
+Fewer arguments
 ===file===
 <?php
 class A {

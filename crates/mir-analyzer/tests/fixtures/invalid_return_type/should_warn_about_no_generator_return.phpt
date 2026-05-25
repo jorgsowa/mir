@@ -1,5 +1,5 @@
 ===description===
-shouldWarnAboutNoGeneratorReturn
+Should warn about no generator return
 ===file===
 <?php
 function generator2() : Generator {

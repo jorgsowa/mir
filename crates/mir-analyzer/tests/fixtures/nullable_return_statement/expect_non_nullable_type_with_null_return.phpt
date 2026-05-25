@@ -1,5 +1,5 @@
 ===description===
-expectNonNullableTypeWithNullReturn
+Expect non nullable type with null return
 ===file===
 <?php
 function example() : Generator {

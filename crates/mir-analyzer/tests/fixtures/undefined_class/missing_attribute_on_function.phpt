@@ -1,5 +1,5 @@
 ===description===
-missingAttributeOnFunction
+Missing attribute on function
 ===file===
 <?php
 use FooBarPure;

@@ -1,5 +1,5 @@
 ===description===
-elseVarReassignedInBranchAndNoReference
+Else var reassigned in branch and no reference
 ===file===
 <?php
 $a = true;

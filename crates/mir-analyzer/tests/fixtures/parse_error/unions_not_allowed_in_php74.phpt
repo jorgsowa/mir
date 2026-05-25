@@ -1,5 +1,5 @@
 ===description===
-unionsNotAllowedInPHP74
+Unions not allowed in p h p74
 ===file===
 <?php
 interface A {

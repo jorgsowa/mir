@@ -1,5 +1,5 @@
 ===description===
-inheritParamTypes
+Inherit param types
 ===file===
 <?php
 class A {

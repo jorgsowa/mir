@@ -1,5 +1,5 @@
 ===description===
-callableWithCorrectArgs
+Callable with correct args
 ===file===
 <?php
 /**

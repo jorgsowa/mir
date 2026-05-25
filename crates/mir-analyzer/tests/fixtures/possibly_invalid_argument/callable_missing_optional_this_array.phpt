@@ -1,5 +1,5 @@
 ===description===
-callableMissingOptionalThisArray
+Callable missing optional this array
 ===file===
 <?php
 /**

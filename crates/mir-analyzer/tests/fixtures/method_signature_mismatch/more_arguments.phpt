@@ -1,5 +1,5 @@
 ===description===
-moreArguments
+More arguments
 ===file===
 <?php
 class A {

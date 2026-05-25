@@ -1,5 +1,5 @@
 ===description===
-possiblyFalseReference
+Possibly false reference
 ===file===
 <?php
 class A {

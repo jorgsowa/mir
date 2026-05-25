@@ -1,5 +1,5 @@
 ===description===
-assertIfTrueNoAnnotation
+Assert if true no annotation
 ===file===
 <?php
 function isValidString(?string $myVar) : bool {

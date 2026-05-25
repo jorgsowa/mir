@@ -1,5 +1,5 @@
 ===description===
-unimplementedInterfaceMethod
+Unimplemented interface method
 ===file===
 <?php
 interface A {

@@ -1,5 +1,5 @@
 ===description===
-enumValueNotBacked
+Enum value not backed
 ===file===
 <?php
 enum Suit {

@@ -1,5 +1,5 @@
 ===description===
-invalidPrivateClassConstFetchFromSubclass
+Invalid private class const fetch from subclass
 ===file===
 <?php
 class A

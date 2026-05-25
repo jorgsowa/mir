@@ -1,5 +1,5 @@
 ===description===
-referenceReuseDeclaredInForeach
+Reference reuse declared in foreach
 ===file===
 <?php
 /** @var array<int> */

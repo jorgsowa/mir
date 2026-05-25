@@ -1,5 +1,5 @@
 ===description===
-getAttributesOnPropertyWithNonPropertyAttribute
+Get attributes on property with non property attribute
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_CLASS)]

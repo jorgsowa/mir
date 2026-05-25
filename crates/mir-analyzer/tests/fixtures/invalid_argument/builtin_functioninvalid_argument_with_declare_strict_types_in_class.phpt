@@ -1,5 +1,5 @@
 ===description===
-builtinFunctioninvalidArgumentWithDeclareStrictTypesInClass
+Builtin functioninvalid argument with declare strict types in class
 ===file===
 <?php declare(strict_types=1);
                     class A {

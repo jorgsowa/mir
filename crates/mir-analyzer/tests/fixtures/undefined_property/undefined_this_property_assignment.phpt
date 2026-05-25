@@ -1,5 +1,5 @@
 ===description===
-undefinedThisPropertyAssignment
+Undefined this property assignment
 ===file===
 <?php
 class A {

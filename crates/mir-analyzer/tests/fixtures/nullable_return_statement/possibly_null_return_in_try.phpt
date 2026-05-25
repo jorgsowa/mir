@@ -1,5 +1,5 @@
 ===description===
-possiblyNullReturnInTry
+Possibly null return in try
 ===file===
 <?php
 function foo() : string {

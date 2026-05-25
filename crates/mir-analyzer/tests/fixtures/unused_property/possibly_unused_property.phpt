@@ -1,5 +1,5 @@
 ===description===
-possiblyUnusedProperty
+Possibly unused property
 ===file===
 <?php
 final class A {

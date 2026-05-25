@@ -1,5 +1,5 @@
 ===description===
-mismatchingDocblockReturnTypes
+Mismatching docblock return types
 ===file===
 <?php
 interface I1 {

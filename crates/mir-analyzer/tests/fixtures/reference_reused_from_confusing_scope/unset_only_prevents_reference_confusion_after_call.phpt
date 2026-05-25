@@ -1,5 +1,5 @@
 ===description===
-unsetOnlyPreventsReferenceConfusionAfterCall
+Unset only prevents reference confusion after call
 ===file===
 <?php
 $arr = [1, 2, 3];

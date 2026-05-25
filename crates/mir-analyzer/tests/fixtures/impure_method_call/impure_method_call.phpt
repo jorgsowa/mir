@@ -1,5 +1,5 @@
 ===description===
-impureMethodCall
+Impure method call
 ===file===
 <?php
 namespace Bar;

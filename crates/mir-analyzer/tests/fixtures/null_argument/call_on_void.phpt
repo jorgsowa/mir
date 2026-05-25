@@ -1,5 +1,5 @@
 ===description===
-callOnVoid
+Call on void
 ===file===
 <?php
 class A {

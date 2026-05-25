@@ -1,5 +1,5 @@
 ===description===
-inheritSealedMethodsWithStatic
+Inherit sealed methods with static
 ===file===
 <?php
 /**

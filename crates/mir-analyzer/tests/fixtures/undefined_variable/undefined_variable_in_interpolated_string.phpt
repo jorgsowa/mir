@@ -1,5 +1,5 @@
 ===description===
-undefinedVariableInInterpolatedString
+Undefined variable in interpolated string
 ===file===
 <?php
 fn(): string => "$a";

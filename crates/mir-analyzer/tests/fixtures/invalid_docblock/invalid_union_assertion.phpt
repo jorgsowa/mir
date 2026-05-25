@@ -1,5 +1,5 @@
 ===description===
-invalidUnionAssertion
+Invalid union assertion
 ===file===
 <?php
 interface I {

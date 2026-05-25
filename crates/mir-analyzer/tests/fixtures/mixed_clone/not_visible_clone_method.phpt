@@ -1,5 +1,5 @@
 ===description===
-notVisibleCloneMethod
+Not visible clone method
 ===file===
 <?php
 class A {

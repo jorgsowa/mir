@@ -1,5 +1,5 @@
 ===description===
-checkVariableInUnknownClassConstructor
+Check variable in unknown class constructor
 ===file===
 <?php
 /** @suppress UndefinedClass */

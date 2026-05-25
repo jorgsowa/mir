@@ -1,5 +1,5 @@
 ===description===
-noNamedArguments
+No named arguments
 ===file===
 <?php
 /**

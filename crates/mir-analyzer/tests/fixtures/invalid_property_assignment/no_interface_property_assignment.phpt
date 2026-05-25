@@ -1,5 +1,5 @@
 ===description===
-noInterfacePropertyAssignment
+No interface property assignment
 ===file===
 <?php
 interface A { }

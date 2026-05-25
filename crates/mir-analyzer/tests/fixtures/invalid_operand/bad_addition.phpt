@@ -1,5 +1,5 @@
 ===description===
-badAddition
+Bad addition
 ===file===
 <?php
 $a = "b" + 5;

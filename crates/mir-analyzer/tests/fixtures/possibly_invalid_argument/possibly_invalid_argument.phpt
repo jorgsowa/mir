@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidArgument
+Possibly invalid argument
 ===file===
 <?php
 $foo = [

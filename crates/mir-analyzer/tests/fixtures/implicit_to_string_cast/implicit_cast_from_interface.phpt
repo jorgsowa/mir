@@ -1,5 +1,5 @@
 ===description===
-implicitCastFromInterface
+Implicit cast from interface
 ===file===
 <?php
 interface I {

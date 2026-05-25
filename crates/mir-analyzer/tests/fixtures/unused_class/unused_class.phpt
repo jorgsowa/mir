@@ -1,5 +1,5 @@
 ===description===
-unusedClass
+Unused class
 ===file===
 <?php
 final class A { }

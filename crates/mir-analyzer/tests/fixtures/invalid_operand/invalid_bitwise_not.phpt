@@ -1,5 +1,5 @@
 ===description===
-invalidBitwiseNot
+Invalid bitwise not
 ===file===
 <?php
 $a = ~new stdClass;

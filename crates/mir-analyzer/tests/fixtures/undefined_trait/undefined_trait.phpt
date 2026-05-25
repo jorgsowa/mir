@@ -1,5 +1,5 @@
 ===description===
-undefinedTrait
+Undefined trait
 ===file===
 <?php
 class B {

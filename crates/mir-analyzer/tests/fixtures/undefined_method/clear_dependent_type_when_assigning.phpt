@@ -1,5 +1,5 @@
 ===description===
-clearDependentTypeWhenAssigning
+Clear dependent type when assigning
 ===file===
 <?php
 class A {}

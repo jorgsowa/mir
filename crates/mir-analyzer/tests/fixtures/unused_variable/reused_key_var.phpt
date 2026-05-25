@@ -1,5 +1,5 @@
 ===description===
-reusedKeyVar
+Reused key var
 ===file===
 <?php
 $key = "a";

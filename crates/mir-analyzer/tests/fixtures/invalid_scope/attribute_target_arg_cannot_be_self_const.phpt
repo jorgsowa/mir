@@ -1,5 +1,5 @@
 ===description===
-attributeTargetArgCannotBeSelfConst
+Attribute target arg cannot be self const
 ===file===
 <?php
 #[Attribute(self::BAR)]

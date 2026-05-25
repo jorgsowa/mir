@@ -1,5 +1,5 @@
 ===description===
-mismatchingInterfaceMethodSignatureInTrait
+Mismatching interface method signature in trait
 ===file===
 <?php
 interface A {

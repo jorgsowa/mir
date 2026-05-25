@@ -1,5 +1,5 @@
 ===description===
-constantDefinedInFunctionButNotCalled
+Constant defined in function but not called
 ===file===
 <?php
 /**

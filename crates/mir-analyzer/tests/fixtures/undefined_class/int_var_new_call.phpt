@@ -1,5 +1,5 @@
 ===description===
-intVarNewCall
+Int var new call
 ===file===
 <?php
 $a = 5;

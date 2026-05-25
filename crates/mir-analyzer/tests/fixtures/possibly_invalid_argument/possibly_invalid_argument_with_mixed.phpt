@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidArgumentWithMixed
+Possibly invalid argument with mixed
 ===file===
 <?php declare(strict_types=1);
 /**

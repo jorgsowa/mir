@@ -1,5 +1,5 @@
 ===description===
-nonExistentConstantClass
+Non existent constant class
 ===file===
 <?php
 /**

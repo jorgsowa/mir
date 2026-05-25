@@ -1,5 +1,5 @@
 ===description===
-noReturn
+No return
 ===file===
 <?php
 $bar = ["foo", "bar"];

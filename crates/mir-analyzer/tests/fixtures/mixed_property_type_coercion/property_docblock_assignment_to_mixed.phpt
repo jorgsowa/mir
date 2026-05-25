@@ -1,5 +1,5 @@
 ===description===
-propertyDocblockAssignmentToMixed
+Property docblock assignment to mixed
 ===file===
 <?php
 /**

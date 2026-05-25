@@ -1,5 +1,5 @@
 ===description===
-throwWithMessageCallAndAssignmentInCatchAndNoReference
+Throw with message call and assignment in catch and no reference
 ===file===
 <?php
 function dangerous(): string {

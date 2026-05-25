@@ -1,5 +1,5 @@
 ===description===
-deprecatedStaticPropertyFetch
+Deprecated static property fetch
 ===file===
 <?php
 

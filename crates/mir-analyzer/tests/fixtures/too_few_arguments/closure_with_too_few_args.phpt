@@ -1,5 +1,5 @@
 ===description===
-closureWithTooFewArgs
+Closure with too few args
 ===file===
 <?php
 /**

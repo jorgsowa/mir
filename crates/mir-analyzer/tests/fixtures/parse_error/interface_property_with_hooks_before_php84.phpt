@@ -1,5 +1,5 @@
 ===description===
-interfacePropertyWithHooksBeforePhp84
+Interface property with hooks before php84
 ===file===
 <?php
 interface A {

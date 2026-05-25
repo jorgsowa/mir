@@ -1,5 +1,5 @@
 ===description===
-privateInterfacePropertyWithHooks
+Private interface property with hooks
 ===file===
 <?php
 interface A {

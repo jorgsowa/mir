@@ -1,5 +1,5 @@
 ===description===
-deprecatedPropertyGetFromInsideTheClass
+Deprecated property get from inside the class
 ===file===
 <?php
 class A{

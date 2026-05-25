@@ -1,5 +1,5 @@
 ===description===
-initializeLazyObjectWithBadType
+Initialize lazy object with bad type
 ===file===
 <?php
 class Foo {}

@@ -1,5 +1,5 @@
 ===description===
-missingTemplateExtendsNativeInterface
+Missing template extends native interface
 ===file===
 <?php
 interface a extends Iterator {

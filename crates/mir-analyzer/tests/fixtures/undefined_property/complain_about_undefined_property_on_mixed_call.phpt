@@ -1,5 +1,5 @@
 ===description===
-complainAboutUndefinedPropertyOnMixedCall
+Complain about undefined property on mixed call
 ===file===
 <?php
 class C {

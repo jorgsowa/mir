@@ -1,5 +1,5 @@
 ===description===
-switchBadMethodCallInCase
+Switch bad method call in case
 ===file===
 <?php
 function f(string $p): void { }

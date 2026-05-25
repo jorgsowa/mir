@@ -1,5 +1,5 @@
 ===description===
-assignmentAsReferenceOnlyPreventsReferenceConfusionAfterAssignment
+Assignment as reference only prevents reference confusion after assignment
 ===file===
 <?php
 $arr = [1, 2, 3];

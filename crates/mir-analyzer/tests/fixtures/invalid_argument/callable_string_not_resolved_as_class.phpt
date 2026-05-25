@@ -1,5 +1,5 @@
 ===description===
-callableStringNotResolvedAsClass
+Callable string not resolved as class
 ===file===
 <?php
 // A function name passed as string should NOT emit UndefinedClass

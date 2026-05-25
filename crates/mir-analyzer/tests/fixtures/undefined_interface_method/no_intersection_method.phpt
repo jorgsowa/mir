@@ -1,5 +1,5 @@
 ===description===
-noIntersectionMethod
+No intersection method
 ===file===
 <?php
 interface A {}

@@ -1,5 +1,5 @@
 ===description===
-getAttributesOnMethodWithNonMethodAttribute
+Get attributes on method with non method attribute
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

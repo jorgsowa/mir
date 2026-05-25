@@ -1,5 +1,5 @@
 ===description===
-invalidThrowClass
+Invalid throw class
 ===file===
 <?php
 class A {}

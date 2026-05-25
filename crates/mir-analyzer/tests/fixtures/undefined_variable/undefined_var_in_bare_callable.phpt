@@ -1,5 +1,5 @@
 ===description===
-undefinedVarInBareCallable
+Undefined var in bare callable
 ===file===
 <?php
 $fn = function(int $a): void{};

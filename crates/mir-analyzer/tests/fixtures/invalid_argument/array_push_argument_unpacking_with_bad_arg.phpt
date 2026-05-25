@@ -1,5 +1,5 @@
 ===description===
-arrayPushArgumentUnpackingWithBadArg
+Array push argument unpacking with bad arg
 ===file===
 <?php
 $a = [];

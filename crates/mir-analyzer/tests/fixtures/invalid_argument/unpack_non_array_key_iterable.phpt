@@ -1,5 +1,5 @@
 ===description===
-unpackNonArrayKeyIterable
+Unpack non array key iterable
 ===file===
 <?php
 /** @suppress UnusedParam */

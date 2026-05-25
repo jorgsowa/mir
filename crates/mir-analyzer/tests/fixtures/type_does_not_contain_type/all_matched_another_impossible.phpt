@@ -1,5 +1,5 @@
 ===description===
-allMatchedAnotherImpossible
+All matched another impossible
 ===file===
 <?php
 function foo() : string {

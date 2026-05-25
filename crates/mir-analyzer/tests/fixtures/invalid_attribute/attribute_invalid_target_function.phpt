@@ -1,5 +1,5 @@
 ===description===
-attributeInvalidTargetFunction
+Attribute invalid target function
 ===file===
 <?php
 #[Attribute]

@@ -1,5 +1,5 @@
 ===description===
-privateMethod
+Private method
 ===file===
 <?php
 class C {

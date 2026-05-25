@@ -1,5 +1,5 @@
 ===description===
-invalidMethodCall
+Invalid method call
 ===file===
 <?php
 ("hello")->someMethod();

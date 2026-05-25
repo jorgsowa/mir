@@ -1,5 +1,5 @@
 ===description===
-deprecatedClassWithNewAttr
+Deprecated class with new attr
 ===file===
 <?php
 #[\Deprecated]

@@ -1,5 +1,5 @@
 ===description===
-unionAnnotationInvalidArg
+Union annotation invalid arg
 ===file===
 <?php
 class ParentClass {

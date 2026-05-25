@@ -1,5 +1,5 @@
 ===description===
-useOfStaticMakesFunctionImpure
+Use of static makes function impure
 ===file===
 <?php
 /** @pure */

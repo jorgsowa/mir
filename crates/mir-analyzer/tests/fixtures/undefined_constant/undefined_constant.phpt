@@ -1,5 +1,5 @@
 ===description===
-undefinedConstant
+Undefined constant
 ===file===
 <?php
 echo HELLO;

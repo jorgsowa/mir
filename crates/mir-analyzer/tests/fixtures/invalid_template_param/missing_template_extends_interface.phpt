@@ -1,5 +1,5 @@
 ===description===
-missingTemplateExtendsInterface
+Missing template extends interface
 ===file===
 <?php
 /** @template T */

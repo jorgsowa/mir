@@ -1,5 +1,5 @@
 ===description===
-possiblyInvalidMethodCall
+Possibly invalid method call
 ===file===
 <?php
 class A1 {

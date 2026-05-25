@@ -1,5 +1,5 @@
 ===description===
-plainStringNotResolvedAsClass
+Plain string not resolved as class
 ===file===
 <?php
 // A plain string literal should NOT be resolved as a class name

@@ -1,5 +1,5 @@
 ===description===
-clasginByRef
+Clasgin by ref
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-anonymousClassWithInvalidFunctionReturnType
+Anonymous class with invalid function return type
 ===file===
 <?php
 $foo = new class {

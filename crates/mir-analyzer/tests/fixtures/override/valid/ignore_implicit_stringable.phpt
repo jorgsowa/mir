@@ -1,5 +1,5 @@
 ===description===
-ignoreImplicitStringable
+Ignore implicit stringable
 ===file===
                     <?php
                     class A {

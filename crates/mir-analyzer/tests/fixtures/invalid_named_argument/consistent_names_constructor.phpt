@@ -1,5 +1,5 @@
 ===description===
-consistentNamesConstructor
+Consistent names constructor
 ===file===
 <?php
 /**

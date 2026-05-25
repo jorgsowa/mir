@@ -1,5 +1,5 @@
 ===description===
-switchVarConditionalAssignmentWithoutReference
+Switch var conditional assignment without reference
 ===file===
 <?php
 switch (rand(0, 4)) {

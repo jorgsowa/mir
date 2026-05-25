@@ -1,5 +1,5 @@
 ===description===
-assertOutOfRange
+Assert out of range
 ===file===
 <?php
 /**

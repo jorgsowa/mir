@@ -1,5 +1,5 @@
 ===description===
-staticInvocation
+Static invocation
 ===file===
 <?php
 class Foo {

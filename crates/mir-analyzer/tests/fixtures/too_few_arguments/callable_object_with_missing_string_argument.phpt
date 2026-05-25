@@ -1,5 +1,5 @@
 ===description===
-callableObjectWithMissingStringArgument
+Callable object with missing string argument
 ===file===
 <?php
 /**

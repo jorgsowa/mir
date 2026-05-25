@@ -1,5 +1,5 @@
 ===description===
-callableInClassLiteralStringArrayMethodOutOfClassContextNonPublic
+Callable in class literal string array method out of class context non public
 ===file===
 <?php
 /**

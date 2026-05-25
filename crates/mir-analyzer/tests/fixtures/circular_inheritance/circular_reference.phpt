@@ -1,5 +1,5 @@
 ===description===
-circularReference
+Circular reference
 ===file===
 <?php
 class A extends A {}

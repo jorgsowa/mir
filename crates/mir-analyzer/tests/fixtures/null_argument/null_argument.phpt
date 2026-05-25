@@ -1,5 +1,5 @@
 ===description===
-nullArgument
+Null argument
 ===file===
 <?php
 function fooFoo(int $a): void {}

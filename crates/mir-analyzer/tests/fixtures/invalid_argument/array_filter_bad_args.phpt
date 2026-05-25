@@ -1,5 +1,5 @@
 ===description===
-arrayFilterBadArgs
+Array filter bad args
 ===file===
 <?php
 function foo(int $i) : bool {

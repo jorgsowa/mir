@@ -1,5 +1,5 @@
 ===description===
-readonlyPhpDocPromotedPropertyAssignOperator
+Readonly php doc promoted property assign operator
 ===file===
 <?php
 

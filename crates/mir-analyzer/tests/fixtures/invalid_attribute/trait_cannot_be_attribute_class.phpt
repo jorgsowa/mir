@@ -1,5 +1,5 @@
 ===description===
-traitCannotBeAttributeClass
+Trait cannot be attribute class
 ===file===
 <?php
 #[Attribute]

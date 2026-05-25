@@ -1,5 +1,5 @@
 ===description===
-forgetAssertionAfterRelevantNonMutationFreeCallOnReference
+Forget assertion after relevant non mutation free call on reference
 ===file===
 <?php
 class Foo

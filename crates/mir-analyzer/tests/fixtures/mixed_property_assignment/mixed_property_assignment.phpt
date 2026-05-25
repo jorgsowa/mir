@@ -1,5 +1,5 @@
 ===description===
-mixedPropertyAssignment
+Mixed property assignment
 ===file===
 <?php
 class Foo {

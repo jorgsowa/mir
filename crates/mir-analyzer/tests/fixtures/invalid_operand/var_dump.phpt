@@ -1,5 +1,5 @@
 ===description===
-varDump
+Var dump
 ===file===
 <?php
 var_dump("hello");

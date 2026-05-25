@@ -1,5 +1,5 @@
 ===description===
-classConstantNoClass
+Class constant no class
 ===file===
 <?php
 namespace Ns;

@@ -1,5 +1,5 @@
 ===description===
-possiblyNullablePropertyFetch
+Possibly nullable property fetch
 ===file===
 <?php
 class Foo {

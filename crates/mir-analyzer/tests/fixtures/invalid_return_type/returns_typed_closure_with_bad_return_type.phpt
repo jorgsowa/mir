@@ -1,5 +1,5 @@
 ===description===
-returnsTypedClosureWithBadReturnType
+Returns typed closure with bad return type
 ===file===
 <?php
 /**

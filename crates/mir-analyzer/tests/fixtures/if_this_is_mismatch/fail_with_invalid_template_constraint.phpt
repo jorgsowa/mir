@@ -1,5 +1,5 @@
 ===description===
-failWithInvalidTemplateConstraint
+Fail with invalid template constraint
 ===file===
 <?php
 /** @template T */

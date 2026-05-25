@@ -1,5 +1,5 @@
 ===description===
-simpleUnusedVariable
+Simple unused variable
 ===file===
 <?php
 $a = 5;

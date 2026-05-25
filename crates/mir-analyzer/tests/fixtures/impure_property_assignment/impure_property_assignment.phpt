@@ -1,5 +1,5 @@
 ===description===
-impurePropertyAssignment
+Impure property assignment
 ===file===
 <?php
 namespace Bar;

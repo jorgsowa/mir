@@ -1,5 +1,5 @@
 ===description===
-suppressUnusedSuppressionByItselfIsNotSuppressed
+Suppress unused suppression by itself is not suppressed
 ===file===
 <?php
 class Foo {

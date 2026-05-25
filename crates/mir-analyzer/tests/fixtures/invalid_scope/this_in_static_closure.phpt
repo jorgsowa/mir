@@ -1,5 +1,5 @@
 ===description===
-thisInStaticClosure
+This in static closure
 ===file===
 <?php
 class C {

@@ -1,5 +1,5 @@
 ===description===
-invalidArgAfterCallable
+Invalid arg after callable
 ===file===
 <?php
 /**

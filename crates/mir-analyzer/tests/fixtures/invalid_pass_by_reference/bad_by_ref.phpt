@@ -1,5 +1,5 @@
 ===description===
-badByRef
+Bad by ref
 ===file===
 <?php
 function fooFoo(string &$v): void {}

@@ -1,5 +1,5 @@
 ===description===
-propertySealedDocblockUndefinedPropertyAssignment
+Property sealed docblock undefined property assignment
 ===file===
 <?php
 /**

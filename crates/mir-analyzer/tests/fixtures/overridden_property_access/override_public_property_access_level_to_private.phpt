@@ -1,5 +1,5 @@
 ===description===
-overridePublicPropertyAccessLevelToPrivate
+Override public property access level to private
 ===file===
 <?php
 class A {

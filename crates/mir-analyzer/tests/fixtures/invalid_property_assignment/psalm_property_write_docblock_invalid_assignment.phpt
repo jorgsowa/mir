@@ -1,5 +1,5 @@
 ===description===
-psalmPropertyWriteDocblockInvalidAssignment
+Psalm property write docblock invalid assignment
 ===file===
 <?php
 /**

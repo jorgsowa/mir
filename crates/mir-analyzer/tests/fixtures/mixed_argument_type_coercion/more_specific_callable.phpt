@@ -1,5 +1,5 @@
 ===description===
-moreSpecificCallable
+More specific callable
 ===file===
 <?php
 /** @param callable(string):void $c */

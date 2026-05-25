@@ -1,5 +1,5 @@
 ===description===
-floatAsABoundary
+Float as a boundary
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-noFatalForUnknownAssertClass
+No fatal for unknown assert class
 ===file===
 <?php
 interface Foo {}

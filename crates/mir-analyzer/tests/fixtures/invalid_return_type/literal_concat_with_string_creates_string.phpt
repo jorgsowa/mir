@@ -1,5 +1,5 @@
 ===description===
-literalConcatWithStringCreatesString
+Literal concat with string creates string
 ===file===
 <?php
 /**

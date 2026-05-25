@@ -1,5 +1,5 @@
 ===description===
-anonymousClassWithBadStatement
+Anonymous class with bad statement
 ===file===
 <?php
 $foo = new class {

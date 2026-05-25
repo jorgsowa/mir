@@ -1,5 +1,5 @@
 ===description===
-arrayMapWithNonCallableIntArray
+Array map with non callable int array
 ===file===
 <?php
 $foo = [1, 2];

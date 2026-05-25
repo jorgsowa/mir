@@ -1,5 +1,5 @@
 ===description===
-returnsTypedCallableWithBadReturnType
+Returns typed callable with bad return type
 ===file===
 <?php
 /**

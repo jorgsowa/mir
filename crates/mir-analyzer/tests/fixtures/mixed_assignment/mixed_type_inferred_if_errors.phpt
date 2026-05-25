@@ -1,5 +1,5 @@
 ===description===
-mixedTypeInferredIfErrors
+Mixed type inferred if errors
 ===file===
 <?php
 class A {}

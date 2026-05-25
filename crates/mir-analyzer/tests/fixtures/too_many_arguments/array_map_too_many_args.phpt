@@ -1,5 +1,5 @@
 ===description===
-arrayMapTooManyArgs
+Array map too many args
 ===file===
 <?php
 function foo() : bool {

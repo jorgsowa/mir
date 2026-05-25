@@ -1,5 +1,5 @@
 ===description===
-wrongReturnType2
+Wrong return type2
 ===file===
 <?php
 function fooFoo(): string {

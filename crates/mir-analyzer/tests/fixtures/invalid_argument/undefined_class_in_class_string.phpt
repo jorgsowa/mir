@@ -1,5 +1,5 @@
 ===description===
-undefinedClassInClassString
+Undefined class in class string
 ===file===
 <?php
 /**

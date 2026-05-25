@@ -1,5 +1,5 @@
 ===description===
-protectedInterfacePropertyWithHooks
+Protected interface property with hooks
 ===file===
 <?php
 interface A {

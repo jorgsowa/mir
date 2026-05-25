@@ -1,5 +1,5 @@
 ===description===
-readonlyPropertyWithDefault
+Readonly property with default
 ===file===
 <?php
 class A {

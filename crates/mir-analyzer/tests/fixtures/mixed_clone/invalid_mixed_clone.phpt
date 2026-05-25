@@ -1,5 +1,5 @@
 ===description===
-invalidMixedClone
+Invalid mixed clone
 ===file===
 <?php
 /** @var mixed $a */

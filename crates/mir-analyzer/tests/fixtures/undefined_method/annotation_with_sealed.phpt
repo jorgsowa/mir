@@ -1,5 +1,5 @@
 ===description===
-annotationWithSealed
+Annotation with sealed
 ===file===
 <?php
 class ParentClass {

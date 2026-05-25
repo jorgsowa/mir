@@ -1,5 +1,5 @@
 ===description===
-referencesIgnoreVarAnnotation
+References ignore var annotation
 ===file===
 <?php
 $a = 1;

@@ -1,5 +1,5 @@
 ===description===
-getAttributesWithNonAttribute
+Get attributes with non attribute
 ===file===
 <?php
 class NonAttr {}

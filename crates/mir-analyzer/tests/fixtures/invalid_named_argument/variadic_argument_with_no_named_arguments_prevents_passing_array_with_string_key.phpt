@@ -1,5 +1,5 @@
 ===description===
-variadicArgumentWithNoNamedArgumentsPreventsPassingArrayWithStringKey
+Variadic argument with no named arguments prevents passing array with string key
 ===file===
 <?php
 /**

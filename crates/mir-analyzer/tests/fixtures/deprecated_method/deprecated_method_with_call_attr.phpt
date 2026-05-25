@@ -1,5 +1,5 @@
 ===description===
-deprecatedMethodWithCallAttr
+Deprecated method with call attr
 ===file===
 <?php
 class Foo {

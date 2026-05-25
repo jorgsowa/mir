@@ -1,5 +1,5 @@
 ===description===
-nonStaticInterfaceMethod
+Non static interface method
 ===file===
 <?php
 interface I {

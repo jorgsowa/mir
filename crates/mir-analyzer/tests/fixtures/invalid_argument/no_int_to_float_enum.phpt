@@ -1,5 +1,5 @@
 ===description===
-noIntToFloatEnum
+No int to float enum
 ===file===
 <?php
 /** @param 0.3|0.5 $p */

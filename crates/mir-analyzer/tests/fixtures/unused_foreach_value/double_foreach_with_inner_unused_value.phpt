@@ -1,5 +1,5 @@
 ===description===
-doubleForeachWithInnerUnusedValue
+Double foreach with inner unused value
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-readonlyPromotedPropertyAccess
+Readonly promoted property access
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-callableWithTooManyArgs
+Callable with too many args
 ===file===
 <?php
 /**

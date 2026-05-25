@@ -1,5 +1,5 @@
 ===description===
-noCrashWithEmptyMatch
+No crash with empty match
 ===file===
 <?php
 function foo(int $i) {

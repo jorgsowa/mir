@@ -1,5 +1,5 @@
 ===description===
-undefinedMethodPassedAsArg
+Undefined method passed as arg
 ===file===
 <?php
 class A {

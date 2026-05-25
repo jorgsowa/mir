@@ -1,5 +1,5 @@
 ===description===
-missingPropertyType
+Missing property type
 ===file===
 <?php
 class A {

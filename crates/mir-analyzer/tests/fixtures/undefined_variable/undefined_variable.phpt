@@ -1,5 +1,5 @@
 ===description===
-undefinedVariable
+Undefined variable
 ===file===
 <?php
 $a = function() use ($i) {};

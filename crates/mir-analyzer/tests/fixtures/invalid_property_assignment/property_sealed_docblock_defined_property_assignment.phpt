@@ -1,5 +1,5 @@
 ===description===
-propertySealedDocblockDefinedPropertyAssignment
+Property sealed docblock defined property assignment
 ===file===
 <?php
 /**

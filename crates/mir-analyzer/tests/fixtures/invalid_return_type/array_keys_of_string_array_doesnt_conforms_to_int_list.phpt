@@ -1,5 +1,5 @@
 ===description===
-arrayKeysOfStringArrayDoesntConformsToIntList
+Array keys of string array doesnt conforms to int list
 ===file===
 <?php
 /**

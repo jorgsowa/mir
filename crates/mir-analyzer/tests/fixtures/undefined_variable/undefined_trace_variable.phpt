@@ -1,5 +1,5 @@
 ===description===
-undefinedTraceVariable
+Undefined trace variable
 ===file===
 <?php
 /** @trace $b */

@@ -1,5 +1,5 @@
 ===description===
-noNamedArgsFunction
+No named args function
 ===file===
 <?php
 /** @no-named-arguments */

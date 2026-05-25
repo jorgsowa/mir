@@ -1,5 +1,5 @@
 ===description===
-abstractTraitMethodWithDifferentParamType
+Abstract trait method with different param type
 ===file===
 <?php
 class A {}

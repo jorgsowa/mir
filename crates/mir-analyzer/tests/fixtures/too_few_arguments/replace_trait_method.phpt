@@ -1,5 +1,5 @@
 ===description===
-replaceTraitMethod
+Replace trait method
 ===file===
 <?php
 trait T {

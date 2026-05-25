@@ -1,5 +1,5 @@
 ===description===
-missingParent
+Missing parent
 ===file===
 <?php
 class A extends B { }

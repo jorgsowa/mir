@@ -1,5 +1,5 @@
 ===description===
-warnAboutMismatchingClassParamDoc
+Warn about mismatching class param doc
 ===file===
 <?php
 class A {}

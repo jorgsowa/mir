@@ -1,5 +1,5 @@
 ===description===
-preventTraversableImplementation
+Prevent traversable implementation
 ===file===
 <?php
 /**

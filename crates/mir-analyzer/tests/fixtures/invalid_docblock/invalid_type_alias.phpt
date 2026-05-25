@@ -1,5 +1,5 @@
 ===description===
-invalidTypeAlias
+Invalid type alias
 ===file===
 <?php
 namespace Barrr;

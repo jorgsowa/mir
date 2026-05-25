@@ -1,5 +1,5 @@
 ===description===
-explicitStringable
+Explicit stringable
 ===file===
 
                     <?php

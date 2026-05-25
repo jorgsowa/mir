@@ -1,5 +1,5 @@
 ===description===
-cannotNameClassConstantClass
+Cannot name class constant class
 ===file===
 <?php
 class Foo

@@ -1,5 +1,5 @@
 ===description===
-preventTraitPropertyType
+Prevent trait property type
 ===file===
 <?php
 trait T {}

@@ -1,5 +1,5 @@
 ===description===
-getterAutomagicOverridden
+Getter automagic overridden
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-detectImplicitVoidReturn
+Detect implicit void return
 ===file===
 <?php
 /**

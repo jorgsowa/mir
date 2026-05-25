@@ -1,5 +1,5 @@
 ===description===
-tooManyArguments
+Too many arguments
 ===file===
 <?php
 function fooFoo(int $a): void {}

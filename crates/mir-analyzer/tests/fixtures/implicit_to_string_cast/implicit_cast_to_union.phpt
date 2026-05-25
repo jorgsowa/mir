@@ -1,5 +1,5 @@
 ===description===
-implicitCastToUnion
+Implicit cast to union
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-mismatchDocblockNativeIntersectionArgument
+Mismatch docblock native intersection argument
 ===file===
 <?php
 interface A {

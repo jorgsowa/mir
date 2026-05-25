@@ -1,5 +1,5 @@
 ===description===
-warnAboutMismatchingInterfaceParamDoc
+Warn about mismatching interface param doc
 ===file===
 <?php
 class A {}

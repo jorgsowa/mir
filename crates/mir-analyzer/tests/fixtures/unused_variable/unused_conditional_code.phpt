@@ -1,5 +1,5 @@
 ===description===
-unusedConditionalCode
+Unused conditional code
 ===file===
 <?php
 $a = 5;

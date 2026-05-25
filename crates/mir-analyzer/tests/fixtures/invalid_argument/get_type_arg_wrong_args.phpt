@@ -1,5 +1,5 @@
 ===description===
-getTypeArgWrongArgs
+Get type arg wrong args
 ===file===
 <?php
 function testInt(int $var): void {

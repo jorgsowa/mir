@@ -1,5 +1,5 @@
 ===description===
-abstractClassMethod
+Abstract class method
 ===file===
 <?php
 abstract class A {

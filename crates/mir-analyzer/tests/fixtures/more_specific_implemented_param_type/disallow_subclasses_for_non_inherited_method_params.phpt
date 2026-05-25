@@ -1,5 +1,5 @@
 ===description===
-disallowSubclassesForNonInheritedMethodParams
+Disallow subclasses for non inherited method params
 ===file===
 <?php
 class A {}

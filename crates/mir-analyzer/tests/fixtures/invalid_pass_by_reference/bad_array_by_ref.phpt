@@ -1,5 +1,5 @@
 ===description===
-badArrayByRef
+Bad array by ref
 ===file===
 <?php
 function fooFoo(array &$a): void {}

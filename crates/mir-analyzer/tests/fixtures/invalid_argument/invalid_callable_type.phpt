@@ -1,5 +1,5 @@
 ===description===
-invalidCallableType
+Invalid callable type
 ===file===
 <?php
 /**

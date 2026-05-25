@@ -1,5 +1,5 @@
 ===description===
-parseBadMethodAnnotation
+Parse bad method annotation
 ===file===
 <?php
                     /**

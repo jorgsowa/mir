@@ -1,5 +1,5 @@
 ===description===
-undefinedPropertyFetch
+Undefined property fetch
 ===file===
 <?php
 class A {

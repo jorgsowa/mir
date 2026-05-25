@@ -1,5 +1,5 @@
 ===description===
-detectMissingTemplateImplementsNative
+Detect missing template implements native
 ===file===
 <?php
 final class C implements Iterator {

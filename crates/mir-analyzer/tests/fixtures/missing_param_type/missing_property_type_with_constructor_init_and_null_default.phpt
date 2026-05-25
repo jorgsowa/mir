@@ -1,5 +1,5 @@
 ===description===
-missingPropertyTypeWithConstructorInitAndNullDefault
+Missing property type with constructor init and null default
 ===file===
 <?php
 class A {

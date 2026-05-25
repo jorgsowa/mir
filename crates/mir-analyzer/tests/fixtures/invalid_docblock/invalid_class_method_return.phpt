@@ -1,5 +1,5 @@
 ===description===
-invalidClassMethodReturn
+Invalid class method return
 ===file===
 <?php
 class C {

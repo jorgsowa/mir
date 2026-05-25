@@ -1,5 +1,5 @@
 ===description===
-wrongReturnTypeInNamespace2
+Wrong return type in namespace2
 ===file===
 <?php
 namespace bar;

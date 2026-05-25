@@ -1,5 +1,5 @@
 ===description===
-invalidArrayAccess
+Invalid array access
 ===file===
 <?php
 $a = 5;

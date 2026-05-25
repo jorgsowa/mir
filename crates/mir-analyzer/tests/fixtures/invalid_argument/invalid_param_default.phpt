@@ -1,5 +1,5 @@
 ===description===
-invalidParamDefault
+Invalid param default
 ===file===
 <?php
 function f(int $p = false) {}

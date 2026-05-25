@@ -1,5 +1,5 @@
 ===description===
-falsePositiveUndefinedClassInCallable
+False positive undefined class in callable
 ===file===
 <?php
 // This demonstrates the FALSE POSITIVE issue:

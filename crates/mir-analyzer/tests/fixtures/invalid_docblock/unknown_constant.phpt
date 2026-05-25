@@ -1,5 +1,5 @@
 ===description===
-unknownConstant
+Unknown constant
 ===file===
 <?php
 /**

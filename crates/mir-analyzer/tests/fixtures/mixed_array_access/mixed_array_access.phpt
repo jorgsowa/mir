@@ -1,5 +1,5 @@
 ===description===
-mixedArrayAccess
+Mixed array access
 ===file===
 <?php
 /** @var mixed */

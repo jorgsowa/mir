@@ -1,5 +1,5 @@
 ===description===
-switchReturnTypeWithNoDefault
+Switch return type with no default
 ===file===
 <?php
 class A {

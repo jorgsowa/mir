@@ -1,5 +1,5 @@
 ===description===
-staticInterfacePropertyWithHooks
+Static interface property with hooks
 ===file===
 <?php
 interface A {

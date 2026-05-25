@@ -1,5 +1,5 @@
 ===description===
-implicitCastWithStrictTypes
+Implicit cast with strict types
 ===file===
 <?php declare(strict_types=1);
                     class A {

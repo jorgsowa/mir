@@ -1,5 +1,5 @@
 ===description===
-tooFewArgumentsToInstance
+Too few arguments to instance
 ===file===
 <?php
 class A {

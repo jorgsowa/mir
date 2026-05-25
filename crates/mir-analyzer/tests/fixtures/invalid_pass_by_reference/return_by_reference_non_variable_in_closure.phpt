@@ -1,5 +1,5 @@
 ===description===
-returnByReferenceNonVariableInClosure
+Return by reference non variable in closure
 ===file===
 <?php
 function &(): int {

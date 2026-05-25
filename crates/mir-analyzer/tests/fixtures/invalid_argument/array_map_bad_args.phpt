@@ -1,5 +1,5 @@
 ===description===
-arrayMapBadArgs
+Array map bad args
 ===file===
 <?php
 function foo(int $i) : bool {

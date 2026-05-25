@@ -1,5 +1,5 @@
 ===description===
-detectUnusedVarBeforeTryInsideForeach
+Detect unused var before try inside foreach
 ===file===
 <?php
 function foo() : void {

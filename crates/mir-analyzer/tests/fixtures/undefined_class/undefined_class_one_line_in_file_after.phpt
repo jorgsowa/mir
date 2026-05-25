@@ -1,5 +1,5 @@
 ===description===
-undefinedClassOneLineInFileAfter
+Undefined class one line in file after
 ===file===
 <?php
 /**

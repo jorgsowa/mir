@@ -1,5 +1,5 @@
 ===description===
-classAttributeUsedOnFunction
+Class attribute used on function
 ===file===
 <?php
 namespace Foo;

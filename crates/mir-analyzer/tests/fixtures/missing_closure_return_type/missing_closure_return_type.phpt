@@ -1,5 +1,5 @@
 ===description===
-missingClosureReturnType
+Missing closure return type
 ===file===
 <?php
 $a = function() {

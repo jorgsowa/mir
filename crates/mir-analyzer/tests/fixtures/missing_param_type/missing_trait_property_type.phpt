@@ -1,5 +1,5 @@
 ===description===
-missingTraitPropertyType
+Missing trait property type
 ===file===
 <?php
 trait T {

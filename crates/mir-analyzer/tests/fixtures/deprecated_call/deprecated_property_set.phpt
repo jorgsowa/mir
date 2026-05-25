@@ -1,5 +1,5 @@
 ===description===
-deprecatedPropertySet
+Deprecated property set
 ===file===
 <?php
 class A{

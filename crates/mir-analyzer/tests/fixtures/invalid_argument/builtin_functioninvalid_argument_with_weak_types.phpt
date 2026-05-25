@@ -1,5 +1,5 @@
 ===description===
-builtinFunctioninvalidArgumentWithWeakTypes
+Builtin functioninvalid argument with weak types
 ===file===
 <?php
 $s = substr(5, 4);

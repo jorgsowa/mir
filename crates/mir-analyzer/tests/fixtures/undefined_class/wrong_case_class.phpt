@@ -1,5 +1,5 @@
 ===description===
-wrongCaseClass
+Wrong case class
 ===file===
 <?php
 class Foo {}

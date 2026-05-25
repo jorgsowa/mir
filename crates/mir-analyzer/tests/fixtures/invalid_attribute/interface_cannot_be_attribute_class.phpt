@@ -1,5 +1,5 @@
 ===description===
-interfaceCannotBeAttributeClass
+Interface cannot be attribute class
 ===file===
 <?php
 #[Attribute]

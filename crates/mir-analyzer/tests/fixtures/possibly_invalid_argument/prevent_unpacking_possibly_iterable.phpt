@@ -1,5 +1,5 @@
 ===description===
-preventUnpackingPossiblyIterable
+Prevent unpacking possibly iterable
 ===file===
 <?php
 function foo(int $arg1, int $arg2): void {}

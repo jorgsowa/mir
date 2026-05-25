@@ -1,5 +1,5 @@
 ===description===
-docblockCallableString
+Docblock callable string
 ===file===
 <?php
 /**

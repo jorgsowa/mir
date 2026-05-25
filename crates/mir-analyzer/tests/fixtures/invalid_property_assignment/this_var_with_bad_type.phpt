@@ -1,5 +1,5 @@
 ===description===
-thisVarWithBadType
+This var with bad type
 ===file===
 <?php
 class A {

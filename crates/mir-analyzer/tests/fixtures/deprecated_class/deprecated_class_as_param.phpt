@@ -1,5 +1,5 @@
 ===description===
-deprecatedClassAsParam
+Deprecated class as param
 ===file===
 <?php
 /**

@@ -1,5 +1,5 @@
 ===description===
-arrayFilterTooFewArgs
+Array filter too few args
 ===file===
 <?php
 function foo(int $i, string $s) : bool {

@@ -1,5 +1,5 @@
 ===description===
-interfacePropertyWithoutHooks
+Interface property without hooks
 ===file===
 <?php
 interface A {

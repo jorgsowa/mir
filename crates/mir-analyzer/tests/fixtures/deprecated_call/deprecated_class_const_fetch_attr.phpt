@@ -1,5 +1,5 @@
 ===description===
-deprecatedClassConstFetchAttr
+Deprecated class const fetch attr
 ===file===
 <?php
 class Foo {

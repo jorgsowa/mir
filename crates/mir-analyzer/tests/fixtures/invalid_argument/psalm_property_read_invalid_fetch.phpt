@@ -1,5 +1,5 @@
 ===description===
-psalmPropertyReadInvalidFetch
+Psalm property read invalid fetch
 ===file===
 <?php
 /**

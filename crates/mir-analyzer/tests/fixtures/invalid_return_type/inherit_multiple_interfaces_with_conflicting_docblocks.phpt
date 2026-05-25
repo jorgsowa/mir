@@ -1,5 +1,5 @@
 ===description===
-inheritMultipleInterfacesWithConflictingDocblocks
+Inherit multiple interfaces with conflicting docblocks
 ===file===
 <?php
 interface I1 {

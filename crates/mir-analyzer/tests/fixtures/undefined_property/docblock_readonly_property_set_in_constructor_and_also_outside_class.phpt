@@ -1,5 +1,5 @@
 ===description===
-docblockReadonlyPropertySetInConstructorAndAlsoOutsideClass
+Docblock readonly property set in constructor and also outside class
 ===file===
 <?php
 class A {

@@ -1,5 +1,5 @@
 ===description===
-paradoxWithDuplicateValue
+Paradox with duplicate value
 ===file===
 <?php
 function foo(int $i) : void {

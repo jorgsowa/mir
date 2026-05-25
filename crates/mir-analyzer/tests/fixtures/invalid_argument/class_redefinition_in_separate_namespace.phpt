@@ -1,5 +1,5 @@
 ===description===
-classRedefinitionInSeparateNamespace
+Class redefinition in separate namespace
 ===file===
 <?php
 namespace Aye {

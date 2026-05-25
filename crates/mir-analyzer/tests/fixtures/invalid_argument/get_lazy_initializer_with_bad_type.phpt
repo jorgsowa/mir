@@ -1,5 +1,5 @@
 ===description===
-getLazyInitializerWithBadType
+Get lazy initializer with bad type
 ===file===
 <?php
 class Foo {}

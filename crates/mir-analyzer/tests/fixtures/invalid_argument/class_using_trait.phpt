@@ -1,5 +1,5 @@
 ===description===
-classUsingTrait
+Class using trait
 ===file===
 <?php
 trait T {

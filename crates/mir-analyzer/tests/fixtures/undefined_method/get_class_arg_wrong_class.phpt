@@ -1,5 +1,5 @@
 ===description===
-getClassArgWrongClass
+Get class arg wrong class
 ===file===
 <?php
 class A {}

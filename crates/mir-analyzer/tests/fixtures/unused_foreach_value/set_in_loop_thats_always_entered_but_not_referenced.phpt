@@ -1,5 +1,5 @@
 ===description===
-setInLoopThatsAlwaysEnteredButNotReferenced
+Set in loop thats always entered but not referenced
 ===file===
 <?php
 /**

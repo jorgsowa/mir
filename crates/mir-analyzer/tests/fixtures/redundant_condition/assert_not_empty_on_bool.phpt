@@ -1,5 +1,5 @@
 ===description===
-assertNotEmptyOnBool
+Assert not empty on bool
 ===file===
 <?php
 /**

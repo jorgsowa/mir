@@ -1,5 +1,5 @@
 ===description===
-assertIfTrueMethodCall
+Assert if true method call
 ===file===
 <?php
 class C {

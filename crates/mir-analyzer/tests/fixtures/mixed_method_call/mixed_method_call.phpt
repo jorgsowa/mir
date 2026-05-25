@@ -1,5 +1,5 @@
 ===description===
-mixedMethodCall
+Mixed method call
 ===file===
 <?php
 class Foo {

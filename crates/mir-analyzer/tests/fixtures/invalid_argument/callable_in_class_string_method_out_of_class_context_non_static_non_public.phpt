@@ -1,5 +1,5 @@
 ===description===
-callableInClassStringMethodOutOfClassContextNonStaticNonPublic
+Callable in class string method out of class context non static non public
 ===file===
 <?php
 /**

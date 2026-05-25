@@ -1,5 +1,5 @@
 ===description===
-unusedParam
+Unused param
 ===file===
 <?php
 function foo(int $i) {}

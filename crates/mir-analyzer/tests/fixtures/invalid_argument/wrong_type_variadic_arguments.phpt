@@ -1,5 +1,5 @@
 ===description===
-wrongTypeVariadicArguments
+Wrong type variadic arguments
 ===file===
 <?php
 function takesArguments(int ...$args) : void {}

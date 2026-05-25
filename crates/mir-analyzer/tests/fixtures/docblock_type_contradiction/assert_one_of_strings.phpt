@@ -1,5 +1,5 @@
 ===description===
-assertOneOfStrings
+Assert one of strings
 ===file===
 <?php
 /**

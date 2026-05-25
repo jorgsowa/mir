@@ -1,5 +1,5 @@
 ===description===
-execTicks
+Exec ticks
 ===file===
 <?php
 `rm -rf`;

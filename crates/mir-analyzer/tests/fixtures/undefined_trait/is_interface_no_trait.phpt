@@ -1,5 +1,5 @@
 ===description===
-isInterfaceNoTrait
+Is interface no trait
 ===file===
 <?php
 interface B {}

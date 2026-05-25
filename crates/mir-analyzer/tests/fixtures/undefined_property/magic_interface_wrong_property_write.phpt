@@ -1,5 +1,5 @@
 ===description===
-magicInterfaceWrongPropertyWrite
+Magic interface wrong property write
 ===file===
 <?php
 /**

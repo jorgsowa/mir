@@ -1,5 +1,5 @@
 ===description===
-invalidIterator
+Invalid iterator
 ===file===
 <?php
 function example() : int {

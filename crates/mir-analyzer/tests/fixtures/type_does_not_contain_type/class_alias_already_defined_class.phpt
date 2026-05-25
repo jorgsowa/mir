@@ -1,5 +1,5 @@
 ===description===
-classAliasAlreadyDefinedClass
+Class alias already defined class
 ===file===
 <?php
 class A {}

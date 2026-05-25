@@ -1,5 +1,5 @@
 ===description===
-assertRedundantInferior
+Assert redundant inferior
 ===file===
 <?php
 /**

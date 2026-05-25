@@ -1,5 +1,5 @@
 ===description===
-globalWithVarNoIndent
+Global with var no indent
 ===file===
 <?php
 /** @var mixed $a */

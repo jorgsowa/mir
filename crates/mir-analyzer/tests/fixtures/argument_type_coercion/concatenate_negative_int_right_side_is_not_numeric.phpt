@@ -1,5 +1,5 @@
 ===description===
-concatenateNegativeIntRightSideIsNotNumeric
+Concatenate negative int right side is not numeric
 ===file===
 <?php
 /**

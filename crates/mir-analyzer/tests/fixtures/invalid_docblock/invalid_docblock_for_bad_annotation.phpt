@@ -1,5 +1,5 @@
 ===description===
-invalidDocblockForBadAnnotation
+Invalid docblock for bad annotation
 ===file===
 <?php
 /**

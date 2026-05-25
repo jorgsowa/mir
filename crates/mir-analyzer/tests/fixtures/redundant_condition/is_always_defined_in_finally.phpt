@@ -1,5 +1,5 @@
 ===description===
-isAlwaysDefinedInFinally
+Is always defined in finally
 ===file===
 <?php
 function maybeThrows() : void {

@@ -1,5 +1,5 @@
 ===description===
-noExceptionOnMissingClass
+No exception on missing class
 ===file===
 <?php
 /** @suppress UndefinedClass */

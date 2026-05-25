@@ -1,5 +1,5 @@
 ===description===
-canCreateObjectWithNoExternalMutationsFail
+Can create object with no external mutations fail
 ===file===
 <?php
 class Counter {

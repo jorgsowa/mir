@@ -1,5 +1,5 @@
 ===description===
-detectUnusedVariableInsideLoopAfterAssignmentWithAddition
+Detect unused variable inside loop after assignment with addition
 ===file===
 <?php
 function foo() : void {

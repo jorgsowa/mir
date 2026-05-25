@@ -1,5 +1,5 @@
 ===description===
-badCustomFunction
+Bad custom function
 ===file===
 <?php
 /**

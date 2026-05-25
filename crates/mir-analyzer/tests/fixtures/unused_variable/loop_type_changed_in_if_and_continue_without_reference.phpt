@@ -1,5 +1,5 @@
 ===description===
-loopTypeChangedInIfAndContinueWithoutReference
+Loop type changed in if and continue without reference
 ===file===
 <?php
 $a = false;

@@ -1,5 +1,5 @@
 ===description===
-preventFinalOverriding
+Prevent final overriding
 ===file===
 <?php
 /**

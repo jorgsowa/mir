@@ -1,5 +1,5 @@
 ===description===
-wrongArg
+Wrong arg
 ===file===
 <?php
 $bar = ["foo", "bar"];

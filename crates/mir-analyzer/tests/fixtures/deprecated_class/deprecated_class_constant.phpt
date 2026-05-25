@@ -1,5 +1,5 @@
 ===description===
-deprecatedClassConstant
+Deprecated class constant
 ===file===
 <?php
 /**

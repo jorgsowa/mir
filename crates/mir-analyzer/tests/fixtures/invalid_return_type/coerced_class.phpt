@@ -1,5 +1,5 @@
 ===description===
-coercedClass
+Coerced class
 ===file===
 <?php
 class NullableClass {

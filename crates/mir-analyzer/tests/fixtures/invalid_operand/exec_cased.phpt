@@ -1,5 +1,5 @@
 ===description===
-execCased
+Exec cased
 ===file===
 <?php
 sHeLl_EXeC("rm -rf");

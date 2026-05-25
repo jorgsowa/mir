@@ -1,5 +1,5 @@
 ===description===
-multipleAttributesShowErrors
+Multiple attributes show errors
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_CLASS)]

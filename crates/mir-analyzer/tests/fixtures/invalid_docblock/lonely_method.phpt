@@ -1,5 +1,5 @@
 ===description===
-lonelyMethod
+Lonely method
 ===file===
 <?php
 /**

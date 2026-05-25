@@ -1,5 +1,5 @@
 ===description===
-foreachUnionMethodCall
+Foreach union method call
 ===file===
 <?php
 class Item {

@@ -1,5 +1,5 @@
 ===description===
-functionParameterViolation
+Function parameter violation
 ===file===
 <?php
 /** @return void */

@@ -1,5 +1,5 @@
 ===description===
-enumValueIsNot
+Enum value is not
 ===file===
 <?php
 enum Suit: string {

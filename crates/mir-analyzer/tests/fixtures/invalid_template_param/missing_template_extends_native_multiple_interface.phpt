@@ -1,5 +1,5 @@
 ===description===
-missingTemplateExtendsNativeMultipleInterface
+Missing template extends native multiple interface
 ===file===
 <?php
 /**

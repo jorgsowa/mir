@@ -1,5 +1,5 @@
 ===description===
-misplacedRequiredParam
+Misplaced required param
 ===file===
 <?php
 function foo(string $bar = null, int $bat): void {}

@@ -1,5 +1,5 @@
 ===description===
-tooFewArgumentsToStatic
+Too few arguments to static
 ===file===
 <?php
 class A {

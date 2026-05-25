@@ -1,5 +1,5 @@
 ===description===
-possiblyUnusedParam
+Possibly unused param
 ===file===
 <?php
 class A {

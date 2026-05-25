@@ -1,5 +1,5 @@
 ===description===
-nullablePropertyFetch
+Nullable property fetch
 ===file===
 <?php
 $a = null;

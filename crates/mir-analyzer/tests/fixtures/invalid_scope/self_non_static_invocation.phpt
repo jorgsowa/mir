@@ -1,5 +1,5 @@
 ===description===
-selfNonStaticInvocation
+Self non static invocation
 ===file===
 <?php
 class A {

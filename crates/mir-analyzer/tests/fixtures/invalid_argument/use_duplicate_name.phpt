@@ -1,5 +1,5 @@
 ===description===
-useDuplicateName
+Use duplicate name
 ===file===
 <?php
 $foo = "bar";

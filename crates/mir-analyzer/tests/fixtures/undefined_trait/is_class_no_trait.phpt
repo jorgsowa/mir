@@ -1,5 +1,5 @@
 ===description===
-isClassNoTrait
+Is class no trait
 ===file===
 <?php
 class B {}

@@ -1,5 +1,5 @@
 ===description===
-mismatchDocblockNativeUnionArgument
+Mismatch docblock native union argument
 ===file===
 <?php
 /**

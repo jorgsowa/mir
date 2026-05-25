@@ -1,5 +1,5 @@
 ===description===
-nestedTraitWithBadReturnType
+Nested trait with bad return type
 ===file===
 <?php
 trait A {

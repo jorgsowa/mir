@@ -1,5 +1,5 @@
 ===description===
-unusedIfInReturnBlock
+Unused if in return block
 ===file===
 <?php
 $i = rand(0, 1);

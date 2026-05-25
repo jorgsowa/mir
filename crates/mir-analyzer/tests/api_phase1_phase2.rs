@@ -376,7 +376,7 @@ fn prefetch_imports_loads_unresolved_use_statements() {
 }
 
 #[test]
-fn analyze_dependents_of_runs_in_parallel() {
+fn reanalyze_dependents_runs_in_parallel() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
@@ -405,10 +405,10 @@ fn analyze_dependents_of_runs_in_parallel() {
     assert!(session.source_of(dep_a.as_ref()).is_some());
     assert_eq!(session.source_of("does-not-exist.php"), None);
 
-    // analyze_dependents_of returns analyses for dependents of base.php.
+    // reanalyze_dependents returns analyses for dependents of base.php.
     // (May be empty if dependency graph wasn't populated — that's still a
     // valid result; the API just shouldn't panic.)
-    let analyses = session.analyze_dependents_of(base.as_ref());
+    let analyses = session.reanalyze_dependents(base.as_ref());
     // Sanity: returned files are a subset of the ingested ones.
     for (file, _) in &analyses {
         assert!(file.as_ref() == dep_a.as_ref() || file.as_ref() == dep_b.as_ref());
@@ -448,12 +448,12 @@ fn all_classes_and_all_functions_workspace_iteration() {
 }
 
 // Regression: bare FQN references without a `use` statement must be tracked in
-// the dependency graph so that `analyze_dependents_of` re-analyzes the referencing
+// the dependency graph so that `reanalyze_dependents` re-analyzes the referencing
 // file when the definition changes.  Currently not implemented — these tests document
 // the missing behaviour and should be un-ignored once the bug is fixed.
 
 #[test]
-fn analyze_dependents_of_tracks_bare_fqn_new() {
+fn reanalyze_dependents_tracks_bare_fqn_new() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
@@ -480,17 +480,17 @@ fn analyze_dependents_of_tracks_bare_fqn_new() {
         &parsed.source_map,
     );
 
-    let analyses = session.analyze_dependents_of(service.as_ref());
+    let analyses = session.reanalyze_dependents(service.as_ref());
     let dependent_files: Vec<&str> = analyses.iter().map(|(f, _)| f.as_ref()).collect();
     assert!(
         dependent_files.contains(&consumer.as_ref()),
         "consumer.php references Service via bare FQN but was not returned by \
-         analyze_dependents_of — dependency graph is missing FQN reference edges"
+         reanalyze_dependents — dependency graph is missing FQN reference edges"
     );
 }
 
 #[test]
-fn analyze_dependents_of_tracks_bare_fqn_static_call() {
+fn reanalyze_dependents_tracks_bare_fqn_static_call() {
     use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
@@ -517,12 +517,12 @@ fn analyze_dependents_of_tracks_bare_fqn_static_call() {
         &parsed.source_map,
     );
 
-    let analyses = session.analyze_dependents_of(helper.as_ref());
+    let analyses = session.reanalyze_dependents(helper.as_ref());
     let dependent_files: Vec<&str> = analyses.iter().map(|(f, _)| f.as_ref()).collect();
     assert!(
         dependent_files.contains(&caller.as_ref()),
         "caller.php references Helper via bare FQN static call but was not returned by \
-         analyze_dependents_of — dependency graph is missing FQN reference edges"
+         reanalyze_dependents — dependency graph is missing FQN reference edges"
     );
 }
 
@@ -570,7 +570,7 @@ fn dependency_graph_includes_unused_param_type_hint() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Mutation tests: analyze_dependents_of after definition is removed / renamed.
+// Mutation tests: reanalyze_dependents after definition is removed / renamed.
 //
 // The correctness gap: when class Foo is deleted from A.php, files referencing
 // \Foo were dropped from the dependent set because symbol_defining_file("Foo")
@@ -585,17 +585,17 @@ fn analyze_file(session: &AnalysisSession, file: Arc<str>, src: &str) {
     FileAnalyzer::new(session).analyze(file, src, &parsed.program, &parsed.source_map);
 }
 
-/// Return the set of file paths returned by analyze_dependents_of.
+/// Return the set of file paths returned by reanalyze_dependents.
 fn dependent_files(session: &AnalysisSession, file: &str) -> std::collections::HashSet<String> {
     session
-        .analyze_dependents_of(file)
+        .reanalyze_dependents(file)
         .into_iter()
         .map(|(f, _)| f.to_string())
         .collect()
 }
 
 #[test]
-fn analyze_dependents_of_after_definition_deleted() {
+fn reanalyze_dependents_after_definition_deleted() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_essential_stubs();
 
@@ -627,14 +627,14 @@ fn analyze_dependents_of_after_definition_deleted() {
     assert!(
         after.contains(bar.as_ref()),
         "Bar.php references \\Foo which was deleted from Foo.php — \
-         it must still appear in analyze_dependents_of so the broken reference is surfaced; \
+         it must still appear in reanalyze_dependents so the broken reference is surfaced; \
          got {:?}",
         after
     );
 }
 
 #[test]
-fn analyze_dependents_of_after_definition_renamed() {
+fn reanalyze_dependents_after_definition_renamed() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_essential_stubs();
 
@@ -659,13 +659,13 @@ fn analyze_dependents_of_after_definition_renamed() {
     assert!(
         after.contains(bar.as_ref()),
         "Bar.php references \\Foo which was renamed to \\Renamed in Foo.php — \
-         Bar.php must still appear in analyze_dependents_of; got {:?}",
+         Bar.php must still appear in reanalyze_dependents; got {:?}",
         after
     );
 }
 
 #[test]
-fn analyze_dependents_of_after_definition_moved() {
+fn reanalyze_dependents_after_definition_moved() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_essential_stubs();
 
@@ -707,7 +707,7 @@ fn analyze_dependents_of_after_definition_moved() {
 }
 
 #[test]
-fn analyze_dependents_of_after_definition_readded() {
+fn reanalyze_dependents_after_definition_readded() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_essential_stubs();
 
@@ -741,7 +741,7 @@ fn analyze_dependents_of_after_definition_readded() {
 }
 
 #[test]
-fn analyze_dependents_of_transitive_after_delete() {
+fn reanalyze_dependents_transitive_after_delete() {
     // A.php defines Foo. B.php references Foo (direct dependent).
     // C.php structurally depends on B.php (e.g. extends a class from B.php).
     // After Foo is deleted from A.php:
