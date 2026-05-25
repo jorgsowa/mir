@@ -9,7 +9,9 @@ use mir_types::Type;
 
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
-use crate::generic::{build_class_bindings, check_template_bounds, infer_template_bindings};
+use crate::generic::{
+    build_class_bindings, check_template_bounds_with_inheritance, infer_template_bindings,
+};
 use crate::symbol::ReferenceKind;
 
 use super::args::{
@@ -411,7 +413,7 @@ fn resolve_method_return<'a>(
             }
             bindings.extend(method_bindings);
             for (name, inferred, bound) in
-                check_template_bounds(&bindings, &resolved.template_params)
+                check_template_bounds_with_inheritance(ea.db, &bindings, &resolved.template_params)
             {
                 ea.emit(
                     IssueKind::InvalidTemplateParam {
