@@ -16,8 +16,8 @@ class DeepFactory {
 }
 
 $factory = new DeepFactory();
-// All nested conditionals should collapse recursively to Box<object>
 $result = $factory->makeDeep(null, 1, "x");
+/** @mir-check $result is Box<object> */
 $factory->box = $result;
 ===expect===
 UnusedParam@10:30: Parameter $a is never used

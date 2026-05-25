@@ -17,7 +17,7 @@ class NestedFactory {
 
 $factory = new NestedFactory();
 $result = $factory->makeNested(null, 1);
-// Should resolve to Wrapper<string> (inner conditional collapses, then outer)
+/** @mir-check $result is Wrapper<string> */
 $factory->wrapper = $result;
 ===expect===
 UnusedParam@10:32: Parameter $x is never used

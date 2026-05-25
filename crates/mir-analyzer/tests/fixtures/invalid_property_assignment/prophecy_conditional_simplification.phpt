@@ -16,6 +16,7 @@ class TestFactory {
 
 $factory = new TestFactory();
 $container = $factory->makeContainer(null);
+/** @mir-check $container is Container<object> */
 $factory->container = $container;
 ===expect===
 UnusedParam@9:35: Parameter $x is never used

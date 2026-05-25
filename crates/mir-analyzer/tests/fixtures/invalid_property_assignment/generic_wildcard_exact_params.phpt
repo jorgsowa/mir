@@ -1,21 +1,31 @@
 ===description===
-exact matching generic parameters still work
+bare PHP-typed property accepts parameterized values of same class regardless of type param
 ===file===
 <?php
 /** @template T */
 class Container {}
 
-class Config {
-    public Container $stringContainer;
-    public Container $intContainer;
+class ContainerFactory {
+    /** @return Container<string> */
+    public function makeString(): Container { return new Container(); }
+
+    /** @return Container<int> */
+    public function makeInt(): Container { return new Container(); }
 }
 
-$c = new Config();
-$stringContainer = new Container();
-$intContainer = new Container();
+class Config {
+    public Container $prop;
+}
 
-// Both values are bare generics (wildcards), so assign to either property
-$c->stringContainer = $stringContainer;
-$c->intContainer = $intContainer;
-$c->stringContainer = $intContainer;
+$factory = new ContainerFactory();
+$c = new Config();
+
+$s = $factory->makeString();
+$i = $factory->makeInt();
+/** @mir-check $s is Container<string> */
+/** @mir-check $i is Container<int> */
+// Both parameterized values accepted by bare property
+$c->prop = $s;
+$c->prop = $i;
 ===expect===
+

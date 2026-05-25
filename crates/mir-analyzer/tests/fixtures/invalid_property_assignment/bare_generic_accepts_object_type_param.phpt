@@ -15,6 +15,8 @@ class Factory {
 }
 
 $f = new Factory();
-$f->prop = $f->make(null);
+$result = $f->make(null);
+/** @mir-check $result is Container<object> */
+$f->prop = $result;
 ===expect===
 UnusedParam@9:26: Parameter $x is never used

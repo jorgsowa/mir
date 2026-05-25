@@ -1,5 +1,5 @@
 ===description===
-bare generic accepts parameterized form with multiple type params
+bare PHP-typed property accepts parameterized value for class with multiple type params
 ===file===
 <?php
 /**
@@ -8,11 +8,23 @@ bare generic accepts parameterized form with multiple type params
  */
 class Pair {}
 
+class PairFactory {
+    /**
+     * @template K
+     * @template V
+     * @return Pair<K, V>
+     */
+    public function make(): Pair { return new Pair(); }
+}
+
 class Config {
     public Pair $bare;
 }
 
+$factory = new PairFactory();
 $c = new Config();
-$pair = new Pair();
+$pair = $factory->make();
+/** @mir-check $pair is Pair<mixed, mixed> */
 $c->bare = $pair;
 ===expect===
+

@@ -1,16 +1,31 @@
 ===description===
-parameterized property also accepts bare actual (symmetric: bare is wildcard in both directions)
+parameterized value is accepted by same-FQCN bare PHP-typed property (wildcard suppresses param mismatch)
 ===file===
 <?php
 /** @template T */
 class Box {}
 
-class Container {
-    public Box $typed;
+class BoxFactory {
+    /** @return Box<string> */
+    public function makeString(): Box { return new Box(); }
+
+    /** @return Box<int> */
+    public function makeInt(): Box { return new Box(); }
 }
 
+class Container {
+    public Box $box;
+}
+
+$factory = new BoxFactory();
 $c = new Container();
-// Bare Box (wildcard) should be accepted for Box-typed property
-$bare = new Box();
-$c->typed = $bare;
+
+$stringBox = $factory->makeString();
+$intBox = $factory->makeInt();
+/** @mir-check $stringBox is Box<string> */
+/** @mir-check $intBox is Box<int> */
+// Bare property accepts both parameterized values regardless of type param
+$c->box = $stringBox;
+$c->box = $intBox;
 ===expect===
+

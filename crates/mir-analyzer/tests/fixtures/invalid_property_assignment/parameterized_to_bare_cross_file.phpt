@@ -33,7 +33,9 @@ class MyTest extends TestCase {
     public ObjectProphecy $prophecy;
 
     public function setUp(): void {
-        $this->prophecy = $this->prophesize(Foo::class);
+        $prophecy = $this->prophesize(Foo::class);
+        /** @mir-check $prophecy is Prophecy\Prophecy\ObjectProphecy<object> */
+        $this->prophecy = $prophecy;
     }
 }
 ===expect===

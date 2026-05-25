@@ -1,5 +1,6 @@
 ===description===
 partially nested conditionals (inner simplifies, outer branches differ)
+===ignore===
 ===file===
 <?php
 class PartialFactory {
@@ -9,11 +10,9 @@ class PartialFactory {
      */
     public function makePartial($x, $y) {}
 
-    /** @var string */
-    public $stringProp;
+    public string $stringProp;
 
-    /** @var int */
-    public $intProp;
+    public int $intProp;
 }
 
 $factory = new PartialFactory();
@@ -23,6 +22,5 @@ $result = $factory->makePartial(null, 1);
 $factory->stringProp = $result;
 $factory->intProp = $result;
 ===expect===
-InvalidPropertyAssignment@20:1: Property $stringProp expects 'string', cannot assign 'int|string'
-InvalidPropertyAssignment@21:1: Property $intProp expects 'int', cannot assign 'int|string'
-===ignore===
+InvalidPropertyAssignment@19:1: Property $stringProp expects 'string', cannot assign 'int|string'
+InvalidPropertyAssignment@20:1: Property $intProp expects 'int', cannot assign 'int|string'
