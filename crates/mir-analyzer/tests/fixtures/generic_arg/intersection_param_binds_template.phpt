@@ -1,11 +1,11 @@
 ===description===
-intersection parameter type — T extracted from matching part, non-template part ignored
+intersection parameter type — no InvalidArgument when arg satisfies all parts of the intersection
 ===file===
 <?php
-/** @template T */
-class Box {}
-
 interface Taggable {}
+
+/** @template T */
+class Box implements Taggable {}
 
 /**
  * @template T
