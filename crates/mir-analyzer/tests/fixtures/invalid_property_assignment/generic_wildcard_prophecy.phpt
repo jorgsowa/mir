@@ -2,15 +2,15 @@
 bare generic accepts parameterized form with same FQCN
 ===file===
 <?php
+/** @template T */
+class GenericWrapper {}
+
 class Container {
-    /** @var GenericWrapper */
-    public $bare;
+    public GenericWrapper $bare;
 
     /** @var GenericWrapper<string> */
-    public $typed;
+    public GenericWrapper $typed;
 }
-
-class GenericWrapper<T> {}
 
 $c = new Container();
 $wrapper = new GenericWrapper();

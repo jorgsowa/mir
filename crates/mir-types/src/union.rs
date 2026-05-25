@@ -181,17 +181,24 @@ impl Type {
         }
 
         // Simplify trivial conditional types: (X is ? T : T) → T
+        // Recursively simplify branches first so nested trivial conditionals collapse.
         let atomic = if let Atomic::TConditional {
             subject: _,
             if_true,
             if_false,
         } = &atomic
         {
-            if if_true == if_false {
-                // Both branches are identical, so the conditional is meaningless.
-                // Extract all types from the constant branch and add them individually.
-                for t in &if_true.types {
-                    self.add_type(t.clone());
+            let mut simplified_true = Type::empty();
+            for t in &if_true.types {
+                simplified_true.add_type(t.clone());
+            }
+            let mut simplified_false = Type::empty();
+            for t in &if_false.types {
+                simplified_false.add_type(t.clone());
+            }
+            if simplified_true == simplified_false {
+                for t in simplified_true.types {
+                    self.add_type(t);
                 }
                 return;
             }

@@ -2,21 +2,24 @@
 deeply nested conditionals with multiple collapsible levels
 ===file===
 <?php
+/** @template T */
+class Box {}
+
 class DeepFactory {
     /**
      * Three levels deep, all with identical branches
      * @return ($a is null ? ($b is int ? ($c is string ? Box<object> : Box<object>) : Box<object>) : Box<object>)
      */
-    public function makeDeep($a, $b, $c): Box {}
+    public function makeDeep($a, $b, $c): Box { return new Box(); }
 
-    /** @var Box */
-    public $box;
+    public Box $box;
 }
-
-class Box<T> {}
 
 $factory = new DeepFactory();
 // All nested conditionals should collapse recursively to Box<object>
 $result = $factory->makeDeep(null, 1, "x");
 $factory->box = $result;
 ===expect===
+UnusedParam@10:30: Parameter $a is never used
+UnusedParam@10:34: Parameter $b is never used
+UnusedParam@10:38: Parameter $c is never used
