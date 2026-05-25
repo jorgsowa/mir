@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use mir_issues::Issue;
 
-use crate::pass2::Pass2Driver;
+use crate::body_analysis::BodyAnalyzer;
 use crate::PhpVersion;
 
 use super::*;
@@ -76,7 +76,7 @@ pub struct AnalyzeFileInput {
 // S4 Step 3: Lazy inferred-type queries
 //
 // These tracked queries compute inferred return types on-demand during Pass 2.
-// When `Pass2Driver` encounters a function/method call, it reads the inferred
+// When `BodyAnalyzer` encounters a function/method call, it reads the inferred
 // type via these queries instead of from a pre-computed buffer.
 //
 // This enables two key optimizations:
@@ -142,7 +142,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
         use std::str::FromStr as _;
         let php_version =
             PhpVersion::from_str(input.php_version(db).as_ref()).unwrap_or(PhpVersion::LATEST);
-        let driver = Pass2Driver::new(db, php_version);
+        let driver = BodyAnalyzer::new(db, php_version);
         let (issues, _symbols) = driver.analyze_bodies(
             &parsed.program,
             path.clone(),
@@ -166,7 +166,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileIn
         // accumulator: a typical file resolves thousands of expressions and
         // retaining them in the salsa cache balloons memory (~50 KiB/file
         // measured on Laravel). Consumers that need symbols call
-        // `Pass2Driver` directly via `FileAnalyzer`.
+        // `BodyAnalyzer` directly via `FileAnalyzer`.
         for loc in db.take_pending_ref_locs() {
             RefLocAccumulator(loc).accumulate(db);
         }

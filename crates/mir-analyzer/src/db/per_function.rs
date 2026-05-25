@@ -11,7 +11,7 @@
 //! granularity, which is out of scope for this prototype.
 //!
 //! Methods and closures are deferred. The driver method
-//! [`crate::pass2::Pass2Driver::analyze_fn_decl_pure`] is the pure entry point
+//! [`crate::body_analysis::BodyAnalyzer::analyze_fn_decl_pure`] is the pure entry point
 //! that produces the result without mutating caller-owned buffers.
 
 use std::sync::Arc;
@@ -134,7 +134,7 @@ pub fn infer_function(
 
     let decl = find_function_decl(&parsed.program, db, path.as_ref(), fn_fqn.as_ref())?;
 
-    let driver = crate::pass2::Pass2Driver::new(db, php_version);
+    let driver = crate::body_analysis::BodyAnalyzer::new(db, php_version);
     let result = driver.analyze_fn_decl_pure(decl, &path, text.as_ref(), &parsed.source_map);
     Some(Arc::new(result))
 }

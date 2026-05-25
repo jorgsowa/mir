@@ -89,14 +89,14 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
         .collect()
 }
 
-pub(crate) struct Pass2Driver<'a> {
+pub(crate) struct BodyAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     inference_only: bool,
     inferred_types: Arc<Mutex<InferredTypes>>,
 }
 
-impl<'a> Pass2Driver<'a> {
+impl<'a> BodyAnalyzer<'a> {
     pub(crate) fn new(db: &'a dyn MirDatabase, php_version: PhpVersion) -> Self {
         Self {
             db,

@@ -20,8 +20,8 @@ use php_ast::owned::Program;
 use php_rs_parser::source_map::SourceMap;
 use rayon::prelude::*;
 
+use crate::body_analysis::BodyAnalyzer;
 use crate::db::MirDatabase;
-use crate::pass2::Pass2Driver;
 use crate::session::AnalysisSession;
 use crate::symbol::ResolvedSymbol;
 
@@ -77,9 +77,9 @@ impl<'a> FileAnalyzer<'a> {
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());
 
-        let _scope = crate::metrics::Pass2Scope::new();
+        let _scope = crate::metrics::BodyAnalysisScope::new();
         let db = self.session.snapshot_db();
-        let driver = Pass2Driver::new(&db, self.session.php_version());
+        let driver = BodyAnalyzer::new(&db, self.session.php_version());
         let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
         self.session
             .commit_ref_locs_batch(db.take_pending_ref_locs());
@@ -148,7 +148,7 @@ impl<'a> BatchFileAnalyzer<'a> {
         let results: Vec<(Arc<str>, FileAnalysis, Vec<crate::db::RefLoc>)> = files
             .into_par_iter()
             .map_with(db, |db, file| {
-                let driver = Pass2Driver::new(db as &dyn MirDatabase, self.session.php_version());
+                let driver = BodyAnalyzer::new(db as &dyn MirDatabase, self.session.php_version());
                 let (issues, symbols) = driver.analyze_bodies(
                     &file.program,
                     file.file.clone(),

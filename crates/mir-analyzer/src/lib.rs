@@ -1,6 +1,7 @@
 use rustc_hash::FxHashMap;
 
 pub mod batch;
+pub(crate) mod body_analysis;
 #[doc(hidden)]
 pub mod cache;
 pub(crate) mod call;
@@ -19,7 +20,6 @@ pub mod metrics;
 pub(crate) mod narrowing;
 #[doc(hidden)]
 pub mod parser;
-pub(crate) mod pass2;
 pub mod php_version;
 pub mod session;
 pub(crate) mod shared_db;
@@ -47,24 +47,23 @@ pub use stubs::{
 };
 
 // ============================================================================
-// API Unification: ProjectAnalyzer and AnalysisSession
+// Analysis entry points
 // ============================================================================
 //
-// `ProjectAnalyzer` (batch-oriented) and `AnalysisSession` (incremental) are
-// now unified under a single analysis engine. Both share the same Salsa database,
-// definition collection, and Pass 2 type inference logic. The difference is
-// ownership model and parallelization strategy:
+// `AnalysisSession` is the single analysis engine. It supports two usage modes:
 //
-// - `ProjectAnalyzer`: Owns the database and all files; analyzes them in parallel.
-//   Best for CLI, CI, and bulk analysis. Configuration via public fields before
-//   calling `analyze()`.
+// - Batch (CLI, CI, bulk analysis): use `analyze_paths` / `BatchOptions` to
+//   run definition collection and body analysis over many files in parallel.
 //
-// - `AnalysisSession`: Incremental file-by-file analysis; clients ingest files
-//   as they change. Best for LSP servers and watch modes. Configuration via
-//   builder pattern (with_cache, with_psr4, etc.).
+// - Incremental (LSP, watch mode): ingest files as they change; per-file
+//   results come from `FileAnalyzer::analyze`. Builder-style configuration
+//   (`with_cache`, `with_psr4`, …).
 //
-// New code should prefer `AnalysisSession` for flexibility; `ProjectAnalyzer`
-// is maintained for backward compatibility with batch workflows.
+// The two phases of analysis are:
+//   1. Definition collection — discovers classes, functions, constants in a
+//      file and registers them in the salsa database.
+//   2. Body analysis (`BodyAnalyzer`) — walks function/method bodies,
+//      inferring types and emitting issues.
 
 /// A position in source code: 1-based line, 0-based codepoint column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

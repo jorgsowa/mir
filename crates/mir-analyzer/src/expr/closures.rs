@@ -81,7 +81,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.inference_only,
         );
         sa.analyze_stmts(&c.body, &mut closure_ctx);
-        let inferred_return = crate::pass2::merge_return_types(&sa.return_types);
+        let inferred_return = crate::body_analysis::merge_return_types(&sa.return_types);
 
         // If the closure reads an outer-scope variable without capturing it via `use`,
         // mark that variable as read in the outer context to suppress false UnusedParam.

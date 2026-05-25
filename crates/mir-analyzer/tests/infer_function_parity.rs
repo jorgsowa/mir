@@ -1,7 +1,7 @@
 //! Parity check: `infer_function` tracked query must produce the same issue
-//! set and return type as the original per-file `Pass2Driver::analyze_bodies`
+//! set and return type as the original per-file `BodyAnalyzer::analyze_bodies`
 //! pipeline for the same function. Guards against semantic drift in
-//! `Pass2Driver::analyze_fn_decl_pure`.
+//! `BodyAnalyzer::analyze_fn_decl_pure`.
 
 use std::sync::Arc;
 

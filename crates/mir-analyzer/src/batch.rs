@@ -20,11 +20,11 @@ use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use mir_issues::Issue;
 use mir_types::{Atomic, Union};
 
+use crate::body_analysis::BodyAnalyzer;
 use crate::cache::hash_content;
 use crate::db::{
     collect_file_definitions, FileDefinitions, MirDatabase, MirDb, RefLoc, SourceFile,
 };
-use crate::pass2::Pass2Driver;
 use crate::php_version::PhpVersion;
 use crate::session::AnalysisSession;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
@@ -376,7 +376,7 @@ impl AnalysisSession {
                 .par_iter()
                 .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
                 .map_with(db_main, |db, parsed| {
-                    let driver = Pass2Driver::new(&*db as &dyn MirDatabase, php_version);
+                    let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                     let (issues, symbols) = if let Some(cache) = &self.cache {
                         let h = hash_content(parsed.source());
                         if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
@@ -628,7 +628,7 @@ impl AnalysisSession {
                         !files_with_parse_errors.contains(f) && files_to_reanalyze.contains(f)
                     })
                     .map_with(db_full, |db, (file, src)| {
-                        let driver = Pass2Driver::new(&*db as &dyn MirDatabase, php_version);
+                        let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                         let parsed = php_rs_parser::parse(src);
                         let (issues, symbols) = driver.analyze_bodies(
                             &parsed.program,
@@ -714,7 +714,7 @@ impl AnalysisSession {
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
-                let driver = Pass2Driver::new(db_ref, php_version);
+                let driver = BodyAnalyzer::new(db_ref, php_version);
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,
                     file.clone(),
@@ -866,7 +866,7 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     let mut all_symbols = Vec::new();
     let result = php_rs_parser::parse(source);
 
-    let driver = Pass2Driver::new(&db, php_version);
+    let driver = BodyAnalyzer::new(&db, php_version);
     all_issues.extend(driver.analyze_bodies_typed(
         &result.program,
         file.clone(),

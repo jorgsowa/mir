@@ -458,7 +458,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         return InferredFileTypes::empty();
     }
 
-    let driver = crate::pass2::Pass2Driver::new_inference_only(db, php_version);
+    let driver = crate::body_analysis::BodyAnalyzer::new_inference_only(db, php_version);
     driver.analyze_bodies(&parsed.program, path, text.as_ref(), &parsed.source_map);
     let inferred = driver.take_inferred_types();
 

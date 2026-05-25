@@ -29,7 +29,7 @@ pub struct Counters {
     pub file_analyses: AtomicU64,
     /// Number of Pass-2 invocations summed across all analyses. Equals
     /// `file_analyses` if the retry loop never iterated.
-    pub pass2_runs: AtomicU64,
+    pub body_analysis_runs: AtomicU64,
     /// Iterations of the retry loop (`file_analyzer.rs`'s
     /// `MAX_LAZY_LOAD_ITERATIONS` block) that actually executed.
     pub retry_iterations: AtomicU64,
@@ -39,7 +39,7 @@ pub struct Counters {
     /// Lazy loads that resolved to a class (the call returned `Some`).
     pub lazy_loads_resolved: AtomicU64,
     /// Total Pass-2 wall time in microseconds.
-    pub pass2_micros: AtomicU64,
+    pub body_analysis_micros: AtomicU64,
 
     /// `collect_and_ingest_file` calls that hit the on-disk stub cache.
     pub stub_cache_hits: AtomicU64,
@@ -68,11 +68,11 @@ pub struct Counters {
 
 static COUNTERS: Counters = Counters {
     file_analyses: AtomicU64::new(0),
-    pass2_runs: AtomicU64::new(0),
+    body_analysis_runs: AtomicU64::new(0),
     retry_iterations: AtomicU64::new(0),
     lazy_loads_attempted: AtomicU64::new(0),
     lazy_loads_resolved: AtomicU64::new(0),
-    pass2_micros: AtomicU64::new(0),
+    body_analysis_micros: AtomicU64::new(0),
     stub_cache_hits: AtomicU64::new(0),
     stub_cache_misses: AtomicU64::new(0),
     ll_fail_no_resolver: AtomicU64::new(0),
@@ -87,11 +87,11 @@ pub fn record_file_analysis() {
     }
 }
 
-pub fn record_pass2(duration_micros: u64) {
+pub fn record_body_analysis(duration_micros: u64) {
     if enabled() {
-        COUNTERS.pass2_runs.fetch_add(1, Ordering::Relaxed);
+        COUNTERS.body_analysis_runs.fetch_add(1, Ordering::Relaxed);
         COUNTERS
-            .pass2_micros
+            .body_analysis_micros
             .fetch_add(duration_micros, Ordering::Relaxed);
     }
 }
@@ -208,11 +208,11 @@ fn render_samples() -> String {
 }
 
 /// RAII scope guard for measuring Pass-2 wall time. Drop emits the record.
-pub struct Pass2Scope {
+pub struct BodyAnalysisScope {
     start: Option<Instant>,
 }
 
-impl Pass2Scope {
+impl BodyAnalysisScope {
     pub fn new() -> Self {
         Self {
             start: if enabled() {
@@ -224,16 +224,16 @@ impl Pass2Scope {
     }
 }
 
-impl Default for Pass2Scope {
+impl Default for BodyAnalysisScope {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for Pass2Scope {
+impl Drop for BodyAnalysisScope {
     fn drop(&mut self) {
         if let Some(t0) = self.start {
-            record_pass2(t0.elapsed().as_micros() as u64);
+            record_body_analysis(t0.elapsed().as_micros() as u64);
         }
     }
 }
@@ -246,11 +246,11 @@ pub fn dump() -> Option<String> {
         return None;
     }
     let analyses = COUNTERS.file_analyses.load(Ordering::Relaxed);
-    let pass2_runs = COUNTERS.pass2_runs.load(Ordering::Relaxed);
+    let body_analysis_runs = COUNTERS.body_analysis_runs.load(Ordering::Relaxed);
     let retries = COUNTERS.retry_iterations.load(Ordering::Relaxed);
     let attempts = COUNTERS.lazy_loads_attempted.load(Ordering::Relaxed);
     let resolved = COUNTERS.lazy_loads_resolved.load(Ordering::Relaxed);
-    let pass2_micros = COUNTERS.pass2_micros.load(Ordering::Relaxed);
+    let body_analysis_micros = COUNTERS.body_analysis_micros.load(Ordering::Relaxed);
     let cache_hits = COUNTERS.stub_cache_hits.load(Ordering::Relaxed);
     let cache_misses = COUNTERS.stub_cache_misses.load(Ordering::Relaxed);
     let ll_no_resolver = COUNTERS.ll_fail_no_resolver.load(Ordering::Relaxed);
@@ -261,17 +261,19 @@ pub fn dump() -> Option<String> {
     let avg_iterations = if analyses == 0 {
         0.0
     } else {
-        pass2_runs as f64 / analyses as f64
+        body_analysis_runs as f64 / analyses as f64
     };
-    let avg_pass2_us = pass2_micros.checked_div(pass2_runs).unwrap_or(0);
+    let avg_pass2_us = body_analysis_micros
+        .checked_div(body_analysis_runs)
+        .unwrap_or(0);
 
     let samples = render_samples();
     Some(format!(
         "mir metrics:\n  \
          file analyses        : {analyses}\n  \
-         pass-2 runs          : {pass2_runs}  (avg per analysis: {avg_iterations:.3})\n  \
+         pass-2 runs          : {body_analysis_runs}  (avg per analysis: {avg_iterations:.3})\n  \
          retry iterations     : {retries}\n  \
-         pass-2 wall time     : {pass2_micros} us  (avg/run: {avg_pass2_us} us)\n  \
+         pass-2 wall time     : {body_analysis_micros} us  (avg/run: {avg_pass2_us} us)\n  \
          lazy load attempts   : {attempts}  resolved: {resolved}\n  \
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \

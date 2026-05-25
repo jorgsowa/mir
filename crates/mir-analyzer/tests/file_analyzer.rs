@@ -30,7 +30,7 @@ fn parse_and_analyze(source: &str) -> mir_analyzer::FileAnalysis {
 
 /// Trait method bodies must be analyzed. `StatementsAnalyzer` (the layer
 /// some external consumers were forced to use) skips traits; `FileAnalyzer`
-/// goes through `Pass2Driver`, which walks them. Regression guard for the
+/// goes through `BodyAnalyzer`, which walks them. Regression guard for the
 /// hidden-trait-bug class.
 #[test]
 fn file_analyzer_walks_trait_method_bodies() {

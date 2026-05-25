@@ -1,5 +1,5 @@
 //! Quick regression timing — ensures the prototype additions (Issue PartialEq
-//! derive, new dormant tracked query, new pure Pass2Driver method) don't slow
+//! derive, new dormant tracked query, new pure BodyAnalyzer method) don't slow
 //! down the existing analyze_paths hot path.
 //!
 //! Run with:

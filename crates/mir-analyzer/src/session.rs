@@ -7,8 +7,8 @@
 //! (Arc-wrapped registries), so this pattern gives parallel readers without
 //! blocking on concurrent writes for longer than the clone itself.
 //!
-//! See [`crate::file_analyzer::FileAnalyzer`] for the per-file Pass 2 entry
-//! point that operates against a session.
+//! See [`crate::file_analyzer::FileAnalyzer`] for the per-file analysis
+//! entry point that operates against a session.
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::PathBuf;
