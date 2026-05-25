@@ -21,4 +21,3 @@ $val = extract($b);
 /** @mir-check $val is string */
 ===expect===
 UnusedParam@12:18: Parameter $item is never used
-InvalidArgument@17:16: Argument $item of extract() expects 'Box<T>&Taggable', got 'Box<string>'

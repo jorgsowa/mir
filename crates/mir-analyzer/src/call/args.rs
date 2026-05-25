@@ -965,6 +965,9 @@ fn param_contains_template_or_unknown(
             }
             _ => false,
         }),
+        Atomic::TIntersection { parts } => parts
+            .iter()
+            .any(|part| has_template_param(part, &template_names)),
         _ => false,
     })
 }
