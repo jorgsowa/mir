@@ -156,16 +156,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ReferenceKind::ClassReference(fqcn.clone()),
                     ty.clone(),
                 );
-                if !self.inference_only {
-                    let (line, col_start, col_end) = self.span_to_ref_loc(n.class.span);
-                    self.db.record_reference_location(crate::db::RefLoc {
-                        symbol_key: fqcn.clone(),
-                        file: self.file.clone(),
-                        line,
-                        col_start,
-                        col_end,
-                    });
-                }
+                self.record_ref(fqcn.clone(), n.class.span);
                 ty
             }
             _ => {
@@ -322,16 +313,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             cca.class.span,
                         );
                     }
-                    if !self.inference_only {
-                        let (line, col_start, col_end) = self.span_to_ref_loc(cca.class.span);
-                        self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(resolved.as_str()),
-                            file: self.file.clone(),
-                            line,
-                            col_start,
-                            col_end,
-                        });
-                    }
+                    self.record_ref(Arc::from(resolved.as_str()), cca.class.span);
                 }
                 Some(mir_types::Name::from(resolved.as_str()))
             } else {
@@ -404,16 +386,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Type::mixed();
         }
 
-        if !self.inference_only {
-            let (line, col_start, col_end) = self.span_to_ref_loc(cca.class.span);
-            self.db.record_reference_location(crate::db::RefLoc {
-                symbol_key: Arc::from(fqcn.as_str()),
-                file: self.file.clone(),
-                line,
-                col_start,
-                col_end,
-            });
-        }
+        self.record_ref(Arc::from(fqcn.as_str()), cca.class.span);
 
         let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
         if !const_exists && !crate::db::has_unknown_ancestor(self.db, &fqcn) {
@@ -447,16 +420,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     )
                     .map(|(_, p)| p.ty.unwrap_or_else(Type::mixed));
                     if let Some(ty) = prop_found {
-                        if !self.inference_only {
-                            let (line, col_start, col_end) = self.span_to_ref_loc(span);
-                            self.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: Arc::from(format!("{}::{}", fqcn, prop_name)),
-                                file: self.file.clone(),
-                                line,
-                                col_start,
-                                col_end,
-                            });
-                        }
+                        self.record_ref(Arc::from(format!("{}::{}", fqcn, prop_name)), span);
                         return ty;
                     }
                     if !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())

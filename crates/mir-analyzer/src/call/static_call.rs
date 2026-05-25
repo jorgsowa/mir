@@ -104,16 +104,10 @@ impl CallAnalyzer {
         let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower);
 
         if let Some(resolved) = resolved {
-            if !ea.inference_only {
-                let (line, col_start, col_end) = ea.span_to_ref_loc(call.method.span);
-                ea.db.record_reference_location(crate::db::RefLoc {
-                    symbol_key: Arc::from(format!("{}::{}", &fqcn, method_name.to_lowercase())),
-                    file: ea.file.clone(),
-                    line,
-                    col_start,
-                    col_end,
-                });
-            }
+            ea.record_ref(
+                Arc::from(format!("{}::{}", &fqcn, method_name.to_lowercase())),
+                call.method.span,
+            );
             if let Some(msg) = resolved.deprecated.clone() {
                 ea.emit(
                     IssueKind::DeprecatedMethodCall {

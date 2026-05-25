@@ -227,16 +227,7 @@ impl CallAnalyzer {
                     let canonical_fqn: Option<Arc<str>> =
                         crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
                     if let Some(canonical_fqn) = canonical_fqn {
-                        if !ea.inference_only {
-                            let (line, col_start, col_end) = ea.span_to_ref_loc(arg.span);
-                            ea.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: Arc::from(canonical_fqn.as_ref()),
-                                file: ea.file.clone(),
-                                line,
-                                col_start,
-                                col_end,
-                            });
-                        }
+                        ea.record_ref(Arc::from(canonical_fqn.as_ref()), arg.span);
                     }
                 }
             }
@@ -252,16 +243,7 @@ impl CallAnalyzer {
         }
 
         if let Some(resolved) = resolved {
-            if !ea.inference_only {
-                let (line, col_start, col_end) = ea.span_to_ref_loc(call.name.span);
-                ea.db.record_reference_location(crate::db::RefLoc {
-                    symbol_key: resolved.fqn.clone(),
-                    file: ea.file.clone(),
-                    line,
-                    col_start,
-                    col_end,
-                });
-            }
+            ea.record_ref(resolved.fqn.clone(), call.name.span);
             let deprecated = resolved.deprecated;
             let params = resolved.params;
             let template_params = resolved.template_params;

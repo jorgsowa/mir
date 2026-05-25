@@ -339,10 +339,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         })
     }
 
-    pub(crate) fn span_to_ref_loc(&self, span: php_ast::Span) -> (u32, u16, u16) {
+    /// Record a reference location for `symbol_key` at `span`, unless in inference-only mode.
+    pub(crate) fn record_ref(&self, symbol_key: Arc<str>, span: php_ast::Span) {
+        if self.inference_only {
+            return;
+        }
         let (line, col_start) = self.offset_to_line_col(span.start);
         let (_, col_end) = self.offset_to_line_col(span.end);
-        (line, col_start, col_end)
+        self.db.record_reference_location(crate::db::RefLoc {
+            symbol_key,
+            file: self.file.clone(),
+            line,
+            col_start,
+            col_end,
+        });
     }
 
     /// Walk a type hint and emit `UndefinedClass` for any named type not in the codebase.

@@ -58,16 +58,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             b.right.span,
                         );
                     }
-                    if !self.inference_only {
-                        let (line, col_start, col_end) = self.span_to_ref_loc(b.right.span);
-                        self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: fqcn,
-                            file: self.file.clone(),
-                            line,
-                            col_start,
-                            col_end,
-                        });
-                    }
+                    self.record_ref(fqcn, b.right.span);
                 }
             }
             return Type::single(Atomic::TBool);
