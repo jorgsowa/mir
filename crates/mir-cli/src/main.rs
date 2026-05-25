@@ -341,7 +341,7 @@ fn main() {
                     );
                 }
             }
-            session.collect_types_only(&vendor_files);
+            session.collect_definitions(&vendor_files);
         }
 
         let show_progress =
@@ -484,7 +484,7 @@ fn main() {
             .extend(dead_code_issue_kinds().iter().map(|s| (*s).to_string()));
     }
 
-    // Load type stubs first (needed before collect_types_only)
+    // Load type stubs first (needed before collect_definitions)
     session.ensure_all_stubs();
 
     // Collect types from ignore_dirs (vendor) for Pass 1 — no error reporting there.
@@ -498,7 +498,7 @@ fn main() {
                     vendor_files.len()
                 );
             }
-            session.collect_types_only(&vendor_files);
+            session.collect_definitions(&vendor_files);
         }
     }
 

@@ -106,7 +106,7 @@ fn warm_project_analyzer(
 ) -> AnalysisSession {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     analyzer.ensure_all_stubs();
-    analyzer.collect_types_only(vendor_files);
+    analyzer.collect_definitions(vendor_files);
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
     analyzer
 }
@@ -117,7 +117,7 @@ fn warm_project_analyzer(
 
 /// Ingest every project + vendor file into a session so subsequent analyses
 /// see the full codebase. Equivalent in coverage to ProjectAnalyzer's
-/// load_stubs + collect_types_only + analyze.
+/// load_stubs + collect_definitions + analyze.
 ///
 /// Vendor files are registered with HIGH durability (they won't be edited
 /// during the session) so salsa can skip O(N) dep-verification for them on

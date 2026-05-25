@@ -81,7 +81,7 @@ pub struct MirDb {
     /// Set once before any analysis begins; read by `collect_file_definitions`
     /// to filter `@since`/`@removed` stub symbols.
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
-    /// Optional disk-backed Pass-1 cache. Shared with `SharedDb::stub_cache`
+    /// Optional disk-backed definition cache. Shared with `SharedDb::stub_cache`
     /// so `collect_file_definitions` can consult it directly without going
     /// through `collect_and_ingest_file`.
     stub_cache: Arc<parking_lot::RwLock<Option<Arc<crate::stub_cache::StubSliceCache>>>>,
@@ -409,7 +409,7 @@ impl MirDb {
     /// quickly detect whether a subsequent edit changed any declared names.
     ///
     /// **Must be called outside any tracked-query context** (it sets a salsa
-    /// input field).  Typical call sites: end of `collect_types_only`, end of
+    /// input field).  Typical call sites: end of `collect_definitions`, end of
     /// `AnalysisSession::rebuild_workspace_symbol_index`, and after any
     /// `ingest_file` that detects a declaration change.
     pub fn rebuild_workspace_symbol_index(&mut self) {

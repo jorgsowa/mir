@@ -1,7 +1,7 @@
 //! Batch-oriented project analysis on [`AnalysisSession`].
 //!
 //! This module hosts the multi-file orchestration that used to live on the
-//! retired `ProjectAnalyzer`: parallel Pass 1, lazy class loading, dead-code
+//! retired `ProjectAnalyzer`: parallel definition collection, lazy class loading, dead-code
 //! sweep, reverse-dependency index, and the [`AnalysisResult`] return type.
 //! Per-file (LSP) entry points stay on `AnalysisSession` itself in
 //! `session.rs`.
@@ -51,7 +51,7 @@ pub struct BatchOptions {
     /// post-filter so analyzer internals don't need to know which
     /// diagnostics the consumer cares about. Empty by default.
     pub suppressed_issue_kinds: HashSet<String>,
-    /// Called once after each file completes Pass 2 (progress reporting).
+    /// Called once after each file completes body analysis (progress reporting).
     pub on_file_done: Option<Arc<dyn Fn() + Send + Sync>>,
     /// Override the session's configured PHP version for this run. `None`
     /// uses the session's version.
@@ -134,7 +134,7 @@ impl ParsedProjectFile {
 }
 
 impl AnalysisSession {
-    /// Cumulative hit / miss counts on the persistent Pass-1 cache attached
+    /// Cumulative hit / miss counts on the persistent definition cache attached
     /// to this session. `(0, 0)` when no cache is configured.
     #[doc(hidden)]
     pub fn stub_cache_stats(&self) -> (u64, u64) {
@@ -165,7 +165,7 @@ impl AnalysisSession {
 
     /// Load the configured PHP version + built-in stubs + user stubs into
     /// the shared db. Called by [`Self::analyze_paths`] and
-    /// [`Self::collect_types_only`].
+    /// [`Self::collect_definitions`].
     fn load_batch_stubs(&self, php_version: PhpVersion) {
         // Wire the PHP version into the db before any SourceFile inputs are
         // registered — collect_file_definitions reads it for @since/@removed filtering.
@@ -197,11 +197,11 @@ impl AnalysisSession {
         let mut all_issues = Vec::new();
         let _t0 = std::time::Instant::now();
 
-        // ---- Load PHP built-in stubs (before Pass 1 so user code can override)
+        // ---- Load PHP built-in stubs (before definition collection so user code can override)
         self.load_batch_stubs(php_version);
         let _t_stubs = _t0.elapsed();
 
-        // ---- Pass 1: read files in parallel ----------------------------------
+        // ---- Read files in parallel ----------------------------------
         let parsed_files: Vec<ParsedProjectFile> = paths
             .par_iter()
             .filter_map(|path| match std::fs::read_to_string(path) {
@@ -222,7 +222,7 @@ impl AnalysisSession {
             .map(|parsed| (parsed.file.clone(), parsed.source.clone()))
             .collect();
 
-        // ---- Pre-Pass-2 invalidation: evict dependents of changed files ------
+        // ---- Pre-analysis invalidation: evict dependents of changed files ------
         if let Some(cache) = &self.cache {
             let changed: Vec<String> = file_data
                 .par_iter()
@@ -249,7 +249,7 @@ impl AnalysisSession {
         }
         let _t_salsa_reg = _t0.elapsed();
 
-        // ---- Pass 1: definition collection from the already-parsed AST -------
+        // ---- Definition collection from the already-parsed AST -------
         // Returns (FileDefinitions, content_hash, has_hard_parse_errors) so we
         // can prime the parse cache before the pre-warm loop below.
         type Pass1Entry = (FileDefinitions, [u8; 32], bool);
@@ -288,7 +288,7 @@ impl AnalysisSession {
                 (defs, content_hash, has_hard_parse_errors)
             })
             .collect();
-        let _t_pass1 = _t0.elapsed();
+        let _t_collect_defs = _t0.elapsed();
 
         // Prime the in-process parse cache so the pre-warm loop below avoids
         // re-parsing every project file through collect_file_definitions.
@@ -363,15 +363,15 @@ impl AnalysisSession {
             all_issues.extend(class_issues);
         }
 
-        let _t_presweep = _t0.elapsed();
+        let _t_class_checks = _t0.elapsed();
 
         let db_main = {
             let guard = self.shared_db.salsa.read();
             (**guard).clone()
         };
 
-        // ---- Pass 2: analyze function/method bodies in parallel --------------
-        let pass2_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =
+        // ---- Body analysis: function/method bodies in parallel --------------
+        let body_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =
             parsed_files
                 .par_iter()
                 .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
@@ -416,12 +416,12 @@ impl AnalysisSession {
                 })
                 .collect();
 
-        let _t_pass2 = _t0.elapsed();
+        let _t_body_analysis = _t0.elapsed();
 
         // Serial commit: one lock acquisition per map for all files combined.
         let mut all_ref_locs: Vec<RefLoc> = Vec::new();
         let mut all_symbols = Vec::new();
-        for (issues, symbols, ref_locs) in pass2_results {
+        for (issues, symbols, ref_locs) in body_results {
             all_issues.extend(issues);
             all_symbols.extend(symbols);
             all_ref_locs.extend(ref_locs);
@@ -431,7 +431,7 @@ impl AnalysisSession {
             guard.commit_reference_locations_batch(all_ref_locs);
         }
 
-        // ---- Post-Pass-2 lazy loading: FQCNs used without `use` imports ------
+        // ---- Post-analysis lazy loading: FQCNs used without `use` imports ------
         if let Some(psr4) = self.psr4.clone() {
             self.lazy_load_from_body_issues(
                 psr4,
@@ -458,14 +458,14 @@ impl AnalysisSession {
         let _t_total = _t0.elapsed();
         if std::env::var("MIR_TIMING").is_ok() {
             eprintln!(
-                "[timing] stubs={:.0}ms read={:.0}ms salsa_reg={:.0}ms pass1={:.0}ms ingest={:.0}ms presweep={:.0}ms pass2={:.0}ms total={:.0}ms",
+                "[timing] stubs={:.0}ms read={:.0}ms salsa_reg={:.0}ms collect_defs={:.0}ms ingest={:.0}ms class_checks={:.0}ms body_analysis={:.0}ms total={:.0}ms",
                 _t_stubs.as_secs_f64() * 1000.0,
                 (_t_read - _t_stubs).as_secs_f64() * 1000.0,
                 (_t_salsa_reg - _t_read).as_secs_f64() * 1000.0,
-                (_t_pass1 - _t_salsa_reg).as_secs_f64() * 1000.0,
-                (_t_ingest - _t_pass1).as_secs_f64() * 1000.0,
-                (_t_presweep - _t_ingest).as_secs_f64() * 1000.0,
-                (_t_pass2 - _t_presweep).as_secs_f64() * 1000.0,
+                (_t_collect_defs - _t_salsa_reg).as_secs_f64() * 1000.0,
+                (_t_ingest - _t_collect_defs).as_secs_f64() * 1000.0,
+                (_t_class_checks - _t_ingest).as_secs_f64() * 1000.0,
+                (_t_body_analysis - _t_class_checks).as_secs_f64() * 1000.0,
                 _t_total.as_secs_f64() * 1000.0,
             );
         }
@@ -654,7 +654,7 @@ impl AnalysisSession {
         }
     }
 
-    /// Re-analyze a single file (Pass 1 + Pass 2) within the batch context.
+    /// Re-analyze a single file (definition collection + body analysis) within the batch context.
     ///
     /// Mirrors the old `ProjectAnalyzer::re_analyze_file` cache-aware path.
     /// Use [`Self::analyze_dependents_of`] for LSP-style per-file flows that
@@ -741,7 +741,7 @@ impl AnalysisSession {
         AnalysisResult::build(all_issues, HashMap::default(), symbols)
     }
 
-    /// Pass 1 only: collect type definitions from `paths` into the codebase
+    /// Collect type definitions only from `paths` into the codebase
     /// without analyzing method bodies or emitting issues. Used to load
     /// vendor types.
     ///
@@ -749,7 +749,7 @@ impl AnalysisSession {
     /// from previous runs are reused on a content-hash match, eliminating
     /// the parse + definition-collection step. Cache misses run the normal
     /// pipeline and write back so subsequent runs hit.
-    pub fn collect_types_only(&self, paths: &[PathBuf]) {
+    pub fn collect_definitions(&self, paths: &[PathBuf]) {
         let _timing = std::env::var("MIR_TIMING").is_ok();
         let _t0 = std::time::Instant::now();
 
@@ -1195,7 +1195,7 @@ pub struct AnalysisResult {
     pub issues: Vec<Issue>,
     #[doc(hidden)]
     pub type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
-    /// Per-expression resolved symbols from Pass 2, sorted by file path.
+    /// Per-expression resolved symbols from body analysis, sorted by file path.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
     /// Maps each file path to the contiguous range within `symbols` that
     /// belongs to it.

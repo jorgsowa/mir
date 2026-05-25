@@ -58,7 +58,7 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
         "App\\A::greet should be visible after cold run"
     );
 
-    // collect_types_only fires for vendor — for analyze(), the stub cache
+    // collect_definitions fires for vendor — for analyze(), the stub cache
     // is consulted inside SharedDb::collect_and_ingest_file (used by
     // re_analyze_file). The cold run writes through the project Pass 1
     // path that bypasses the cache, so hits are typically 0 here. That's

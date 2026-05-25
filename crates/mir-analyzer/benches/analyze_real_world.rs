@@ -108,7 +108,7 @@ fn split_vendor_project(root: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
 fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[PathBuf]) {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     analyzer.ensure_all_stubs();
-    analyzer.collect_types_only(vendor_files);
+    analyzer.collect_definitions(vendor_files);
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
 }
 
@@ -147,8 +147,8 @@ fn bench_full_analysis(c: &mut Criterion) {
         checkpoint_alloc("after new analyzer");
         analyzer.ensure_all_stubs();
         checkpoint_alloc("after load_stubs");
-        analyzer.collect_types_only(&vendor_files);
-        checkpoint_alloc("after collect_types_only (vendor)");
+        analyzer.collect_definitions(&vendor_files);
+        checkpoint_alloc("after collect_definitions (vendor)");
         let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
         checkpoint_alloc("after analyze (project)");
     }
@@ -175,7 +175,7 @@ fn bench_full_analysis(c: &mut Criterion) {
                 pool.install(|| {
                     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
                     analyzer.ensure_all_stubs();
-                    analyzer.collect_types_only(&vendor_files);
+                    analyzer.collect_definitions(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new())
                 })
             })
@@ -234,7 +234,7 @@ fn bench_reanalysis(c: &mut Criterion) {
             let analyzer =
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
             analyzer.ensure_all_stubs();
-            analyzer.collect_types_only(&vendor_files);
+            analyzer.collect_definitions(&vendor_files);
             let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
         }
         print_alloc_stats("reanalysis/laravel_high_fanout");
@@ -249,7 +249,7 @@ fn bench_reanalysis(c: &mut Criterion) {
             let analyzer =
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
             analyzer.ensure_all_stubs();
-            analyzer.collect_types_only(&vendor_files);
+            analyzer.collect_definitions(&vendor_files);
             let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
         }
         print_alloc_stats("reanalysis/laravel_leaf_file");
@@ -287,7 +287,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
                     analyzer.ensure_all_stubs();
-                    analyzer.collect_types_only(&vendor_files);
+                    analyzer.collect_definitions(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new())
                 },
                 BatchSize::LargeInput,
@@ -308,7 +308,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
                     analyzer.ensure_all_stubs();
-                    analyzer.collect_types_only(&vendor_files);
+                    analyzer.collect_definitions(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new())
                 },
                 BatchSize::LargeInput,
@@ -354,7 +354,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         let mem_analyzer =
             AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
         mem_analyzer.ensure_all_stubs();
-        mem_analyzer.collect_types_only(&vendor_files);
+        mem_analyzer.collect_definitions(&vendor_files);
         reset_alloc_counters();
         let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new());
         print_alloc_stats("reanalysis_project_only/laravel_high_fanout");
@@ -367,7 +367,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         let mem_analyzer =
             AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
         mem_analyzer.ensure_all_stubs();
-        mem_analyzer.collect_types_only(&vendor_files);
+        mem_analyzer.collect_definitions(&vendor_files);
         reset_alloc_counters();
         let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new());
         print_alloc_stats("reanalysis_project_only/laravel_leaf_file");
@@ -403,7 +403,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
                     analyzer.ensure_all_stubs();
-                    analyzer.collect_types_only(&vendor_files);
+                    analyzer.collect_definitions(&vendor_files);
                     analyzer
                 },
                 |analyzer| analyzer.analyze_paths(&project_files, &BatchOptions::new()),
@@ -423,7 +423,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     let analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
                     analyzer.ensure_all_stubs();
-                    analyzer.collect_types_only(&vendor_files);
+                    analyzer.collect_definitions(&vendor_files);
                     analyzer
                 },
                 |analyzer| analyzer.analyze_paths(&project_files, &BatchOptions::new()),
@@ -436,7 +436,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
     group.finish();
 }
 
-/// Vendor type collection: stubs + `collect_types_only` across the real
+/// Vendor type collection: stubs + `collect_definitions` across the real
 /// composer-installed `vendor/` directory, no body analysis. Isolates the cost
 /// of loading third-party type definitions before project analysis.
 ///
@@ -456,7 +456,7 @@ fn bench_vendor_collection(c: &mut Criterion) {
     {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST);
         analyzer.ensure_all_stubs();
-        analyzer.collect_types_only(&vendor_files);
+        analyzer.collect_definitions(&vendor_files);
     }
     print_alloc_stats("vendor_collection/laravel");
 
@@ -469,7 +469,7 @@ fn bench_vendor_collection(c: &mut Criterion) {
         b.iter(|| {
             let analyzer = AnalysisSession::new(PhpVersion::LATEST);
             analyzer.ensure_all_stubs();
-            analyzer.collect_types_only(&vendor_files)
+            analyzer.collect_definitions(&vendor_files)
         });
     });
 
@@ -494,8 +494,8 @@ fn bench_vendor_collection_detailed(_c: &mut Criterion) {
     analyzer.ensure_all_stubs();
     checkpoint_alloc("After load_stubs()");
 
-    analyzer.collect_types_only(&vendor_files);
-    checkpoint_alloc("After collect_types_only() - TOTAL VENDOR ALLOCATION");
+    analyzer.collect_definitions(&vendor_files);
+    checkpoint_alloc("After collect_definitions() - TOTAL VENDOR ALLOCATION");
 
     eprintln!();
 }
@@ -545,8 +545,8 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
     analyzer.ensure_all_stubs();
     checkpoint_alloc("After load_stubs()");
 
-    analyzer.collect_types_only(&vendor_files);
-    checkpoint_alloc("After collect_types_only() - VENDOR COLLECTION");
+    analyzer.collect_definitions(&vendor_files);
+    checkpoint_alloc("After collect_definitions() - VENDOR COLLECTION");
 
     let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
     checkpoint_alloc("After analyze() - FULL ANALYSIS COMPLETE");
@@ -572,8 +572,8 @@ fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
         checkpoint_alloc("After load_stubs()");
 
         // Just loading and parsing files (no ingestion yet)
-        analyzer.collect_types_only(&vendor_files);
-        checkpoint_alloc("After collect_types_only() [parse + ingest complete]");
+        analyzer.collect_definitions(&vendor_files);
+        checkpoint_alloc("After collect_definitions() [parse + ingest complete]");
     }
     eprintln!();
 }
@@ -606,7 +606,7 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         analyzer.ensure_all_stubs();
-        analyzer.collect_types_only(&vendor_files);
+        analyzer.collect_definitions(&vendor_files);
     }
     let cold = cold_start.elapsed();
     let cold_peak = G_PEAK.0.load(Relaxed) as f64 / 1_048_576.0;
@@ -624,7 +624,7 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     let (hits, misses) = {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         analyzer.ensure_all_stubs();
-        analyzer.collect_types_only(&vendor_files);
+        analyzer.collect_definitions(&vendor_files);
         analyzer.stub_cache_stats()
     };
     let warm = warm_start.elapsed();

@@ -1,7 +1,7 @@
-//! Persistent Pass-1 cache: serialized [`StubSlice`] per source file, keyed
+//! Persistent definition cache: serialized [`StubSlice`] per source file, keyed
 //! by file path with the file's content hash as the validity field.
 //!
-//! On a cache hit, `collect_types_only` and the Pass 1 collection inside
+//! On a cache hit, `collect_definitions` and the definition collection inside
 //! `analyze()` deserialize the stored slice and skip the much more expensive
 //! parse + definition-collection work. Vendor analysis on Laravel
 //! (~10 k files) is dominated by parse+collect (≈800 ms) vs. ingest (≈45 ms),
@@ -69,7 +69,7 @@ fn mir_version_hash() -> u64 {
     })
 }
 
-/// Persistent Pass-1 cache. Thread-safe; no in-memory shared state — every
+/// Persistent definition cache. Thread-safe; no in-memory shared state — every
 /// operation goes through the filesystem.
 pub struct StubSliceCache {
     root: PathBuf,
