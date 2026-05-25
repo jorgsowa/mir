@@ -17,7 +17,9 @@ function extract(mixed $item): mixed { return null; }
 /** @var Box<string>&Taggable $b */
 $b = new Box();
 
-// arg type Box<string>&Taggable satisfies both parts of the intersection param — no error
+// arg type Box<string>&Taggable satisfies both parts — no error; T unbound (TIntersection arg)
 $val = extract($b);
+/** @mir-check $val is mixed */
+echo $val;
 ===expect===
 UnusedParam@12:18: Parameter $item is never used
