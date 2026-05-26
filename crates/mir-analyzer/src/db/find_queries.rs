@@ -14,7 +14,8 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::{
-    ClassDef, ConstantDef, EnumDef, FunctionDef, InterfaceDef, MethodDef, PropertyDef, TraitDef,
+    ClassDef, ConstantDef, EnumDef, FnParam, FunctionDef, InterfaceDef, MethodDef, PropertyDef,
+    TraitDef,
 };
 use mir_types::Name;
 
@@ -503,11 +504,11 @@ pub fn find_method_in_class<'db>(
     if let ClassLike::Enum(e) = &class {
         let lower = name.to_ascii_lowercase();
         let is_backed = e.scalar_type.is_some();
-        let synth = |method_name: &str| {
+        let synth = |method_name: &str, params: Arc<[FnParam]>| {
             Arc::new(mir_codebase::storage::MethodDef {
                 fqcn: e.fqcn.clone(),
                 name: Arc::from(method_name),
-                params: Arc::from([].as_ref()),
+                params,
                 return_type: Some(Arc::new(mir_types::Type::mixed())),
                 inferred_return_type: None,
                 visibility: mir_codebase::storage::Visibility::Public,
@@ -527,10 +528,18 @@ pub fn find_method_in_class<'db>(
             })
         };
         if lower == "cases" {
-            return Some(synth("cases"));
+            return Some(synth("cases", Arc::from([].as_ref())));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
-            return Some(synth(name));
+            let value_param = FnParam {
+                name: Name::from("value"),
+                ty: e.scalar_type.as_ref().map(|t| Arc::new(t.clone())),
+                has_default: false,
+                is_variadic: false,
+                is_byref: false,
+                is_optional: false,
+            };
+            return Some(synth(name, Arc::from(vec![value_param])));
         }
     }
     None
