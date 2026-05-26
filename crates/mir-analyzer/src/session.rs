@@ -30,6 +30,7 @@ use crate::php_version::PhpVersion;
 /// Cheap to clone the inner db for parallel reads; writes funnel through
 /// [`Self::ingest_file`], [`Self::invalidate_file`], and the crate-internal
 /// [`Self::with_db_mut`].
+#[derive(Clone)]
 pub struct AnalysisSession {
     /// Shared database management (salsa, file registry, stub tracking).
     pub(crate) db: Arc<AnalyzerDb>,

@@ -1,6 +1,8 @@
 use mir_types::{Atomic, Name, Type};
 use php_ast::owned::{Expr, ExprKind};
 
+use crate::subtype::is_subtype;
+
 pub fn widen_array_with_value(current: &Type, new_value: &Type) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
@@ -203,20 +205,10 @@ pub(crate) fn property_assign_compatible(
     if scalar_types_compatible(value_ty, prop_ty) {
         return true;
     }
+    if is_subtype(db, value_ty, prop_ty) {
+        return true;
+    }
     value_ty.types.iter().all(|a| match a {
-        Atomic::TNamedObject { fqcn: arg_fqcn, .. }
-        | Atomic::TSelf { fqcn: arg_fqcn }
-        | Atomic::TStaticObject { fqcn: arg_fqcn }
-        | Atomic::TParent { fqcn: arg_fqcn } => prop_ty.types.iter().any(|p| match p {
-            Atomic::TNamedObject {
-                fqcn: prop_fqcn, ..
-            } => {
-                arg_fqcn == prop_fqcn
-                    || crate::db::extends_or_implements(db, arg_fqcn.as_ref(), prop_fqcn.as_ref())
-            }
-            Atomic::TObject | Atomic::TMixed => true,
-            _ => false,
-        }),
         Atomic::TTemplateParam { .. } => true,
         Atomic::TClosure { .. } | Atomic::TCallable { .. } => prop_ty.types.iter().any(|p| {
             matches!(p, Atomic::TClosure { .. } | Atomic::TCallable { .. })
