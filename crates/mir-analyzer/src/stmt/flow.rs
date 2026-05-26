@@ -6,6 +6,67 @@ use super::return_type::{
 /// Each method corresponds to one match arm in the parent `analyze_stmt`.
 use super::StatementsAnalyzer;
 
+/// Returns true when `actual` does not satisfy `declared` and an InvalidReturnType
+/// diagnostic should fire.  Combines scalar structural checks (fast path for primitives)
+/// with codebase-aware named-object and array checks.
+fn return_type_is_invalid(
+    actual: &Type,
+    declared: &Type,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
+    // Fast path: scalar actual is already a structural subtype of declared.
+    if actual.is_subtype_structural(declared) {
+        return false;
+    }
+    if declared.is_mixed() || actual.is_mixed() {
+        return false;
+    }
+    if named_object_return_compatible(actual, declared, db, file) {
+        return false;
+    }
+    // Also check without null (handles `null|T` where T implements declared).
+    // Guard: if actual is purely null, remove_null() is empty and would
+    // vacuously return true, incorrectly suppressing the error.
+    if !actual.remove_null().is_empty()
+        && named_object_return_compatible(&actual.remove_null(), declared, db, file)
+    {
+        return false;
+    }
+    if declared_return_has_template(declared, db) || declared_return_has_template(actual, db) {
+        return false;
+    }
+    if return_arrays_compatible(actual, declared, db, file) {
+        return false;
+    }
+    // Scalar coercion suppression: declared is a structural subtype of actual
+    // (declared is more specific — widening is not an error at this level).
+    if declared.is_subtype_structural(actual)
+        || declared.remove_null().is_subtype_structural(actual)
+    {
+        return false;
+    }
+    // Scalar strip suppression: actual without null/false is already compatible.
+    // Guard against empty union (e.g. pure-null type): removing null from `null`
+    // alone gives an empty union which vacuously passes — that would incorrectly
+    // suppress the error.
+    if !actual.remove_null().is_empty() && actual.remove_null().is_subtype_structural(declared) {
+        return false;
+    }
+    if actual.remove_false().is_subtype_structural(declared) {
+        return false;
+    }
+    // Suppress LessSpecificReturnStatement (level 4): actual is a supertype of declared
+    // (not flagged at default error level).
+    if named_object_return_compatible(declared, actual, db, file) {
+        return false;
+    }
+    if named_object_return_compatible(&declared.remove_null(), &actual.remove_null(), db, file) {
+        return false;
+    }
+    true
+}
+
 use mir_issues::{IssueKind, Location};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{Expr, StaticVar};
@@ -46,30 +107,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // with TNull, so handle void separately to avoid false suppression).
                 if !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                     && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
-                        || (!check_ty.is_subtype_structural(declared)
-                        && !declared.is_mixed()
-                        && !check_ty.is_mixed()
-                        && !named_object_return_compatible(&check_ty, declared, self.db, &self.file)
-                        // Also check without null (handles `null|T` where T implements declared).
-                        // Guard: if check_ty is purely null, remove_null() is empty and would
-                        // vacuously return true, incorrectly suppressing the error.
-                        && (check_ty.remove_null().is_empty() || !named_object_return_compatible(&check_ty.remove_null(), declared, self.db, &self.file))
-                        && !declared_return_has_template(declared, self.db)
-                        && !declared_return_has_template(&check_ty, self.db)
-                        && !return_arrays_compatible(&check_ty, declared, self.db, &self.file)
-                        // Skip coercions: declared is more specific than actual
-                        && !declared.is_subtype_structural(&check_ty)
-                        && !declared.remove_null().is_subtype_structural(&check_ty)
-                        // Skip when actual is compatible after removing null/false.
-                        // Guard against empty union (e.g. pure-null type): removing null
-                        // from `null` alone gives an empty union which vacuously passes
-                        // is_subtype_structural — that would incorrectly suppress the error.
-                        && (check_ty.remove_null().is_empty() || !check_ty.remove_null().is_subtype_structural(declared))
-                        && !check_ty.remove_false().is_subtype_structural(declared)
-                        // Suppress LessSpecificReturnStatement (level 4): actual is a
-                        // supertype of declared (not flagged at default error level).
-                        && !named_object_return_compatible(declared, &check_ty, self.db, &self.file)
-                        && !named_object_return_compatible(&declared.remove_null(), &check_ty.remove_null(), self.db, &self.file)))
+                        || return_type_is_invalid(&check_ty, declared, self.db, &self.file))
                 {
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(

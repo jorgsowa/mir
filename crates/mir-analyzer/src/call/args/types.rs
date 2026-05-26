@@ -25,6 +25,20 @@ fn class_template_params(
         .unwrap_or_default()
 }
 
+/// Returns true when `arg` is a structural subtype of `param` for scalar / primitive types.
+/// Named-object cases (class hierarchies) are always handled separately by named_object_subtype
+/// or array_list_compatible; this function is only called when those checks have already
+/// been tried or when we know the types cannot be class instances.
+fn scalar_arg_fits_param(arg: &Type, param: &Type) -> bool {
+    arg.is_subtype_structural(param)
+}
+
+/// Returns true when `param` is structurally less specific than `arg` (a supertype),
+/// meaning the call is a deliberate widening — not an error.
+fn param_accepts_wider_than_arg(param: &Type, arg: &Type) -> bool {
+    param.is_subtype_structural(arg)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_one(
     ea: &mut ExpressionAnalyzer<'_>,
@@ -81,8 +95,8 @@ pub(crate) fn check_one(
         // Strip null too: handles int|null|false → int (alongside PossiblyNullArgument)
         let arg_core = arg_ty.core_type();
         if !arg_core.types.is_empty()
-            && (arg_without_false.is_subtype_structural(param_ty)
-                || arg_core.is_subtype_structural(param_ty)
+            && (scalar_arg_fits_param(&arg_without_false, param_ty)
+                || scalar_arg_fits_param(&arg_core, param_ty)
                 || named_object_subtype(&arg_without_false, param_ty, ea)
                 || named_object_subtype(&arg_core, param_ty, ea))
         {
@@ -114,24 +128,24 @@ pub(crate) fn check_one(
     }
 
     let arg_core = arg_ty.core_type();
-    if !arg_ty.is_subtype_structural(param_ty)
+    if !scalar_arg_fits_param(arg_ty, param_ty)
         && !param_ty.is_mixed()
         && !arg_ty.is_mixed()
         && !named_object_subtype(arg_ty, param_ty, ea)
         && !super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
         && !super::param_contains_template_or_unknown(arg_ty, arg_ty, ea, template_params)
         && !array_list_compatible(arg_ty, param_ty, ea)
-        && !(arg_ty.is_single() && param_ty.is_subtype_structural(arg_ty))
-        && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_structural(arg_ty))
+        && !(arg_ty.is_single() && param_accepts_wider_than_arg(param_ty, arg_ty))
+        && !(arg_ty.is_single() && param_accepts_wider_than_arg(&param_ty.remove_null(), arg_ty))
         && !(arg_ty.is_single()
             && param_ty
                 .types
                 .iter()
-                .any(|p| Type::single(p.clone()).is_subtype_structural(arg_ty)))
-        && !arg_ty.remove_null().is_subtype_structural(param_ty)
+                .any(|p| param_accepts_wider_than_arg(&Type::single(p.clone()), arg_ty)))
+        && !scalar_arg_fits_param(&arg_ty.remove_null(), param_ty)
         && (arg_ty.remove_false().types.is_empty()
-            || !arg_ty.remove_false().is_subtype_structural(param_ty))
-        && (arg_core.types.is_empty() || !arg_core.is_subtype_structural(param_ty))
+            || !scalar_arg_fits_param(&arg_ty.remove_false(), param_ty))
+        && (arg_core.types.is_empty() || !scalar_arg_fits_param(&arg_core, param_ty))
         && !named_object_subtype(&arg_ty.remove_null(), param_ty, ea)
         && (arg_ty.remove_false().types.is_empty()
             || !named_object_subtype(&arg_ty.remove_false(), param_ty, ea))
@@ -515,13 +529,13 @@ fn generic_type_params_compatible(
 
         let compatible = match variance {
             mir_types::Variance::Covariant => {
-                arg_p.is_subtype_structural(param_p)
+                scalar_arg_fits_param(arg_p, param_p)
                     || param_p.is_mixed()
                     || arg_p.is_mixed()
                     || strict_named_object_subtype(arg_p, param_p, ea)
             }
             mir_types::Variance::Contravariant => {
-                param_p.is_subtype_structural(arg_p)
+                scalar_arg_fits_param(param_p, arg_p)
                     || arg_p.is_mixed()
                     || param_p.is_mixed()
                     || strict_named_object_subtype(param_p, arg_p, ea)
@@ -530,8 +544,8 @@ fn generic_type_params_compatible(
                 arg_p == param_p
                     || arg_p.is_mixed()
                     || param_p.is_mixed()
-                    || (arg_p.is_subtype_structural(param_p)
-                        && param_p.is_subtype_structural(arg_p))
+                    || (scalar_arg_fits_param(arg_p, param_p)
+                        && scalar_arg_fits_param(param_p, arg_p))
             }
         };
 
@@ -625,7 +639,7 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                 });
             }
             Atomic::TKeyedArray { .. } => return true,
-            _ => return Type::single(av.clone()).is_subtype_structural(param_ty),
+            _ => return scalar_arg_fits_param(&Type::single(av.clone()), param_ty),
         };
 
         param_ty.types.iter().any(|pv| {

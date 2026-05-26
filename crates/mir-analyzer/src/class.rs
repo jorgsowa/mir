@@ -299,6 +299,24 @@ impl<'a> ClassAnalyzer<'a> {
     // Check: override compatibility
     // -----------------------------------------------------------------------
 
+    /// Returns true if both scalar return types are compatible (covariant).
+    /// Only called when neither side contains named objects or self/static —
+    /// those cases are handled by named_object_return_compatible.
+    fn scalar_return_types_compatible(
+        child_ret: &mir_types::Type,
+        parent_ret: &mir_types::Type,
+    ) -> bool {
+        child_ret.is_subtype_structural(parent_ret)
+    }
+
+    /// Returns true when a child's scalar param type has been illegally narrowed
+    /// relative to the parent (contravariance violation).
+    /// Only called after confirming neither side contains named objects, self/static,
+    /// templates, or mixed — those cases are skipped by the caller.
+    fn scalar_param_type_narrowed(parent_ty: &mir_types::Type, child_ty: &mir_types::Type) -> bool {
+        !parent_ty.is_subtype_structural(child_ty)
+    }
+
     fn check_overrides(
         &self,
         fqcn: &Arc<str>,
@@ -412,7 +430,7 @@ impl<'a> ClassAnalyzer<'a> {
                     } else if involves_named_objects || involves_self_static {
                         true // mixed scalar+object union — skip (G5 gap)
                     } else {
-                        child_ret.is_subtype_structural(parent_ret)
+                        Self::scalar_return_types_compatible(child_ret, parent_ret)
                     };
 
                     if !compatible {
@@ -493,9 +511,7 @@ impl<'a> ClassAnalyzer<'a> {
                     continue;
                 }
 
-                // Contravariance: parent_ty must be subtype of child_ty.
-                // If not, child has narrowed the param type.
-                if !parent_ty.is_subtype_structural(child_ty) {
+                if Self::scalar_param_type_narrowed(parent_ty, child_ty) {
                     issues.push(
                         Issue::new(
                             IssueKind::MethodSignatureMismatch {

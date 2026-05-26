@@ -191,12 +191,16 @@ pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
     }
 }
 
+fn scalar_types_compatible(value_ty: &Type, prop_ty: &Type) -> bool {
+    value_ty.is_subtype_structural(prop_ty)
+}
+
 pub(crate) fn property_assign_compatible(
     value_ty: &Type,
     prop_ty: &Type,
     db: &dyn crate::db::MirDatabase,
 ) -> bool {
-    if value_ty.is_subtype_structural(prop_ty) {
+    if scalar_types_compatible(value_ty, prop_ty) {
         return true;
     }
     value_ty.types.iter().all(|a| match a {

@@ -277,6 +277,13 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
     }
 }
 
+/// Returns true when a scalar (non-object) atom in an array's value type is structurally
+/// compatible with the declared value type.  Only called after the named-object and
+/// class-string branches of the match have already been handled above.
+fn scalar_array_element_compatible(av: &Atomic, dec_val: &Type) -> bool {
+    Type::single(av.clone()).is_subtype_structural(dec_val)
+}
+
 /// Returns true if both actual and declared are array/list types whose value types are
 /// compatible with FQCN resolution (to avoid short-name vs FQCN mismatches in return types).
 pub(super) fn return_arrays_compatible(
@@ -323,7 +330,7 @@ pub(super) fn return_arrays_compatible(
                     Atomic::TNamedObject { fqcn, .. } => fqcn,
                     Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => fqcn,
                     Atomic::TClosure { .. } => return true,
-                    _ => return Type::single(av.clone()).is_subtype_structural(dec_val),
+                    _ => return scalar_array_element_compatible(av, dec_val),
                 };
                 dec_val.types.iter().any(|dv| {
                     let dv_fqcn: &Name = match dv {
