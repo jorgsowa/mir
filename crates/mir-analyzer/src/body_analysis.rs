@@ -13,6 +13,19 @@ use crate::diagnostics::{
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
 
+/// Controls which side-effects the analysis passes perform.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum AnalysisMode {
+    /// Full analysis: emits diagnostics, records reference locations, and
+    /// tracks symbol definitions.
+    Full,
+    /// Inference-only (priming) pass: collects inferred function/method return
+    /// types into the shared store. Skips reference location recording,
+    /// symbol tracking, and top-level diagnostic emission so those locations
+    /// are not double-counted by the subsequent `Full` pass.
+    InferenceOnly,
+}
+
 #[derive(Clone)]
 pub(crate) struct InferredTypes {
     pub(crate) functions: Vec<(Arc<str>, Type)>,
@@ -92,7 +105,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
 pub(crate) struct BodyAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
-    inference_only: bool,
+    mode: AnalysisMode,
     inferred_types: Arc<Mutex<InferredTypes>>,
 }
 
@@ -101,7 +114,7 @@ impl<'a> BodyAnalyzer<'a> {
         Self {
             db,
             php_version,
-            inference_only: false,
+            mode: AnalysisMode::Full,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
@@ -113,7 +126,7 @@ impl<'a> BodyAnalyzer<'a> {
         Self {
             db,
             php_version,
-            inference_only: true,
+            mode: AnalysisMode::InferenceOnly,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
@@ -129,14 +142,14 @@ impl<'a> BodyAnalyzer<'a> {
     }
 
     fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Type) {
-        if self.inference_only {
+        if self.mode == AnalysisMode::InferenceOnly {
             let mut types = self.inferred_types.lock();
             types.functions.push((fqn.clone(), inferred.clone()));
         }
     }
 
     fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Type) {
-        if self.inference_only {
+        if self.mode == AnalysisMode::InferenceOnly {
             let mut types = self.inferred_types.lock();
             types
                 .methods
@@ -161,7 +174,7 @@ impl<'a> BodyAnalyzer<'a> {
             all_issues,
             self.php_version,
         );
-        if !self.inference_only {
+        if self.mode == AnalysisMode::Full {
             for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
@@ -294,7 +307,7 @@ impl<'a> BodyAnalyzer<'a> {
         // Analyze top-level executable statements in global scope. The
         // inference-only sweep only primes function/method return types; top-
         // level diagnostics and references are produced by the main sweep.
-        if !self.inference_only {
+        if self.mode == AnalysisMode::Full {
             use crate::flow_state::FlowState;
             use crate::stmt::StatementsAnalyzer;
             use mir_issues::IssueBuffer;
@@ -309,7 +322,7 @@ impl<'a> BodyAnalyzer<'a> {
                 &mut buf,
                 &mut all_symbols,
                 self.php_version,
-                self.inference_only,
+                self.mode,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -466,7 +479,7 @@ impl<'a> BodyAnalyzer<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
+                self.mode,
             );
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
@@ -586,7 +599,7 @@ impl<'a> BodyAnalyzer<'a> {
             &mut buf,
             all_symbols,
             self.php_version,
-            self.inference_only,
+            self.mode,
         );
         sa.analyze_stmts(&decl.body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -712,7 +725,7 @@ impl<'a> BodyAnalyzer<'a> {
             &mut buf,
             &mut discarded_symbols,
             self.php_version,
-            self.inference_only,
+            self.mode,
         );
         sa.analyze_stmts(&decl.body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -815,7 +828,7 @@ impl<'a> BodyAnalyzer<'a> {
                     &mut buf,
                     all_symbols,
                     self.php_version,
-                    self.inference_only,
+                    self.mode,
                 );
                 let mut default_ctx = FlowState::new();
                 default_ctx.self_fqcn = Some(Arc::from(fqcn));
@@ -861,7 +874,7 @@ impl<'a> BodyAnalyzer<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
+                self.mode,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -958,7 +971,7 @@ impl<'a> BodyAnalyzer<'a> {
             &mut buf,
             all_symbols,
             self.php_version,
-            self.inference_only,
+            self.mode,
         );
         sa.analyze_stmts(&decl.body, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -1067,7 +1080,7 @@ impl<'a> BodyAnalyzer<'a> {
                     &mut buf,
                     all_symbols,
                     self.php_version,
-                    self.inference_only,
+                    self.mode,
                 );
                 let mut default_ctx = FlowState::new();
                 default_ctx.self_fqcn = Some(Arc::from(fqcn));
@@ -1112,7 +1125,7 @@ impl<'a> BodyAnalyzer<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
+                self.mode,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -1319,7 +1332,7 @@ impl<'a> BodyAnalyzer<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
+                self.mode,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
@@ -1404,7 +1417,7 @@ impl<'a> BodyAnalyzer<'a> {
                 &mut buf,
                 all_symbols,
                 self.php_version,
-                self.inference_only,
+                self.mode,
             );
             sa.analyze_stmts(body, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);

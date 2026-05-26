@@ -20,6 +20,7 @@ use php_ast::owned::StmtKind;
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
 use mir_types::{Atomic, Type};
 
+use crate::body_analysis::AnalysisMode;
 use crate::db::MirDatabase;
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -72,7 +73,7 @@ pub struct StatementsAnalyzer<'a> {
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
-    pub inference_only: bool,
+    pub mode: AnalysisMode,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Type>,
     /// Break-context stack: one entry per active loop nesting level.
@@ -90,7 +91,7 @@ impl<'a> StatementsAnalyzer<'a> {
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
         php_version: PhpVersion,
-        inference_only: bool,
+        mode: AnalysisMode,
     ) -> Self {
         Self {
             db,
@@ -100,7 +101,7 @@ impl<'a> StatementsAnalyzer<'a> {
             issues,
             symbols,
             php_version,
-            inference_only,
+            mode,
             return_types: Vec::new(),
             break_ctx_stack: Vec::new(),
         }
@@ -319,7 +320,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.issues,
             self.symbols,
             self.php_version,
-            self.inference_only,
+            self.mode,
         )
     }
 

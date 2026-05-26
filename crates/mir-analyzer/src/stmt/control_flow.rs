@@ -355,7 +355,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut catch_ctx = catch_base.clone();
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
-                if !self.inference_only {
+                if self.mode == crate::body_analysis::AnalysisMode::Full {
                     let raw = parser::name_to_string_owned(catch_ty);
                     let resolved = db::resolve_name(self.db, &self.file, &raw);
                     if !matches!(resolved.as_str(), "self" | "static" | "parent") {

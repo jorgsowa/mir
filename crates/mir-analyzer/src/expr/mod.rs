@@ -6,6 +6,7 @@ use php_ast::owned::ExprKind;
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location, Severity};
 use mir_types::{Atomic, Type};
 
+use crate::body_analysis::AnalysisMode;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
@@ -39,9 +40,7 @@ pub struct ExpressionAnalyzer<'a> {
     pub issues: &'a mut IssueBuffer,
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
-    /// When true, skip all reference-tracking side-effects (used by the
-    /// inference priming pass so reference locations aren't double-counted).
-    pub inference_only: bool,
+    pub mode: AnalysisMode,
     /// When true, suppress UndefinedVariable errors (isset/empty don't error on undefined vars).
     suppress_undefined_errors: bool,
 }
@@ -56,7 +55,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         issues: &'a mut IssueBuffer,
         symbols: &'a mut Vec<ResolvedSymbol>,
         php_version: PhpVersion,
-        inference_only: bool,
+        mode: AnalysisMode,
     ) -> Self {
         Self {
             db,
@@ -66,7 +65,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             issues,
             symbols,
             php_version,
-            inference_only,
+            mode,
             suppress_undefined_errors: false,
         }
     }
@@ -192,7 +191,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.issues,
                     self.symbols,
                     self.php_version,
-                    self.inference_only,
+                    self.mode,
                 );
                 sa.analyze_class_decl_stmt(anon, ctx);
                 Type::single(Atomic::TObject)
@@ -341,7 +340,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// Record a reference location for `symbol_key` at `span`, unless in inference-only mode.
     pub(crate) fn record_ref(&self, symbol_key: Arc<str>, span: php_ast::Span) {
-        if self.inference_only {
+        if self.mode == AnalysisMode::InferenceOnly {
             return;
         }
         let (line, col_start) = self.offset_to_line_col(span.start);
