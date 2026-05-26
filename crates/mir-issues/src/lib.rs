@@ -43,126 +43,134 @@ pub use mir_types::Location;
 #[non_exhaustive]
 pub enum IssueKind {
     // --- Undefined ----------------------------------------------------------
+    /// Emitted by `mir-analyzer/src/expr/variables.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_scope/`.
     InvalidScope {
         /// `true` when inside a class but in a static method; `false` when outside a class.
         in_class: bool,
     },
-    UndefinedVariable {
-        name: String,
-    },
-    UndefinedFunction {
-        name: String,
-    },
-    UndefinedMethod {
-        class: String,
-        method: String,
-    },
-    UndefinedClass {
-        name: String,
-    },
-    UndefinedProperty {
-        class: String,
-        property: String,
-    },
-    UndefinedConstant {
-        name: String,
-    },
-    PossiblyUndefinedVariable {
-        name: String,
-    },
-    UndefinedTrait {
-        name: String,
-    },
-    InvalidStringClass {
-        actual: String,
-    },
+    /// Emitted by `mir-analyzer/src/expr/variables.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_variable/`.
+    UndefinedVariable { name: String },
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_function/`.
+    UndefinedFunction { name: String },
+    /// Emitted by `mir-analyzer/src/call/static_call.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_method/`.
+    UndefinedMethod { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/batch.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_class/`.
+    UndefinedClass { name: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_property/`.
+    UndefinedProperty { class: String, property: String },
+    /// Emitted by `mir-analyzer/src/expr/variables.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_constant/`.
+    UndefinedConstant { name: String },
+    /// Emitted by `mir-analyzer/src/expr/variables.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_undefined_variable/`.
+    PossiblyUndefinedVariable { name: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_trait/`.
+    UndefinedTrait { name: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_string_class/`.
+    InvalidStringClass { actual: String },
 
     // --- Nullability --------------------------------------------------------
-    NullArgument {
-        param: String,
-        fn_name: String,
-    },
-    NullPropertyFetch {
-        property: String,
-    },
-    NullMethodCall {
-        method: String,
-    },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/null_argument/`.
+    NullArgument { param: String, fn_name: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/null_property_fetch/`.
+    NullPropertyFetch { property: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/null_method_call/`.
+    NullMethodCall { method: String },
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/null_array_access/`.
     NullArrayAccess,
-    PossiblyNullArgument {
-        param: String,
-        fn_name: String,
-    },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_null_argument/`.
+    PossiblyNullArgument { param: String, fn_name: String },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_argument/`.
     PossiblyInvalidArgument {
         param: String,
         fn_name: String,
         expected: String,
         actual: String,
     },
-    PossiblyNullPropertyFetch {
-        property: String,
-    },
-    PossiblyNullMethodCall {
-        method: String,
-    },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_null_property_fetch/`.
+    PossiblyNullPropertyFetch { property: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_null_method_call/`.
+    PossiblyNullMethodCall { method: String },
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_null_array_access/`.
     PossiblyNullArrayAccess,
-    NullableReturnStatement {
-        expected: String,
-        actual: String,
-    },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/nullable_return_statement/` (planned).
+    NullableReturnStatement { expected: String, actual: String },
 
     // --- Type mismatches ----------------------------------------------------
-    InvalidReturnType {
-        expected: String,
-        actual: String,
-    },
+    /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_return_type/`.
+    InvalidReturnType { expected: String, actual: String },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/`.
     InvalidArgument {
         param: String,
         fn_name: String,
         expected: String,
         actual: String,
     },
+    /// Emitted by `mir-analyzer/src/call/callable.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/too_few_arguments/`.
     TooFewArguments {
         fn_name: String,
         expected: usize,
         actual: usize,
     },
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/too_many_arguments/`.
     TooManyArguments {
         fn_name: String,
         expected: usize,
         actual: usize,
     },
-    InvalidNamedArgument {
-        fn_name: String,
-        name: String,
-    },
-    InvalidPassByReference {
-        fn_name: String,
-        param: String,
-    },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_named_argument/`.
+    InvalidNamedArgument { fn_name: String, name: String },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_pass_by_reference/`.
+    InvalidPassByReference { fn_name: String, param: String },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_property_assignment/`.
     InvalidPropertyAssignment {
         property: String,
         expected: String,
         actual: String,
     },
-    InvalidCast {
-        from: String,
-        to: String,
-    },
+    /// Emitted by `mir-analyzer/src/expr/casts.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_cast/`.
+    InvalidCast { from: String, to: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/invalid_operand/` (planned).
     InvalidOperand {
         op: String,
         left: String,
         right: String,
     },
-    MismatchingDocblockReturnType {
-        declared: String,
-        inferred: String,
-    },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/` (planned).
+    MismatchingDocblockReturnType { declared: String, inferred: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_param_type/` (planned).
     MismatchingDocblockParamType {
         param: String,
         declared: String,
         inferred: String,
     },
+    /// Emitted by `mir-analyzer/src/stmt/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/type_check_mismatch/`.
     TypeCheckMismatch {
         var: String,
         expected: String,
@@ -170,181 +178,184 @@ pub enum IssueKind {
     },
 
     // --- Array issues -------------------------------------------------------
-    InvalidArrayOffset {
-        expected: String,
-        actual: String,
-    },
-    NonExistentArrayOffset {
-        key: String,
-    },
-    PossiblyInvalidArrayOffset {
-        expected: String,
-        actual: String,
-    },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/invalid_array_offset/` (planned).
+    InvalidArrayOffset { expected: String, actual: String },
+    /// Not yet emitted. No fixtures yet.
+    NonExistentArrayOffset { key: String },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_array_offset/`.
+    PossiblyInvalidArrayOffset { expected: String, actual: String },
 
     // --- Redundancy ---------------------------------------------------------
-    RedundantCondition {
-        ty: String,
-    },
-    RedundantCast {
-        from: String,
-        to: String,
-    },
-    UnnecessaryVarAnnotation {
-        var: String,
-    },
-    TypeDoesNotContainType {
-        left: String,
-        right: String,
-    },
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/redundant_condition/`.
+    RedundantCondition { ty: String },
+    /// Emitted by `mir-analyzer/src/expr/casts.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/redundant_cast/`.
+    RedundantCast { from: String, to: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/unnecessary_var_annotation/` (planned).
+    UnnecessaryVarAnnotation { var: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/type_does_not_contain_type/` (planned).
+    TypeDoesNotContainType { left: String, right: String },
 
     // --- Dead code ----------------------------------------------------------
-    UnusedVariable {
-        name: String,
-    },
-    UnusedParam {
-        name: String,
-    },
+    /// Emitted by `mir-analyzer/src/diagnostics.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_variable/`.
+    UnusedVariable { name: String },
+    /// Emitted by `mir-analyzer/src/diagnostics.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_param/`.
+    UnusedParam { name: String },
+    /// Emitted by `mir-analyzer/src/stmt/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unreachable_code/`.
     UnreachableCode,
-    UnusedMethod {
-        class: String,
-        method: String,
-    },
-    UnusedProperty {
-        class: String,
-        property: String,
-    },
-    UnusedFunction {
-        name: String,
-    },
+    /// Emitted by `mir-analyzer/src/dead_code.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_method/`.
+    UnusedMethod { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/dead_code.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_property/`.
+    UnusedProperty { class: String, property: String },
+    /// Emitted by `mir-analyzer/src/dead_code.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_function/`.
+    UnusedFunction { name: String },
 
     // --- Readonly -----------------------------------------------------------
-    ReadonlyPropertyAssignment {
-        class: String,
-        property: String,
-    },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/readonly_property_assignment/`.
+    ReadonlyPropertyAssignment { class: String, property: String },
 
     // --- Inheritance --------------------------------------------------------
-    UnimplementedAbstractMethod {
-        class: String,
-        method: String,
-    },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unimplemented_abstract_method/`.
+    UnimplementedAbstractMethod { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unimplemented_interface_method/`.
     UnimplementedInterfaceMethod {
         class: String,
         interface: String,
         method: String,
     },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
     MethodSignatureMismatch {
         class: String,
         method: String,
         detail: String,
     },
-    OverriddenMethodAccess {
-        class: String,
-        method: String,
-    },
-    FinalClassExtended {
-        parent: String,
-        child: String,
-    },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/overridden_method_access/`.
+    OverriddenMethodAccess { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/final_class_extended/`.
+    FinalClassExtended { parent: String, child: String },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/final_method_overridden/`.
     FinalMethodOverridden {
         class: String,
         method: String,
         parent: String,
     },
-    AbstractInstantiation {
-        class: String,
-    },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/`.
+    AbstractInstantiation { class: String },
 
     // --- Security (taint) ---------------------------------------------------
-    TaintedInput {
-        sink: String,
-    },
+    /// Not yet emitted (generic taint sink; specific sinks use `TaintedHtml`, `TaintedSql`, `TaintedShell`).
+    /// No fixtures yet.
+    TaintedInput { sink: String },
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_html/`.
     TaintedHtml,
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_sql/`.
     TaintedSql,
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_shell/`.
     TaintedShell,
 
     // --- Generics -----------------------------------------------------------
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_template_param/`.
     InvalidTemplateParam {
         name: String,
         expected_bound: String,
         actual: String,
     },
-    ShadowedTemplateParam {
-        name: String,
-    },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/shadowed_template_param/`.
+    ShadowedTemplateParam { name: String },
 
     // --- Other --------------------------------------------------------------
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_call/`.
     DeprecatedCall {
         name: String,
         message: Option<Arc<str>>,
     },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_method_call/`.
     DeprecatedMethodCall {
         class: String,
         method: String,
         message: Option<Arc<str>>,
     },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_method/`.
     DeprecatedMethod {
         class: String,
         method: String,
         message: Option<Arc<str>>,
     },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_class/`.
     DeprecatedClass {
         name: String,
         message: Option<Arc<str>>,
     },
-    InternalMethod {
-        class: String,
-        method: String,
-    },
-    MissingReturnType {
-        fn_name: String,
-    },
-    MissingParamType {
-        fn_name: String,
-        param: String,
-    },
-    InvalidThrow {
-        ty: String,
-    },
-    MissingThrowsDocblock {
-        class: String,
-    },
-    ImplicitToStringCast {
-        class: String,
-    },
-    ImplicitFloatToIntCast {
-        from: String,
-    },
-    ParseError {
-        message: String,
-    },
-    InvalidDocblock {
-        message: String,
-    },
-    MixedArgument {
-        param: String,
-        fn_name: String,
-    },
-    MixedAssignment {
-        var: String,
-    },
-    MixedMethodCall {
-        method: String,
-    },
-    MixedPropertyFetch {
-        property: String,
-    },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/internal_method/`.
+    InternalMethod { class: String, method: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/missing_return_type/` (planned).
+    MissingReturnType { fn_name: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/missing_param_type/` (planned).
+    MissingParamType { fn_name: String, param: String },
+    /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_throw/`.
+    InvalidThrow { ty: String },
+    /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/missing_throws_docblock/`.
+    MissingThrowsDocblock { class: String },
+    /// Emitted by `mir-analyzer/src/stmt/expressions.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/implicit_to_string_cast/`.
+    ImplicitToStringCast { class: String },
+    /// Emitted by `mir-analyzer/src/call/args.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/implicit_float_to_int_cast/`.
+    ImplicitFloatToIntCast { from: String },
+    /// Emitted by `mir-analyzer/src/parser/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/parse_error/`.
+    ParseError { message: String },
+    /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_docblock/`.
+    InvalidDocblock { message: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mixed_argument/` (planned).
+    MixedArgument { param: String, fn_name: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mixed_assignment/` (planned).
+    MixedAssignment { var: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_method_call/`.
+    MixedMethodCall { method: String },
+    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/` (planned).
+    MixedPropertyFetch { property: String },
+    /// Emitted by `mir-analyzer/src/expr/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
     MixedClone,
-    CircularInheritance {
-        class: String,
-    },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/circular_inheritance/`.
+    CircularInheritance { class: String },
 
     // --- Trait constraints --------------------------------------------------
-    InvalidTraitUse {
-        trait_name: String,
-        reason: String,
-    },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_trait_use/`.
+    InvalidTraitUse { trait_name: String, reason: String },
 }
 
 fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
