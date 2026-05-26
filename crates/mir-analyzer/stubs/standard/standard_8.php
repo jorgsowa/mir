@@ -591,7 +591,7 @@ function shuffle(array &$array) {}
  * </p>
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
-function array_walk(object|array &$array, callable $callback, mixed $arg) {}
+function array_walk(object|array &$array, callable $callback, mixed $arg = null) {}
 
 /**
  * Apply a user function recursively to every member of an array
@@ -619,7 +619,7 @@ function array_walk(object|array &$array, callable $callback, mixed $arg) {}
  * </p>
  */
 #[LanguageLevelTypeAware(['8.2' => 'true'], default: 'bool')]
-function array_walk_recursive(object|array &$array, callable $callback, mixed $arg) {}
+function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null) {}
 
 /**
  * Counts all elements in an array, or something in an object.
@@ -1103,11 +1103,7 @@ function array_slice(array $array, int $offset, ?int $length = null, bool $prese
  * @meta
  */
 #[Pure]
-function array_merge(
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.3')] $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] $arrays,
-    array ...$arrays
-): array {}
+function array_merge(array ...$arrays): array {}
 
 /**
  * @template TKey

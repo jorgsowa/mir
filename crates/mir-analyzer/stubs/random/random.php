@@ -57,7 +57,7 @@ namespace {
      * @return int A pseudo random value between min
      * (or 0) and max (or getrandmax, inclusive).
      */
-    function rand(int $min, int $max): int {}
+    function rand(int $min = 0, int $max = PHP_INT_MAX): int {}
 
     /**
      * Generate a random value via the Mersenne Twister Random Number Generator
@@ -71,7 +71,7 @@ namespace {
      * @return int A random integer value between min (or 0)
      * and max (or mt_getrandmax, inclusive)
      */
-    function mt_rand(int $min, int $max): int {}
+    function mt_rand(int $min = 0, int $max = PHP_INT_MAX): int {}
 
     /**
      * Show largest possible random value

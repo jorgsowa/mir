@@ -47,11 +47,7 @@ function array_merge_recursive(
  * @return array or null if an error occurs.
  */
 #[Pure]
-function array_replace(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] $replacements,
-    array ...$replacements
-): array {}
+function array_replace(array $array, array ...$replacements): array {}
 
 /**
  * Replaces elements from passed arrays into the first array recursively
@@ -65,11 +61,7 @@ function array_replace(
  * @return array an array, or null if an error occurs.
  */
 #[Pure]
-function array_replace_recursive(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] $replacements,
-    array ...$replacements
-): array {}
+function array_replace_recursive(array $array, array ...$replacements): array {}
 
 /**
  * Return all the keys or a subset of the keys of an array
