@@ -412,7 +412,7 @@ impl<'a> ClassAnalyzer<'a> {
                     } else if involves_named_objects || involves_self_static {
                         true // mixed scalar+object union — skip (G5 gap)
                     } else {
-                        child_ret.is_subtype_of_simple(parent_ret)
+                        child_ret.is_subtype_structural(parent_ret)
                     };
 
                     if !compatible {
@@ -495,7 +495,7 @@ impl<'a> ClassAnalyzer<'a> {
 
                 // Contravariance: parent_ty must be subtype of child_ty.
                 // If not, child has narrowed the param type.
-                if !parent_ty.is_subtype_of_simple(child_ty) {
+                if !parent_ty.is_subtype_structural(child_ty) {
                     issues.push(
                         Issue::new(
                             IssueKind::MethodSignatureMismatch {

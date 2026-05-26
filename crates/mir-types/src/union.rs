@@ -736,10 +736,14 @@ impl Type {
 
     // --- Subtype check -------------------------------------------------------
 
-    /// Returns true if every atomic in `self` is a subtype of some atomic in `other`.
-    /// Does not require a Codebase (no inheritance check); use the codebase-aware
-    /// version in mir-analyzer for full checks.
-    pub fn is_subtype_of_simple(&self, other: &Type) -> bool {
+    /// Returns true if every atomic in `self` is a subtype of some atomic in `other`,
+    /// using **only structural rules** — no `extends` / `implements` walk.
+    ///
+    /// Two distinct user-defined classes are never related here, even when one
+    /// extends the other. Within `mir-analyzer`, when a `db` is in scope,
+    /// prefer `crate::subtype::is_subtype(db, sub, sup)` which layers
+    /// inheritance resolution on top of this check.
+    pub fn is_subtype_structural(&self, other: &Type) -> bool {
         if other.is_mixed() {
             return true;
         }
@@ -928,37 +932,37 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
             // list key is always int
             matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
-                && value.is_subtype_of_simple(av)
+                && value.is_subtype_structural(av)
         }
         (Atomic::TNonEmptyList { value }, Atomic::TList { value: lv }) => {
-            value.is_subtype_of_simple(lv)
+            value.is_subtype_structural(lv)
         }
         // array<int, X> is accepted where list<X> or non-empty-list<X> expected
         (Atomic::TArray { key, value: av }, Atomic::TList { value: lv }) => {
             matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
-                && av.is_subtype_of_simple(lv)
+                && av.is_subtype_structural(lv)
         }
         (Atomic::TArray { key, value: av }, Atomic::TNonEmptyList { value: lv }) => {
             matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
-                && av.is_subtype_of_simple(lv)
+                && av.is_subtype_structural(lv)
         }
         (Atomic::TNonEmptyArray { key, value: av }, Atomic::TList { value: lv }) => {
             matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
-                && av.is_subtype_of_simple(lv)
+                && av.is_subtype_structural(lv)
         }
         (Atomic::TNonEmptyArray { key, value: av }, Atomic::TNonEmptyList { value: lv }) => {
             matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
-                && av.is_subtype_of_simple(lv)
+                && av.is_subtype_structural(lv)
         }
         // TList <: TList value covariance
-        (Atomic::TList { value: v1 }, Atomic::TList { value: v2 }) => v1.is_subtype_of_simple(v2),
+        (Atomic::TList { value: v1 }, Atomic::TList { value: v2 }) => v1.is_subtype_structural(v2),
         (Atomic::TNonEmptyArray { key: k1, value: v1 }, Atomic::TArray { key: k2, value: v2 }) => {
-            k1.is_subtype_of_simple(k2) && v1.is_subtype_of_simple(v2)
+            k1.is_subtype_structural(k2) && v1.is_subtype_structural(v2)
         }
 
         // array<A, B> <: array<C, D>  iff  A <: C && B <: D
         (Atomic::TArray { key: k1, value: v1 }, Atomic::TArray { key: k2, value: v2 }) => {
-            k1.is_subtype_of_simple(k2) && v1.is_subtype_of_simple(v2)
+            k1.is_subtype_structural(k2) && v1.is_subtype_structural(v2)
         }
 
         // A keyed/shape array (array{...} or array{}) is a subtype of any generic array.
@@ -972,7 +976,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 ..
             },
             Atomic::TList { value: lv },
-        ) => *is_list && properties.values().all(|p| p.ty.is_subtype_of_simple(lv)),
+        ) => *is_list && properties.values().all(|p| p.ty.is_subtype_structural(lv)),
         (
             Atomic::TKeyedArray {
                 properties,
@@ -983,7 +987,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         ) => {
             *is_list
                 && !properties.is_empty()
-                && properties.values().all(|p| p.ty.is_subtype_of_simple(lv))
+                && properties.values().all(|p| p.ty.is_subtype_structural(lv))
         }
 
         // A template parameter T acts as a wildcard — any type satisfies it.
@@ -1080,21 +1084,21 @@ mod tests {
     fn subtype_literal_int_under_int() {
         let sub = Type::single(Atomic::TLiteralInt(5));
         let sup = Type::single(Atomic::TInt);
-        assert!(sub.is_subtype_of_simple(&sup));
+        assert!(sub.is_subtype_structural(&sup));
     }
 
     #[test]
     fn subtype_never_is_bottom() {
         let never = Type::never();
         let string = Type::single(Atomic::TString);
-        assert!(never.is_subtype_of_simple(&string));
+        assert!(never.is_subtype_structural(&string));
     }
 
     #[test]
     fn subtype_everything_under_mixed() {
         let string = Type::single(Atomic::TString);
         let mixed = Type::mixed();
-        assert!(string.is_subtype_of_simple(&mixed));
+        assert!(string.is_subtype_structural(&mixed));
     }
 
     #[test]

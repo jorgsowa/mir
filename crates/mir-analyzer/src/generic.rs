@@ -6,6 +6,7 @@ use mir_codebase::storage::{FnParam, TemplateParam};
 use mir_types::{atomic::ArrayKey, union::empty_type_params, Atomic, Name, Type};
 
 use crate::db::MirDatabase;
+use crate::subtype::is_subtype;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -44,32 +45,6 @@ pub fn infer_template_bindings(
     bindings
 }
 
-/// Check that each binding satisfies the template's declared bound.
-/// Returns a list of `(template_name, inferred_type, bound)` for violations.
-///
-/// Deprecated: use check_template_bounds_with_inheritance() instead for
-/// inheritance-aware validation that accepts subclasses.
-#[allow(dead_code)]
-pub fn check_template_bounds<'a>(
-    bindings: &'a FxHashMap<Name, Type>,
-    template_params: &'a [TemplateParam],
-) -> Vec<(&'a Name, &'a Type, &'a Type)> {
-    let mut violations = Vec::new();
-    for tp in template_params {
-        if let Some(bound) = &tp.bound {
-            if let Some(inferred) = bindings.get(&tp.name) {
-                if !bound.is_mixed()
-                    && !inferred.is_mixed()
-                    && !inferred.is_subtype_of_simple(bound)
-                {
-                    violations.push((&tp.name, inferred, bound));
-                }
-            }
-        }
-    }
-    violations
-}
-
 /// Check that each binding satisfies the template's declared bound, using
 /// the codebase to resolve class inheritance chains. This is inheritance-aware
 /// and will accept subclasses that satisfy their parent's bound.
@@ -89,7 +64,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
                 let resolved_bound = bound.substitute_templates(bindings);
                 if !resolved_bound.is_mixed()
                     && !inferred.is_mixed()
-                    && !is_subtype_with_inheritance(db, inferred, &resolved_bound)
+                    && !is_subtype(db, inferred, &resolved_bound)
                 {
                     violations.push((&tp.name, inferred, bound));
                 }
@@ -97,53 +72,6 @@ pub fn check_template_bounds_with_inheritance<'a>(
         }
     }
     violations
-}
-
-/// Check if `sub` is a subtype of `sup`, resolving class inheritance chains
-/// via the codebase. Falls back to `is_subtype_of_simple` for non-class
-/// comparisons.
-fn is_subtype_with_inheritance(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
-    // Try simple comparison first (handles scalars, exact matches, etc)
-    if sub.is_subtype_of_simple(sup) {
-        return true;
-    }
-
-    // If simple check failed, try inheritance for class hierarchies
-    if sup.is_mixed() {
-        return true;
-    }
-    if sub.is_never() {
-        return true;
-    }
-
-    // Check each atomic in sub against each atomic in sup
-    sub.types.iter().all(|a| {
-        sup.types.iter().any(|b| match (a, b) {
-            (
-                Atomic::TNamedObject { fqcn: sub_fqcn, .. },
-                Atomic::TNamedObject { fqcn: sup_fqcn, .. },
-            ) => {
-                // Check if sub_fqcn extends/implements sup_fqcn
-                crate::db::extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
-            }
-            (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TIntersection { parts }) => {
-                // sub satisfies intersection bound iff it satisfies every part
-                parts.iter().all(|part| {
-                    part.types.iter().any(|part_atomic| match part_atomic {
-                        Atomic::TNamedObject {
-                            fqcn: part_fqcn, ..
-                        } => crate::db::extends_or_implements(
-                            db,
-                            sub_fqcn.as_ref(),
-                            part_fqcn.as_ref(),
-                        ),
-                        _ => false,
-                    })
-                })
-            }
-            _ => false,
-        })
-    })
 }
 
 /// Build template bindings from a receiver's concrete type params.

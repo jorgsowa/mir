@@ -111,6 +111,7 @@ pub(crate) fn named_object_return_compatible(
                         actual_type_params,
                         declared_type_params,
                         &class_tps,
+                        db,
                     );
                 }
                 return true;
@@ -126,12 +127,13 @@ pub(crate) fn named_object_return_compatible(
 }
 
 /// Check whether generic return type parameters are compatible according to each parameter's
-/// declared variance. Simpler than the arg-checking version — uses only structural subtyping
-/// since we don't have access to ExpressionAnalyzer here.
+/// declared variance. Uses codebase-aware subtyping so user-defined class hierarchies
+/// (e.g. `Box<Cat>` accepted as `Box<Animal>` when `T` is covariant) are recognized.
 fn return_type_params_compatible(
     actual_params: &[Type],
     declared_params: &[Type],
     template_params: &[mir_codebase::storage::TemplateParam],
+    db: &dyn MirDatabase,
 ) -> bool {
     if actual_params.len() != declared_params.len() {
         return true;
@@ -149,12 +151,12 @@ fn return_type_params_compatible(
 
         let compatible = match variance {
             mir_types::Variance::Covariant => {
-                actual_p.is_subtype_of_simple(declared_p)
+                crate::subtype::is_subtype(db, actual_p, declared_p)
                     || declared_p.is_mixed()
                     || actual_p.is_mixed()
             }
             mir_types::Variance::Contravariant => {
-                declared_p.is_subtype_of_simple(actual_p)
+                crate::subtype::is_subtype(db, declared_p, actual_p)
                     || actual_p.is_mixed()
                     || declared_p.is_mixed()
             }
@@ -162,8 +164,8 @@ fn return_type_params_compatible(
                 actual_p == declared_p
                     || actual_p.is_mixed()
                     || declared_p.is_mixed()
-                    || (actual_p.is_subtype_of_simple(declared_p)
-                        && declared_p.is_subtype_of_simple(actual_p))
+                    || (crate::subtype::is_subtype(db, actual_p, declared_p)
+                        && crate::subtype::is_subtype(db, declared_p, actual_p))
             }
         };
 
@@ -321,7 +323,7 @@ pub(super) fn return_arrays_compatible(
                     Atomic::TNamedObject { fqcn, .. } => fqcn,
                     Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => fqcn,
                     Atomic::TClosure { .. } => return true,
-                    _ => return Type::single(av.clone()).is_subtype_of_simple(dec_val),
+                    _ => return Type::single(av.clone()).is_subtype_structural(dec_val),
                 };
                 dec_val.types.iter().any(|dv| {
                     let dv_fqcn: &Name = match dv {

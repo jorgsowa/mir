@@ -405,8 +405,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 // Strip null too: handles int|null|false → int (alongside PossiblyNullArgument)
                 let arg_core = arg_ty.core_type();
                 if !arg_core.types.is_empty()
-                    && (arg_without_false.is_subtype_of_simple(param_ty)
-                        || arg_core.is_subtype_of_simple(param_ty)
+                    && (arg_without_false.is_subtype_structural(param_ty)
+                        || arg_core.is_subtype_structural(param_ty)
                         || named_object_subtype(&arg_without_false, param_ty, ea)
                         || named_object_subtype(&arg_core, param_ty, ea))
                 {
@@ -438,24 +438,24 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
             }
 
             let arg_core = arg_ty.core_type();
-            if !arg_ty.is_subtype_of_simple(param_ty)
+            if !arg_ty.is_subtype_structural(param_ty)
                 && !param_ty.is_mixed()
                 && !arg_ty.is_mixed()
                 && !named_object_subtype(&arg_ty, param_ty, ea)
                 && !param_contains_template_or_unknown(param_ty, &arg_ty, ea, template_params)
                 && !param_contains_template_or_unknown(&arg_ty, &arg_ty, ea, template_params)
                 && !array_list_compatible(&arg_ty, param_ty, ea)
-                && !(arg_ty.is_single() && param_ty.is_subtype_of_simple(&arg_ty))
-                && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_of_simple(&arg_ty))
+                && !(arg_ty.is_single() && param_ty.is_subtype_structural(&arg_ty))
+                && !(arg_ty.is_single() && param_ty.remove_null().is_subtype_structural(&arg_ty))
                 && !(arg_ty.is_single()
                     && param_ty
                         .types
                         .iter()
-                        .any(|p| Type::single(p.clone()).is_subtype_of_simple(&arg_ty)))
-                && !arg_ty.remove_null().is_subtype_of_simple(param_ty)
+                        .any(|p| Type::single(p.clone()).is_subtype_structural(&arg_ty)))
+                && !arg_ty.remove_null().is_subtype_structural(param_ty)
                 && (arg_ty.remove_false().types.is_empty()
-                    || !arg_ty.remove_false().is_subtype_of_simple(param_ty))
-                && (arg_core.types.is_empty() || !arg_core.is_subtype_of_simple(param_ty))
+                    || !arg_ty.remove_false().is_subtype_structural(param_ty))
+                && (arg_core.types.is_empty() || !arg_core.is_subtype_structural(param_ty))
                 && !named_object_subtype(&arg_ty.remove_null(), param_ty, ea)
                 && (arg_ty.remove_false().types.is_empty()
                     || !named_object_subtype(&arg_ty.remove_false(), param_ty, ea))
@@ -841,13 +841,13 @@ fn generic_type_params_compatible(
 
         let compatible = match variance {
             mir_types::Variance::Covariant => {
-                arg_p.is_subtype_of_simple(param_p)
+                arg_p.is_subtype_structural(param_p)
                     || param_p.is_mixed()
                     || arg_p.is_mixed()
                     || strict_named_object_subtype(arg_p, param_p, ea)
             }
             mir_types::Variance::Contravariant => {
-                param_p.is_subtype_of_simple(arg_p)
+                param_p.is_subtype_structural(arg_p)
                     || arg_p.is_mixed()
                     || param_p.is_mixed()
                     || strict_named_object_subtype(param_p, arg_p, ea)
@@ -856,7 +856,8 @@ fn generic_type_params_compatible(
                 arg_p == param_p
                     || arg_p.is_mixed()
                     || param_p.is_mixed()
-                    || (arg_p.is_subtype_of_simple(param_p) && param_p.is_subtype_of_simple(arg_p))
+                    || (arg_p.is_subtype_structural(param_p)
+                        && param_p.is_subtype_structural(arg_p))
             }
         };
 
@@ -1059,7 +1060,7 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                 });
             }
             Atomic::TKeyedArray { .. } => return true,
-            _ => return Type::single(av.clone()).is_subtype_of_simple(param_ty),
+            _ => return Type::single(av.clone()).is_subtype_structural(param_ty),
         };
 
         param_ty.types.iter().any(|pv| {

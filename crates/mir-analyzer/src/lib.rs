@@ -30,6 +30,7 @@ pub(crate) mod stmt;
 pub mod stub_cache;
 #[doc(hidden)]
 pub mod stubs;
+pub(crate) mod subtype;
 pub(crate) mod taint;
 pub(crate) mod type_env;
 

@@ -46,7 +46,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 // with TNull, so handle void separately to avoid false suppression).
                 if !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                     && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
-                        || (!check_ty.is_subtype_of_simple(declared)
+                        || (!check_ty.is_subtype_structural(declared)
                         && !declared.is_mixed()
                         && !check_ty.is_mixed()
                         && !named_object_return_compatible(&check_ty, declared, self.db, &self.file)
@@ -58,14 +58,14 @@ impl<'a> StatementsAnalyzer<'a> {
                         && !declared_return_has_template(&check_ty, self.db)
                         && !return_arrays_compatible(&check_ty, declared, self.db, &self.file)
                         // Skip coercions: declared is more specific than actual
-                        && !declared.is_subtype_of_simple(&check_ty)
-                        && !declared.remove_null().is_subtype_of_simple(&check_ty)
+                        && !declared.is_subtype_structural(&check_ty)
+                        && !declared.remove_null().is_subtype_structural(&check_ty)
                         // Skip when actual is compatible after removing null/false.
                         // Guard against empty union (e.g. pure-null type): removing null
                         // from `null` alone gives an empty union which vacuously passes
-                        // is_subtype_of_simple — that would incorrectly suppress the error.
-                        && (check_ty.remove_null().is_empty() || !check_ty.remove_null().is_subtype_of_simple(declared))
-                        && !check_ty.remove_false().is_subtype_of_simple(declared)
+                        // is_subtype_structural — that would incorrectly suppress the error.
+                        && (check_ty.remove_null().is_empty() || !check_ty.remove_null().is_subtype_structural(declared))
+                        && !check_ty.remove_false().is_subtype_structural(declared)
                         // Suppress LessSpecificReturnStatement (level 4): actual is a
                         // supertype of declared (not flagged at default error level).
                         && !named_object_return_compatible(declared, &check_ty, self.db, &self.file)

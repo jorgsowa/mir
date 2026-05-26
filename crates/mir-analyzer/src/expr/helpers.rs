@@ -196,7 +196,7 @@ pub(crate) fn property_assign_compatible(
     prop_ty: &Type,
     db: &dyn crate::db::MirDatabase,
 ) -> bool {
-    if value_ty.is_subtype_of_simple(prop_ty) {
+    if value_ty.is_subtype_structural(prop_ty) {
         return true;
     }
     value_ty.types.iter().all(|a| match a {
