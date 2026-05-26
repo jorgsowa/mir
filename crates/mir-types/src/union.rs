@@ -183,6 +183,7 @@ impl Type {
         // Simplify trivial conditional types: (X is ? T : T) → T
         // Recursively simplify branches first so nested trivial conditionals collapse.
         let atomic = if let Atomic::TConditional {
+            param_name: _,
             subject: _,
             if_true,
             if_false,
@@ -605,11 +606,13 @@ impl Type {
                     });
                 }
                 Atomic::TConditional {
+                    param_name,
                     subject,
                     if_true,
                     if_false,
                 } => {
                     result.add_type(Atomic::TConditional {
+                        param_name: *param_name,
                         subject: Box::new(subject.substitute_templates(bindings)),
                         if_true: Box::new(if_true.substitute_templates(bindings)),
                         if_false: Box::new(if_false.substitute_templates(bindings)),
@@ -667,6 +670,65 @@ impl Type {
                 _ => {
                     result.add_type(atomic.clone());
                 }
+            }
+        }
+        result
+    }
+
+    /// Resolves `TConditional` atoms whose discriminator is known at the call site.
+    ///
+    /// `lookup(param_name)` returns the call-site argument type for the named parameter,
+    /// or `None` if the argument is not available. Currently only `is null` conditions
+    /// are resolved; other condition types pass through unchanged.
+    pub fn resolve_conditional_returns<F>(self, lookup: F) -> Type
+    where
+        F: Fn(&str) -> Option<Type>,
+    {
+        let mut result = Type::empty();
+        for atomic in self.types {
+            match atomic {
+                Atomic::TConditional {
+                    ref param_name,
+                    ref subject,
+                    ref if_true,
+                    ref if_false,
+                } => {
+                    // Only handle `is null` for now — the dominant case for Prophecy FPs.
+                    let subject_is_null =
+                        subject.types.len() == 1 && matches!(subject.types[0], Atomic::TNull);
+                    let resolved = if subject_is_null {
+                        if let Some(name) = param_name {
+                            if let Some(arg_ty) = lookup(name.as_ref()) {
+                                let has_null =
+                                    arg_ty.types.iter().any(|t| matches!(t, Atomic::TNull));
+                                let only_null = !arg_ty.types.is_empty()
+                                    && arg_ty.types.iter().all(|t| matches!(t, Atomic::TNull));
+                                if only_null {
+                                    Some((**if_true).clone())
+                                } else if !has_null {
+                                    Some((**if_false).clone())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    if let Some(branch) = resolved {
+                        for t in branch.types {
+                            result.add_type(t);
+                        }
+                    } else {
+                        result.add_type(atomic);
+                    }
+                }
+                other => result.add_type(other),
             }
         }
         result
@@ -1309,12 +1371,14 @@ mod tests {
     #[test]
     fn substitute_conditional_all_branches() {
         let ty = Type::single(Atomic::TConditional {
+            param_name: None,
             subject: Box::new(t_param("T")),
             if_true: Box::new(t_param("T")),
             if_false: Box::new(Type::single(Atomic::TInt)),
         });
         let result = ty.substitute_templates(&bindings_t_string());
         let Atomic::TConditional {
+            param_name: _,
             subject,
             if_true,
             if_false,
@@ -1325,6 +1389,66 @@ mod tests {
         assert!(matches!(subject.types[0], Atomic::TString));
         assert!(matches!(if_true.types[0], Atomic::TString));
         assert!(matches!(if_false.types[0], Atomic::TInt));
+    }
+
+    #[test]
+    fn resolve_conditional_is_null_non_null_arg() {
+        let ty = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TNull)),
+            if_true: Box::new(Type::single(Atomic::TInt)),
+            if_false: Box::new(Type::single(Atomic::TString)),
+        });
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TString)) // definitely not null
+            } else {
+                None
+            }
+        });
+        assert!(result.types.len() == 1);
+        assert!(matches!(result.types[0], Atomic::TString));
+    }
+
+    #[test]
+    fn resolve_conditional_is_null_null_arg() {
+        let ty = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TNull)),
+            if_true: Box::new(Type::single(Atomic::TInt)),
+            if_false: Box::new(Type::single(Atomic::TString)),
+        });
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TNull)) // definitely null
+            } else {
+                None
+            }
+        });
+        assert!(result.types.len() == 1);
+        assert!(matches!(result.types[0], Atomic::TInt));
+    }
+
+    #[test]
+    fn resolve_conditional_is_null_nullable_arg_stays_unresolved() {
+        let mut nullable_str = Type::single(Atomic::TString);
+        nullable_str.add_type(Atomic::TNull);
+        let ty = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TNull)),
+            if_true: Box::new(Type::single(Atomic::TInt)),
+            if_false: Box::new(Type::single(Atomic::TString)),
+        });
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(nullable_str.clone())
+            } else {
+                None
+            }
+        });
+        // uncertain — keep as TConditional
+        assert!(result.types.len() == 1);
+        assert!(matches!(result.types[0], Atomic::TConditional { .. }));
     }
 
     #[test]

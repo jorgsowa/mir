@@ -1176,6 +1176,11 @@ fn parse_conditional_type(s: &str) -> Option<Type> {
         return None;
     }
     let is_pos = s.find(" is ")?;
+    let param_raw = s[..is_pos].trim();
+    let param_name = param_raw
+        .strip_prefix('$')
+        .filter(|n| !n.is_empty())
+        .map(mir_types::Name::new);
     let after_is = s[is_pos + 4..].trim();
     let q_pos = find_char_at_depth(after_is, '?')?;
     let subject_str = after_is[..q_pos].trim();
@@ -1184,6 +1189,7 @@ fn parse_conditional_type(s: &str) -> Option<Type> {
     let true_str = rest[..colon_pos].trim();
     let false_str = rest[colon_pos + 1..].trim();
     Some(Type::single(Atomic::TConditional {
+        param_name,
         subject: Box::new(parse_type_string(subject_str)),
         if_true: Box::new(parse_type_string(true_str)),
         if_false: Box::new(parse_type_string(false_str)),

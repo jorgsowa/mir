@@ -446,11 +446,19 @@ fn resolve_method_return<'a>(
             }
         }
 
-        if !bindings.is_empty() {
+        let return_ty = if !bindings.is_empty() {
             ret_raw.substitute_templates(&bindings)
         } else {
             ret_raw
-        }
+        };
+        return_ty.resolve_conditional_returns(|param_name| {
+            resolved
+                .params
+                .iter()
+                .position(|p| p.name.as_ref() == param_name)
+                .and_then(|idx| arg_types.get(idx))
+                .cloned()
+        })
     } else if crate::db::class_exists(ea.db, fqcn) && !crate::db::has_unknown_ancestor(ea.db, fqcn)
     {
         let (is_interface, is_abstract) = crate::db::class_kind(ea.db, fqcn)

@@ -199,8 +199,11 @@ pub enum Atomic {
         /// The entity (class or function FQN) that declared this template
         defining_entity: Name,
     },
-    /// `(T is string ? A : B)` — conditional type
+    /// `($param is TypeName ? A : B)` — conditional type
     TConditional {
+        /// The parameter name being tested (without `$`), e.g. `"classOrInterface"`.
+        /// `None` for conditionals that were not parsed from a `$param is` form.
+        param_name: Option<Name>,
         subject: Box<Type>,
         if_true: Box<Type>,
         if_false: Box<Type>,
@@ -595,11 +598,13 @@ impl Hash for Atomic {
                 defining_entity.hash(state);
             }
             Atomic::TConditional {
+                param_name,
                 subject,
                 if_true,
                 if_false,
             } => {
                 (T::TConditional as u8).hash(state);
+                param_name.hash(state);
                 subject.hash(state);
                 if_true.hash(state);
                 if_false.hash(state);

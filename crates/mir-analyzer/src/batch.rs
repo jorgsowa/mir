@@ -1043,6 +1043,7 @@ fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
             }
         }
         Atomic::TConditional {
+            param_name: _,
             subject,
             if_true,
             if_false,

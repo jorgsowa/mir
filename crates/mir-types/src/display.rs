@@ -141,12 +141,14 @@ impl fmt::Display for Atomic {
 
             Atomic::TTemplateParam { name, .. } => write!(f, "{name}"),
             Atomic::TConditional {
+                param_name,
                 subject,
                 if_true,
                 if_false,
-            } => {
-                write!(f, "({subject} is ? {if_true} : {if_false})")
-            }
+            } => match param_name {
+                Some(name) => write!(f, "(${name} is {subject} ? {if_true} : {if_false})"),
+                None => write!(f, "({subject} is ? {if_true} : {if_false})"),
+            },
 
             Atomic::TInterfaceString => write!(f, "interface-string"),
             Atomic::TEnumString => write!(f, "enum-string"),

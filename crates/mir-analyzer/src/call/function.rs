@@ -342,13 +342,6 @@ impl CallAnalyzer {
                 None
             };
 
-            super::ARG_TYPES_BUF.with(|b| {
-                let mut g = b.borrow_mut();
-                if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {
-                    *g = Some(arg_types);
-                }
-            });
-
             for assertion in resolved
                 .assertions
                 .iter()
@@ -371,6 +364,21 @@ impl CallAnalyzer {
                 Some(bindings) => return_ty_raw.substitute_templates(bindings),
                 None => return_ty_raw,
             };
+
+            let return_ty = return_ty.resolve_conditional_returns(|param_name| {
+                params
+                    .iter()
+                    .position(|p| p.name.as_ref() == param_name)
+                    .and_then(|idx| arg_types.get(idx))
+                    .cloned()
+            });
+
+            super::ARG_TYPES_BUF.with(|b| {
+                let mut g = b.borrow_mut();
+                if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {
+                    *g = Some(arg_types);
+                }
+            });
 
             // Check inter-procedural throws: if callee declares @throws, check if caller covers them.
             // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
