@@ -283,6 +283,9 @@ impl CallAnalyzer {
                 },
             );
 
+            // Validate callbacks for built-in PHP functions with special callback requirements.
+            // These functions invoke callbacks with variable numbers of arguments depending on context.
+            // See callable.rs::calculate_callback_arity for the list of supported functions.
             match resolved_fn_name.as_str() {
                 "array_map" => {
                     super::callable::check_array_map_callback(ea, &arg_types, &arg_spans)

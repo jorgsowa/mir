@@ -112,9 +112,39 @@ pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
     true
 }
 
-/// Validate array_map callback: arity must be 1 (element arg).
-/// Emits InvalidArgument if callback is not valid callable.
-/// Emits TooFewArguments/TooManyArguments if callback arity doesn't match.
+/// Calculate expected callback arity for built-in PHP functions with variable callback requirements.
+///
+/// Some functions invoke their callbacks with different numbers of arguments depending on context:
+/// - array_map(cb, arr1, arr2, ...): callback receives N arguments (N = number of arrays)
+/// - array_filter(arr, cb, flag): callback arity depends on ARRAY_FILTER_USE_* flag
+/// - etc.
+///
+/// TODO(user-defined-variadic-callbacks): Support user-defined functions with variable callback arity.
+/// This would require:
+/// 1. PHP language support for expressing "callback arity = arg count" (dependent types)
+/// 2. PHPDoc/annotation syntax to declare this pattern in user code
+/// 3. Type inference logic to validate user-defined variadic callback functions
+///
+/// For now, only built-in PHP functions are supported.
+pub(crate) fn calculate_callback_arity(
+    fn_name: &str,
+    callback_index: usize,
+    arg_types: &[Type],
+) -> Option<usize> {
+    match fn_name {
+        "array_map" => {
+            if callback_index == 0 && arg_types.len() > 1 {
+                Some(arg_types.len() - 1)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Validate array_map callback: arity must match the number of arrays passed.
+/// array_map(callback, array1, array2, ...) → callback receives one element from each array.
 pub(crate) fn check_array_map_callback(
     ea: &mut ExpressionAnalyzer<'_>,
     arg_types: &[Type],
@@ -141,6 +171,19 @@ pub(crate) fn check_array_map_callback(
         return;
     }
 
+    if let Some(expected_arity) = calculate_callback_arity("array_map", 0, arg_types) {
+        validate_callback_arity(ea, callback_ty, callback_span, expected_arity);
+    }
+}
+
+/// Generic callback arity validation for any function.
+/// Emits TooFewArguments or TooManyArguments if the callback doesn't match expected arity.
+fn validate_callback_arity(
+    ea: &mut ExpressionAnalyzer<'_>,
+    callback_ty: &Type,
+    callback_span: Span,
+    expected_arity: usize,
+) {
     if let Some(params) = extract_callable_params(callback_ty, ea) {
         let required_count = params
             .iter()
@@ -149,24 +192,24 @@ pub(crate) fn check_array_map_callback(
         let has_variadic = params.iter().any(|p| p.is_variadic);
         let max_params = params.len();
 
-        if required_count > 1 {
+        if required_count > expected_arity {
             let fn_name = callback_name_for_diagnostic(callback_ty);
             ea.emit(
                 IssueKind::TooFewArguments {
                     fn_name,
                     expected: required_count,
-                    actual: 1,
+                    actual: expected_arity,
                 },
                 Severity::Error,
                 callback_span,
             );
-        } else if !has_variadic && max_params == 0 {
+        } else if !has_variadic && max_params < expected_arity {
             let fn_name = callback_name_for_diagnostic(callback_ty);
             ea.emit(
                 IssueKind::TooManyArguments {
                     fn_name,
-                    expected: 0,
-                    actual: 1,
+                    expected: max_params,
+                    actual: expected_arity,
                 },
                 Severity::Error,
                 callback_span,
