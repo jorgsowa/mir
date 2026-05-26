@@ -205,104 +205,14 @@ impl<'a> BodyAnalyzer<'a> {
         let mut all_issues = Vec::new();
         let mut all_symbols = Vec::new();
 
-        for stmt in program.stmts.iter() {
-            match &stmt.kind {
-                StmtKind::Function(decl) => {
-                    self.analyze_fn_decl(
-                        decl,
-                        &file,
-                        source,
-                        source_map,
-                        &mut all_issues,
-                        &mut all_symbols,
-                    );
-                }
-                StmtKind::Class(decl) => {
-                    self.analyze_class_decl(
-                        decl,
-                        &file,
-                        source,
-                        source_map,
-                        &mut all_issues,
-                        &mut all_symbols,
-                    );
-                }
-                StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, &file, source, source_map, &mut all_issues);
-                }
-                StmtKind::Interface(decl) => {
-                    self.analyze_interface_decl(decl, &file, source, source_map, &mut all_issues);
-                }
-                StmtKind::Trait(decl) => {
-                    self.analyze_trait_decl(
-                        decl,
-                        &file,
-                        source,
-                        source_map,
-                        &mut all_issues,
-                        &mut all_symbols,
-                    );
-                }
-                StmtKind::Namespace(ns) => {
-                    if let php_ast::owned::NamespaceBody::Braced(stmts) = &ns.body {
-                        for inner in stmts.iter() {
-                            match &inner.kind {
-                                StmtKind::Function(decl) => {
-                                    self.analyze_fn_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                        &mut all_symbols,
-                                    );
-                                }
-                                StmtKind::Class(decl) => {
-                                    self.analyze_class_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                        &mut all_symbols,
-                                    );
-                                }
-                                StmtKind::Enum(decl) => {
-                                    self.analyze_enum_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                    );
-                                }
-                                StmtKind::Interface(decl) => {
-                                    self.analyze_interface_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                    );
-                                }
-                                StmtKind::Trait(decl) => {
-                                    self.analyze_trait_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                        &mut all_symbols,
-                                    );
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
+        self.analyze_top_level_stmts(
+            &program.stmts,
+            &file,
+            source,
+            source_map,
+            &mut all_issues,
+            &mut all_symbols,
+        );
 
         // Analyze top-level executable statements in global scope. The
         // inference-only sweep only primes function/method return types; top-
@@ -358,110 +268,15 @@ impl<'a> BodyAnalyzer<'a> {
     ) -> Vec<Issue> {
         use php_ast::owned::StmtKind;
         let mut all_issues = Vec::new();
-        for stmt in program.stmts.iter() {
-            match &stmt.kind {
-                StmtKind::Function(decl) => {
-                    self.analyze_fn_decl_typed(
-                        decl,
-                        &file,
-                        source,
-                        source_map,
-                        &mut all_issues,
-                        type_envs,
-                        all_symbols,
-                    );
-                }
-                StmtKind::Class(decl) => {
-                    self.analyze_class_decl_typed(
-                        decl,
-                        &file,
-                        source,
-                        source_map,
-                        &mut all_issues,
-                        type_envs,
-                        all_symbols,
-                    );
-                }
-                StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, &file, source, source_map, &mut all_issues);
-                }
-                StmtKind::Interface(decl) => {
-                    self.analyze_interface_decl(decl, &file, source, source_map, &mut all_issues);
-                }
-                StmtKind::Trait(decl) => {
-                    self.analyze_trait_decl_typed(
-                        decl,
-                        &file,
-                        source,
-                        source_map,
-                        &mut all_issues,
-                        type_envs,
-                        all_symbols,
-                    );
-                }
-                StmtKind::Namespace(ns) => {
-                    if let php_ast::owned::NamespaceBody::Braced(stmts) = &ns.body {
-                        for inner in stmts.iter() {
-                            match &inner.kind {
-                                StmtKind::Function(decl) => {
-                                    self.analyze_fn_decl_typed(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                        type_envs,
-                                        all_symbols,
-                                    );
-                                }
-                                StmtKind::Class(decl) => {
-                                    self.analyze_class_decl_typed(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                        type_envs,
-                                        all_symbols,
-                                    );
-                                }
-                                StmtKind::Enum(decl) => {
-                                    self.analyze_enum_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                    );
-                                }
-                                StmtKind::Interface(decl) => {
-                                    self.analyze_interface_decl(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                    );
-                                }
-                                StmtKind::Trait(decl) => {
-                                    self.analyze_trait_decl_typed(
-                                        decl,
-                                        &file,
-                                        source,
-                                        source_map,
-                                        &mut all_issues,
-                                        type_envs,
-                                        all_symbols,
-                                    );
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
+        self.analyze_top_level_stmts_typed(
+            &program.stmts,
+            &file,
+            source,
+            source_map,
+            &mut all_issues,
+            type_envs,
+            all_symbols,
+        );
 
         // Analyze top-level executable statements in global scope.
         {
@@ -501,6 +316,135 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         all_issues
+    }
+
+    fn analyze_top_level_stmts(
+        &self,
+        stmts: &[php_ast::owned::Stmt],
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use php_ast::owned::StmtKind;
+        for stmt in stmts.iter() {
+            match &stmt.kind {
+                StmtKind::Function(decl) => {
+                    self.analyze_fn_decl(decl, file, source, source_map, all_issues, all_symbols);
+                }
+                StmtKind::Class(decl) => {
+                    self.analyze_class_decl(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        all_symbols,
+                    );
+                }
+                StmtKind::Enum(decl) => {
+                    self.analyze_enum_decl(decl, file, source, source_map, all_issues);
+                }
+                StmtKind::Interface(decl) => {
+                    self.analyze_interface_decl(decl, file, source, source_map, all_issues);
+                }
+                StmtKind::Trait(decl) => {
+                    self.analyze_trait_decl(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        all_symbols,
+                    );
+                }
+                StmtKind::Namespace(ns) => {
+                    if let php_ast::owned::NamespaceBody::Braced(inner) = &ns.body {
+                        self.analyze_top_level_stmts(
+                            inner,
+                            file,
+                            source,
+                            source_map,
+                            all_issues,
+                            all_symbols,
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn analyze_top_level_stmts_typed(
+        &self,
+        stmts: &[php_ast::owned::Stmt],
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        type_envs: &mut rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use php_ast::owned::StmtKind;
+        for stmt in stmts.iter() {
+            match &stmt.kind {
+                StmtKind::Function(decl) => {
+                    self.analyze_fn_decl_typed(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
+                }
+                StmtKind::Class(decl) => {
+                    self.analyze_class_decl_typed(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
+                }
+                StmtKind::Enum(decl) => {
+                    self.analyze_enum_decl(decl, file, source, source_map, all_issues);
+                }
+                StmtKind::Interface(decl) => {
+                    self.analyze_interface_decl(decl, file, source, source_map, all_issues);
+                }
+                StmtKind::Trait(decl) => {
+                    self.analyze_trait_decl_typed(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
+                }
+                StmtKind::Namespace(ns) => {
+                    if let php_ast::owned::NamespaceBody::Braced(inner) = &ns.body {
+                        self.analyze_top_level_stmts_typed(
+                            inner,
+                            file,
+                            source,
+                            source_map,
+                            all_issues,
+                            type_envs,
+                            all_symbols,
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
