@@ -83,9 +83,13 @@ pub fn check_template_bounds_with_inheritance<'a>(
     for tp in template_params {
         if let Some(bound) = &tp.bound {
             if let Some(inferred) = bindings.get(&tp.name) {
-                if !bound.is_mixed()
+                // Substitute already-bound template params into the bound before
+                // comparing — handles `@template B of A` where A itself is a
+                // template that was just bound from another argument.
+                let resolved_bound = bound.substitute_templates(bindings);
+                if !resolved_bound.is_mixed()
                     && !inferred.is_mixed()
-                    && !is_subtype_with_inheritance(db, inferred, bound)
+                    && !is_subtype_with_inheritance(db, inferred, &resolved_bound)
                 {
                     violations.push((&tp.name, inferred, bound));
                 }

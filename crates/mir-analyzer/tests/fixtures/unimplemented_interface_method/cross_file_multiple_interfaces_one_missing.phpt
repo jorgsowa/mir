@@ -1,20 +1,20 @@
 ===description===
 cross file multiple interfaces one missing
-===file:Serializable.php===
+===file:Stringable.php===
 <?php
-interface Serializable {
-    public function serialize(): string;
+interface HasLabel {
+    public function getLabel(): string;
 }
-===file:Identifiable.php===
+===file:Countable.php===
 <?php
-interface Identifiable {
-    public function getId(): int;
+interface HasCount {
+    public function getCount(): int;
 }
 ===file:Entity.php===
 <?php
-class Entity implements Serializable, Identifiable {
-    public function serialize(): string { return ""; }
-    # getId() is NOT implemented
+class Entity implements HasLabel, HasCount {
+    public function getLabel(): string { return ""; }
+    # getCount() is NOT implemented
 }
 ===expect===
-Entity.php: UnimplementedInterfaceMethod@2:0: Class Entity must implement Identifiable::getId() from interface
+Entity.php: UnimplementedInterfaceMethod@2:0: Class Entity must implement HasCount::getCount() from interface
