@@ -616,7 +616,8 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                             Atomic::TNamedObject { fqcn, .. } => fqcn,
                             _ => return false,
                         };
-                        let resolved_part = crate::db::resolve_name(ea.db, &ea.file, part_fqcn.as_ref());
+                        let resolved_part =
+                            crate::db::resolve_name(ea.db, &ea.file, part_fqcn.as_ref());
                         crate::db::extends_or_implements(ea.db, arg_fqcn.as_ref(), &resolved_part)
                             || crate::db::extends_or_implements(
                                 ea.db,

@@ -126,16 +126,17 @@ fn is_subtype_with_inheritance(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> 
                 // Check if sub_fqcn extends/implements sup_fqcn
                 crate::db::extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
             }
-            (
-                Atomic::TNamedObject { fqcn: sub_fqcn, .. },
-                Atomic::TIntersection { parts },
-            ) => {
+            (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TIntersection { parts }) => {
                 // sub satisfies intersection bound iff it satisfies every part
                 parts.iter().all(|part| {
                     part.types.iter().any(|part_atomic| match part_atomic {
-                        Atomic::TNamedObject { fqcn: part_fqcn, .. } => {
-                            crate::db::extends_or_implements(db, sub_fqcn.as_ref(), part_fqcn.as_ref())
-                        }
+                        Atomic::TNamedObject {
+                            fqcn: part_fqcn, ..
+                        } => crate::db::extends_or_implements(
+                            db,
+                            sub_fqcn.as_ref(),
+                            part_fqcn.as_ref(),
+                        ),
                         _ => false,
                     })
                 })
