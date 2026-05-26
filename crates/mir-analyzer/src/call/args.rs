@@ -366,6 +366,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
 
             if !param_ty.is_nullable()
                 && !param_ty.is_mixed()
+                && !param_contains_template_or_unknown(param_ty, &arg_ty, ea, template_params)
                 && arg_ty.is_single()
                 && arg_ty.contains(|t| matches!(t, Atomic::TNull))
             {
@@ -377,7 +378,11 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                     Severity::Warning,
                     arg_span,
                 );
-            } else if !param_ty.is_nullable() && !param_ty.is_mixed() && arg_ty.is_nullable() {
+            } else if !param_ty.is_nullable()
+                && !param_ty.is_mixed()
+                && !param_contains_template_or_unknown(param_ty, &arg_ty, ea, template_params)
+                && arg_ty.is_nullable()
+            {
                 ea.emit(
                     IssueKind::PossiblyNullArgument {
                         param: param.name.to_string(),
