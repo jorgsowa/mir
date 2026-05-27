@@ -175,21 +175,42 @@ pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) 
     let Some(class) = crate::db::find_class_like(db, here) else {
         return false;
     };
+
+    // If the ancestor is namespace-qualified but doesn't exist in the symbol table,
+    // fall back to the short name. This recovers global stub classes (DOMNode, etc.)
+    // that were incorrectly namespace-qualified when referenced from namespaced files
+    // without a leading backslash.
+    let short: Option<&str> = if ancestor.contains('\\') {
+        let fqcn = crate::db::Fqcn::from_str(db, ancestor);
+        if crate::db::find_class_like(db, fqcn).is_none() {
+            ancestor.rsplit('\\').next()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let eff = short.unwrap_or(ancestor);
+
+    if child == eff {
+        return true;
+    }
+
     if class.is_enum() {
-        if class.interfaces().iter().any(|i| i.as_ref() == ancestor) {
+        if class.interfaces().iter().any(|i| i.as_ref() == eff) {
             return true;
         }
-        if ancestor == "UnitEnum" || ancestor == "\\UnitEnum" {
+        if eff == "UnitEnum" || eff == "\\UnitEnum" {
             return true;
         }
-        if (ancestor == "BackedEnum" || ancestor == "\\BackedEnum") && class.is_backed_enum() {
+        if (eff == "BackedEnum" || eff == "\\BackedEnum") && class.is_backed_enum() {
             return true;
         }
         return false;
     }
     crate::db::class_ancestors_by_fqcn(db, here)
         .iter()
-        .any(|p| p.as_ref() == ancestor)
+        .any(|p| p.as_ref() == eff)
 }
 
 // parse_file tracked query (S0 — owned parse, salsa-memoized)
