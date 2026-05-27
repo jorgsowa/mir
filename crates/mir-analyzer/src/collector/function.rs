@@ -38,7 +38,7 @@ impl DefinitionCollector<'_> {
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
-                bound: bound.clone(),
+                bound: self.resolve_union_opt(bound.clone()),
                 defining_entity: fqn.as_str().into(),
                 variance: *variance,
             })

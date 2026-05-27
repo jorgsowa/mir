@@ -1,7 +1,5 @@
 ===description===
-FP guard: template bound — InvalidTemplateParam for unresolved bare bound is pre-existing, NOT caused by this fix.
-Template bounds (`of Base`) are stored without FQN resolution since before this change; the fix only
-affects return/param type resolution. Documented here as a known pre-existing issue.
+Template bound referencing a same-namespace class is FQN-qualified and no longer produces a spurious bound violation
 ===file:Lib/Container.php===
 <?php
 namespace Lib;
@@ -28,4 +26,3 @@ $child = new Child();
 $result = \Lib\wrap($child);
 /** @mir-check $result is Lib\Child */
 ===expect===
-UseIt.php: InvalidTemplateParam@8:11: Template type 'T' inferred as 'Lib\Child' does not satisfy bound 'Base'
