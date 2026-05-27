@@ -255,6 +255,37 @@ impl Type {
             self.types.retain(|t| !matches!(t, Atomic::TNever));
         }
 
+        // Empty keyed array (array{}) is a subtype of any generic array.
+        // Remove array{} if we already have an array<K, V> with matching structure.
+        if let Atomic::TKeyedArray { properties, .. } = &atomic {
+            if properties.is_empty() {
+                // Check if any existing type is a generic array variant
+                for existing in &self.types {
+                    match existing {
+                        Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. } => {
+                            return; // Don't add empty array, it's subsumed
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        // When adding a generic array, remove any empty keyed arrays since they're subtypes.
+        let is_generic_array = matches!(
+            &atomic,
+            Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. }
+        );
+        if is_generic_array {
+            self.types.retain(|t| {
+                if let Atomic::TKeyedArray { properties, .. } = t {
+                    !properties.is_empty()
+                } else {
+                    true
+                }
+            });
+        }
+
         self.types.push(atomic);
     }
 
