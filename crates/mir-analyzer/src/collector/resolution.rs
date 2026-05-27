@@ -175,6 +175,14 @@ pub(super) fn resolve_atomic_inner(
                 use_aliases,
             )),
         },
+        Atomic::TIntersection { parts } => Atomic::TIntersection {
+            parts: vec_to_type_params(
+                parts
+                    .iter()
+                    .map(|p| resolve_union_inner(p.clone(), full_qualify, namespace, use_aliases))
+                    .collect(),
+            ),
+        },
         other => other,
     }
 }

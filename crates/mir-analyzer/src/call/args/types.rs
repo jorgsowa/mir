@@ -279,6 +279,17 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     .iter()
                     .any(|p| matches!(p, Atomic::TFalse | Atomic::TBool));
             }
+            Atomic::TIntersection { parts } => {
+                // An intersection of named types is an object; check if param accepts
+                // `object` or if any part of the intersection satisfies the param.
+                return param
+                    .types
+                    .iter()
+                    .any(|p| matches!(p, Atomic::TObject | Atomic::TMixed))
+                    || parts
+                        .iter()
+                        .any(|part| named_object_subtype(part, param, ea));
+            }
             _ => return false,
         };
 

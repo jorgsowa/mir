@@ -76,6 +76,12 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     })
                 })
             }
+            // An intersection type is a subtype of C if any of its parts is a subtype of C
+            // (a value satisfying A&B is also an A and also a B).
+            (Atomic::TIntersection { parts }, b) => {
+                let sup_single = Type::single(b.clone());
+                parts.iter().any(|part| is_subtype(db, part, &sup_single))
+            }
             _ => false,
         })
     })

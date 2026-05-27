@@ -386,6 +386,24 @@ impl<'a> DefinitionCollector<'a> {
                         type_params: mir_types::union::empty_type_params(),
                     });
                 }
+                // Intersection bound like `Type&Named`: recurse into each part so every
+                // class name inside is FQN-qualified and template references are converted.
+                mir_types::Atomic::TIntersection { parts } => {
+                    let new_parts: Vec<Type> = parts
+                        .iter()
+                        .map(|p| {
+                            self.resolve_union_doc_with_templates(
+                                p.clone(),
+                                template_names,
+                                defining_entity,
+                                template_params,
+                            )
+                        })
+                        .collect();
+                    result.add_type(mir_types::Atomic::TIntersection {
+                        parts: mir_types::union::vec_to_type_params(new_parts),
+                    });
+                }
                 // Conditional return type: recurse into subject and both branches with the
                 // same template context so class names and template references inside them
                 // are resolved correctly.
