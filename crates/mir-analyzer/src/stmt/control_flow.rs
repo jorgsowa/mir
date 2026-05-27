@@ -142,6 +142,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut entry = ctx.branch();
         narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
 
+        let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true));
         let post = self.analyze_loop_widened(
             &pre,
             entry,
@@ -149,7 +150,8 @@ impl<'a> StatementsAnalyzer<'a> {
                 sa.analyze_stmt(&w.body, iter);
                 sa.expr_analyzer(iter).analyze(&w.condition, iter);
             },
-            false,
+            is_infinite,
+            is_infinite,
         );
         *ctx = post;
     }
@@ -166,6 +168,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 sa.expr_analyzer(iter).analyze(&dw.condition, iter);
             },
             true,
+            false,
         );
         *ctx = post;
     }
@@ -180,6 +183,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.expr_analyzer(&entry).analyze(cond, &mut entry);
         }
 
+        let is_infinite = f.condition.is_empty();
         let post = self.analyze_loop_widened(
             &pre,
             entry,
@@ -192,7 +196,8 @@ impl<'a> StatementsAnalyzer<'a> {
                     sa.expr_analyzer(iter).analyze(cond, iter);
                 }
             },
-            false,
+            is_infinite,
+            is_infinite,
         );
         *ctx = post;
     }
@@ -253,6 +258,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 sa.analyze_stmt(&fe.body, iter);
             },
             loop_guaranteed,
+            false,
         );
         *ctx = post;
     }

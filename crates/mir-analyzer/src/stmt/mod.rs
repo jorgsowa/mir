@@ -419,6 +419,8 @@ impl<'a> StatementsAnalyzer<'a> {
     /// * `body`  — closure that analyses one loop iteration, receives `&mut Self`
     ///   and `&mut FlowState` for the current iteration context
     /// * `loop_guaranteed` — whether the loop is guaranteed to execute at least once
+    /// * `is_infinite` — whether the loop condition is always-true (while(true)/for(;;)),
+    ///   meaning normal loop exit is unreachable and only break paths matter
     ///
     /// Returns the post-loop context that merges:
     ///   - the stable widened context after normal loop exit
@@ -429,6 +431,7 @@ impl<'a> StatementsAnalyzer<'a> {
         entry: FlowState,
         mut body: F,
         loop_guaranteed: bool,
+        is_infinite: bool,
     ) -> FlowState
     where
         F: FnMut(&mut Self, &mut FlowState),
@@ -462,6 +465,14 @@ impl<'a> StatementsAnalyzer<'a> {
             std::sync::Arc::make_mut(&mut current.vars),
             loop_guaranteed,
         );
+
+        // For infinite loops (while(true)/for(;;)) the normal-exit path is unreachable;
+        // only break statements can leave the loop. Marking current as diverging causes
+        // merge_branches below to use the break context directly, so variables assigned
+        // before every break are treated as definitely-assigned after the loop.
+        if is_infinite {
+            current.diverges = true;
+        }
 
         // Pop break contexts and merge them into the post-loop result
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
