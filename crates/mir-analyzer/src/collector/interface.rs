@@ -32,12 +32,24 @@ impl<'a> DefinitionCollector<'a> {
             return ControlFlow::Continue(());
         }
 
+        let iface_template_names: std::collections::HashSet<String> = iface_doc
+            .templates
+            .iter()
+            .map(|(n, _, _)| n.to_string())
+            .collect();
         let template_params: Vec<TemplateParam> = iface_doc
             .templates
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
-                bound: self.resolve_union_opt(bound.clone()),
+                bound: bound.clone().map(|b| {
+                    self.resolve_union_doc_with_templates(
+                        b,
+                        &iface_template_names,
+                        fqcn.as_str(),
+                        &[],
+                    )
+                }),
                 defining_entity: fqcn.as_str().into(),
                 variance: *variance,
             })

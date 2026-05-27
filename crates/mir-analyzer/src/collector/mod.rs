@@ -882,23 +882,9 @@ impl<'a> DefinitionCollector<'a> {
             PARAM_WITH_DEFAULT.fetch_add(local_defaults, Relaxed);
         }
 
-        // Extract template params before processing return type so generic return types
-        // like ObjectProphecy<T> can be resolved with template-awareness (FQN-qualifying
-        // the outer class while converting T to TTemplateParam).
-        let template_params: Vec<TemplateParam> = doc
-            .templates
-            .iter()
-            .map(|(name, bound, variance)| TemplateParam {
-                name: name.as_str().into(),
-                bound: self.resolve_union_opt(bound.clone()),
-                defining_entity: class_fqcn.into(),
-                variance: *variance,
-            })
-            .collect();
-
-        // Build combined template name set: method-level templates union class-level templates.
-        // This prevents class-level template params (e.g. TKey on a generic class) from being
-        // treated as bare class names and wrongly namespace-qualified by the TNamedObject branch.
+        // Build combined template name set first so bound resolution below can recognise
+        // template-param names and avoid namespace-qualifying them.
+        // Includes both method-level and class-level template names.
         let template_names: std::collections::HashSet<String> = doc
             .templates
             .iter()
@@ -908,6 +894,30 @@ impl<'a> DefinitionCollector<'a> {
                     .iter()
                     .map(|tp| tp.name.as_ref().to_string()),
             )
+            .collect();
+
+        // Extract template params before processing return type so generic return types
+        // like ObjectProphecy<T> can be resolved with template-awareness (FQN-qualifying
+        // the outer class while converting T to TTemplateParam).
+        // Bounds are resolved with template-awareness so a bound that is itself a template
+        // param (e.g. `@template T of A` where A is another template) is stored as
+        // TTemplateParam rather than being wrongly FQN-qualified.
+        let template_params: Vec<TemplateParam> = doc
+            .templates
+            .iter()
+            .map(|(name, bound, variance)| TemplateParam {
+                name: name.as_str().into(),
+                bound: bound.clone().map(|b| {
+                    self.resolve_union_doc_with_templates(
+                        b,
+                        &template_names,
+                        class_fqcn,
+                        class_template_params,
+                    )
+                }),
+                defining_entity: class_fqcn.into(),
+                variance: *variance,
+            })
             .collect();
 
         // Combined param list for bound lookup: method-level first (they shadow class-level),

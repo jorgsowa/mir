@@ -32,24 +32,28 @@ impl DefinitionCollector<'_> {
             return;
         }
 
-        // Extract template parameters first so they're available during type resolution
-        let template_params = doc
-            .templates
-            .iter()
-            .map(|(name, bound, variance)| TemplateParam {
-                name: name.as_str().into(),
-                bound: self.resolve_union_opt(bound.clone()),
-                defining_entity: fqn.as_str().into(),
-                variance: *variance,
-            })
-            .collect::<Vec<_>>();
-
-        // Build a set of template names for use during param type resolution
+        // Build template names first so bound resolution below can recognise template-param
+        // names and avoid FQN-qualifying them (e.g. `@template T of K` where K is another param).
         let template_names: std::collections::HashSet<String> = doc
             .templates
             .iter()
             .map(|(n, _, _)| n.to_string())
             .collect();
+
+        // Extract template parameters; resolve bounds with template-awareness so template
+        // names used as bounds are stored as TTemplateParam, not wrongly namespace-qualified.
+        let template_params = doc
+            .templates
+            .iter()
+            .map(|(name, bound, variance)| TemplateParam {
+                name: name.as_str().into(),
+                bound: bound.clone().map(|b| {
+                    self.resolve_union_doc_with_templates(b, &template_names, fqn.as_str(), &[])
+                }),
+                defining_entity: fqn.as_str().into(),
+                variance: *variance,
+            })
+            .collect::<Vec<_>>();
 
         let mut params = Vec::new();
         let mut local_scalar = 0usize;

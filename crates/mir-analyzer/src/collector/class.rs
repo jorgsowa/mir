@@ -55,13 +55,26 @@ impl<'a> DefinitionCollector<'a> {
         // Build class-level template params before the member loop so they can be passed
         // to build_method_storage, allowing method return types to reference class templates
         // (e.g. TKey) without those names being wrongly namespace-qualified.
+        // Collect names first so bounds referencing sibling template params are not FQN-qualified.
+        let class_template_names: std::collections::HashSet<String> = class_doc
+            .templates
+            .iter()
+            .map(|(n, _, _)| n.to_string())
+            .collect();
         let class_template_params: Vec<mir_codebase::storage::TemplateParam> = class_doc
             .templates
             .iter()
             .map(
                 |(name, bound, variance)| mir_codebase::storage::TemplateParam {
                     name: name.as_str().into(),
-                    bound: self.resolve_union_opt(bound.clone()),
+                    bound: bound.clone().map(|b| {
+                        self.resolve_union_doc_with_templates(
+                            b,
+                            &class_template_names,
+                            fqcn.as_str(),
+                            &[],
+                        )
+                    }),
                     defining_entity: fqcn.as_str().into(),
                     variance: *variance,
                 },
