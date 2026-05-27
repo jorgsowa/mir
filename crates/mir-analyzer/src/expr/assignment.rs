@@ -1,6 +1,6 @@
 use super::helpers::{
     extract_simple_var, extract_string_from_expr, infer_arithmetic, property_assign_compatible,
-    widen_array_with_value,
+    widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -183,9 +183,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             ExprKind::StaticPropertyAccess(_) => {}
             ExprKind::ArrayAccess(aa) => {
-                if let Some(idx) = &aa.index {
-                    self.analyze(idx, ctx);
-                }
+                let key_ty = if let Some(idx) = &aa.index {
+                    self.analyze(idx, ctx)
+                } else {
+                    Type::mixed()
+                };
                 let mut base: &Expr = &aa.array;
                 loop {
                     match &base.kind {
@@ -196,7 +198,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 std::sync::Arc::make_mut(&mut ctx.vars).insert(
                                     name_sym,
                                     std::sync::Arc::new(Type::single(Atomic::TArray {
-                                        key: Box::new(Type::mixed()),
+                                        key: Box::new(key_ty.clone()),
                                         value: Box::new(ty.clone()),
                                     })),
                                 );
@@ -208,7 +210,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             } else {
                                 let current = ctx.get_var(name_str);
-                                let updated = widen_array_with_value(&current, &ty);
+                                let updated =
+                                    widen_array_with_value_and_key(&current, &ty, &key_ty);
                                 ctx.set_var(name_str, updated);
                             }
                             break;

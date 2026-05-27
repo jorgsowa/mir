@@ -3,7 +3,12 @@ use php_ast::owned::{Expr, ExprKind};
 
 use crate::subtype::is_subtype;
 
+#[allow(dead_code)]
 pub fn widen_array_with_value(current: &Type, new_value: &Type) -> Type {
+    widen_array_with_value_and_key(current, new_value, &Type::mixed())
+}
+
+pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key: &Type) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
@@ -12,20 +17,29 @@ pub fn widen_array_with_value(current: &Type, new_value: &Type) -> Type {
         match atomic {
             Atomic::TKeyedArray { properties, .. } => {
                 let mut all_values = new_value.clone();
+                let mut all_keys = new_key.clone();
                 for prop in properties.values() {
                     all_values.merge_with(&prop.ty);
                 }
+                for k in properties.keys() {
+                    let key_atomic = match k {
+                        mir_types::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
+                        mir_types::ArrayKey::Int(i) => Atomic::TLiteralInt(*i),
+                    };
+                    all_keys.merge_with(&Type::single(key_atomic));
+                }
                 result.add_type(Atomic::TArray {
-                    key: Box::new(Type::mixed()),
+                    key: Box::new(all_keys),
                     value: Box::new(all_values),
                 });
                 found_array = true;
             }
             Atomic::TArray { key, value } => {
-                let merged = Type::merge(value, new_value);
+                let merged_value = Type::merge(value, new_value);
+                let merged_key = Type::merge(key, new_key);
                 result.add_type(Atomic::TArray {
-                    key: key.clone(),
-                    value: Box::new(merged),
+                    key: Box::new(merged_key),
+                    value: Box::new(merged_value),
                 });
                 found_array = true;
             }
@@ -33,6 +47,15 @@ pub fn widen_array_with_value(current: &Type, new_value: &Type) -> Type {
                 let merged = Type::merge(value, new_value);
                 result.add_type(Atomic::TList {
                     value: Box::new(merged),
+                });
+                found_array = true;
+            }
+            Atomic::TNonEmptyArray { key, value } => {
+                let merged_value = Type::merge(value, new_value);
+                let merged_key = Type::merge(key, new_key);
+                result.add_type(Atomic::TNonEmptyArray {
+                    key: Box::new(merged_key),
+                    value: Box::new(merged_value),
                 });
                 found_array = true;
             }
