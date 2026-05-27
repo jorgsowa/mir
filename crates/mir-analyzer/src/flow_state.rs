@@ -105,13 +105,15 @@ impl FlowState {
             var_locations: FxHashMap::default(),
             template_param_names: Arc::new(FxHashSet::default()),
         };
-        // PHP superglobals — always in scope in any context
+        // PHP superglobals — always in scope in any context.
+        // Also includes $argv/$argc which are auto-populated at global scope in CLI scripts
+        // (when register_argc_argv is on, the default for CLI).
         {
             let vars = Arc::make_mut(&mut ctx.vars);
             let assigned = Arc::make_mut(&mut ctx.assigned_vars);
             for sg in &[
                 "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
-                "GLOBALS",
+                "GLOBALS", "argv", "argc",
             ] {
                 let sym = Name::from(*sg);
                 vars.insert(sym, Arc::new(mir_types::Type::mixed()));

@@ -388,6 +388,7 @@ pub(crate) fn emit_unused_variables(
 ) {
     const SUPERGLOBALS: &[&str] = &[
         "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV", "GLOBALS",
+        "argv", "argc",
     ];
     for name in ctx.assigned_vars.iter() {
         if ctx.param_names.contains(name) {
