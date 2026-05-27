@@ -386,6 +386,37 @@ impl<'a> DefinitionCollector<'a> {
                         type_params: mir_types::union::empty_type_params(),
                     });
                 }
+                // Conditional return type: recurse into subject and both branches with the
+                // same template context so class names and template references inside them
+                // are resolved correctly.
+                mir_types::Atomic::TConditional {
+                    param_name,
+                    subject,
+                    if_true,
+                    if_false,
+                } => {
+                    result.add_type(mir_types::Atomic::TConditional {
+                        param_name: *param_name,
+                        subject: Box::new(self.resolve_union_doc_with_templates(
+                            *subject.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                        if_true: Box::new(self.resolve_union_doc_with_templates(
+                            *if_true.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                        if_false: Box::new(self.resolve_union_doc_with_templates(
+                            *if_false.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
                 _ => {
                     let resolved_union = self.resolve_union_doc(Type::single(atomic.clone()));
                     for resolved_atomic in resolved_union.types {

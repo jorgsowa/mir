@@ -1192,17 +1192,31 @@ fn is_inside_generics(s: &str) -> bool {
     depth != 0
 }
 
-/// Parses `$param is TypeName ? TrueType : FalseType` into a `TConditional`.
+/// Parses `$param is TypeName ? TrueType : FalseType` or `T is TypeName ? TrueType : FalseType`
+/// (template-type conditional, no `$`) into a `TConditional`.
 fn parse_conditional_type(s: &str) -> Option<Type> {
-    if !s.starts_with('$') {
-        return None;
-    }
     let is_pos = s.find(" is ")?;
     let param_raw = s[..is_pos].trim();
-    let param_name = param_raw
-        .strip_prefix('$')
-        .filter(|n| !n.is_empty())
-        .map(mir_types::Name::new);
+
+    // Accept either `$identifier` (regular param) or a bare identifier (template name).
+    let param_name_str: &str = if let Some(name) = param_raw.strip_prefix('$') {
+        if name.is_empty() {
+            return None;
+        }
+        name
+    } else {
+        // Bare template name: must be a valid identifier and the string must contain `?`
+        // so we don't accidentally parse class-hierarchy expressions.
+        if param_raw.is_empty()
+            || !param_raw.starts_with(|c: char| c.is_alphabetic() || c == '_')
+            || !param_raw.chars().all(|c| c.is_alphanumeric() || c == '_')
+            || !s.contains('?')
+        {
+            return None;
+        }
+        param_raw
+    };
+    let param_name = Some(mir_types::Name::new(param_name_str));
     let after_is = s[is_pos + 4..].trim();
     let q_pos = find_char_at_depth(after_is, '?')?;
     let subject_str = after_is[..q_pos].trim();
