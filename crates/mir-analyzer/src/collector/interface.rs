@@ -43,6 +43,10 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
+        // Build interface-level template params before the member loop so methods referencing
+        // interface templates in their return types don't get them wrongly namespace-qualified.
+        let iface_template_params = template_params.clone();
+
         let extends: Vec<Arc<str>> = decl
             .extends
             .iter()
@@ -55,9 +59,13 @@ impl<'a> DefinitionCollector<'a> {
         for member in decl.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
-                    if let Some(method) =
-                        self.build_method_storage(m, &fqcn, Some(&member.span), None)
-                    {
+                    if let Some(method) = self.build_method_storage(
+                        m,
+                        &fqcn,
+                        Some(&member.span),
+                        None,
+                        &iface_template_params,
+                    ) {
                         own_methods.insert(
                             Arc::from(method.name.to_lowercase().as_str()),
                             Arc::new(method),

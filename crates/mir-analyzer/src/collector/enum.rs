@@ -52,7 +52,7 @@ impl DefinitionCollector<'_> {
                 }
                 EnumMemberKind::Method(m) => {
                     if let Some(method) =
-                        self.build_method_storage(m, &fqcn, Some(&member.span), None)
+                        self.build_method_storage(m, &fqcn, Some(&member.span), None, &[])
                     {
                         own_methods.insert(
                             Arc::from(method.name.to_lowercase().as_str()),

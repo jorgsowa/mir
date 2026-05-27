@@ -76,9 +76,13 @@ impl<'a> DefinitionCollector<'a> {
                             }
                         }
                     }
-                    if let Some(method) =
-                        self.build_method_storage(m, &fqcn, Some(&member.span), None)
-                    {
+                    if let Some(method) = self.build_method_storage(
+                        m,
+                        &fqcn,
+                        Some(&member.span),
+                        None,
+                        &trait_template_params,
+                    ) {
                         own_methods.insert(
                             Arc::from(method.name.to_lowercase().as_str()),
                             Arc::new(method),

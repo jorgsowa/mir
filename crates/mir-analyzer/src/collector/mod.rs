@@ -57,6 +57,47 @@ fn is_simple_scalar(u: &Type) -> bool {
     )
 }
 
+/// Returns true for PHP built-in type keywords and Psalm pseudo-types that must never be
+/// namespace-qualified, even when they appear as TNamedObject (e.g. inside generic params).
+fn is_php_builtin_type(name: &str) -> bool {
+    matches!(
+        name,
+        "array"
+            | "bool"
+            | "callable"
+            | "false"
+            | "float"
+            | "int"
+            | "iterable"
+            | "list"
+            | "mixed"
+            | "never"
+            | "null"
+            | "object"
+            | "parent"
+            | "positive-int"
+            | "scalar"
+            | "self"
+            | "static"
+            | "string"
+            | "true"
+            | "void"
+            | "class-string"
+            | "int-mask"
+            | "int-mask-of"
+            | "key-of"
+            | "lowercase-string"
+            | "negative-int"
+            | "non-empty-array"
+            | "non-empty-list"
+            | "non-empty-string"
+            | "non-falsy-string"
+            | "numeric-string"
+            | "truthy-string"
+            | "value-of"
+    )
+}
+
 /// Print profiling statistics for type collection.
 pub(crate) fn print_collector_stats() {
     let scalar = SCALAR_PARAM_COUNT.load(Relaxed);
@@ -298,8 +339,11 @@ impl<'a> DefinitionCollector<'a> {
                 // FQN-qualified (it is a real class, not a template), and type_params are
                 // recursed through this function so template names inside (e.g. T) are
                 // properly converted to TTemplateParam.
+                // Guard: PHP built-in pseudo-types (array, iterable, callable, …) can appear
+                // as TNamedObject with type params in some docblock parse paths; do not
+                // namespace-qualify those — fall through to resolve_union_doc.
                 mir_types::Atomic::TNamedObject { fqcn, type_params }
-                    if !type_params.is_empty() =>
+                    if !type_params.is_empty() && !is_php_builtin_type(fqcn.as_ref()) =>
                 {
                     let resolved_fqcn = resolution::resolve_type_name(
                         fqcn.as_ref(),
@@ -323,9 +367,14 @@ impl<'a> DefinitionCollector<'a> {
                         type_params: mir_types::union::vec_to_type_params(new_params),
                     });
                 }
-                // Bare non-template class name (empty type_params, not a template): FQN-qualify it.
-                // This covers same-namespace class references in docblocks that lack use aliases.
-                mir_types::Atomic::TNamedObject { fqcn, .. } => {
+                // Bare non-template class name (empty type_params, not a template param):
+                // FQN-qualify it so same-namespace class references in docblocks are stored
+                // with their full path. PHP built-in type keywords (array, list, callable, …)
+                // are excluded — they must not be namespace-qualified even if the docblock
+                // parser emits them as TNamedObject.
+                mir_types::Atomic::TNamedObject { fqcn, .. }
+                    if !is_php_builtin_type(fqcn.as_ref()) =>
+                {
                     let resolved_fqcn = resolution::resolve_type_name(
                         fqcn.as_ref(),
                         true,
@@ -734,6 +783,7 @@ impl<'a> DefinitionCollector<'a> {
         class_fqcn: &str,
         span: Option<&php_ast::Span>,
         aliases: Option<&FxHashMap<String, Type>>,
+        class_template_params: &[TemplateParam],
     ) -> Option<MethodDef> {
         let doc = m
             .doc_comment
@@ -814,11 +864,38 @@ impl<'a> DefinitionCollector<'a> {
                 variance: *variance,
             })
             .collect();
+
+        // Build combined template name set: method-level templates union class-level templates.
+        // This prevents class-level template params (e.g. TKey on a generic class) from being
+        // treated as bare class names and wrongly namespace-qualified by the TNamedObject branch.
         let template_names: std::collections::HashSet<String> = doc
             .templates
             .iter()
             .map(|(n, _, _)| n.to_string())
+            .chain(
+                class_template_params
+                    .iter()
+                    .map(|tp| tp.name.as_ref().to_string()),
+            )
             .collect();
+
+        // Combined param list for bound lookup: method-level first (they shadow class-level),
+        // then class-level. Used only for resolve_union_doc_with_templates, not stored in MethodDef.
+        let combined_template_params: Vec<TemplateParam>;
+        let template_params_for_resolve: &[TemplateParam] = if class_template_params.is_empty() {
+            &template_params
+        } else {
+            combined_template_params = template_params
+                .iter()
+                .chain(
+                    class_template_params
+                        .iter()
+                        .filter(|ctp| !template_params.iter().any(|tp| tp.name == ctp.name)),
+                )
+                .cloned()
+                .collect();
+            &combined_template_params
+        };
 
         let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {
             (Some(mut ty), _) => {
@@ -831,7 +908,7 @@ impl<'a> DefinitionCollector<'a> {
                         ty,
                         &template_names,
                         class_fqcn,
-                        &template_params,
+                        template_params_for_resolve,
                     )
                 } else {
                     aliases

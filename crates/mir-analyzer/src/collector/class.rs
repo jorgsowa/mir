@@ -52,6 +52,22 @@ impl<'a> DefinitionCollector<'a> {
 
         let type_aliases = self.build_type_aliases(&class_doc);
 
+        // Build class-level template params before the member loop so they can be passed
+        // to build_method_storage, allowing method return types to reference class templates
+        // (e.g. TKey) without those names being wrongly namespace-qualified.
+        let class_template_params: Vec<mir_codebase::storage::TemplateParam> = class_doc
+            .templates
+            .iter()
+            .map(
+                |(name, bound, variance)| mir_codebase::storage::TemplateParam {
+                    name: name.as_str().into(),
+                    bound: self.resolve_union_opt(bound.clone()),
+                    defining_entity: fqcn.as_str().into(),
+                    variance: *variance,
+                },
+            )
+            .collect();
+
         for member in decl.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
@@ -80,9 +96,13 @@ impl<'a> DefinitionCollector<'a> {
                             }
                         }
                     }
-                    if let Some(method) =
-                        self.build_method_storage(m, &fqcn, Some(&member.span), Some(&type_aliases))
-                    {
+                    if let Some(method) = self.build_method_storage(
+                        m,
+                        &fqcn,
+                        Some(&member.span),
+                        Some(&type_aliases),
+                        &class_template_params,
+                    ) {
                         own_methods.insert(
                             Arc::from(method.name.to_lowercase().as_str()),
                             Arc::new(method),
@@ -168,16 +188,7 @@ impl<'a> DefinitionCollector<'a> {
             Some(self.location(stmt_span.start, stmt_span.end)),
         );
 
-        let template_params: Vec<TemplateParam> = class_doc
-            .templates
-            .iter()
-            .map(|(name, bound, variance)| TemplateParam {
-                name: name.as_str().into(),
-                bound: self.resolve_union_opt(bound.clone()),
-                defining_entity: fqcn.as_str().into(),
-                variance: *variance,
-            })
-            .collect();
+        let template_params: Vec<TemplateParam> = class_template_params;
 
         let extends_type_args: Vec<mir_types::Type> = class_doc
             .extends
