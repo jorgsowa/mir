@@ -319,10 +319,19 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
     let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
 
-    // First pass: all files with or_insert (first-write-wins for native stubs).
+    // Native stubs have relative paths (e.g. "stubs/standard/functions.php");
+    // user-analyzed files have absolute paths.  Process stubs first so that
+    // user-defined symbols can unconditionally overwrite same-named builtins.
+    let user_stub_set: std::collections::HashSet<_> =
+        db.user_stub_source_files().into_iter().collect();
+    let (native_stubs, user_files): (Vec<SourceFile>, Vec<SourceFile>) = files
+        .into_iter()
+        .partition(|f| f.path(db).starts_with("stubs/"));
+
+    // Pass 1: native stubs with or_insert (first-write-wins among stubs).
     // collect_file_declarations has a name-only PartialEq so body-only edits
     // don't propagate to this index.
-    for file in files.iter() {
+    for file in &native_stubs {
         let decls = collect_file_declarations(db, *file);
         for (key, loc) in &decls.class_like {
             class_like.entry(*key).or_insert(*loc);
@@ -335,8 +344,25 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
         }
     }
 
-    // Second pass: user stubs overwrite native stubs for the same symbol.
-    for file in db.user_stub_source_files().iter() {
+    // Pass 2: user-analyzed files overwrite native stubs.
+    for file in &user_files {
+        if user_stub_set.contains(file) {
+            continue; // handled in pass 3
+        }
+        let decls = collect_file_declarations(db, *file);
+        for (key, loc) in decls.class_like {
+            class_like.insert(key, loc);
+        }
+        for (key, loc) in decls.functions {
+            functions.insert(key, loc);
+        }
+        for (key, loc) in decls.constants {
+            constants.insert(key, loc);
+        }
+    }
+
+    // Pass 3: user stubs overwrite everything.
+    for file in &user_stub_set {
         let decls = collect_file_declarations(db, *file);
         for (key, loc) in decls.class_like {
             class_like.insert(key, loc);
