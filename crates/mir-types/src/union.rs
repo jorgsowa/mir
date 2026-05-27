@@ -642,12 +642,51 @@ impl Type {
                     if_true,
                     if_false,
                 } => {
-                    result.add_type(Atomic::TConditional {
-                        param_name: *param_name,
-                        subject: Box::new(subject.substitute_templates(bindings)),
-                        if_true: Box::new(if_true.substitute_templates(bindings)),
-                        if_false: Box::new(if_false.substitute_templates(bindings)),
-                    });
+                    let new_subject = subject.substitute_templates(bindings);
+                    let new_if_true = if_true.substitute_templates(bindings);
+                    let new_if_false = if_false.substitute_templates(bindings);
+
+                    // If param_name names a template that is bound in this substitution,
+                    // resolve the conditional immediately (same logic as
+                    // `resolve_conditional_returns` for the $param form).
+                    let resolved = if let Some(name) = param_name {
+                        if let Some(bound) = bindings.get(name) {
+                            let subject_is_null = new_subject.types.len() == 1
+                                && matches!(new_subject.types[0], Atomic::TNull);
+                            if subject_is_null {
+                                let only_null = !bound.types.is_empty()
+                                    && bound.types.iter().all(|t| matches!(t, Atomic::TNull));
+                                let has_null =
+                                    bound.types.iter().any(|t| matches!(t, Atomic::TNull));
+                                if only_null {
+                                    Some(new_if_true.clone())
+                                } else if !has_null {
+                                    Some(new_if_false.clone())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    if let Some(branch) = resolved {
+                        for t in branch.types {
+                            result.add_type(t);
+                        }
+                    } else {
+                        result.add_type(Atomic::TConditional {
+                            param_name: *param_name,
+                            subject: Box::new(new_subject),
+                            if_true: Box::new(new_if_true),
+                            if_false: Box::new(new_if_false),
+                        });
+                    }
                 }
                 Atomic::TIntersection { parts } => {
                     result.add_type(Atomic::TIntersection {

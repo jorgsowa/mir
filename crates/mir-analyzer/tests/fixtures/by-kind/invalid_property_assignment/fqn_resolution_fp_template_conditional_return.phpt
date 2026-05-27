@@ -27,4 +27,3 @@ $result = $db->fetch(null);
 /** @mir-check $result is ($TKey is null ? list<array<mixed, mixed>> : array<int, array<mixed, mixed>>) */
 ===expect===
 Db.php: UnusedParam@10:27: Parameter $key is never used
-
