@@ -294,6 +294,49 @@ impl<'a> DefinitionCollector<'a> {
                         defining_entity: defining_entity.into(),
                     });
                 }
+                // A generic class like ObjectProphecy<T>: the outer class name must be
+                // FQN-qualified (it is a real class, not a template), and type_params are
+                // recursed through this function so template names inside (e.g. T) are
+                // properly converted to TTemplateParam.
+                mir_types::Atomic::TNamedObject { fqcn, type_params }
+                    if !type_params.is_empty() =>
+                {
+                    let resolved_fqcn = resolution::resolve_type_name(
+                        fqcn.as_ref(),
+                        true,
+                        &self.namespace,
+                        &self.use_aliases,
+                    );
+                    let new_params: Vec<Type> = type_params
+                        .iter()
+                        .map(|p| {
+                            self.resolve_union_doc_with_templates(
+                                p.clone(),
+                                template_names,
+                                defining_entity,
+                                template_params,
+                            )
+                        })
+                        .collect();
+                    result.add_type(mir_types::Atomic::TNamedObject {
+                        fqcn: resolved_fqcn,
+                        type_params: mir_types::union::vec_to_type_params(new_params),
+                    });
+                }
+                // Bare non-template class name (empty type_params, not a template): FQN-qualify it.
+                // This covers same-namespace class references in docblocks that lack use aliases.
+                mir_types::Atomic::TNamedObject { fqcn, .. } => {
+                    let resolved_fqcn = resolution::resolve_type_name(
+                        fqcn.as_ref(),
+                        true,
+                        &self.namespace,
+                        &self.use_aliases,
+                    );
+                    result.add_type(mir_types::Atomic::TNamedObject {
+                        fqcn: resolved_fqcn,
+                        type_params: mir_types::union::empty_type_params(),
+                    });
+                }
                 _ => {
                     let resolved_union = self.resolve_union_doc(Type::single(atomic.clone()));
                     for resolved_atomic in resolved_union.types {
@@ -758,20 +801,9 @@ impl<'a> DefinitionCollector<'a> {
             PARAM_WITH_DEFAULT.fetch_add(local_defaults, Relaxed);
         }
 
-        let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {
-            (Some(mut ty), _) => {
-                ty.from_docblock = true;
-                let resolved = aliases
-                    .map(|a| self.resolve_union_doc_with_aliases(ty.clone(), a))
-                    .unwrap_or_else(|| self.resolve_union_doc(ty));
-                Some(Self::fill_self_static_parent(resolved, class_fqcn))
-            }
-            (None, Some(h)) => {
-                self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
-            }
-            (None, None) => None,
-        };
-
+        // Extract template params before processing return type so generic return types
+        // like ObjectProphecy<T> can be resolved with template-awareness (FQN-qualifying
+        // the outer class while converting T to TTemplateParam).
         let template_params: Vec<TemplateParam> = doc
             .templates
             .iter()
@@ -782,6 +814,37 @@ impl<'a> DefinitionCollector<'a> {
                 variance: *variance,
             })
             .collect();
+        let template_names: std::collections::HashSet<String> = doc
+            .templates
+            .iter()
+            .map(|(n, _, _)| n.to_string())
+            .collect();
+
+        let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {
+            (Some(mut ty), _) => {
+                ty.from_docblock = true;
+                let resolved = if !template_names.is_empty() {
+                    // Use template-aware resolution: FQN-qualifies the outer class in
+                    // generic return types (e.g. ObjectProphecy<T>) and converts T to
+                    // TTemplateParam.
+                    self.resolve_union_doc_with_templates(
+                        ty,
+                        &template_names,
+                        class_fqcn,
+                        &template_params,
+                    )
+                } else {
+                    aliases
+                        .map(|a| self.resolve_union_doc_with_aliases(ty.clone(), a))
+                        .unwrap_or_else(|| self.resolve_union_doc(ty))
+                };
+                Some(Self::fill_self_static_parent(resolved, class_fqcn))
+            }
+            (None, Some(h)) => {
+                self.resolve_union_opt(Some(type_from_hint_owned(h, Some(class_fqcn))))
+            }
+            (None, None) => None,
+        };
 
         let throws = doc
             .throws
