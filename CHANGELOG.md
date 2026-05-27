@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2026-05-27
+
+### Added
+
+- Cache is now enabled by default without `--cache-dir`. Composer projects cache to `<project-root>/.mir/cache`; other scans use the platform cache directory. Pass `--no-cache` to opt out.
+- `@mir-check` inline type assertion directive: annotate a variable with `/** @mir-check $x is SomeType */` in a test fixture to emit `TypeCheckMismatch` if the inferred type does not match, enabling regression tests for type inference.
+- Short-circuit `isset`/`!isset` narrowing in `&&` and `||` expressions: `isset($x) && $x->method()` now correctly narrows `$x` to non-null inside the right-hand side.
+- `InvalidStringClass` diagnostic: emitted instead of `UndefinedClass` when a dynamic class expression (`new $var`, `$var::method()`) is not a valid `class-string`. String literal arguments to `class-string` parameters are now validated.
+- `TCallableString` atomic type for proper callable-string validation.
+- Variance checking for generic return types: a method return type that widens its parent's generic parameter now emits a diagnostic.
+
+### Fixed
+
+- **Template bounds (FQN resolution)**: eliminated ~2,100 false-positive `InvalidTemplateParam` and `InvalidArgument` diagnostics caused by bare class names in `@template T of …` bounds not being namespace-qualified. Fixes cover all definition collectors (class, interface, trait, function, method), intersection bounds, `@var` and property type annotations, and generic type arguments.
+- **Template conditional returns**: `@return (T is null ? X : Y)` now parses and resolves correctly at call sites. When T is already bound in the substitution, the conditional collapses to the correct branch. When the discriminator is nullable-but-not-only-null, the conditional widens to `X|Y` instead of emitting a false positive.
+- **Intersection types**: intersection-typed values are now recognized as subtypes of their parts and of `object`, eliminating companion `InvalidArgument` false positives for functions like `get_class()`. `InvalidArgument` is also suppressed when a parameter type contains templates within an intersection.
+- **Template inference**: `T` is now correctly inferred from `class-string<T>` arguments, `Closure`, `callable`, and intersection-typed parameters. Template bounds now check inheritance chains. Array-key pseudo-type and `TKeyedArray` are recognized in template binding.
+- **Array types**: empty keyed arrays (`array{}`) are folded into matching generic arrays in unions, eliminating `|array{}` noise from loop-built arrays. Array key types are now preserved in `$arr[$key] = $val` assignments, fixing ~62 false-positive `InvalidReturnType` diagnostics. Mutual-reference array loops no longer cause an infinite hang during inference.
+- **PHP built-ins**: `array_walk`, `array_walk_recursive` 3rd parameter is now optional; `mt_rand`/`rand` parameters are now optional. Fixes ~30 `TooFewArguments` false positives. `array_map` with multiple arrays now accepts a callback with matching arity instead of requiring arity 1, fixing ~62 false positives.
+- **Enum built-ins**: `from()`/`tryFrom()` are now synthesized with one parameter, eliminating `TooManyArguments` false positives.
+- **Narrowing**: `UndefinedVariable` is no longer emitted for variables on the left-hand side of `??` and `??=`. `assigned_vars` is now correctly restored after `isset`-narrowed branches.
+- **Column numbers**: diagnostic column numbers are now 1-indexed (previously 0-indexed). Any tooling that parses mir output should update accordingly.
+- **Stubs**: user-defined files now consistently override native stub definitions in the symbol index, eliminating non-deterministic false positives when shadowing PHP built-in names.
+- `self::CONST` references in method parameter defaults now correctly emit `UndefinedConstant` when the constant does not exist.
+- First-class callable syntax (`SomeClass::method(...)`) now resolves to a typed `TClosure` instead of an untyped callable.
+- `InvalidStringClass` false positives eliminated for object expressions on the left of `::` (e.g. `$obj::CONST`).
+
+### Changed
+
+- `ProjectAnalyzer` is replaced by `AnalysisSession` in the public API. The new type consolidates project setup and analysis into a single entry point.
+- Stub loading is now fully lazy: stubs for a PHP version are loaded on first reference rather than at startup, reducing cold-start memory for projects that use only a subset of built-ins.
+
 ## [0.28.0] - 2026-05-17
 
 ### Added
