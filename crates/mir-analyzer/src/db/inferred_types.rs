@@ -5,11 +5,22 @@
 //! return types on demand via the salsa query graph.  No pre-committed
 //! singleton is needed.
 
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use mir_types::Type;
 
 use crate::db::{MirDatabase, SymbolLoc};
+
+thread_local! {
+    // Guards against re-entrant demand for a file currently being inferred on
+    // this thread. When mutually-referential classes trigger a cycle that salsa
+    // hasn't closed yet, the same file can be demanded again before the first
+    // inference completes.  Returning None (→ mixed) breaks the recursion and
+    // lets the fixpoint converge.
+    static INFER_IN_PROGRESS: RefCell<HashSet<Arc<str>>> = RefCell::new(HashSet::new());
+}
 
 /// Demand-driven inferred return type lookup for a function.
 ///
@@ -24,7 +35,14 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
         SymbolLoc::Function { file, .. } => *file,
         _ => return None,
     };
+    let path = sf.path(db);
+    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
+    if already_active {
+        return None;
+    }
+    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
     let inferred = crate::db::infer_file_return_types(db, sf);
+    INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&path));
     inferred.functions.get(fqn).cloned()
 }
 
@@ -48,7 +66,14 @@ pub fn inferred_method_return_type_demand(
         | SymbolLoc::Enum { file, .. } => *file,
         _ => return None,
     };
+    let path = sf.path(db);
+    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
+    if already_active {
+        return None;
+    }
+    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
     let inferred = crate::db::infer_file_return_types(db, sf);
+    INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&path));
     inferred
         .methods
         .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(method_name_lower)))

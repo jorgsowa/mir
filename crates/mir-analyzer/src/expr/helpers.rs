@@ -13,6 +13,12 @@ pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key:
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
     let mut found_array = false;
+    // Merge ALL array-like variants from current into a single accumulated TArray/TList.
+    // Without this, each TArray variant in a growing union independently emits a new TArray,
+    // causing unbounded union growth across salsa fixpoint iterations (infinite recursion).
+    let mut acc_key: Option<Type> = None;
+    let mut acc_value: Option<Type> = None;
+    let mut acc_list: Option<Type> = None;
     for atomic in &current.types {
         match atomic {
             Atomic::TKeyedArray { properties, .. } => {
@@ -28,35 +34,22 @@ pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key:
                     };
                     all_keys.merge_with(&Type::single(key_atomic));
                 }
-                result.add_type(Atomic::TArray {
-                    key: Box::new(all_keys),
-                    value: Box::new(all_values),
-                });
+                fold_into(&mut acc_key, all_keys);
+                fold_into(&mut acc_value, all_values);
                 found_array = true;
             }
             Atomic::TArray { key, value } => {
-                let merged_value = Type::merge(value, new_value);
-                let merged_key = Type::merge(key, new_key);
-                result.add_type(Atomic::TArray {
-                    key: Box::new(merged_key),
-                    value: Box::new(merged_value),
-                });
+                fold_into(&mut acc_key, Type::merge(key, new_key));
+                fold_into(&mut acc_value, Type::merge(value, new_value));
                 found_array = true;
             }
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                let merged = Type::merge(value, new_value);
-                result.add_type(Atomic::TList {
-                    value: Box::new(merged),
-                });
+                fold_into(&mut acc_list, Type::merge(value, new_value));
                 found_array = true;
             }
             Atomic::TNonEmptyArray { key, value } => {
-                let merged_value = Type::merge(value, new_value);
-                let merged_key = Type::merge(key, new_key);
-                result.add_type(Atomic::TNonEmptyArray {
-                    key: Box::new(merged_key),
-                    value: Box::new(merged_value),
-                });
+                fold_into(&mut acc_key, Type::merge(key, new_key));
+                fold_into(&mut acc_value, Type::merge(value, new_value));
                 found_array = true;
             }
             Atomic::TMixed => {
@@ -67,10 +60,26 @@ pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key:
             }
         }
     }
+    if let (Some(key), Some(value)) = (acc_key, acc_value) {
+        result.add_type(Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        });
+    }
+    if let Some(v) = acc_list {
+        result.add_type(Atomic::TList { value: Box::new(v) });
+    }
     if !found_array {
         return current.clone();
     }
     result
+}
+
+fn fold_into(acc: &mut Option<Type>, new: Type) {
+    match acc {
+        None => *acc = Some(new),
+        Some(existing) => existing.merge_with(&new),
+    }
 }
 
 pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
