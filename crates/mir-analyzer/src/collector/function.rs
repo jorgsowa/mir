@@ -160,7 +160,7 @@ impl DefinitionCollector<'_> {
         self.slice.functions.push(std::sync::Arc::new(storage));
 
         // Scan the function body for `@var`-annotated global declarations.
-        self.scan_stmts_for_global_vars(&decl.body);
+        self.scan_stmts_for_global_vars(&decl.body.stmts);
     }
 
     pub(super) fn collect_global_stmt(&mut self, stmt: &php_ast::owned::Stmt) {

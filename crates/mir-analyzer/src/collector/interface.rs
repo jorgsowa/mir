@@ -68,7 +68,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_methods = indexmap::IndexMap::new();
         let mut own_constants = indexmap::IndexMap::new();
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
                     if let Some(method) = self.build_method_storage(

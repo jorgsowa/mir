@@ -362,7 +362,7 @@ impl<'a> BodyAnalyzer<'a> {
                 StmtKind::Namespace(ns) => {
                     if let php_ast::owned::NamespaceBody::Braced(inner) = &ns.body {
                         self.analyze_top_level_stmts(
-                            inner,
+                            &inner.stmts,
                             file,
                             source,
                             source_map,
@@ -432,7 +432,7 @@ impl<'a> BodyAnalyzer<'a> {
                 StmtKind::Namespace(ns) => {
                     if let php_ast::owned::NamespaceBody::Braced(inner) = &ns.body {
                         self.analyze_top_level_stmts_typed(
-                            inner,
+                            &inner.stmts,
                             file,
                             source,
                             source_map,
@@ -545,7 +545,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
-        sa.analyze_stmts(&decl.body, &mut ctx);
+        sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -671,7 +671,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
-        sa.analyze_stmts(&decl.body, &mut ctx);
+        sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -738,7 +738,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
@@ -820,7 +820,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -917,7 +917,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
-        sa.analyze_stmts(&decl.body, &mut ctx);
+        sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
 
@@ -990,7 +990,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
@@ -1071,7 +1071,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -1223,7 +1223,7 @@ impl<'a> BodyAnalyzer<'a> {
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
@@ -1278,7 +1278,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -1308,7 +1308,7 @@ impl<'a> BodyAnalyzer<'a> {
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
                 if let Some(hint) = &prop.type_hint {
                     self.check_and_record_type_hint_classes(
@@ -1363,7 +1363,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
-            sa.analyze_stmts(body, &mut ctx);
+            sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
 
@@ -1403,7 +1403,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
             );
         }
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 continue;
             };
@@ -1440,7 +1440,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
             );
         }
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };

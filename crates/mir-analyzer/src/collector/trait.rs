@@ -60,7 +60,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_constants = indexmap::IndexMap::new();
         let mut trait_uses: Vec<Arc<str>> = vec![];
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
                     if m.name.as_deref() == Some("__construct") {

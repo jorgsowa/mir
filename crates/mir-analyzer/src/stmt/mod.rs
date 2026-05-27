@@ -234,8 +234,8 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             // ---- Block --------------------------------------------------------
-            StmtKind::Block(stmts) => {
-                self.analyze_stmts(stmts, ctx);
+            StmtKind::Block(block) => {
+                self.analyze_stmts(&block.stmts, ctx);
             }
 
             // ---- Break --------------------------------------------------------

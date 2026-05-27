@@ -701,7 +701,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                         // Save and restore use aliases per namespace block
                         let saved_aliases = self.use_aliases.clone();
                         self.use_aliases.clear();
-                        let flow = self.process_stmts(stmts);
+                        let flow = self.process_stmts(&stmts.stmts);
                         self.use_aliases = saved_aliases;
                         flow?;
                     }
@@ -781,8 +781,8 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                 }
             }
 
-            StmtKind::Block(stmts) => {
-                return self.process_stmts(stmts);
+            StmtKind::Block(block) => {
+                return self.process_stmts(&block.stmts);
             }
 
             // Collect top-level define('NAME', value) calls as global constants.

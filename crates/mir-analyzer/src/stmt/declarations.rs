@@ -85,7 +85,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
-        sa.analyze_stmts(&decl.body, &mut fn_ctx);
+        sa.analyze_stmts(&decl.body.stmts, &mut fn_ctx);
     }
 
     pub(crate) fn analyze_class_decl_stmt(&mut self, decl: &ClassDecl, ctx: &mut FlowState) {
@@ -105,7 +105,7 @@ impl<'a> StatementsAnalyzer<'a> {
         param_default_ctx.parent_fqcn = parent_fqcn.clone();
         param_default_ctx.static_fqcn = Some(fqcn.clone());
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
@@ -164,7 +164,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
-            sa.analyze_stmts(body, &mut method_ctx);
+            sa.analyze_stmts(&body.stmts, &mut method_ctx);
         }
     }
 }

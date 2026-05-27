@@ -268,10 +268,10 @@ impl<'a> StatementsAnalyzer<'a> {
         let pre_ctx = ctx.clone();
         self.break_ctx_stack.push(Vec::new());
 
-        let has_default = sw.cases.iter().any(|c| c.value.is_none());
+        let has_default = sw.body.cases.iter().any(|c| c.value.is_none());
 
         let mut case_results: Vec<FlowState> = Vec::new();
-        for case in sw.cases.iter() {
+        for case in sw.body.cases.iter() {
             let mut case_ctx = pre_ctx.branch();
             if let Some(val) = &case.value {
                 if switch_on_true {
@@ -346,7 +346,7 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut FlowState) {
         let pre_ctx = ctx.clone();
         let mut try_ctx = ctx.branch();
-        self.analyze_stmts(&tc.body, &mut try_ctx);
+        self.analyze_stmts(&tc.body.stmts, &mut try_ctx);
 
         let catch_base = FlowState::merge_branches(&pre_ctx, try_ctx.clone(), None);
 
@@ -393,7 +393,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 let (line_end, col_end) = self.offset_to_line_col(catch.span.end);
                 catch_ctx.record_var_location(var_name, line, col_start, line_end, col_end);
             }
-            self.analyze_stmts(&catch.body, &mut catch_ctx);
+            self.analyze_stmts(&catch.body.stmts, &mut catch_ctx);
             if !catch_ctx.diverges {
                 non_diverging_catches.push(catch_ctx);
             }
@@ -414,7 +414,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(finally_stmts) = &tc.finally {
             let mut finally_ctx = result.clone();
             finally_ctx.inside_finally = true;
-            self.analyze_stmts(finally_stmts, &mut finally_ctx);
+            self.analyze_stmts(&finally_stmts.stmts, &mut finally_ctx);
             if finally_ctx.diverges {
                 result.diverges = true;
             }

@@ -37,7 +37,7 @@ impl DefinitionCollector<'_> {
         let mut own_methods = indexmap::IndexMap::new();
         let mut own_constants = indexmap::IndexMap::new();
 
-        for member in decl.members.iter() {
+        for member in decl.body.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
                     let case_name = c.name.as_deref().unwrap_or_default();

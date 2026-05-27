@@ -80,7 +80,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
-        sa.analyze_stmts(&c.body, &mut closure_ctx);
+        sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
         let inferred_return = crate::body_analysis::merge_return_types(&sa.return_types);
 
         // If the closure reads an outer-scope variable without capturing it via `use`,

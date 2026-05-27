@@ -86,8 +86,8 @@ fn find_function_decl<'a>(
                 return Some(decl);
             }
             StmtKind::Namespace(ns) => {
-                if let NamespaceBody::Braced(stmts) = &ns.body {
-                    for inner in stmts.iter() {
+                if let NamespaceBody::Braced(block) = &ns.body {
+                    for inner in block.stmts.iter() {
                         if let StmtKind::Function(decl) = &inner.kind {
                             if matches(decl, db, file, target_fqn) {
                                 return Some(decl);
