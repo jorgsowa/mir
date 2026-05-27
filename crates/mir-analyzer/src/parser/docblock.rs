@@ -64,7 +64,10 @@ impl DocblockParser {
                             result.var_type = Some(parse_type_string(&ty_s));
                             result.var_name = Some(name.trim_start_matches('$').to_string());
                         } else {
-                            let ty_s = body_str.trim();
+                            // Spaces inside PHP types only appear within <…> generics.
+                            // Stop at top-level whitespace to exclude description text that
+                            // follows the type in multi-line @var bodies.
+                            let ty_s = extract_type_prefix(body_str.trim());
                             if let Some(msg) = validate_type_str(ty_s, "var") {
                                 result.invalid_annotations.push(msg);
                             }
@@ -1156,6 +1159,25 @@ fn split_generics(s: &str) -> Vec<String> {
         parts.push(current.trim().to_string());
     }
     parts
+}
+
+/// Return the leading type expression from `s`, stopping at top-level whitespace.
+/// Spaces inside `<…>` brackets are kept so that `array<string, int>` is returned whole.
+fn extract_type_prefix(s: &str) -> &str {
+    let mut depth = 0i32;
+    let mut end = s.len();
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => depth -= 1,
+            _ if ch.is_whitespace() && depth == 0 => {
+                end = i;
+                break;
+            }
+            _ => {}
+        }
+    }
+    &s[..end]
 }
 
 fn is_inside_generics(s: &str) -> bool {

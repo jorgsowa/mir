@@ -22,6 +22,14 @@ thread_local! {
     static INFER_IN_PROGRESS: RefCell<HashSet<Arc<str>>> = RefCell::new(HashSet::new());
 }
 
+struct InferGuard(Arc<str>);
+
+impl Drop for InferGuard {
+    fn drop(&mut self) {
+        INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&self.0));
+    }
+}
+
 /// Demand-driven inferred return type lookup for a function.
 ///
 /// Locates the file that declares `fqn` via the workspace symbol index, then
@@ -41,8 +49,8 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
         return None;
     }
     INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
+    let _guard = InferGuard(path);
     let inferred = crate::db::infer_file_return_types(db, sf);
-    INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&path));
     inferred.functions.get(fqn).cloned()
 }
 
@@ -72,8 +80,8 @@ pub fn inferred_method_return_type_demand(
         return None;
     }
     INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
+    let _guard = InferGuard(path);
     let inferred = crate::db::infer_file_return_types(db, sf);
-    INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&path));
     inferred
         .methods
         .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(method_name_lower)))

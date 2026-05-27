@@ -8,7 +8,8 @@ $parent = new DOMNode();
 // DOMElement extends DOMNode, so it should satisfy TNode bound
 $parent->appendChild($el);
 $parent->insertBefore($el, null);
-$parent->replaceChild($el, $parent->firstChild);
+$child = new DOMElement('span');
+$parent->replaceChild($el, $child);
 
 // Same with DOMComment
 $comment = new DOMComment('test');

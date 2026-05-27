@@ -914,8 +914,9 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // TNamedObject(X) satisfies self(X) / static(X) with same FQCN
         (Atomic::TNamedObject { fqcn: a, .. }, Atomic::TSelf { fqcn: b }) => a == b,
         (Atomic::TNamedObject { fqcn: a, .. }, Atomic::TStaticObject { fqcn: b }) => a == b,
-        // Bare generic accepts parameterized form: ObjectProphecy accepts ObjectProphecy<T>
-        // (sup has empty type_params, sub has any type_params with same FQCN)
+        // Bare generic property accepts parameterized value: Box accepts Box<string>.
+        // The reverse is NOT true — bare Box value does not satisfy Box<string> property
+        // (invariant check). Only sup being bare (empty type_params) is the wildcard.
         (
             Atomic::TNamedObject {
                 fqcn: sub_fqcn,
@@ -925,10 +926,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 fqcn: sup_fqcn,
                 type_params: sup_params,
             },
-        ) => {
-            sub_fqcn == sup_fqcn
-                && (sup_params.is_empty() || sub_params.is_empty() || sub_params == sup_params)
-        }
+        ) => sub_fqcn == sup_fqcn && (sup_params.is_empty() || sub_params == sup_params),
 
         // Literal int widens to float in PHP
         (Atomic::TLiteralInt(_), Atomic::TFloat) => true,

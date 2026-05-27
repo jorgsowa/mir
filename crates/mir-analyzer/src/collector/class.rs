@@ -104,13 +104,17 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let prop_name = p.name.as_deref().unwrap_or_default();
+                    let hint_ty = self.resolve_union_opt(
+                        p.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    // @var docblock overrides the PHP type hint when present, allowing
+                    // @var Box<string> to refine a bare Box declaration with type params.
+                    let ty = prop_doc.var_type.map(|t| self.resolve_union(t)).or(hint_ty);
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
-                        ty: self.resolve_union_opt(
-                            p.type_hint
-                                .as_ref()
-                                .map(|h| type_from_hint_owned(h, Some(&fqcn))),
-                        ),
+                        ty,
                         inferred_ty: None,
                         visibility: Self::convert_visibility(p.visibility),
                         is_static: p.is_static,
