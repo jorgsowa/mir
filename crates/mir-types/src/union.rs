@@ -795,7 +795,14 @@ impl Type {
                             result.add_type(t);
                         }
                     } else {
-                        result.add_type(atomic);
+                        // Cannot resolve at this call site: widen to the union of both branches
+                        // so downstream callers see a concrete type rather than an opaque conditional.
+                        for t in if_true.types.iter() {
+                            result.add_type(t.clone());
+                        }
+                        for t in if_false.types.iter() {
+                            result.add_type(t.clone());
+                        }
                     }
                 }
                 other => result.add_type(other),
@@ -1502,7 +1509,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_conditional_is_null_nullable_arg_stays_unresolved() {
+    fn resolve_conditional_is_null_nullable_arg_widens_to_branch_union() {
         let mut nullable_str = Type::single(Atomic::TString);
         nullable_str.add_type(Atomic::TNull);
         let ty = Type::single(Atomic::TConditional {
@@ -1518,9 +1525,10 @@ mod tests {
                 None
             }
         });
-        // uncertain — keep as TConditional
-        assert!(result.types.len() == 1);
-        assert!(matches!(result.types[0], Atomic::TConditional { .. }));
+        // uncertain discriminator → widen to if_true | if_false
+        assert_eq!(result.types.len(), 2);
+        assert!(result.types.iter().any(|t| matches!(t, Atomic::TInt)));
+        assert!(result.types.iter().any(|t| matches!(t, Atomic::TString)));
     }
 
     #[test]
