@@ -192,7 +192,10 @@ pub(crate) fn find_preceding_docblock(source: &str, offset: u32) -> Option<Strin
         return None;
     }
     let end = trimmed.rfind("*/")?;
-    let start = trimmed[..end].rfind("/**")?;
+    // Prefer /** docblocks; fall back to /* for inline @var annotations (e.g. Yii2 view files).
+    let start = trimmed[..end]
+        .rfind("/**")
+        .or_else(|| trimmed[..end].rfind("/*"))?;
     Some(trimmed[start..end + 2].to_string())
 }
 
