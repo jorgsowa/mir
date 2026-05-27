@@ -250,9 +250,20 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
                 return Atomic::TNamedObject { fqcn, type_params };
             }
             let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
-            Atomic::TNamedObject {
-                fqcn: resolved.into(),
-                type_params,
+            if type_params.is_empty() {
+                Atomic::TNamedObject {
+                    fqcn: resolved.into(),
+                    type_params,
+                }
+            } else {
+                let new_params: Vec<mir_types::Type> = type_params
+                    .iter()
+                    .map(|p| resolve_union_for_file(p.clone(), db, file))
+                    .collect();
+                Atomic::TNamedObject {
+                    fqcn: resolved.into(),
+                    type_params: mir_types::union::vec_to_type_params(new_params),
+                }
             }
         }
         Atomic::TClassString(Some(cls)) => {

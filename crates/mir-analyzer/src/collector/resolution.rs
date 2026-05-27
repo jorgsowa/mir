@@ -1,4 +1,4 @@
-use mir_types::{Atomic, Name, Type};
+use mir_types::{union::vec_to_type_params, Atomic, Name, Type};
 use rustc_hash::FxHashMap;
 
 pub(super) fn resolve_name(
@@ -85,9 +85,20 @@ pub(super) fn resolve_atomic_inner(
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
             let resolved = resolve_type_name(fqcn.as_str(), full_qualify, namespace, use_aliases);
-            Atomic::TNamedObject {
-                fqcn: resolved,
-                type_params,
+            if type_params.is_empty() {
+                Atomic::TNamedObject {
+                    fqcn: resolved,
+                    type_params,
+                }
+            } else {
+                let new_params: Vec<Type> = type_params
+                    .iter()
+                    .map(|p| resolve_union_inner(p.clone(), full_qualify, namespace, use_aliases))
+                    .collect();
+                Atomic::TNamedObject {
+                    fqcn: resolved,
+                    type_params: vec_to_type_params(new_params),
+                }
             }
         }
         Atomic::TClassString(Some(cls)) => {
