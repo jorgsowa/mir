@@ -212,23 +212,39 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             ExprKind::StaticPropertyAccess(_) => {}
             ExprKind::ArrayAccess(aa) => {
-                let key_ty = if let Some(idx) = &aa.index {
+                // Collect the full index chain from outermost to innermost.
+                // For `$arr[$a][$b] = $val`, this gives [type($b), type($a)].
+                // The base variable's key is the innermost (last in vec), and
+                // intermediate indices are used to wrap the value type.
+                let outer_key = if let Some(idx) = &aa.index {
                     self.analyze(idx, ctx)
                 } else {
                     Type::mixed()
                 };
+                let mut key_chain: Vec<Type> = vec![outer_key];
                 let mut base: &Expr = &aa.array;
                 loop {
                     match &base.kind {
                         ExprKind::Variable(name) => {
                             let name_str = name.trim_start_matches('$');
+                            // Base key: innermost index in the chain (closest to $arr).
+                            let base_key = key_chain.last().unwrap().clone();
+                            // Wrap the assigned value with intermediate keys (outermost first).
+                            // For single-level ($arr[$k] = $v): no wrapping, value stays as-is.
+                            let mut wrapped_value = ty.clone();
+                            for k in key_chain[..key_chain.len() - 1].iter().rev() {
+                                wrapped_value = Type::single(Atomic::TArray {
+                                    key: Box::new(k.clone()),
+                                    value: Box::new(wrapped_value),
+                                });
+                            }
                             if !ctx.var_is_defined(name_str) {
                                 let name_sym = mir_types::Name::from(name_str);
                                 std::sync::Arc::make_mut(&mut ctx.vars).insert(
                                     name_sym,
                                     std::sync::Arc::new(Type::single(Atomic::TArray {
-                                        key: Box::new(key_ty.clone()),
-                                        value: Box::new(ty.clone()),
+                                        key: Box::new(base_key),
+                                        value: Box::new(wrapped_value),
                                     })),
                                 );
                                 std::sync::Arc::make_mut(&mut ctx.assigned_vars).insert(name_sym);
@@ -239,16 +255,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             } else {
                                 let current = ctx.get_var(name_str);
-                                let updated =
-                                    widen_array_with_value_and_key(&current, &ty, &key_ty);
+                                let updated = widen_array_with_value_and_key(
+                                    &current,
+                                    &wrapped_value,
+                                    &base_key,
+                                );
                                 ctx.set_var(name_str, updated);
                             }
                             break;
                         }
                         ExprKind::ArrayAccess(inner) => {
-                            if let Some(idx) = &inner.index {
-                                self.analyze(idx, ctx);
-                            }
+                            let inner_key = if let Some(idx) = &inner.index {
+                                self.analyze(idx, ctx)
+                            } else {
+                                Type::mixed()
+                            };
+                            key_chain.push(inner_key);
                             base = &inner.array;
                         }
                         _ => break,
