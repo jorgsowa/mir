@@ -10,6 +10,4 @@ function getKeys() {
 }
 
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO
+InvalidReturnType@6:5: Return type 'list<string>' is not compatible with declared 'list<int>'

@@ -66,7 +66,8 @@ function array_replace_recursive(array $array, array ...$replacements): array {}
 /**
  * Return all the keys or a subset of the keys of an array
  * @link https://php.net/manual/en/function.array-keys.php
- * @param array $array <p>
+ * @template TKey of int|string
+ * @param array<TKey, mixed> $array <p>
  * An array containing keys to return.
  * </p>
  * @param mixed $filter_value [optional] <p>
@@ -75,7 +76,7 @@ function array_replace_recursive(array $array, array ...$replacements): array {}
  * @param bool $strict [optional] <p>
  * Determines if strict comparison (===) should be used during the search.
  * </p>
- * @return int[]|string[] an array of all the keys in input.
+ * @return list<TKey> an array of all the keys in input.
  */
 #[Pure]
 function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array {}
