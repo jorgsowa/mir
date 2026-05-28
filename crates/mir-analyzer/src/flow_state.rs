@@ -381,6 +381,10 @@ impl FlowState {
         if if_ctx.diverges && !else_ctx.diverges {
             let mut result = else_ctx;
             result.diverges = false;
+            // Variables read in the diverging branch still count as used.
+            for name in if_ctx.read_vars.iter() {
+                result.read_vars.insert(*name);
+            }
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -388,12 +392,20 @@ impl FlowState {
         if else_ctx.diverges && !if_ctx.diverges {
             let mut result = if_ctx;
             result.diverges = false;
+            // Variables read in the diverging branch still count as used.
+            for name in else_ctx.read_vars.iter() {
+                result.read_vars.insert(*name);
+            }
             return result;
         }
         // If both diverge, the code after the if is unreachable.
         if if_ctx.diverges && else_ctx.diverges {
             let mut result = pre.clone();
             result.diverges = true;
+            // Variables read in either diverging branch still count as used.
+            for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
+                result.read_vars.insert(*name);
+            }
             return result;
         }
 
