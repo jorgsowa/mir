@@ -301,7 +301,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         if expr_name_str(&cca.member) == Some("class") {
-            let fqcn = if let ExprKind::Identifier(id) = &cca.class.kind {
+            if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                     if !crate::db::class_exists(self.db, &resolved) {
@@ -315,11 +315,31 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     self.record_ref(Arc::from(resolved.as_str()), cca.class.span);
                 }
-                Some(mir_types::Name::from(resolved.as_str()))
-            } else {
-                None
-            };
-            return Type::single(Atomic::TClassString(fqcn));
+                return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
+                    resolved.as_str(),
+                ))));
+            }
+
+            // For $obj::class, derive class-string<T> from the object's declared type.
+            if let ExprKind::Variable(var_name) = &cca.class.kind {
+                let obj_ty = ctx.get_var(var_name.as_ref());
+                let mut result = Type::empty();
+                for atomic in &obj_ty.types {
+                    match atomic {
+                        Atomic::TNamedObject { fqcn, .. }
+                        | Atomic::TSelf { fqcn }
+                        | Atomic::TStaticObject { fqcn } => {
+                            result.add_type(Atomic::TClassString(Some(*fqcn)));
+                        }
+                        _ => {}
+                    }
+                }
+                if !result.types.is_empty() {
+                    return result;
+                }
+            }
+
+            return Type::single(Atomic::TClassString(None));
         }
 
         let const_name = match expr_name_str(&cca.member) {
