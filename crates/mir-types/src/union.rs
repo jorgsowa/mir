@@ -899,6 +899,13 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // Top types — anything goes in both directions for mixed
         (_, Atomic::TMixed) => true,
         (Atomic::TMixed, _) => true,
+        // Template param in supertype position: any value satisfies an unconstrained
+        // template (as_type = mixed), or a constrained one if it satisfies the bound.
+        // This handles union bounds like `T of string|list<I>|array<K, V>` where
+        // I/K/V are free template params — any type satisfies them structurally.
+        (_, Atomic::TTemplateParam { as_type, .. }) => {
+            as_type.is_mixed() || as_type.types.iter().any(|b| atomic_subtype(sub, b))
+        }
 
         // Scalars
         (Atomic::TLiteralInt(_), Atomic::TInt) => true,
@@ -1064,9 +1071,6 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 && !properties.is_empty()
                 && properties.values().all(|p| p.ty.is_subtype_structural(lv))
         }
-
-        // A template parameter T acts as a wildcard — any type satisfies it.
-        (_, Atomic::TTemplateParam { .. }) => true,
 
         _ => false,
     }
