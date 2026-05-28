@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2026-05-28
+
+### Fixed
+
+- `$argv` and `$argc` are now seeded as predefined globals, eliminating `UndefinedVariable` false positives in CLI scripts.
+- Single-star `/* @var $this */` annotations (the form PhpStorm generates for Yii2 view templates) are now recognized in addition to `/**` PHPDoc blocks. Fixes #290.
+- `PossiblyUndefinedVariable` false positives eliminated for variables assigned inside `while(true)` and `for(;;)` loops before every `break`. Infinite loops no longer treat the "loop never executes" path as reachable.
+- `UnusedVariable` and `UnusedParam` false positives eliminated for variables read only inside a diverging if-branch (one that always `return`s or `throw`s).
+
+### Changed
+
+- Upgraded `php-rs-parser`, `php-ast`, `php-lexer`, and `phpdoc-parser` to 0.15.0. Function and closure bodies are now wrapped in a `Block` type; class/enum/interface/trait members are behind `ClassBody`/`EnumBody` wrappers.
+
 ## [0.29.0] - 2026-05-27
 
 ### Added
