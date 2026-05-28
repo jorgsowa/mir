@@ -233,7 +233,10 @@ pub(crate) fn load_stubs(db: &mut MirDbStorage) {
 /// so multiple declarations of the same name (e.g. `each` on PHP 7 vs.
 /// PHP 8) gated by `@since`/`@removed` collapse to the one matching variant.
 #[allow(dead_code)]
-pub(crate) fn load_stubs_for_version(db: &mut MirDbStorage, _php_version: PhpVersion) {
+pub(crate) fn load_stubs_for_version(db: &mut MirDbStorage, php_version: PhpVersion) {
+    // Wire the target version before registering any SourceFile inputs so
+    // collect_file_definitions reads the right version for @since/@removed filtering.
+    db.set_php_version(Arc::from(php_version.to_string().as_str()));
     // Register each stub file's text as a salsa `SourceFile` input.
     // `find_class_like` / `find_function` resolve built-in PHP symbols by
     // routing through the `StubClassResolver` we install below.
@@ -479,7 +482,6 @@ mod tests {
         db
     }
 
-    #[allow(dead_code)]
     fn stubs_codebase_for(version: PhpVersion) -> MirDbStorage {
         let mut db = MirDbStorage::default();
         load_stubs_for_version(&mut db, version);
@@ -525,9 +527,54 @@ mod tests {
         );
     }
 
-    // since_tag_excludes_constant_below_target and
-    // removed_tag_excludes_function_at_or_after_target deleted:
-    // pull-path version filtering is a Phase-5 follow-up.
+    #[test]
+    fn since_tag_excludes_function_below_target() {
+        let cb = stubs_codebase_for(PhpVersion::new(7, 4));
+        assert!(
+            !function_exists(&cb, "str_contains"),
+            "str_contains (@since 8.0) must be absent on PHP 7.4"
+        );
+        assert!(
+            !function_exists(&cb, "str_starts_with"),
+            "str_starts_with (@since 8.0) must be absent on PHP 7.4"
+        );
+        assert!(
+            !function_exists(&cb, "array_is_list"),
+            "array_is_list (@since 8.1) must be absent on PHP 7.4"
+        );
+
+        let cb80 = stubs_codebase_for(PhpVersion::new(8, 0));
+        assert!(
+            function_exists(&cb80, "str_contains"),
+            "str_contains must be present on PHP 8.0"
+        );
+        assert!(
+            !function_exists(&cb80, "array_is_list"),
+            "array_is_list (@since 8.1) must be absent on PHP 8.0"
+        );
+
+        let cb81 = stubs_codebase_for(PhpVersion::new(8, 1));
+        assert!(
+            function_exists(&cb81, "array_is_list"),
+            "array_is_list must be present on PHP 8.1"
+        );
+    }
+
+    #[test]
+    fn removed_tag_excludes_function_at_or_after_target() {
+        // hebrevc() was removed in PHP 8.0 (@removed 8.0).
+        let cb74 = stubs_codebase_for(PhpVersion::new(7, 4));
+        assert!(
+            function_exists(&cb74, "hebrevc"),
+            "hebrevc must be present on PHP 7.4"
+        );
+
+        let cb80 = stubs_codebase_for(PhpVersion::new(8, 0));
+        assert!(
+            !function_exists(&cb80, "hebrevc"),
+            "hebrevc (@removed 8.0) must be absent on PHP 8.0"
+        );
+    }
 
     fn assert_fn(cb: &MirDbStorage, name: &str) {
         assert!(

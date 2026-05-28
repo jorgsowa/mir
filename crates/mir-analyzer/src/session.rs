@@ -92,8 +92,12 @@ const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 impl AnalysisSession {
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
+        let db = Arc::new(AnalyzerDb::new());
+        db.salsa
+            .write()
+            .set_php_version(Arc::from(php_version.to_string().as_str()));
         Self {
-            db: Arc::new(AnalyzerDb::new()),
+            db,
             cache: None,
             psr4: None,
             resolver: None,
@@ -132,6 +136,10 @@ impl AnalysisSession {
         );
         let dir = cache.cache_dir().to_path_buf();
         self.db = Arc::new(AnalyzerDb::new().with_cache_dir(&dir));
+        self.db
+            .salsa
+            .write()
+            .set_php_version(Arc::from(self.php_version.to_string().as_str()));
         self.cache = Some(cache);
         self
     }
@@ -151,6 +159,10 @@ impl AnalysisSession {
             "AnalysisSession::with_cache_dir must be called before any file is ingested"
         );
         self.db = Arc::new(AnalyzerDb::new().with_cache_dir(cache_dir));
+        self.db
+            .salsa
+            .write()
+            .set_php_version(Arc::from(self.php_version.to_string().as_str()));
         self.cache = Some(Arc::new(AnalysisCache::open(cache_dir)));
         self
     }

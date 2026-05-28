@@ -181,6 +181,204 @@ function encode(array $data): string {
     );
 }
 
+// ── Version-filtering helpers ────────────────────────────────────────────────
+
+/// Run `FileAnalyzer` on `src` inside `session` and return all issue-kind
+/// names. A fresh file path is used each time so there is no cross-test
+/// ingestion state.
+fn version_test_issues(session: &AnalysisSession, src: &str) -> Vec<String> {
+    let file: Arc<str> = Arc::from("<version-test>");
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    FileAnalyzer::new(session)
+        .analyze(file, src, &parsed.program, &parsed.source_map)
+        .issues
+        .iter()
+        .map(|i| i.kind.name().to_string())
+        .collect()
+}
+
+// ── @since filtering ─────────────────────────────────────────────────────────
+
+/// PHP 7.4 session must reject `str_contains` (`@since 8.0`) in the
+/// FileAnalyzer (LSP / incremental) path.
+///
+/// Discriminator: `strlen` has no `@since` tag and lives in the same
+/// `Core/Core.php` stub file as `str_contains`. It must be present on PHP 7.4,
+/// proving that Core.php was loaded AND that filtering was selective rather
+/// than a blanket load failure.
+#[test]
+fn version_filter_since_php74_rejects_php80_function() {
+    let session = AnalysisSession::new(PhpVersion::new(7, 4));
+    session.ensure_all_stubs();
+
+    assert!(
+        session.contains_function("strlen"),
+        "strlen (no @since) must be present on PHP 7.4 — Core.php must have been loaded"
+    );
+    assert!(
+        !session.contains_function("str_contains"),
+        "str_contains (@since 8.0) must be absent on PHP 7.4"
+    );
+
+    let issues = version_test_issues(&session, "<?php\nstr_contains('hello', 'x');\n");
+    assert!(
+        issues.iter().any(|n| n == "UndefinedFunction"),
+        "FileAnalyzer must emit UndefinedFunction for str_contains on PHP 7.4; got: {issues:?}"
+    );
+}
+
+/// PHP 8.0 session must accept `str_contains` (introduced in 8.0).
+///
+/// Same discriminator: both `strlen` and `str_contains` must be present,
+/// proving Core.php was loaded and the symbol passed the version filter.
+#[test]
+fn version_filter_since_php80_accepts_php80_function() {
+    let session = AnalysisSession::new(PhpVersion::new(8, 0));
+    session.ensure_all_stubs();
+
+    assert!(
+        session.contains_function("strlen"),
+        "strlen must be present on PHP 8.0"
+    );
+    assert!(
+        session.contains_function("str_contains"),
+        "str_contains (@since 8.0) must be present on PHP 8.0"
+    );
+
+    let issues = version_test_issues(&session, "<?php\nstr_contains('hello', 'x');\n");
+    assert!(
+        !issues.iter().any(|n| n == "UndefinedFunction"),
+        "str_contains must be defined on PHP 8.0; got: {issues:?}"
+    );
+}
+
+// ── @removed filtering ───────────────────────────────────────────────────────
+
+/// `hebrevc` is `@removed 8.0`. It must be resolvable on PHP 7.4 …
+#[test]
+fn version_filter_removed_php74_accepts_hebrevc() {
+    let session = AnalysisSession::new(PhpVersion::new(7, 4));
+    session.ensure_all_stubs();
+
+    assert!(
+        session.contains_function("hebrevc"),
+        "hebrevc (@removed 8.0) must be present on PHP 7.4"
+    );
+
+    let issues = version_test_issues(&session, "<?php\nhebrevc('hello');\n");
+    assert!(
+        !issues.iter().any(|n| n == "UndefinedFunction"),
+        "hebrevc must be defined on PHP 7.4; got: {issues:?}"
+    );
+}
+
+/// … and must be absent (and raise `UndefinedFunction`) on PHP 8.0.
+#[test]
+fn version_filter_removed_php80_rejects_hebrevc() {
+    let session = AnalysisSession::new(PhpVersion::new(8, 0));
+    session.ensure_all_stubs();
+
+    assert!(
+        !session.contains_function("hebrevc"),
+        "hebrevc (@removed 8.0) must be absent on PHP 8.0"
+    );
+
+    let issues = version_test_issues(&session, "<?php\nhebrevc('hello');\n");
+    assert!(
+        issues.iter().any(|n| n == "UndefinedFunction"),
+        "FileAnalyzer must emit UndefinedFunction for hebrevc on PHP 8.0; got: {issues:?}"
+    );
+}
+
+// ── Secondary regression guards: with_cache_dir / with_cache paths ───────────
+
+/// `with_cache_dir` rebuilds `self.db`; the fix must re-apply `php_version`
+/// after the rebuild so version filtering is not silently reset to the "8.2"
+/// default.
+#[test]
+fn version_filter_with_cache_dir_preserves_version() {
+    let cache_dir = create_temp_dir("ver_cache_dir");
+    let session = AnalysisSession::new(PhpVersion::new(7, 4)).with_cache_dir(cache_dir.path());
+    session.ensure_all_stubs();
+
+    assert!(
+        session.contains_function("strlen"),
+        "strlen must be present after with_cache_dir on PHP 7.4"
+    );
+    assert!(
+        !session.contains_function("str_contains"),
+        "str_contains must be filtered after with_cache_dir on PHP 7.4"
+    );
+
+    let issues = version_test_issues(&session, "<?php\nstr_contains('hello', 'x');\n");
+    assert!(
+        issues.iter().any(|n| n == "UndefinedFunction"),
+        "with_cache_dir must not silently reset php_version to 8.2; got: {issues:?}"
+    );
+}
+
+/// `with_cache` also rebuilds `self.db`; the same fix must apply.
+#[test]
+fn version_filter_with_cache_preserves_version() {
+    use mir_analyzer::cache::AnalysisCache;
+
+    let cache_dir = create_temp_dir("ver_cache");
+    let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let session = AnalysisSession::new(PhpVersion::new(7, 4)).with_cache(cache);
+    session.ensure_all_stubs();
+
+    assert!(
+        session.contains_function("strlen"),
+        "strlen must be present after with_cache on PHP 7.4"
+    );
+    assert!(
+        !session.contains_function("str_contains"),
+        "str_contains must be filtered after with_cache on PHP 7.4"
+    );
+
+    let issues = version_test_issues(&session, "<?php\nstr_contains('hello', 'x');\n");
+    assert!(
+        issues.iter().any(|n| n == "UndefinedFunction"),
+        "with_cache must not silently reset php_version to 8.2; got: {issues:?}"
+    );
+}
+
+// ── Session isolation ─────────────────────────────────────────────────────────
+
+/// Two independent sessions at different PHP versions must not share salsa db
+/// state. A PHP 8.0 session created first must not contaminate a PHP 7.4
+/// session created afterwards.
+#[test]
+fn version_filter_independent_sessions_do_not_share_state() {
+    let session_80 = AnalysisSession::new(PhpVersion::new(8, 0));
+    let session_74 = AnalysisSession::new(PhpVersion::new(7, 4));
+
+    session_80.ensure_all_stubs();
+    session_74.ensure_all_stubs();
+
+    assert!(
+        session_80.contains_function("str_contains"),
+        "str_contains must be present in the PHP 8.0 session"
+    );
+    assert!(
+        !session_74.contains_function("str_contains"),
+        "str_contains must be absent in the PHP 7.4 session even when a PHP 8.0 session exists"
+    );
+
+    let issues_74 = version_test_issues(&session_74, "<?php\nstr_contains('a', 'b');\n");
+    assert!(
+        issues_74.iter().any(|n| n == "UndefinedFunction"),
+        "PHP 7.4 session must produce UndefinedFunction for str_contains even with a PHP 8.0 session alive; got: {issues_74:?}"
+    );
+
+    let issues_80 = version_test_issues(&session_80, "<?php\nstr_contains('a', 'b');\n");
+    assert!(
+        !issues_80.iter().any(|n| n == "UndefinedFunction"),
+        "PHP 8.0 session must not produce UndefinedFunction for str_contains; got: {issues_80:?}"
+    );
+}
+
 /// Go-to-definition flow: find a symbol at the cursor, then resolve its
 /// declaration location. Verifies that `FileAnalysis::symbol_at` and
 /// `AnalysisSession::definition_of` compose into the expected end-to-end
