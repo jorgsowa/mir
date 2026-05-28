@@ -1,5 +1,6 @@
 use mir_types::{Atomic, Name, Type};
 use php_ast::owned::{Expr, ExprKind};
+use rustc_hash::FxHashSet;
 
 use crate::subtype::is_subtype;
 
@@ -223,6 +224,29 @@ pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
         ExprKind::String(s) => Some(s.to_string()),
         _ => None,
     }
+}
+
+/// Returns true if `ty` contains any reference to a template param name from `names`,
+/// including names nested inside generic type arguments (e.g. `R` inside `Result<Throwable, R>`).
+/// Handles both `TTemplateParam` and the docblock-parser workaround where bare unqualified names
+/// are emitted as `TNamedObject { fqcn: "T", type_params: [] }`.
+pub(crate) fn type_refs_any_template(ty: &Type, names: &FxHashSet<Name>) -> bool {
+    fn check_atomic(a: &Atomic, names: &FxHashSet<Name>) -> bool {
+        match a {
+            Atomic::TTemplateParam { name, .. } => names.contains(name),
+            Atomic::TNamedObject { fqcn, type_params } => {
+                if type_params.is_empty() && !fqcn.contains('\\') && names.contains(fqcn) {
+                    return true;
+                }
+                type_params
+                    .iter()
+                    .any(|tp| tp.types.iter().any(|a| check_atomic(a, names)))
+            }
+            Atomic::TClassString(Some(inner)) => !inner.contains('\\') && names.contains(inner),
+            _ => false,
+        }
+    }
+    ty.types.iter().any(|a| check_atomic(a, names))
 }
 
 fn scalar_types_compatible(value_ty: &Type, prop_ty: &Type) -> bool {

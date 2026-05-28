@@ -1,6 +1,6 @@
 use super::helpers::{
     extract_simple_var, extract_string_from_expr, infer_arithmetic, property_assign_compatible,
-    widen_array_with_value_and_key,
+    type_refs_any_template, widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -9,6 +9,7 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::AssignOp;
 use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
+use rustc_hash::FxHashSet;
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_assign(
@@ -161,19 +162,47 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                                 if let Some(prop_ty) = &prop_ty {
-                                    if !prop_ty.is_mixed()
-                                        && !ty.is_mixed()
-                                        && !property_assign_compatible(&ty, prop_ty, self.db)
-                                    {
-                                        self.emit(
-                                            IssueKind::InvalidPropertyAssignment {
-                                                property: prop_name.clone(),
-                                                expected: format!("{prop_ty}"),
-                                                actual: format!("{ty}"),
-                                            },
-                                            Severity::Warning,
-                                            span,
-                                        );
+                                    if !prop_ty.is_mixed() && !ty.is_mixed() {
+                                        // Collect all template param names in scope: class-level
+                                        // (from the receiver's class) and method-level.
+                                        let class_tp_names: FxHashSet<mir_types::Name> =
+                                            crate::db::class_template_params(
+                                                self.db,
+                                                fqcn.as_ref(),
+                                            )
+                                            .map(|tps| {
+                                                tps.iter()
+                                                    .map(|tp| {
+                                                        mir_types::Name::from(tp.name.as_ref())
+                                                    })
+                                                    .collect()
+                                            })
+                                            .unwrap_or_default();
+                                        // Skip the check if prop_ty or ty references any
+                                        // unresolvable template param (class-level or
+                                        // method-level). Inside a generic class, $this carries
+                                        // no concrete type args, so class templates in prop_ty
+                                        // can't be resolved, and method templates in ty are
+                                        // likewise unknown.
+                                        let skip = type_refs_any_template(prop_ty, &class_tp_names)
+                                            || type_refs_any_template(&ty, &class_tp_names)
+                                            || type_refs_any_template(
+                                                &ty,
+                                                &ctx.template_param_names,
+                                            );
+                                        if !skip
+                                            && !property_assign_compatible(&ty, prop_ty, self.db)
+                                        {
+                                            self.emit(
+                                                IssueKind::InvalidPropertyAssignment {
+                                                    property: prop_name.clone(),
+                                                    expected: format!("{prop_ty}"),
+                                                    actual: format!("{ty}"),
+                                                },
+                                                Severity::Warning,
+                                                span,
+                                            );
+                                        }
                                     }
                                 }
                             }
