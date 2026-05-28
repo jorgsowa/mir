@@ -54,15 +54,16 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                 // For parameterized classes we can only reason about the
                 // hierarchy when the supertype is bare (no `<...>`), the
                 // supertype's params are all unbound template vars (e.g.
-                // `Base<K, V>` where `K`/`V` are free), or both sides match
-                // exactly. Walking the parent's `@extends Foo<X>` to
-                // translate type params through inheritance is out of scope
-                // here; rejecting otherwise keeps invariant generic checks
-                // honest (`Box<int>` is not interchangeable with
-                // `Box<string>` even though `Box extends Box`).
+                // `Base<K, V>` where `K`/`V` are free), both sides match
+                // exactly, or the sub's params are free:
+                // - `mixed` explicitly opts out of type-param checking
+                //   (mirrors Psalm/PHPStan behaviour for `mixed` args)
+                // - `never` is the bottom type and a subtype of every type
                 let params_ok = sup_params.is_empty()
                     || sub_params == sup_params
-                    || sup_params.iter().all(sup_param_is_free);
+                    || sup_params.iter().all(sup_param_is_free)
+                    || (!sub_params.is_empty()
+                        && sub_params.iter().all(|p| p.is_mixed() || p.is_never()));
                 params_ok && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
             }
             (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TIntersection { parts }) => {

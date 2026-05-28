@@ -16,6 +16,7 @@ use super::args::{
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
+use crate::generic::infer_template_bindings;
 
 fn extract_namespace(fqcn: &str) -> Option<&str> {
     if let Some(pos) = fqcn.rfind('\\') {
@@ -214,7 +215,17 @@ impl CallAnalyzer {
                 },
             );
             let ret_raw = resolved.return_ty_raw;
-            let ret = substitute_static_in_return(ret_raw, &fqcn_arc);
+            let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc);
+            let ret = if !resolved.template_params.is_empty() {
+                let bindings = infer_template_bindings(
+                    &resolved.template_params,
+                    &resolved.params,
+                    &arg_types,
+                );
+                ret_substituted.substitute_templates(&bindings)
+            } else {
+                ret_substituted
+            };
             ea.record_symbol(
                 call.method.span,
                 ReferenceKind::StaticCall {
