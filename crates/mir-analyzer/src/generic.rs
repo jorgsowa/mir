@@ -188,6 +188,37 @@ fn infer_from_pair(
                 entry.merge_with(bind);
             }
 
+            // non-empty-array<K, V> matched against array<k_ty, v_ty> or array{...}
+            // Same inference logic as TArray below — delegates to the TArray handler.
+            Atomic::TNonEmptyArray { key: pk, value: pv } => {
+                for a_atomic in &arg_ty.types {
+                    match a_atomic {
+                        Atomic::TArray { key: ak, value: av }
+                        | Atomic::TNonEmptyArray { key: ak, value: av } => {
+                            infer_from_pair(pk, ak, template_names, bindings);
+                            infer_from_pair(pv, av, template_names, bindings);
+                        }
+                        Atomic::TKeyedArray { properties, .. } => {
+                            let mut key_union = Type::empty();
+                            let mut val_union = Type::empty();
+                            for (k, prop) in properties {
+                                let key_atomic = match k {
+                                    ArrayKey::String(_) => Atomic::TString,
+                                    ArrayKey::Int(_) => Atomic::TInt,
+                                };
+                                key_union.add_type(key_atomic);
+                                val_union.merge_with(&prop.ty);
+                            }
+                            if !key_union.types.is_empty() {
+                                infer_from_pair(pk, &key_union, template_names, bindings);
+                                infer_from_pair(pv, &val_union, template_names, bindings);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
             // array<K, V> matched against array<k_ty, v_ty> or array{...}
             Atomic::TArray { key: pk, value: pv } => {
                 for a_atomic in &arg_ty.types {

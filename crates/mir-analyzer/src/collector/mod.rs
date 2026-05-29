@@ -404,6 +404,61 @@ impl<'a> DefinitionCollector<'a> {
                         parts: mir_types::union::vec_to_type_params(new_parts),
                     });
                 }
+                // Array types: recurse into key and value with template awareness so that
+                // bare template names like `L` inside `array<int, L>` are converted to
+                // TTemplateParam rather than left as unresolved TNamedObject references.
+                mir_types::Atomic::TArray { key, value } => {
+                    result.add_type(mir_types::Atomic::TArray {
+                        key: Box::new(self.resolve_union_doc_with_templates(
+                            *key.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                        value: Box::new(self.resolve_union_doc_with_templates(
+                            *value.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TNonEmptyArray { key, value } => {
+                    result.add_type(mir_types::Atomic::TNonEmptyArray {
+                        key: Box::new(self.resolve_union_doc_with_templates(
+                            *key.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                        value: Box::new(self.resolve_union_doc_with_templates(
+                            *value.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TList { value } => {
+                    result.add_type(mir_types::Atomic::TList {
+                        value: Box::new(self.resolve_union_doc_with_templates(
+                            *value.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TNonEmptyList { value } => {
+                    result.add_type(mir_types::Atomic::TNonEmptyList {
+                        value: Box::new(self.resolve_union_doc_with_templates(
+                            *value.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                    });
+                }
                 // Conditional return type: recurse into subject and both branches with the
                 // same template context so class names and template references inside them
                 // are resolved correctly.
