@@ -467,7 +467,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
     const endCol    = colEnd > 0 ? colEnd : lineText.length;
 
     const top   = padTop + (line - 1) * lineH + lineH - 4 - input.scrollTop;
-    const left  = padLeft + colStart * cw - input.scrollLeft;
+    const left  = padLeft + (colStart - 1) * cw - input.scrollLeft;
     const width = Math.max(cw * 2, (endCol - colStart) * cw);
 
     const colors = { error: 'var(--mir-error)', warning: 'var(--mir-warning)', info: 'var(--mir-gold)' };
