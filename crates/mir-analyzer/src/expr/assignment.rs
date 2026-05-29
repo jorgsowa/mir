@@ -59,10 +59,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 result_ty
             }
             AssignOp::Coalesce => {
-                let old_suppress = self.suppress_undefined_errors;
-                self.suppress_undefined_errors = true;
-                let lhs_ty = self.analyze(&a.target, ctx);
-                self.suppress_undefined_errors = old_suppress;
+                let lhs_ty = self.with_existence_check(|ea| ea.analyze(&a.target, ctx));
                 let merged = Type::merge(&lhs_ty.remove_null(), &rhs_ty);
                 if let Some(var_name) = extract_simple_var(&a.target) {
                     ctx.set_var(&var_name, merged.clone());

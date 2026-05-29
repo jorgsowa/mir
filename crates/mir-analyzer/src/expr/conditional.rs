@@ -54,10 +54,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         nc: &NullCoalesceExpr,
         ctx: &mut FlowState,
     ) -> Type {
-        let old_suppress = self.suppress_undefined_errors;
-        self.suppress_undefined_errors = true;
-        let left_ty = self.analyze(&nc.left, ctx);
-        self.suppress_undefined_errors = old_suppress;
+        let left_ty = self.with_existence_check(|ea| ea.analyze(&nc.left, ctx));
         let right_ty = self.analyze(&nc.right, ctx);
         let non_null_left = left_ty.remove_null();
         if non_null_left.is_empty() {

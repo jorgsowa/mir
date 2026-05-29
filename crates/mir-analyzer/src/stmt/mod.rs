@@ -38,12 +38,10 @@ struct VarAnnotation {
     ty: mir_types::Type,
 }
 
-/// Apply post-narrow: after `$x = expr()`, if the preceding `@var` names `$x`,
-/// override the inferred type with the annotated one.
+/// Apply post-narrow: after `$x = expr()`, override the inferred type with the annotated one.
+/// Named `@var Type $x` applies only when the LHS matches. Bare `@var Type` applies to any
+/// simple assignment LHS (it annotates the statement, not a specific variable).
 fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ctx: &mut FlowState) {
-    let Some(ref var_name) = annotation.name else {
-        return;
-    };
     let php_ast::owned::StmtKind::Expression(e) = &stmt.kind else {
         return;
     };
@@ -56,8 +54,16 @@ fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ct
     let php_ast::owned::ExprKind::Variable(lhs_name) = &a.target.kind else {
         return;
     };
-    if lhs_name.trim_start_matches('$') == var_name.as_str() {
-        ctx.set_var(var_name.as_str(), annotation.ty.clone());
+    let lhs = lhs_name.trim_start_matches('$');
+    match &annotation.name {
+        Some(var_name) => {
+            if lhs == var_name.as_str() {
+                ctx.set_var(var_name.as_str(), annotation.ty.clone());
+            }
+        }
+        None => {
+            ctx.set_var(lhs, annotation.ty.clone());
+        }
     }
 }
 

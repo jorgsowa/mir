@@ -41,8 +41,9 @@ pub struct ExpressionAnalyzer<'a> {
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
     pub mode: AnalysisMode,
-    /// When true, suppress UndefinedVariable errors (isset/empty don't error on undefined vars).
-    suppress_undefined_errors: bool,
+    /// When true, we are inside an existence-check context (isset/empty/??) where missing
+    /// variables and missing array offsets are not errors — they are what is being tested.
+    in_existence_check: bool,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -66,8 +67,21 @@ impl<'a> ExpressionAnalyzer<'a> {
             symbols,
             php_version,
             mode,
-            suppress_undefined_errors: false,
+            in_existence_check: false,
         }
+    }
+
+    /// Run `f` in an existence-check context (isset/empty/??/??=), suppressing
+    /// missing-variable and missing-offset diagnostics for the duration.
+    pub(super) fn with_existence_check<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let old = self.in_existence_check;
+        self.in_existence_check = true;
+        let result = f(self);
+        self.in_existence_check = old;
+        result
     }
 
     /// Record a resolved symbol.
@@ -137,21 +151,15 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- isset / empty ----------------------------------------------
             ExprKind::Isset(exprs) => {
-                // isset() doesn't error on undefined variables — it checks if they're defined.
-                let old_suppress = self.suppress_undefined_errors;
-                self.suppress_undefined_errors = true;
-                for e in exprs.iter() {
-                    self.analyze(e, ctx);
-                }
-                self.suppress_undefined_errors = old_suppress;
+                self.with_existence_check(|ea| {
+                    for e in exprs.iter() {
+                        ea.analyze(e, ctx);
+                    }
+                });
                 Type::single(Atomic::TBool)
             }
             ExprKind::Empty(inner) => {
-                // empty() doesn't error on undefined variables — it checks if they're defined.
-                let old_suppress = self.suppress_undefined_errors;
-                self.suppress_undefined_errors = true;
-                self.analyze(inner, ctx);
-                self.suppress_undefined_errors = old_suppress;
+                self.with_existence_check(|ea| ea.analyze(inner, ctx));
                 Type::single(Atomic::TBool)
             }
 

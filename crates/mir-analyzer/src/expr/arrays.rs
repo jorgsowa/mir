@@ -175,7 +175,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Some(prop) = properties.get(key) {
                             return prop.ty.clone();
                         }
-                        if !is_open {
+                        if !is_open && !self.in_existence_check {
                             let key_str = match key {
                                 mir_types::atomic::ArrayKey::String(s) => s.to_string(),
                                 mir_types::atomic::ArrayKey::Int(i) => i.to_string(),

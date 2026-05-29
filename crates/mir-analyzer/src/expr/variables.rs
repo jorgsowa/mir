@@ -16,34 +16,31 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let name_str = name.trim_start_matches('$');
-        if !ctx.var_is_defined(name_str) {
-            // isset() and empty() don't error on undefined variables
-            if !self.suppress_undefined_errors {
-                if ctx.var_possibly_defined(name_str) {
-                    self.emit(
-                        IssueKind::PossiblyUndefinedVariable {
-                            name: name_str.to_string(),
-                        },
-                        Severity::Warning,
-                        expr.span,
-                    );
-                } else if name_str == "this" {
-                    self.emit(
-                        IssueKind::InvalidScope {
-                            in_class: ctx.self_fqcn.is_some(),
-                        },
-                        Severity::Error,
-                        expr.span,
-                    );
-                } else {
-                    self.emit(
-                        IssueKind::UndefinedVariable {
-                            name: name_str.to_string(),
-                        },
-                        Severity::Error,
-                        expr.span,
-                    );
-                }
+        if !ctx.var_is_defined(name_str) && !self.in_existence_check {
+            if ctx.var_possibly_defined(name_str) {
+                self.emit(
+                    IssueKind::PossiblyUndefinedVariable {
+                        name: name_str.to_string(),
+                    },
+                    Severity::Warning,
+                    expr.span,
+                );
+            } else if name_str == "this" {
+                self.emit(
+                    IssueKind::InvalidScope {
+                        in_class: ctx.self_fqcn.is_some(),
+                    },
+                    Severity::Error,
+                    expr.span,
+                );
+            } else {
+                self.emit(
+                    IssueKind::UndefinedVariable {
+                        name: name_str.to_string(),
+                    },
+                    Severity::Error,
+                    expr.span,
+                );
             }
         }
         ctx.read_vars.insert(mir_types::Name::from(name_str));
