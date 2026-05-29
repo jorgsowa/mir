@@ -753,8 +753,8 @@ impl Type {
     /// Resolves `TConditional` atoms whose discriminator is known at the call site.
     ///
     /// `lookup(param_name)` returns the call-site argument type for the named parameter,
-    /// or `None` if the argument is not available. Currently only `is null` conditions
-    /// are resolved; other condition types pass through unchanged.
+    /// or `None` if the argument is not available. Handles `is null`, `is string`, and
+    /// `is array` conditions; other condition types pass through unchanged.
     pub fn resolve_conditional_returns<F>(self, lookup: F) -> Type
     where
         F: Fn(&str) -> Option<Type>,
@@ -768,23 +768,15 @@ impl Type {
                     ref if_true,
                     ref if_false,
                 } => {
-                    // Only handle `is null` for now — the dominant case for Prophecy FPs.
-                    let subject_is_null =
-                        subject.types.len() == 1 && matches!(subject.types[0], Atomic::TNull);
-                    let resolved = if subject_is_null {
+                    let resolved = if subject.types.len() == 1 {
                         if let Some(name) = param_name {
                             if let Some(arg_ty) = lookup(name.as_ref()) {
-                                let has_null =
-                                    arg_ty.types.iter().any(|t| matches!(t, Atomic::TNull));
-                                let only_null = !arg_ty.types.is_empty()
-                                    && arg_ty.types.iter().all(|t| matches!(t, Atomic::TNull));
-                                if only_null {
-                                    Some((**if_true).clone())
-                                } else if !has_null {
-                                    Some((**if_false).clone())
-                                } else {
-                                    None
-                                }
+                                resolve_conditional_branch(
+                                    &subject.types[0],
+                                    &arg_ty,
+                                    if_true,
+                                    if_false,
+                                )
                             } else {
                                 None
                             }
@@ -861,6 +853,65 @@ impl Type {
     pub fn from_docblock(mut self) -> Self {
         self.from_docblock = true;
         self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Conditional return resolution helpers
+// ---------------------------------------------------------------------------
+
+fn is_string_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TString
+            | Atomic::TNonEmptyString
+            | Atomic::TLiteralString(_)
+            | Atomic::TNumericString
+            | Atomic::TClassString(_)
+            | Atomic::TCallableString
+    )
+}
+
+fn is_array_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TArray { .. }
+            | Atomic::TNonEmptyArray { .. }
+            | Atomic::TKeyedArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TNonEmptyList { .. }
+    )
+}
+
+/// Resolve one branch of a conditional return type given the subject discriminant
+/// atomic and the actual argument type at the call site.
+///
+/// Returns `Some(branch)` when the branch can be determined statically, or `None`
+/// to signal that the caller should widen to the union of both branches.
+fn resolve_conditional_branch(
+    subject: &Atomic,
+    arg_ty: &Type,
+    if_true: &Type,
+    if_false: &Type,
+) -> Option<Type> {
+    let predicate: fn(&Atomic) -> bool = match subject {
+        Atomic::TNull => |a| matches!(a, Atomic::TNull),
+        Atomic::TString => is_string_atomic,
+        Atomic::TArray { .. } => is_array_atomic,
+        _ => return None,
+    };
+
+    if arg_ty.types.is_empty() {
+        return None;
+    }
+    let all_match = arg_ty.types.iter().all(&predicate);
+    let none_match = !arg_ty.types.iter().any(predicate);
+    if all_match {
+        Some(if_true.clone())
+    } else if none_match {
+        Some(if_false.clone())
+    } else {
+        None
     }
 }
 

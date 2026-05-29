@@ -806,7 +806,7 @@ function rtrim(string $string, string $characters = " \n\r\t\v\0"): string {}
  * well.
  * </p>
  * @param int &$count [optional] If passed, this will hold the number of matched and replaced needles.
- * @return string|string[] This function returns a string or an array with the replaced values.
+ * @return ($subject is string ? string : array<int, string>)
  */
 function str_replace(array|string $search, array|string $replace, array|string $subject, &$count = null): array|string {}
 
@@ -830,7 +830,7 @@ function str_replace(array|string $search, array|string $replace, array|string $
  * be returned in count which is passed by
  * reference.
  * </p>
- * @return string|string[] a string or an array of replacements.
+ * @return ($subject is string ? string : array<int, string>)
  */
 function str_ireplace(array|string $search, array|string $replace, array|string $subject, &$count = null): array|string {}
 
