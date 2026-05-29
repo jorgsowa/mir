@@ -5,7 +5,6 @@ use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\ExpectedValues;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Generate a system log message
@@ -135,8 +134,8 @@ function define_syslog_variables() {}
  * The default value of 0 means no restriction.
  * </p>
  * @return string|false the metaphone key as a string, or FALSE on failure
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
 function metaphone(string $string, int $max_phonemes = 0) {}
 
@@ -259,8 +258,8 @@ function ob_get_clean(): string|false {}
  * @link https://php.net/manual/en/function.ob-get-length.php
  * @return int|false the length of the output buffer contents or false if no
  * buffering is active.
+ * @pure
  */
-#[Pure(true)]
 function ob_get_length(): int|false {}
 
 /**
@@ -268,8 +267,8 @@ function ob_get_length(): int|false {}
  * @link https://php.net/manual/en/function.ob-get-level.php
  * @return int the level of nested output buffering handlers or zero if output
  * buffering is not active.
+ * @pure
  */
-#[Pure(true)]
 function ob_get_level(): int {}
 
 /**
@@ -351,7 +350,6 @@ function ob_get_level(): int {}
     "buffer_size" => "int",
     "buffer_used" => "int",
 ])]
-#[Pure(true)]
 function ob_get_status(bool $full_status = false): array {}
 
 /**
@@ -359,8 +357,8 @@ function ob_get_status(bool $full_status = false): array {}
  * @link https://php.net/manual/en/function.ob-get-contents.php
  * @return string|false This will return the contents of the output buffer or false, if output
  * buffering isn't active.
+ * @pure
  */
-#[Pure(true)]
 function ob_get_contents(): string|false {}
 
 /**
@@ -647,8 +645,8 @@ function array_walk_recursive(object|array &$array, callable $callback, mixed $a
  * but it may also return 0 for a variable that has been initialized with an
  * empty array. Use isset to test if a variable is set.
  * </p>
+ * @pure
  */
-#[Pure]
 function count(Countable|array $value, int $mode = COUNT_NORMAL): int {}
 
 /**
@@ -714,8 +712,8 @@ function reset(object|array &$array): mixed {}
  * internal pointer points beyond the end of the elements list or the array is
  * empty, current returns false.
  * @meta
+ * @pure
  */
-#[Pure]
 function current(object|array $array): mixed {}
 
 /**
@@ -729,8 +727,8 @@ function current(object|array $array): mixed {}
  * internal pointer. It does not move the pointer in any way. If the
  * internal pointer points beyond the end of the elements list or the array is
  * empty, key returns null.
+ * @pure
  */
-#[Pure]
 function key(object|array $array): string|int|null {}
 
 /**
@@ -740,8 +738,8 @@ function key(object|array $array): string|int|null {}
  * @param mixed ...$values any comparable value
  * @return mixed min returns the numerically lowest of the
  * parameter values.
+ * @pure
  */
-#[Pure]
 function min(
     #[PhpStormStubsElementAvailable(from: '8.0')] mixed $value,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] mixed $values = null,
@@ -755,8 +753,8 @@ function min(
  * @param mixed ...$values any comparable value
  * @return mixed max returns the numerically highest of the
  * parameter values, either within a arg array or two arguments.
+ * @pure
  */
-#[Pure]
 function max(
     #[PhpStormStubsElementAvailable(from: '8.0')] mixed $value,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] mixed $values = null,
@@ -784,8 +782,8 @@ function max(
  * </p>
  * @return bool true if needle is found in the array,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function in_array(mixed $needle, array $haystack, bool $strict = false): bool {}
 
 /**
@@ -815,8 +813,8 @@ function in_array(mixed $needle, array $haystack, bool $strict = false): bool {}
  * more than once, the first matching key is returned. To return the keys for
  * all matching values, use array_keys with the optional
  * search_value parameter instead.
+ * @pure
  */
-#[Pure]
 function array_search(mixed $needle, array $haystack, bool $strict = false): string|int|false {}
 
 /**
@@ -872,8 +870,8 @@ function extract(
  * </p>
  * @param mixed ...$var_names
  * @return array the output array with all the variables added to it.
+ * @pure
  */
-#[Pure]
 function compact(#[PhpStormStubsElementAvailable(from: '8.0')] $var_name, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $var_names = null, ...$var_names): array {}
 
 /**
@@ -890,8 +888,8 @@ function compact(#[PhpStormStubsElementAvailable(from: '8.0')] $var_name, #[PhpS
  * Value to use for filling
  * </p>
  * @return array the filled array
+ * @pure
  */
-#[Pure]
 function array_fill(int $start_index, int $count, mixed $value): array {}
 
 /**
@@ -905,8 +903,8 @@ function array_fill(int $start_index, int $count, mixed $value): array {}
  * Value to use for filling
  * </p>
  * @return array the filled array
+ * @pure
  */
-#[Pure]
 function array_fill_keys(array $keys, mixed $value): array {}
 
 /**
@@ -926,8 +924,8 @@ function array_fill_keys(array $keys, mixed $value): array {}
  * </p>
  * @return array an array of elements from start to
  * end, inclusive.
+ * @pure
  */
-#[Pure]
 function range(
     #[LanguageLevelTypeAware(['8.3' => 'string|int|float'], default: '')] $start,
     #[LanguageLevelTypeAware(['8.3' => 'string|int|float'], default: '')] $end,
@@ -1088,8 +1086,8 @@ function array_splice(array &$array, int $offset, ?int $length = null, mixed $re
  * </p>
  * @return array the slice.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_slice(array $array, int $offset, ?int $length = null, bool $preserve_keys = false): array {}
 
 /**
@@ -1101,8 +1099,8 @@ function array_slice(array $array, int $offset, ?int $length = null, bool $prese
  * </p>
  * @return array the resulting array.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_merge(array ...$arrays): array {}
 
 /**
@@ -1112,8 +1110,8 @@ function array_merge(array ...$arrays): array {}
  * @return TValue|null
  * @since 8.5
  * @meta
+ * @pure
  */
-#[Pure]
 function array_first(array $array): mixed {}
 
 /**
@@ -1123,6 +1121,6 @@ function array_first(array $array): mixed {}
  * @return TValue|null
  * @since 8.5
  * @meta
+ * @pure
  */
-#[Pure]
 function array_last(array $array): mixed {}

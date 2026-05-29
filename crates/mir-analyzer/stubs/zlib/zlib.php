@@ -3,7 +3,6 @@
 // Start of zlib v.2.0
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Output a gz-file
@@ -257,8 +256,8 @@ function gzfile(string $filename, #[LanguageLevelTypeAware(['8.5' => 'bool'], de
  * One of <b>ZLIB_ENCODING_*</b> constants.
  * </p>
  * @return string|false The compressed string or <b>FALSE</b> if an error occurred.
+ * @pure
  */
-#[Pure]
 function gzcompress(string $data, int $level = -1, int $encoding = ZLIB_ENCODING_DEFLATE): string|false {}
 
 /**
@@ -276,8 +275,8 @@ function gzcompress(string $data, int $level = -1, int $encoding = ZLIB_ENCODING
  * 32768 times the length of the compressed input <i>data</i>
  * or more than the optional parameter <i>length</i>.
  * </p>
+ * @pure
  */
-#[Pure]
 function gzuncompress(string $data, int $max_length = 0): string|false {}
 
 /**
@@ -295,8 +294,8 @@ function gzuncompress(string $data, int $max_length = 0): string|false {}
  * One of <b>ZLIB_ENCODING_*</b> constants.
  * </p>
  * @return string|false The deflated string or <b>FALSE</b> if an error occurred.
+ * @pure
  */
-#[Pure]
 function gzdeflate(string $data, int $level = -1, int $encoding = ZLIB_ENCODING_RAW): string|false {}
 
 /**
@@ -314,8 +313,8 @@ function gzdeflate(string $data, int $level = -1, int $encoding = ZLIB_ENCODING_
  * 32768 times the length of the compressed input <i>data</i>
  * or more than the optional parameter <i>length</i>.
  * </p>
+ * @pure
  */
-#[Pure]
 function gzinflate(string $data, int $max_length = 0): string|false {}
 
 /**
@@ -344,8 +343,8 @@ function gzinflate(string $data, int $max_length = 0): string|false {}
  * data, and an Adler checksum.
  * </p>
  * @return string|false The encoded string, or <b>FALSE</b> if an error occurred.
+ * @pure
  */
-#[Pure]
 function gzencode(string $data, int $level = -1, int $encoding = FORCE_GZIP): string|false {}
 
 /**
@@ -359,8 +358,8 @@ function gzencode(string $data, int $level = -1, int $encoding = FORCE_GZIP): st
  * </p>
  * @return string|false The decoded string, or <b>FALSE</b> if an error occurred.
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function gzdecode(string $data, int $max_length = 0): string|false {}
 
 /**
@@ -374,8 +373,8 @@ function gzdecode(string $data, int $max_length = 0): string|false {}
  * </p>
  * @return string|false
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function zlib_encode(string $data, int $encoding, int $level = -1): string|false {}
 
 /**
@@ -387,8 +386,8 @@ function zlib_encode(string $data, int $encoding, int $level = -1): string|false
  * </p>
  * @return string|false
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function zlib_decode(string $data, int $max_length = 0): string|false {}
 
 /**
@@ -396,8 +395,8 @@ function zlib_decode(string $data, int $max_length = 0): string|false {}
  * @link https://php.net/manual/en/function.zlib-get-coding-type.php
  * @return string|false Possible return values are gzip, deflate,
  * or <b>FALSE</b>.
+ * @pure
  */
-#[Pure]
 function zlib_get_coding_type(): string|false {}
 
 /**
@@ -429,8 +428,8 @@ function ob_gzhandler(string $data, int $flags): string|false {}
  * <b>FALSE</b> on failure.
  * </p>
  * @since 7.0
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "DeflateContext|false"], default: "resource|false")]
 function deflate_init(int $encoding, #[LanguageLevelTypeAware(["8.3" => "array|object"], default: "array")] $options = []) {}
 
@@ -477,8 +476,8 @@ function deflate_add(#[LanguageLevelTypeAware(["8.0" => "DeflateContext"], defau
  * <b>FALSE</b> on failure.
  * </p>
  * @since 7.0
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "InflateContext|false"], default: "resource|false")]
 function inflate_init(int $encoding, #[LanguageLevelTypeAware(["8.3" => "array|object"], default: "array")] $options = []) {}
 
@@ -510,8 +509,8 @@ function inflate_add(#[LanguageLevelTypeAware(["8.0" => "InflateContext"], defau
  * @param InflateContext|resource $context
  * @return int
  * @since 7.2
+ * @pure
  */
-#[Pure]
 function inflate_get_read_len(#[LanguageLevelTypeAware(["8.0" => "InflateContext"], default: "resource")] $context): int {}
 
 /**
@@ -519,8 +518,8 @@ function inflate_get_read_len(#[LanguageLevelTypeAware(["8.0" => "InflateContext
  * @param InflateContext|resource $context
  * @return int
  * @since 7.2
+ * @pure
  */
-#[Pure]
 function inflate_get_status(#[LanguageLevelTypeAware(["8.0" => "InflateContext"], default: "resource")] $context): int {}
 
 /**

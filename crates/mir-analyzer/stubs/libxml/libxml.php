@@ -4,7 +4,6 @@
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Contains various information about errors thrown by libxml. The error codes
@@ -99,8 +98,8 @@ function libxml_use_internal_errors(
  * @link https://php.net/manual/en/function.libxml-get-last-error.php
  * @return LibXMLError|false a LibXMLError object if there is any error in the
  * buffer, <b>FALSE</b> otherwise.
+ * @pure
  */
-#[Pure(true)]
 function libxml_get_last_error(): LibXMLError|false {}
 
 /**
@@ -115,8 +114,8 @@ function libxml_clear_errors(): void {}
  * @link https://php.net/manual/en/function.libxml-get-errors.php
  * @return LibXMLError[] an array with LibXMLError objects if there are any
  * errors in the buffer, or an empty array otherwise.
+ * @pure
  */
-#[Pure(true)]
 function libxml_get_errors(): array {}
 
 /**

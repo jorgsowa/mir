@@ -2,7 +2,6 @@
 
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 use JetBrains\PhpStorm\Internal\TentativeType;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * The ReflectionType class reports information about a function's parameters.

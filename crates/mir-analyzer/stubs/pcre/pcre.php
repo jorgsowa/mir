@@ -3,7 +3,6 @@
 // Start of pcre v.
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Perform a regular expression match
@@ -447,8 +446,8 @@ function preg_filter(array|string $pattern, array|string $replacement, array|str
  * @return string[]|false an array containing substrings of <i>subject</i>
  * split along boundaries matched by <i>pattern</i>, or <b>FALSE</b>
  * if an error occurred.
+ * @pure
  */
-#[Pure]
 function preg_split(string $pattern, string $subject, int $limit = -1, int $flags = 0): array|false {}
 
 /**
@@ -464,8 +463,8 @@ function preg_split(string $pattern, string $subject, int $limit = -1, int $flag
  * used delimiter.
  * </p>
  * @return string the quoted (escaped) string.
+ * @pure
  */
-#[Pure]
 function preg_quote(string $str, ?string $delimiter = null): string {}
 
 /**
@@ -484,8 +483,8 @@ function preg_quote(string $str, ?string $delimiter = null): string {}
  * </p>
  * @return array|false an array indexed using the keys from the
  * <i>input</i> array or false when pattern cannot be compiled.
+ * @pure
  */
-#[Pure]
 function preg_grep(string $pattern, array $array, int $flags = 0): array|false {}
 
 /**
@@ -498,8 +497,8 @@ function preg_grep(string $pattern, array $array, int $flags = 0): array|false {
  * <b>PREG_RECURSION_LIMIT_ERROR</b> (see also pcre.recursion_limit)
  * <b>PREG_BAD_UTF8_ERROR</b>
  * <b>PREG_BAD_UTF8_OFFSET_ERROR</b> (since PHP 5.3.0)
+ * @pure
  */
-#[Pure(true)]
 function preg_last_error(): int {}
 
 /**
@@ -507,8 +506,8 @@ function preg_last_error(): int {}
  *
  * @return string one of the error messages or "No error" if there is no error.
  * @since 8.0
+ * @pure
  */
-#[Pure(true)]
 function preg_last_error_msg(): string {}
 
 /**

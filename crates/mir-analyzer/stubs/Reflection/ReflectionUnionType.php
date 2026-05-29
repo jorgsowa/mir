@@ -1,7 +1,6 @@
 <?php
 
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * @since 8.0

@@ -2,7 +2,6 @@
 
 // Start of gettext v.
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Sets the default domain
@@ -24,8 +23,8 @@ function textdomain(?string $domain = null): string {}
  * </p>
  * @return string a translated string if one is found in the
  * translation table, or the submitted message if not found.
+ * @pure
  */
-#[Pure]
 function _(string $message): string {}
 
 /**
@@ -36,8 +35,8 @@ function _(string $message): string {}
  * </p>
  * @return string a translated string if one is found in the
  * translation table, or the submitted message if not found.
+ * @pure
  */
-#[Pure]
 function gettext(string $message): string {}
 
 /**
@@ -91,8 +90,8 @@ function bindtextdomain(string $domain, #[LanguageLevelTypeAware(['8.0' => 'stri
  * @return string correct plural form of message identified by
  * <i>msgid1</i> and <i>msgid2</i>
  * for count <i>n</i>.
+ * @pure
  */
-#[Pure]
 function ngettext(string $singular, string $plural, int $count): string {}
 
 /**
@@ -105,8 +104,8 @@ function ngettext(string $singular, string $plural, int $count): string {}
  * @param string $plural
  * @param int $count
  * @return string A string on success.
+ * @pure
  */
-#[Pure]
 function dngettext(string $domain, string $singular, string $plural, int $count): string {}
 
 /**
@@ -120,8 +119,8 @@ function dngettext(string $domain, string $singular, string $plural, int $count)
  * @param int $count
  * @param int $category
  * @return string A string on success.
+ * @pure
  */
-#[Pure]
 function dcngettext(string $domain, string $singular, string $plural, int $count, int $category): string {}
 
 /**

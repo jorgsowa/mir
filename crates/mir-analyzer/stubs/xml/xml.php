@@ -3,7 +3,6 @@
 // Start of xml v.
 use JetBrains\PhpStorm\Deprecated as Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Create an XML parser
@@ -22,8 +21,8 @@ use JetBrains\PhpStorm\Pure;
  * US-ASCII.
  * </p>
  * @return resource|false|XMLParser a resource handle for the new XML parser.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")]
 function xml_parser_create(?string $encoding = null) {}
 
@@ -47,8 +46,8 @@ function xml_parser_create(?string $encoding = null) {}
  * the string specified in <i>separator</i>.
  * </p>
  * @return resource|false|XMLParser a resource handle for the new XML parser.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")]
 function xml_parser_create_ns(?string $encoding = null, string $separator = ':') {}
 
@@ -412,8 +411,8 @@ function xml_parse_into_struct(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], 
  * </p>
  * @return int|false Returns one of the error codes listed in the error codes
  * section.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "int"], default: "int|false")]
 function xml_get_error_code(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")] $parser) {}
 
@@ -425,8 +424,8 @@ function xml_get_error_code(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], def
  * </p>
  * @return string|null a string with a textual description of the error
  * <i>code</i>, or <b>FALSE</b> if no description was found.
+ * @pure
  */
-#[Pure]
 function xml_error_string(int $error_code): ?string {}
 
 /**
@@ -438,8 +437,8 @@ function xml_error_string(int $error_code): ?string {}
  * @return int|false This function returns <b>FALSE</b> if <i>parser</i> does
  * not refer to a valid parser, or else it returns which line the
  * parser is currently at in its data buffer.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "int"], default: "int|false")]
 function xml_get_current_line_number(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")] $parser) {}
 
@@ -454,8 +453,8 @@ function xml_get_current_line_number(#[LanguageLevelTypeAware(["8.0" => "XMLPars
  * the current line (as given by
  * <b>xml_get_current_line_number</b>) the parser is
  * currently at.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "int"], default: "int|false")]
 function xml_get_current_column_number(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")] $parser) {}
 
@@ -468,8 +467,8 @@ function xml_get_current_column_number(#[LanguageLevelTypeAware(["8.0" => "XMLPa
  * @return int|false This function returns <b>FALSE</b> if <i>parser</i> does
  * not refer to a valid parser, or else it returns which byte index
  * the parser is currently at in its data buffer (starting at 0).
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "int"], default: "int|false")]
 function xml_get_current_byte_index(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")] $parser) {}
 
@@ -557,8 +556,8 @@ function xml_parser_set_option(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], 
  * not refer to a valid parser or if <i>option</i> isn't
  * valid (generates also a <b>E_WARNING</b>).
  * Else the option's value is returned.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.3" => "string|int|bool"], default: "string|int")]
 function xml_parser_get_option(#[LanguageLevelTypeAware(["8.0" => "XMLParser"], default: "resource")] $parser, int $option) {}
 

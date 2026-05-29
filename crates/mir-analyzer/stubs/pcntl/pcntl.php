@@ -3,7 +3,6 @@
 // Start of pcntl v.
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Forks the currently running process
@@ -198,8 +197,8 @@ function pcntl_signal_dispatch(): bool {}
  * call to <b>pcntl_waitpid</b>.</p>
  * @return bool <b>TRUE</b> if the child status code represents a normal exit, <b>FALSE</b>
  * otherwise.
+ * @pure
  */
-#[Pure]
 function pcntl_wifexited(int $status): bool {}
 
 /**
@@ -210,8 +209,8 @@ function pcntl_wifexited(int $status): bool {}
  * call to <b>pcntl_waitpid</b>.</p>
  * @return bool <b>TRUE</b> if the child process which caused the return is
  * currently stopped, <b>FALSE</b> otherwise.
+ * @pure
  */
-#[Pure]
 function pcntl_wifstopped(int $status): bool {}
 
 /**
@@ -222,8 +221,8 @@ function pcntl_wifstopped(int $status): bool {}
  * call to <b>pcntl_waitpid</b>.</p>
  * @return bool <b>TRUE</b> if the child process exited because of a signal which was
  * not caught, <b>FALSE</b> otherwise.
+ * @pure
  */
-#[Pure]
 function pcntl_wifsignaled(int $status): bool {}
 
 /**
@@ -233,15 +232,15 @@ function pcntl_wifsignaled(int $status): bool {}
  * parameter is the status parameter supplied to a successful
  * call to <b>pcntl_waitpid</b>.</p>
  * @return int|false the return code, as an integer.
+ * @pure
  */
-#[Pure]
 function pcntl_wexitstatus(int $status): int|false {}
 
 /**
  * @param int $status
  * @return bool
+ * @pure
  */
-#[Pure]
 function pcntl_wifcontinued(int $status): bool {}
 
 /**
@@ -251,8 +250,8 @@ function pcntl_wifcontinued(int $status): bool {}
  * parameter is the status parameter supplied to a successful
  * call to <b>pcntl_waitpid</b>.</p>
  * @return int|false the signal number, as an integer.
+ * @pure
  */
-#[Pure]
 function pcntl_wtermsig(int $status): int|false {}
 
 /**
@@ -262,8 +261,8 @@ function pcntl_wtermsig(int $status): int|false {}
  * parameter is the status parameter supplied to a successful
  * call to <b>pcntl_waitpid</b>.</p>
  * @return int|false the signal number.
+ * @pure
  */
-#[Pure]
 function pcntl_wstopsig(int $status): int|false {}
 
 /**
@@ -308,8 +307,8 @@ function pcntl_alarm(int $seconds): int {}
  * @link https://php.net/manual/en/function.pcntl-get-last-error.php
  * @return int error code.
  * @since 5.3.4
+ * @pure
  */
-#[Pure(true)]
 function pcntl_get_last_error(): int {}
 
 /**
@@ -317,8 +316,8 @@ function pcntl_get_last_error(): int {}
  * @link https://php.net/manual/en/function.pcntl-errno.php
  * @return int error code.
  * @since 5.3.4
+ * @pure
  */
-#[Pure(true)]
 function pcntl_errno(): int {}
 
 /**
@@ -328,8 +327,8 @@ function pcntl_errno(): int {}
  * </p>
  * @return string|false error description on success or <b>FALSE</b> on failure.
  * @since 5.3.4
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
 function pcntl_strerror(int $error_code): false|string {}
 
@@ -346,8 +345,8 @@ function pcntl_strerror(int $error_code): false|string {}
  * @return int|false <b>pcntl_getpriority</b> returns the priority of the process
  * or <b>FALSE</b> on error. A lower numerical value causes more favorable
  * scheduling.
+ * @pure
  */
-#[Pure]
 function pcntl_getpriority(?int $process_id = null, int $mode = PRIO_PROCESS): int|false {}
 
 /**

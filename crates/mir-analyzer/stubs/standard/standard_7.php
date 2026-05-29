@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Open Internet or Unix domain socket connection
@@ -180,8 +179,8 @@ function pfsockopen(
  * @param mixed ...$values <p>
  * </p>
  * @return string|false a binary string containing data or false if the format string contains errors
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
 function pack(
     string $format,
@@ -201,8 +200,8 @@ function pack(
  * @param int $offset [optional]
  * @return array<int, mixed>|false an associative array containing unpacked elements of binary
  * string or false if the format string contains errors
+ * @pure
  */
-#[Pure]
 function unpack(
     string $format,
     string $string,
@@ -235,8 +234,8 @@ function unpack(
  * enabled the browser to accept cookies or not. The only way to test if
  * cookies are accepted is to set one with setcookie,
  * reload, and check for the value.
+ * @pure
  */
-#[Pure(true)]
 function get_browser(?string $user_agent = null, bool $return_array = false): object|array|false {}
 
 /**
@@ -256,8 +255,8 @@ function get_browser(?string $user_agent = null, bool $return_array = false): ob
  * may impact both appearance and security.
  * </p>
  * @return string|null the encrypted string or <b>NULL</b> if an error occurs
+ * @pure
  */
-#[Pure]
 #[PhpStormStubsElementAvailable(to: '7.4')]
 function crypt($string, $salt): ?string {}
 
@@ -278,8 +277,8 @@ function crypt($string, $salt): ?string {}
  * may impact both appearance and security.
  * </p>
  * @return string the encrypted string or <b>NULL</b> if an error occurs
+ * @pure
  */
-#[Pure]
 #[PhpStormStubsElementAvailable('8.0')]
 function crypt(string $string, string $salt): string {}
 
@@ -355,8 +354,8 @@ function chroot(string $directory): bool {}
  * does. See chmod for more information on
  * modes and permissions.
  * </p>
+ * @pure
  */
-#[Pure(true)]
 function getcwd(): string|false {}
 
 /**
@@ -451,8 +450,8 @@ function scandir(string $directory, int $sorting_order = 0, $context = null): ar
  * <p>
  * On some systems it is impossible to distinguish between empty match and an
  * error.</p>
+ * @pure
  */
-#[Pure(true)]
 function glob(string $pattern, int $flags = 0): array|false {}
 
 /**
@@ -463,8 +462,8 @@ function glob(string $pattern, int $flags = 0): array|false {}
  * </p>
  * @return int|false the time the file was last accessed, or false on failure.
  * The time is returned as a Unix timestamp.
+ * @pure
  */
-#[Pure(true)]
 function fileatime(string $filename): int|false {}
 
 /**
@@ -475,8 +474,8 @@ function fileatime(string $filename): int|false {}
  * </p>
  * @return int|false the time the file was last changed, or false on failure.
  * The time is returned as a Unix timestamp.
+ * @pure
  */
-#[Pure(true)]
 function filectime(string $filename): int|false {}
 
 /**
@@ -489,8 +488,8 @@ function filectime(string $filename): int|false {}
  * of an error. The group ID is returned in numerical format, use
  * posix_getgrgid to resolve it to a group name.
  * Upon failure, false is returned.
+ * @pure
  */
-#[Pure(true)]
 function filegroup(string $filename): int|false {}
 
 /**
@@ -500,8 +499,8 @@ function filegroup(string $filename): int|false {}
  * Path to the file.
  * </p>
  * @return int|false the inode number of the file, or false on failure.
+ * @pure
  */
-#[Pure(true)]
 function fileinode(string $filename): int|false {}
 
 /**
@@ -513,8 +512,8 @@ function fileinode(string $filename): int|false {}
  * @return int|false the time the file was last modified, or false on failure.
  * The time is returned as a Unix timestamp, which is
  * suitable for the date function.
+ * @pure
  */
-#[Pure(true)]
 function filemtime(string $filename): int|false {}
 
 /**
@@ -526,8 +525,8 @@ function filemtime(string $filename): int|false {}
  * @return int|false the user ID of the owner of the file, or false on failure.
  * The user ID is returned in numerical format, use
  * posix_getpwuid to resolve it to a username.
+ * @pure
  */
-#[Pure(true)]
 function fileowner(string $filename): int|false {}
 
 /**
@@ -537,8 +536,8 @@ function fileowner(string $filename): int|false {}
  * Path to the file.
  * </p>
  * @return int|false the permissions on the file, or false on failure.
+ * @pure
  */
-#[Pure(true)]
 function fileperms(string $filename): int|false {}
 
 /**
@@ -549,8 +548,8 @@ function fileperms(string $filename): int|false {}
  * </p>
  * @return int|false the size of the file in bytes, or false (and generates an error
  * of level E_WARNING) in case of an error.
+ * @pure
  */
-#[Pure(true)]
 function filesize(string $filename): int|false {}
 
 /**
@@ -566,8 +565,8 @@ function filesize(string $filename): int|false {}
  * Returns false if an error occurs. filetype will also
  * produce an E_NOTICE message if the stat call fails
  * or if the file type is unknown.
+ * @pure
  */
-#[Pure(true)]
 function filetype(string $filename): string|false {}
 
 /**
@@ -595,8 +594,8 @@ function filetype(string $filename): string|false {}
  * </p>
  * <p>
  * The check is done using the real UID/GID instead of the effective one.
+ * @pure
  */
-#[Pure(true)]
 function file_exists(string $filename): bool {}
 
 /**
@@ -607,8 +606,8 @@ function file_exists(string $filename): bool {}
  * </p>
  * @return bool true if the filename exists and is
  * writable.
+ * @pure
  */
-#[Pure(true)]
 function is_writable(string $filename): bool {}
 
 /**
@@ -620,8 +619,8 @@ function is_writable(string $filename): bool {}
  * </p>
  * @return bool true if the filename exists and is
  * writable.
+ * @pure
  */
-#[Pure(true)]
 function is_writeable(string $filename): bool {}
 
 /**
@@ -632,8 +631,8 @@ function is_writeable(string $filename): bool {}
  * </p>
  * @return bool true if the file or directory specified by
  * filename exists and is readable, false otherwise.
+ * @pure
  */
-#[Pure(true)]
 function is_readable(string $filename): bool {}
 
 /**
@@ -644,8 +643,8 @@ function is_readable(string $filename): bool {}
  * </p>
  * @return bool true if the filename exists and is executable, or false on
  * error.
+ * @pure
  */
-#[Pure(true)]
 function is_executable(string $filename): bool {}
 
 /**
@@ -656,8 +655,8 @@ function is_executable(string $filename): bool {}
  * </p>
  * @return bool true if the filename exists and is a regular file, false
  * otherwise.
+ * @pure
  */
-#[Pure(true)]
 function is_file(string $filename): bool {}
 
 /**
@@ -671,8 +670,8 @@ function is_file(string $filename): bool {}
  * </p>
  * @return bool true if the filename exists and is a directory, false
  * otherwise.
+ * @pure
  */
-#[Pure(true)]
 function is_dir(string $filename): bool {}
 
 /**
@@ -683,8 +682,8 @@ function is_dir(string $filename): bool {}
  * </p>
  * @return bool true if the filename exists and is a symbolic link, false
  * otherwise.
+ * @pure
  */
-#[Pure(true)]
 function is_link(string $filename): bool {}
 
 /**
@@ -775,8 +774,8 @@ function is_link(string $filename): bool {}
  * </p>
  * <p>
  * In case of error, stat returns false.
+ * @pure
  */
-#[Pure(true)]
 #[ArrayShape([
     "dev" => "int",
     "ino" => "int",
@@ -807,8 +806,8 @@ function stat(string $filename): array|false {}
  * except that if the filename parameter is a symbolic
  * link, the status of the symbolic link is returned, not the status of the
  * file pointed to by the symbolic link.
+ * @pure
  */
-#[Pure(true)]
 function lstat(string $filename): array|false {}
 
 /**
@@ -941,8 +940,8 @@ function clearstatcache(bool $clear_realpath_cache = false, string $filename = '
  * </p>
  * @return float|false the total number of bytes as a float
  * or false on failure.
+ * @pure
  */
-#[Pure(true)]
 function disk_total_space(string $directory): float|false {}
 
 /**
@@ -958,8 +957,8 @@ function disk_total_space(string $directory): float|false {}
  * </p>
  * @return float|false the number of available bytes as a float
  * or false on failure.
+ * @pure
  */
-#[Pure(true)]
 function disk_free_space(string $directory): float|false {}
 
 /**
@@ -968,8 +967,8 @@ function disk_free_space(string $directory): float|false {}
  * @see disk_free_space
  * @param string $directory
  * @return float|false
+ * @pure
  */
-#[Pure(true)]
 function diskfreespace(string $directory): float|false {}
 
 /**

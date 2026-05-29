@@ -1,7 +1,6 @@
 <?php
 
 // Start of SQLite v.2.0-dev
-use JetBrains\PhpStorm\Pure;
 
 /**
  * @link https://php.net/manual/en/ref.sqlite.php

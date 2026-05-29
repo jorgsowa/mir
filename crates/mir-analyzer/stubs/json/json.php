@@ -3,7 +3,6 @@
 // Start of json v.1.3.1
 use JetBrains\PhpStorm\Internal\TentativeType;
 use JetBrains\PhpStorm\Language;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Objects implementing JsonSerializable
@@ -218,8 +217,8 @@ function json_decode(#[Language("JSON")] string $json, ?bool $associative = null
  * </tbody>
  *
  * </table>
+ * @pure
  */
-#[Pure(true)]
 function json_last_error(): int {}
 
 /**
@@ -227,8 +226,8 @@ function json_last_error(): int {}
  * @link https://php.net/manual/en/function.json-last-error-msg.php
  * @return string Returns the error message on success, "No error" if no error has occurred.
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function json_last_error_msg(): string {}
 
 /**

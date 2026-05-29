@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Runs the equivalent of the select() system call on the given
@@ -719,8 +718,8 @@ function flock($stream, int $operation, &$would_block = null): bool {}
  * '_', the rest is converted to lower case. If two meta tags have the same
  * name, only the last one is returned.
  * </p>
+ * @pure
  */
-#[Pure(true)]
 function get_meta_tags(string $filename, bool $use_include_path = false): array|false {}
 
 /**
@@ -995,16 +994,16 @@ function stream_wrapper_restore(string $protocol): bool {}
  * @link https://php.net/manual/en/function.stream-get-wrappers.php
  * @return list<string> an indexed array containing the name of all stream wrappers
  * available on the running system.
+ * @pure
  */
-#[Pure(true)]
 function stream_get_wrappers(): array {}
 
 /**
  * Retrieve list of registered socket transports
  * @link https://php.net/manual/en/function.stream-get-transports.php
  * @return list<string> an indexed array of socket transports names.
+ * @pure
  */
-#[Pure(true)]
 function stream_get_transports(): array {}
 
 /**
@@ -1015,8 +1014,8 @@ function stream_get_transports(): array {}
  * </p>
  * @return bool true on success or false on failure.
  * @since 5.2.4
+ * @pure
  */
-#[Pure]
 function stream_is_local($stream): bool {}
 
 /**
@@ -1033,8 +1032,8 @@ function stream_is_local($stream): bool {}
  * @param resource $context [optional]
  * @return array|false an indexed or associative array with the headers, or false on
  * failure.
+ * @pure
  */
-#[Pure(true)]
 function get_headers(
     string $url,
     #[LanguageLevelTypeAware(['8.0' => 'bool'], default: 'int')] $associative = false,
@@ -1164,8 +1163,8 @@ function socket_get_status($stream): array {}
  * realpath returns false on failure, e.g. if
  * the file does not exist.
  * </p>
+ * @pure
  */
-#[Pure(true)]
 function realpath(string $path): string|false {}
 
 /**
@@ -1223,6 +1222,6 @@ function realpath(string $path): string|false {}
  * </table>
  * </p>
  * @return bool true if there is a match, false otherwise.
+ * @pure
  */
-#[Pure(true)]
 function fnmatch(string $pattern, string $filename, int $flags = 0): bool {}

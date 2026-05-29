@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Get the last occurred error
@@ -14,7 +13,6 @@ use JetBrains\PhpStorm\Pure;
  * yet.
  */
 #[ArrayShape(["type" => "int", "message" => "string", "file" => "string", "line" => "int"])]
-#[Pure(true)]
 function error_get_last(): ?array {}
 
 /**
@@ -261,8 +259,8 @@ function print_r(mixed $value, bool $return = false) {}
  * emalloc() is reported.
  * </p>
  * @return int the memory amount in bytes.
+ * @pure
  */
-#[Pure(true)]
 function memory_get_usage(bool $real_usage = false): int {}
 
 /**
@@ -274,8 +272,8 @@ function memory_get_usage(bool $real_usage = false): int {}
  * emalloc() is reported.
  * </p>
  * @return int the memory peak in bytes.
+ * @pure
  */
-#[Pure(true)]
 function memory_get_peak_usage(bool $real_usage = false): int {}
 
 /**
@@ -382,8 +380,8 @@ function highlight_string(string $string, bool $return = false) {}
  * @param bool $as_number <p>Whether the high resolution time should be returned as array or number.<p>
  * @since 7.3
  * @return ($as_number is true ? int|float : array{0: int, 1: int}|false)
+ * @pure
  */
-#[Pure(true)]
 function hrtime(bool $as_number = false): array|int|float|false {}
 
 /**
@@ -400,8 +398,8 @@ function hrtime(bool $as_number = false): array|int|float|false {}
  * only return an empty string. For more information on this bug and its
  * prior behavior, see bug report
  * #29606.
+ * @pure
  */
-#[Pure(true)]
 function php_strip_whitespace(string $filename): string {}
 
 /**
@@ -413,8 +411,8 @@ function php_strip_whitespace(string $filename): string {}
  * </p>
  * @return string|false the value of the configuration option as a string on success, or
  * an empty string on failure or for null values.
+ * @pure
  */
-#[Pure(true)]
 function ini_get(string $option): string|false {}
 
 /**
@@ -449,8 +447,8 @@ function ini_get(string $option): string|false {}
  * It's possible for a directive to have multiple access levels, which is
  * why access shows the appropriate bitmask values.
  * </p>
+ * @pure
  */
-#[Pure(true)]
 #[ArrayShape(["global_value" => "string", "local_value" => "string", "access" => "int"])]
 function ini_get_all(?string $extension = null, #[PhpStormStubsElementAvailable(from: '7.0')] bool $details = true): array|false {}
 
@@ -505,8 +503,8 @@ function ini_parse_quantity(string $shorthand): int {}
  * Gets the current include_path configuration option
  * @link https://php.net/manual/en/function.get-include-path.php
  * @return string|false the path, as a string.
+ * @pure
  */
-#[Pure(true)]
 function get_include_path(): string|false {}
 
 /**
@@ -772,16 +770,16 @@ function headers_sent(&$filename = null, &$line = null): bool {}
  * Returns a list of response headers sent (or ready to send)
  * @link https://php.net/manual/en/function.headers-list.php
  * @return array a numerically indexed array of headers.
+ * @pure
  */
-#[Pure]
 function headers_list(): array {}
 
 /**
  * Fetches all HTTP request headers from the current request
  * @link https://php.net/manual/en/function.apache-request-headers.php
  * @return array|false An associative array of all the HTTP headers in the current request, or <b>FALSE</b> on failure.
+ * @pure
  */
-#[Pure]
 function apache_request_headers(): false|array {}
 
 /**
@@ -789,16 +787,16 @@ function apache_request_headers(): false|array {}
  * This function is an alias for apache_request_headers(). Please read the apache_request_headers() documentation for more information on how this function works.
  * @link https://php.net/manual/en/function.getallheaders.php
  * @return array|false An associative array of all the HTTP headers in the current request, or <b>FALSE</b> on failure.
+ * @pure
  */
-#[Pure]
 function getallheaders(): false|array {}
 
 /**
  * Check whether client disconnected
  * @link https://php.net/manual/en/function.connection-aborted.php
  * @return int 1 if client disconnected, 0 otherwise.
+ * @pure
  */
-#[Pure(true)]
 function connection_aborted(): int {}
 
 /**
@@ -807,8 +805,8 @@ function connection_aborted(): int {}
  * @return int the connection status bitfield, which can be used against the
  * CONNECTION_XXX constants to determine the connection
  * status.
+ * @pure
  */
-#[Pure(true)]
 function connection_status(): int {}
 
 /**
@@ -850,8 +848,8 @@ function ignore_user_abort(?bool $enable = null): int {}
  * </p>
  * @return array|false The settings are returned as an associative array on success,
  * and false on failure.
+ * @pure
  */
-#[Pure(true)]
 function parse_ini_file(string $filename, bool $process_sections = false, int $scanner_mode = INI_SCANNER_NORMAL): array|false {}
 
 /**
@@ -873,8 +871,8 @@ function parse_ini_file(string $filename, bool $process_sections = false, int $s
  * </p>
  * @return array|false The settings are returned as an associative array on success,
  * and false on failure.
+ * @pure
  */
-#[Pure]
 function parse_ini_string(string $ini_string, bool $process_sections = false, int $scanner_mode = INI_SCANNER_NORMAL): array|false {}
 
 /**
@@ -884,8 +882,8 @@ function parse_ini_string(string $ini_string, bool $process_sections = false, in
  * The filename being checked.
  * </p>
  * @return bool true on success or false on failure.
+ * @pure
  */
-#[Pure(true)]
 function is_uploaded_file(string $filename): bool {}
 
 /**
@@ -913,8 +911,8 @@ function move_uploaded_file(string $from, string $to): bool {}
 /**
  * @return array|false
  * @since 7.3
+ * @pure
  */
-#[Pure]
 #[ArrayShape(["description" => "string", "mac" => "string", "mtu" => "int", "unicast" => "array", "up" => "bool"])]
 function net_get_interfaces(): array|false {}
 
@@ -926,8 +924,8 @@ function net_get_interfaces(): array|false {}
  * </p>
  * @return string|false the host name or the unmodified ip_address
  * on failure.
+ * @pure
  */
-#[Pure]
 function gethostbyaddr(string $ip): string|false {}
 
 /**
@@ -938,8 +936,8 @@ function gethostbyaddr(string $ip): string|false {}
  * </p>
  * @return string the IPv4 address or a string containing the unmodified
  * hostname on failure.
+ * @pure
  */
-#[Pure]
 function gethostbyname(string $hostname): string {}
 
 /**
@@ -951,8 +949,8 @@ function gethostbyname(string $hostname): string {}
  * </p>
  * @return array|false an array of IPv4 addresses or false if
  * hostname could not be resolved.
+ * @pure
  */
-#[Pure]
 function gethostbynamel(string $hostname): array|false {}
 
 /**
@@ -960,8 +958,8 @@ function gethostbynamel(string $hostname): array|false {}
  * @link https://php.net/manual/en/function.gethostname.php
  * @return string|false a string with the hostname on success, otherwise false is
  * returned.
+ * @pure
  */
-#[Pure]
 function gethostname(): string|false {}
 
 /**
@@ -993,8 +991,8 @@ function dns_check_record(string $hostname, string $type = 'MX'): bool {}
  * </p>
  * @return bool true if any records are found; returns false if no records
  * were found or if an error occurred.
+ * @pure
  */
-#[Pure]
 function checkdnsrr(string $hostname, string $type = 'MX'): bool {}
 
 /**

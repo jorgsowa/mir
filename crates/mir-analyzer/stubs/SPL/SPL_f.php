@@ -2,14 +2,13 @@
 
 // Start of SPL v.0.2
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Return available SPL classes
  * @link https://php.net/manual/en/function.spl-classes.php
  * @return array
+ * @pure
  */
-#[Pure]
 function spl_classes(): array {}
 
 /**
@@ -106,8 +105,8 @@ function spl_autoload_call(string $class): void {}
  * method.
  * </p>
  * @return string[]|false An array on success, or false on error.
+ * @pure
  */
-#[Pure]
 function class_parents($object_or_class, bool $autoload = true): array|false {}
 
 /**
@@ -122,8 +121,8 @@ function class_parents($object_or_class, bool $autoload = true): array|false {}
  * method.
  * </p>
  * @return string[]|false An array on success, or false on error.
+ * @pure
  */
-#[Pure]
 function class_implements($object_or_class, bool $autoload = true): array|false {}
 
 /**
@@ -132,8 +131,8 @@ function class_implements($object_or_class, bool $autoload = true): array|false 
  * @param object $object
  * @return string A string that is unique for each object and is always the same for
  * the same object.
+ * @pure
  */
-#[Pure]
 function spl_object_hash(object $object): string {}
 
 /**
@@ -162,8 +161,8 @@ function iterator_to_array(#[LanguageLevelTypeAware(['8.2' => 'Traversable|array
  * The iterator being counted.
  * </p>
  * @return int The number of elements in iterator.
+ * @pure
  */
-#[Pure]
 function iterator_count(#[LanguageLevelTypeAware(['8.2' => 'Traversable|array'], default: 'Traversable')] $iterator): int {}
 
 /**

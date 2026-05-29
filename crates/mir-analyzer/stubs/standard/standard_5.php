@@ -3,7 +3,6 @@
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\ExpectedValues;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * (PHP 5.5.0)<br/>
@@ -11,8 +10,8 @@ use JetBrains\PhpStorm\Pure;
  * @param mixed $value <p>the scalar value being converted to a boolean.</p>
  * @return bool The boolean value of var.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function boolval(mixed $value): bool {}
 
 /**
@@ -40,8 +39,8 @@ function boolval(mixed $value): bool {}
  * leftmost characters of the string. The common rules of
  * integer casting
  * apply.
+ * @pure
  */
-#[Pure]
 function intval(mixed $value, int $base = 10): int {}
 
 /**
@@ -49,8 +48,8 @@ function intval(mixed $value, int $base = 10): int {}
  * @link https://php.net/manual/en/function.floatval.php
  * @param mixed $value May be any scalar type. should not be used on objects, as doing so will emit an E_NOTICE level error and return 1.
  * @return float value of the given variable. Empty arrays return 0, non-empty arrays return 1.
+ * @pure
  */
-#[Pure]
 function floatval(mixed $value): float {}
 
 /**
@@ -61,8 +60,8 @@ function floatval(mixed $value): float {}
  * @link https://php.net/manual/en/function.doubleval.php
  * @param mixed $value May be any scalar type. should not be used on objects, as doing so will emit an E_NOTICE level error and return 1.
  * @return float value of the given variable. Empty arrays return 0, non-empty arrays return 1.
+ * @pure
  */
-#[Pure]
 function doubleval(mixed $value): float {}
 
 /**
@@ -76,8 +75,8 @@ function doubleval(mixed $value): float {}
  * You cannot use strval() on arrays or objects that do not implement the __toString() method.
  * </p>
  * @return string The string value of var.
+ * @pure
  */
-#[Pure]
 function strval(mixed $value): string {}
 
 /**
@@ -99,8 +98,8 @@ function strval(mixed $value): string {}
  * "NULL"
  * "unknown type"
  * "resource (closed)" since 7.2.0
+ * @pure
  */
-#[Pure]
 #[ExpectedValues([
     "boolean", "integer", "double", "string", "array", "object", "resource", "NULL", "unknown type", "resource (closed)"
 ])]
@@ -150,8 +149,8 @@ function settype(mixed &$var, #[ExpectedValues(["bool", "boolean", "int", "integ
  * </p>
  * @return bool true if var is null, false
  * otherwise.
+ * @pure
  */
-#[Pure]
 function is_null(mixed $value): bool {}
 
 /**
@@ -162,8 +161,8 @@ function is_null(mixed $value): bool {}
  * </p>
  * @return bool true if var is a resource,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_resource(mixed $value): bool {}
 
 /**
@@ -174,8 +173,8 @@ function is_resource(mixed $value): bool {}
  * </p>
  * @return bool true if var is a boolean,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_bool(mixed $value): bool {}
 
 /**
@@ -187,8 +186,8 @@ function is_bool(mixed $value): bool {}
  * </p>
  * @return bool true if var is an integer,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_long(mixed $value): bool {}
 
 /**
@@ -199,8 +198,8 @@ function is_long(mixed $value): bool {}
  * </p>
  * @return bool true if var is a float,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_float(mixed $value): bool {}
 
 /**
@@ -211,8 +210,8 @@ function is_float(mixed $value): bool {}
  * </p>
  * @return bool true if var is an integer,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_int(mixed $value): bool {}
 
 /**
@@ -224,8 +223,8 @@ function is_int(mixed $value): bool {}
  * </p>
  * @return bool true if var is an integer,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_integer(mixed $value): bool {}
 
 /**
@@ -237,8 +236,8 @@ function is_integer(mixed $value): bool {}
  * </p>
  * @return bool true if var is a float,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_double(mixed $value): bool {}
 
 /**
@@ -250,8 +249,8 @@ function is_double(mixed $value): bool {}
  * </p>
  * @return bool true if var is a float,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '7.4')]
 function is_real(mixed $var): bool {}
 
@@ -263,8 +262,8 @@ function is_real(mixed $var): bool {}
  * </p>
  * @return bool true if var is a number or a numeric
  * string, false otherwise.
+ * @pure
  */
-#[Pure]
 function is_numeric(mixed $value): bool {}
 
 /**
@@ -275,8 +274,8 @@ function is_numeric(mixed $value): bool {}
  * </p>
  * @return bool true if var is of type string,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_string(mixed $value): bool {}
 
 /**
@@ -287,8 +286,8 @@ function is_string(mixed $value): bool {}
  * </p>
  * @return bool true if var is an array,
  * false otherwise.
+ * @pure
  */
-#[Pure]
 function is_array(mixed $value): bool {}
 
 /**
@@ -299,8 +298,8 @@ function is_array(mixed $value): bool {}
  * </p>
  * @return bool true if var is an object, false otherwise.<br/>
  * Since 7.2.0 returns true for unserialized objects without a class definition (class of <b>__PHP_Incomplete_Class</b>).
+ * @pure
  */
-#[Pure]
 function is_object(mixed $value): bool {}
 
 /**
@@ -311,8 +310,8 @@ function is_object(mixed $value): bool {}
  * </p>
  * @return bool true if var is a scalar false
  * otherwise.
+ * @pure
  */
-#[Pure]
 function is_scalar(mixed $value): bool {}
 
 /**
@@ -347,8 +346,8 @@ function is_callable(mixed $value, bool $syntax_only = false, &$callable_name = 
  * @param mixed $value The value to check
  * @return bool <b>TRUE</b> if $var is countable, <b>FALSE</b> otherwise.
  * @since 7.3
+ * @pure
  */
-#[Pure]
 function is_countable(mixed $value): bool {}
 
 /**
@@ -453,8 +452,8 @@ function fclose($stream): bool {}
  * @param resource $stream The file pointer must be valid, and must point to a file successfully opened by fopen() or fsockopen() (and not yet closed by fclose()).
  * @return bool true if the file pointer is at EOF or an error occurs
  * (including socket timeout); otherwise returns false.
+ * @pure
  */
-#[Pure(true)]
 function feof($stream): bool {}
 
 /**
@@ -748,8 +747,8 @@ function ftruncate($stream, int $size): bool {}
  * @param resource $stream &fs.file.pointer;
  * @return array|false an array with the statistics of the file; the format of the array
  * is described in detail on the stat manual page.
+ * @pure
  */
-#[Pure(true)]
 function fstat($stream): array|false {}
 
 /**
@@ -794,8 +793,8 @@ function fseek($stream, int $offset, int $whence = SEEK_SET): int {}
  * </p>
  * <p>
  * If an error occurs, returns false.
+ * @pure
  */
-#[Pure(true)]
 function ftell($stream): int|false {}
 
 /**
@@ -988,8 +987,8 @@ function tmpfile() {}
  * use rtrim if you do not want the line ending
  * present.
  * </p>
+ * @pure
  */
-#[Pure(true)]
 function file(string $filename, int $flags = 0, $context = null): array|false {}
 
 /**
@@ -1015,8 +1014,8 @@ function file(string $filename, int $flags = 0, $context = null): array|false {}
  * of file is reached.
  * </p>
  * @return string|false The function returns the read data or false on failure.
+ * @pure
  */
-#[Pure(true)]
 function file_get_contents(string $filename, bool $use_include_path = false, $context = null, int $offset = 0, ?int $length = null): string|false {}
 
 /**

@@ -7,7 +7,6 @@ use JetBrains\PhpStorm\ExpectedValues as EV;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware as LanguageAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable as ElementAvailable;
 use JetBrains\PhpStorm\Internal\TentativeType;
-use JetBrains\PhpStorm\Pure;
 
 class Collator
 {
@@ -3887,8 +3886,8 @@ class IntlTimeZone
  * </p>
  * @return Collator|null Return new instance of <b>Collator</b> object, or <b>NULL</b>
  * on error.
+ * @pure
  */
-#[Pure]
 function collator_create(string $locale): ?Collator {}
 
 /**
@@ -3920,8 +3919,8 @@ function collator_create(string $locale): ?Collator {}
  * boolean
  * <b>FALSE</b>
  * is returned.
+ * @pure
  */
-#[Pure]
 function collator_compare(Collator $object, string $string1, string $string2): int|false {}
 
 /**
@@ -3933,8 +3932,8 @@ function collator_compare(Collator $object, string $string1, string $string2): i
  * Attribute to get value for.
  * </p>
  * @return int|false Attribute value, or boolean <b>FALSE</b> on error.
+ * @pure
  */
-#[Pure]
 function collator_get_attribute(Collator $object, int $attribute): int|false {}
 
 /**
@@ -3956,8 +3955,8 @@ function collator_set_attribute(Collator $object, int $attribute, int $value): b
  * @link https://php.net/manual/en/collator.getstrength.php
  * @param Collator $object
  * @return int current collation strength
+ * @pure
  */
-#[Pure]
 function collator_get_strength(Collator $object): int {}
 
 /**
@@ -4037,8 +4036,8 @@ function collator_asort(Collator $object, array &$array, int $flags = 0): bool {
  * @return string|false Real locale name from which the collation data comes. If the collator was
  * instantiated from rules or an error occurred, returns
  * boolean <b>FALSE</b>.
+ * @pure
  */
-#[Pure]
 function collator_get_locale(Collator $object, int $type): string|false {}
 
 /**
@@ -4047,8 +4046,8 @@ function collator_get_locale(Collator $object, int $type): string|false {}
  * @link https://php.net/manual/en/collator.geterrorcode.php
  * @param Collator $object
  * @return int|false Error code returned by the last Collator API function call.
+ * @pure
  */
-#[Pure(true)]
 function collator_get_error_code(Collator $object): int|false {}
 
 /**
@@ -4057,8 +4056,8 @@ function collator_get_error_code(Collator $object): int|false {}
  * @link https://php.net/manual/en/collator.geterrormessage.php
  * @param Collator $object
  * @return string|false Description of an error occurred in the last Collator API function call.
+ * @pure
  */
-#[Pure]
 function collator_get_error_message(Collator $object): string|false {}
 
 /**
@@ -4070,8 +4069,8 @@ function collator_get_error_message(Collator $object): string|false {}
  * The string to produce the key from.
  * </p>
  * @return string|false the collation key for the string. Collation keys can be compared directly instead of strings.
+ * @pure
  */
-#[Pure]
 function collator_get_sort_key(
     Collator $object,
     string $string,
@@ -4101,8 +4100,8 @@ function collator_get_sort_key(
  * Pattern string if the chosen style requires a pattern.
  * </p>
  * @return NumberFormatter|null <b>NumberFormatter</b> object or <b>NULL</b> on error.
+ * @pure
  */
-#[Pure]
 function numfmt_create(string $locale, int $style, #[LanguageAware(['8.0' => 'string|null'], default: 'string')] $pattern = null): ?NumberFormatter {}
 
 /**
@@ -4119,8 +4118,8 @@ function numfmt_create(string $locale, int $style, #[LanguageAware(['8.0' => 'st
  * formatting type to use.
  * </p>
  * @return string|false the string containing formatted value, or <b>FALSE</b> on error.
+ * @pure
  */
-#[Pure]
 function numfmt_format(NumberFormatter $formatter, int|float $num, int $type = 0): string|false {}
 
 /**
@@ -4139,8 +4138,8 @@ function numfmt_format(NumberFormatter $formatter, int|float $num, int $type = 0
  * will hold the offset at which parsing ended.
  * </p>
  * @return int|float|false The value of the parsed number or <b>FALSE</b> on error.
+ * @pure
  */
-#[Pure]
 function numfmt_parse(NumberFormatter $formatter, string $string, int $type = NumberFormatter::TYPE_DOUBLE, &$offset = null): int|float|false {}
 
 /**
@@ -4155,8 +4154,8 @@ function numfmt_parse(NumberFormatter $formatter, string $string, int $type = Nu
  * The 3-letter ISO 4217 currency code indicating the currency to use.
  * </p>
  * @return string|false String representing the formatted currency value.
+ * @pure
  */
-#[Pure]
 function numfmt_format_currency(NumberFormatter $formatter, float $amount, string $currency): string|false {}
 
 /**
@@ -4203,8 +4202,8 @@ function numfmt_set_attribute(NumberFormatter $formatter, int $attribute, int|fl
  * numeric attribute constants.
  * </p>
  * @return int|float|false Return attribute value on success, or <b>FALSE</b> on error.
+ * @pure
  */
-#[Pure]
 function numfmt_get_attribute(NumberFormatter $formatter, int $attribute): int|float|false {}
 
 /**
@@ -4234,8 +4233,8 @@ function numfmt_set_text_attribute(NumberFormatter $formatter, int $attribute, s
  * text attribute constants.
  * </p>
  * @return string|false Return attribute value on success, or <b>FALSE</b> on error.
+ * @pure
  */
-#[Pure]
 function numfmt_get_text_attribute(NumberFormatter $formatter, int $attribute): string|false {}
 
 /**
@@ -4264,8 +4263,8 @@ function numfmt_set_symbol(NumberFormatter $formatter, int $symbol, string $valu
  * format symbol constants.
  * </p>
  * @return string|false The symbol string or <b>FALSE</b> on error.
+ * @pure
  */
-#[Pure]
 function numfmt_get_symbol(NumberFormatter $formatter, int $symbol): string|false {}
 
 /**
@@ -4288,8 +4287,8 @@ function numfmt_set_pattern(NumberFormatter $formatter, string $pattern): bool {
  * @link https://php.net/manual/en/numberformatter.getpattern.php
  * @param NumberFormatter $formatter
  * @return string|false Pattern string that is used by the formatter, or <b>FALSE</b> if an error happens.
+ * @pure
  */
-#[Pure]
 function numfmt_get_pattern(NumberFormatter $formatter): string|false {}
 
 /**
@@ -4304,8 +4303,8 @@ function numfmt_get_pattern(NumberFormatter $formatter): string|false {}
  * respectively). The default is the actual locale.
  * </p>
  * @return string|false The locale name used to create the formatter.
+ * @pure
  */
-#[Pure]
 function numfmt_get_locale(NumberFormatter $formatter, int $type = 0): string|false {}
 
 /**
@@ -4314,8 +4313,8 @@ function numfmt_get_locale(NumberFormatter $formatter, int $type = 0): string|fa
  * @link https://php.net/manual/en/numberformatter.geterrorcode.php
  * @param NumberFormatter $formatter
  * @return int error code from last formatter call.
+ * @pure
  */
-#[Pure(true)]
 function numfmt_get_error_code(NumberFormatter $formatter): int {}
 
 /**
@@ -4324,8 +4323,8 @@ function numfmt_get_error_code(NumberFormatter $formatter): int {}
  * @link https://php.net/manual/en/numberformatter.geterrormessage.php
  * @param NumberFormatter $formatter
  * @return string error message from last formatter call.
+ * @pure
  */
-#[Pure(true)]
 function numfmt_get_error_message(NumberFormatter $formatter): string {}
 
 /**
@@ -4335,8 +4334,8 @@ function numfmt_get_error_message(NumberFormatter $formatter): string {}
  * @param string $string <p>The input string to normalize</p>
  * @param int $form [optional] <p>One of the normalization forms.</p>
  * @return string|false The normalized string or <b>FALSE</b> if an error occurred.
+ * @pure
  */
-#[Pure]
 function normalizer_normalize(string $string, int $form = Normalizer::FORM_C): string|false {}
 
 /**
@@ -4349,16 +4348,16 @@ function normalizer_normalize(string $string, int $form = Normalizer::FORM_C): s
  * One of the normalization forms.
  * </p>
  * @return bool <b>TRUE</b> if normalized, <b>FALSE</b> otherwise or if there an error
+ * @pure
  */
-#[Pure]
 function normalizer_is_normalized(string $string, int $form = Normalizer::FORM_C): bool {}
 
 /**
  * Gets the default locale value from the intl global 'default_locale'
  * @link https://php.net/manual/en/function.locale-get-default.php
  * @return string a string with the current Locale.
+ * @pure
  */
-#[Pure]
 function locale_get_default(): string {}
 
 /**
@@ -4382,8 +4381,8 @@ function locale_set_default(string $locale) {}
  * The locale to extract the primary language code from
  * </p>
  * @return string|null The language code associated with the language or <b>NULL</b> in case of error.
+ * @pure
  */
-#[Pure]
 function locale_get_primary_language(string $locale): ?string {}
 
 /**
@@ -4394,8 +4393,8 @@ function locale_get_primary_language(string $locale): ?string {}
  * The locale to extract the script code from
  * </p>
  * @return string|null The script subtag for the locale or <b>NULL</b> if not present
+ * @pure
  */
-#[Pure]
 function locale_get_script(string $locale): ?string {}
 
 /**
@@ -4406,8 +4405,8 @@ function locale_get_script(string $locale): ?string {}
  * The locale to extract the region code from
  * </p>
  * @return string|null The region subtag for the locale or <b>NULL</b> if not present
+ * @pure
  */
-#[Pure]
 function locale_get_region(string $locale): ?string {}
 
 /**
@@ -4418,8 +4417,8 @@ function locale_get_region(string $locale): ?string {}
  * The locale to extract the keywords from
  * </p>
  * @return array|false|null Associative array containing the keyword-value pairs for this locale
+ * @pure
  */
-#[Pure]
 function locale_get_keywords(string $locale): array|false|null {}
 
 /**
@@ -4434,8 +4433,8 @@ function locale_get_keywords(string $locale): array|false|null {}
  * </p>
  * @return string|false Display name of the script for the $locale in the format appropriate for
  * $in_locale.
+ * @pure
  */
-#[Pure]
 function locale_get_display_script(
     string $locale,
     #[ElementAvailable(from: '5.3', to: '5.6')] ?string $displayLocale,
@@ -4454,8 +4453,8 @@ function locale_get_display_script(
  * </p>
  * @return string|false display name of the region for the $locale in the format appropriate for
  * $in_locale.
+ * @pure
  */
-#[Pure]
 function locale_get_display_region(
     string $locale,
     #[ElementAvailable(from: '5.3', to: '5.6')] ?string $displayLocale,
@@ -4471,8 +4470,8 @@ function locale_get_display_region(
  * </p>
  * @param string|null $displayLocale <p>optional format locale</p>
  * @return string|false Display name of the locale in the format appropriate for $in_locale.
+ * @pure
  */
-#[Pure]
 function locale_get_display_name(
     string $locale,
     #[ElementAvailable(from: '5.3', to: '5.6')] ?string $displayLocale,
@@ -4491,8 +4490,8 @@ function locale_get_display_name(
  * </p>
  * @return string|false display name of the language for the $locale in the format appropriate for
  * $in_locale.
+ * @pure
  */
-#[Pure]
 function locale_get_display_language(
     string $locale,
     #[ElementAvailable(from: '5.3', to: '5.6')] ?string $displayLocale,
@@ -4511,8 +4510,8 @@ function locale_get_display_language(
  * </p>
  * @return string|false Display name of the variant for the $locale in the format appropriate for
  * $in_locale.
+ * @pure
  */
-#[Pure]
 function locale_get_display_variant(
     string $locale,
     #[ElementAvailable(from: '5.3', to: '5.6')] ?string $displayLocale,
@@ -4542,8 +4541,8 @@ function locale_get_display_variant(
  * </p>
  * </p>
  * @return string|false The corresponding locale identifier.
+ * @pure
  */
-#[Pure]
 function locale_compose(array $subtags): string|false {}
 
 /**
@@ -4561,8 +4560,8 @@ function locale_compose(array $subtags): string|false {}
  * subtags e.g. in the locale id if variants are '-varX-varY-varZ' then the
  * returned array will have variant0=&gt;varX , variant1=&gt;varY ,
  * variant2=&gt;varZ
+ * @pure
  */
-#[Pure]
 function locale_parse(string $locale): ?array {}
 
 /**
@@ -4574,8 +4573,8 @@ function locale_parse(string $locale): ?array {}
  * </p>
  * @return array|null The array containing the list of all variants subtag for the locale
  * or <b>NULL</b> if not present
+ * @pure
  */
-#[Pure]
 function locale_get_all_variants(string $locale): ?array {}
 
 /**
@@ -4593,8 +4592,8 @@ function locale_get_all_variants(string $locale): ?array {}
  * matching.
  * </p>
  * @return bool|null <b>TRUE</b> if $locale matches $langtag <b>FALSE</b> otherwise.
+ * @pure
  */
-#[Pure]
 function locale_filter_matches(
     string $languageTag,
     string $locale,
@@ -4607,8 +4606,8 @@ function locale_filter_matches(
  * @param string $locale
  *
  * @return null|string
+ * @pure
  */
-#[Pure]
 function locale_canonicalize(string $locale): ?string {}
 
 /**
@@ -4630,8 +4629,8 @@ function locale_canonicalize(string $locale): ?string {}
  * The locale to use if no match is found.
  * </p>
  * @return string|null The closest matching language tag or default value.
+ * @pure
  */
-#[Pure]
 function locale_lookup(
     array $languageTag,
     string $locale,
@@ -4649,8 +4648,8 @@ function locale_lookup(
  * The string containing the "Accept-Language" header according to format in RFC 2616.
  * </p>
  * @return string|false The corresponding locale identifier.
+ * @pure
  */
-#[Pure]
 function locale_accept_from_http(string $header): string|false {}
 
 /**
@@ -4658,8 +4657,8 @@ function locale_accept_from_http(string $header): string|false {}
  * @param string $locale
  * @param string $pattern
  * @return MessageFormatter|null
+ * @pure
  */
-#[Pure]
 function msgfmt_create(string $locale, string $pattern): ?MessageFormatter {}
 
 /**
@@ -4671,8 +4670,8 @@ function msgfmt_create(string $locale, string $pattern): ?MessageFormatter {}
  * Arguments to insert into the format string
  * </p>
  * @return string|false The formatted string, or <b>FALSE</b> if an error occurred
+ * @pure
  */
-#[Pure]
 function msgfmt_format(MessageFormatter $formatter, array $values): string|false {}
 
 /**
@@ -4692,8 +4691,8 @@ function msgfmt_format(MessageFormatter $formatter, array $values): string|false
  * The array of values to insert into the format string
  * </p>
  * @return string|false The formatted pattern string or <b>FALSE</b> if an error occurred
+ * @pure
  */
-#[Pure]
 function msgfmt_format_message(string $locale, string $pattern, array $values): string|false {}
 
 /**
@@ -4705,8 +4704,8 @@ function msgfmt_format_message(string $locale, string $pattern, array $values): 
  * The string to parse
  * </p>
  * @return array|false An array containing the items extracted, or <b>FALSE</b> on error
+ * @pure
  */
-#[Pure]
 function msgfmt_parse(MessageFormatter $formatter, string $string): array|false {}
 
 /**
@@ -4723,8 +4722,8 @@ function msgfmt_parse(MessageFormatter $formatter, string $string): array|false 
  * The string to parse, conforming to the <i>pattern</i>.
  * </p>
  * @return array|false An array containing items extracted, or <b>FALSE</b> on error
+ * @pure
  */
-#[Pure]
 function msgfmt_parse_message(string $locale, string $pattern, string $message): array|false {}
 
 /**
@@ -4748,8 +4747,8 @@ function msgfmt_set_pattern(MessageFormatter $formatter, string $pattern): bool 
  * @link https://php.net/manual/en/messageformatter.getpattern.php
  * @param MessageFormatter $formatter
  * @return string|false The pattern string for this message formatter
+ * @pure
  */
-#[Pure]
 function msgfmt_get_pattern(MessageFormatter $formatter): string|false {}
 
 /**
@@ -4758,8 +4757,8 @@ function msgfmt_get_pattern(MessageFormatter $formatter): string|false {}
  * @link https://php.net/manual/en/messageformatter.getlocale.php
  * @param MessageFormatter $formatter
  * @return string The locale name
+ * @pure
  */
-#[Pure]
 function msgfmt_get_locale(MessageFormatter $formatter): string {}
 
 /**
@@ -4768,8 +4767,8 @@ function msgfmt_get_locale(MessageFormatter $formatter): string {}
  * @link https://php.net/manual/en/messageformatter.geterrorcode.php
  * @param MessageFormatter $formatter
  * @return int The error code, one of UErrorCode values. Initial value is U_ZERO_ERROR.
+ * @pure
  */
-#[Pure(true)]
 function msgfmt_get_error_code(MessageFormatter $formatter): int {}
 
 /**
@@ -4778,8 +4777,8 @@ function msgfmt_get_error_code(MessageFormatter $formatter): int {}
  * @link https://php.net/manual/en/messageformatter.geterrormessage.php
  * @param MessageFormatter $formatter
  * @return string Description of the last error.
+ * @pure
  */
-#[Pure(true)]
 function msgfmt_get_error_message(MessageFormatter $formatter): string {}
 
 /**
@@ -4816,8 +4815,8 @@ function msgfmt_get_error_message(MessageFormatter $formatter): string {}
  * Possible patterns are documented at http://userguide.icu-project.org/formatparse/datetime.
  * </p>
  * @return IntlDateFormatter|null
+ * @pure
  */
-#[Pure]
 function datefmt_create(
     ?string $locale,
     #[ElementAvailable(from: '5.3', to: '8.0')] int $dateType,
@@ -4835,8 +4834,8 @@ function datefmt_create(
  * @link https://php.net/manual/en/intldateformatter.getdatetype.php
  * @param IntlDateFormatter $formatter
  * @return int|false The current date type value of the formatter.
+ * @pure
  */
-#[Pure]
 function datefmt_get_datetype(IntlDateFormatter $formatter): int|false {}
 
 /**
@@ -4845,8 +4844,8 @@ function datefmt_get_datetype(IntlDateFormatter $formatter): int|false {}
  * @link https://php.net/manual/en/intldateformatter.gettimetype.php
  * @param IntlDateFormatter $formatter
  * @return int|false The current date type value of the formatter.
+ * @pure
  */
-#[Pure]
 function datefmt_get_timetype(IntlDateFormatter $formatter): int|false {}
 
 /**
@@ -4855,8 +4854,8 @@ function datefmt_get_timetype(IntlDateFormatter $formatter): int|false {}
  * @link https://php.net/manual/en/intldateformatter.getcalendar.php
  * @param IntlDateFormatter $formatter
  * @return int|false The calendar being used by the formatter.
+ * @pure
  */
-#[Pure]
 function datefmt_get_calendar(IntlDateFormatter $formatter): int|false {}
 
 /**
@@ -4879,8 +4878,8 @@ function datefmt_set_calendar(IntlDateFormatter $formatter, IntlCalendar|int|nul
  * @param IntlDateFormatter $formatter
  * @param int $type [optional]
  * @return string|false the locale of this formatter or 'false' if error
+ * @pure
  */
-#[Pure]
 function datefmt_get_locale(
     IntlDateFormatter $formatter,
     #[ElementAvailable(from: '8.0')] int $type = ULOC_ACTUAL_LOCALE
@@ -4892,8 +4891,8 @@ function datefmt_get_locale(
  * @link https://php.net/manual/en/intldateformatter.gettimezoneid.php
  * @param IntlDateFormatter $formatter
  * @return string|false ID string for the time zone used by this formatter.
+ * @pure
  */
-#[Pure]
 function datefmt_get_timezone_id(IntlDateFormatter $formatter): string|false {}
 
 /**
@@ -4902,8 +4901,8 @@ function datefmt_get_timezone_id(IntlDateFormatter $formatter): string|false {}
  * @link https://secure.php.net/manual/en/intldateformatter.getcalendarobject.php
  * @param IntlDateFormatter $formatter
  * @return IntlCalendar|false|null A copy of the internal calendar object used by this formatter.
+ * @pure
  */
-#[Pure]
 function datefmt_get_calendar_object(IntlDateFormatter $formatter): IntlCalendar|false|null {}
 
 /**
@@ -4912,8 +4911,8 @@ function datefmt_get_calendar_object(IntlDateFormatter $formatter): IntlCalendar
  * @link https://secure.php.net/manual/en/intldateformatter.gettimezone.php
  * @param IntlDateFormatter $formatter
  * @return IntlTimeZone|false The associated IntlTimeZone object or FALSE on failure.
+ * @pure
  */
-#[Pure]
 function datefmt_get_timezone(IntlDateFormatter $formatter): IntlTimeZone|false {}
 
 /**
@@ -4980,8 +4979,8 @@ function datefmt_set_timezone(IntlDateFormatter $formatter, #[LanguageAware(['8.
  * @link https://php.net/manual/en/intldateformatter.getpattern.php
  * @param IntlDateFormatter $formatter
  * @return string|false The pattern string being used to format/parse.
+ * @pure
  */
-#[Pure]
 function datefmt_get_pattern(IntlDateFormatter $formatter): string|false {}
 
 /**
@@ -5004,8 +5003,8 @@ function datefmt_set_pattern(IntlDateFormatter $formatter, string $pattern): boo
  * @link https://php.net/manual/en/intldateformatter.islenient.php
  * @param IntlDateFormatter $formatter
  * @return bool <b>TRUE</b> if parser is lenient, <b>FALSE</b> if parser is strict. By default the parser is lenient.
+ * @pure
  */
-#[Pure]
 function datefmt_is_lenient(IntlDateFormatter $formatter): bool {}
 
 /**
@@ -5035,8 +5034,8 @@ function datefmt_set_lenient(
  * <b>localtime</b>.
  * </p>
  * @return string|false The formatted string or, if an error occurred, <b>FALSE</b>.
+ * @pure
  */
-#[Pure]
 function datefmt_format(
     #[LanguageAware(['8.0' => 'IntlDateFormatter'], default: '')] #[ElementAvailable(from: '5.3', to: '7.4')] $formatter = null,
     #[LanguageAware(['8.0' => 'IntlDateFormatter'], default: '')] #[ElementAvailable(from: '8.0')] $formatter,
@@ -5067,8 +5066,8 @@ function datefmt_format(
  * @param string|null $locale [optional] <p>
  * The locale to use, or NULL to use the default one.</p>
  * @return string|false The formatted string or, if an error occurred, <b>FALSE</b>.
+ * @pure
  */
-#[Pure]
 function datefmt_format_object($datetime, $format = null, ?string $locale = null): string|false {}
 
 /**
@@ -5114,8 +5113,8 @@ function datefmt_localtime(IntlDateFormatter $formatter, string $string, &$offse
  * @link https://php.net/manual/en/intldateformatter.geterrorcode.php
  * @param IntlDateFormatter $formatter
  * @return int The error code, one of UErrorCode values. Initial value is U_ZERO_ERROR.
+ * @pure
  */
-#[Pure(true)]
 function datefmt_get_error_code(IntlDateFormatter $formatter): int {}
 
 /**
@@ -5124,8 +5123,8 @@ function datefmt_get_error_code(IntlDateFormatter $formatter): int {}
  * @link https://php.net/manual/en/intldateformatter.geterrormessage.php
  * @param IntlDateFormatter $formatter
  * @return string Description of the last error.
+ * @pure
  */
-#[Pure(true)]
 function datefmt_get_error_message(IntlDateFormatter $formatter): string {}
 
 /**
@@ -5136,8 +5135,8 @@ function datefmt_get_error_message(IntlDateFormatter $formatter): string {}
  * The string being measured for length. It must be a valid UTF-8 string.
  * </p>
  * @return int|false|null The length of the string on success, and 0 if the string is empty.
+ * @pure
  */
-#[Pure]
 function grapheme_strlen(string $string): int|false|null {}
 
 /**
@@ -5157,8 +5156,8 @@ function grapheme_strlen(string $string): int|false|null {}
  * regardless of the value of $offset.
  * </p>
  * @return int|false the position as an integer. If needle is not found, strpos() will return boolean FALSE.
+ * @pure
  */
-#[Pure]
 function grapheme_strpos(string $haystack, string $needle, int $offset = 0, #[ElementAvailable(from: '8.5')] string $locale = ""): int|false {}
 
 /**
@@ -5178,8 +5177,8 @@ function grapheme_strpos(string $haystack, string $needle, int $offset = 0, #[El
  * regardless of the value of $offset.
  * </p>
  * @return int|false the position as an integer. If needle is not found, grapheme_stripos() will return boolean FALSE.
+ * @pure
  */
-#[Pure]
 function grapheme_stripos(string $haystack, string $needle, int $offset = 0, #[ElementAvailable(from: '8.5')] string $locale = ""): int|false {}
 
 /**
@@ -5199,8 +5198,8 @@ function grapheme_stripos(string $haystack, string $needle, int $offset = 0, #[E
  * regardless of the value of $offset.
  * </p>
  * @return int|false the position as an integer. If needle is not found, grapheme_strrpos() will return boolean FALSE.
+ * @pure
  */
-#[Pure]
 function grapheme_strrpos(string $haystack, string $needle, int $offset = 0, #[ElementAvailable(from: '8.5')] string $locale = ""): int|false {}
 
 /**
@@ -5220,8 +5219,8 @@ function grapheme_strrpos(string $haystack, string $needle, int $offset = 0, #[E
  * regardless of the value of $offset.
  * </p>
  * @return int|false the position as an integer. If needle is not found, grapheme_strripos() will return boolean FALSE.
+ * @pure
  */
-#[Pure]
 function grapheme_strripos(string $haystack, string $needle, int $offset = 0, #[ElementAvailable(from: '8.5')] string $locale = ""): int|false {}
 
 /**
@@ -5250,8 +5249,8 @@ function grapheme_strripos(string $haystack, string $needle, int $offset = 0, #[
  * @return string|false <p>the extracted part of $string,<br />
  * or <strong>FALSE</strong> if $length is negative and $start denotes a position beyond truncation $length,<br />
  * or also <strong>FALSE</strong> if $start denotes a position beyond $string length</p>
+ * @pure
  */
-#[Pure]
 function grapheme_substr(string $string, int $offset, ?int $length = null, #[ElementAvailable(from: '8.5')] string $locale = ""): string|false {}
 
 /**
@@ -5269,8 +5268,8 @@ function grapheme_substr(string $string, int $offset, ?int $length = null, #[Ele
  * haystack before the first occurrence of the needle (excluding the needle).
  * </p>
  * @return string|false the portion of string, or FALSE if needle is not found.
+ * @pure
  */
-#[Pure]
 function grapheme_strstr(string $haystack, string $needle, bool $beforeNeedle = false, #[ElementAvailable(from: '8.5')] string $locale = ""): string|false {}
 
 /**
@@ -5288,8 +5287,8 @@ function grapheme_strstr(string $haystack, string $needle, bool $beforeNeedle = 
  * haystack before the first occurrence of the needle (excluding needle).
  * </p>
  * @return string|false the portion of $haystack, or FALSE if $needle is not found.
+ * @pure
  */
-#[Pure]
 function grapheme_stristr(string $haystack, string $needle, bool $beforeNeedle = false, #[ElementAvailable(from: '8.5')] string $locale = ""): string|false {}
 
 /**
@@ -5429,8 +5428,8 @@ function idn_to_utf8(string $domain, int $flags = IDNA_DEFAULT, int $variant = I
  * The created {@link https://secure.php.net/manual/en/class.intlcalendar.php IntlCalendar} instance or <b>NULL</b> on
  * failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_create_instance(#[LanguageAware(['8.5' => 'IntlTimeZone|DateTimeZone|string|null'], default: '')] $timezone = null, ?string $locale = null): ?IntlCalendar {}
 
 /**
@@ -5449,8 +5448,8 @@ function intlcal_create_instance(#[LanguageAware(['8.5' => 'IntlTimeZone|DateTim
  * </p>
  * @return IntlIterator|false An iterator that yields strings with the locale keyword values or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_get_keyword_values_for_locale(string $keyword, string $locale, bool $onlyCommon): IntlIterator|false {}
 
 /**
@@ -5459,8 +5458,8 @@ function intlcal_get_keyword_values_for_locale(string $keyword, string $locale, 
  * @link https://secure.php.net/manual/en/intlcalendar.getnow.php
  * @return float A float representing a number of milliseconds since the epoch, not counting leap seconds.
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function intlcal_get_now(): float {}
 
 /**
@@ -5469,8 +5468,8 @@ function intlcal_get_now(): float {}
  * @link https://secure.php.net/manual/en/intlcalendar.getavailablelocales.php
  * @return string[] An array of strings, one for which locale.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_get_available_locales(): array {}
 
 /**
@@ -5487,8 +5486,8 @@ function intlcal_get_available_locales(): array {}
  * </p>
  * @return int An integer with the value of the time field.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intl_get($calendar, $field) {}
 
 /**
@@ -5499,8 +5498,8 @@ function intl_get($calendar, $field) {}
  * A {@link https://secure.php.net/manual/en/language.types.float.php float} representing the number of milliseconds elapsed since the
  * reference time (1 Jan 1970 00:00:00 UTC).
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'float|false'], default: 'float')]
 function intlcal_get_time(IntlCalendar $calendar) {}
 
@@ -5599,8 +5598,8 @@ function intlcal_set_time_zone(IntlCalendar $calendar, #[LanguageAware(['8.5' =>
  * Also returns <b>FALSE</b> on failure. You can use {@link https://secure.php.net/manual/en/intl.configuration.php#ini.intl.use-exceptions exceptions} or
  * {@link https://secure.php.net/manual/en/function.intl-get-error-code.php intl_get_error_code()} to detect error conditions.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_after(IntlCalendar $calendar, IntlCalendar $other): bool {}
 
 /**
@@ -5619,8 +5618,8 @@ function intlcal_after(IntlCalendar $calendar, IntlCalendar $other): bool {}
  * {@link https://secure.php.net/manual/en/function.intl-get-error-code.php intl_get_error_code()} to detect error conditions.
  * </p>
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_before(IntlCalendar $calendar, IntlCalendar $other): bool {}
 
 /**
@@ -5733,8 +5732,8 @@ function intlcal_clear(IntlCalendar $calendar, ?int $field = null): bool {}
  * @return int Returns a (signed) difference of time in the unit associated with the
  * specified field or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_field_difference(IntlCalendar $calendar, float $timestamp, int $field) {}
 
@@ -5754,8 +5753,8 @@ function intlcal_field_difference(IntlCalendar $calendar, float $timestamp, int 
  * An {@link https://secure.php.net/manual/en/language.types.integer.php int} representing the maximum value in the units associated
  * with the given <em>field</em> or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_actual_maximum(IntlCalendar $calendar, int $field) {}
 
@@ -5775,8 +5774,8 @@ function intlcal_get_actual_maximum(IntlCalendar $calendar, int $field) {}
  * An {@link https://secure.php.net/manual/en/language.types.integer.php int} representing the minimum value in the field's
  * unit or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_actual_minimum(IntlCalendar $calendar, int $field) {}
 
@@ -5799,8 +5798,8 @@ function intlcal_get_actual_minimum(IntlCalendar $calendar, int $field) {}
  * <b>IntlCalendar::DOW_TYPE_WEEKEND_OFFSET</b> or
  * <b>IntlCalendar::DOW_TYPE_WEEKEND_CEASE</b> or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_day_of_week_type(IntlCalendar $calendar, int $dayOfWeek) {}
 
@@ -5816,8 +5815,8 @@ function intlcal_get_day_of_week_type(IntlCalendar $calendar, int $dayOfWeek) {}
  * <b>IntlCalendar::DOW_MONDAY</b>, ...,
  * <b>IntlCalendar::DOW_SATURDAY</b> or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_first_day_of_week(IntlCalendar $calendar) {}
 
@@ -5836,8 +5835,8 @@ function intlcal_get_first_day_of_week(IntlCalendar $calendar) {}
  * An {@link https://secure.php.net/manual/en/language.types.integer.php int} representing a field value, in the field's
  * unit, or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_greates_minimum($calendar, $field) {}
 
 /**
@@ -5851,8 +5850,8 @@ function intlcal_greates_minimum($calendar, $field) {}
  * One of the IntlCalendar date/time field constants. These are integer values between 0 and IntlCalendar::FIELD_COUNT.
  * </p>
  * @return int An integer with the value of the time field.
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get(IntlCalendar $calendar, int $field) {}
 
@@ -5873,8 +5872,8 @@ function intlcal_get(IntlCalendar $calendar, int $field) {}
  * unit or <b>FALSE</b> on failure.
  * </p>
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_least_maximum(IntlCalendar $calendar, int $field) {}
 
@@ -5893,8 +5892,8 @@ function intlcal_get_least_maximum(IntlCalendar $calendar, int $field) {}
  * An {@link https://secure.php.net/manual/en/language.types.integer.php int} representing a field value, in the field's
  * unit, or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_greatest_minimum(IntlCalendar $calendar, int $field) {}
 
@@ -5916,8 +5915,8 @@ function intlcal_get_greatest_minimum(IntlCalendar $calendar, int $field) {}
  * @return string
  * A locale string or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'string|false'], default: 'string')]
 function intlcal_get_locale(IntlCalendar $calendar, int $type) {}
 
@@ -5935,8 +5934,8 @@ function intlcal_get_locale(IntlCalendar $calendar, int $type) {}
  * </p>
  * @return int|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intcal_get_maximum($calendar, $field) {}
 
 /**
@@ -5949,8 +5948,8 @@ function intcal_get_maximum($calendar, $field) {}
  * @return int
  * An {@link https://secure.php.net/manual/en/language.types.integer.php  int} representing a number of days or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_minimal_days_in_first_week(IntlCalendar $calendar) {}
 
@@ -5969,8 +5968,8 @@ function intlcal_get_minimal_days_in_first_week(IntlCalendar $calendar) {}
  * @return int
  * An int representing a value for the given field in the field's unit or FALSE on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_minimum(IntlCalendar $calendar, int $field) {}
 
@@ -5985,8 +5984,8 @@ function intlcal_get_minimum(IntlCalendar $calendar, int $field) {}
  * An {@link https://secure.php.net/manual/en/class.intltimezone.php IntlTimeZone} object corresponding to the one used
  * internally in this object.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_get_time_zone(IntlCalendar $calendar): IntlTimeZone|false {}
 
 /**
@@ -6000,8 +5999,8 @@ function intlcal_get_time_zone(IntlCalendar $calendar): IntlTimeZone|false {}
  * A {@link https://secure.php.net/manual/en/language.types.string.php string} representing the calendar type, such as
  * <em>'gregorian'</em>, <em>'islamic'</em>, etc.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_get_type(IntlCalendar $calendar): string {}
 
 /**
@@ -6020,8 +6019,8 @@ function intlcal_get_type(IntlCalendar $calendar): string {}
  * The number of milliseconds into the day at which the the weekend begins or
  * ends or <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_weekend_transition(IntlCalendar $calendar, int $dayOfWeek) {}
 
@@ -6038,8 +6037,8 @@ function intlcal_get_weekend_transition(IntlCalendar $calendar, int $dayOfWeek) 
  * specifying invalid field values on non-lenient mode; use {@link https://secure.php.net/manual/en/intl.configuration.php#ini.intl.use-exceptions exceptions} or query
  * {@link https://secure.php.net/manual/en/function.intl-get-error-code.php intl_get_error_code()} to disambiguate.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_in_daylight_time(IntlCalendar $calendar): bool {}
 
 /**
@@ -6052,8 +6051,8 @@ function intlcal_in_daylight_time(IntlCalendar $calendar): bool {}
  * @return bool
  * A {@link https://secure.php.net/manual/en/language.types.boolean.php bool} representing whether the calendar is set to lenient mode.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_is_lenient(IntlCalendar $calendar): bool {}
 
 /**
@@ -6070,8 +6069,8 @@ function intlcal_is_lenient(IntlCalendar $calendar): bool {}
  * </p>
  * @return bool Assuming there are no argument errors, returns <b>TRUE</b> iif the field is set.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_is_set(IntlCalendar $calendar, int $field): bool {}
 
 /**
@@ -6088,8 +6087,8 @@ function intlcal_is_set(IntlCalendar $calendar, int $field): bool {}
  * </p>
  * @return int|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.0' => 'int|false'], default: 'int')]
 function intlcal_get_maximum(IntlCalendar $calendar, int $field) {}
 
@@ -6104,8 +6103,8 @@ function intlcal_get_maximum(IntlCalendar $calendar, int $field) {}
  * @return bool
  * Assuming there are no argument errors, returns <b>TRUE</b> iif the calendars are equivalent except possibly for their set time.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_is_equivalent_to(IntlCalendar $calendar, IntlCalendar $other): bool {}
 
 /**
@@ -6129,8 +6128,8 @@ function intlcal_is_equivalent_to(IntlCalendar $calendar, IntlCalendar $other): 
  * a date out of bounds on non-lenient mode; use {@link https://secure.php.net/manual/en/intl.configuration.php#ini.intl.use-exceptions exceptions} or query
  * {@link https://secure.php.net/manual/en/function.intl-get-error-code.php intl_get_error_code()} to disambiguate.</p>
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_is_weekend(IntlCalendar $calendar, ?float $timestamp = null): bool {}
 
 /**
@@ -6178,8 +6177,8 @@ function intlcal_set_lenient(IntlCalendar $calendar, bool $lenient) {}
  * One of the constants <b>IntlCalendar::WALLTIME_FIRST</b> or
  * <b>IntlCalendar::WALLTIME_LAST</b>.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_get_repeated_wall_time_option(IntlCalendar $calendar): int {}
 
 /**
@@ -6198,8 +6197,8 @@ function intlcal_get_repeated_wall_time_option(IntlCalendar $calendar): int {}
  * distinguished by calling  {@link https://secure.php.net/manual/en/function.intl-get-error-code.php intl_get_error_code()}.
  * </p>
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_equals(IntlCalendar $calendar, IntlCalendar $other): bool {}
 
 /**
@@ -6214,8 +6213,8 @@ function intlcal_equals(IntlCalendar $calendar, IntlCalendar $other): bool {}
  * <b>IntlCalendar::WALLTIME_LAST</b> or
  * <b>IntlCalendar::WALLTIME_NEXT_VALID</b>.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_get_skipped_wall_time_option(IntlCalendar $calendar): int {}
 
 /**
@@ -6271,8 +6270,8 @@ function intlcal_set_skipped_wall_time_option(IntlCalendar $calendar, int $optio
  * failure. If a {@link https://secure.php.net/manual/en/language.types.string.php string} is passed, any exception that occurs
  * inside the {@link https://secure.php.net/manual/en/class.datetime.php DateTime} constructor is propagated.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_from_date_time(
     DateTime|string $datetime,
     #[ElementAvailable(from: '8.0')] ?string $locale = null
@@ -6291,8 +6290,8 @@ function intlcal_from_date_time(
  * except for the smaller precision (second precision instead of millisecond).
  * Returns <b>FALSE</b> on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlcal_to_date_time(IntlCalendar $calendar): DateTime|false {}
 
 /**
@@ -6304,8 +6303,8 @@ function intlcal_to_date_time(IntlCalendar $calendar): DateTime|false {}
  * </p>
  * @return int|false An ICU error code indicating either success, failure or a warning.
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function intlcal_get_error_code(IntlCalendar $calendar): int|false {}
 
 /**
@@ -6317,8 +6316,8 @@ function intlcal_get_error_code(IntlCalendar $calendar): int|false {}
  * </p>
  * @return string|false The error message associated with last error that occurred in a function call on this object, or a string indicating the non-existance of an error.
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function intlcal_get_error_message(IntlCalendar $calendar): string|false {}
 
 /**
@@ -6328,8 +6327,8 @@ function intlcal_get_error_message(IntlCalendar $calendar): string|false {}
  * @param string $timezoneId
  * @return int|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_count_equivalent_ids(string $timezoneId): int|false {}
 
 /**
@@ -6338,8 +6337,8 @@ function intltz_count_equivalent_ids(string $timezoneId): int|false {}
  * @link https://secure.php.net/manual/en/intltimezone.createdefault.php
  * @return IntlTimeZone
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intlz_create_default() {}
 
 /**
@@ -6348,8 +6347,8 @@ function intlz_create_default() {}
  * @param IntlTimeZone|string|int|float|null $countryOrRawOffset [optional]
  * @return IntlIterator|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_create_enumeration(#[LanguageAware(['8.5' => 'string|int|null'], default: '')] $countryOrRawOffset): IntlIterator|false {}
 
 /**
@@ -6358,8 +6357,8 @@ function intltz_create_enumeration(#[LanguageAware(['8.5' => 'string|int|null'],
  * @param string $timezoneId
  * @return IntlTimeZone|null
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_create_time_zone(string $timezoneId): ?IntlTimeZone {}
 
 /**
@@ -6368,8 +6367,8 @@ function intltz_create_time_zone(string $timezoneId): ?IntlTimeZone {}
  * @param DateTimeZone $timezone
  * @return IntlTimeZone|null
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_from_date_time_zone(DateTimeZone $timezone): ?IntlTimeZone {}
 
 /**
@@ -6380,8 +6379,8 @@ function intltz_from_date_time_zone(DateTimeZone $timezone): ?IntlTimeZone {}
  * @param bool &$isSystemId [optional]
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_canonical_id(string $timezoneId, &$isSystemId): string|false {}
 
 /**
@@ -6395,8 +6394,8 @@ function intltz_get_canonical_id(string $timezoneId, &$isSystemId): string|false
  * @param string|null $locale [optional]
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_display_name(IntlTimeZone $timezone, bool $dst = false, int $style = 2, ?string $locale): string|false {}
 
 /**
@@ -6408,8 +6407,8 @@ function intltz_get_display_name(IntlTimeZone $timezone, bool $dst = false, int 
  * @return int
  * @link https://secure.php.net/manual/en/intltimezone.getequivalentid.php
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_dst_savings(IntlTimeZone $timezone): int {}
 
 /**
@@ -6420,8 +6419,8 @@ function intltz_get_dst_savings(IntlTimeZone $timezone): int {}
  * @param int $offset
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_equivalent_id(string $timezoneId, int $offset): string|false {}
 
 /**
@@ -6433,8 +6432,8 @@ function intltz_get_equivalent_id(string $timezoneId, int $offset): string|false
  * </p>
  * @return int|false
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function intltz_get_error_code(IntlTimeZone $timezone): int|false {}
 
 /**
@@ -6446,8 +6445,8 @@ function intltz_get_error_code(IntlTimeZone $timezone): int|false {}
  * </p>
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function intltz_get_error_message(IntlTimeZone $timezone): string|false {}
 
 /**
@@ -6456,8 +6455,8 @@ function intltz_get_error_message(IntlTimeZone $timezone): string|false {}
  * @link https://secure.php.net/manual/en/intltimezone.getgmt.php
  * @return IntlTimeZone
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_getGMT(): IntlTimeZone {}
 
 /**
@@ -6467,8 +6466,8 @@ function intltz_getGMT(): IntlTimeZone {}
  * @param IntlTimeZone $timezone
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_id(IntlTimeZone $timezone): string|false {}
 
 /**
@@ -6482,8 +6481,8 @@ function intltz_get_id(IntlTimeZone $timezone): string|false {}
  * @param int &$dstOffset
  * @return bool
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_offset(IntlTimeZone $timezone, float $timestamp, bool $local, &$rawOffset, &$dstOffset): bool {}
 
 /**
@@ -6491,8 +6490,8 @@ function intltz_get_offset(IntlTimeZone $timezone, float $timestamp, bool $local
  * @link https://secure.php.net/manual/en/intltimezone.getrawoffset.php
  * @param IntlTimeZone $timezone
  * @return int
+ * @pure
  */
-#[Pure]
 function intltz_get_raw_offset(IntlTimeZone $timezone): int {}
 
 /**
@@ -6501,8 +6500,8 @@ function intltz_get_raw_offset(IntlTimeZone $timezone): int {}
  * @link https://secure.php.net/manual/en/intltimezone.gettzdataversion.php
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_tz_data_version(): string|false {}
 
 /**
@@ -6513,8 +6512,8 @@ function intltz_get_tz_data_version(): string|false {}
  * @param IntlTimeZone $other
  * @return bool
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_has_same_rules(
     IntlTimeZone $timezone,
     #[ElementAvailable(from: '5.5', to: '7.4')] IntlTimeZone $other = null,
@@ -6528,8 +6527,8 @@ function intltz_has_same_rules(
  * @param IntlTimeZone $timezone
  * @return DateTimeZone|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_to_date_time_zone(IntlTimeZone $timezone): DateTimeZone|false {}
 
 /**
@@ -6539,8 +6538,8 @@ function intltz_to_date_time_zone(IntlTimeZone $timezone): DateTimeZone|false {}
  * @param IntlTimeZone $timezone
  * @return bool
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_use_daylight_time(IntlTimeZone $timezone): bool {}
 
 /**
@@ -6553,8 +6552,8 @@ function intltz_use_daylight_time(IntlTimeZone $timezone): bool {}
  * @param int $second [optional]
  * @return IntlGregorianCalendar|null
  * @since 5.5
+ * @pure
  */
-#[Pure]
 #[Deprecated( reason: 'use IntlGregorianCalendar::__construct(), IntlGregorianCalendar::createFromDate(), or IntlGregorianCalendar::createFromDateTime() instead', since: '8.4' )]
 function intlgregcal_create_instance($timezoneOrYear, $localeOrMonth, $day, $hour, $minute, $second): ?IntlGregorianCalendar {}
 
@@ -6568,16 +6567,16 @@ function intlgregcal_set_gregorian_change(IntlGregorianCalendar $calendar, float
 /**
  * @param IntlGregorianCalendar $calendar
  * @return float
+ * @pure
  */
-#[Pure]
 function intlgregcal_get_gregorian_change(IntlGregorianCalendar $calendar): float {}
 
 /**
  * @param IntlGregorianCalendar $calendar
  * @param int $year
  * @return bool
+ * @pure
  */
-#[Pure]
 function intlgregcal_is_leap_year(IntlGregorianCalendar $calendar, int $year): bool {}
 
 /**
@@ -6594,8 +6593,8 @@ function intlgregcal_is_leap_year(IntlGregorianCalendar $calendar, int $year): b
  * Whether locale should match exactly or fallback to parent locale is allowed.
  * </p>
  * @return ResourceBundle|null <b>ResourceBundle</b> object or <b>NULL</b> on error.
+ * @pure
  */
-#[Pure]
 function resourcebundle_create(?string $locale, ?string $bundle, bool $fallback = true): ?ResourceBundle {}
 
 /**
@@ -6610,8 +6609,8 @@ function resourcebundle_create(?string $locale, ?string $bundle, bool $fallback 
  * @return mixed the data located at the index or <b>NULL</b> on error. Strings, integers and binary data strings
  * are returned as corresponding PHP types, integer array is returned as PHP array. Complex types are
  * returned as <b>ResourceBundle</b> object.
+ * @pure
  */
-#[Pure]
 #[LanguageAware(['8.4' => 'ResourceBundle|array|string|int|null'], default: 'mixed')]
 function resourcebundle_get(ResourceBundle $bundle, string|int $index, bool $fallback = true) {}
 
@@ -6621,8 +6620,8 @@ function resourcebundle_get(ResourceBundle $bundle, string|int $index, bool $fal
  * @link https://php.net/manual/en/resourcebundle.count.php
  * @param ResourceBundle $bundle
  * @return int number of elements in the bundle.
+ * @pure
  */
-#[Pure]
 function resourcebundle_count(ResourceBundle $bundle): int {}
 
 /**
@@ -6634,8 +6633,8 @@ function resourcebundle_count(ResourceBundle $bundle): int {}
  * empty string for default locales list.
  * </p>
  * @return array|false the list of locales supported by the bundle.
+ * @pure
  */
-#[Pure]
 function resourcebundle_locales(string $bundle): array|false {}
 
 /**
@@ -6644,8 +6643,8 @@ function resourcebundle_locales(string $bundle): array|false {}
  * @link https://php.net/manual/en/resourcebundle.geterrorcode.php
  * @param ResourceBundle $bundle
  * @return int error code from last bundle object call.
+ * @pure
  */
-#[Pure(true)]
 function resourcebundle_get_error_code(ResourceBundle $bundle): int {}
 
 /**
@@ -6654,8 +6653,8 @@ function resourcebundle_get_error_code(ResourceBundle $bundle): int {}
  * @link https://php.net/manual/en/resourcebundle.geterrormessage.php
  * @param ResourceBundle $bundle
  * @return string error message from last bundle object's call.
+ * @pure
  */
-#[Pure(true)]
 function resourcebundle_get_error_message(ResourceBundle $bundle): string {}
 
 /**
@@ -6674,8 +6673,8 @@ function resourcebundle_get_error_message(ResourceBundle $bundle): string {}
  * @return Transliterator|null a <b>Transliterator</b> object on success,
  * or <b>NULL</b> on failure.
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function transliterator_create(string $id, int $direction = 0): ?Transliterator {}
 
 /**
@@ -6694,8 +6693,8 @@ function transliterator_create(string $id, int $direction = 0): ?Transliterator 
  * @return Transliterator|null a <b>Transliterator</b> object on success,
  * or <b>NULL</b> on failure.
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function transliterator_create_from_rules(string $rules, int $direction = 0): ?Transliterator {}
 
 /**
@@ -6705,8 +6704,8 @@ function transliterator_create_from_rules(string $rules, int $direction = 0): ?T
  * @return string[]|false An array of registered transliterator IDs on success,
  * or <b>FALSE</b> on failure.
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function transliterator_list_ids(): array|false {}
 
 /**
@@ -6717,8 +6716,8 @@ function transliterator_list_ids(): array|false {}
  * @return Transliterator|null a <b>Transliterator</b> object on success,
  * or <b>NULL</b> on failure
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function transliterator_create_inverse(Transliterator $transliterator): ?Transliterator {}
 
 /**
@@ -6741,8 +6740,8 @@ function transliterator_create_inverse(Transliterator $transliterator): ?Transli
  * </p>
  * @return string|false The transfomed string on success, or <b>FALSE</b> on failure.
  * @since 5.4
+ * @pure
  */
-#[Pure]
 function transliterator_transliterate(Transliterator|string $transliterator, string $string, int $start = 0, int $end = -1): string|false {}
 
 /**
@@ -6753,8 +6752,8 @@ function transliterator_transliterate(Transliterator|string $transliterator, str
  * @return int|false The error code on success,
  * or <b>FALSE</b> if none exists, or on failure.
  * @since 5.4
+ * @pure
  */
-#[Pure(true)]
 #[LanguageAware(['8.5' => 'int'], default: 'int|false')]
 function transliterator_get_error_code(Transliterator $transliterator) {}
 
@@ -6766,8 +6765,8 @@ function transliterator_get_error_code(Transliterator $transliterator) {}
  * @return string|false The error code on success,
  * or <b>FALSE</b> if none exists, or on failure.
  * @since 5.4
+ * @pure
  */
-#[Pure(true)]
 #[LanguageAware(['8.5' => 'string'], default: 'string|false')]
 function transliterator_get_error_message(Transliterator $transliterator) {}
 
@@ -6776,8 +6775,8 @@ function transliterator_get_error_message(Transliterator $transliterator) {}
  * Get the last error code
  * @link https://php.net/manual/en/function.intl-get-error-code.php
  * @return int Error code returned by the last API function call.
+ * @pure
  */
-#[Pure(true)]
 function intl_get_error_code(): int {}
 
 /**
@@ -6785,8 +6784,8 @@ function intl_get_error_code(): int {}
  * Get description of the last error
  * @link https://php.net/manual/en/function.intl-get-error-message.php
  * @return string Description of an error occurred in the last API function call.
+ * @pure
  */
-#[Pure(true)]
 function intl_get_error_message(): string {}
 
 /**
@@ -6800,8 +6799,8 @@ function intl_get_error_message(): string {}
  * </p>
  * @return bool <b>TRUE</b> if it the code indicates some failure, and <b>FALSE</b>
  * in case of success or a warning.
+ * @pure
  */
-#[Pure]
 function intl_is_failure(int $errorCode): bool {}
 
 /**
@@ -6813,8 +6812,8 @@ function intl_is_failure(int $errorCode): bool {}
  * </p>
  * @return string The returned string will be the same as the name of the error code
  * constant.
+ * @pure
  */
-#[Pure]
 function intl_error_name(int $errorCode): string {}
 
 /**
@@ -6827,29 +6826,29 @@ function intl_error_name(int $errorCode): string {}
  * @return string|null
  *
  * @since 7.3
+ * @pure
  */
-#[Pure]
 function normalizer_get_raw_decomposition(string $string, #[ElementAvailable(from: '8.0')] int $form = Normalizer::FORM_C): ?string {}
 
 /**
  * @return IntlTimeZone
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_create_default(): IntlTimeZone {}
 
 /**
  * @return IntlTimeZone
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_gmt(): IntlTimeZone {}
 
 /**
  * @return IntlTimeZone
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_unknown(): IntlTimeZone {}
 
 /**
@@ -6858,16 +6857,16 @@ function intltz_get_unknown(): IntlTimeZone {}
  * @param null|int $rawOffset
  * @return IntlIterator|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_create_time_zone_id_enumeration(int $type, ?string $region = null, ?int $rawOffset = null): IntlIterator|false {}
 
 /**
  * @param string $timezoneId
  * @return string|false
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function intltz_get_region(string $timezoneId): string|false {}
 
 /**

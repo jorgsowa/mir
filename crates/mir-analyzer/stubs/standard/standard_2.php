@@ -3,7 +3,6 @@
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Query language and locale information
@@ -149,8 +148,8 @@ use JetBrains\PhpStorm\Pure;
  * </table>
  * @return string|false the element as a string, or false if item
  * is not valid.
+ * @pure
  */
-#[Pure(true)]
 function nl_langinfo(int $item): string|false {}
 
 /**
@@ -160,8 +159,8 @@ function nl_langinfo(int $item): string|false {}
  * The input string.
  * </p>
  * @return string the soundex key as a string.
+ * @pure
  */
-#[Pure]
 function soundex(string $string): string {}
 
 /**
@@ -201,8 +200,8 @@ function levenshtein(string $string1, string $string2, int $insertion_cost = 1, 
  * The ascii code.
  * </p>
  * @return string the specified character.
+ * @pure
  */
-#[Pure]
 function chr(int $codepoint): string {}
 
 /**
@@ -212,8 +211,8 @@ function chr(int $codepoint): string {}
  * A character.
  * </p>
  * @return int<0, 255> the ASCII value as an integer.
+ * @pure
  */
-#[Pure]
 function ord(string $character): int {}
 
 /**
@@ -252,8 +251,8 @@ function parse_str(
  * Defaults as a backslash (\)
  * </p>
  * @return array an indexed array containing the fields read.
+ * @pure
  */
-#[Pure]
 function str_getcsv(string $string, string $separator = ",", string $enclosure = '"', string $escape = "\\"): array {}
 
 /**
@@ -280,8 +279,8 @@ function str_getcsv(string $string, string $separator = ",", string $enclosure =
  * STR_PAD_RIGHT.
  * </p>
  * @return string the padded string.
+ * @pure
  */
-#[Pure]
 function str_pad(string $string, int $length, string $pad_string = " ", int $pad_type = STR_PAD_RIGHT): string {}
 
 /**
@@ -292,8 +291,8 @@ function str_pad(string $string, int $length, string $pad_string = " ", int $pad
  * @return string the modified string.
  * @link https://php.net/manual/en/function.chop.php
  * @see rtrim()
+ * @pure
  */
-#[Pure]
 function chop(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
@@ -308,8 +307,8 @@ function chop(string $string, string $characters = " \n\r\t\v\0"): string {}
  * @param string $needle If needle is not a string, it is converted to an integer and applied as the ordinal value of a character.
  * @param bool $before_needle [optional] If TRUE, strstr() returns the part of the haystack before the first occurrence of the needle (excluding the needle).
  * @return string|false Returns the portion of string, or FALSE if needle is not found.
+ * @pure
  */
-#[Pure]
 function strchr(string $haystack, string $needle, bool $before_needle = false): string|false {}
 
 /**
@@ -335,8 +334,8 @@ function strchr(string $haystack, string $needle, bool $before_needle = false): 
  * </p>
  * @return string a string produced according to the formatting string
  * format.
+ * @pure
  */
-#[Pure]
 function sprintf(
     string $format,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '5.6')] $values = null,
@@ -381,8 +380,8 @@ function vprintf(string $format, array $values): int {}
  * @return string Return array values as a formatted string according to
  * format (which is described in the documentation
  * for sprintf).
+ * @pure
  */
-#[Pure]
 function vsprintf(string $format, array $values): string {}
 
 /**
@@ -488,7 +487,6 @@ function fscanf($stream, string $format, mixed &...$vars): array|int|false|null 
  * If the requested component doesn't exist within the given URL, null will be returned.
  */
 #[ArrayShape(["scheme" => "string", "host" => "string", "port" => "int", "user" => "string", "pass" => "string", "query" => "string", "path" => "string", "fragment" => "string"])]
-#[Pure]
 function parse_url(string $url, int $component = -1): array|string|int|false|null {}
 
 /**
@@ -506,8 +504,8 @@ function parse_url(string $url, int $component = -1): array|string|int|false|nul
  * differs from the RFC 3986 encoding (see
  * rawurlencode) in that for historical reasons, spaces
  * are encoded as plus (+) signs.
+ * @pure
  */
-#[Pure]
 function urlencode(string $string): string {}
 
 /**
@@ -517,8 +515,8 @@ function urlencode(string $string): string {}
  * The string to be decoded.
  * </p>
  * @return string the decoded string.
+ * @pure
  */
-#[Pure]
 function urldecode(string $string): string {}
 
 /**
@@ -534,8 +532,8 @@ function urldecode(string $string): string {}
  * protecting literal characters from being interpreted as special URL
  * delimiters, and for protecting URLs from being mangled by transmission
  * media with character conversions (like some email systems).
+ * @pure
  */
-#[Pure]
 function rawurlencode(string $string): string {}
 
 /**
@@ -545,8 +543,8 @@ function rawurlencode(string $string): string {}
  * The URL to be decoded.
  * </p>
  * @return string the decoded URL, as a string.
+ * @pure
  */
-#[Pure]
 function rawurldecode(string $string): string {}
 
 /**
@@ -581,8 +579,8 @@ function rawurldecode(string $string): string {}
  *  which implies that spaces are encoded as plus (+) signs.
  *  <p>If enc_type is PHP_QUERY_RFC3986, then encoding is performed according to » RFC 3986, and spaces will be percent encoded (%20).
  * @return string a URL-encoded string.
+ * @pure
  */
-#[Pure]
 function http_build_query(object|array $data, string $numeric_prefix = "", ?string $arg_separator = null, int $encoding_type = PHP_QUERY_RFC1738): string {}
 
 /**
@@ -592,8 +590,8 @@ function http_build_query(object|array $data, string $numeric_prefix = "", ?stri
  * The symbolic link path.
  * </p>
  * @return string|false the contents of the symbolic link path or false on error.
+ * @pure
  */
-#[Pure(true)]
 function readlink(string $path): string|false {}
 
 /**
@@ -605,8 +603,8 @@ function readlink(string $path): string|false {}
  * @return int|false linkinfo returns the st_dev field
  * of the Unix C stat structure returned by the lstat
  * system call. Returns 0 or false in case of error.
+ * @pure
  */
-#[Pure(true)]
 function linkinfo(string $path): int|false {}
 
 /**
@@ -697,8 +695,8 @@ function system(string $command, &$result_code = null): string|false {}
  * The command that will be escaped.
  * </p>
  * @return string The escaped string.
+ * @pure
  */
-#[Pure]
 function escapeshellcmd(string $command): string {}
 
 /**
@@ -708,8 +706,8 @@ function escapeshellcmd(string $command): string {}
  * The argument that will be escaped.
  * </p>
  * @return string The escaped string.
+ * @pure
  */
-#[Pure]
 function escapeshellarg(string $arg): string {}
 
 /**
@@ -941,8 +939,8 @@ function proc_nice(int $priority): bool {}
  * </p>
  * @return int|false the port number, or false if service or
  * protocol is not found.
+ * @pure
  */
-#[Pure]
 function getservbyname(string $service, string $protocol): int|false {}
 
 /**
@@ -956,8 +954,8 @@ function getservbyname(string $service, string $protocol): int|false {}
  * or "udp" (in lowercase).
  * </p>
  * @return string|false the Internet service name as a string.
+ * @pure
  */
-#[Pure]
 function getservbyport(int $port, string $protocol): string|false {}
 
 /**
@@ -967,8 +965,8 @@ function getservbyport(int $port, string $protocol): string|false {}
  * The protocol name.
  * </p>
  * @return int|false the protocol number or -1 if the protocol is not found.
+ * @pure
  */
-#[Pure]
 function getprotobyname(string $protocol): int|false {}
 
 /**
@@ -978,38 +976,38 @@ function getprotobyname(string $protocol): int|false {}
  * The protocol number.
  * </p>
  * @return string|false the protocol name as a string.
+ * @pure
  */
-#[Pure]
 function getprotobynumber(int $protocol): string|false {}
 
 /**
  * Gets PHP script owner's UID
  * @link https://php.net/manual/en/function.getmyuid.php
  * @return int|false the user ID of the current script, or false on error.
+ * @pure
  */
-#[Pure]
 function getmyuid(): int|false {}
 
 /**
  * Get PHP script owner's GID
  * @link https://php.net/manual/en/function.getmygid.php
  * @return int|false the group ID of the current script, or false on error.
+ * @pure
  */
-#[Pure]
 function getmygid(): int|false {}
 
 /**
  * Gets PHP's process ID
  * @link https://php.net/manual/en/function.getmypid.php
  * @return int|false the current PHP process ID, or false on error.
+ * @pure
  */
-#[Pure]
 function getmypid(): int|false {}
 
 /**
  * Gets the inode of the current script
  * @link https://php.net/manual/en/function.getmyinode.php
  * @return int|false the current script's inode as an integer, or false on error.
+ * @pure
  */
-#[Pure]
 function getmyinode(): int|false {}

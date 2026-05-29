@@ -1,7 +1,6 @@
 <?php
 
 use JetBrains\PhpStorm\Internal\TentativeType;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * The ReflectionGenerator class reports information about a generator.

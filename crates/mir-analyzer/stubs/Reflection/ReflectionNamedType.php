@@ -1,7 +1,6 @@
 <?php
 
 use JetBrains\PhpStorm\Internal\TentativeType;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * @since 7.1

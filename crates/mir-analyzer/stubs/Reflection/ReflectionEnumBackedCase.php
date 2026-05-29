@@ -1,6 +1,5 @@
 <?php
 
-use JetBrains\PhpStorm\Pure;
 
 /**
  * @link https://php.net/manual/en/class.reflectionenumbackedcase.php

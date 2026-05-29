@@ -4,7 +4,6 @@
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * (PHP 5 &gt;= 5.1.2, PECL hash &gt;= 1.1)<br/>
@@ -23,8 +22,8 @@ use JetBrains\PhpStorm\Pure;
  * @return string a string containing the calculated message digest as lowercase hexits
  * unless <i>binary</i> is set to true in which case the raw
  * binary representation of the message digest is returned.
+ * @pure
  */
-#[Pure]
 function hash(string $algo, string $data, bool $binary = false, #[PhpStormStubsElementAvailable('8.1')] array $options = []): string {}
 
 /**
@@ -34,8 +33,8 @@ function hash(string $algo, string $data, bool $binary = false, #[PhpStormStubsE
  * @param string $user_string <p>The user-supplied string to compare against.</p>
  * @return bool <p>Returns <b>TRUE</b> when the two strings are equal, <b>FALSE</b> otherwise.</p>
  * @since 5.6
+ * @pure
  */
-#[Pure]
 function hash_equals(string $known_string, string $user_string): bool {}
 
 /**
@@ -55,8 +54,8 @@ function hash_equals(string $known_string, string $user_string): bool {}
  * @return string|false a string containing the calculated message digest as lowercase hexits
  * unless <i>binary</i> is set to true in which case the raw
  * binary representation of the message digest is returned.
+ * @pure
  */
-#[Pure]
 function hash_file(string $algo, string $filename, bool $binary = false, #[PhpStormStubsElementAvailable('8.1')] array $options = []): string|false {}
 
 /**
@@ -80,8 +79,8 @@ function hash_file(string $algo, string $filename, bool $binary = false, #[PhpSt
  * @return string a string containing the calculated message digest as lowercase hexits
  * unless <i>binary</i> is set to true in which case the raw
  * binary representation of the message digest is returned.
+ * @pure
  */
-#[Pure]
 function hash_hmac(string $algo, string $data, string $key, bool $binary = false): string {}
 
 /**
@@ -105,8 +104,8 @@ function hash_hmac(string $algo, string $data, string $key, bool $binary = false
  * @return string|false a string containing the calculated message digest as lowercase hexits
  * unless <i>binary</i> is set to true in which case the raw
  * binary representation of the message digest is returned.
+ * @pure
  */
-#[Pure]
 function hash_hmac_file(string $algo, string $filename, string $key, bool $binary = false): string|false {}
 
 /**
@@ -130,8 +129,8 @@ function hash_hmac_file(string $algo, string $filename, string $key, bool $binar
  * @return HashContext|resource a Hashing Context resource for use with <b>hash_update</b>,
  * <b>hash_update_stream</b>, <b>hash_update_file</b>,
  * and <b>hash_final</b>.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["7.2" => "HashContext"], default: "resource")]
 function hash_init(string $algo, int $flags = 0, string $key = "", #[PhpStormStubsElementAvailable('8.1')] array $options = []) {}
 
@@ -209,8 +208,8 @@ function hash_final(#[LanguageLevelTypeAware(["7.2" => "HashContext"], default: 
  * Hashing context returned by {@see hash_init}.
  * </p>
  * @return HashContext|resource a copy of Hashing Context resource.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["7.2" => "HashContext"], default: "resource")]
 function hash_copy(#[LanguageLevelTypeAware(["7.2" => "HashContext"], default: "resource")] $context) {}
 
@@ -220,8 +219,8 @@ function hash_copy(#[LanguageLevelTypeAware(["7.2" => "HashContext"], default: "
  * @link https://php.net/manual/en/function.hash-algos.php
  * @return array a numerically indexed array containing the list of supported
  * hashing algorithms.
+ * @pure
  */
-#[Pure]
 function hash_algos(): array {}
 
 /**
@@ -243,8 +242,8 @@ function hash_algos(): array {}
  * @since 7.1.2
  * Generate a HKDF key derivation of a supplied key input
  * @link https://php.net/manual/en/function.hash-hkdf.php
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
 function hash_hkdf(string $algo, string $key, int $length = 0, string $info = '', string $salt = '') {}
 
@@ -253,8 +252,8 @@ function hash_hkdf(string $algo, string $key, int $length = 0, string $info = ''
  * @since 7.2
  * Return a list of registered hashing algorithms suitable for hash_hmac
  * @return string[] Returns a numerically indexed array containing the list of supported hashing algorithms suitable for {@see hash_hmac()}.
+ * @pure
  */
-#[Pure]
 function hash_hmac_algos(): array {}
 
 /**
@@ -288,8 +287,8 @@ function hash_hmac_algos(): array {}
  * <i>binary</i> is set to <b>TRUE</b> in which case the raw
  * binary representation of the derived key is returned.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function hash_pbkdf2(
     string $algo,
     string $password,
@@ -322,8 +321,8 @@ function hash_pbkdf2(
  * </p>
  * @return string|false the generated key as a string, or <b>FALSE</b> on error.
  * @deprecated 8.1
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '8.1')]
 function mhash_keygen_s2k(int $algo, string $password, string $salt, int $length): string|false {}
 
@@ -336,8 +335,8 @@ function mhash_keygen_s2k(int $algo, string $password, string $salt, int $length
  * @return int|false the size in bytes or <b>FALSE</b>, if the <i>hash</i>
  * does not exist.
  * @deprecated 8.1
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '8.1')]
 function mhash_get_block_size(int $algo): int|false {}
 
@@ -349,8 +348,8 @@ function mhash_get_block_size(int $algo): int|false {}
  * </p>
  * @return string|false the name of the hash or <b>FALSE</b>, if the hash does not exist.
  * @deprecated 8.1
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '8.1')]
 function mhash_get_hash_name(int $algo): string|false {}
 
@@ -360,8 +359,8 @@ function mhash_get_hash_name(int $algo): string|false {}
  * @return int<0, max> the highest available hash ID. Hashes are numbered from 0 to this
  * hash ID.
  * @deprecated 8.1
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '8.1')]
 function mhash_count(): int {}
 
@@ -383,8 +382,8 @@ function mhash_count(): int {}
  * @return string|false the resulting hash (also called digest) or HMAC as a string, or
  * <b>FALSE</b> on error.
  * @deprecated 8.1
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '8.1')]
 function mhash(int $algo, string $data, ?string $key = null): string|false {}
 

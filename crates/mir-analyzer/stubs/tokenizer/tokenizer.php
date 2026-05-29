@@ -2,7 +2,6 @@
 
 // Start of tokenizer v.0.1
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Split given source into PHP tokens
@@ -27,8 +26,8 @@ use JetBrains\PhpStorm\Pure;
  * &gt;, !, etc...),
  * or a three element array containing the token index in element 0, the string
  * content of the original token in element 1 and the line number in element 2.
+ * @pure
  */
-#[Pure]
 function token_get_all(string $code, #[PhpStormStubsElementAvailable(from: '7.0')] int $flags = 0): array {}
 
 /**
@@ -38,8 +37,8 @@ function token_get_all(string $code, #[PhpStormStubsElementAvailable(from: '7.0'
  * The token value.
  * </p>
  * @return string The symbolic name of the given <i>token</i>.
+ * @pure
  */
-#[Pure]
 function token_name(int $id): string {}
 
 define('TOKEN_PARSE', 1);

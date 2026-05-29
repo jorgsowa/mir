@@ -8,7 +8,6 @@ use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\ExpectedValues;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 define("ARRAY_FILTER_USE_BOTH", 1);
 
@@ -22,8 +21,8 @@ define("ARRAY_FILTER_USE_KEY", 2);
  * @link https://php.net/manual/en/function.array-merge-recursive.php
  * @param array ...$arrays Variable list of arrays to recursively merge.
  * @return array An array of values resulted from merging the arguments together.
+ * @pure
  */
-#[Pure]
 function array_merge_recursive(
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.3')] array $arr1,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] array $arrays,
@@ -45,8 +44,8 @@ function array_merge_recursive(
  * The array from which elements will be extracted.
  * </p>
  * @return array or null if an error occurs.
+ * @pure
  */
-#[Pure]
 function array_replace(array $array, array ...$replacements): array {}
 
 /**
@@ -59,8 +58,8 @@ function array_replace(array $array, array ...$replacements): array {}
  * The array from which elements will be extracted.
  * </p>
  * @return array an array, or null if an error occurs.
+ * @pure
  */
-#[Pure]
 function array_replace_recursive(array $array, array ...$replacements): array {}
 
 /**
@@ -77,8 +76,8 @@ function array_replace_recursive(array $array, array ...$replacements): array {}
  * Determines if strict comparison (===) should be used during the search.
  * </p>
  * @return list<TKey> an array of all the keys in input.
+ * @pure
  */
-#[Pure]
 function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array {}
 
 /**
@@ -89,8 +88,8 @@ function array_keys(array $array, mixed $filter_value = null, bool $strict = fal
  * </p>
  * @return array an indexed array of values.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_values(array $array): array {}
 
 /**
@@ -101,8 +100,8 @@ function array_values(array $array): array {}
  * </p>
  * @return array an associative array of values from input as
  * keys and their count as value.
+ * @pure
  */
-#[Pure]
 function array_count_values(array $array): array {}
 
 /**
@@ -113,8 +112,8 @@ function array_count_values(array $array): array {}
  * @param string|int|null $index_key [optional] <p>The column to use as the index/keys for the returned array. This value may be the integer key of the column, or it may be the string key name.</p>
  * @return array Returns an array of values representing a single column from the input array.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function array_column(array $array, string|int|null $column_key, string|int|null $index_key = null): array {}
 
 /**
@@ -128,8 +127,8 @@ function array_column(array $array, string|int|null $column_key, string|int|null
  * </p>
  * @return array the reversed array.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_reverse(array $array, bool $preserve_keys = false): array {}
 
 /**
@@ -183,8 +182,8 @@ function array_reduce(array $array, callable $callback, mixed $initial = null): 
  * positive then the array is padded on the right, if it's negative then
  * on the left. If the absolute value of pad_size is less than or equal to
  * the length of the input then no padding takes place.
+ * @pure
  */
-#[Pure]
 function array_pad(array $array, int $length, mixed $value): array {}
 
 /**
@@ -196,8 +195,8 @@ function array_pad(array $array, int $length, mixed $value): array {}
  * An array of key/value pairs to be flipped.
  * </p>
  * @return array<TValue, TKey> Returns the flipped array.
+ * @pure
  */
-#[Pure]
 function array_flip(array $array): array {}
 
 /**
@@ -212,8 +211,8 @@ function array_flip(array $array): array {}
  * </p>
  * @return array an array with its keys lower or uppercased
  * @meta
+ * @pure
  */
-#[Pure]
 function array_change_key_case(array $array, int $case = CASE_LOWER): array {}
 
 /**
@@ -262,8 +261,8 @@ function array_rand(array $array, int $num = 1): array|string|int {}
  * </ul>
  * @return array the filtered array.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_unique(array $array, int $flags = SORT_STRING): array {}
 
 /**
@@ -277,8 +276,8 @@ function array_unique(array $array, int $flags = SORT_STRING): array {}
  * <code>array</code> that are present in all the arguments.
  * Note that keys are preserved.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_intersect(array $array, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays, array ...$arrays): array {}
 
 /**
@@ -292,8 +291,8 @@ function array_intersect(array $array, #[PhpStormStubsElementAvailable(from: '5.
  * <code>array</code>  which have keys that are present in all the
  * arguments.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_intersect_key(array $array, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays, array ...$arrays): array {}
 
 /**
@@ -361,8 +360,8 @@ function array_uintersect(
  * @return array an associative array containing all the values in
  * <code>array</code> that are present in all of the arguments.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_intersect_assoc(array $array, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays, array ...$arrays): array {}
 
 /**
@@ -459,8 +458,8 @@ function array_uintersect_uassoc(
  * <code>array</code> that are not present in any of the other
  * arrays. Keys in the array <code>array</code> are preserved.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_diff(array $array, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays, array ...$arrays): array {}
 
 /**
@@ -475,8 +474,8 @@ function array_diff(array $array, #[PhpStormStubsElementAvailable(from: '5.3', t
  * @return array an array containing all the entries from
  * <code>array</code> whose keys are absent from all of the other arrays.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_diff_key(array $array, #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays, array ...$arrays): array {}
 
 /**
@@ -548,8 +547,8 @@ function array_udiff(
  * @return array an array containing all the values from
  * <code>array</code> that are not present in any of the other arrays.
  * @meta
+ * @pure
  */
-#[Pure]
 function array_diff_assoc(
     array $array,
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $arrays,
@@ -671,8 +670,8 @@ function array_udiff_uassoc(
  * The input array.
  * </p>
  * @return int|float the sum of values as an integer or float.
+ * @pure
  */
-#[Pure]
 function array_sum(array $array): int|float {}
 
 /**
@@ -682,8 +681,8 @@ function array_sum(array $array): int|float {}
  * The array.
  * </p>
  * @return int|float the product as an integer or float.
+ * @pure
  */
-#[Pure]
 function array_product(array $array): int|float {}
 
 /**
@@ -753,8 +752,8 @@ function array_map(?callable $callback, array $array, array ...$arrays): array {
  * </p>
  * @return array a multidimensional numerically indexed array, starting with zero,
  * with each dimension containing size elements.
+ * @pure
  */
-#[Pure]
 function array_chunk(array $array, int $length, bool $preserve_keys = false): array {}
 
 /**
@@ -770,8 +769,8 @@ function array_chunk(array $array, int $length, bool $preserve_keys = false): ar
  * @return array|false the combined array, false if the number of elements
  * for each array isn't equal or if the arrays are empty.
  * @meta
+ * @pure
  */
-#[Pure]
 #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]
 function array_combine(array $keys, array $values): array|false {}
 
@@ -789,8 +788,8 @@ function array_combine(array $keys, array $values): array|false {}
  * @throws \ValueError if the number of elements in keys and values does not
  * match.
  * @meta
+ * @pure
  */
-#[Pure]
 #[PhpStormStubsElementAvailable(from: '8.0')]
 function array_combine(array $keys, array $values): array {}
 
@@ -804,8 +803,8 @@ function array_combine(array $keys, array $values): array {}
  * An array with keys to check.
  * </p>
  * @return bool true on success or false on failure.
+ * @pure
  */
-#[Pure]
 function array_key_exists($key, #[LanguageLevelTypeAware(["8.0" => "array"], default: "array|ArrayObject")] $array): bool {}
 
 /**
@@ -817,8 +816,8 @@ function array_key_exists($key, #[LanguageLevelTypeAware(["8.0" => "array"], def
  * @param array $array An array
  * @return string|int|null Returns the first key of array if the array is not empty; NULL otherwise.
  * @since 7.3
+ * @pure
  */
-#[Pure]
 function array_key_first(array $array): string|int|null {}
 
 /**
@@ -830,8 +829,8 @@ function array_key_first(array $array): string|int|null {}
  * @param array $array An array
  * @return string|int|null Returns the last key of array if the array is not empty; NULL otherwise.
  * @since 7.3
+ * @pure
  */
-#[Pure]
 function array_key_last(array $array): string|int|null {}
 
 /**
@@ -840,8 +839,8 @@ function array_key_last(array $array): string|int|null {}
  * @return bool return true if the array keys are 0 .. count($array)-1 in that order.
  * For other arrays, it returns false. For non-arrays, it throws a TypeError.
  * @since 8.1
+ * @pure
  */
-#[Pure]
 function array_is_list(array $array): bool {}
 
 /**
@@ -850,8 +849,8 @@ function array_is_list(array $array): bool {}
  * @link https://php.net/manual/en/function.pos.php
  * @param array|ArrayAccess $array
  * @return mixed
+ * @pure
  */
-#[Pure]
 function pos(object|array $array): mixed {}
 
 /**
@@ -861,8 +860,8 @@ function pos(object|array $array): mixed {}
  * @param array|Countable $value
  * @param int $mode [optional]
  * @return int<0, max>
+ * @pure
  */
-#[Pure]
 function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int {}
 
 /**
@@ -875,8 +874,8 @@ function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int {}
  * An array with keys to check.
  * </p>
  * @return bool true on success or false on failure.
+ * @pure
  */
-#[Pure]
 function key_exists($key, array $array): bool {}
 
 /**
@@ -994,8 +993,8 @@ function assert_options(int $option, mixed $value): mixed {}
  * function will return true if the relationship is the one specified
  * by the operator, false otherwise.
  * @throws ValueError when a non-supported operator is provided.
+ * @pure
  */
-#[Pure]
 #[ExpectedValues([-1, 0, 1, false, true])]
 #[PhpStormStubsElementAvailable(from: '8.0')]
 function version_compare(
@@ -1053,8 +1052,8 @@ function version_compare(
  * function will return true if the relationship is the one specified
  * by the operator, false otherwise.
  * If a non supported operator is provided, it will return null.
+ * @pure
  */
-#[Pure]
 #[ExpectedValues([-1, 0, 1, false, true, null])]
 #[PhpStormStubsElementAvailable(to: '7.4')]
 function version_compare(
@@ -1089,8 +1088,8 @@ function version_compare(
  * </p>
  * @return int On success the return value will be the created key value, otherwise
  * -1 is returned.
+ * @pure
  */
-#[Pure(true)]
 function ftok(string $filename, string $project_id): int {}
 
 /**
@@ -1100,8 +1099,8 @@ function ftok(string $filename, string $project_id): int {}
  * The input string.
  * </p>
  * @return string the ROT13 version of the given string.
+ * @pure
  */
-#[Pure]
 function str_rot13(string $string): string {}
 
 /**
@@ -1109,8 +1108,8 @@ function str_rot13(string $string): string {}
  * @link https://php.net/manual/en/function.stream-get-filters.php
  * @return list<string> an indexed array containing the name of all stream filters
  * available.
+ * @pure
  */
-#[Pure(true)]
 function stream_get_filters(): array {}
 
 /**
@@ -1119,8 +1118,8 @@ function stream_get_filters(): array {}
  * @param resource $stream
  * @return bool
  * @since 7.2
+ * @pure
  */
-#[Pure]
 function stream_isatty($stream): bool {}
 
 /**
@@ -1336,8 +1335,8 @@ function sys_get_temp_dir(): string {}
  * containing the resolved path, expiration date, and other options kept in
  * the cache.
  * @since 5.3.2
+ * @pure
  */
-#[Pure(true)]
 function realpath_cache_get(): array {}
 
 /**
@@ -1345,8 +1344,8 @@ function realpath_cache_get(): array {}
  * @link https://php.net/manual/en/function.realpath-cache-size.php
  * @return int Returns how much memory realpath cache is using.
  * @since 5.3.2
+ * @pure
  */
-#[Pure(true)]
 function realpath_cache_size(): int {}
 
 /**
@@ -1375,8 +1374,8 @@ function get_mangled_object_vars(object $object): array {}
  *  - "resource (xxx)" for any resources where "xxx" is a name of resource
  *  - "resource (closed)" for closed resources
  * @since 8.0
+ * @pure
  */
-#[Pure]
 function get_debug_type(mixed $value): string {}
 
 /**
@@ -1385,6 +1384,6 @@ function get_debug_type(mixed $value): string {}
  * @param resource $resource
  * @return int
  * @since 8.0
+ * @pure
  */
-#[Pure]
 function get_resource_id($resource): int {}

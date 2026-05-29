@@ -8,7 +8,6 @@ use JetBrains\PhpStorm\ExpectedValues;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 use JetBrains\PhpStorm\Internal\TentativeType;
-use JetBrains\PhpStorm\Pure;
 
 final class __PHP_Incomplete_Class
 {
@@ -168,8 +167,8 @@ class Directory
  * </p>
  * @return mixed the value of the constant.
  * @throws Error If the constant is not defined
+ * @pure
  */
-#[Pure(true)]
 function constant(string $name): mixed {}
 
 /**
@@ -179,8 +178,8 @@ function constant(string $name): mixed {}
  * A string.
  * </p>
  * @return string the hexadecimal representation of the given string.
+ * @pure
  */
-#[Pure]
 function bin2hex(string $string): string {}
 
 /**
@@ -311,8 +310,8 @@ function time_sleep_until(float $timestamp): bool {}
  * </table>
  * </p>
  * @deprecated 8.1
+ * @pure
  */
-#[Pure(true)]
 #[Deprecated(since: '8.1')]
 #[ArrayShape([
     'tm_sec' => 'int',
@@ -354,8 +353,8 @@ function flush(): void {}
  * (See second example).
  * </p>
  * @return string the given string wrapped at the specified length.
+ * @pure
  */
-#[Pure]
 function wordwrap(string $string, int $width = 75, string $break = "\n", bool $cut_long_words = false): string {}
 
 /**
@@ -473,8 +472,8 @@ function wordwrap(string $string, int $width = 75, string $break = "\n", bool $c
  * encode existing html entities, the default is to convert everything.
  * </p>
  * @return string The converted string.
+ * @pure
  */
-#[Pure]
 function htmlspecialchars(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITUTE, ?string $encoding = null, bool $double_encode = true): string {}
 
 /**
@@ -519,8 +518,8 @@ function htmlspecialchars(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITUTE
  * encode existing html entities. The default is to convert everything.
  * </p>
  * @return string the encoded string.
+ * @pure
  */
-#[Pure]
 function htmlentities(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITUTE, ?string $encoding = null, bool $double_encode = true): string {}
 
 /**
@@ -560,8 +559,8 @@ function htmlentities(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITUTE, ?s
  * conversion.
  * </p>
  * @return string the decoded string.
+ * @pure
  */
-#[Pure]
 function html_entity_decode(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITUTE, ?string $encoding = null): string {}
 
 /**
@@ -594,8 +593,8 @@ function html_entity_decode(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITU
  * </table>
  * </p>
  * @return string the decoded string.
+ * @pure
  */
-#[Pure]
 function htmlspecialchars_decode(string $string, int $flags = ENT_QUOTES|ENT_SUBSTITUTE): string {}
 
 /**
@@ -770,8 +769,8 @@ function htmlspecialchars_decode(string $string, int $flags = ENT_QUOTES|ENT_SUB
  *
  * </p></blockquote>
  * @return array the translation table as an array.
+ * @pure
  */
-#[Pure]
 function get_html_translation_table(
     int $table = 0,
     int $flags = ENT_QUOTES|ENT_SUBSTITUTE,
@@ -791,8 +790,8 @@ function get_html_translation_table(
  * hexadecimal number.
  * </p>
  * @return string the sha1 hash as a string.
+ * @pure
  */
-#[Pure]
 function sha1(string $string, bool $binary = false): string {}
 
 /**
@@ -806,8 +805,8 @@ function sha1(string $string, bool $binary = false): string {}
  * 20.
  * </p>
  * @return string|false a string on success, false otherwise.
+ * @pure
  */
-#[Pure(true)]
 function sha1_file(string $filename, bool $binary = false): string|false {}
 
 /**
@@ -822,8 +821,8 @@ function sha1_file(string $filename, bool $binary = false): string|false {}
  * length of 16.
  * </p>
  * @return string the hash as a 32-character hexadecimal number.
+ * @pure
  */
-#[Pure]
 function md5(string $string, bool $binary = false): string {}
 
 /**
@@ -837,8 +836,8 @@ function md5(string $string, bool $binary = false): string {}
  * 16.
  * </p>
  * @return string|false a string on success, false otherwise.
+ * @pure
  */
-#[Pure(true)]
 function md5_file(string $filename, bool $binary = false): string|false {}
 
 /**
@@ -848,8 +847,8 @@ function md5_file(string $filename, bool $binary = false): string|false {}
  * The data.
  * </p>
  * @return int the crc32 checksum of str as an integer..1
+ * @pure
  */
-#[Pure]
 function crc32(string $string): int {}
 
 /**
@@ -861,8 +860,8 @@ function crc32(string $string): int {}
  * </p>
  * @return array|false an array using the tagmarker as an index and the value as the
  * value. It returns false on error or if no IPTC data was found.
+ * @pure
  */
-#[Pure]
 function iptcparse(string $iptc_block): array|false {}
 
 /**
@@ -1033,8 +1032,8 @@ function getimagesize(string $filename, &$image_info = null): array|false {}
  * <td>image/vnd.microsoft.icon</td>
  * </tr>
  * </table>
+ * @pure
  */
-#[Pure]
 function image_type_to_mime_type(int $image_type): string {}
 
 /**
@@ -1048,8 +1047,8 @@ function image_type_to_mime_type(int $image_type): string {}
  * Whether to prepend a dot to the extension or not. Default to true.
  * </p>
  * @return string|false A string with the extension corresponding to the given image type, or false on failure.
+ * @pure
  */
-#[Pure]
 function image_type_to_extension(int $image_type, bool $include_dot = true): string|false {}
 
 /**
@@ -1149,8 +1148,8 @@ function phpinfo(#[ExpectedValues(flags: [INFO_GENERAL, INFO_CREDITS, INFO_CONFI
  * specified, phpversion returns the version of that
  * extension, or false if there is no version information associated or
  * the extension isn't enabled.
+ * @pure
  */
-#[Pure]
 function phpversion(?string $extension = null): string|false {}
 
 /**
@@ -1224,8 +1223,8 @@ function phpcredits(int $flags = CREDITS_ALL): bool {}
  * @removed 5.5
  * @link https://php.net/manual/en/function.php-logo-guid.php
  * @return string PHPE9568F34-D428-11d2-A769-00AA001ACF42.
+ * @pure
  */
-#[Pure]
 function php_logo_guid(): string {}
 
 /**
@@ -1262,8 +1261,8 @@ function zend_logo_guid(): string {}
  * phttpd, pi3web, roxen,
  * thttpd, tux, and webjames.
  * </p>
+ * @pure
  */
-#[Pure]
 #[ExpectedValues(['cli', 'phpdbg', 'embed', 'apache', 'apache2handler', 'cgi-fcgi', 'cli-server', 'fpm-fcgi', 'litespeed'])]
 function php_sapi_name(): string|false {}
 
@@ -1276,8 +1275,8 @@ function php_sapi_name(): string|false {}
  * 'a': This is the default. Contains all modes in
  * the sequence "s n r v m".</p>
  * @return string the description, as a string.
+ * @pure
  */
-#[Pure(true)]
 function php_uname(#[PhpStormStubsElementAvailable(from: '7.0')] string $mode = 'a'): string {}
 
 /**
@@ -1290,8 +1289,8 @@ function php_uname(#[PhpStormStubsElementAvailable(from: '7.0')] string $mode = 
  * still make it into the returned string but a PHP error will also result.
  * This PHP error will be seen both at compile time and while using
  * php_ini_scanned_files.
+ * @pure
  */
-#[Pure]
 function php_ini_scanned_files(): string|false {}
 
 /**
@@ -1299,8 +1298,8 @@ function php_ini_scanned_files(): string|false {}
  * @link https://php.net/manual/en/function.php-ini-loaded-file.php
  * @return string|false The loaded "php.ini" path, or false if one is not loaded.
  * @since 5.2.4
+ * @pure
  */
-#[Pure]
 function php_ini_loaded_file(): string|false {}
 
 /**
@@ -1316,8 +1315,8 @@ function php_ini_loaded_file(): string|false {}
  * str1 is less than str2; &gt;
  * 0 if str1 is greater than
  * str2, and 0 if they are equal.
+ * @pure
  */
-#[Pure]
 function strnatcmp(string $string1, string $string2): int {}
 
 /**
@@ -1333,8 +1332,8 @@ function strnatcmp(string $string1, string $string2): int {}
  * str1 is less than str2 &gt;
  * 0 if str1 is greater than
  * str2, and 0 if they are equal.
+ * @pure
  */
-#[Pure]
 function strnatcasecmp(string $string1, string $string2): int {}
 
 /**
@@ -1358,8 +1357,8 @@ function strnatcasecmp(string $string1, string $string2): int {}
  * </p>
  * @return int<0,max> This functions returns an integer.
  * @removed 7.4
+ * @pure
  */
-#[Pure]
 function substr_count(string $haystack, string $needle, int $offset, ?int $length = null): int {}
 
 /**
@@ -1383,8 +1382,8 @@ function substr_count(string $haystack, string $needle, int $offset, ?int $lengt
  * </p>
  * @return int<0,max> This functions returns an integer.
  * @since 7.4
+ * @pure
  */
-#[Pure]
 function substr_count(string $haystack, string $needle, int $offset = 0, ?int $length = null): int {}
 
 /**
@@ -1436,8 +1435,8 @@ function substr_count(string $haystack, string $needle, int $offset = 0, ?int $l
  * </p>
  * @return int the length of the initial segment of str1
  * which consists entirely of characters in str2.
+ * @pure
  */
-#[Pure]
 function strspn(string $string, string $characters, int $offset = 0, ?int $length = null): int {}
 
 /**
@@ -1456,8 +1455,8 @@ function strspn(string $string, string $characters, int $offset = 0, ?int $lengt
  * The length of the string to examine.
  * </p>
  * @return int the length of the segment as an integer.
+ * @pure
  */
-#[Pure]
 function strcspn(string $string, string $characters, int $offset = 0, ?int $length = null): int {}
 
 /**

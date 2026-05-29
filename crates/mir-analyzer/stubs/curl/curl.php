@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
 use JetBrains\PhpStorm\Internal\TentativeType;
-use JetBrains\PhpStorm\Pure;
 
 class CURLFile
 {
@@ -113,8 +112,8 @@ function curl_init(?string $url = null) {}
  * @link https://php.net/manual/en/function.curl-copy-handle.php
  * @param CurlHandle|resource $handle
  * @return CurlHandle|resource|false a new cURL handle.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(['8.0' => 'CurlHandle|false'], default: 'resource|false')]
 function curl_copy_handle(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle) {}
 
@@ -165,7 +164,6 @@ function curl_copy_handle(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], defa
  * </tr>
  */
 #[ArrayShape(["version_number" => "string", "version" => "string", "ssl_version_number" => "int", "ssl_version" => "string", "libz_version" => "string", "host" => "string", "age" => "int", "features" => "int", "protocols" => "array"])]
-#[Pure]
 function curl_version(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] $age = null): array|false {}
 
 /**
@@ -2253,8 +2251,8 @@ function curl_share_setopt(#[LanguageLevelTypeAware(['8.0' => 'CurlShareHandle']
  * </p>
  * @return string|null Returns error description or <b>NULL</b> for invalid error code.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function curl_strerror(int $error_code): ?string {}
 
 /**
@@ -2268,8 +2266,8 @@ function curl_strerror(int $error_code): ?string {}
  * </p>
  * @return string|false Returns decoded string or FALSE on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function curl_unescape(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle, string $string): string|false {}
 
 /**
@@ -2540,8 +2538,8 @@ function curl_exec(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'r
  *     </strong> is set by a previous call to curl_setopt()
  *   </li>
  * </ul>
+ * @pure
  */
-#[Pure(true)]
 function curl_getinfo(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle, ?int $option = null): mixed {}
 
 /**
@@ -2550,8 +2548,8 @@ function curl_getinfo(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default:
  * @param CurlHandle|resource $handle
  * @return string the error message or '' (the empty string) if no
  * error occurred.
+ * @pure
  */
-#[Pure(true)]
 function curl_error(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle): string {}
 
 /**
@@ -2560,8 +2558,8 @@ function curl_error(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
  * @param CurlHandle|resource $handle
  * @return int the error number or 0 (zero) if no error
  * occurred.
+ * @pure
  */
-#[Pure(true)]
 function curl_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle): int {}
 
 /**
@@ -2574,8 +2572,8 @@ function curl_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: '
  * The string to be encoded.</p>
  * @return string|false Returns escaped string or FALSE on failure.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function curl_escape(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle, string $string): string|false {}
 
 /**
@@ -2588,8 +2586,8 @@ function curl_escape(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 
  * @return CURLFile
  * Returns a {@link https://secure.php.net/manual/en/class.curlfile.php CURLFile} object.
  * @since 5.5
+ * @pure
  */
-#[Pure]
 function curl_file_create(string $filename, ?string $mime_type = null, ?string $posted_filename = null): CURLFile {}
 
 /**
@@ -2753,8 +2751,8 @@ function curl_multi_exec(
  * @link https://php.net/manual/en/function.curl-multi-getcontent.php
  * @param CurlHandle|resource $handle
  * @return null|string Return the content of a cURL handle if CURLOPT_RETURNTRANSFER is set.
+ * @pure
  */
-#[Pure]
 function curl_multi_getcontent(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'], default: 'resource')] $handle): ?string {}
 
 /**
@@ -2765,8 +2763,8 @@ function curl_multi_getcontent(#[LanguageLevelTypeAware(['8.0' => 'CurlHandle'],
  * Number of messages that are still in the queue
  * </p>
  * @return array|false On success, returns an associative array for the message, false on failure.
+ * @pure
  */
-#[Pure]
 #[ArrayShape(["msg" => "int", "result" => "int", "handle" => "resource"])]
 function curl_multi_info_read(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'], default: 'resource')] $multi_handle, &$queued_messages = null): array|false {}
 
@@ -2783,8 +2781,8 @@ function curl_multi_close(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'],
  * @param CurlMultiHandle|resource $multi_handle
  * @return int
  * @since 7.1
+ * @pure
  */
-#[Pure(true)]
 function curl_multi_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'], default: 'resource')] $multi_handle): int {}
 
 /**
@@ -2792,8 +2790,8 @@ function curl_multi_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlMultiHandle'],
  * @param CurlMultiHandle|resource $share_handle
  * @return int
  * @since 7.1
+ * @pure
  */
-#[Pure(true)]
 function curl_share_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlShareHandle'], default: 'resource')] $share_handle): int {}
 
 /**
@@ -2801,8 +2799,8 @@ function curl_share_errno(#[LanguageLevelTypeAware(['8.0' => 'CurlShareHandle'],
  * @param int $error_code
  * @return string|null
  * @since 7.1
+ * @pure
  */
-#[Pure]
 function curl_share_strerror(int $error_code): ?string {}
 
 /**

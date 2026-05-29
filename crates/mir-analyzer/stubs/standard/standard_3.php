@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Gets time of last page modification
@@ -12,8 +11,8 @@ use JetBrains\PhpStorm\Pure;
  * @return int|false the time of the last modification of the current
  * page. The value returned is a Unix timestamp, suitable for
  * feeding to date. Returns false on error.
+ * @pure
  */
-#[Pure(true)]
 function getlastmod(): int|false {}
 
 /**
@@ -28,8 +27,8 @@ function getlastmod(): int|false {}
  * </p>
  * @return string|false the original data or false on failure. The returned data may be
  * binary.
+ * @pure
  */
-#[Pure]
 function base64_decode(string $string, bool $strict = false): string|false {}
 
 /**
@@ -39,8 +38,8 @@ function base64_decode(string $string, bool $strict = false): string|false {}
  * The data to encode.
  * </p>
  * @return string The encoded data, as a string.
+ * @pure
  */
-#[Pure]
 function base64_encode(string $string): string {}
 
 /**
@@ -50,8 +49,8 @@ function base64_encode(string $string): string {}
  * The data to be encoded.
  * </p>
  * @return string the uuencoded data.
+ * @pure
  */
-#[Pure]
 function convert_uuencode(string $string): string {}
 
 /**
@@ -61,8 +60,8 @@ function convert_uuencode(string $string): string {}
  * The uuencoded data.
  * </p>
  * @return string|false the decoded data as a string.
+ * @pure
  */
-#[Pure]
 function convert_uudecode(string $string): string|false {}
 
 /**
@@ -76,8 +75,8 @@ function convert_uudecode(string $string): string|false {}
  * of type float, the return type is also float,
  * otherwise it is integer (as float usually has a
  * bigger value range than integer).
+ * @pure
  */
-#[Pure]
 function abs(int|float $num): int|float {}
 
 /**
@@ -91,8 +90,8 @@ function abs(int|float $num): int|float {}
  * The return value of ceil is still of type
  * float as the value range of float is
  * usually bigger than that of integer.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "float"], default: "float|false")]
 function ceil(int|float $num) {}
 /**
@@ -105,8 +104,8 @@ function ceil(int|float $num) {}
  * The return value of floor is still of type
  * float because the value range of float is
  * usually bigger than that of integer.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(["8.0" => "float"], default: "float|false")]
 function floor(int|float $num) {}
 
@@ -128,8 +127,8 @@ function floor(int|float $num) {}
  * PHP_ROUND_HALF_ODD.
  * </p>
  * @return float The rounded value
+ * @pure
  */
-#[Pure]
 function round(
     int|float $num,
     int $precision = 0,
@@ -144,8 +143,8 @@ function round(
  * A value in radians
  * </p>
  * @return float The sine of arg
+ * @pure
  */
-#[Pure]
 function sin(float $num): float {}
 
 /**
@@ -155,8 +154,8 @@ function sin(float $num): float {}
  * An angle in radians
  * </p>
  * @return float The cosine of arg
+ * @pure
  */
-#[Pure]
 function cos(float $num): float {}
 
 /**
@@ -166,8 +165,8 @@ function cos(float $num): float {}
  * The argument to process in radians
  * </p>
  * @return float The tangent of arg
+ * @pure
  */
-#[Pure]
 function tan(float $num): float {}
 
 /**
@@ -177,8 +176,8 @@ function tan(float $num): float {}
  * The argument to process
  * </p>
  * @return float The arc sine of arg in radians
+ * @pure
  */
-#[Pure]
 function asin(float $num): float {}
 
 /**
@@ -188,8 +187,8 @@ function asin(float $num): float {}
  * The argument to process
  * </p>
  * @return float The arc cosine of arg in radians.
+ * @pure
  */
-#[Pure]
 function acos(float $num): float {}
 
 /**
@@ -199,8 +198,8 @@ function acos(float $num): float {}
  * The argument to process
  * </p>
  * @return float The arc tangent of arg in radians.
+ * @pure
  */
-#[Pure]
 function atan(float $num): float {}
 
 /**
@@ -210,8 +209,8 @@ function atan(float $num): float {}
  * The argument to process
  * </p>
  * @return float Inverse hyperbolic tangent of arg
+ * @pure
  */
-#[Pure]
 function atanh(float $num): float {}
 
 /**
@@ -225,8 +224,8 @@ function atanh(float $num): float {}
  * </p>
  * @return float The arc tangent of y/x
  * in radians.
+ * @pure
  */
-#[Pure]
 function atan2(float $y, float $x): float {}
 
 /**
@@ -236,8 +235,8 @@ function atan2(float $y, float $x): float {}
  * The argument to process
  * </p>
  * @return float The hyperbolic sine of arg
+ * @pure
  */
-#[Pure]
 function sinh(float $num): float {}
 
 /**
@@ -247,8 +246,8 @@ function sinh(float $num): float {}
  * The argument to process
  * </p>
  * @return float The hyperbolic cosine of arg
+ * @pure
  */
-#[Pure]
 function cosh(float $num): float {}
 
 /**
@@ -258,8 +257,8 @@ function cosh(float $num): float {}
  * The argument to process
  * </p>
  * @return float The hyperbolic tangent of arg
+ * @pure
  */
-#[Pure]
 function tanh(float $num): float {}
 
 /**
@@ -269,8 +268,8 @@ function tanh(float $num): float {}
  * The argument to process
  * </p>
  * @return float The inverse hyperbolic sine of arg
+ * @pure
  */
-#[Pure]
 function asinh(float $num): float {}
 
 /**
@@ -280,8 +279,8 @@ function asinh(float $num): float {}
  * The value to process
  * </p>
  * @return float The inverse hyperbolic cosine of arg
+ * @pure
  */
-#[Pure]
 function acosh(float $num): float {}
 
 /**
@@ -292,8 +291,8 @@ function acosh(float $num): float {}
  * The argument to process
  * </p>
  * @return float 'e' to the power of arg minus one
+ * @pure
  */
-#[Pure]
 function expm1(float $num): float {}
 
 /**
@@ -304,16 +303,16 @@ function expm1(float $num): float {}
  * The argument to process
  * </p>
  * @return float log(1 + number)
+ * @pure
  */
-#[Pure]
 function log1p(float $num): float {}
 
 /**
  * Get value of pi
  * @link https://php.net/manual/en/function.pi.php
  * @return float The value of pi as float.
+ * @pure
  */
-#[Pure]
 function pi(): float {}
 
 /**
@@ -325,8 +324,8 @@ function pi(): float {}
  * @return bool true if val is a legal finite
  * number within the allowed range for a PHP float on this platform,
  * else false.
+ * @pure
  */
-#[Pure]
 function is_finite(float $num): bool {}
 
 /**
@@ -337,8 +336,8 @@ function is_finite(float $num): bool {}
  * </p>
  * @return bool true if val is 'not a number',
  * else false.
+ * @pure
  */
-#[Pure]
 function is_nan(float $num): bool {}
 
 /**
@@ -350,8 +349,8 @@ function is_nan(float $num): bool {}
  * @since 7.0
  * @throws DivisionByZeroError <p>if divisor is 0</p>
  * @throws ArithmeticError <p>if the <b><i>dividend</i></b> is <b>PHP_INT_MIN</b> and the <b><i>divisor</i></b> is -1</p>
+ * @pure
  */
-#[Pure]
 function intdiv(int $num1, int $num2): int {}
 
 /**
@@ -361,8 +360,8 @@ function intdiv(int $num1, int $num2): int {}
  * The value to check
  * </p>
  * @return bool true if val is infinite, else false.
+ * @pure
  */
-#[Pure]
 function is_infinite(float $num): bool {}
 
 /**
@@ -378,8 +377,8 @@ function is_infinite(float $num): bool {}
  * If the result can be represented as integer it will be returned as type
  * integer, else it will be returned as type float.
  * If the power cannot be computed false will be returned instead.
+ * @pure
  */
-#[Pure]
 function pow(mixed $num, mixed $exponent): object|int|float {}
 
 /**
@@ -389,8 +388,8 @@ function pow(mixed $num, mixed $exponent): object|int|float {}
  * The argument to process
  * </p>
  * @return float 'e' raised to the power of arg
+ * @pure
  */
-#[Pure]
 function exp(float $num): float {}
 
 /**
@@ -406,8 +405,8 @@ function exp(float $num): float {}
  * @return float The logarithm of arg to
  * base, if given, or the
  * natural logarithm.
+ * @pure
  */
-#[Pure]
 function log(float $num, float $base = M_E): float {}
 
 /**
@@ -417,8 +416,8 @@ function log(float $num, float $base = M_E): float {}
  * The argument to process
  * </p>
  * @return float The base-10 logarithm of arg
+ * @pure
  */
-#[Pure]
 function log10(float $num): float {}
 
 /**
@@ -429,8 +428,8 @@ function log10(float $num): float {}
  * </p>
  * @return float The square root of arg
  * or the special value NAN for negative numbers.
+ * @pure
  */
-#[Pure]
 function sqrt(float $num): float {}
 
 /**
@@ -443,8 +442,8 @@ function sqrt(float $num): float {}
  * Length of second side
  * </p>
  * @return float Calculated length of the hypotenuse
+ * @pure
  */
-#[Pure]
 function hypot(float $x, float $y): float {}
 
 /**
@@ -454,8 +453,8 @@ function hypot(float $x, float $y): float {}
  * Angular value in degrees
  * </p>
  * @return float The radian equivalent of number
+ * @pure
  */
-#[Pure]
 function deg2rad(float $num): float {}
 
 /**
@@ -465,8 +464,8 @@ function deg2rad(float $num): float {}
  * A radian value
  * </p>
  * @return float The equivalent of number in degrees
+ * @pure
  */
-#[Pure]
 function rad2deg(float $num): float {}
 
 /**
@@ -476,8 +475,8 @@ function rad2deg(float $num): float {}
  * The binary string to convert
  * </p>
  * @return int|float The decimal value of binary_string
+ * @pure
  */
-#[Pure]
 function bindec(string $binary_string): int|float {}
 
 /**
@@ -487,8 +486,8 @@ function bindec(string $binary_string): int|float {}
  * The hexadecimal string to convert
  * </p>
  * @return int|float The decimal representation of hex_string
+ * @pure
  */
-#[Pure]
 function hexdec(string $hex_string): int|float {}
 
 /**
@@ -498,8 +497,8 @@ function hexdec(string $hex_string): int|float {}
  * The octal string to convert
  * </p>
  * @return int|float The decimal representation of octal_string
+ * @pure
  */
-#[Pure]
 function octdec(string $octal_string): int|float {}
 
 /**
@@ -617,8 +616,8 @@ function octdec(string $octal_string): int|float {}
  * </tr>
  * </table>
  * @return string Binary string representation of number
+ * @pure
  */
-#[Pure]
 function decbin(int $num): string {}
 
 /**
@@ -628,8 +627,8 @@ function decbin(int $num): string {}
  * Decimal value to convert
  * </p>
  * @return string Octal string representation of number
+ * @pure
  */
-#[Pure]
 function decoct(int $num): string {}
 
 /**
@@ -639,8 +638,8 @@ function decoct(int $num): string {}
  * Decimal value to convert
  * </p>
  * @return string Hexadecimal string representation of number
+ * @pure
  */
-#[Pure]
 function dechex(int $num): string {}
 
 /**
@@ -656,8 +655,8 @@ function dechex(int $num): string {}
  * The base to convert number to
  * </p>
  * @return string number converted to base tobase
+ * @pure
  */
-#[Pure]
 function base_convert(string $num, int $from_base, int $to_base): string {}
 
 /**
@@ -672,8 +671,8 @@ function base_convert(string $num, int $from_base, int $to_base): string {}
  * @param string|null $decimal_separator [optional]
  * @param string|null $thousands_separator [optional]
  * @return string A formatted version of number.
+ * @pure
  */
-#[Pure]
 function number_format(float $num, int $decimals = 0, ?string $decimal_separator = '.', ?string $thousands_separator = ','): string {}
 
 /**
@@ -688,8 +687,8 @@ function number_format(float $num, int $decimals = 0, ?string $decimal_separator
  * </p>
  * @return float The floating point remainder of
  * x/y
+ * @pure
  */
-#[Pure]
 function fmod(float $num1, float $num2): float {}
 
 /**
@@ -700,8 +699,8 @@ function fmod(float $num1, float $num2): float {}
  * @param float $num2
  * @return float
  * @since 8.0
+ * @pure
  */
-#[Pure]
 function fdiv(float $num1, float $num2): float {}
 
 /**
@@ -711,8 +710,8 @@ function fdiv(float $num1, float $num2): float {}
  * A 32bit IPv4, or 128bit IPv6 address.
  * </p>
  * @return string|false a string representation of the address or false on failure.
+ * @pure
  */
-#[Pure]
 function inet_ntop(string $ip): string|false {}
 
 /**
@@ -723,8 +722,8 @@ function inet_ntop(string $ip): string|false {}
  * </p>
  * @return string|false the in_addr representation of the given
  * address
+ * @pure
  */
-#[Pure]
 function inet_pton(string $ip): string|false {}
 
 /**
@@ -735,8 +734,8 @@ function inet_pton(string $ip): string|false {}
  * </p>
  * @return int|false the IPv4 address or false if ip_address
  * is invalid.
+ * @pure
  */
-#[Pure]
 function ip2long(string $ip): int|false {}
 
 /**
@@ -746,8 +745,8 @@ function ip2long(string $ip): int|false {}
  * A proper address representation.
  * </p>
  * @return string|false the Internet IP address as a string.
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(['8.4' => 'string'], default: 'string|false')]
 function long2ip(int $ip) {}
 
@@ -763,8 +762,8 @@ function long2ip(int $ip) {}
  * @return string|array|false the value of the environment variable
  * varname or an associative array with all environment variables if no variable name
  * is provided, or false on an error.
+ * @pure
  */
-#[Pure(true)]
 function getenv(
     #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] $varname,
     #[PhpStormStubsElementAvailable(from: '7.1')] ?string $name = null,
@@ -799,8 +798,8 @@ function putenv(string $assignment): bool {}
  * @param int &$rest_index [optional] If the optind parameter is present, then the index where argument parsing stopped will be written to this variable.
  * @return string[]|false[]|false This function will return an array of option / argument pairs or false on
  * failure.
+ * @pure
  */
-#[Pure(true)]
 function getopt(
     string $short_options,
     array $long_options = [],
@@ -813,8 +812,8 @@ function getopt(
  * @return array{float, float, float}|false an array with three samples (last 1, 5 and 15
  * minutes).
  * @since 5.1.3
+ * @pure
  */
-#[Pure(true)]
 function sys_getloadavg(): array|false {}
 
 /**
@@ -832,8 +831,8 @@ function sys_getloadavg(): array|false {}
  * true then a float (in seconds) is returned.
  * </p>
  * @return ($as_float is true ? float : string)
+ * @pure
  */
-#[Pure(true)]
 function microtime(bool $as_float = false): string|float {}
 
 /**
@@ -843,8 +842,8 @@ function microtime(bool $as_float = false): string|float {}
  * When set to true, a float instead of an array is returned.
  * </p>
  * @return ($as_float is true ? float : array{sec: int, usec: int, minuteswest: int, dsttime: int})
+ * @pure
  */
-#[Pure(true)]
 function gettimeofday(bool $as_float = false): array|float {}
 
 /**
@@ -855,8 +854,8 @@ function gettimeofday(bool $as_float = false): array|float {}
  * </p>
  * @return array|false an associative array containing the data returned from the system
  * call. All entries are accessible by using their documented field names.
+ * @pure
  */
-#[Pure(true)]
 function getrusage(int $mode = 0): array|false {}
 
 /**
@@ -878,8 +877,8 @@ function getrusage(int $mode = 0): array|false {}
  * of the return value, which should make the results more unique.
  * </p>
  * @return string the unique identifier, as a string.
+ * @pure
  */
-#[Pure(true)]
 function uniqid(string $prefix = "", bool $more_entropy = false): string {}
 
 /**
@@ -889,8 +888,8 @@ function uniqid(string $prefix = "", bool $more_entropy = false): string {}
  * The input string.
  * </p>
  * @return string the 8-bit binary string.
+ * @pure
  */
-#[Pure]
 function quoted_printable_decode(string $string): string {}
 
 /**
@@ -900,8 +899,8 @@ function quoted_printable_decode(string $string): string {}
  * The input string.
  * </p>
  * @return string the encoded string.
+ * @pure
  */
-#[Pure]
 function quoted_printable_encode(string $string): string {}
 
 /**
@@ -921,8 +920,8 @@ function quoted_printable_encode(string $string): string {}
  * @see mb_convert_string()
  * @see iconv()
  * @see UConverter
+ * @pure
  */
-#[Pure]
 #[Deprecated(since: '7.4', reason: 'Us mb_convert_string(), iconv() or UConverter instead.')]
 function convert_cyr_string(string $str, string $from, string $to): string {}
 
@@ -930,8 +929,8 @@ function convert_cyr_string(string $str, string $from, string $to): string {}
  * Gets the name of the owner of the current PHP script
  * @link https://php.net/manual/en/function.get-current-user.php
  * @return string the username as a string.
+ * @pure
  */
-#[Pure(true)]
 function get_current_user(): string {}
 
 /**
@@ -953,8 +952,8 @@ function set_time_limit(int $seconds): bool {}
  * </p>
  * @return array|string|false the current value of the PHP configuration variable specified by
  * option, or false if an error occurs.
+ * @pure
  */
-#[Pure]
 function get_cfg_var(string $option): array|string|false {}
 
 /**

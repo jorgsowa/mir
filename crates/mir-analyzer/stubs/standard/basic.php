@@ -1,7 +1,6 @@
 <?php
 
 use JetBrains\PhpStorm\Deprecated;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Loads a php extension at runtime
@@ -56,8 +55,8 @@ function cli_set_process_title(string $title): bool {}
  * @link https://php.net/manual/en/function.cli-get-process-title.php
  * @return string|null Return a string with the current process title or <b>NULL</b> on error.
  * @since 5.5
+ * @pure
  */
-#[Pure(true)]
 function cli_get_process_title(): ?string {}
 
 /**
@@ -66,8 +65,8 @@ function cli_get_process_title(): ?string {}
  * @return bool
  * @since 7.1
  * @link https://php.net/manual/en/function.is-iterable.php
+ * @pure
  */
-#[Pure]
 function is_iterable(mixed $value): bool {}
 
 /**
@@ -78,8 +77,8 @@ function is_iterable(mixed $value): bool {}
  * </p>
  * @return string the UTF-8 translation of <i>data</i>.
  * @deprecated 8.2 Consider to use {@link mb_convert_encoding}, {@link UConverter::transcode()} or {@link iconv()}
+ * @pure
  */
-#[Pure]
 #[Deprecated(replacement: "mb_convert_encoding(%parameter0%, 'UTF-8', 'ISO-8859-1')", since: "8.2")]
 function utf8_encode(string $string): string {}
 
@@ -92,8 +91,8 @@ function utf8_encode(string $string): string {}
  * </p>
  * @return string the ISO-8859-1 translation of <i>data</i>.
  * @deprecated 8.2 Consider to use {@link mb_convert_encoding}, {@link UConverter::transcode()} or {@link iconv()}
+ * @pure
  */
-#[Pure]
 #[Deprecated(replacement: "mb_convert_encoding(%parameter0%, 'ISO-8859-1', 'UTF-8')", since: "8.2")]
 function utf8_decode(string $string): string {}
 

@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Retrieve information about the currently installed GD library
@@ -83,8 +82,8 @@ use JetBrains\PhpStorm\Pure;
  * Previous to PHP 5.3.0, the JPEG Support attribute was named
  * JPG Support.
  * </p>
+ * @pure
  */
-#[Pure]
 #[ArrayShape([
     "GD Version" => "string",
     "FreeType Support" => "bool",
@@ -232,8 +231,8 @@ function imagecharup(
  * y-coordinate of the point.
  * </p>
  * @return int|false the index of the color or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorat(GdImage $image, int $x, int $y): int|false {}
 
 /**
@@ -269,8 +268,8 @@ function imagepalettecopy(GdImage $dst, GdImage $src): void {}
  * @return resource|GdImage|false An image resource will be returned on success. <b>FALSE</b> is returned if
  * the image type is unsupported, the data is not in a recognised format,
  * or the image is corrupt and cannot be loaded.
+ * @pure
  */
-#[Pure]
 function imagecreatefromstring(string $data): GdImage|false {}
 
 /**
@@ -282,8 +281,8 @@ function imagecreatefromstring(string $data): GdImage|false {}
  * @param int $blue <p>Value of blue component.</p>
  * @return int|false the index of the closest color, in the palette of the image, to
  * the specified one or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorclosest(GdImage $image, int $red, int $green, int $blue): int {}
 
 /**
@@ -295,8 +294,8 @@ function imagecolorclosest(GdImage $image, int $red, int $green, int $blue): int
  * @param int $blue <p>Value of blue component.</p>
  * @return int|false an integer with the index of the color which has
  * the hue, white and blackness nearest the given color or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorclosesthwb(GdImage $image, int $red, int $green, int $blue): int {}
 
 /**
@@ -319,8 +318,8 @@ function imagecolordeallocate(GdImage $image, int $color) {}
  * @param int $green <p>Value of green component.</p>
  * @param int $blue <p>Value of blue component.</p>
  * @return int|false a color index or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorresolve(GdImage $image, int $red, int $green, int $blue): int {}
 
 /**
@@ -332,8 +331,8 @@ function imagecolorresolve(GdImage $image, int $red, int $green, int $blue): int
  * @param int $blue <p>Value of blue component.</p>
  * @return int|false the index of the specified color in the palette, -1 if the
  * color does not exist, or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorexact(GdImage $image, int $red, int $green, int $blue): int {}
 
 /**
@@ -378,8 +377,8 @@ function imagecolortransparent(GdImage $image, ?int $color = null): int {}
  * </p>
  * @return int|false the number of colors in the specified image's palette, 0 for
  * truecolor images, or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorstotal(GdImage $image): int {}
 
 /**
@@ -391,8 +390,8 @@ function imagecolorstotal(GdImage $image): int {}
  * </p>
  * @return array|false an associative array with red, green, blue and alpha keys that
  * contain the appropriate values for the specified color index or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(['8.0' => 'array'], default: 'array|false')]
 #[ArrayShape(["red" => "int", "green" => "int", "blue" => "int", "alpha" => "int"])]
 function imagecolorsforindex(GdImage $image, int $color) {}
@@ -551,8 +550,8 @@ function imagecopyresized(GdImage $dst_image, GdImage $src_image, int $dst_x, in
  * The image height.
  * </p>
  * @return resource|GdImage|false an image resource identifier on success, false on errors.
+ * @pure
  */
-#[Pure]
 function imagecreate(int $width, int $height): GdImage|false {}
 
 /**
@@ -565,8 +564,8 @@ function imagecreate(int $width, int $height): GdImage|false {}
  * Image height.
  * </p>
  * @return resource|GdImage|false an image resource identifier on success, false on errors.
+ * @pure
  */
-#[Pure]
 function imagecreatetruecolor(int $width, int $height): GdImage|false {}
 
 /**
@@ -575,8 +574,8 @@ function imagecreatetruecolor(int $width, int $height): GdImage|false {}
  * @param resource|GdImage $image
  * @return bool true if the image is truecolor, false
  * otherwise.
+ * @pure
  */
-#[Pure]
 function imageistruecolor(GdImage $image): bool {}
 
 /**
@@ -734,8 +733,8 @@ function imagecolorallocatealpha(GdImage $image, int $red, int $green, int $blue
  * 127 indicates completely transparent.
  * </p>
  * @return int|false a color index or <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorresolvealpha(GdImage $image, int $red, int $green, int $blue, int $alpha): int {}
 
 /**
@@ -758,8 +757,8 @@ function imagecolorresolvealpha(GdImage $image, int $red, int $green, int $blue,
  * </p>
  * @return int|false the index of the closest color in the palette or
  * <b>FALSE</b> on failure
+ * @pure
  */
-#[Pure]
 function imagecolorclosestalpha(GdImage $image, int $red, int $green, int $blue, int $alpha): int {}
 
 /**
@@ -783,8 +782,8 @@ function imagecolorclosestalpha(GdImage $image, int $red, int $green, int $blue,
  * @return int|false the index of the specified color+alpha in the palette of the
  * image, -1 if the color does not exist in the image's palette, or <b>FALSE</b>
  * on failure
+ * @pure
  */
-#[Pure]
 #[LanguageLevelTypeAware(['8.0' => 'int'], default: 'int|false')]
 function imagecolorexactalpha(GdImage $image, int $red, int $green, int $blue, int $alpha) {}
 
@@ -1283,8 +1282,8 @@ function imagefilltoborder(GdImage $image, int $x, int $y, int $border_color, in
  * @link https://php.net/manual/en/function.imagefontwidth.php
  * @param int $font
  * @return int the width of the pixel
+ * @pure
  */
-#[Pure]
 function imagefontwidth(#[LanguageLevelTypeAware(['8.1' => 'GdFont|int'], default: 'int')] $font): int {}
 
 /**
@@ -1292,8 +1291,8 @@ function imagefontwidth(#[LanguageLevelTypeAware(['8.1' => 'GdFont|int'], defaul
  * @link https://php.net/manual/en/function.imagefontheight.php
  * @param int $font
  * @return int the height of the pixel.
+ * @pure
  */
-#[Pure]
 function imagefontheight(#[LanguageLevelTypeAware(['8.1' => 'GdFont|int'], default: 'int')] $font): int {}
 
 /**
@@ -1541,8 +1540,8 @@ function imagestringup(
  * @param resource|GdImage $image
  * @return int|false Return the width of the image or false on
  * errors.
+ * @pure
  */
-#[Pure]
 function imagesx(GdImage $image): int {}
 
 /**
@@ -1551,8 +1550,8 @@ function imagesx(GdImage $image): int {}
  * @param resource|GdImage $image
  * @return int|false Return the height of the image or false on
  * errors.
+ * @pure
  */
-#[Pure]
 function imagesy(GdImage $image): int {}
 
 /**
@@ -1644,8 +1643,8 @@ function imagedashedline(GdImage $image, int $x1, int $y1, int $x2, int $y2, int
  * The points are relative to the text regardless of the
  * angle, so "upper left" means in the top left-hand
  * corner seeing the text horizontally.
+ * @pure
  */
-#[Pure]
 function imagettfbbox(float $size, float $angle, string $font_filename, string $string, #[PhpStormStubsElementAvailable(from: '8.0')] array $options = []): array|false {}
 
 /**
@@ -1817,8 +1816,8 @@ function imagettftext(GdImage $image, float $size, float $angle, int $x, int $y,
  * angle, so "upper left" means in the top left-hand
  * corner seeing the text horizontally.
  * Returns false on error.
+ * @pure
  */
-#[Pure]
 function imageftbbox(float $size, float $angle, string $font_filename, string $string, array $options = []): array|false {}
 
 /**
@@ -2118,8 +2117,8 @@ function imagepsbbox($text, $font, $size) {}
  * @return int a bit-field corresponding to the image formats supported by the
  * version of GD linked into PHP. The following bits are returned,
  * IMG_BMP | IMG_GIF | IMG_JPG | IMG_PNG | IMG_WBMP | IMG_XPM | IMG_WEBP
+ * @pure
  */
-#[Pure]
 function imagetypes(): int {}
 
 /**
@@ -2380,8 +2379,8 @@ function imagecreatefromtga(string $filename): GdImage|false {}
  * https://www.php.net/manual/en/function.imagegrabscreen.php
  *
  * @return resource|GdImage|false
+ * @pure
  */
-#[Pure]
 function imagegrabscreen() {}
 
 /**
@@ -2392,8 +2391,8 @@ function imagegrabscreen() {}
  * @param int $handle
  * @param int|null $client_area
  * @return resource|GdImage|false
+ * @pure
  */
-#[Pure]
 function imagegrabwindow($handle, $client_area = null) {}
 
 /**
@@ -2403,8 +2402,8 @@ function imagegrabwindow($handle, $client_area = null) {}
  *
  * @param GdImage $image
  * @return int
+ * @pure
  */
-#[Pure]
 function imagegetinterpolation(GdImage $image): int {}
 
 /**

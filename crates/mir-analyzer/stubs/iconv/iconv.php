@@ -2,7 +2,6 @@
 
 // Start of iconv v.
 use JetBrains\PhpStorm\ArrayShape;
-use JetBrains\PhpStorm\Pure;
 
 /**
  * Convert string to requested character encoding
@@ -27,8 +26,8 @@ use JetBrains\PhpStorm\Pure;
  * The string to be converted.
  * </p>
  * @return string|false the converted string or <b>FALSE</b> on failure.
+ * @pure
  */
-#[Pure]
 function iconv(string $from_encoding, string $to_encoding, string $string): string|false {}
 
 /**
@@ -38,8 +37,8 @@ function iconv(string $from_encoding, string $to_encoding, string $string): stri
  * @param int $status
  * @return string See <b>ob_start</b> for information about this handler
  * return values.
+ * @pure
  */
-#[Pure]
 function ob_iconv_handler(string $contents, int $status): string {}
 
 /**
@@ -59,8 +58,8 @@ function ob_iconv_handler(string $contents, int $status): string {}
  * <b>iconv_get_encoding</b> returns an array that
  * stores all these variables.
  * </p>
+ * @pure
  */
-#[Pure]
 #[ArrayShape(["input_encoding" => "string", "output_encoding" => "string", "internal_encoding" => "string"])]
 function iconv_get_encoding(string $type = "all"): array|string|false {}
 
@@ -92,8 +91,8 @@ function iconv_set_encoding(string $type, string $encoding): bool {}
  * iconv.internal_encoding.
  * </p>
  * @return int|false the character count of <i>str</i>, as an integer. False on error.
+ * @pure
  */
-#[Pure]
 function iconv_strlen(string $string, ?string $encoding = null): int|false {}
 
 /**
@@ -147,8 +146,8 @@ function iconv_strlen(string $string, ?string $encoding = null): int|false {}
  * If <i>str</i> is shorter than <i>offset</i>
  * characters long, <b>FALSE</b> will be returned.
  * </p>
+ * @pure
  */
-#[Pure]
 function iconv_substr(string $string, int $offset, ?int $length = null, ?string $encoding = null): string|false {}
 
 /**
@@ -175,8 +174,8 @@ function iconv_substr(string $string, int $offset, ?int $length = null, ?string 
  * If <i>needle</i> is not found,
  * <b>iconv_strpos</b> will return <b>FALSE</b>.
  * </p>
+ * @pure
  */
-#[Pure]
 function iconv_strpos(string $haystack, string $needle, int $offset = 0, ?string $encoding = null): int|false {}
 
 /**
@@ -199,8 +198,8 @@ function iconv_strpos(string $haystack, string $needle, int $offset = 0, ?string
  * If <i>needle</i> is not found,
  * <b>iconv_strrpos</b> will return <b>FALSE</b>.
  * </p>
+ * @pure
  */
-#[Pure]
 function iconv_strrpos(string $haystack, string $needle, ?string $encoding = null): int|false {}
 
 /**
@@ -300,8 +299,8 @@ function iconv_strrpos(string $haystack, string $needle, ?string $encoding = nul
  * </p>
  * @return string|false an encoded MIME field on success,
  * or <b>FALSE</b> if an error occurs during the encoding.
+ * @pure
  */
-#[Pure]
 function iconv_mime_encode(string $field_name, string $field_value, array $options = []): string|false {}
 
 /**
@@ -352,8 +351,8 @@ function iconv_mime_encode(string $field_name, string $field_value, array $optio
  * </p>
  * @return string|false a decoded MIME field on success,
  * or <b>FALSE</b> if an error occurs during the decoding.
+ * @pure
  */
-#[Pure]
 function iconv_mime_decode(string $string, int $mode = 0, ?string $encoding = null): string|false {}
 
 /**
@@ -413,8 +412,8 @@ function iconv_mime_decode(string $string, int $mode = 0, ?string $encoding = nu
  * <b>iconv_mime_decode_headers</b> automatically incorporates
  * them into a numerically indexed array in the order of occurrence.
  * </p>
+ * @pure
  */
-#[Pure]
 function iconv_mime_decode_headers(string $headers, int $mode = 0, ?string $encoding = null): array|false {}
 
 /**
