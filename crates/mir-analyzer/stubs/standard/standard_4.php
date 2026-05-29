@@ -381,8 +381,7 @@ function highlight_string(string $string, bool $return = false) {}
  * @link https://secure.php.net/manual/en/function.hrtime.php
  * @param bool $as_number <p>Whether the high resolution time should be returned as array or number.<p>
  * @since 7.3
- * @return int[]|int|float|false Returns an array of integers in the form [seconds, nanoseconds], if the parameter get_as_number is false.
- * Otherwise the nanoseconds are returned as integer (64bit platforms) or float (32bit platforms).
+ * @return ($as_number is true ? int|float : array{0: int, 1: int}|false)
  */
 #[Pure(true)]
 function hrtime(bool $as_number = false): array|int|float|false {}

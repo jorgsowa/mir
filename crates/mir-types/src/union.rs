@@ -896,6 +896,8 @@ fn resolve_conditional_branch(
 ) -> Option<Type> {
     let predicate: fn(&Atomic) -> bool = match subject {
         Atomic::TNull => |a| matches!(a, Atomic::TNull),
+        Atomic::TTrue => |a| matches!(a, Atomic::TTrue),
+        Atomic::TFalse => |a| matches!(a, Atomic::TFalse),
         Atomic::TString => is_string_atomic,
         Atomic::TArray { .. } => is_array_atomic,
         _ => return None,
