@@ -4,7 +4,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Deprecated;
 use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
 use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Internal\ReturnTypeContract as TypeContract;
 use JetBrains\PhpStorm\Pure;
 
 /**
@@ -832,10 +831,10 @@ function sys_getloadavg(): array|false {}
  * If the optional get_as_float is set to
  * true then a float (in seconds) is returned.
  * </p>
- * @return string|float
+ * @return ($as_float is true ? float : string)
  */
 #[Pure(true)]
-function microtime(#[TypeContract(true: "float", false: "string")] bool $as_float = false): string|float {}
+function microtime(bool $as_float = false): string|float {}
 
 /**
  * Get current time
@@ -843,19 +842,10 @@ function microtime(#[TypeContract(true: "float", false: "string")] bool $as_floa
  * @param bool $as_float [optional] <p>
  * When set to true, a float instead of an array is returned.
  * </p>
- * @return int[]|float By default an array is returned. If return_float
- * is set, then a float is returned.
- * </p>
- * <p>
- * Array keys:
- * "sec" - seconds since the Unix Epoch
- * "usec" - microseconds
- * "minuteswest" - minutes west of Greenwich
- * "dsttime" - type of dst correction
+ * @return ($as_float is true ? float : array{sec: int, usec: int, minuteswest: int, dsttime: int})
  */
 #[Pure(true)]
-#[ArrayShape(["sec" => "int", "usec" => "int", "minuteswest" => "int", "dsttime" => "int"])]
-function gettimeofday(#[TypeContract(true: "float", false: "int[]")] bool $as_float = false): array|float {}
+function gettimeofday(bool $as_float = false): array|float {}
 
 /**
  * Gets the current resource usages
