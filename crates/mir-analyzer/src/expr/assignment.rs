@@ -1,6 +1,6 @@
 use super::helpers::{
     extract_simple_var, extract_string_from_expr, infer_arithmetic, property_assign_compatible,
-    type_refs_any_template, widen_array_with_value_and_key,
+    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -214,39 +214,47 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::ArrayAccess(aa) => {
                 // Collect the full index chain from outermost to innermost.
                 // For `$arr[$a][$b] = $val`, this gives [type($b), type($a)].
+                // None means push notation (`[]`), which produces TList rather than TArray.
                 // The base variable's key is the innermost (last in vec), and
                 // intermediate indices are used to wrap the value type.
-                let outer_key = if let Some(idx) = &aa.index {
-                    self.analyze(idx, ctx)
-                } else {
-                    Type::mixed()
-                };
-                let mut key_chain: Vec<Type> = vec![outer_key];
+                let outer_key: Option<Type> = aa.index.as_ref().map(|idx| self.analyze(idx, ctx));
+                let mut key_chain: Vec<Option<Type>> = vec![outer_key];
                 let mut base: &Expr = &aa.array;
                 loop {
                     match &base.kind {
                         ExprKind::Variable(name) => {
                             let name_str = name.trim_start_matches('$');
                             // Base key: innermost index in the chain (closest to $arr).
-                            let base_key = key_chain.last().unwrap().clone();
+                            let base_key_opt = key_chain.last().unwrap().clone();
+                            let base_key = base_key_opt.unwrap_or_else(Type::mixed);
                             // Wrap the assigned value with intermediate keys (outermost first).
                             // For single-level ($arr[$k] = $v): no wrapping, value stays as-is.
+                            // None entries ([] push) produce TList instead of TArray.
                             let mut wrapped_value = ty.clone();
-                            for k in key_chain[..key_chain.len() - 1].iter().rev() {
-                                wrapped_value = Type::single(Atomic::TArray {
-                                    key: Box::new(k.clone()),
-                                    value: Box::new(wrapped_value),
-                                });
+                            for k_opt in key_chain[..key_chain.len() - 1].iter().rev() {
+                                wrapped_value = match k_opt {
+                                    None => Type::single(Atomic::TList {
+                                        value: Box::new(wrapped_value),
+                                    }),
+                                    Some(k) => Type::single(Atomic::TArray {
+                                        key: Box::new(k.clone()),
+                                        value: Box::new(wrapped_value),
+                                    }),
+                                };
                             }
                             if !ctx.var_is_defined(name_str) {
                                 let name_sym = mir_types::Name::from(name_str);
-                                std::sync::Arc::make_mut(&mut ctx.vars).insert(
-                                    name_sym,
-                                    std::sync::Arc::new(Type::single(Atomic::TArray {
+                                let init_ty = match &key_chain.last().unwrap() {
+                                    None => Type::single(Atomic::TList {
+                                        value: Box::new(wrapped_value),
+                                    }),
+                                    Some(_) => Type::single(Atomic::TArray {
                                         key: Box::new(base_key),
                                         value: Box::new(wrapped_value),
-                                    })),
-                                );
+                                    }),
+                                };
+                                std::sync::Arc::make_mut(&mut ctx.vars)
+                                    .insert(name_sym, std::sync::Arc::new(init_ty));
                                 std::sync::Arc::make_mut(&mut ctx.assigned_vars).insert(name_sym);
                                 let (line, col_start) = self.offset_to_line_col(base.span.start);
                                 let (line_end, col_end) = self.offset_to_line_col(base.span.end);
@@ -255,21 +263,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             } else {
                                 let current = ctx.get_var(name_str);
-                                let updated = widen_array_with_value_and_key(
-                                    &current,
-                                    &wrapped_value,
-                                    &base_key,
-                                );
+                                let updated = match &key_chain.last().unwrap() {
+                                    None => widen_array_as_list(&current, &wrapped_value),
+                                    Some(_) => widen_array_with_value_and_key(
+                                        &current,
+                                        &wrapped_value,
+                                        &base_key,
+                                    ),
+                                };
                                 ctx.set_var(name_str, updated);
                             }
                             break;
                         }
                         ExprKind::ArrayAccess(inner) => {
-                            let inner_key = if let Some(idx) = &inner.index {
-                                self.analyze(idx, ctx)
-                            } else {
-                                Type::mixed()
-                            };
+                            let inner_key: Option<Type> =
+                                inner.index.as_ref().map(|idx| self.analyze(idx, ctx));
                             key_chain.push(inner_key);
                             base = &inner.array;
                         }

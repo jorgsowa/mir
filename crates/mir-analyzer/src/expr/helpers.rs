@@ -76,6 +76,43 @@ pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key:
     result
 }
 
+/// Widen an existing array-like type by appending `new_value` via push notation (`[]`).
+/// Always produces `TList { merged_value }`, regardless of the current key type,
+/// because push notation in PHP assigns the next integer index.
+pub fn widen_array_as_list(current: &Type, new_value: &Type) -> Type {
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+    let mut acc: Option<Type> = Some(new_value.clone());
+    let mut found_array = false;
+    for atomic in &current.types {
+        match atomic {
+            Atomic::TKeyedArray { properties, .. } => {
+                for prop in properties.values() {
+                    fold_into(&mut acc, prop.ty.clone());
+                }
+                found_array = true;
+            }
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => {
+                fold_into(&mut acc, *value.clone());
+                found_array = true;
+            }
+            Atomic::TMixed => return Type::mixed(),
+            other => result.add_type(other.clone()),
+        }
+    }
+    if !found_array {
+        return current.clone();
+    }
+    if let Some(v) = acc {
+        result.add_type(Atomic::TList { value: Box::new(v) });
+    }
+    result
+}
+
 fn fold_into(acc: &mut Option<Type>, new: Type) {
     match acc {
         None => *acc = Some(new),
