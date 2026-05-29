@@ -42,15 +42,11 @@ echo $user->getName();
     label: 'Null method call',
     code: `<?php
 
-function findUser(int $id): ?User {
-    return $id > 0 ? new User() : null;
-}
-
 class User {
     public function name(): string { return ''; }
 }
 
-$user = findUser(0);
+$user = null;
 echo $user->name();
 `,
   },
@@ -58,13 +54,8 @@ echo $user->name();
     label: 'Array access',
     code: `<?php
 
-/** @return array<string, int> */
-function counts(): array {
-    return ['a' => 1, 'b' => 2];
-}
-
-$c = counts();
-echo $c['missing'] + 1;
+$counts = ['a' => 1, 'b' => 2];
+echo $counts['missing'] + 1;
 `,
   },
   'dead-code': {
@@ -85,10 +76,9 @@ function helper(): void {
     label: 'Taint (SQL)',
     code: `<?php
 
-function query(string $sql): void {}
-
-$id = $_GET['id'];
-query("SELECT * FROM users WHERE id = $id");
+function run_query(\\mysqli $db): void {
+    mysqli_query($db, $_GET['sql']);
+}
 `,
   },
   'generics': {
@@ -96,7 +86,7 @@ query("SELECT * FROM users WHERE id = $id");
     code: `<?php
 
 /**
- * @template T
+ * @template T of int
  * @param T $value
  * @return T
  */
@@ -104,8 +94,7 @@ function identity($value) {
     return $value;
 }
 
-/** @var int $n */
-$n = identity("not an int");
+identity("not an int");
 `,
   },
 };
