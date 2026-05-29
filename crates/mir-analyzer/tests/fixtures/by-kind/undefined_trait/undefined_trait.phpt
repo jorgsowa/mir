@@ -6,4 +6,4 @@ class B {
     use A;
 }
 ===expect===
-UndefinedTrait@3:8: Trait A does not exist
+UndefinedTrait@3:8-3:9: Trait A does not exist

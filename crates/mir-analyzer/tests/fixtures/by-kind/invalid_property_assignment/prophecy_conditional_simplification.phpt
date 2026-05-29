@@ -19,4 +19,4 @@ $container = $factory->makeContainer(null);
 /** @mir-check $container is Container<object> */
 $factory->container = $container;
 ===expect===
-UnusedParam@9:35: Parameter $x is never used
+UnusedParam@9:35-9:37: Parameter $x is never used

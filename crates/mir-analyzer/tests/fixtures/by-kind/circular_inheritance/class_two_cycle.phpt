@@ -5,4 +5,4 @@ class two cycle
 class A extends B {}
 class B extends A {}
 ===expect===
-CircularInheritance@3:0: Class B has a circular inheritance chain
+CircularInheritance@3:0-3:20: Class B has a circular inheritance chain

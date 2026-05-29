@@ -8,4 +8,4 @@ function foo() : bool {
 
 array_map("foo", [1, 2, 3]);
 ===expect===
-TooManyArguments@6:11: Too many arguments for foo(): expected 0, got 1
+TooManyArguments@6:11-6:16: Too many arguments for foo(): expected 0, got 1

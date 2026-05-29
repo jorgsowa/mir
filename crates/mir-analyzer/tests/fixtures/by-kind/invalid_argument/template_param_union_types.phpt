@@ -42,5 +42,5 @@ function test(): void {
     assertSuccessValue($complexResult);
 }
 ===expect===
-UnusedParam@13:29: Parameter $result is never used
-UnusedParam@20:24: Parameter $either is never used
+UnusedParam@13:29-13:43: Parameter $result is never used
+UnusedParam@20:24-20:38: Parameter $either is never used

@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::Visibility;
-use mir_issues::{Issue, IssueKind, Location, Severity};
+use mir_issues::{Issue, IssueKind, Severity};
 
 use crate::db::MirDatabase;
 use crate::stubs::StubVfs;
@@ -81,7 +81,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
                         fqcn_str,
                         name.to_ascii_lowercase()
                     )) {
-                        let location = location_from_storage(&method.location);
+                        let location =
+                            crate::diagnostics::storage_loc_to_location(method.location.as_ref());
                         issues.push(Issue::new(
                             IssueKind::UnusedMethod {
                                 class: fqcn_str.to_string(),
@@ -104,7 +105,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
                             .db
                             .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
                         {
-                            let location = location_from_storage(&prop.location);
+                            let location =
+                                crate::diagnostics::storage_loc_to_location(prop.location.as_ref());
                             issues.push(Issue::new(
                                 IssueKind::UnusedProperty {
                                     class: fqcn_str.to_string(),
@@ -139,7 +141,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
             }
             if !self.db.has_reference(fqn.as_ref()) {
-                let location = location_from_storage(&location);
+                let location = crate::diagnostics::storage_loc_to_location(location.as_ref());
                 issues.push(Issue::new(
                     IssueKind::UnusedFunction { name: short_name },
                     location,
@@ -153,25 +155,6 @@ impl<'a> DeadCodeAnalyzer<'a> {
         }
 
         issues
-    }
-}
-
-fn location_from_storage(loc: &Option<mir_types::Location>) -> Location {
-    match loc {
-        Some(l) => Location {
-            file: l.file.clone(),
-            line: l.line,
-            line_end: l.line_end,
-            col_start: l.col_start,
-            col_end: l.col_end,
-        },
-        None => Location {
-            file: std::sync::Arc::from("<unknown>"),
-            line: 1,
-            line_end: 1,
-            col_start: 0,
-            col_end: 0,
-        },
     }
 }
 

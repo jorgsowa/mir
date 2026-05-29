@@ -4,4 +4,4 @@ reports too many arguments to native function
 <?php
 strlen('hello', 'extra');
 ===expect===
-TooManyArguments@2:17: Too many arguments for strlen(): expected 1, got 2
+TooManyArguments@2:17-2:24: Too many arguments for strlen(): expected 1, got 2

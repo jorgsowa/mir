@@ -14,4 +14,4 @@ function test(): void {
     $y->bar();
 }
 ===expect===
-MixedMethodCall@11:5: Method bar() called on mixed type
+MixedMethodCall@11:5-11:14: Method bar() called on mixed type

@@ -6,4 +6,4 @@ function test(): void {
     global $config;
 }
 ===expect===
-UnusedVariable@3:12: Variable $config is never read
+UnusedVariable@3:12-3:19: Variable $config is never read

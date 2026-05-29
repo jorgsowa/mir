@@ -20,4 +20,4 @@ $barWrapper = make(Bar::class);
 /** @mir-check $fooWrapper is Wrapper<Foo> */
 /** @mir-check $barWrapper is Wrapper<Bar> */
 ===expect===
-UnusedParam@13:15: Parameter $cls is never used
+UnusedParam@13:15-13:26: Parameter $cls is never used

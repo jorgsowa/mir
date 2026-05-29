@@ -15,4 +15,4 @@ abstract class A
     }
 }
 ===expect===
-UndefinedProperty@11:22: Property A::$nonexistent does not exist
+UndefinedProperty@11:22-11:33: Property A::$nonexistent does not exist

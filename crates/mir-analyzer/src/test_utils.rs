@@ -174,6 +174,8 @@ pub(crate) struct ExpectedIssue {
     pub message: String,
     pub line: Option<u32>,
     pub col_start: Option<u16>,
+    pub line_end: Option<u32>,
+    pub col_end: Option<u16>,
 }
 
 /// Parsed representation of a `.phpt` fixture.
@@ -437,21 +439,41 @@ fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
         (kind_part.trim().to_string(), None)
     };
 
-    let (line_num, col_start) = if let Some(loc) = line_col {
-        let loc_parts: Vec<&str> = loc.split(':').collect();
-        if loc_parts.len() == 2 {
-            let l = loc_parts[0]
-                .parse::<u32>()
-                .unwrap_or_else(|_| panic!("fixture {path}: invalid line number in {line:?}"));
-            let c = loc_parts[1]
-                .parse::<u16>()
-                .unwrap_or_else(|_| panic!("fixture {path}: invalid column number in {line:?}"));
-            (Some(l), Some(c))
+    let (line_num, col_start, line_end, col_end) = if let Some(loc) = line_col {
+        // Format: "line:col" or "line:col-line_end:col_end"
+        let (start_part, end_part) = if let Some(dash) = loc.find('-') {
+            (&loc[..dash], Some(&loc[dash + 1..]))
         } else {
+            (loc, None)
+        };
+        let loc_parts: Vec<&str> = start_part.split(':').collect();
+        if loc_parts.len() != 2 {
             panic!("fixture {path}: invalid location format in {line:?} — expected \"@line:col\"");
         }
+        let l = loc_parts[0]
+            .parse::<u32>()
+            .unwrap_or_else(|_| panic!("fixture {path}: invalid line number in {line:?}"));
+        let c = loc_parts[1]
+            .parse::<u16>()
+            .unwrap_or_else(|_| panic!("fixture {path}: invalid column number in {line:?}"));
+        let (le, ce) = if let Some(end) = end_part {
+            let end_parts: Vec<&str> = end.split(':').collect();
+            if end_parts.len() != 2 {
+                panic!("fixture {path}: invalid end-location format in {line:?} — expected \"line_end:col_end\"");
+            }
+            let le = end_parts[0]
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("fixture {path}: invalid end line number in {line:?}"));
+            let ce = end_parts[1].parse::<u16>().unwrap_or_else(|_| {
+                panic!("fixture {path}: invalid end column number in {line:?}")
+            });
+            (Some(le), Some(ce))
+        } else {
+            (None, None)
+        };
+        (Some(l), Some(c), le, ce)
     } else {
-        (None, None)
+        (None, None, None, None)
     };
 
     ExpectedIssue {
@@ -460,6 +482,8 @@ fn parse_single_expect_line(line: &str, path: &str) -> ExpectedIssue {
         message,
         line: line_num,
         col_start,
+        line_end,
+        col_end,
     }
 }
 
@@ -486,21 +510,41 @@ fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
         (kind_part.trim().to_string(), None)
     };
 
-    let (line_num, col_start) = if let Some(loc) = line_col {
-        let loc_parts: Vec<&str> = loc.split(':').collect();
-        if loc_parts.len() == 2 {
-            let l = loc_parts[0]
-                .parse::<u32>()
-                .unwrap_or_else(|_| panic!("fixture {path}: invalid line number in {line:?}"));
-            let c = loc_parts[1]
-                .parse::<u16>()
-                .unwrap_or_else(|_| panic!("fixture {path}: invalid column number in {line:?}"));
-            (Some(l), Some(c))
+    let (line_num, col_start, line_end, col_end) = if let Some(loc) = line_col {
+        // Format: "line:col" or "line:col-line_end:col_end"
+        let (start_part, end_part) = if let Some(dash) = loc.find('-') {
+            (&loc[..dash], Some(&loc[dash + 1..]))
         } else {
+            (loc, None)
+        };
+        let loc_parts: Vec<&str> = start_part.split(':').collect();
+        if loc_parts.len() != 2 {
             panic!("fixture {path}: invalid location format in {line:?} — expected \"@line:col\"");
         }
+        let l = loc_parts[0]
+            .parse::<u32>()
+            .unwrap_or_else(|_| panic!("fixture {path}: invalid line number in {line:?}"));
+        let c = loc_parts[1]
+            .parse::<u16>()
+            .unwrap_or_else(|_| panic!("fixture {path}: invalid column number in {line:?}"));
+        let (le, ce) = if let Some(end) = end_part {
+            let end_parts: Vec<&str> = end.split(':').collect();
+            if end_parts.len() != 2 {
+                panic!("fixture {path}: invalid end-location format in {line:?} — expected \"line_end:col_end\"");
+            }
+            let le = end_parts[0]
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("fixture {path}: invalid end line number in {line:?}"));
+            let ce = end_parts[1].parse::<u16>().unwrap_or_else(|_| {
+                panic!("fixture {path}: invalid end column number in {line:?}")
+            });
+            (Some(le), Some(ce))
+        } else {
+            (None, None)
+        };
+        (Some(l), Some(c), le, ce)
     } else {
-        (None, None)
+        (None, None, None, None)
     };
 
     ExpectedIssue {
@@ -509,6 +553,8 @@ fn parse_multi_expect_line(line: &str, path: &str) -> ExpectedIssue {
         message,
         line: line_num,
         col_start,
+        line_end,
+        col_end,
     }
 }
 
@@ -706,7 +752,7 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
             .map(|d| format!("\n\nDescription: {d}"))
             .unwrap_or_default();
         panic!(
-            "fixture {path} FAILED:{desc}\n{}\n\nTo fix: ensure all expected issues have @line:col locations, then run: UPDATE_FIXTURES=1 cargo test --lib fixture\n\nAll actual issues:\n{}",
+            "fixture {path} FAILED:{desc}\n{}\n\nTo fix: ensure all expected issues have @line:col-line_end:col_end locations, then run: UPDATE_FIXTURES=1 cargo test --lib fixture\n\nAll actual issues:\n{}",
             failures.join("\n"),
             fmt_issues(actual, fixture.is_multi)
         );
@@ -736,6 +782,16 @@ fn issue_matches(actual: &Issue, expected: &ExpectedIssue) -> bool {
     }
     if let Some(col) = expected.col_start {
         if actual.location.col_start != col {
+            return false;
+        }
+    }
+    if let Some(line_end) = expected.line_end {
+        if actual.location.line_end != line_end {
+            return false;
+        }
+    }
+    if let Some(col_end) = expected.col_end {
+        if actual.location.col_end != col_end {
             return false;
         }
     }
@@ -776,11 +832,13 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) 
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
             out.push_str(&format!(
-                "{}: {}@{}:{}: {}\n",
+                "{}: {}@{}:{}-{}:{}: {}\n",
                 basename,
                 issue.kind.name(),
                 issue.location.line,
                 issue.location.col_start,
+                issue.location.line_end,
+                issue.location.col_end,
                 issue.kind.message()
             ));
         }
@@ -788,10 +846,12 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) 
         sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
         for issue in sorted {
             out.push_str(&format!(
-                "{}@{}:{}: {}\n",
+                "{}@{}:{}-{}:{}: {}\n",
                 issue.kind.name(),
                 issue.location.line,
                 issue.location.col_start,
+                issue.location.line_end,
+                issue.location.col_end,
                 issue.kind.message()
             ));
         }
@@ -853,7 +913,11 @@ pub fn assert_no_issue(issues: &[Issue], kind_name: &str) {
 
 fn fmt_expected(exp: &ExpectedIssue, is_multi: bool) -> String {
     let kind_with_loc = if let (Some(line), Some(col)) = (exp.line, exp.col_start) {
-        format!("{}@{}:{}", exp.kind_name, line, col)
+        if let (Some(le), Some(ce)) = (exp.line_end, exp.col_end) {
+            format!("{}@{}:{}-{}:{}", exp.kind_name, line, col, le, ce)
+        } else {
+            format!("{}@{}:{}", exp.kind_name, line, col)
+        }
     } else {
         exp.kind_name.clone()
     };
@@ -873,19 +937,23 @@ fn fmt_actual(act: &Issue, is_multi: bool) -> String {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
         return format!(
-            "{}: {}@{}:{}: {}",
+            "{}: {}@{}:{}-{}:{}: {}",
             basename,
             act.kind.name(),
             act.location.line,
             act.location.col_start,
+            act.location.line_end,
+            act.location.col_end,
             act.kind.message()
         );
     }
     format!(
-        "{}@{}:{}: {}",
+        "{}@{}:{}-{}:{}: {}",
         act.kind.name(),
         act.location.line,
         act.location.col_start,
+        act.location.line_end,
+        act.location.col_end,
         act.kind.message()
     )
 }

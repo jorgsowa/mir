@@ -9,4 +9,4 @@ function process($items): void {
     echo $items;
 }
 ===expect===
-InvalidDocblock@2:0: Invalid docblock: @param has empty generic type parameter in `array<>`
+InvalidDocblock@2:0-2:0: Invalid docblock: @param has empty generic type parameter in `array<>`

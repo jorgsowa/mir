@@ -9,4 +9,4 @@ function test(): void {
     $_ = $keys;
 }
 ===expect===
-App.php: UndefinedFunction@3:13: Function array_key_list() is not defined
+App.php: UndefinedFunction@3:13-3:49: Function array_key_list() is not defined

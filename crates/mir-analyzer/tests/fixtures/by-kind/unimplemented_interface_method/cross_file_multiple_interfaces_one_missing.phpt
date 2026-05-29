@@ -17,4 +17,4 @@ class Entity implements HasLabel, HasCount {
     # getCount() is NOT implemented
 }
 ===expect===
-Entity.php: UnimplementedInterfaceMethod@2:0: Class Entity must implement HasCount::getCount() from interface
+Entity.php: UnimplementedInterfaceMethod@2:0-2:44: Class Entity must implement HasCount::getCount() from interface

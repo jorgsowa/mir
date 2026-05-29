@@ -11,4 +11,4 @@ function test_wrong_type(int $n): void {
 <?php
 test_wrong_type(42);
 ===expect===
-TextHelper.php: InvalidArgument@3:13: Argument $hebrew_text of hebrevc() expects 'string', got 'int'
+TextHelper.php: InvalidArgument@3:13-3:15: Argument $hebrew_text of hebrevc() expects 'string', got 'int'

@@ -24,4 +24,4 @@ function testGetClassElseif(Foo|Bar $obj) {
     }
 }
 ===expect===
-RedundantCondition@19:15: Condition is always true/false for type 'bool'
+RedundantCondition@19:15-19:40: Condition is always true/false for type 'bool'

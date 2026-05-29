@@ -10,5 +10,5 @@ function foo(int $n): void {
 foo(3.7);
 
 ===expect===
-ImplicitFloatToIntCast@6:5: Implicit cast from 3.7 to int truncates the fractional part
-InvalidArgument@6:5: Argument $n of foo() expects 'int', got '3.7'
+ImplicitFloatToIntCast@6:5-6:8: Implicit cast from 3.7 to int truncates the fractional part
+InvalidArgument@6:5-6:8: Argument $n of foo() expects 'int', got '3.7'

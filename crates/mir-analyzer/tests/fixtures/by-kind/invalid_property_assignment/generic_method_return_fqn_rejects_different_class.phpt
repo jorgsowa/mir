@@ -38,5 +38,5 @@ class Consumer {
     }
 }
 ===expect===
-ClassA.php: UnusedParam@16:27: Parameter $cls is never used
-Consumer.php: InvalidPropertyAssignment@14:9: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'
+ClassA.php: UnusedParam@16:27-16:38: Parameter $cls is never used
+Consumer.php: InvalidPropertyAssignment@14:9-14:32: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'

@@ -9,4 +9,3 @@ Ignore implicit stringable
                     }
                 
 ===expect===
-

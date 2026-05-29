@@ -18,4 +18,4 @@ function test(): void {
     identity(null);
 }
 ===expect===
-UnusedParam@8:19: Parameter $value is never used
+UnusedParam@8:19-8:31: Parameter $value is never used

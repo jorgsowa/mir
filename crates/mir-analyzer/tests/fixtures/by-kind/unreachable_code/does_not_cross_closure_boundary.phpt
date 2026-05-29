@@ -9,4 +9,4 @@ function foo(): void {
     };
 }
 ===expect===
-UnreachableCode@4:5: Unreachable code detected
+UnreachableCode@4:5-6:7: Unreachable code detected

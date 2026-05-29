@@ -28,5 +28,5 @@ function takesA(A $a): void {
     $a->foo1();
 }
 ===expect===
-MissingThrowsDocblock@18:9: Exception Exception is thrown but not declared in @throws
-UndefinedMethod@25:5: Method A::foo1() does not exist
+MissingThrowsDocblock@18:9-18:31: Exception Exception is thrown but not declared in @throws
+UndefinedMethod@25:5-25:15: Method A::foo1() does not exist

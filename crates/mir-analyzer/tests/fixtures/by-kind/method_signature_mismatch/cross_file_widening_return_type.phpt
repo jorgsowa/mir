@@ -11,4 +11,4 @@ class Child extends Base {
     public function fetch(): ?string { return null; }
 }
 ===expect===
-Child.php: MethodSignatureMismatch@3:4: Method Child::fetch() signature mismatch: return type 'string|null' is not a subtype of parent 'string'
+Child.php: MethodSignatureMismatch@3:4-3:53: Method Child::fetch() signature mismatch: return type 'string|null' is not a subtype of parent 'string'

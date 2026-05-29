@@ -20,5 +20,5 @@ $result = $factory->makeNested(null, 1);
 /** @mir-check $result is Wrapper<string> */
 $factory->wrapper = $result;
 ===expect===
-UnusedParam@10:32: Parameter $x is never used
-UnusedParam@10:36: Parameter $y is never used
+UnusedParam@10:32-10:34: Parameter $x is never used
+UnusedParam@10:36-10:38: Parameter $y is never used

@@ -6,4 +6,4 @@ class Foo {
     public function __construct(int $x) {}
 }
 ===expect===
-UnusedParam@3:33: Parameter $x is never used
+UnusedParam@3:33-3:39: Parameter $x is never used

@@ -33,4 +33,4 @@ class Consumer {
     }
 }
 ===expect===
-Types.php: UnusedParam@13:26: Parameter $cls is never used
+Types.php: UnusedParam@13:26-13:37: Parameter $cls is never used

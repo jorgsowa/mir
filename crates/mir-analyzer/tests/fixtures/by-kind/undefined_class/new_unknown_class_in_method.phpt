@@ -8,4 +8,4 @@ class A {
     }
 }
 ===expect===
-UndefinedClass@4:13: Class UnknownClass does not exist
+UndefinedClass@4:13-4:25: Class UnknownClass does not exist

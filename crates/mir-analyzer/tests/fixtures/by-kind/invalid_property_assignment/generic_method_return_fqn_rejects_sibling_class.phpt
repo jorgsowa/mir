@@ -38,5 +38,5 @@ class MyTest {
     }
 }
 ===expect===
-ObjectProphecy.php: UnusedParam@16:32: Parameter $cls is never used
-MyTest.php: InvalidPropertyAssignment@14:9: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
+MyTest.php: InvalidPropertyAssignment@14:9-14:30: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
+ObjectProphecy.php: UnusedParam@16:32-16:43: Parameter $cls is never used

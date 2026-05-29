@@ -10,4 +10,4 @@ function getKeys() {
 }
 
 ===expect===
-InvalidReturnType@6:5: Return type 'list<string>' is not compatible with declared 'list<int>'
+InvalidReturnType@6:5-6:51: Return type 'list<string>' is not compatible with declared 'list<int>'

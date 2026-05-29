@@ -15,4 +15,3 @@ $result = apply(strlen(...), 'hello');
 /** @mir-check $result is int */
 echo $result;
 ===expect===
-

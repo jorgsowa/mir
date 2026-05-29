@@ -18,4 +18,4 @@ accept('hello');          // satisfies string arm
 accept([1, 2, 3]);        // satisfies list<I> arm (I = int)
 accept(['a' => 1]);       // satisfies array<K, V> arm
 ===expect===
-UnusedParam@10:17: Parameter $value is never used
+UnusedParam@10:17-10:29: Parameter $value is never used

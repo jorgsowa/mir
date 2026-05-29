@@ -17,4 +17,4 @@ function test(): void {
     f($p);
 }
 ===expect===
-InvalidArgument@14:7: Argument $p of f() expects 'Pair<string, Animal>', got 'Pair<int, Cat>'
+InvalidArgument@14:7-14:9: Argument $p of f() expects 'Pair<string, Animal>', got 'Pair<int, Cat>'

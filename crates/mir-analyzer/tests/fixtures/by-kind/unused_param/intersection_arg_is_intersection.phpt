@@ -22,4 +22,4 @@ $val = extract($b);
 /** @mir-check $val is mixed */
 echo $val;
 ===expect===
-UnusedParam@12:18: Parameter $item is never used
+UnusedParam@12:18-12:29: Parameter $item is never used

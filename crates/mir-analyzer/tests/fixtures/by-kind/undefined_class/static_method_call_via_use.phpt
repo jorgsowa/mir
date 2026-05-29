@@ -5,4 +5,4 @@ static method call via use
 use Vendor\Missing\Foo;
 Foo::bar();
 ===expect===
-UndefinedClass@3:1: Class Vendor\Missing\Foo does not exist
+UndefinedClass@3:1-3:4: Class Vendor\Missing\Foo does not exist

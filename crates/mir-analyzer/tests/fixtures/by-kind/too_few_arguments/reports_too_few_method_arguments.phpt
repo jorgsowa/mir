@@ -7,6 +7,6 @@ class Greeter {
 }
 (new Greeter())->say('Ada');
 ===expect===
-UnusedParam@3:25: Parameter $name is never used
-UnusedParam@3:39: Parameter $suffix is never used
-TooFewArguments@5:1: Too few arguments for say(): expected 2, got 1
+UnusedParam@3:25-3:37: Parameter $name is never used
+UnusedParam@3:39-3:53: Parameter $suffix is never used
+TooFewArguments@5:1-5:28: Too few arguments for say(): expected 2, got 1

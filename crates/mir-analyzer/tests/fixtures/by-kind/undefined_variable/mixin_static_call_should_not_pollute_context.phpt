@@ -23,4 +23,4 @@ class Bar
     }
 }
 ===expect===
-UndefinedVariable@19:16: Variable $__tmp_mixin_var__ is not defined
+UndefinedVariable@19:16-19:34: Variable $__tmp_mixin_var__ is not defined

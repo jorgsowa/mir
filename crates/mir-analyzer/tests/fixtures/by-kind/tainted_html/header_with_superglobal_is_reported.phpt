@@ -6,4 +6,4 @@ function redirect(): void {
     header('Location: ' . $_GET['next']);
 }
 ===expect===
-TaintedHtml@3:5: Tainted HTML output — possible XSS
+TaintedHtml@3:5-3:41: Tainted HTML output — possible XSS

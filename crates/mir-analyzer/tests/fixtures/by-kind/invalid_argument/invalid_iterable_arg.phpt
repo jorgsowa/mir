@@ -17,4 +17,4 @@ class A {
 
 iterator(new A());
 ===expect===
-InvalidArgument@15:10: Argument $iter of iterator() expects 'array<mixed, string>', got 'A'
+InvalidArgument@15:10-15:17: Argument $iter of iterator() expects 'array<mixed, string>', got 'A'

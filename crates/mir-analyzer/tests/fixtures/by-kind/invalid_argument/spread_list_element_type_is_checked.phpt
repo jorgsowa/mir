@@ -9,4 +9,4 @@ function test(): void {
     takes_ints(...$values);
 }
 ===expect===
-InvalidArgument@6:16: Argument $xs of takes_ints() expects 'int', got '"1"|"2"'
+InvalidArgument@6:16-6:26: Argument $xs of takes_ints() expects 'int', got '"1"|"2"'

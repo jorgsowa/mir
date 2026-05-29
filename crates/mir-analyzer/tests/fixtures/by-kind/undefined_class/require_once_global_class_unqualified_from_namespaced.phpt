@@ -11,4 +11,4 @@ function run(): void {
     new Foo();
 }
 ===expect===
-Main.php: UndefinedClass@5:9: Class App\Service\Foo does not exist
+Main.php: UndefinedClass@5:9-5:12: Class App\Service\Foo does not exist

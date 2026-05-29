@@ -23,4 +23,3 @@ class Consumer {
     }
 }
 ===expect===
-

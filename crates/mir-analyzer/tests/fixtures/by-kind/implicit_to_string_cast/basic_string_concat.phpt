@@ -6,4 +6,4 @@ class Foo {}
 $f = new Foo();
 $s = 'Value: ' . $f;
 ===expect===
-ImplicitToStringCast@4:18: Class Foo does not implement __toString()
+ImplicitToStringCast@4:18-4:20: Class Foo does not implement __toString()

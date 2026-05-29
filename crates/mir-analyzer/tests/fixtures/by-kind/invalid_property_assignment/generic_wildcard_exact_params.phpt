@@ -28,4 +28,3 @@ $i = $factory->makeInt();
 $c->prop = $s;
 $c->prop = $i;
 ===expect===
-

@@ -27,4 +27,3 @@ $pair = $factory->make();
 /** @mir-check $pair is Pair<mixed, mixed> */
 $c->bare = $pair;
 ===expect===
-

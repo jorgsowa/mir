@@ -5,5 +5,5 @@ Invalid argument with declare strict types
                     function fooFoo(int $a): void {}
                     fooFoo("string");
 ===expect===
-UnusedParam@2:37: Parameter $a is never used
-InvalidArgument@3:28: Argument $a of fooFoo() expects 'int', got '"string"'
+UnusedParam@2:37-2:43: Parameter $a is never used
+InvalidArgument@3:28-3:36: Argument $a of fooFoo() expects 'int', got '"string"'

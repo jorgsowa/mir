@@ -24,5 +24,5 @@ function takesType(Type $t) : void {
     $t->isFoo();
 }
 ===expect===
-MissingThrowsDocblock@8:13: Exception Exception is thrown but not declared in @throws
-UndefinedMethod@20:5: Method Type::bar() does not exist
+MissingThrowsDocblock@8:13-8:35: Exception Exception is thrown but not declared in @throws
+UndefinedMethod@20:5-20:14: Method Type::bar() does not exist

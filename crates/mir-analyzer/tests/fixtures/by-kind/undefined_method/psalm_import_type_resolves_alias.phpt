@@ -22,4 +22,4 @@ function test(Service $s): void {
     $s->find()->missing();
 }
 ===expect===
-UndefinedMethod@19:5: Method User::missing() does not exist
+UndefinedMethod@19:5-19:26: Method User::missing() does not exist

@@ -11,6 +11,6 @@ class C {
     }
 }
 ===expect===
-UndefinedClass@3:13: Class ExampleUnknownA does not exist
-UndefinedClass@3:29: Class ExampleUnknownB does not exist
-UndefinedClass@5:28: Class ExampleUnknownAB does not exist
+UndefinedClass@3:13-3:28: Class ExampleUnknownA does not exist
+UndefinedClass@3:29-3:44: Class ExampleUnknownB does not exist
+UndefinedClass@5:28-5:44: Class ExampleUnknownAB does not exist

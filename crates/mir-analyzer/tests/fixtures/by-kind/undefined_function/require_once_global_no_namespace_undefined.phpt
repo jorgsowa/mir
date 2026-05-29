@@ -12,4 +12,4 @@ function run(): void {
     missing_helper();
 }
 ===expect===
-Main.php: UndefinedFunction@4:5: Function missing_helper() is not defined
+Main.php: UndefinedFunction@4:5-4:21: Function missing_helper() is not defined

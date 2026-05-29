@@ -7,4 +7,4 @@ $a = 5;
 /** @mir-check $a is mixed */
 clone $a;
 ===expect===
-MixedClone@5:1: cannot clone mixed
+MixedClone@5:1-5:9: cannot clone mixed

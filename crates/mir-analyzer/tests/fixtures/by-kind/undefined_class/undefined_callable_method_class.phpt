@@ -14,4 +14,4 @@ function foo(callable $c): void {}
 
 foo("B::bar");
 ===expect===
-UndefinedClass@10:5: Class B does not exist
+UndefinedClass@10:5-10:13: Class B does not exist

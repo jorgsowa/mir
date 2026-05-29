@@ -10,4 +10,4 @@ function outer(): void {
     }
 }
 ===expect===
-UndefinedFunction@5:13: Function nonexistent_function() is not defined
+UndefinedFunction@5:13-5:35: Function nonexistent_function() is not defined

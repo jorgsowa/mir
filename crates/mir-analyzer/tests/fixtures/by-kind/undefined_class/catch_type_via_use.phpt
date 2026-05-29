@@ -12,4 +12,4 @@ function f(): void {
     }
 }
 ===expect===
-UndefinedClass@6:14: Class Vendor\Missing\MyException does not exist
+UndefinedClass@6:14-6:25: Class Vendor\Missing\MyException does not exist

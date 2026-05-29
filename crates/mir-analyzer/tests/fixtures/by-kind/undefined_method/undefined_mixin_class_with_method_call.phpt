@@ -7,4 +7,4 @@ class A {}
 
 (new A)->foo();
 ===expect===
-UndefinedMethod@5:1: Method A::foo() does not exist
+UndefinedMethod@5:1-5:15: Method A::foo() does not exist

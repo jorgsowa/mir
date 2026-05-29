@@ -11,4 +11,4 @@ $a = match (get_class($a)) {
     C::class => 5,
 };
 ===expect===
-UndefinedClass@8:5: Class C does not exist
+UndefinedClass@8:5-8:6: Class C does not exist

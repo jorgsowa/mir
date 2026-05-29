@@ -12,5 +12,5 @@ function wrap(): void {
     } catch (MissingEntity $e) {}
 }
 ===expect===
-UndefinedClass@4:14: Class App\Model\MissingEntity does not exist
-UndefinedClass@7:14: Class App\Model\MissingEntity does not exist
+UndefinedClass@4:14-4:27: Class App\Model\MissingEntity does not exist
+UndefinedClass@7:14-7:27: Class App\Model\MissingEntity does not exist

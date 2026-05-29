@@ -8,4 +8,4 @@ if (empty($x) || $x->method()) {
     // So this WILL error with UndefinedVariable - expected
 }
 ===expect===
-MixedMethodCall@2:18: Method method() called on mixed type
+MixedMethodCall@2:18-2:30: Method method() called on mixed type

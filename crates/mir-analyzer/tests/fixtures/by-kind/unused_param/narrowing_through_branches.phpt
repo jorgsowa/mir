@@ -42,4 +42,4 @@ function testElseAfterNarrowing(string|null $value) {
     }
 }
 ===expect===
-TypeCheckMismatch@28:9: Type of $x is expected to be float, got int|string|float
+TypeCheckMismatch@28:9-28:25: Type of $x is expected to be float, got int|string|float

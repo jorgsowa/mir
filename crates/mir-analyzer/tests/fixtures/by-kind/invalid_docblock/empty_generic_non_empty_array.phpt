@@ -9,4 +9,4 @@ class Container {
     private $items = [];
 }
 ===expect===
-InvalidDocblock@3:0: Invalid docblock: @var has empty generic type parameter in `non-empty-array<>`
+InvalidDocblock@3:0-3:0: Invalid docblock: @var has empty generic type parameter in `non-empty-array<>`

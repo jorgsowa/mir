@@ -28,4 +28,3 @@ $intBox = $factory->makeInt();
 $c->box = $stringBox;
 $c->box = $intBox;
 ===expect===
-

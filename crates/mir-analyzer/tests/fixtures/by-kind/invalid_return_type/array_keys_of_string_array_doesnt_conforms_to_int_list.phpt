@@ -11,4 +11,4 @@ function getKeys(array $array) {
 }
 
 ===expect===
-InvalidReturnType@7:5: Return type 'list<string>' is not compatible with declared 'list<int>'
+InvalidReturnType@7:5-7:31: Return type 'list<string>' is not compatible with declared 'list<int>'

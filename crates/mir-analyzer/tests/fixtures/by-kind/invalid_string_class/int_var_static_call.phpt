@@ -5,4 +5,4 @@ Int var static call
 $a = 5;
 $a::bar();
 ===expect===
-InvalidStringClass@3:1: Dynamic class instantiation requires string or class-string type, got '5'
+InvalidStringClass@3:1-3:3: Dynamic class instantiation requires string or class-string type, got '5'

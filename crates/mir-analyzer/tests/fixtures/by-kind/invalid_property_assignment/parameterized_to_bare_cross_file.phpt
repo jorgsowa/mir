@@ -39,4 +39,4 @@ class MyTest extends TestCase {
     }
 }
 ===expect===
-TestCase.php: UnusedParam@12:32: Parameter $classOrInterface is never used
+TestCase.php: UnusedParam@12:32-12:56: Parameter $classOrInterface is never used

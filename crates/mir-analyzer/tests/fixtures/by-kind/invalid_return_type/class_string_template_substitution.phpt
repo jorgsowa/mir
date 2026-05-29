@@ -17,4 +17,3 @@ $bar = identity(Bar::class);
 /** @mir-check $foo is class-string<Foo> */
 /** @mir-check $bar is class-string<Bar> */
 ===expect===
-

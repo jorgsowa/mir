@@ -22,4 +22,4 @@ function test(): void {
     processPair($pair);
 }
 ===expect===
-UnusedParam@13:22: Parameter $pair is never used
+UnusedParam@13:22-13:32: Parameter $pair is never used

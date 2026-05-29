@@ -19,4 +19,4 @@ $result = $f->make(null);
 /** @mir-check $result is Container<object> */
 $f->prop = $result;
 ===expect===
-UnusedParam@9:26: Parameter $x is never used
+UnusedParam@9:26-9:28: Parameter $x is never used

@@ -8,4 +8,4 @@ function test() {
     clone $a;
 }
 ===expect===
-MixedClone@5:5: cannot clone mixed
+MixedClone@5:5-5:13: cannot clone mixed

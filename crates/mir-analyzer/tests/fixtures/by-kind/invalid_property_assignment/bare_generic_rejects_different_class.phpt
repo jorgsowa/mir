@@ -18,4 +18,4 @@ class Holder {
     }
 }
 ===expect===
-InvalidPropertyAssignment@14:9: Property $item expects 'BoxA', cannot assign 'BoxB<string>'
+InvalidPropertyAssignment@14:9-14:25: Property $item expects 'BoxA', cannot assign 'BoxB<string>'

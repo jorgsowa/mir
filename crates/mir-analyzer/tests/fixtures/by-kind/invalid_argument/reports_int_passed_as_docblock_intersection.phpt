@@ -12,4 +12,4 @@ function test(): void {
     f(42);
 }
 ===expect===
-InvalidArgument@9:7: Argument $x of f() expects 'Iterator&Countable', got '42'
+InvalidArgument@9:7-9:9: Argument $x of f() expects 'Iterator&Countable', got '42'

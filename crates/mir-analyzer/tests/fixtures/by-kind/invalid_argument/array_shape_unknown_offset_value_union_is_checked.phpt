@@ -9,4 +9,4 @@ function test(string $key): void {
     takes_int($row[$key]);
 }
 ===expect===
-InvalidArgument@6:15: Argument $value of takes_int() expects 'int', got '123|"Ada"'
+InvalidArgument@6:15-6:25: Argument $value of takes_int() expects 'int', got '123|"Ada"'

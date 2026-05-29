@@ -12,4 +12,4 @@ class Task implements Runnable {
     public function run(): void {}
 }
 ===expect===
-Task.php: UnimplementedInterfaceMethod@2:0: Class Task must implement Runnable::stop() from interface
+Task.php: UnimplementedInterfaceMethod@2:0-2:32: Class Task must implement Runnable::stop() from interface

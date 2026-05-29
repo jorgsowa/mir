@@ -4,6 +4,34 @@ use crate::db::{class_exists, resolve_name, MirDatabase};
 use crate::php_version::PhpVersion;
 
 // ---------------------------------------------------------------------------
+// Stored-location → Issue Location passthrough
+// ---------------------------------------------------------------------------
+
+/// Convert a stored `mir_types::Location` reference into an `Issue` `Location`,
+/// passing all fields through unchanged.  Use this for diagnostics whose stored
+/// span is already tight (property, method, function declarations).
+/// For class-level spans that cover the entire body, use the clamping logic in
+/// `class.rs::issue_location` instead.
+pub(crate) fn storage_loc_to_location(loc: Option<&mir_types::Location>) -> mir_issues::Location {
+    match loc {
+        Some(l) => mir_issues::Location {
+            file: l.file.clone(),
+            line: l.line,
+            line_end: l.line_end,
+            col_start: l.col_start,
+            col_end: l.col_end,
+        },
+        None => mir_issues::Location {
+            file: Arc::from("<unknown>"),
+            line: 1,
+            line_end: 1,
+            col_start: 0,
+            col_end: 1,
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Offset to char-count column conversion (1-indexed)
 // ---------------------------------------------------------------------------
 

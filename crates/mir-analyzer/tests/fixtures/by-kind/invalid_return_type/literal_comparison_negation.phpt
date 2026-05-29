@@ -27,4 +27,4 @@ function strictlyNotOne(int $x): int {
     return $x;
 }
 ===expect===
-InvalidReturnType@22:9: Return type '1' is not compatible with declared '2|3'
+InvalidReturnType@22:9-22:18: Return type '1' is not compatible with declared '2|3'

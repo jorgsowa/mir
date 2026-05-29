@@ -24,4 +24,4 @@ $wrapper = $factory->make(stdClass::class);
 /** @mir-check $wrapper is GenericWrapper<stdClass> */
 $c->bare = $wrapper;
 ===expect===
-UnusedParam@11:26: Parameter $cls is never used
+UnusedParam@11:26-11:37: Parameter $cls is never used

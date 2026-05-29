@@ -7,4 +7,4 @@ empty generic iterable return
  */
 function getData() { return []; }
 ===expect===
-InvalidDocblock@2:0: Invalid docblock: @return has empty generic type parameter in `iterable<>`
+InvalidDocblock@2:0-2:0: Invalid docblock: @return has empty generic type parameter in `iterable<>`

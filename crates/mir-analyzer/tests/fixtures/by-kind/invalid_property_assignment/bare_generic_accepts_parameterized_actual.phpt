@@ -28,4 +28,4 @@ class MyTest extends TestCase {
     }
 }
 ===expect===
-UnusedParam@11:32: Parameter $cls is never used
+UnusedParam@11:32-11:43: Parameter $cls is never used

@@ -11,5 +11,5 @@ function test(): void {
     Greeter::oldGreet('Alice');
 }
 ===expect===
-UnusedParam@4:37: Parameter $name is never used
-DeprecatedMethodCall@8:5: Call to deprecated method Greeter::oldGreet: use newGreet() instead
+UnusedParam@4:37-4:49: Parameter $name is never used
+DeprecatedMethodCall@8:5-8:31: Call to deprecated method Greeter::oldGreet: use newGreet() instead

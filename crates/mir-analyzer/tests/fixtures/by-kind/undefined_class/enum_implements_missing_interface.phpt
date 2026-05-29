@@ -4,4 +4,4 @@ enum implements missing interface
 <?php
 enum Status: string implements MissingInterface {}
 ===expect===
-UndefinedClass@2:32: Class MissingInterface does not exist
+UndefinedClass@2:32-2:48: Class MissingInterface does not exist

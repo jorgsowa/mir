@@ -17,4 +17,4 @@ class Stream implements ReadWritable {
     # read() inherited from Readable is NOT implemented
 }
 ===expect===
-Stream.php: UnimplementedInterfaceMethod@2:0: Class Stream must implement Readable::read() from interface
+Stream.php: UnimplementedInterfaceMethod@2:0-2:38: Class Stream must implement Readable::read() from interface

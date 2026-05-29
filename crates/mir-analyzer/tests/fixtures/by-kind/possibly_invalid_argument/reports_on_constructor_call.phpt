@@ -11,4 +11,4 @@ function test(): void {
     new Query(buildSql());
 }
 ===expect===
-PossiblyInvalidArgument@8:15: Argument $sql of Query::__construct() expects 'string', possibly different type 'string|false' provided
+PossiblyInvalidArgument@8:15-8:25: Argument $sql of Query::__construct() expects 'string', possibly different type 'string|false' provided

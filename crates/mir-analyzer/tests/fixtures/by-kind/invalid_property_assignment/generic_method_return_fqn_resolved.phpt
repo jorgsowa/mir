@@ -43,4 +43,4 @@ class MyTest {
     }
 }
 ===expect===
-Prophet.php: UnusedParam@10:32: Parameter $cls is never used
+Prophet.php: UnusedParam@10:32-10:43: Parameter $cls is never used

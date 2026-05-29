@@ -10,4 +10,4 @@ function run(): void {
     new Missing();
 }
 ===expect===
-Main.php: UndefinedClass@4:9: Class Missing does not exist
+Main.php: UndefinedClass@4:9-4:16: Class Missing does not exist

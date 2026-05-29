@@ -36,4 +36,3 @@ $key = $col->firstKey();
 $val = $col->first();
 /** @mir-check $val is int|null */
 ===expect===
-

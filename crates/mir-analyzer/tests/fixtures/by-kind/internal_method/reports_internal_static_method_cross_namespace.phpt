@@ -16,4 +16,4 @@ class Foo {
 namespace User;
 \Vendor\Library\Foo::internalHelper();
 ===expect===
-Main.php: InternalMethod@3:1: Method Vendor\Library\Foo::internalHelper() is marked @internal
+Main.php: InternalMethod@3:1-3:38: Method Vendor\Library\Foo::internalHelper() is marked @internal

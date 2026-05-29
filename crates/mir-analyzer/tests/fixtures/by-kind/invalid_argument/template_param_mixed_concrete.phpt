@@ -19,5 +19,5 @@ function test(): void {
     saveUserData(123, new User());
 }
 ===expect===
-UnusedParam@10:23: Parameter $data is never used
-UnusedParam@10:36: Parameter $user is never used
+UnusedParam@10:23-10:34: Parameter $data is never used
+UnusedParam@10:36-10:46: Parameter $user is never used

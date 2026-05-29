@@ -13,4 +13,4 @@ function test(bool $cond): void {
     }
 }
 ===expect===
-PossiblyUndefinedVariable@9:14: Variable $x might not be defined
+PossiblyUndefinedVariable@9:14-9:16: Variable $x might not be defined

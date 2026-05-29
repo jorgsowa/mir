@@ -9,4 +9,4 @@ function test(): void {
     takesInt(getResult());
 }
 ===expect===
-InvalidArgument@6:14: Argument $n of takesInt() expects 'int', got 'string|false'
+InvalidArgument@6:14-6:25: Argument $n of takesInt() expects 'int', got 'string|false'

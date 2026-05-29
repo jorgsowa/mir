@@ -20,4 +20,4 @@ function test(Repository $repo): void {
     $repo->get()->missing();
 }
 ===expect===
-UndefinedMethod@17:5: Method User::missing() does not exist
+UndefinedMethod@17:5-17:28: Method User::missing() does not exist

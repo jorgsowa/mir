@@ -8,4 +8,4 @@ class Foo {
     }
 }
 ===expect===
-UndefinedMethod@4:9: Method Foo::nonExistent() does not exist
+UndefinedMethod@4:9-4:29: Method Foo::nonExistent() does not exist

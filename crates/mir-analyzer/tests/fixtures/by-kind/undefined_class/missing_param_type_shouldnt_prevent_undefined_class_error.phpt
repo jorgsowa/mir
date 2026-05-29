@@ -7,4 +7,4 @@ suppress=UnusedParam,UnusedFunction
 /** @suppress MissingParamType */
 function foo($s = Foo::BAR) : void {}
 ===expect===
-UndefinedClass@3:19: Class Foo does not exist
+UndefinedClass@3:19-3:22: Class Foo does not exist

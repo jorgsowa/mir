@@ -110,7 +110,6 @@ impl<'a> ClassAnalyzer<'a> {
                     if parent_is_final {
                         let loc = issue_location(
                             location.as_ref(),
-                            fqcn,
                             location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
@@ -130,7 +129,6 @@ impl<'a> ClassAnalyzer<'a> {
                     if let Some(msg) = parent_deprecated {
                         let loc = issue_location(
                             location.as_ref(),
-                            fqcn,
                             location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
@@ -210,7 +208,6 @@ impl<'a> ClassAnalyzer<'a> {
 
                 let loc = issue_location(
                     cls_location,
-                    fqcn,
                     cls_location.and_then(|l| self.sources.get(&l.file).copied()),
                 );
                 let mut issue = Issue::new(
@@ -275,7 +272,6 @@ impl<'a> ClassAnalyzer<'a> {
                 if !implemented {
                     let loc = issue_location(
                         cls_location,
-                        fqcn,
                         cls_location.and_then(|l| self.sources.get(&l.file).copied()),
                     );
                     let mut issue = Issue::new(
@@ -364,7 +360,6 @@ impl<'a> ClassAnalyzer<'a> {
             let own_location = own.location.clone();
             let loc = issue_location(
                 own_location.as_ref(),
-                fqcn,
                 own_location
                     .as_ref()
                     .and_then(|l| self.sources.get(&l.file).copied()),
@@ -666,7 +661,6 @@ impl<'a> ClassAnalyzer<'a> {
                             .and_then(|c| c.location().cloned());
                         let loc = issue_location(
                             location.as_ref(),
-                            offender,
                             location
                                 .as_ref()
                                 .and_then(|l| self.sources.get(&l.file).copied()),
@@ -773,7 +767,6 @@ impl<'a> ClassAnalyzer<'a> {
                     crate::db::find_class_like(self.db, here).and_then(|c| c.location().cloned());
                 let loc = issue_location(
                     location.as_ref(),
-                    offender,
                     location
                         .as_ref()
                         .and_then(|l| self.sources.get(&l.file).copied()),
@@ -839,28 +832,26 @@ fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
 }
 
 /// Build an issue location from the stored codebase Location.
-/// Falls back to a dummy location using the FQCN as the file path when no
-/// Location is stored.
-fn issue_location(
-    storage_loc: Option<&mir_types::Location>,
-    fqcn: &Arc<str>,
-    _source: Option<&str>,
-) -> Location {
-    match storage_loc {
-        Some(loc) => Location {
-            file: loc.file.clone(),
-            line: loc.line,
-            line_end: loc.line_end,
-            col_start: loc.col_start,
-            col_end: loc.col_end,
-        },
-        None => Location {
-            file: fqcn.clone(),
-            line: 1,
-            line_end: 1,
-            col_start: 0,
-            col_end: 0,
-        },
+/// Clamps `line_end`/`col_end` to the declaration line so SARIF/WASM consumers
+/// see a tight range instead of the entire class body.
+/// Falls back to `storage_loc_to_location(None)` when no Location is stored.
+fn issue_location(storage_loc: Option<&mir_types::Location>, source: Option<&str>) -> Location {
+    let Some(loc) = storage_loc else {
+        return crate::diagnostics::storage_loc_to_location(None);
+    };
+    let (line_end, col_end) = source
+        .and_then(|src| src.lines().nth(loc.line.saturating_sub(1) as usize))
+        .map(|decl_line| {
+            let char_count = decl_line.chars().count() as u16;
+            (loc.line, char_count.max(loc.col_start + 1))
+        })
+        .unwrap_or((loc.line, loc.col_end));
+    Location {
+        file: loc.file.clone(),
+        line: loc.line,
+        line_end,
+        col_start: loc.col_start,
+        col_end,
     }
 }
 

@@ -12,4 +12,4 @@ function run(): void {
     $p->process('not-an-int');
 }
 ===expect===
-App.php: InvalidArgument@4:17: Argument $n of process() expects 'int', got '"not-an-int"'
+App.php: InvalidArgument@4:17-4:29: Argument $n of process() expects 'int', got '"not-an-int"'

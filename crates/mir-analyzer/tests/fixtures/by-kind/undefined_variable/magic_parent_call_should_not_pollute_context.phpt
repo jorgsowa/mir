@@ -22,4 +22,4 @@ class Bar extends Foo
     }
 }
 ===expect===
-UndefinedVariable@18:16: Variable $__tmp_parent_var__ is not defined
+UndefinedVariable@18:16-18:35: Variable $__tmp_parent_var__ is not defined

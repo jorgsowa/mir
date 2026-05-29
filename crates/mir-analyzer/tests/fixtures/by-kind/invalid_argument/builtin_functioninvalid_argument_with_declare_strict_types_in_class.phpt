@@ -8,5 +8,5 @@ Builtin functioninvalid argument with declare strict types in class
                         }
                     }
 ===expect===
-UnusedVariable@4:29: Variable $s is never read
-InvalidArgument@4:41: Argument $string of substr() expects 'string', got '5'
+UnusedVariable@4:29-4:31: Variable $s is never read
+InvalidArgument@4:41-4:42: Argument $string of substr() expects 'string', got '5'

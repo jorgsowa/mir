@@ -22,4 +22,4 @@ function getAssetInfo(Document|Image $asset): void {
     }
 }
 ===expect===
-RedundantCondition@17:15: Condition is always true/false for type 'bool'
+RedundantCondition@17:15-17:38: Condition is always true/false for type 'bool'

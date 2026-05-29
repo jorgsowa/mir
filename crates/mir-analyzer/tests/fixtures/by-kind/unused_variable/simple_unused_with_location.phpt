@@ -7,4 +7,4 @@ function example() {
     return 10;
 }
 ===expect===
-UnusedVariable@3:5: Variable $unused is never read
+UnusedVariable@3:5-3:12: Variable $unused is never read

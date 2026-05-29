@@ -14,4 +14,4 @@ function test(): void {
     echo $x->val;
 }
 ===expect===
-PossiblyNullPropertyFetch@11:10: Cannot access property $val on possibly null value
+PossiblyNullPropertyFetch@11:10-11:17: Cannot access property $val on possibly null value

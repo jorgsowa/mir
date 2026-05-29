@@ -42,4 +42,4 @@ class Dto {
     }
 }
 ===expect===
-UnusedParam@12:33: Parameter $value is never used
+UnusedParam@12:33-12:45: Parameter $value is never used

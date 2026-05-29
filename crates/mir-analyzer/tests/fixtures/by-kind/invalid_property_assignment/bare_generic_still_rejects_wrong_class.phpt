@@ -17,4 +17,4 @@ $h = new Holder();
 $b = new ProphecyB();
 $h->prop = $b;
 ===expect===
-InvalidPropertyAssignment@15:1: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'
+InvalidPropertyAssignment@15:1-15:14: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'

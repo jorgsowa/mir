@@ -15,4 +15,4 @@ function foo(): void {
     }
 }
 ===expect===
-InvalidArgument@11:19: Argument $k of takes_int() expects 'int', got '"hello"|"world"'
+InvalidArgument@11:19-11:21: Argument $k of takes_int() expects 'int', got '"hello"|"world"'

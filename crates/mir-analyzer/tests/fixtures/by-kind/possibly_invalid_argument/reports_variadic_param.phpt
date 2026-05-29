@@ -9,5 +9,5 @@ function test(): void {
     takesInts(getResult(), getResult());
 }
 ===expect===
-PossiblyInvalidArgument@6:15: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
-PossiblyInvalidArgument@6:28: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
+PossiblyInvalidArgument@6:15-6:26: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
+PossiblyInvalidArgument@6:28-6:39: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided

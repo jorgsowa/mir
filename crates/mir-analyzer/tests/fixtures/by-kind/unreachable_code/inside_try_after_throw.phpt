@@ -10,5 +10,5 @@ function test(): void {
     }
 }
 ===expect===
-MissingThrowsDocblock@4:9: Exception Exception is thrown but not declared in @throws
-UnreachableCode@5:9: Unreachable code detected
+MissingThrowsDocblock@4:9-4:37: Exception Exception is thrown but not declared in @throws
+UnreachableCode@5:9-5:28: Unreachable code detected
