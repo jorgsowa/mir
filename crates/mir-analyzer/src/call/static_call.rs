@@ -124,6 +124,10 @@ impl CallAnalyzer {
 
         let fqcn = resolve_static_class(&fqcn, ctx);
 
+        if matches!(&call.class.kind, ExprKind::Identifier(_)) {
+            ea.record_ref(Arc::from(fqcn.as_str()), call.class.span);
+        }
+
         let arg_types: Vec<Type> = call
             .args
             .iter()

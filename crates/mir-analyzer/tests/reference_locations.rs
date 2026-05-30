@@ -802,3 +802,30 @@ fn static_property_access_records_property_reference() {
         "Config::$timeout should record a property reference to Config::timeout"
     );
 }
+
+#[test]
+fn static_method_call_records_class_reference() {
+    // Widget::foo() should record a class reference to Widget, consistent with
+    // Widget::VERSION, Widget::$bar, and new Widget() all recording one.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "static_method_class_ref.php",
+        "<?php\nclass Widget { public static function make(): void {} }\nfunction caller(): void { Widget::make(); }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("Widget")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "Widget::make() should record a class reference to Widget"
+    );
+}
