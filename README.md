@@ -90,6 +90,10 @@ issue on the target line. `@mir-ignore-file Kind …` suppresses a kind across t
 whole file. The `@psalm-suppress`, `@suppress`, `@phpstan-ignore-line` and
 `@phpstan-ignore-next-line` aliases are accepted for drop-in compatibility.
 
+Directives are matched per physical line, so a directive written inside a string
+literal or heredoc body is also honored — harmless in practice, since no
+diagnostic is normally reported on such a line.
+
 ## Documentation
 
 Full documentation is available at **[jorgsowa.github.io/mir](https://jorgsowa.github.io/mir/)**.

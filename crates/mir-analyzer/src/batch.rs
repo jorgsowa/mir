@@ -812,6 +812,18 @@ impl AnalysisSession {
             }
         };
 
+        // Bake inline-suppression marks in *before* caching: suppression is a
+        // pure function of file content (and the cache key hashes content), so
+        // the cached issues should already carry their marks. The cache-hit
+        // branch above replays this file's source without re-registering the
+        // `SourceFile` input, so the db-backed post-filter cannot recompute
+        // marks there — caching the canonical result is what keeps a fresh
+        // process honoring `@mir-ignore` on an unchanged file.
+        mark_suppressed(
+            &mut all_issues,
+            &crate::suppression::SuppressionMap::from_source(new_content),
+        );
+
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
             cache.evict_with_dependents(&[file_path.to_string()]);
@@ -821,7 +833,6 @@ impl AnalysisSession {
         }
 
         opts.apply(&mut all_issues);
-        self.apply_inline_suppressions(&mut all_issues);
         AnalysisResult::build(all_issues, HashMap::default(), symbols)
     }
 
