@@ -652,24 +652,17 @@ impl Type {
                     let new_if_false = if_false.substitute_templates(bindings);
 
                     // If param_name names a template that is bound in this substitution,
-                    // resolve the conditional immediately (same logic as
-                    // `resolve_conditional_returns` for the $param form).
+                    // resolve the conditional immediately using the same predicate logic as
+                    // `resolve_conditional_returns` for the $param form.
                     let resolved = if let Some(name) = param_name {
                         if let Some(bound) = bindings.get(name) {
-                            let subject_is_null = new_subject.types.len() == 1
-                                && matches!(new_subject.types[0], Atomic::TNull);
-                            if subject_is_null {
-                                let only_null = !bound.types.is_empty()
-                                    && bound.types.iter().all(|t| matches!(t, Atomic::TNull));
-                                let has_null =
-                                    bound.types.iter().any(|t| matches!(t, Atomic::TNull));
-                                if only_null {
-                                    Some(new_if_true.clone())
-                                } else if !has_null {
-                                    Some(new_if_false.clone())
-                                } else {
-                                    None
-                                }
+                            if new_subject.types.len() == 1 {
+                                resolve_conditional_branch(
+                                    &new_subject.types[0],
+                                    bound,
+                                    &new_if_true,
+                                    &new_if_false,
+                                )
                             } else {
                                 None
                             }
@@ -883,6 +876,14 @@ fn is_array_atomic(a: &Atomic) -> bool {
     )
 }
 
+fn is_list_atomic(a: &Atomic) -> bool {
+    match a {
+        Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => true,
+        Atomic::TKeyedArray { is_list, .. } => *is_list,
+        _ => false,
+    }
+}
+
 /// Resolve one branch of a conditional return type given the subject discriminant
 /// atomic and the actual argument type at the call site.
 ///
@@ -899,6 +900,7 @@ fn resolve_conditional_branch(
         Atomic::TTrue => |a| matches!(a, Atomic::TTrue),
         Atomic::TFalse => |a| matches!(a, Atomic::TFalse),
         Atomic::TString => is_string_atomic,
+        Atomic::TList { .. } => is_list_atomic,
         Atomic::TArray { .. } => is_array_atomic,
         _ => return None,
     };
