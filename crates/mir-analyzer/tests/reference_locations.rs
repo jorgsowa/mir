@@ -647,3 +647,80 @@ fn property_type_hint_records_class_reference() {
         "property type hint Logger should record a reference to Logger"
     );
 }
+
+#[test]
+fn self_const_access_records_constant_reference() {
+    // self::CONST inside the declaring class was silently dropped — no record_ref
+    // was emitted for the constant key, so findReferences returned nothing.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "self_const.php",
+        "<?php\nfinal class Foo {\n    public const string SEP = ':';\n    public function build(string $a, string $b): string {\n        return $a . self::SEP . $b;\n    }\n}\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    assert!(
+        !analyzer.reference_locations("Foo::SEP").is_empty(),
+        "self::SEP should record a reference to Foo::SEP"
+    );
+}
+
+#[test]
+fn static_const_access_records_constant_reference() {
+    // static::CONST (late static binding) should also record the constant reference.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "static_const.php",
+        "<?php\nclass Bar {\n    public const string PREFIX = 'x';\n    public function go(): string {\n        return static::PREFIX;\n    }\n}\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    assert!(
+        !analyzer.reference_locations("Bar::PREFIX").is_empty(),
+        "static::PREFIX should record a reference to Bar::PREFIX"
+    );
+}
+
+#[test]
+fn parent_const_access_records_constant_reference() {
+    // parent::CONST should record a reference to the parent class's constant.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "parent_const.php",
+        "<?php\nclass Base {\n    public const string TAG = 'base';\n}\nclass Child extends Base {\n    public function tag(): string {\n        return parent::TAG;\n    }\n}\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    assert!(
+        !analyzer.reference_locations("Base::TAG").is_empty(),
+        "parent::TAG should record a reference to Base::TAG"
+    );
+}
+
+#[test]
+fn explicit_class_const_access_records_constant_reference() {
+    // ClassName::CONST should record a reference to the constant, not just the class.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "explicit_const.php",
+        "<?php\nclass Config {\n    public const string VERSION = '1.0';\n}\nfunction ver(): string { return Config::VERSION; }\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    assert!(
+        !analyzer.reference_locations("Config::VERSION").is_empty(),
+        "Config::VERSION should record a reference to Config::VERSION"
+    );
+}

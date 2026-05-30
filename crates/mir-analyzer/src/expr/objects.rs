@@ -369,6 +369,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
+                        self.record_ref(
+                            Arc::from(format!("{}::{}", self_fqcn, const_name)),
+                            cca.member.span,
+                        );
                         return Type::mixed();
                     }
                     "parent" => {
@@ -389,6 +393,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
+                        self.record_ref(
+                            Arc::from(format!("{}::{}", parent_fqcn, const_name)),
+                            cca.member.span,
+                        );
                         return Type::mixed();
                     }
                     _ => resolved,
@@ -407,6 +415,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         self.record_ref(Arc::from(fqcn.as_str()), cca.class.span);
+        self.record_ref(
+            Arc::from(format!("{}::{}", fqcn, const_name)),
+            cca.member.span,
+        );
 
         let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
         if !const_exists && !crate::db::has_unknown_ancestor(self.db, &fqcn) {
