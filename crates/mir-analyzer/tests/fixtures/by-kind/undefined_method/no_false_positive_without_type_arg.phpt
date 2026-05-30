@@ -12,5 +12,3 @@ class UserRepo extends BaseRepo {}
 $repo = new UserRepo();
 $result = $repo->find();
 ===expect===
-===ignore===
-TODO

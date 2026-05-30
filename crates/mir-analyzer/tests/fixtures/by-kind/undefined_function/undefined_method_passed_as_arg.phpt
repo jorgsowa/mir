@@ -9,6 +9,4 @@ class A {
 $q = new A;
 $q->foo(bar());
 ===expect===
-UndefinedFunction
-===ignore===
-TODO
+UndefinedFunction@7:9-7:14: Function bar() is not defined

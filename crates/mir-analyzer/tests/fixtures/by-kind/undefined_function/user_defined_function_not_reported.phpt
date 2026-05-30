@@ -7,5 +7,3 @@ function test(): void {
     myFn();
 }
 ===expect===
-===ignore===
-TODO

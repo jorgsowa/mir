@@ -10,6 +10,4 @@ class B extends A {
     protected function fooFoo(): void {}
 }
 ===expect===
-OverriddenMethodAccess
-===ignore===
-TODO
+OverriddenMethodAccess@7:4-7:40: Method B::foofoo() overrides with less visibility

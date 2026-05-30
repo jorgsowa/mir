@@ -9,5 +9,3 @@ class Child extends ParentClass {
     public function unlocked(): void {}
 }
 ===expect===
-===ignore===
-TODO

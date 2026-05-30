@@ -4,6 +4,4 @@ Possibly null function call
 <?php
 $this->foo();
 ===expect===
-InvalidScope
-===ignore===
-TODO
+InvalidScope@2:1-2:6: $this cannot be used outside of a class

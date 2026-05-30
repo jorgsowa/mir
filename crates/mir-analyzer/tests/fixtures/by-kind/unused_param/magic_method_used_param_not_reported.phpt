@@ -19,5 +19,3 @@ class Cache {
     }
 }
 ===expect===
-===ignore===
-TODO

@@ -6,5 +6,3 @@ custom stubs loaded
 $obj = new stdClass();
 $obj->name = 'test';
 ===expect===
-===ignore===
-TODO

@@ -10,5 +10,3 @@ final class MyClass {
     }
 }
 ===expect===
-===ignore===
-TODO

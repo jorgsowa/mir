@@ -17,5 +17,3 @@ function test(): void {
     $resolver()->handle();
 }
 ===expect===
-===ignore===
-TODO

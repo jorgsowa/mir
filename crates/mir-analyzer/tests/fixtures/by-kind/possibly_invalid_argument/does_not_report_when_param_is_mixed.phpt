@@ -9,5 +9,3 @@ function test(): void {
     takesMixed(getResult());
 }
 ===expect===
-===ignore===
-TODO

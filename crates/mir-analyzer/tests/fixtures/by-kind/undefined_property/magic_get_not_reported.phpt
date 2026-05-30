@@ -12,5 +12,3 @@ function test(): void {
     echo $m->anything;
 }
 ===expect===
-===ignore===
-TODO

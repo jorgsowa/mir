@@ -5,5 +5,3 @@ not reported when not final
 class Base {}
 class Child extends Base {}
 ===expect===
-===ignore===
-TODO

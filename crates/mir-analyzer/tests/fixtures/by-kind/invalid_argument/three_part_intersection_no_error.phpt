@@ -10,5 +10,3 @@ function f(A&B&C $x): void {
     $_ = $x;
 }
 ===expect===
-===ignore===
-TODO

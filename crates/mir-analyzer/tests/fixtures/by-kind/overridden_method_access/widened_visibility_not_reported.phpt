@@ -9,5 +9,3 @@ class Child extends ParentClass {
     public function doStuff(): void {}
 }
 ===expect===
-===ignore===
-TODO

@@ -11,5 +11,3 @@ function f(): Iterator&Countable {
     return $x;
 }
 ===expect===
-===ignore===
-TODO

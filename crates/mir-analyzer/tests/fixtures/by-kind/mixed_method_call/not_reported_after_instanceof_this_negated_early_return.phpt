@@ -16,5 +16,3 @@ abstract class A
     }
 }
 ===expect===
-===ignore===
-TODO

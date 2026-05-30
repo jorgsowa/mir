@@ -4,5 +4,3 @@ not reported without dead code flag
 <?php
 function helper(): void {}
 ===expect===
-===ignore===
-TODO

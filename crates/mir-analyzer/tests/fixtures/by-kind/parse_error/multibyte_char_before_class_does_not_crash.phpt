@@ -6,5 +6,3 @@ multibyte char before class does not crash
 // It must not cause a panic when looking for the preceding docblock.
 class Foo {}
 ===expect===
-===ignore===
-TODO

@@ -8,6 +8,4 @@ interface A {
 
 class B implements A { }
 ===expect===
-UnimplementedInterfaceMethod
-===ignore===
-TODO
+UnimplementedInterfaceMethod@6:0-6:24: Class B must implement A::fooFoo() from interface

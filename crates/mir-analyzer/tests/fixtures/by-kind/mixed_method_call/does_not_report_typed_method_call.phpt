@@ -10,5 +10,3 @@ function test(Foo $value): void {
     $value->bar();
 }
 ===expect===
-===ignore===
-TODO

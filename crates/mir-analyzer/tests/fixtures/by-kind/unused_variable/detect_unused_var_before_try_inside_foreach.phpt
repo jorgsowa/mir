@@ -10,6 +10,4 @@ function foo() : void {
     }
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@3:5-3:12: Variable $unused is never read

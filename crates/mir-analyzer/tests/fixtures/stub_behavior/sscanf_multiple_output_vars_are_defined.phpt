@@ -7,5 +7,3 @@ function parse_pair(string $input): int {
     return $left + $right;
 }
 ===expect===
-===ignore===
-TODO

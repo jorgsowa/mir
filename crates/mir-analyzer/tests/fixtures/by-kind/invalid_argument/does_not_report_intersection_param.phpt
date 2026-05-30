@@ -9,5 +9,3 @@ function f(Iterator&Countable $x): void {
     $_ = $x;
 }
 ===expect===
-===ignore===
-TODO

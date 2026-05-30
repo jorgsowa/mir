@@ -6,6 +6,4 @@ $a = null;
 
 echo $a->foo;
 ===expect===
-NullPropertyFetch
-===ignore===
-TODO
+NullPropertyFetch@4:6-4:13: Cannot access property $foo on null

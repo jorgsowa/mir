@@ -7,5 +7,3 @@ does not report valid nested generic
  */
 function foo(): array { return []; }
 ===expect===
-===ignore===
-TODO

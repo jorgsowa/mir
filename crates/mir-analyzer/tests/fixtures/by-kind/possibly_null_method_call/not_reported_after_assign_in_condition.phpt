@@ -13,5 +13,3 @@ function d(Foo|null $s): void {
     $s->bar();
 }
 ===expect===
-===ignore===
-TODO

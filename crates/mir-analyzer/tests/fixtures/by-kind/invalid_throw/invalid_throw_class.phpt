@@ -5,6 +5,4 @@ Invalid throw class
 class A {}
 throw new A();
 ===expect===
-InvalidThrow
-===ignore===
-TODO
+InvalidThrow@3:1-3:15: Thrown type 'A' does not extend Throwable

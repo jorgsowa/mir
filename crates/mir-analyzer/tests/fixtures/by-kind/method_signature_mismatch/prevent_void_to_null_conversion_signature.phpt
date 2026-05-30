@@ -14,6 +14,4 @@ class B extends A {
     }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@9:4-9:33: Method B::foo() signature mismatch: return type 'void' is not a subtype of parent 'string|null'

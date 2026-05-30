@@ -27,5 +27,3 @@ function test(A $a): void {
     $a->fromA();
 }
 ===expect===
-===ignore===
-TODO

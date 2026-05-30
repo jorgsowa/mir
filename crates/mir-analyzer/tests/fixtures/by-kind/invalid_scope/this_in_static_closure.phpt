@@ -13,6 +13,4 @@ class C {
 }
 
 ===expect===
-InvalidScope
-===ignore===
-TODO
+InvalidScope@6:18-6:23: $this cannot be used in a static method

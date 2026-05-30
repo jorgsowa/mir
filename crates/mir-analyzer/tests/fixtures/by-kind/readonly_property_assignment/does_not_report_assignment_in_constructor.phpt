@@ -10,5 +10,3 @@ class Foo {
     }
 }
 ===expect===
-===ignore===
-TODO

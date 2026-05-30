@@ -10,5 +10,3 @@ function test(?Color $color): string {
     return $color?->name ?? 'none';
 }
 ===expect===
-===ignore===
-TODO

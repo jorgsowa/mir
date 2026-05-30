@@ -14,5 +14,3 @@ function test(): void {
     echo $c->anotherUndefined;
 }
 ===expect===
-===ignore===
-TODO

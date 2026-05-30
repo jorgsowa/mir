@@ -16,6 +16,4 @@ class DedupeIterator extends FilterIterator {
     }
 }
 ===expect===
-UnimplementedAbstractMethod
-===ignore===
-TODO
+UnimplementedAbstractMethod@7:0-7:45: Class DedupeIterator must implement abstract method accept()

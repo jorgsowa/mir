@@ -6,5 +6,3 @@ function test(): void {
     echo htmlspecialchars($_GET['x']);
 }
 ===expect===
-===ignore===
-TODO

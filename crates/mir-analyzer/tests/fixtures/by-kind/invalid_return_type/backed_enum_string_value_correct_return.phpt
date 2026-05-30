@@ -9,5 +9,3 @@ function test(Status $status): string {
     return $status->value;
 }
 ===expect===
-===ignore===
-TODO

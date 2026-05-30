@@ -8,5 +8,3 @@ function parse(string $s): int {
     return $row + $col;
 }
 ===expect===
-===ignore===
-TODO

@@ -20,5 +20,3 @@ function test(A $a): void {
     strlen($a->fromA);
 }
 ===expect===
-===ignore===
-TODO

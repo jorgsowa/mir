@@ -7,5 +7,3 @@ function test(): void {
     exec($cmd);
 }
 ===expect===
-===ignore===
-TODO

@@ -9,5 +9,3 @@ class Child extends Base {
     public function f(int $x): void { var_dump($x); }
 }
 ===expect===
-===ignore===
-TODO

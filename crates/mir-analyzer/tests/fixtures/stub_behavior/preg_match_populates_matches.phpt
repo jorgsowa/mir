@@ -10,5 +10,3 @@ function extract(string $s): string {
     return '';
 }
 ===expect===
-===ignore===
-TODO

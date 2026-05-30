@@ -1,5 +1,7 @@
 ===description===
 does not report read property
+===config===
+suppress=
 ===file===
 <?php
 class Foo {
@@ -10,5 +12,3 @@ class Foo {
     }
 }
 ===expect===
-===ignore===
-TODO

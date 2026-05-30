@@ -10,5 +10,3 @@ function test(?Status $status): string {
     return $status?->value ?? 'unknown';
 }
 ===expect===
-===ignore===
-TODO

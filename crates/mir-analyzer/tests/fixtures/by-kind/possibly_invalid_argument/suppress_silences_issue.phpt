@@ -12,5 +12,3 @@ function test(): void {
     takesInt(getResult());
 }
 ===expect===
-===ignore===
-TODO

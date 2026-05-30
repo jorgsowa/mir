@@ -7,6 +7,4 @@ function foo() : void {
     $a[0] = 1;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@3:5-3:7: Variable $a is never read

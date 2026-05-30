@@ -11,5 +11,3 @@ function test(): void {
     echo $c->name;
 }
 ===expect===
-===ignore===
-TODO

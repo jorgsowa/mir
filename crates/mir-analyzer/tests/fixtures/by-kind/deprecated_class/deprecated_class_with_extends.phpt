@@ -9,6 +9,4 @@ class Foo { }
 
 class Bar extends Foo {}
 ===expect===
-DeprecatedClass
-===ignore===
-TODO
+DeprecatedClass@7:0-7:24: Class Foo is deprecated

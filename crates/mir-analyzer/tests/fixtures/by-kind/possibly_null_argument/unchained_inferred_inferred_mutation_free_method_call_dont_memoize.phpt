@@ -24,6 +24,4 @@ if ($obj->getInt() !== null) {
     printInt($obj->getInt());
 }
 ===expect===
-PossiblyNullArgument
-===ignore===
-TODO
+PossiblyNullArgument@21:14-21:28: Argument $int of printInt() might be null

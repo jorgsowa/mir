@@ -8,5 +8,3 @@ function test(): void {
     var_dump($a);
 }
 ===expect===
-===ignore===
-TODO

@@ -15,6 +15,4 @@ final class A {
     }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@9:4-9:15: Method A::run() signature mismatch: overriding method requires 1 argument(s) but parent requires 0

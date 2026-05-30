@@ -11,5 +11,3 @@ function c(object|null $s): object {
     return $s;
 }
 ===expect===
-===ignore===
-TODO

@@ -9,5 +9,3 @@ class Child extends Base {
     public function getInstance(): static { return $this; }
 }
 ===expect===
-===ignore===
-TODO

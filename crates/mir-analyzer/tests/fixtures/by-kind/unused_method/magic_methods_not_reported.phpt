@@ -1,5 +1,7 @@
 ===description===
 magic methods not reported
+===config===
+suppress=
 ===file===
 <?php
 class Magic {
@@ -21,5 +23,3 @@ class Magic {
     private function __debugInfo(): array { return []; }
 }
 ===expect===
-===ignore===
-TODO

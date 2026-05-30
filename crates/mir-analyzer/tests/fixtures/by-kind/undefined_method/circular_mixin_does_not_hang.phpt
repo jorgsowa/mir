@@ -21,5 +21,3 @@ function test(A $a, B $b): void {
     $b->fromB();
 }
 ===expect===
-===ignore===
-TODO

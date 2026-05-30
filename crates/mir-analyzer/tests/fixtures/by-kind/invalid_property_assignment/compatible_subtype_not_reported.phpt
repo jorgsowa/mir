@@ -12,5 +12,3 @@ class Cage {
 $c = new Cage();
 $c->occupant = new Dog();
 ===expect===
-===ignore===
-TODO

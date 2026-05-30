@@ -6,5 +6,3 @@ function test(): void {
     throw new \RuntimeException('something went wrong');
 }
 ===expect===
-===ignore===
-TODO

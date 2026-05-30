@@ -10,5 +10,3 @@ function d(object|null $s): object {
     return $s;
 }
 ===expect===
-===ignore===
-TODO

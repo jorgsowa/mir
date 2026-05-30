@@ -22,5 +22,3 @@ class C extends B {
     }
 }
 ===expect===
-===ignore===
-TODO

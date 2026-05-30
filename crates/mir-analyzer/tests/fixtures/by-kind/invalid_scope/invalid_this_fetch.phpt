@@ -4,6 +4,4 @@ Invalid this fetch
 <?php
 echo $this;
 ===expect===
-InvalidScope
-===ignore===
-TODO
+InvalidScope@2:6-2:11: $this cannot be used outside of a class

@@ -8,5 +8,3 @@ suppressed via psalm suppress
  */
 function foo(): mixed { return []; }
 ===expect===
-===ignore===
-TODO

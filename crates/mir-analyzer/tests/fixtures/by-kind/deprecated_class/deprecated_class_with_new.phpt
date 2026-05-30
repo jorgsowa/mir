@@ -9,6 +9,4 @@ class Foo { }
 
 $a = new Foo();
 ===expect===
-DeprecatedClass
-===ignore===
-TODO
+DeprecatedClass@7:10-7:13: Class Foo is deprecated

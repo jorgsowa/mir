@@ -9,5 +9,3 @@ function test(?Foo $obj): void {
     $obj?->bar();
 }
 ===expect===
-===ignore===
-TODO

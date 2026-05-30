@@ -12,5 +12,3 @@ function test(): void {
     f(null);
 }
 ===expect===
-===ignore===
-TODO

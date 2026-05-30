@@ -1,5 +1,7 @@
 ===description===
 does not report called private method
+===config===
+suppress=
 ===file===
 <?php
 class Foo {
@@ -10,5 +12,3 @@ class Foo {
     private function helper(): void {}
 }
 ===expect===
-===ignore===
-TODO

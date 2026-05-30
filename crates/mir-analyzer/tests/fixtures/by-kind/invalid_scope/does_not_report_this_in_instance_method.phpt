@@ -9,5 +9,3 @@ class Foo {
     public function baz(): void {}
 }
 ===expect===
-===ignore===
-TODO

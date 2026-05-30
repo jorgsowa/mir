@@ -21,5 +21,3 @@ function test(object $c): void {
     $c->get()->process();
 }
 ===expect===
-===ignore===
-TODO

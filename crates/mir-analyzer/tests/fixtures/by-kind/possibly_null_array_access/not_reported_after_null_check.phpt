@@ -11,5 +11,3 @@ function test(?array $arr): void {
     }
 }
 ===expect===
-===ignore===
-TODO

@@ -9,5 +9,3 @@ function test(): void {
     takesIntOrFalse(getResult());
 }
 ===expect===
-===ignore===
-TODO

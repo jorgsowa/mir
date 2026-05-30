@@ -31,6 +31,4 @@ function foo(A $a) : void {
 
 foo(new AChild());
 ===expect===
-PossiblyNullArgument
-===ignore===
-TODO
+PossiblyNullArgument@25:21-25:31: Argument $string of strlen() might be null

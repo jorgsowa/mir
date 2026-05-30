@@ -8,5 +8,3 @@ function f(): Base {
     return new Child();
 }
 ===expect===
-===ignore===
-TODO

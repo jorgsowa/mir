@@ -11,6 +11,4 @@ $a = rand(0, 10) ? new Foo() : null;
 
 echo $a->foo;
 ===expect===
-PossiblyNullPropertyFetch
-===ignore===
-TODO
+PossiblyNullPropertyFetch@9:6-9:13: Cannot access property $foo on possibly null value
