@@ -284,8 +284,8 @@ impl CallAnalyzer {
             );
 
             // Validate callbacks for built-in PHP functions with special callback requirements.
-            // These functions invoke callbacks with variable numbers of arguments depending on context.
-            // See callable.rs::calculate_callback_arity for the list of supported functions.
+            // Functions with dynamic or mode-dependent arity use specialized handlers.
+            // Functions with a fixed minimum arity are declared in callback_min_arity_spec.
             match resolved_fn_name.as_str() {
                 "array_map" => {
                     super::callable::check_array_map_callback(ea, &arg_types, &arg_spans)
@@ -293,18 +293,15 @@ impl CallAnalyzer {
                 "array_filter" => {
                     super::callable::check_array_filter_callback(ea, &arg_types, &arg_spans)
                 }
-                "array_reduce" => {
-                    super::callable::check_array_reduce_callback(ea, &arg_types, &arg_spans)
+                fn_name => {
+                    if let Some((cb_idx, min_arity)) =
+                        super::callable::callback_min_arity_spec(fn_name)
+                    {
+                        super::callable::check_min_arity_callback(
+                            ea, fn_name, cb_idx, min_arity, &arg_types, &arg_spans,
+                        );
+                    }
                 }
-                "usort" | "uasort" | "uksort" | "array_walk" | "array_walk_recursive" => {
-                    super::callable::check_sort_callback(
-                        ea,
-                        &resolved_fn_name,
-                        &arg_types,
-                        &arg_spans,
-                    )
-                }
-                _ => {}
             }
 
             for (i, param) in params.iter().enumerate() {

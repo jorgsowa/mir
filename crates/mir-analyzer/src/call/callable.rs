@@ -112,37 +112,6 @@ pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
     true
 }
 
-/// Calculate expected callback arity for built-in PHP functions with variable callback requirements.
-///
-/// Some functions invoke their callbacks with different numbers of arguments depending on context:
-/// - array_map(cb, arr1, arr2, ...): callback receives N arguments (N = number of arrays)
-/// - array_filter(arr, cb, flag): callback arity depends on ARRAY_FILTER_USE_* flag
-/// - etc.
-///
-/// TODO(user-defined-variadic-callbacks): Support user-defined functions with variable callback arity.
-/// This would require:
-/// 1. PHP language support for expressing "callback arity = arg count" (dependent types)
-/// 2. PHPDoc/annotation syntax to declare this pattern in user code
-/// 3. Type inference logic to validate user-defined variadic callback functions
-///
-/// For now, only built-in PHP functions are supported.
-pub(crate) fn calculate_callback_arity(
-    fn_name: &str,
-    callback_index: usize,
-    arg_types: &[Type],
-) -> Option<usize> {
-    match fn_name {
-        "array_map" => {
-            if callback_index == 0 && arg_types.len() > 1 {
-                Some(arg_types.len() - 1)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
 /// Validate array_map callback: arity must match the number of arrays passed.
 /// array_map(callback, array1, array2, ...) → callback receives one element from each array.
 pub(crate) fn check_array_map_callback(
@@ -171,8 +140,8 @@ pub(crate) fn check_array_map_callback(
         return;
     }
 
-    if let Some(expected_arity) = calculate_callback_arity("array_map", 0, arg_types) {
-        validate_callback_arity(ea, callback_ty, callback_span, expected_arity);
+    if arg_types.len() > 1 {
+        validate_callback_arity(ea, callback_ty, callback_span, arg_types.len() - 1);
     }
 }
 
@@ -218,10 +187,14 @@ fn validate_callback_arity(
     }
 }
 
+// PHP array_filter mode constants
+const ARRAY_FILTER_USE_BOTH: i64 = 1; // pass value and key to callback
+const ARRAY_FILTER_USE_KEY: i64 = 2; // pass only key to callback
+
 /// Validate array_filter callback.
 /// Expected arity depends on mode (arg_types[2]):
-/// - TLiteralInt(1) ARRAY_FILTER_USE_BOTH: 2 args (value, key)
-/// - TLiteralInt(2) ARRAY_FILTER_USE_KEY: 1 arg (key)
+/// - ARRAY_FILTER_USE_BOTH (1): 2 args (value, key)
+/// - ARRAY_FILTER_USE_KEY (2): 1 arg (key)
 /// - else/missing: 1 arg (value)
 pub(crate) fn check_array_filter_callback(
     ea: &mut ExpressionAnalyzer<'_>,
@@ -251,8 +224,8 @@ pub(crate) fn check_array_filter_callback(
 
     let expected_arity = if arg_types.len() > 2 {
         match arg_types[2].types.first() {
-            Some(Atomic::TLiteralInt(1)) => 2,
-            Some(Atomic::TLiteralInt(2)) => 1,
+            Some(Atomic::TLiteralInt(ARRAY_FILTER_USE_BOTH)) => 2,
+            Some(Atomic::TLiteralInt(ARRAY_FILTER_USE_KEY)) => 1,
             _ => 1,
         }
     } else {
@@ -268,17 +241,25 @@ pub(crate) fn check_array_filter_callback(
         let max_params = params.len();
 
         if required_count > expected_arity || (!has_variadic && max_params < expected_arity) {
-            let actual_msg = if has_variadic {
-                format!("callable accepting at least {} argument(s)", required_count)
+            let actual_count = if has_variadic {
+                required_count
             } else {
-                format!("callable accepting {} argument(s)", max_params)
+                max_params
             };
+            let expected_plural = if expected_arity == 1 { "" } else { "s" };
+            let actual_plural = if actual_count == 1 { "" } else { "s" };
             ea.emit(
                 IssueKind::InvalidArgument {
                     param: "callback".to_string(),
                     fn_name: "array_filter".to_string(),
-                    expected: format!("callable accepting {} arg(s)", expected_arity),
-                    actual: actual_msg,
+                    expected: format!(
+                        "callable accepting {} argument{}",
+                        expected_arity, expected_plural
+                    ),
+                    actual: format!(
+                        "callable accepting {} argument{}",
+                        actual_count, actual_plural
+                    ),
                 },
                 Severity::Error,
                 callback_span,
@@ -287,67 +268,33 @@ pub(crate) fn check_array_filter_callback(
     }
 }
 
-/// Validate array_reduce callback: arity must be >= 2 (carry, element).
-pub(crate) fn check_array_reduce_callback(
-    ea: &mut ExpressionAnalyzer<'_>,
-    arg_types: &[Type],
-    arg_spans: &[Span],
-) {
-    if arg_types.len() < 2 || arg_spans.len() < 2 {
-        return;
-    }
-
-    let callback_ty = &arg_types[1];
-    let callback_span = arg_spans[1];
-
-    if !is_valid_callable_type(callback_ty) {
-        ea.emit(
-            IssueKind::InvalidArgument {
-                param: "callback".to_string(),
-                fn_name: "array_reduce".to_string(),
-                expected: "callable".to_string(),
-                actual: callback_ty.to_string(),
-            },
-            Severity::Error,
-            callback_span,
-        );
-        return;
-    }
-
-    if let Some(params) = extract_callable_params(callback_ty, ea) {
-        let required_count = params
-            .iter()
-            .filter(|p| !p.is_optional && !p.is_variadic)
-            .count();
-        if required_count < 2 {
-            ea.emit(
-                IssueKind::InvalidArgument {
-                    param: "callback".to_string(),
-                    fn_name: "array_reduce".to_string(),
-                    expected: "callable accepting at least 2 arguments".to_string(),
-                    actual: format!("callable accepting {} argument(s)", required_count),
-                },
-                Severity::Error,
-                callback_span,
-            );
-        }
+/// Returns `(callback_arg_index, min_required_arity)` for built-in functions that enforce a
+/// minimum callback arity via `check_min_arity_callback`. Functions with more complex rules
+/// (array_map, array_filter) use their own specialized handlers instead.
+pub(crate) fn callback_min_arity_spec(fn_name: &str) -> Option<(usize, usize)> {
+    match fn_name {
+        "array_reduce" => Some((1, 2)),
+        "usort" | "uasort" | "uksort" => Some((1, 2)),
+        "array_walk" | "array_walk_recursive" => Some((1, 1)),
+        _ => None,
     }
 }
 
-/// Validate sort callback (usort, uasort, uksort, array_walk, array_walk_recursive).
-/// All need arity >= 2 (for sorts: comparison args; for array_walk: element, key).
-pub(crate) fn check_sort_callback(
+/// Validate a callback argument against a minimum required arity.
+pub(crate) fn check_min_arity_callback(
     ea: &mut ExpressionAnalyzer<'_>,
     fn_name: &str,
+    callback_idx: usize,
+    min_arity: usize,
     arg_types: &[Type],
     arg_spans: &[Span],
 ) {
-    if arg_types.len() < 2 || arg_spans.len() < 2 {
+    if arg_types.len() <= callback_idx || arg_spans.len() <= callback_idx {
         return;
     }
 
-    let callback_ty = &arg_types[1];
-    let callback_span = arg_spans[1];
+    let callback_ty = &arg_types[callback_idx];
+    let callback_span = arg_spans[callback_idx];
 
     if !is_valid_callable_type(callback_ty) {
         ea.emit(
@@ -368,13 +315,21 @@ pub(crate) fn check_sort_callback(
             .iter()
             .filter(|p| !p.is_optional && !p.is_variadic)
             .count();
-        if required_count < 2 {
+        if required_count < min_arity {
+            let expected_plural = if min_arity == 1 { "" } else { "s" };
+            let actual_plural = if required_count == 1 { "" } else { "s" };
             ea.emit(
                 IssueKind::InvalidArgument {
                     param: "callback".to_string(),
                     fn_name: fn_name.to_string(),
-                    expected: "callable accepting at least 2 arguments".to_string(),
-                    actual: format!("callable accepting {} argument(s)", required_count),
+                    expected: format!(
+                        "callable accepting at least {} argument{}",
+                        min_arity, expected_plural
+                    ),
+                    actual: format!(
+                        "callable accepting {} argument{}",
+                        required_count, actual_plural
+                    ),
                 },
                 Severity::Error,
                 callback_span,
