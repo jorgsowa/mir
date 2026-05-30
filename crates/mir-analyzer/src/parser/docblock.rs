@@ -768,6 +768,14 @@ fn parse_generic(name: &str, inner: &str) -> Type {
     }
 }
 
+fn strip_quotes(s: &str) -> &str {
+    if (s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')) {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
+}
+
 fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     use mir_types::atomic::KeyedProperty;
     let mut properties: IndexMap<ArrayKey, KeyedProperty> = IndexMap::new();
@@ -805,6 +813,7 @@ fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
             let ty_part = item[colon + 1..].trim();
             let optional = key_part.ends_with('?');
             let key_str = key_part.trim_end_matches('?').trim();
+            let key_str = strip_quotes(key_str);
             let key = if let Ok(n) = key_str.parse::<i64>() {
                 ArrayKey::Int(n)
             } else {
