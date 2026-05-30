@@ -161,7 +161,11 @@ impl CallAnalyzer {
 
         if let Some(resolved) = resolved {
             ea.record_ref(
-                Arc::from(format!("{}::{}", &fqcn, method_name.to_lowercase())),
+                Arc::from(format!(
+                    "{}::{}",
+                    resolved.owner_fqcn,
+                    method_name.to_lowercase()
+                )),
                 call.method.span,
             );
             if let Some(msg) = resolved.deprecated.clone() {
@@ -214,6 +218,7 @@ impl CallAnalyzer {
                     template_params: &resolved.template_params,
                 },
             );
+            let owner_fqcn = resolved.owner_fqcn.clone();
             let ret_raw = resolved.return_ty_raw;
             let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc);
             let ret = if !resolved.template_params.is_empty() {
@@ -229,7 +234,7 @@ impl CallAnalyzer {
             ea.record_symbol(
                 call.method.span,
                 ReferenceKind::StaticCall {
-                    class: fqcn_arc,
+                    class: owner_fqcn,
                     method: Arc::from(method_name),
                 },
                 ret.clone(),

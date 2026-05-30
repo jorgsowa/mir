@@ -818,3 +818,58 @@ fn symbol_at_function_call_span_matches_reference_location_span() {
         "symbol_at span length must equal reference location column width"
     );
 }
+
+#[test]
+fn class_const_access_records_symbol() {
+    // Config::VERSION should push a ConstantAccess ResolvedSymbol so that
+    // symbol_at can resolve the position to a typed symbol for hover / go-to-def.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Config { const string VERSION = '1.0'; }\nfunction ver(): string { return Config::VERSION; }\n";
+    let file = write_file(&dir, "const_sym.php", src);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let sym = result
+        .symbols
+        .iter()
+        .find(|s| {
+            matches!(&s.kind, ReferenceKind::ConstantAccess { constant, .. } if constant.as_ref() == "VERSION")
+        })
+        .expect("ConstantAccess(VERSION) must be recorded for Config::VERSION");
+
+    let key = sym.codebase_key().unwrap();
+    assert_eq!(key, "Config::VERSION");
+    assert!(
+        !analyzer.reference_locations(key.as_str()).is_empty(),
+        "codebase_key should match an entry in symbol_reference_locations"
+    );
+}
+
+#[test]
+fn inherited_static_call_symbol_keys_by_declaring_class() {
+    // The StaticCall symbol for Child::foo() must use the declaring class Base,
+    // so that codebase_key() matches the reference-index entry "Base::foo".
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Base { public static function foo(): void {} }\nclass Child extends Base {}\nfunction caller(): void { Child::foo(); }\n";
+    let file = write_file(&dir, "inherited_static_sym.php", src);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let sym = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, ReferenceKind::StaticCall { method, .. } if method.as_ref() == "foo"))
+        .expect("StaticCall(foo) must be recorded");
+
+    let key = sym.codebase_key().unwrap();
+    assert_eq!(
+        key, "Base::foo",
+        "codebase_key must be the declaring class Base, not Child"
+    );
+    assert!(
+        !analyzer.reference_locations(key.as_str()).is_empty(),
+        "codebase_key should match an entry in symbol_reference_locations"
+    );
+}

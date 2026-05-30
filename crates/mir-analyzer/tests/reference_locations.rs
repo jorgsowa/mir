@@ -724,3 +724,81 @@ fn explicit_class_const_access_records_constant_reference() {
         "Config::VERSION should record a reference to Config::VERSION"
     );
 }
+
+#[test]
+fn inherited_static_method_call_keys_by_declaring_class() {
+    // Child::foo() where foo is declared on Base must record "Base::foo",
+    // not "Child::foo", so that reference_locations("Base::foo") finds the call.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "inherited_static.php",
+        "<?php\nclass Base { public static function foo(): void {} }\nclass Child extends Base {}\nfunction caller(): void { Child::foo(); }\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    assert!(
+        !analyzer.reference_locations("Base::foo").is_empty(),
+        "Child::foo() should record a reference to the declaring class Base::foo"
+    );
+    assert!(
+        analyzer.reference_locations("Child::foo").is_empty(),
+        "Child::foo() must not be recorded under the called subclass key Child::foo"
+    );
+}
+
+#[test]
+fn static_property_access_records_class_reference() {
+    // Foo::$bar should record a class reference to Foo so that
+    // reference_locations("Foo") includes the static property access.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "static_prop_class_ref.php",
+        "<?php\nclass Config { public static int $timeout = 30; }\nfunction read(): int { return Config::$timeout; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let class_locs: Vec<_> = analyzer
+        .reference_locations("Config")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !class_locs.is_empty(),
+        "Config::$timeout should record a class reference to Config"
+    );
+}
+
+#[test]
+fn static_property_access_records_property_reference() {
+    // Foo::$bar should also record a property reference so that
+    // reference_locations("Foo::timeout") finds the static property access.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "static_prop_ref.php",
+        "<?php\nclass Config { public static int $timeout = 30; }\nfunction read(): int { return Config::$timeout; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let prop_locs: Vec<_> = analyzer
+        .reference_locations("Config::timeout")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !prop_locs.is_empty(),
+        "Config::$timeout should record a property reference to Config::timeout"
+    );
+}

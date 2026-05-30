@@ -24,51 +24,17 @@ pub struct ResolvedSymbol {
 }
 
 impl ResolvedSymbol {
-    /// Return the key used in the salsa db's reference-location table for this
-    /// symbol, or `None` for kinds that are not tracked there (e.g. variables).
-    ///
-    /// Key format mirrors `MirDatabase::record_reference_location`:
-    /// - method / static call : `"ClassName::methodname"` (method lowercased)
-    /// - property access      : `"ClassName::propName"`
-    /// - function call        : fully-qualified function name
-    /// - class reference      : fully-qualified class name
-    ///
-    /// Prefer [`Self::to_symbol`] for type-safe access.
+    /// Return the reference-index lookup key, or `None` for kinds that are not
+    /// tracked there (e.g. variables). Delegates to [`ReferenceKind::to_name`].
     pub fn codebase_key(&self) -> Option<String> {
-        match &self.kind {
-            ReferenceKind::MethodCall { class, method }
-            | ReferenceKind::StaticCall { class, method } => {
-                Some(format!("{}::{}", class, method.to_lowercase()))
-            }
-            ReferenceKind::PropertyAccess { class, property } => {
-                Some(format!("{class}::{property}"))
-            }
-            ReferenceKind::FunctionCall(fqn) => Some(fqn.to_string()),
-            ReferenceKind::ClassReference(fqcn) => Some(fqcn.to_string()),
-            ReferenceKind::Variable(_) => None,
-        }
+        self.kind.to_name().map(|name| name.codebase_key())
     }
 
-    /// Convert this `ResolvedSymbol` to a typed [`crate::Name`] for use with
+    /// Convert to a typed [`crate::Name`] for use with
     /// [`crate::AnalysisSession::definition_of`], [`crate::AnalysisSession::references_to`],
-    /// or [`crate::AnalysisSession::hover`].
-    ///
-    /// Returns `None` for kinds that don't map to a codebase-level symbol
-    /// (currently only `Variable` — local variables aren't tracked in the
-    /// codebase symbol table).
+    /// or [`crate::AnalysisSession::hover`]. Delegates to [`ReferenceKind::to_name`].
     pub fn to_symbol(&self) -> Option<crate::Name> {
-        match &self.kind {
-            ReferenceKind::MethodCall { class, method }
-            | ReferenceKind::StaticCall { class, method } => {
-                Some(crate::Name::method(class.clone(), method.as_ref()))
-            }
-            ReferenceKind::PropertyAccess { class, property } => {
-                Some(crate::Name::property(class.clone(), property.clone()))
-            }
-            ReferenceKind::FunctionCall(fqn) => Some(crate::Name::function(fqn.clone())),
-            ReferenceKind::ClassReference(fqcn) => Some(crate::Name::class(fqcn.clone())),
-            ReferenceKind::Variable(_) => None,
-        }
+        self.kind.to_name()
     }
 }
 
@@ -126,4 +92,28 @@ pub enum ReferenceKind {
     FunctionCall(Arc<str>),
     /// A class reference (`new Foo`, `instanceof Foo`, type hints).
     ClassReference(Arc<str>),
+    /// A class constant access (`Config::VERSION`, `self::CONST`, `parent::CONST`).
+    ConstantAccess { class: Arc<str>, constant: Arc<str> },
+}
+
+impl ReferenceKind {
+    /// Map to a typed [`crate::Name`], or `None` for kinds that don't correspond
+    /// to a codebase-level symbol (currently only `Variable`).
+    pub fn to_name(&self) -> Option<crate::Name> {
+        match self {
+            ReferenceKind::MethodCall { class, method }
+            | ReferenceKind::StaticCall { class, method } => {
+                Some(crate::Name::method(class.clone(), method.as_ref()))
+            }
+            ReferenceKind::PropertyAccess { class, property } => {
+                Some(crate::Name::property(class.clone(), property.clone()))
+            }
+            ReferenceKind::FunctionCall(fqn) => Some(crate::Name::function(fqn.clone())),
+            ReferenceKind::ClassReference(fqcn) => Some(crate::Name::class(fqcn.clone())),
+            ReferenceKind::ConstantAccess { class, constant } => {
+                Some(crate::Name::class_constant(class.clone(), constant.clone()))
+            }
+            ReferenceKind::Variable(_) => None,
+        }
+    }
 }

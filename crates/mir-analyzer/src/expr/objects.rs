@@ -281,14 +281,22 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_static_property_access(&mut self, spa: &StaticAccessExpr) -> Type {
         if let ExprKind::Identifier(id) = &spa.class.kind {
             let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
-            if !matches!(resolved.as_str(), "self" | "static" | "parent")
-                && !crate::db::class_exists(self.db, &resolved)
-            {
+            if matches!(resolved.as_str(), "self" | "static" | "parent") {
+                // Cannot resolve without FlowState; skip reference recording.
+            } else if !crate::db::class_exists(self.db, &resolved) {
                 self.emit(
                     IssueKind::UndefinedClass { name: resolved },
                     Severity::Error,
                     spa.class.span,
                 );
+            } else {
+                self.record_ref(Arc::from(resolved.as_str()), spa.class.span);
+                if let Some(prop_name) = expr_name_str(&spa.member) {
+                    self.record_ref(
+                        Arc::from(format!("{}::{}", resolved, prop_name)),
+                        spa.member.span,
+                    );
+                }
             }
         }
         Type::mixed()
@@ -373,6 +381,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Arc::from(format!("{}::{}", self_fqcn, const_name)),
                             cca.member.span,
                         );
+                        self.record_symbol(
+                            cca.member.span,
+                            ReferenceKind::ConstantAccess {
+                                class: self_fqcn.clone(),
+                                constant: Arc::from(const_name.as_str()),
+                            },
+                            Type::mixed(),
+                        );
                         return Type::mixed();
                     }
                     "parent" => {
@@ -397,6 +413,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Arc::from(format!("{}::{}", parent_fqcn, const_name)),
                             cca.member.span,
                         );
+                        self.record_symbol(
+                            cca.member.span,
+                            ReferenceKind::ConstantAccess {
+                                class: parent_fqcn.clone(),
+                                constant: Arc::from(const_name.as_str()),
+                            },
+                            Type::mixed(),
+                        );
                         return Type::mixed();
                     }
                     _ => resolved,
@@ -418,6 +442,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.record_ref(
             Arc::from(format!("{}::{}", fqcn, const_name)),
             cca.member.span,
+        );
+        self.record_symbol(
+            cca.member.span,
+            ReferenceKind::ConstantAccess {
+                class: Arc::from(fqcn.as_str()),
+                constant: Arc::from(const_name.as_str()),
+            },
+            Type::mixed(),
         );
 
         let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
