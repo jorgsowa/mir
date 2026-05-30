@@ -68,6 +68,28 @@ mir --baseline baseline.xml src/  # suppress known issues
 
 See [docs/cli.md](docs/cli.md) for the full CLI reference.
 
+### Suppressing issues inline
+
+Silence a single false positive directly in the source with a comment, without
+editing config or a baseline file:
+
+```php
+// @mir-ignore UndefinedClass
+new ThirdPartyClass();
+
+$obj->method();          // @mir-ignore NullMethodCall   (trailing: this line)
+
+// @mir-ignore-next-line PossiblyNullArgument
+doThing($maybeNull);
+```
+
+A bare comment above a statement annotates the statement that follows it; a
+trailing comment annotates its own line. List one or more `IssueKind` names (or
+codes such as `MIR1400`) after the directive, or omit them to suppress every
+issue on the target line. `@mir-ignore-file Kind …` suppresses a kind across the
+whole file. The `@psalm-suppress`, `@suppress`, `@phpstan-ignore-line` and
+`@phpstan-ignore-next-line` aliases are accepted for drop-in compatibility.
+
 ## Documentation
 
 Full documentation is available at **[jorgsowa.github.io/mir](https://jorgsowa.github.io/mir/)**.

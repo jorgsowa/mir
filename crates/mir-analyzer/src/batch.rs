@@ -148,6 +148,43 @@ impl AnalysisSession {
         opts.php_version_override.unwrap_or(self.php_version)
     }
 
+    /// Mark issues silenced by inline suppression comments
+    /// (`@mir-ignore`, `@psalm-suppress`, `@phpstan-ignore*`, …) as suppressed.
+    ///
+    /// Runs as a final post-filter over the merged issue list so it applies
+    /// uniformly to every emitting pass — body analysis, the collector, class
+    /// checks and dead-code detection — including diagnostics the per-statement
+    /// `@psalm-suppress` path in `stmt/mod.rs` structurally cannot reach.
+    ///
+    /// Issues are *marked* rather than dropped, mirroring that per-statement
+    /// path and the kind-level `mir.xml` suppress handler; every consumer (CLI,
+    /// WASM, the test harness) already skips [`Issue::suppressed`].
+    fn apply_inline_suppressions(&self, issues: &mut [Issue]) {
+        use crate::suppression::SuppressionMap;
+        if issues.iter().all(|i| i.suppressed) {
+            return;
+        }
+        let db = self.snapshot_db();
+        // One map per distinct file, built lazily; `None` once we know a file
+        // has no source registered or no suppression comments.
+        let mut cache: HashMap<Arc<str>, Option<SuppressionMap>> = HashMap::default();
+        for issue in issues.iter_mut() {
+            if issue.suppressed {
+                continue;
+            }
+            let map = cache.entry(issue.location.file.clone()).or_insert_with(|| {
+                db.lookup_source_file(&issue.location.file)
+                    .map(|sf| SuppressionMap::from_source(&sf.text(&db)))
+                    .filter(|m| !m.is_empty())
+            });
+            if let Some(map) = map.as_ref() {
+                if map.is_suppressed(issue.location.line, issue.kind.name(), issue.kind.code()) {
+                    issue.suppressed = true;
+                }
+            }
+        }
+    }
+
     fn type_exists(&self, fqcn: &str) -> bool {
         let db = self.snapshot_db();
         crate::db::class_exists(&db, fqcn)
@@ -514,6 +551,7 @@ impl AnalysisSession {
         }
 
         opts.apply(&mut all_issues);
+        self.apply_inline_suppressions(&mut all_issues);
         if let Some(dump) = crate::metrics::dump() {
             eprintln!("{dump}");
         }
@@ -718,7 +756,9 @@ impl AnalysisSession {
                 let guard = self.db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
                 guard.commit_pending_to_maps();
+                drop(guard);
                 opts.apply(&mut issues);
+                self.apply_inline_suppressions(&mut issues);
                 return AnalysisResult::build(issues, HashMap::default(), Vec::new());
             }
         }
@@ -781,6 +821,7 @@ impl AnalysisSession {
         }
 
         opts.apply(&mut all_issues);
+        self.apply_inline_suppressions(&mut all_issues);
         AnalysisResult::build(all_issues, HashMap::default(), symbols)
     }
 
@@ -898,11 +939,13 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     crate::stubs::load_stubs_for_version(&mut db, php_version);
     let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
     let file_defs = collect_file_definitions(&db, salsa_file);
+    let suppressions = crate::suppression::SuppressionMap::from_source(source);
     let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
     if all_issues.iter().any(|issue| {
         matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
             && issue.severity == mir_issues::Severity::Error
     }) {
+        mark_suppressed(&mut all_issues, &suppressions);
         return AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), Vec::new());
     }
     let mut type_envs = rustc_hash::FxHashMap::default();
@@ -918,7 +961,24 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
         &mut type_envs,
         &mut all_symbols,
     ));
+    mark_suppressed(&mut all_issues, &suppressions);
     AnalysisResult::build(all_issues, type_envs, all_symbols)
+}
+
+/// Mark issues silenced by a single file's [`SuppressionMap`]. Shared by the
+/// in-memory [`analyze_source`] entry point, which has the source in hand and
+/// does not go through the db-backed batch post-filter.
+fn mark_suppressed(issues: &mut [Issue], suppressions: &crate::suppression::SuppressionMap) {
+    if suppressions.is_empty() {
+        return;
+    }
+    for issue in issues.iter_mut() {
+        if !issue.suppressed
+            && suppressions.is_suppressed(issue.location.line, issue.kind.name(), issue.kind.code())
+        {
+            issue.suppressed = true;
+        }
+    }
 }
 
 /// Discover all `.php` files under a directory, recursively.

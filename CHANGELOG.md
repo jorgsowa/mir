@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Inline issue suppression via source comments. Silence a single false positive without a baseline or config change using `@mir-ignore [Kind …]` (a bare comment annotates the following statement; a trailing comment annotates its own line), `@mir-ignore-line`, `@mir-ignore-next-line`, or `@mir-ignore-file [Kind …]` for whole-file suppression. Kinds may be given by name (`UndefinedClass`) or code (`MIR1400`); omitting them suppresses every issue on the target. The `@psalm-suppress`, `@suppress`, `@phpstan-ignore-line`, and `@phpstan-ignore-next-line` aliases are accepted for compatibility. Suppression is applied as a final post-filter, so it reaches every diagnostic — including dead-code findings and other cross-pass issues the previous docblock-only path could not silence.
+
+### Fixed
+
+- Single-line `/** @psalm-suppress Kind */` docblocks above a statement now suppress the issue (previously only multi-line docblocks were honored).
+
 ## [0.30.0] - 2026-05-28
 
 ### Fixed

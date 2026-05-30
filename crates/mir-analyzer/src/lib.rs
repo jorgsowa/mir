@@ -31,6 +31,7 @@ pub mod stub_cache;
 #[doc(hidden)]
 pub mod stubs;
 pub(crate) mod subtype;
+pub mod suppression;
 pub(crate) mod taint;
 pub(crate) mod type_env;
 
