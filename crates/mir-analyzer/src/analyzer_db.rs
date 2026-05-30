@@ -14,7 +14,6 @@ use std::sync::Arc;
 
 use crate::db::MirDatabase;
 use parking_lot::{Mutex, RwLock};
-use rayon::prelude::*;
 
 use crate::db::MirDbStorage;
 use crate::php_version::PhpVersion;
@@ -116,9 +115,8 @@ impl AnalyzerDb {
         (**guard).clone()
     }
 
-    /// Ingest multiple stub paths in parallel then serially under the lock.
-    /// Idempotent — already-loaded stubs are skipped.
-    pub fn ingest_stub_paths(&self, paths: &[&'static str], php_version: PhpVersion) {
+    /// Ingest multiple stub paths. Idempotent — already-loaded stubs are skipped.
+    pub fn ingest_stub_paths(&self, paths: &[&'static str], _php_version: PhpVersion) {
         // Identify needed paths (filter to those not yet loaded).
         let needed: Vec<&'static str> = {
             let loaded = self.loaded_stubs.lock();
@@ -133,27 +131,14 @@ impl AnalyzerDb {
             return;
         }
 
-        // Parse in parallel; ingest serially under write lock.
-        let slices: Vec<(&'static str, mir_codebase::storage::StubSlice)> = needed
-            .par_iter()
-            .filter_map(|&path| {
-                crate::stubs::stub_content_for_path(path).map(|content| {
-                    let slice =
-                        crate::stubs::stub_slice_from_source(path, content, Some(php_version));
-                    (path, slice)
-                })
-            })
-            .collect();
-
         let mut guard = self.salsa.write();
         let mut loaded = self.loaded_stubs.lock();
-        // Filter again under the lock to avoid double-ingestion races, then
-        // bulk-ingest so the Arc::make_mut clones amortize over the batch
-        // instead of paying per slice.
-        for (path, _slice) in &slices {
+        for path in &needed {
             if loaded.insert(*path) {
                 // Register as a SourceFile so the pull path (workspace_symbol_index
-                // → collect_file_definitions) can index built-in PHP classes.
+                // → collect_file_definitions) can index built-in PHP symbols.
+                // Version filtering happens in collect_file_definitions_uncached via
+                // db.php_version_str() / .with_php_version().
                 // HIGH durability: built-in stubs never change within a session.
                 if let Some(content) = crate::stubs::stub_content_for_path(path) {
                     guard.upsert_source_file_with_durability(
