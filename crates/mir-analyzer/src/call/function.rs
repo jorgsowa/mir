@@ -306,17 +306,22 @@ impl CallAnalyzer {
 
             for (i, param) in params.iter().enumerate() {
                 if param.is_byref {
+                    let output_ty = param
+                        .ty
+                        .as_ref()
+                        .map(|t| (**t).clone())
+                        .unwrap_or_else(Type::mixed);
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
-                                ctx.set_var(var_name, Type::mixed());
+                                ctx.set_var(var_name, output_ty.clone());
                             }
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
-                            ctx.set_var(var_name, Type::mixed());
+                            ctx.set_var(var_name, output_ty);
                         }
                     }
                 }

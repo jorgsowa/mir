@@ -694,6 +694,22 @@ mod tests {
     }
 
     #[test]
+    fn preg_match_matches_param_is_byref_with_type() {
+        let func = stub_function_for(PhpVersion::LATEST, "preg_match")
+            .expect("preg_match should exist in stubs");
+        let matches_param = func
+            .params
+            .iter()
+            .find(|p| p.name.as_ref() == "matches")
+            .expect("preg_match should have a $matches param");
+        assert!(matches_param.is_byref, "$matches should be byref");
+        assert!(
+            matches_param.ty.is_some(),
+            "$matches should have a type annotation (string[] from PHPDoc)"
+        );
+    }
+
+    #[test]
     fn is_builtin_function_returns_true_for_known_builtins() {
         assert!(is_builtin_function("strlen"), "strlen should be a builtin");
         assert!(

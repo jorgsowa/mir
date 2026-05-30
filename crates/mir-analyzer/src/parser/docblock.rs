@@ -987,27 +987,29 @@ fn parse_import_type(body: &str) -> Option<DocImportType> {
 }
 
 fn parse_param_line(s: &str) -> Option<(String, String)> {
-    // Formats: `Type $name`, `Type $name description`
+    // Formats: `Type $name`, `Type $name description`, or `Type &$name ...` (byref)
     // Types can contain spaces (e.g., `array<string, int>`), so we need to find the variable name.
     // The variable name is the `$identifier` that comes after whitespace (not part of type syntax).
+    //
+    // Only examine the first line to avoid matching `$var` references in multi-line descriptions.
+    let first_line = s.lines().next().unwrap_or(s);
 
-    // Strategy: find the last sequence of whitespace followed by `$identifier`
-    // This handles both simple types and types with generics/spaces.
+    // Strategy: find the last sequence of whitespace followed by `$identifier` or `&$identifier`
+    // on the first line. This handles both simple types and types with generics/spaces.
     let mut best_split: Option<(String, String)> = None;
 
-    for (i, ch) in s.char_indices() {
+    for (i, ch) in first_line.char_indices() {
         if ch.is_whitespace() {
-            // Found whitespace; check what comes after it
-            let after = &s[i..].trim_start();
-            if after.starts_with('$') {
-                // Found a `$` after whitespace
-                let mut var_parts = after.split(char::is_whitespace);
+            let after = first_line[i..].trim_start();
+            // Accept `$name` or `&$name` (by-reference params in PHPDoc)
+            let after_stripped = after.strip_prefix('&').unwrap_or(after);
+            if after_stripped.starts_with('$') {
+                let mut var_parts = after_stripped.split(char::is_whitespace);
                 if let Some(name_with_dollar) = var_parts.next() {
                     let name = name_with_dollar.trim_start_matches('$').to_string();
                     if !name.is_empty() {
-                        let type_part = s[..i].trim().to_string();
+                        let type_part = first_line[..i].trim().to_string();
                         if !type_part.is_empty() {
-                            // Keep this as a candidate; if there are more, the last one wins
                             best_split = Some((type_part, name));
                         }
                     }
