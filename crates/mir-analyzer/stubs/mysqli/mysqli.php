@@ -2265,8 +2265,18 @@ function mysqli_get_warnings(mysqli $mysql): mysqli_warning|false {}
  * @link https://php.net/manual/en/mysqli.init.php
  * @return mysqli|false
  * @see mysqli_real_connect()
+ * @removed 8.0
  */
 function mysqli_init(): mysqli|false {}
+
+/**
+ * Initializes MySQLi and returns a resource for use with mysqli_real_connect()
+ * @link https://php.net/manual/en/mysqli.init.php
+ * @return mysqli
+ * @see mysqli_real_connect()
+ * @since 8.0
+ */
+function mysqli_init(): mysqli {}
 
 /**
  * Retrieves information about the most recently executed query
