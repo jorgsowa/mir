@@ -273,6 +273,156 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
 }
 
 #[test]
+fn method_references_scoped_by_declaring_class() {
+    // Verify: findReferences on Foo::toString must NOT return Bar::toString or
+    // its call sites — they are unrelated classes with no common ancestor.
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("scope.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         final class Foo { public function toString(): string { return 'foo'; } }\n\
+         final class Bar { public function toString(): string { return 'bar'; } }\n\
+         (new Foo())->toString();\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let _ = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let foo_refs = session.references_to(&Name::method("Foo", "toString"));
+    let bar_refs = session.references_to(&Name::method("Bar", "toString"));
+
+    assert!(
+        !foo_refs.is_empty(),
+        "Foo::toString should have at least one reference (the call site); got none"
+    );
+    assert!(
+        bar_refs.is_empty(),
+        "Bar::toString should have zero references; got {bar_refs:?}"
+    );
+
+    let foo_lines: Vec<u32> = foo_refs.iter().map(|(_, r)| r.start.line).collect();
+    assert!(
+        foo_lines.contains(&4),
+        "Expected reference on line 4 (1-based); got {foo_lines:?}"
+    );
+}
+
+#[test]
+fn method_references_end_to_end_symbol_at_flow() {
+    // Verify the real findReferences flow: symbol_at → to_symbol() → references_to.
+    // The Name built from the resolved symbol at the call position must round-trip
+    // back to the same reference.
+    use mir_analyzer::symbol::ReferenceKind;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("e2e.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         final class Foo { public function toString(): string { return 'foo'; } }\n\
+         (new Foo())->toString();\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    // "->toString" — skip the "->" (2 bytes) to land on the 't'.
+    let call_offset = source.find("->toString").unwrap() as u32 + 2;
+
+    let sym = analysis
+        .symbol_at(call_offset)
+        .expect("should resolve symbol at toString call site");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { class, .. } if class.as_ref() == "Foo"),
+        "symbol_at should report class Foo; got {:?}",
+        sym.kind
+    );
+
+    let name = sym.to_symbol().expect("MethodCall should map to a Name");
+    let refs = session.references_to(&name);
+
+    assert!(
+        !refs.is_empty(),
+        "references_to via symbol_at flow must find the call site; got none"
+    );
+}
+
+#[test]
+fn method_references_inherited_method_end_to_end() {
+    // When Foo inherits toString from Base, record_ref stores the reference
+    // under "Base::tostring" (the declaring class). Before this fix, record_symbol
+    // stored class "Foo" (the receiver), making symbol_at → references_to return
+    // nothing. After the fix both keys agree on the declaring class.
+    use mir_analyzer::symbol::ReferenceKind;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("inherit.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Base { public function toString(): string { return 'b'; } }\n\
+         final class Foo extends Base {}\n\
+         (new Foo())->toString();\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    // "->toString" — skip the "->" (2 bytes) to land on the 't'.
+    let call_offset = source.find("->toString").unwrap() as u32 + 2;
+
+    let sym = analysis
+        .symbol_at(call_offset)
+        .expect("should resolve symbol at toString call");
+
+    let declaring_class = match &sym.kind {
+        ReferenceKind::MethodCall { class, .. } => class.as_ref().to_string(),
+        other => panic!("unexpected kind: {other:?}"),
+    };
+
+    assert_eq!(
+        declaring_class, "Base",
+        "symbol_at must report the DECLARING class (Base), not the receiver (Foo)"
+    );
+
+    let name = sym.to_symbol().expect("MethodCall maps to Name");
+    let refs = session.references_to(&name);
+
+    assert!(
+        !refs.is_empty(),
+        "references_to(Base::toString) must find the (new Foo())->toString() call; \
+         got none (declaring_class was '{declaring_class}', refs: {refs:?})"
+    );
+}
+
+#[test]
 fn load_class_with_custom_resolver() {
     use mir_analyzer::{ClassResolver, LoadOutcome};
     use std::path::PathBuf;

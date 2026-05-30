@@ -261,10 +261,23 @@ impl CallAnalyzer {
 
         for atomic in &obj_ty.types {
             if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+                // Resolve to the declaring class (via the inheritance chain) so that
+                // symbol_at → to_symbol() → references_to uses the same key as
+                // record_ref, which also keys by owner_fqcn. Fall back to the receiver
+                // type for unresolvable calls (__call, unknown methods).
+                let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+                let fqcn_arc = Arc::from(fqcn_resolved.as_str());
+                let declaring_class = crate::db::find_method_in_chain(
+                    ea.db,
+                    crate::db::Fqcn::from_str(ea.db, &fqcn_arc),
+                    &method_name.to_ascii_lowercase(),
+                )
+                .map(|(owner, _)| owner)
+                .unwrap_or(fqcn_arc);
                 ea.record_symbol(
                     call.method.span,
                     ReferenceKind::MethodCall {
-                        class: Arc::from(fqcn.as_ref()),
+                        class: declaring_class,
                         method: Arc::from(method_name),
                     },
                     final_ty.clone(),
