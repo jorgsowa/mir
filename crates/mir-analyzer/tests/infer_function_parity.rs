@@ -189,3 +189,52 @@ fn parity_return_type_mismatch() {
 fn parity_typed_params() {
     assert_issue_set_parity("with_params", fixture());
 }
+
+/// A function declared inside an `if (! function_exists(...))` guard — the
+/// Laravel global-helper pattern — must be locatable by `find_function_decl`
+/// so its body is analyzed on the incremental per-function path. Before the
+/// guard-recursion fix, `infer_function` returned `None` for such a function
+/// and its body diagnostics silently vanished.
+#[test]
+fn guarded_function_body_is_analyzed() {
+    let src = r#"<?php
+if (! function_exists('guarded_returns_str')) {
+    function guarded_returns_str(): string {
+        return 42;
+    }
+}
+"#;
+    let issues = new_path_issues_for("guarded_returns_str", src);
+    assert!(
+        issues
+            .iter()
+            .any(|i| matches!(i.kind, mir_issues::IssueKind::InvalidReturnType { .. })),
+        "expected the guarded function's body to be analyzed and report a \
+         return-type mismatch, got: {issues:?}",
+    );
+}
+
+/// A function declared inside a `declare() {}` block must be locatable by
+/// `find_function_decl` so the per-function path analyzes its body. This
+/// covers the `Declare` arm of `for_each_file_scope_decl`, keeping it in
+/// lockstep with the collector's `walk_owned_stmt` (which also descends into
+/// declare bodies). Without that arm, `infer_function` returns `None` here and
+/// the return-type mismatch below vanishes.
+#[test]
+fn declare_block_function_body_is_analyzed() {
+    let src = r#"<?php
+declare(ticks=1) {
+    function tick_returns_str(): string {
+        return 42;
+    }
+}
+"#;
+    let issues = new_path_issues_for("tick_returns_str", src);
+    assert!(
+        issues
+            .iter()
+            .any(|i| matches!(i.kind, mir_issues::IssueKind::InvalidReturnType { .. })),
+        "expected the declare-block function's body to be analyzed and report a \
+         return-type mismatch, got: {issues:?}",
+    );
+}

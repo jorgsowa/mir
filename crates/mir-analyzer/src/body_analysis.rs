@@ -13,6 +13,97 @@ use crate::diagnostics::{
 use crate::php_version::PhpVersion;
 use crate::symbol::ResolvedSymbol;
 
+/// Calls `f` on every file-scope statement that is **not** a control-flow
+/// wrapper, recursing into the bodies of `if`/`elseif`/`else`, `while`, `for`,
+/// `foreach`, `do`/`while`, `switch`, `try`/`catch`/`finally`, bare blocks, and
+/// braced namespaces to any depth. It never descends into a declaration's own
+/// body, into closures, or into expressions — so callers see exactly the
+/// declarations and other simple statements that live at file scope, whether or
+/// not they are wrapped in conditional guards.
+///
+/// This exists because conditionally-declared symbols must be discoverable
+/// identically to top-level ones: Laravel declares every global helper inside an
+/// `if (! function_exists('foo')) { function foo() {} }` guard (as do Symfony
+/// polyfills and WordPress pluggable functions). It mirrors the statement
+/// recursion in `php_ast`'s `walk_owned_stmt`, kept as a standalone
+/// borrow-transparent walk because the callers are not `OwnedVisitor`s and one
+/// of them ([`crate::db::per_function`]) must return a reference tied to the
+/// program's lifetime, which the visitor trait's elided lifetimes cannot express.
+pub(crate) fn for_each_file_scope_decl<'a>(
+    stmts: &'a [php_ast::owned::Stmt],
+    f: &mut dyn FnMut(&'a php_ast::owned::Stmt),
+) {
+    for stmt in stmts.iter() {
+        visit_file_scope_stmt(stmt, f);
+    }
+}
+
+fn visit_file_scope_stmt<'a>(
+    stmt: &'a php_ast::owned::Stmt,
+    f: &mut dyn FnMut(&'a php_ast::owned::Stmt),
+) {
+    use php_ast::owned::{NamespaceBody, StmtKind};
+    match &stmt.kind {
+        StmtKind::If(s) => {
+            visit_file_scope_stmt(&s.then_branch, f);
+            for branch in s.elseif_branches.iter() {
+                visit_file_scope_stmt(&branch.body, f);
+            }
+            if let Some(else_branch) = &s.else_branch {
+                visit_file_scope_stmt(else_branch, f);
+            }
+        }
+        StmtKind::While(s) => visit_file_scope_stmt(&s.body, f),
+        StmtKind::For(s) => visit_file_scope_stmt(&s.body, f),
+        StmtKind::Foreach(s) => visit_file_scope_stmt(&s.body, f),
+        StmtKind::DoWhile(s) => visit_file_scope_stmt(&s.body, f),
+        StmtKind::Switch(s) => {
+            for case in s.body.cases.iter() {
+                for inner in case.body.iter() {
+                    visit_file_scope_stmt(inner, f);
+                }
+            }
+        }
+        StmtKind::TryCatch(t) => {
+            for inner in t.body.stmts.iter() {
+                visit_file_scope_stmt(inner, f);
+            }
+            for catch in t.catches.iter() {
+                for inner in catch.body.stmts.iter() {
+                    visit_file_scope_stmt(inner, f);
+                }
+            }
+            if let Some(finally) = &t.finally {
+                for inner in finally.stmts.iter() {
+                    visit_file_scope_stmt(inner, f);
+                }
+            }
+        }
+        StmtKind::Block(b) => {
+            for inner in b.stmts.iter() {
+                visit_file_scope_stmt(inner, f);
+            }
+        }
+        StmtKind::Declare(d) => {
+            // Block form: `declare(strict_types=1) { function foo() {} }`.
+            // Kept in lockstep with the collector's `walk_owned_stmt`, which also
+            // descends into declare bodies, so both walks agree on what counts as
+            // a file-scope declaration.
+            if let Some(body) = &d.body {
+                visit_file_scope_stmt(body, f);
+            }
+        }
+        StmtKind::Namespace(ns) => {
+            if let NamespaceBody::Braced(block) = &ns.body {
+                for inner in block.stmts.iter() {
+                    visit_file_scope_stmt(inner, f);
+                }
+            }
+        }
+        _ => f(stmt),
+    }
+}
+
 /// Controls which side-effects the analysis passes perform.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum AnalysisMode {

@@ -57,52 +57,33 @@ unsafe impl salsa::Update for FunctionInferenceResult {
 
 /// Find the FunctionDecl in `program` whose resolved FQN equals `target_fqn`.
 ///
-/// Walks top-level Function/Namespace statements. Inside a namespace block,
-/// candidate FQNs are `<namespace>\<fn_name>`; outside, just `<fn_name>`.
-/// Returns the first match (PHP doesn't allow duplicate function definitions).
+/// Recurses through control-flow wrappers and braced namespaces via
+/// [`crate::body_analysis::for_each_file_scope_decl`], so a function declared
+/// inside an `if (! function_exists('foo')) { … }` guard (the Laravel helper
+/// pattern) is located just like a top-level one. Name resolution goes through
+/// `resolve_name`, which consults `db.file_namespace`, so braced and unbraced
+/// namespaces resolve identically. Returns the first match (PHP doesn't allow
+/// duplicate function definitions).
 fn find_function_decl<'a>(
     program: &'a php_ast::owned::Program,
     db: &dyn MirDatabase,
     file: &str,
     target_fqn: &str,
 ) -> Option<&'a php_ast::owned::FunctionDecl> {
-    use php_ast::owned::{NamespaceBody, StmtKind};
-    fn matches(
-        decl: &php_ast::owned::FunctionDecl,
-        db: &dyn MirDatabase,
-        file: &str,
-        target_fqn: &str,
-    ) -> bool {
-        let name = decl.name.as_deref().unwrap_or("");
-        if name.is_empty() {
-            return false;
+    use php_ast::owned::StmtKind;
+    let mut found: Option<&'a php_ast::owned::FunctionDecl> = None;
+    crate::body_analysis::for_each_file_scope_decl(&program.stmts, &mut |stmt| {
+        if found.is_some() {
+            return;
         }
-        let resolved = crate::db::resolve_name(db, file, name);
-        resolved == target_fqn
-    }
-    for stmt in program.stmts.iter() {
-        match &stmt.kind {
-            StmtKind::Function(decl) if matches(decl, db, file, target_fqn) => {
-                return Some(decl);
+        if let StmtKind::Function(decl) = &stmt.kind {
+            let name = decl.name.as_deref().unwrap_or("");
+            if !name.is_empty() && crate::db::resolve_name(db, file, name) == target_fqn {
+                found = Some(decl);
             }
-            StmtKind::Namespace(ns) => {
-                if let NamespaceBody::Braced(block) = &ns.body {
-                    for inner in block.stmts.iter() {
-                        if let StmtKind::Function(decl) = &inner.kind {
-                            if matches(decl, db, file, target_fqn) {
-                                return Some(decl);
-                            }
-                        }
-                    }
-                }
-                // Unbraced `namespace Foo;` body lives in program.stmts after this
-                // statement — the matches() resolver consults the file's namespace
-                // via db.file_namespace, so the top-level walk already handles it.
-            }
-            _ => {}
         }
-    }
-    None
+    });
+    found
 }
 
 /// Per-function inference tracked query.

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::ops::ControlFlow;
 
 use php_ast::ast::Visibility as AstVisibility;
-use php_ast::owned::visitor::{walk_owned_program, OwnedVisitor};
+use php_ast::owned::visitor::{walk_owned_program, walk_owned_stmt, OwnedVisitor};
 use php_ast::owned::{Program, StmtKind};
 
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
@@ -836,10 +836,6 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                 }
             }
 
-            StmtKind::Block(block) => {
-                return self.process_stmts(&block.stmts);
-            }
-
             // Collect top-level define('NAME', value) calls as global constants.
             // phpstorm-stubs uses this form extensively in *_defines.php files.
             StmtKind::Expression(expr) => {
@@ -874,8 +870,34 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                 }
             }
 
-            _ => {}
+            // Recurse through control-flow wrappers (`if`/`while`/`for`/`foreach`/
+            // `do`/`switch`/`try`/blocks) so a declaration nested inside one is
+            // collected identically to a top-level declaration. This is what makes
+            // Laravel's global helpers visible: every one is declared inside an
+            // `if (! function_exists('foo')) { function foo() {} }` guard, as are
+            // Symfony polyfills and WordPress pluggable functions. Indexing is
+            // unconditional — the guard is a runtime concern (which copy wins when
+            // the file loads), irrelevant to static symbol candidacy, and the
+            // codebase dedups by FQCN so a polyfill declared in several packages
+            // produces no redeclaration noise.
+            //
+            // `walk_owned_stmt` only re-enters `visit_stmt` for nested statements;
+            // it never reaches a declaration's own body because the `Function`/
+            // `Class`/`Interface`/`Trait`/`Enum` arms above return without walking.
+            // Closures and anonymous classes live in expressions, which `visit_expr`
+            // (below) deliberately does not descend into — so a function declared
+            // inside a closure is not wrongly registered at file scope.
+            _ => return walk_owned_stmt(self, stmt),
         }
+        ControlFlow::Continue(())
+    }
+
+    /// The collector registers statement-level declarations only; it has no
+    /// reason to look inside expressions. Overriding this to a no-op stops the
+    /// control-flow recursion in `visit_stmt` from descending into closure and
+    /// arrow-function bodies (reached via `walk_owned_stmt`'s expression walk),
+    /// which would otherwise register locally-scoped declarations at file scope.
+    fn visit_expr(&mut self, _expr: &php_ast::owned::Expr) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }
 }
