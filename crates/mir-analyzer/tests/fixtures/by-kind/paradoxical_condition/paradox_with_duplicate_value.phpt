@@ -9,6 +9,4 @@ function foo(int $i) : void {
     };
 };
 ===expect===
-ParadoxicalCondition
-===ignore===
-TODO
+ParadoxicalCondition@5:9-5:10: Value 1 is duplicated; this branch can never be reached

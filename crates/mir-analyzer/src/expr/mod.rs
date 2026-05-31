@@ -26,7 +26,9 @@ mod unary;
 mod variables;
 
 #[allow(unused_imports)]
-pub use helpers::{extract_destructure_vars, extract_simple_var, infer_arithmetic};
+pub use helpers::{
+    duplicate_literal_conditions, extract_destructure_vars, extract_simple_var, infer_arithmetic,
+};
 
 // ---------------------------------------------------------------------------
 // ExpressionAnalyzer

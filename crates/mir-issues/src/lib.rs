@@ -197,6 +197,9 @@ pub enum IssueKind {
     UnnecessaryVarAnnotation { var: String },
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/type_does_not_contain_type/` (planned).
     TypeDoesNotContainType { left: String, right: String },
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` and `mir-analyzer/src/expr/conditional.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/paradoxical_condition/`.
+    ParadoxicalCondition { value: String },
 
     // --- Dead code ----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/diagnostics.rs`.
@@ -417,6 +420,7 @@ impl IssueKind {
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. }
+            | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::InvalidStringClass { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -537,6 +541,7 @@ impl IssueKind {
             IssueKind::RedundantCast { .. } => "MIR0401",
             IssueKind::UnnecessaryVarAnnotation { .. } => "MIR0402",
             IssueKind::TypeDoesNotContainType { .. } => "MIR0403",
+            IssueKind::ParadoxicalCondition { .. } => "MIR0404",
 
             // Dead code (0500-0599)
             IssueKind::UnusedVariable { .. } => "MIR0500",
@@ -644,6 +649,7 @@ impl IssueKind {
             IssueKind::RedundantCast { .. } => "RedundantCast",
             IssueKind::UnnecessaryVarAnnotation { .. } => "UnnecessaryVarAnnotation",
             IssueKind::TypeDoesNotContainType { .. } => "TypeDoesNotContainType",
+            IssueKind::ParadoxicalCondition { .. } => "ParadoxicalCondition",
             IssueKind::UnusedVariable { .. } => "UnusedVariable",
             IssueKind::UnusedParam { .. } => "UnusedParam",
             IssueKind::UnreachableCode => "UnreachableCode",
@@ -843,6 +849,9 @@ impl IssueKind {
             }
             IssueKind::TypeDoesNotContainType { left, right } => {
                 format!("Type '{left}' can never contain type '{right}'")
+            }
+            IssueKind::ParadoxicalCondition { value } => {
+                format!("Value {value} is duplicated; this branch can never be reached")
             }
 
             IssueKind::UnusedVariable { name } => format!("Variable ${name} is never read"),

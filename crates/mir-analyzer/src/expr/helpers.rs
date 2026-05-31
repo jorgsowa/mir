@@ -263,6 +263,43 @@ pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {
     }
 }
 
+/// For a literal `switch` case / `match` arm condition, return a
+/// `(dedup_key, display)` pair. The key is type-tagged so that distinct
+/// literal kinds never collide (e.g. the int `0` and the string `"0"`),
+/// keeping duplicate detection free of PHP's loose-comparison surprises.
+///
+/// Returns `None` for any non-literal (variables, calls, negation, floats,
+/// …) so dynamic conditions are never flagged — duplicate detection stays at
+/// zero false positives.
+fn literal_condition_key(expr: &Expr) -> Option<(String, String)> {
+    match &expr.kind {
+        ExprKind::Int(n) => Some((format!("int:{n}"), n.to_string())),
+        ExprKind::String(s) => Some((format!("str:{s}"), format!("\"{s}\""))),
+        ExprKind::Bool(b) => Some((format!("bool:{b}"), b.to_string())),
+        ExprKind::Null => Some(("null".to_string(), "null".to_string())),
+        _ => None,
+    }
+}
+
+/// Given `switch`/`match` condition expressions in source order, return the
+/// `(span, display)` of each literal whose value repeats an earlier one — the
+/// duplicate branch can never be reached. Non-literal conditions are ignored,
+/// so dynamic arms are never flagged.
+pub fn duplicate_literal_conditions<'e>(
+    conditions: impl Iterator<Item = &'e Expr>,
+) -> Vec<(php_ast::Span, String)> {
+    let mut seen = FxHashSet::default();
+    let mut duplicates = Vec::new();
+    for cond in conditions {
+        if let Some((key, display)) = literal_condition_key(cond) {
+            if !seen.insert(key) {
+                duplicates.push((cond.span, display));
+            }
+        }
+    }
+    duplicates
+}
+
 /// Returns true if `ty` contains any reference to a template param name from `names`,
 /// including names nested inside generic type arguments (e.g. `R` inside `Result<Throwable, R>`).
 /// Handles both `TTemplateParam` and the docblock-parser workaround where bare unqualified names

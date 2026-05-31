@@ -263,7 +263,32 @@ impl<'a> StatementsAnalyzer<'a> {
         *ctx = post;
     }
 
+    /// Emit `ParadoxicalCondition` for `switch` cases whose literal value
+    /// repeats an earlier case — the duplicate branch can never be reached
+    /// because the first matching case wins. Only literal cases are compared,
+    /// so dynamic `case $x:` arms are never flagged.
+    fn check_duplicate_case_values(&mut self, sw: &SwitchStmt) {
+        let values = sw.body.cases.iter().filter_map(|c| c.value.as_ref());
+        for (span, value) in crate::expr::duplicate_literal_conditions(values) {
+            let (line, line_end, col_start, col_end) = self.span_to_location(span);
+            self.issues.add(
+                Issue::new(
+                    IssueKind::ParadoxicalCondition { value },
+                    Location {
+                        file: self.file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
+                    },
+                )
+                .with_snippet(parser::span_text(self.source, span).unwrap_or_default()),
+            );
+        }
+    }
+
     pub(super) fn analyze_switch_stmt(&mut self, sw: &SwitchStmt, ctx: &mut FlowState) {
+        self.check_duplicate_case_values(sw);
         let _subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
         let subject_var: Option<String> = match &sw.expr.kind {
             ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),

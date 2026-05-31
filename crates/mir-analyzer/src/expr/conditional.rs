@@ -1,5 +1,6 @@
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
+use mir_issues::{IssueKind, Severity};
 use mir_types::Type;
 use php_ast::owned::{ExprKind, MatchExpr, NullCoalesceExpr, TernaryExpr};
 
@@ -67,6 +68,22 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub(super) fn analyze_match(&mut self, m: &MatchExpr, ctx: &mut FlowState) -> Type {
+        // Flag match-arm conditions whose literal value repeats an earlier arm —
+        // the duplicate branch can never be reached. Only literal conditions are
+        // compared, so dynamic conditions are never flagged.
+        let conditions = m
+            .arms
+            .iter()
+            .filter_map(|a| a.conditions.as_deref())
+            .flatten();
+        for (span, value) in crate::expr::duplicate_literal_conditions(conditions) {
+            self.emit(
+                IssueKind::ParadoxicalCondition { value },
+                Severity::Warning,
+                span,
+            );
+        }
+
         let subject_ty = self.analyze(&m.subject, ctx);
         let subject_var = match &m.subject.kind {
             ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
