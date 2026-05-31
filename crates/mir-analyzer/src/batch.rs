@@ -221,9 +221,9 @@ impl AnalysisSession {
             .map(|parsed| (parsed.file.clone(), parsed.source.clone()))
             .collect();
 
-        // ---- Pre-analysis invalidation: evict dependents of changed files ------
+        // ---- Pre-analysis invalidation: evict dependents of changed/removed files
         if let Some(cache) = &self.cache {
-            let changed: Vec<String> = file_data
+            let mut invalidated: Vec<String> = file_data
                 .par_iter()
                 .filter_map(|(f, src)| {
                     let h = hash_content(src.as_ref());
@@ -234,8 +234,26 @@ impl AnalysisSession {
                     }
                 })
                 .collect();
-            if !changed.is_empty() {
-                cache.evict_with_dependents(&changed);
+
+            // Files analyzed in a previous run but now gone from disk: their
+            // dependents hold stale results that still assume the deleted
+            // definitions exist. A file merely absent from this run's path set
+            // (but still on disk) is NOT a deletion — checking disk existence
+            // avoids evicting dependents during partial-path analysis.
+            let current: std::collections::HashSet<&str> =
+                file_data.iter().map(|(f, _)| f.as_ref()).collect();
+            let removed: Vec<String> = cache
+                .cached_files()
+                .into_iter()
+                .filter(|f| !current.contains(f.as_str()) && !std::path::Path::new(f).exists())
+                .collect();
+            for f in &removed {
+                cache.evict(f);
+            }
+            invalidated.extend(removed);
+
+            if !invalidated.is_empty() {
+                cache.evict_with_dependents(&invalidated);
             }
         }
 
@@ -332,35 +350,33 @@ impl AnalysisSession {
                     let _ = collect_file_definitions(db as &dyn MirDatabase, sf);
                 });
         }
+        let _t_prewarm_ms = (_t0.elapsed() - _t_ingest).as_secs_f64() * 1000.0;
 
         // ---- Lazy-load unknown classes via PSR-4 ----------------------------
+        let _t_before_lazy = _t0.elapsed();
         if let Some(psr4) = self.psr4.clone() {
             self.lazy_load_missing_classes(psr4, php_version, &mut all_issues);
         }
-
-        // ---- Build reverse dep graph and persist it for the next run ---------
-        if let Some(cache) = &self.cache {
-            let db_snapshot = {
-                let guard = self.db.salsa.read();
-                (**guard).clone()
-            };
-            let rev = build_reverse_deps(&db_snapshot);
-            cache.set_reverse_deps(rev);
-        }
+        let _t_lazyload_ms = (_t0.elapsed() - _t_before_lazy).as_secs_f64() * 1000.0;
 
         // ---- Class-level checks ---------------------------------------------
         let analyzed_file_set: HashSet<Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
+        let _t_class_analyzer = std::time::Instant::now();
         {
             let class_db = {
                 let guard = self.db.salsa.read();
                 (**guard).clone()
             };
-            let class_issues =
-                crate::class::ClassAnalyzer::with_files(&class_db, analyzed_file_set, &file_data)
-                    .analyze_all();
+            let class_issues = crate::class::ClassAnalyzer::with_files(
+                &class_db,
+                analyzed_file_set.clone(),
+                &file_data,
+            )
+            .analyze_all();
             all_issues.extend(class_issues);
         }
+        let _t_class_analyzer_ms = _t_class_analyzer.elapsed().as_secs_f64() * 1000.0;
 
         let _t_class_checks = _t0.elapsed();
 
@@ -442,6 +458,22 @@ impl AnalysisSession {
             );
         }
 
+        // ---- Build reverse dep graph and persist it for the next run ---------
+        // Must run AFTER `commit_reference_locations_batch` (above): the graph's
+        // call-site / instantiation / inferred-return edges are derived from the
+        // committed reference-location map. Built any earlier (the salsa db is
+        // fresh each session) that map is empty, so only structural edges
+        // (parent/interface/trait/declared types) survive — and any dependent
+        // reachable only through a call site or inferred type goes stale.
+        if let Some(cache) = &self.cache {
+            let db_snapshot = {
+                let guard = self.db.salsa.read();
+                (**guard).clone()
+            };
+            let rev = build_reverse_deps(&db_snapshot);
+            cache.set_reverse_deps(rev);
+        }
+
         // Persist cache hits/misses to disk
         if let Some(cache) = &self.cache {
             cache.flush();
@@ -450,20 +482,32 @@ impl AnalysisSession {
         // ---- Dead-code detection -------------------------------------------
         if opts.should_run_dead_code() {
             let salsa = self.snapshot_db();
-            let dead_code_issues = crate::dead_code::DeadCodeAnalyzer::new(&salsa).analyze();
+            let _t_dead_code = std::time::Instant::now();
+            let dead_code_issues =
+                crate::dead_code::DeadCodeAnalyzer::with_files(&salsa, analyzed_file_set.clone())
+                    .analyze();
             all_issues.extend(dead_code_issues);
+            if std::env::var("MIR_TIMING").is_ok() {
+                eprintln!(
+                    "[timing] dead_code_analyzer={:.0}ms",
+                    _t_dead_code.elapsed().as_secs_f64() * 1000.0
+                );
+            }
         }
 
         let _t_total = _t0.elapsed();
         if std::env::var("MIR_TIMING").is_ok() {
             eprintln!(
-                "[timing] stubs={:.0}ms read={:.0}ms salsa_reg={:.0}ms collect_defs={:.0}ms ingest={:.0}ms class_checks={:.0}ms body_analysis={:.0}ms total={:.0}ms",
+                "[timing] stubs={:.0}ms read={:.0}ms salsa_reg={:.0}ms collect_defs={:.0}ms ingest={:.0}ms class_checks={:.0}ms (prewarm={:.0}ms lazy_load={:.0}ms class_analyzer={:.0}ms) body_analysis={:.0}ms total={:.0}ms",
                 _t_stubs.as_secs_f64() * 1000.0,
                 (_t_read - _t_stubs).as_secs_f64() * 1000.0,
                 (_t_salsa_reg - _t_read).as_secs_f64() * 1000.0,
                 (_t_collect_defs - _t_salsa_reg).as_secs_f64() * 1000.0,
                 (_t_ingest - _t_collect_defs).as_secs_f64() * 1000.0,
                 (_t_class_checks - _t_ingest).as_secs_f64() * 1000.0,
+                _t_prewarm_ms,
+                _t_lazyload_ms,
+                _t_class_analyzer_ms,
                 (_t_body_analysis - _t_class_checks).as_secs_f64() * 1000.0,
                 _t_total.as_secs_f64() * 1000.0,
             );
@@ -916,7 +960,7 @@ pub(crate) fn collect_php_files(dir: &Path, out: &mut Vec<PathBuf>) {
 // transitive vendor types.
 // ---------------------------------------------------------------------------
 
-fn collect_class_referenced_fqcns(class: &crate::db::ClassLike, out: &mut Vec<String>) {
+pub(crate) fn collect_class_referenced_fqcns(class: &crate::db::ClassLike, out: &mut Vec<String>) {
     if let Some(p) = class.parent() {
         out.push(p.to_string());
     }
@@ -966,7 +1010,7 @@ fn collect_class_referenced_fqcns(class: &crate::db::ClassLike, out: &mut Vec<St
     }
 }
 
-fn collect_fqcns_in_union(u: &Type, out: &mut Vec<String>) {
+pub(crate) fn collect_fqcns_in_union(u: &Type, out: &mut Vec<String>) {
     for atom in u.types.iter() {
         collect_fqcns_in_atomic(atom, out);
     }
@@ -978,7 +1022,7 @@ fn collect_fqcns_in_simple(t: &mir_types::compact::SimpleType, out: &mut Vec<Str
     }
 }
 
-fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
+pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
     match a {
         Atomic::TNamedObject { fqcn, type_params } => {
             out.push(fqcn.to_string());

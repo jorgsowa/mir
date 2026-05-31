@@ -40,11 +40,27 @@ const MAGIC_METHODS: &[&str] = &[
 
 pub struct DeadCodeAnalyzer<'a> {
     db: &'a dyn MirDatabase,
+    /// Only report dead code defined in these files (empty = all files).
+    /// Threading the project file set keeps the pass from materializing and
+    /// flagging private members of lazily-loaded vendor classes (whose bodies
+    /// are never analyzed, so every private member looks unreferenced).
+    analyzed_files: rustc_hash::FxHashSet<Arc<str>>,
 }
 
 impl<'a> DeadCodeAnalyzer<'a> {
+    #[allow(dead_code)]
     pub fn new(db: &'a dyn MirDatabase) -> Self {
-        Self { db }
+        Self {
+            db,
+            analyzed_files: rustc_hash::FxHashSet::default(),
+        }
+    }
+
+    pub fn with_files(
+        db: &'a dyn MirDatabase,
+        analyzed_files: rustc_hash::FxHashSet<Arc<str>>,
+    ) -> Self {
+        Self { db, analyzed_files }
     }
 
     pub fn analyze(&self) -> Vec<Issue> {
@@ -52,69 +68,55 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
         // Walk only plain classes (not interfaces/traits/enums); private
         // members on the other kinds aren't subject to dead-code reporting.
-        let class_fqcns: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
-            .iter()
-            .cloned()
-            .collect();
-
-        for fqcn in &class_fqcns {
-            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-            let pulled = crate::db::find_class_like(self.db, here);
-            let is_class = pulled.as_ref().map(|c| c.is_class()).unwrap_or(false);
-            if !is_class {
-                continue;
-            }
+        // `analyzed_class_defs` already restricts to the project file set and
+        // returns plain classes only, so vendor classes are never enumerated.
+        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
             let fqcn_str = fqcn.as_ref();
 
             // Methods.
-            if let Some(class) = pulled.as_ref() {
-                for (name, method) in class.own_methods().iter() {
-                    if method.visibility != Visibility::Private {
-                        continue;
-                    }
-                    let name_lower = name.to_ascii_lowercase();
-                    if MAGIC_METHODS.contains(&name_lower.as_str()) {
-                        continue;
-                    }
-                    if !self.db.has_reference(&format!(
-                        "{}::{}",
-                        fqcn_str,
-                        name.to_ascii_lowercase()
-                    )) {
-                        let location =
-                            crate::diagnostics::storage_loc_to_location(method.location.as_ref());
-                        issues.push(Issue::new(
-                            IssueKind::UnusedMethod {
-                                class: fqcn_str.to_string(),
-                                method: name.to_string(),
-                            },
-                            location,
-                        ));
-                    }
+            for (name, method) in class.own_methods().iter() {
+                if method.visibility != Visibility::Private {
+                    continue;
+                }
+                let name_lower = name.to_ascii_lowercase();
+                if MAGIC_METHODS.contains(&name_lower.as_str()) {
+                    continue;
+                }
+                if !self
+                    .db
+                    .has_reference(&format!("{}::{}", fqcn_str, name_lower))
+                {
+                    let location =
+                        crate::diagnostics::storage_loc_to_location(method.location.as_ref());
+                    issues.push(Issue::new(
+                        IssueKind::UnusedMethod {
+                            class: fqcn_str.to_string(),
+                            method: name.to_string(),
+                        },
+                        location,
+                    ));
                 }
             }
 
             // Properties.
-            if let Some(class) = pulled.as_ref() {
-                if let Some(props) = class.own_properties() {
-                    for (name, prop) in props.iter() {
-                        if prop.visibility != Visibility::Private {
-                            continue;
-                        }
-                        if !self
-                            .db
-                            .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
-                        {
-                            let location =
-                                crate::diagnostics::storage_loc_to_location(prop.location.as_ref());
-                            issues.push(Issue::new(
-                                IssueKind::UnusedProperty {
-                                    class: fqcn_str.to_string(),
-                                    property: name.to_string(),
-                                },
-                                location,
-                            ));
-                        }
+            if let Some(props) = class.own_properties() {
+                for (name, prop) in props.iter() {
+                    if prop.visibility != Visibility::Private {
+                        continue;
+                    }
+                    if !self
+                        .db
+                        .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
+                    {
+                        let location =
+                            crate::diagnostics::storage_loc_to_location(prop.location.as_ref());
+                        issues.push(Issue::new(
+                            IssueKind::UnusedProperty {
+                                class: fqcn_str.to_string(),
+                                property: name.to_string(),
+                            },
+                            location,
+                        ));
                     }
                 }
             }
@@ -137,6 +139,14 @@ impl<'a> DeadCodeAnalyzer<'a> {
             // they are not user-defined dead code.
             if let Some(loc) = &location {
                 if stub_vfs.is_stub_file(loc.file.as_ref()) {
+                    continue;
+                }
+                // Restrict to the project file set (when scoped), mirroring the
+                // class-member pass: a function from a lazily-loaded vendor file
+                // is not user dead code.
+                if !self.analyzed_files.is_empty()
+                    && !self.analyzed_files.contains(loc.file.as_ref())
+                {
                     continue;
                 }
             }

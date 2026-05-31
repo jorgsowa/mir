@@ -143,6 +143,18 @@ impl AnalysisCache {
         })
     }
 
+    /// Return the paths of every file that currently has a cache entry.
+    /// Used to detect files that were analyzed in a previous run but have since
+    /// been deleted, so their dependents can be invalidated.
+    pub fn cached_files(&self) -> Vec<String> {
+        let id_map = self.file_id_map.lock();
+        let entries = self.entries.lock();
+        entries
+            .keys()
+            .filter_map(|&id| id_map.path(id).map(|p| p.to_string()))
+            .collect()
+    }
+
     /// Store `issues` and `reference_locations` for `file_path` with the given
     /// `content_hash`. `reference_locations` is a list of
     /// `(symbol_key, line, col_start, col_end)` recorded during body analysis.

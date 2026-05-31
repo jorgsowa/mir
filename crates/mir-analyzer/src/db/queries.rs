@@ -496,26 +496,6 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     }
 }
 
-#[allow(dead_code)]
-pub(crate) fn collect_accumulated_issues(
-    db: &dyn MirDatabase,
-    files: &[(Arc<str>, SourceFile)],
-    php_version: &str,
-) -> Vec<Issue> {
-    let mut all_issues = Vec::new();
-    let input = AnalyzeFileInput::new(db, Arc::from(php_version));
-
-    for (_path, file) in files {
-        analyze_file(db, *file, input);
-        let accumulated: Vec<&IssueAccumulator> = analyze_file::accumulated(db, *file, input);
-        for acc in accumulated {
-            all_issues.push(acc.0.clone());
-        }
-    }
-
-    all_issues
-}
-
 pub fn is_unchecked_exception(db: &dyn MirDatabase, fqcn: &str) -> bool {
     extends_or_implements(db, fqcn, "RuntimeException")
         || extends_or_implements(db, fqcn, "LogicException")
