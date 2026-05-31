@@ -392,6 +392,44 @@ pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<
     defs.slice.classes.get(idx as usize).cloned()
 }
 
+/// Plain classes (not interfaces/traits/enums) defined in `analyzed_files`,
+/// each materialized exactly once and the whole list sorted by FQCN for
+/// deterministic issue order across runs.
+///
+/// Decomposes per file via the memoized [`collect_file_definitions`] query
+/// rather than walking the global symbol index: in batch mode `analyzed_files`
+/// is the project file set, so vendor / stub classes are never enumerated at
+/// all (they aren't in the set). An empty `analyzed_files` means "all files"
+/// — used by the `new()`/unit-test path — and falls back to every registered
+/// source file. Incremental edits only recompute the touched files' slices.
+pub fn analyzed_class_defs(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<(Arc<str>, ClassLike)> {
+    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
+        db.all_source_files()
+    } else {
+        analyzed_files
+            .iter()
+            .filter_map(|p| db.lookup_source_file(p))
+            .collect()
+    };
+    // Iterate files in a stable order so the FQCN sort below — which is stable
+    // and therefore preserves input order on equal keys — yields a fully
+    // deterministic result even when two files declare the same class name.
+    files.sort_by_key(|a| a.path(db));
+
+    let mut out: Vec<(Arc<str>, ClassLike)> = Vec::new();
+    for sf in files {
+        let defs = collect_file_definitions(db, sf);
+        for class in defs.slice.classes.iter() {
+            out.push((class.fqcn.clone(), ClassLike::Class(class.clone())));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 #[salsa::tracked]
 pub fn interface_def_at(
     db: &dyn MirDatabase,

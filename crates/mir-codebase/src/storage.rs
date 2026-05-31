@@ -340,8 +340,15 @@ pub struct MethodDef {
         serialize_with = "serialize_return_type"
     )]
     pub return_type: Option<Arc<Type>>,
-    /// Type inferred from body analysis (filled in during pass 2).
-    pub inferred_return_type: Option<Type>,
+    /// Type inferred from body analysis. Stored as `Option<Arc<Type>>` (8 B) rather
+    /// than inline `Option<Type>` (176 B, no niche) — inference is now demand-driven
+    /// via salsa (`inferred_*_return_type_demand`), so this field is a rarely/never
+    /// populated fallback; shrinking it saves ~168 B on every MethodDef.
+    #[serde(
+        deserialize_with = "deserialize_return_type",
+        serialize_with = "serialize_return_type"
+    )]
+    pub inferred_return_type: Option<Arc<Type>>,
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_abstract: bool,
@@ -368,7 +375,7 @@ impl MethodDef {
     pub fn effective_return_type(&self) -> Option<&Type> {
         self.return_type
             .as_deref()
-            .or(self.inferred_return_type.as_ref())
+            .or(self.inferred_return_type.as_deref())
     }
 }
 
@@ -542,7 +549,13 @@ pub struct FunctionDef {
         serialize_with = "serialize_return_type"
     )]
     pub return_type: Option<Arc<Type>>,
-    pub inferred_return_type: Option<Type>,
+    /// See `MethodDef::inferred_return_type` — `Option<Arc<Type>>` (8 B) for the
+    /// same demand-driven-inference reason.
+    #[serde(
+        deserialize_with = "deserialize_return_type",
+        serialize_with = "serialize_return_type"
+    )]
+    pub inferred_return_type: Option<Arc<Type>>,
     pub template_params: Vec<TemplateParam>,
     pub assertions: Vec<Assertion>,
     pub throws: Vec<Arc<str>>,
@@ -559,7 +572,7 @@ impl FunctionDef {
     pub fn effective_return_type(&self) -> Option<&Type> {
         self.return_type
             .as_deref()
-            .or(self.inferred_return_type.as_ref())
+            .or(self.inferred_return_type.as_deref())
     }
 }
 

@@ -832,6 +832,7 @@ dependencies = [
  "anyhow",
  "clap",
  "indicatif",
+ "mimalloc",
  "mir-analyzer",
  "mir-codebase",
  "mir-issues",

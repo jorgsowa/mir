@@ -2,6 +2,13 @@ use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
 
+// macOS's default `libmalloc` serializes heavily under the multi-threaded,
+// allocation-dense `body_analysis` phase. mimalloc (per-thread arenas) is what
+// the benchmarks already run under; matching it in the shipping binary removes
+// that allocator-lock contention from real `mir` runs.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;

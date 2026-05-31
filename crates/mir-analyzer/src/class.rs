@@ -63,38 +63,15 @@ impl<'a> ClassAnalyzer<'a> {
     pub fn analyze_all(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
 
-        let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
-            .iter()
-            .filter(|fqcn| {
-                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                crate::db::find_class_like(self.db, here)
-                    .map(|c| c.is_class())
-                    .unwrap_or(false)
-            })
-            .cloned()
-            .collect();
-        // Sort for deterministic issue order across runs.
-        class_keys.sort();
-
-        for fqcn in &class_keys {
-            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-            let Some(class) = crate::db::find_class_like(self.db, here) else {
-                continue;
-            };
+        // Only plain classes defined in the analyzed file set, already sorted by
+        // FQCN. Decomposing per file via `collect_file_definitions` means vendor
+        // / stub classes are never materialized (they aren't in `analyzed_files`),
+        // which is the dominant cost on cold start over a large `vendor/`.
+        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
+            let fqcn = &fqcn;
             let location: Option<Location> = class.location().cloned();
             let parent_fqcn: Option<Arc<str>> = class.parent().cloned();
             let is_abstract = class.is_abstract();
-
-            // Skip classes from vendor / stub files — only check user-analyzed files
-            if !self.analyzed_files.is_empty() {
-                let in_analyzed = location
-                    .as_ref()
-                    .map(|loc| self.analyzed_files.contains(&loc.file))
-                    .unwrap_or(false);
-                if !in_analyzed {
-                    continue;
-                }
-            }
 
             // ---- 1. Final-class extension check / deprecated parent check ------
             if let Some(parent_fqcn) = parent_fqcn.as_ref() {
