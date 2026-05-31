@@ -314,11 +314,11 @@ impl<'a> StatementsAnalyzer<'a> {
     // Helper: create a short-lived ExpressionAnalyzer borrowing our fields
     // -----------------------------------------------------------------------
 
-    pub(crate) fn expr_analyzer<'b>(&'b mut self, _ctx: &FlowState) -> ExpressionAnalyzer<'b>
+    pub(crate) fn expr_analyzer<'b>(&'b mut self, ctx: &FlowState) -> ExpressionAnalyzer<'b>
     where
         'a: 'b,
     {
-        ExpressionAnalyzer::new(
+        let mut ea = ExpressionAnalyzer::new(
             self.db,
             self.file.clone(),
             self.source,
@@ -327,7 +327,9 @@ impl<'a> StatementsAnalyzer<'a> {
             self.symbols,
             self.php_version,
             self.mode,
-        )
+        );
+        ea.strict_types = ctx.strict_types;
+        ea
     }
 
     fn offset_to_line_col(&self, offset: u32) -> (u32, u16) {

@@ -333,8 +333,9 @@ impl<'a> BodyAnalyzer<'a> {
                     | StmtKind::Interface(_)
                     | StmtKind::Trait(_)
                     | StmtKind::Namespace(_)
-                    | StmtKind::Use(_)
-                    | StmtKind::Declare(_) => {}
+                    | StmtKind::Use(_) => {}
+                    // Process Declare so that `declare(strict_types=1)` updates
+                    // ctx.strict_types before later executable stmts are analyzed.
                     _ => {
                         sa.analyze_stmt(stmt, &mut ctx);
                     }
@@ -395,8 +396,7 @@ impl<'a> BodyAnalyzer<'a> {
                     | StmtKind::Interface(_)
                     | StmtKind::Trait(_)
                     | StmtKind::Namespace(_)
-                    | StmtKind::Use(_)
-                    | StmtKind::Declare(_) => {}
+                    | StmtKind::Use(_) => {}
                     _ => {
                         sa.analyze_stmt(stmt, &mut ctx);
                     }

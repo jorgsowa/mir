@@ -383,6 +383,11 @@ pub(crate) fn emit_unused_params(
     }
     for p in params {
         let name = p.name.as_ref().trim_start_matches('$');
+        // Skip the synthetic variadic param injected by func_get_args() detection —
+        // its name "..." is not a valid PHP identifier and never appears in source.
+        if name == "..." {
+            continue;
+        }
         let name_sym = mir_types::Name::from(name);
         if !ctx.read_vars.contains(&name_sym) {
             let (line, col_start, line_end, col_end) = ctx

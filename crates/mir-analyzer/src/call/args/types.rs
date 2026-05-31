@@ -150,6 +150,11 @@ pub(crate) fn check_one(
         && (arg_ty.remove_false().types.is_empty()
             || !named_object_subtype(&arg_ty.remove_false(), param_ty, ea))
         && (arg_core.types.is_empty() || !named_object_subtype(&arg_core, param_ty, ea))
+        // In PHP's coercive typing mode (no strict_types=1), an object that
+        // implements \Stringable can be passed where a string is expected —
+        // PHP calls __toString() implicitly. Most PHP code (including Laravel)
+        // does not declare strict_types, so this is the common case.
+        && !stringable_coercion_ok(arg_ty, param_ty, ea)
     {
         ea.emit(
             IssueKind::InvalidArgument {
@@ -162,6 +167,49 @@ pub(crate) fn check_one(
             arg_span,
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// PHP coercive-typing helpers
+// ---------------------------------------------------------------------------
+
+/// Returns `true` when passing `arg` where `string` is expected is safe via
+/// PHP's coercive `__toString()` mechanism.
+///
+/// In PHP without `strict_types=1`, an object that implements `\Stringable`
+/// (or whose class has `__toString()`) is automatically coerced to a string
+/// when passed to a `string`-typed parameter. Most PHP code, including the
+/// entire Laravel framework, does not declare strict_types, so this coercion
+/// is the common case and should not be reported as `InvalidArgument`.
+///
+/// Scope: only fires when `param` contains a `string` atomic and `arg` is a
+/// named-object type that implements `\Stringable`. Other parameter types
+/// (int, array, …) are deliberately excluded.
+fn stringable_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    use mir_types::Atomic;
+
+    // Under strict_types=1, PHP does NOT coerce objects to string even when
+    // they implement \Stringable — the runtime would throw a TypeError.
+    if ea.strict_types {
+        return false;
+    }
+
+    if !param.types.iter().any(|p| matches!(p, Atomic::TString)) {
+        return false;
+    }
+
+    arg.types.iter().any(|a| {
+        let fqcn = match a {
+            Atomic::TNamedObject { fqcn, .. } => fqcn.as_ref(),
+            Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => fqcn.as_ref(),
+            _ => return false,
+        };
+        let resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+        crate::db::extends_or_implements(ea.db, &resolved, "Stringable")
+            || crate::db::extends_or_implements(ea.db, fqcn, "Stringable")
+            || crate::db::has_method_in_chain(ea.db, &resolved, "__toString")
+            || crate::db::has_method_in_chain(ea.db, fqcn, "__toString")
+    })
 }
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,10 @@ pub struct ExpressionAnalyzer<'a> {
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
     pub mode: AnalysisMode,
+    /// Whether `declare(strict_types=1)` is active for the calling file.
+    /// When true, coercive PHP typing (e.g. Stringable → string) must not be
+    /// silently allowed — the runtime would throw a TypeError.
+    pub strict_types: bool,
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
@@ -69,6 +73,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             symbols,
             php_version,
             mode,
+            strict_types: false,
             in_existence_check: false,
         }
     }

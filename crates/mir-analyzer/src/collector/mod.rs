@@ -977,6 +977,26 @@ impl<'a> DefinitionCollector<'a> {
             PARAM_WITH_DEFAULT.fetch_add(local_defaults, Relaxed);
         }
 
+        // Same func_get_args detection as for free functions (see collector/function.rs).
+        let last_is_variadic = params.last().is_some_and(|p| p.is_variadic);
+        if !last_is_variadic {
+            let body_stmts = m
+                .body
+                .as_deref()
+                .map(|b| b.stmts.as_ref())
+                .unwrap_or_default();
+            if crate::collector::function::stmts_use_func_get_args(body_stmts) {
+                params.push(FnParam {
+                    name: mir_types::Name::new("..."),
+                    ty: None,
+                    has_default: false,
+                    is_variadic: true,
+                    is_byref: false,
+                    is_optional: true,
+                });
+            }
+        }
+
         // Build combined template name set first so bound resolution below can recognise
         // template-param names and avoid namespace-qualifying them.
         // Includes both method-level and class-level template names.
