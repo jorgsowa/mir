@@ -347,16 +347,6 @@ impl AnalysisSession {
         self.db.ingest_stub_paths(&paths, self.php_version);
     }
 
-    /// Scan a parsed AST for class references and lazy-load any that are
-    /// PSR-4-resolvable but not yet registered as `SourceFile` inputs. After
-    /// this call, `find_class_like(fqcn)` can pull-resolve the referenced
-    /// classes without needing a retry loop.
-    ///
-    /// The current implementation reuses [`crate::diagnostics::collect_referenced_class_fqcns`]
-    /// already used by the diagnostics pass. Missing classes are passed
-    /// through [`Self::load_class_transitive`] so their inheritance
-    /// chain is also primed (body analysis reads parents/interfaces while
-    /// resolving members).
     /// Returns true if this session has a configured class resolver
     /// (typically a PSR-4 / classmap autoloader chained with the stub
     /// resolver). Used by `FileAnalyzer` to skip the AST-scan preload
@@ -374,6 +364,13 @@ impl AnalysisSession {
         self.preload_psr4_classes_for_ast(program, file);
     }
 
+    /// Scan a parsed AST for class references and lazy-load any that are
+    /// PSR-4-resolvable but not yet registered as `SourceFile` inputs, together
+    /// with their full declared-type closure (see [`Self::load_class_transitive`]).
+    /// After this call, `find_class_like` can pull-resolve not just the
+    /// referenced classes but the types named in their signatures and
+    /// inheritance chains — so open-file diagnostics are as complete as the
+    /// batch path, without a post-analysis retry loop.
     pub fn preload_psr4_classes_for_ast(&self, program: &php_ast::owned::Program, file: &str) {
         if self.resolver.is_none() {
             return;
@@ -391,10 +388,17 @@ impl AnalysisSession {
                 .collect()
         };
         for fqcn in resolved {
-            if self.contains_class(&fqcn) {
-                continue;
-            }
-            let _ = self.load_class(&fqcn);
+            // Load each referenced class together with its declared-type closure
+            // (inheritance chain + signature types) so member access and chained
+            // calls on lazily-loaded types type-check in a single pass.
+            //
+            // Depth 3 is empirically the knee of the curve: on Laravel hub files
+            // it produces diagnostics identical to the unbounded (depth-10)
+            // closure while loading ~2-3× fewer classes (e.g. 117 vs 314 for
+            // Builder.php), roughly halving cold-open latency. Depth 2 is cheaper
+            // still but measurably less complete (leaves more types unresolved).
+            // `load_class_transitive` short-circuits classes already present.
+            self.load_class_transitive(&fqcn, 3);
         }
     }
 
@@ -1122,14 +1126,19 @@ impl AnalysisSession {
         }
     }
 
-    /// Lazy-load every class transitively reachable from `fqcn` via parent /
-    /// interface / trait edges. Useful when the consumer needs not just the
-    /// requested class but enough of its inheritance chain to type-check
-    /// member access.
+    /// Lazy-load the full *declared-type closure* transitively reachable from
+    /// `fqcn`: not just its parent / interface / trait inheritance chain, but
+    /// also the classes named in its members' signatures (method return /
+    /// parameter types, property types, constant types, generic args, mixins,
+    /// `@throws`). This mirrors the batch path's
+    /// [`crate::batch::collect_class_referenced_fqcns`] closure, so an open
+    /// buffer gets the same complete diagnostics the CLI produces: a value
+    /// whose type comes from a vendor method's return type, or a member
+    /// inherited from a vendor parent, resolves instead of degrading to `mixed`.
     ///
     /// Walks at most `max_depth` levels (default in batch analysis is 10).
-    /// Returns the number of classes successfully loaded (not counting
-    /// `fqcn` itself if it was already present).
+    /// Returns the number of classes successfully loaded (not counting classes
+    /// that were already present).
     pub fn load_class_transitive(&self, fqcn: &str, max_depth: usize) -> usize {
         if self.resolver.is_none() {
             return 0;
@@ -1142,31 +1151,34 @@ impl AnalysisSession {
             if frontier.is_empty() {
                 break;
             }
-            let mut next: Vec<String> = Vec::new();
+            // Phase 1: load every class in this frontier level (mutates inputs).
+            let mut to_expand: Vec<String> = Vec::with_capacity(frontier.len());
             for name in frontier.drain(..) {
                 if !visited.insert(name.clone()) {
                     continue;
                 }
                 let was_present = self.contains_class(&name);
-                let resolved = self.load_class(&name).is_loaded();
-                if resolved && !was_present {
+                if !self.load_class(&name).is_loaded() {
+                    continue;
+                }
+                if !was_present {
                     loaded += 1;
-                    // Walk the new class's parent / interfaces / traits via pull.
-                    let db = self.snapshot_db();
+                }
+                to_expand.push(name);
+            }
+
+            // Phase 2: follow the declared-type closure of every resolved class
+            // — including already-present ones, so a class loaded shallowly
+            // elsewhere still gets its references expanded. One db snapshot for
+            // the whole level (all loads above are committed); `visited` and
+            // `contains_class` keep re-walks cheap and loop-free.
+            let mut next: Vec<String> = Vec::new();
+            if !to_expand.is_empty() {
+                let db = self.snapshot_db();
+                for name in &to_expand {
                     let here = crate::db::Fqcn::from_str(&db, name.as_str());
                     if let Some(class) = crate::db::find_class_like(&db, here) {
-                        if let Some(parent) = class.parent() {
-                            next.push(parent.to_string());
-                        }
-                        for iface in class.interfaces().iter() {
-                            next.push(iface.to_string());
-                        }
-                        for tr in class.class_traits().iter() {
-                            next.push(tr.to_string());
-                        }
-                        for ext in class.extends().iter() {
-                            next.push(ext.to_string());
-                        }
+                        crate::batch::collect_class_referenced_fqcns(&class, &mut next);
                     }
                 }
             }
