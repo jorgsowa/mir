@@ -61,8 +61,26 @@ pub fn narrow_from_condition(
             let is_identical = b.op == BinaryOp::Identical;
             let effective_true = if is_identical { is_true } else { !is_true };
 
+            // `($x ?? FALLBACK) === FALLBACK` — on the false branch, $x was defined
+            // Must be checked before literal comparisons because `b.right` matching a literal
+            // would otherwise consume the arm before we check for NullCoalesce on `b.left`.
+            if let Some(nc) = extract_null_coalesce(&b.left) {
+                if let Some(var_name) = extract_var_name(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.right) {
+                        let current = ctx.get_var(&var_name);
+                        ctx.set_var(&var_name, current.remove_null());
+                    }
+                }
+            } else if let Some(nc) = extract_null_coalesce(&b.right) {
+                if let Some(var_name) = extract_var_name(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.left) {
+                        let current = ctx.get_var(&var_name);
+                        ctx.set_var(&var_name, current.remove_null());
+                    }
+                }
+            }
             // `$x === null`
-            if matches!(b.right.kind, ExprKind::Null) {
+            else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
                 }
@@ -842,6 +860,33 @@ fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
         _ => None,
+    }
+}
+
+fn extract_null_coalesce(expr: &php_ast::owned::Expr) -> Option<&php_ast::owned::NullCoalesceExpr> {
+    match &expr.kind {
+        ExprKind::NullCoalesce(nc) => Some(nc),
+        ExprKind::Parenthesized(inner) => extract_null_coalesce(inner),
+        _ => None,
+    }
+}
+
+fn same_literal(a: &php_ast::owned::Expr, b: &php_ast::owned::Expr) -> bool {
+    let a = peel_parens(a);
+    let b = peel_parens(b);
+    match (&a.kind, &b.kind) {
+        (ExprKind::Null, ExprKind::Null) => true,
+        (ExprKind::Bool(a), ExprKind::Bool(b)) => a == b,
+        (ExprKind::Int(a), ExprKind::Int(b)) => a == b,
+        (ExprKind::String(a), ExprKind::String(b)) => a == b,
+        _ => false,
+    }
+}
+
+fn peel_parens(expr: &php_ast::owned::Expr) -> &php_ast::owned::Expr {
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) => peel_parens(inner),
+        _ => expr,
     }
 }
 
