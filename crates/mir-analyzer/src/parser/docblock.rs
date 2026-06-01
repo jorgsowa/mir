@@ -1358,9 +1358,13 @@ fn parse_method_params(name_part: &str) -> Vec<DocMethodParam> {
     let Some(open) = name_part.find('(') else {
         return vec![];
     };
-    let Some(close) = name_part.rfind(')') else {
+    // Use the existing balanced-paren matcher, which expects the slice to start
+    // at '('. This avoids capturing closing parens from description text that
+    // follows the method signature (e.g. Carbon's "@method addDay() ... (desc)").
+    let Some(rel_close) = find_matching_paren(&name_part[open..]) else {
         return vec![];
     };
+    let close = open + rel_close;
     let inner = name_part[open + 1..close].trim();
     if inner.is_empty() {
         return vec![];
@@ -1592,6 +1596,23 @@ mod tests {
         assert!(!get_name.is_static);
         let create = parsed.methods.iter().find(|m| m.name == "create").unwrap();
         assert!(create.is_static);
+    }
+
+    #[test]
+    fn parse_method_tag_description_with_parens() {
+        // Carbon-style: description text contains "(using date interval)" after the
+        // closing paren of the method signature. The old rfind(')') would capture
+        // the description's closing paren and produce a phantom parameter.
+        let doc = r#"/**
+         * @method $this addDay() Add one day to the instance (using date interval).
+         * @method $this subDays(int|float $value = 1) Sub days (the $value count passed in).
+         */"#;
+        let parsed = DocblockParser::parse(doc);
+        let add_day = parsed.methods.iter().find(|m| m.name == "addDay").unwrap();
+        assert_eq!(add_day.params.len(), 0, "addDay() must have zero params");
+        let sub_days = parsed.methods.iter().find(|m| m.name == "subDays").unwrap();
+        assert_eq!(sub_days.params.len(), 1);
+        assert!(sub_days.params[0].is_optional);
     }
 
     #[test]
