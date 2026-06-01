@@ -496,6 +496,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     if !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())
                         && !crate::db::has_method_in_chain(self.db, fqcn.as_ref(), "__get")
+                        && !self.in_existence_check
                     {
                         self.emit(
                             IssueKind::UndefinedProperty {
@@ -520,25 +521,29 @@ impl<'a> ExpressionAnalyzer<'a> {
                             {
                                 return scalar_ty;
                             }
-                            self.emit(
-                                IssueKind::UndefinedProperty {
-                                    class: fqcn.to_string(),
-                                    property: prop_name.to_string(),
-                                },
-                                Severity::Warning,
-                                span,
-                            );
+                            if !self.in_existence_check {
+                                self.emit(
+                                    IssueKind::UndefinedProperty {
+                                        class: fqcn.to_string(),
+                                        property: prop_name.to_string(),
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
                             return Type::mixed();
                         }
                         _ => {
-                            self.emit(
-                                IssueKind::UndefinedProperty {
-                                    class: fqcn.to_string(),
-                                    property: prop_name.to_string(),
-                                },
-                                Severity::Warning,
-                                span,
-                            );
+                            if !self.in_existence_check {
+                                self.emit(
+                                    IssueKind::UndefinedProperty {
+                                        class: fqcn.to_string(),
+                                        property: prop_name.to_string(),
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
                             return Type::mixed();
                         }
                     }
