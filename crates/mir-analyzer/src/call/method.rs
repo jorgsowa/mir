@@ -95,7 +95,10 @@ impl CallAnalyzer {
 
         let method_name = match &call.method.kind {
             ExprKind::Identifier(name) => name.as_ref(),
-            _ => return Type::mixed(),
+            _ => {
+                ea.analyze(&call.method, ctx);
+                return Type::mixed();
+            }
         };
 
         // Always analyze arguments — even when the receiver is null/mixed and we

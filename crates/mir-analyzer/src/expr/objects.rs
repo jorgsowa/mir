@@ -232,6 +232,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         if prop_name == "<dynamic>" {
+            self.analyze(&pa.property, ctx);
             return Type::mixed();
         }
         let resolved = self.resolve_property_type(&obj_ty, &prop_name, pa.property.span);
@@ -260,6 +261,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
         if prop_name == "<dynamic>" {
+            self.analyze(&pa.property, ctx);
             return Type::mixed();
         }
         let non_null_ty = obj_ty.remove_null();

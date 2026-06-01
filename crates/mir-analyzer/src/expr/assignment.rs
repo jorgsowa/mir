@@ -139,7 +139,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             ExprKind::PropertyAccess(pa) => {
                 let obj_ty = self.analyze(&pa.object, ctx);
-                if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                let prop_name_opt = extract_string_from_expr(&pa.property);
+                if prop_name_opt.is_none() {
+                    self.analyze(&pa.property, ctx);
+                }
+                if let Some(prop_name) = prop_name_opt {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
