@@ -4,6 +4,11 @@ use std::sync::Arc;
 
 use mir_types::{Name, Type};
 
+/// FQCNs known to exist in the current branch due to a `class_exists()` /
+/// `interface_exists()` / `trait_exists()` guard.  Not Arc-wrapped — it is
+/// small and branch-local (cleared at merge unless one branch diverges).
+type ClassExistsGuards = FxHashSet<Arc<str>>;
+
 // ---------------------------------------------------------------------------
 // FlowState
 // ---------------------------------------------------------------------------
@@ -80,6 +85,11 @@ pub struct FlowState {
     /// Used during type narrowing to correctly handle generic template variables.
     /// Arc-shared — set once at context construction, never mutated during analysis.
     pub template_param_names: Arc<FxHashSet<Name>>,
+
+    /// FQCNs proven to exist in this branch via a `class_exists()` /
+    /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
+    /// `UndefinedClass` diagnostics inside guarded branches.
+    pub class_exists_guards: ClassExistsGuards,
 }
 
 impl FlowState {
@@ -104,6 +114,7 @@ impl FlowState {
             diverges: false,
             var_locations: FxHashMap::default(),
             template_param_names: Arc::new(FxHashSet::default()),
+            class_exists_guards: FxHashSet::default(),
         };
         // PHP superglobals — always in scope in any context.
         // Also includes $argv/$argc which are auto-populated at global scope in CLI scripts
@@ -500,6 +511,17 @@ impl FlowState {
                 }
             }
         }
+
+        // Class-exists guards: intersection — a guard survives the merge only if
+        // both branches have it, meaning the class is guaranteed to exist on every
+        // path.  In the common case (only the then-branch has the guard) the
+        // intersection is empty, which is correct: after the if/else the guard no
+        // longer applies.
+        result.class_exists_guards = if_ctx
+            .class_exists_guards
+            .intersection(&else_ctx.class_exists_guards)
+            .cloned()
+            .collect();
 
         // Taint: conservative union — if either branch taints a var, it stays tainted
         for name in if_ctx

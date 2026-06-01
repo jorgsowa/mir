@@ -50,6 +50,11 @@ pub struct ExpressionAnalyzer<'a> {
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
+    /// When true, we are analyzing the first argument of `class_exists()` /
+    /// `interface_exists()` / `trait_exists()`.  `ClassName::class` does not
+    /// require the class to be defined in PHP, so `UndefinedClass` is suppressed
+    /// for `::class` accesses inside these existence-probe calls.
+    in_class_exists_arg: bool,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -75,6 +80,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             mode,
             strict_types: false,
             in_existence_check: false,
+            in_class_exists_arg: false,
         }
     }
 
@@ -88,6 +94,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.in_existence_check = true;
         let result = f(self);
         self.in_existence_check = old;
+        result
+    }
+
+    /// Run `f` while marking that we are inside the first argument of
+    /// `class_exists()` / `interface_exists()` / `trait_exists()`.
+    /// `ClassName::class` is a PHP compile-time constant that does not require
+    /// the class to be loaded, so `UndefinedClass` is suppressed for `::class`
+    /// accesses during `f`.
+    pub(super) fn with_class_exists_arg<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let old = self.in_class_exists_arg;
+        self.in_class_exists_arg = true;
+        let result = f(self);
+        self.in_class_exists_arg = old;
         result
     }
 
@@ -217,7 +239,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::NullsafePropertyAccess(pa) => self.analyze_nullsafe_property_access(pa, ctx),
 
-            ExprKind::StaticPropertyAccess(spa) => self.analyze_static_property_access(spa),
+            ExprKind::StaticPropertyAccess(spa) => self.analyze_static_property_access(spa, ctx),
 
             ExprKind::ClassConstAccess(cca) => self.analyze_class_const_access(cca, expr.span, ctx),
 

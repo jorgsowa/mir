@@ -231,7 +231,21 @@ pub fn narrow_from_condition(
                 _ => None,
             };
             if let Some(fn_name) = fn_name_opt {
-                if fn_name.eq_ignore_ascii_case("assert") {
+                let bare = fn_name.trim_start_matches('\\');
+                if matches!(bare, "class_exists" | "interface_exists" | "trait_exists") {
+                    // `if (class_exists(\Foo\Bar::class)) { ... }` — record \Foo\Bar as
+                    // proven-to-exist in the true branch so that UndefinedClass is
+                    // suppressed for all usages within the guarded block.
+                    if is_true {
+                        if let Some(arg_expr) = call.args.first() {
+                            if let Some(fqcn) =
+                                extract_class_fqcn_from_expr(&arg_expr.value, db, file)
+                            {
+                                ctx.class_exists_guards.insert(fqcn);
+                            }
+                        }
+                    }
+                } else if fn_name.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {
                         narrow_from_condition(&arg_expr.value, ctx, is_true, db, file);
@@ -861,6 +875,48 @@ fn narrow_var_to_specific_class(ctx: &mut FlowState, name: &str, fqcn: &str, is_
         })
     };
     set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Extract a fully-qualified class name from the first argument of
+/// `class_exists()` / `interface_exists()` / `trait_exists()`.
+///
+/// Recognised forms:
+/// - `\Foo\Bar::class` or `Foo\Bar::class` — resolved via `crate::db::resolve_name`
+/// - `'Foo\Bar'` or `'Foo\\Bar'` — string literals
+fn extract_class_fqcn_from_expr(
+    expr: &php_ast::owned::Expr,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<str>> {
+    let expr = peel_parens(expr);
+    match &expr.kind {
+        // \Foo\Bar::class  or  Foo\Bar::class
+        ExprKind::ClassConstAccess(cca) => {
+            if let ExprKind::Identifier(id) = &cca.class.kind {
+                let member = match &cca.member.kind {
+                    ExprKind::Identifier(s) => s.as_ref(),
+                    _ => return None,
+                };
+                if member.eq_ignore_ascii_case("class") {
+                    let resolved = crate::db::resolve_name(db, file, id.as_ref());
+                    if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                        return Some(std::sync::Arc::from(resolved.as_str()));
+                    }
+                }
+            }
+            None
+        }
+        // 'Foo\Bar'  or  'Foo\\Bar'  or  'Foo'
+        ExprKind::String(s) => {
+            let name = s.as_ref().trim_start_matches('\\');
+            if !name.is_empty() {
+                Some(std::sync::Arc::from(name))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {

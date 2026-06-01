@@ -86,7 +86,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     _ => Arc::from(resolved.as_str()),
                 };
                 let type_exists = crate::db::class_exists(self.db, fqcn.as_ref());
-                if !matches!(resolved.as_str(), "self" | "static" | "parent") && !type_exists {
+                if !matches!(resolved.as_str(), "self" | "static" | "parent")
+                    && !type_exists
+                    && !ctx.class_exists_guards.contains(fqcn.as_ref())
+                {
                     self.emit(
                         IssueKind::UndefinedClass {
                             name: resolved.clone(),
@@ -278,12 +281,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         prop_ty
     }
 
-    pub(super) fn analyze_static_property_access(&mut self, spa: &StaticAccessExpr) -> Type {
+    pub(super) fn analyze_static_property_access(
+        &mut self,
+        spa: &StaticAccessExpr,
+        ctx: &FlowState,
+    ) -> Type {
         if let ExprKind::Identifier(id) = &spa.class.kind {
             let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
             if matches!(resolved.as_str(), "self" | "static" | "parent") {
                 // Cannot resolve without FlowState; skip reference recording.
-            } else if !crate::db::class_exists(self.db, &resolved) {
+            } else if !crate::db::class_exists(self.db, &resolved)
+                && !ctx.class_exists_guards.contains(resolved.as_str())
+            {
                 self.emit(
                     IssueKind::UndefinedClass { name: resolved },
                     Severity::Error,
@@ -312,7 +321,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                    if !crate::db::class_exists(self.db, &resolved) {
+                    if !crate::db::class_exists(self.db, &resolved)
+                        && !self.in_class_exists_arg
+                        && !ctx.class_exists_guards.contains(resolved.as_str())
+                    {
                         self.emit(
                             IssueKind::UndefinedClass {
                                 name: resolved.clone(),
@@ -429,7 +441,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => return Type::mixed(),
         };
 
-        if !crate::db::class_exists(self.db, &fqcn) {
+        if !crate::db::class_exists(self.db, &fqcn)
+            && !ctx.class_exists_guards.contains(fqcn.as_str())
+        {
             self.emit(
                 IssueKind::UndefinedClass { name: fqcn },
                 Severity::Error,

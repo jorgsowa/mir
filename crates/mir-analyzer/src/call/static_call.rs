@@ -275,6 +275,7 @@ impl CallAnalyzer {
             }
         } else if !crate::db::class_exists(ea.db, &fqcn)
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
+            && !ctx.class_exists_guards.contains(fqcn.as_str())
         {
             ea.emit(
                 IssueKind::UndefinedClass { name: fqcn },
