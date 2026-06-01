@@ -752,6 +752,13 @@ impl Type {
     where
         F: Fn(&str) -> Option<Type>,
     {
+        self.resolve_conditional_inner(&lookup)
+    }
+
+    fn resolve_conditional_inner<F>(self, lookup: &F) -> Type
+    where
+        F: Fn(&str) -> Option<Type>,
+    {
         let mut result = Type::empty();
         for atomic in self.types {
             match atomic {
@@ -781,17 +788,18 @@ impl Type {
                     };
 
                     if let Some(branch) = resolved {
-                        for t in branch.types {
+                        // Recursively resolve nested conditionals in the selected branch.
+                        for t in branch.resolve_conditional_inner(lookup).types {
                             result.add_type(t);
                         }
                     } else {
-                        // Cannot resolve at this call site: widen to the union of both branches
-                        // so downstream callers see a concrete type rather than an opaque conditional.
-                        for t in if_true.types.iter() {
-                            result.add_type(t.clone());
+                        // Cannot resolve at this call site: widen to the union of both branches.
+                        // Recursively resolve nested conditionals in each branch.
+                        for t in if_true.clone().resolve_conditional_inner(lookup).types {
+                            result.add_type(t);
                         }
-                        for t in if_false.types.iter() {
-                            result.add_type(t.clone());
+                        for t in if_false.clone().resolve_conditional_inner(lookup).types {
+                            result.add_type(t);
                         }
                     }
                 }
@@ -1597,6 +1605,74 @@ mod tests {
         assert_eq!(result.types.len(), 2);
         assert!(result.types.iter().any(|t| matches!(t, Atomic::TInt)));
         assert!(result.types.iter().any(|t| matches!(t, Atomic::TString)));
+    }
+
+    #[test]
+    fn resolve_conditional_nested_widens_inner_branch() {
+        // ($x is null ? int : ($x is string ? string : float))
+        // When $x is unknown, should widen to int|string|float (no TConditional remaining).
+        let inner = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TString)),
+            if_true: Box::new(Type::single(Atomic::TString)),
+            if_false: Box::new(Type::single(Atomic::TFloat)),
+        });
+        let ty = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TNull)),
+            if_true: Box::new(Type::single(Atomic::TInt)),
+            if_false: Box::new(inner),
+        });
+        // unknown arg → widen both outer branches, inner conditional must also be widened
+        let result = ty.resolve_conditional_returns(|_| None);
+        assert!(
+            result
+                .types
+                .iter()
+                .all(|t| !matches!(t, Atomic::TConditional { .. })),
+            "no TConditional should survive: {:?}",
+            result.types
+        );
+        assert!(result.types.iter().any(|t| matches!(t, Atomic::TInt)));
+        assert!(result.types.iter().any(|t| matches!(t, Atomic::TString)));
+        assert!(result.types.iter().any(|t| matches!(t, Atomic::TFloat)));
+    }
+
+    #[test]
+    fn resolve_conditional_nested_resolves_inner_branch() {
+        // ($x is null ? int : ($x is string ? string : float))
+        // When $x is definitely not null but unknown string-or-not → resolves outer to inner,
+        // then inner must also be resolved.
+        let inner = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TString)),
+            if_true: Box::new(Type::single(Atomic::TString)),
+            if_false: Box::new(Type::single(Atomic::TFloat)),
+        });
+        let ty = Type::single(Atomic::TConditional {
+            param_name: Some(Name::new("x")),
+            subject: Box::new(Type::single(Atomic::TNull)),
+            if_true: Box::new(Type::single(Atomic::TInt)),
+            if_false: Box::new(inner),
+        });
+        // $x = string → outer: not null → if_false (inner); inner: is string → if_true = string
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TString))
+            } else {
+                None
+            }
+        });
+        assert!(
+            result
+                .types
+                .iter()
+                .all(|t| !matches!(t, Atomic::TConditional { .. })),
+            "no TConditional should survive: {:?}",
+            result.types
+        );
+        assert_eq!(result.types.len(), 1);
+        assert!(matches!(result.types[0], Atomic::TString));
     }
 
     #[test]
