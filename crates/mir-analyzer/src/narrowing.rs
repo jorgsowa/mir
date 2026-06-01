@@ -39,6 +39,10 @@ pub fn narrow_from_condition(
             if is_true {
                 narrow_from_condition(&b.left, ctx, true, db, file);
                 narrow_from_condition(&b.right, ctx, true, db, file);
+                // When A && B is true, both sides were evaluated.
+                // Promote variables from possibly_assigned to assigned for side effects in each.
+                promote_assignment_effects(&b.left, ctx);
+                promote_assignment_effects(&b.right, ctx);
             }
         }
 
@@ -47,6 +51,10 @@ pub fn narrow_from_condition(
             if !is_true {
                 narrow_from_condition(&b.left, ctx, false, db, file);
                 narrow_from_condition(&b.right, ctx, false, db, file);
+                // When A || B is false, both sides were evaluated.
+                // Promote variables from possibly_assigned to assigned for side effects in each.
+                promote_assignment_effects(&b.left, ctx);
+                promote_assignment_effects(&b.right, ctx);
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
                 narrow_or_instanceof_true(&b.left, &b.right, ctx, db, file);
@@ -930,6 +938,68 @@ fn extract_class_const_fqcn(
     }
     let short = extract_class_name(&cca.class, self_fqcn)?;
     Some(crate::db::resolve_name(db, file, &short))
+}
+
+/// Promote variables that were assigned as side effects of evaluating `expr`.
+///
+/// Called when we know `expr` was definitely evaluated (e.g., from the true-branch
+/// of `&&` or the false-branch of `||`). Promotes variables that are in
+/// `possibly_assigned_vars` up to `assigned_vars` if they appear as assignment
+/// targets inside `expr`.
+///
+/// Conservative for internal short-circuit operators: only recurses into the
+/// guaranteed-evaluated side (LHS) of nested `&&`/`||` sub-expressions, since
+/// we cannot know whether the RHS of those was reached.
+fn promote_assignment_effects(expr: &php_ast::owned::Expr, ctx: &mut FlowState) {
+    match &expr.kind {
+        ExprKind::Assign(a) => {
+            if let Some(var_name) = extract_var_name(&a.target) {
+                let sym = mir_types::Name::from(var_name.as_str());
+                if ctx.possibly_assigned_vars.contains(&sym) {
+                    let ty = ctx.get_var(&var_name);
+                    ctx.set_var(&var_name, ty);
+                    std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&sym);
+                }
+            }
+            promote_assignment_effects(&a.value, ctx);
+        }
+        ExprKind::UnaryPrefix(u) => {
+            promote_assignment_effects(&u.operand, ctx);
+        }
+        ExprKind::FunctionCall(call) => {
+            for arg in call.args.iter() {
+                promote_assignment_effects(&arg.value, ctx);
+            }
+        }
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            promote_assignment_effects(&mc.object, ctx);
+            for arg in mc.args.iter() {
+                promote_assignment_effects(&arg.value, ctx);
+            }
+        }
+        ExprKind::StaticMethodCall(smc) => {
+            for arg in smc.args.iter() {
+                promote_assignment_effects(&arg.value, ctx);
+            }
+        }
+        // For nested &&: LHS is always evaluated; RHS might short-circuit — only recurse LHS.
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanAnd || b.op == BinaryOp::LogicalAnd => {
+            promote_assignment_effects(&b.left, ctx);
+        }
+        // For nested ||: LHS is always evaluated; RHS might short-circuit — only recurse LHS.
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            promote_assignment_effects(&b.left, ctx);
+        }
+        // For all other binary operators (===, !==, instanceof, +, etc.) both sides are evaluated.
+        ExprKind::Binary(b) => {
+            promote_assignment_effects(&b.left, ctx);
+            promote_assignment_effects(&b.right, ctx);
+        }
+        ExprKind::Parenthesized(inner) => {
+            promote_assignment_effects(inner, ctx);
+        }
+        _ => {}
+    }
 }
 
 fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
