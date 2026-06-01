@@ -1069,6 +1069,10 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             fqcn.as_ref().eq_ignore_ascii_case("closure")
         }
         (Atomic::TClosure { .. }, Atomic::TObject) => true,
+        // bare `Closure` (named object without signature) satisfies any typed Closure(): T
+        (Atomic::TNamedObject { fqcn, .. }, Atomic::TClosure { .. }) => {
+            fqcn.as_ref().eq_ignore_ascii_case("closure")
+        }
 
         // List <: array
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
