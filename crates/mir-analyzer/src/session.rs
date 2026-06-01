@@ -493,6 +493,14 @@ impl AnalysisSession {
         }
 
         self.update_reverse_deps_for(&file);
+        // Evict cached analysis results for files that depend on this one so
+        // that the next re_analyze_file call re-analyses them rather than
+        // replaying a stale cache entry. Mirrors the eviction in
+        // `re_analyze_file` (batch.rs) but applies to the ingest path used by
+        // LSP servers that edit a single file without re-analysing it.
+        if let Some(cache) = self.cache.as_deref() {
+            cache.evict_with_dependents(&[file.to_string()]);
+        }
         // Only evict cache entries whose resolver-mapped path equals this
         // file. FQCNs the resolver can't map (psr4 miss) stay cached — no
         // ingest could change their fate. Avoids the per-keystroke storm
