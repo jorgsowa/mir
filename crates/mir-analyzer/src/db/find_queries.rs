@@ -53,10 +53,15 @@ impl ClassLike {
 
     /// Returns whatever this kind considers its "parents" — what salsa
     /// `class_ancestors_by_fqcn` will walk:
-    ///   - Class: `parent` (single, if any) + `interfaces` + `traits`
+    ///   - Class: `traits` (first, PHP precedence) + `parent` + `interfaces`
     ///   - Interface: `extends` (multi)
     ///   - Trait: used `traits`
     ///   - Enum: `interfaces`
+    ///
+    /// Traits come before the parent class so that DFS in
+    /// `class_ancestors_by_fqcn` exhausts the full trait sub-tree before
+    /// visiting the parent, matching PHP's rule that trait methods override
+    /// inherited parent methods.
     ///
     /// `@mixin` FQCNs are intentionally excluded here — they are handled by
     /// `find_method_in_chain` via a separate cycle-safe walk so they don't
@@ -65,11 +70,11 @@ impl ClassLike {
         match self {
             ClassLike::Class(c) => {
                 let mut out = Vec::new();
+                out.extend(c.traits.iter().cloned());
                 if let Some(p) = &c.parent {
                     out.push(p.clone());
                 }
                 out.extend(c.interfaces.iter().cloned());
-                out.extend(c.traits.iter().cloned());
                 out
             }
             ClassLike::Interface(i) => i.extends.clone(),
@@ -639,19 +644,25 @@ pub fn find_class_constant_in_class<'db>(
 pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Arc<[Arc<str>]> {
     let mut visited = std::collections::HashSet::<Arc<str>>::new();
     let mut order = Vec::<Arc<str>>::new();
-    let mut queue = std::collections::VecDeque::<Arc<str>>::new();
+    // DFS (stack) so the full trait sub-tree is exhausted before the parent
+    // class is visited. Combined with `ancestor_fqcns` returning traits before
+    // the parent, this matches PHP's rule: trait methods take priority over
+    // inherited parent methods.
+    let mut stack = Vec::<Arc<str>>::new();
 
     let initial: Arc<str> = fqcn.name(db).into();
-    queue.push_back(initial.clone());
+    stack.push(initial.clone());
     visited.insert(initial);
 
-    while let Some(name) = queue.pop_front() {
+    while let Some(name) = stack.pop() {
         order.push(name.clone());
         let here = Fqcn::new(db, Name::new(name.as_ref()));
         if let Some(class) = find_class_like(db, here) {
-            for parent in class.ancestor_fqcns() {
+            // Push in reverse so the first ancestor in the list ends up on
+            // top of the stack and is visited next (LIFO / pre-order DFS).
+            for parent in class.ancestor_fqcns().into_iter().rev() {
                 if visited.insert(parent.clone()) {
-                    queue.push_back(parent);
+                    stack.push(parent);
                 }
             }
         }
