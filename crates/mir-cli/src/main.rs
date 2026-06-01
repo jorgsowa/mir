@@ -586,6 +586,19 @@ fn default_cache_dir() -> Option<PathBuf> {
     }
 }
 
+/// Return `true` if `dir` is inside a Composer vendor package directory.
+///
+/// Composer always places packages at `vendor/<org>/<pkg>/`, so a package root
+/// has the path component `vendor` followed by at least 2 more segments.
+/// `windows(3)` finds any three consecutive components whose first is `vendor`,
+/// which matches `vendor/<org>/<pkg>` and deeper paths without accidentally
+/// flagging a project root that merely lives one level under a directory named
+/// `vendor` (e.g. `/srv/vendor/myapp/` — vendor+1 — forms no 3-window).
+fn is_vendor_package_dir(dir: &std::path::Path) -> bool {
+    let comps: Vec<_> = dir.components().collect();
+    comps.windows(3).any(|w| w[0].as_os_str() == "vendor")
+}
+
 fn find_composer_root_for_path(path: &std::path::Path) -> Option<PathBuf> {
     let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let start = if resolved.is_dir() {
@@ -594,9 +607,25 @@ fn find_composer_root_for_path(path: &std::path::Path) -> Option<PathBuf> {
         resolved.parent()?
     };
 
+    // Skip any composer.json that lives inside a vendor/ subtree — those are
+    // package manifests, not project roots. Keep walking up until we find a
+    // composer.json that is not under any vendor/ ancestor.
+    //
+    // Composer always installs packages at vendor/<org>/<pkg>/, so a package
+    // root has `vendor` followed by ≥2 more path segments. Using windows(3)
+    // (any window whose first component is "vendor") catches vendor/<org>/<pkg>/
+    // and deeper paths while correctly allowing a legitimate project root whose
+    // own path merely passes through a directory named "vendor" one level up
+    // (e.g. /srv/vendor/myapp/ — vendor+1 — has no 3-window starting with
+    // "vendor" and is therefore not skipped).
+    //
+    // Known limitation: if vendor/ is a symlink, canonicalize() resolves it and
+    // the resulting path may not contain a "vendor" component at all, causing
+    // the walk to stop at the package's own composer.json. This is uncommon in
+    // standard Composer setups and is out of scope for this check.
     start
         .ancestors()
-        .find(|dir| dir.join("composer.json").exists())
+        .find(|dir| dir.join("composer.json").exists() && !is_vendor_package_dir(dir))
         .map(PathBuf::from)
 }
 
@@ -1074,8 +1103,9 @@ fn format_sarif(issues: &[&Issue]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::find_composer_root_for_path;
+    use super::{find_composer_root_for_path, is_vendor_package_dir};
     use std::fs;
+    use std::path::Path;
 
     fn temp_project(name: &str) -> std::path::PathBuf {
         let thread_name = std::thread::current()
@@ -1116,5 +1146,140 @@ mod tests {
 
         assert_eq!(found, Some(root.canonicalize().unwrap()));
         let _ = fs::remove_dir_all(root);
+    }
+
+    // Regression: when a path inside vendor/ is given, the package's own
+    // composer.json must be skipped and the project root returned instead.
+    // Previously find_composer_root_for_path stopped at
+    // vendor/laravel/framework/composer.json, leaving cross-package classes
+    // unresolvable and producing ~1,552 false UndefinedClass diagnostics.
+    #[test]
+    fn composer_root_skips_vendor_package_composer_json() {
+        let root = temp_project("vendor_skip");
+        let pkg_dir = root.join("vendor/laravel/framework/src/Illuminate");
+        fs::create_dir_all(&pkg_dir).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        // Simulate the package having its own composer.json (as every Composer package does).
+        fs::write(root.join("vendor/laravel/framework/composer.json"), "{}").unwrap();
+        fs::write(pkg_dir.join("Support.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&pkg_dir.join("Support.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn composer_root_skips_vendor_subtree_directory_path() {
+        let root = temp_project("vendor_skip_dir");
+        let illuminate = root.join("vendor/laravel/framework/src/Illuminate");
+        fs::create_dir_all(&illuminate).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(root.join("vendor/laravel/framework/composer.json"), "{}").unwrap();
+
+        let found = find_composer_root_for_path(&illuminate);
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // Edge case: vendor-in-vendor (a package that commits its own test dependencies).
+    // Both package manifests must be skipped; the real project root is returned.
+    #[test]
+    fn composer_root_skips_nested_vendor_in_vendor() {
+        let root = temp_project("nested_vendor");
+        let deep = root.join("vendor/league/flysystem/vendor/mockery/prophecy/src");
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(root.join("composer.json"), "{}").unwrap();
+        fs::write(root.join("vendor/league/flysystem/composer.json"), "{}").unwrap();
+        fs::write(
+            root.join("vendor/league/flysystem/vendor/mockery/prophecy/composer.json"),
+            "{}",
+        )
+        .unwrap();
+        fs::write(deep.join("Prophecy.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&deep.join("Prophecy.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // Edge case: project root itself lives one level under a directory named
+    // "vendor" (vendor+1). This must NOT be skipped — vendor+1 never matches
+    // the Composer vendor/<org>/<pkg> (vendor+2) structure.
+    #[test]
+    fn composer_root_is_found_when_project_is_one_level_under_vendor_named_dir() {
+        let root = temp_project("under_vendor_dir");
+        // Create parent/vendor/myapp/ where myapp/ is the actual project root.
+        let project_dir = root.join("vendor/myapp");
+        fs::create_dir_all(project_dir.join("src")).unwrap();
+        fs::write(project_dir.join("composer.json"), "{}").unwrap();
+        fs::write(project_dir.join("src/Service.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&project_dir.join("src/Service.php"));
+
+        assert_eq!(found, Some(project_dir.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // Edge case: standalone package checkout (cloned directly, not inside a
+    // project vendor/).  The package directory itself is returned as the root
+    // because its composer.json is not under any vendor/<org>/<pkg> ancestor.
+    #[test]
+    fn composer_root_is_found_for_standalone_package_checkout() {
+        let root = temp_project("standalone_pkg");
+        let src = root.join("src/Illuminate");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"name":"laravel/framework"}"#,
+        )
+        .unwrap();
+        fs::write(src.join("Support.php"), "<?php\n").unwrap();
+
+        let found = find_composer_root_for_path(&src.join("Support.php"));
+
+        assert_eq!(found, Some(root.canonicalize().unwrap()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // is_vendor_package_dir unit tests — verify the windows(3) predicate directly.
+
+    #[test]
+    fn is_vendor_package_dir_true_for_package_root_and_deeper() {
+        // vendor/<org>/<pkg> — the package root itself
+        assert!(is_vendor_package_dir(Path::new("vendor/laravel/framework")));
+        // deeper paths inside a package
+        assert!(is_vendor_package_dir(Path::new(
+            "vendor/laravel/framework/src/Illuminate"
+        )));
+        // nested vendor-in-vendor (package that commits its own dependencies)
+        assert!(is_vendor_package_dir(Path::new(
+            "vendor/league/flysystem/vendor/mockery/prophecy"
+        )));
+        // Critical: the *src subdirectory* of a project whose root lives at
+        // vendor+1 (e.g. /srv/vendor/myapp/src/). The walk in
+        // find_composer_root_for_path starts here, sees vendor+2, and skips
+        // past it before landing on the true project root (vendor+1) below.
+        assert!(is_vendor_package_dir(Path::new("/srv/vendor/myapp/src")));
+    }
+
+    #[test]
+    fn is_vendor_package_dir_false_for_vendor_plus_one_and_above() {
+        // vendor/ itself — no 3-window possible with a single component
+        assert!(!is_vendor_package_dir(Path::new("vendor")));
+        // vendor/<org> — only 2 components under vendor, still no 3-window
+        assert!(!is_vendor_package_dir(Path::new("vendor/laravel")));
+        // Project root that lives exactly one level under a dir named "vendor"
+        // (vendor+1).  The directory itself is NOT flagged; only its contents
+        // (vendor+2) are.  find_composer_root_for_path relies on this to
+        // return the correct root for unusual deployment paths like /srv/vendor/myapp/.
+        assert!(!is_vendor_package_dir(Path::new("/srv/vendor/myapp")));
+        // Ordinary project paths contain no "vendor" component at all
+        assert!(!is_vendor_package_dir(Path::new("src/App")));
+        assert!(!is_vendor_package_dir(Path::new(".")));
+        // "vendor" as a *substring* of a directory name must not match
+        assert!(!is_vendor_package_dir(Path::new("vendor-plugins/myapp")));
     }
 }
