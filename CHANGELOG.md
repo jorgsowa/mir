@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-06-01
+
+### Added
+
+- Inline issue suppression via source comments: add `// @mir-suppress DiagnosticName` on the offending line (or the line above) to silence a specific diagnostic without affecting others.
+- `NonExistentArrayOffset` (MIR0301) is now emitted when a literal string or integer key is accessed on a closed keyed array (`array{foo: int}`) and the key is absent.
+- `ParadoxicalCondition` (MIR0404, Warning) is now emitted for duplicate literal values in `switch` cases and `match` arms, where the repeated branch can never be reached.
+- Conditionally-declared functions and classes — the `if (!function_exists('foo')) { function foo() {} }` guard pattern used by Laravel helpers, Symfony polyfills, and WordPress pluggable functions — are now indexed. Resolves ~1,608 `UndefinedFunction` false positives on a standard Laravel project.
+- All issue locations now carry `line_end`/`col_end` in addition to the existing start position, enabling tighter diagnostic ranges in SARIF, LSP, and playground consumers.
+
+### Fixed
+
+- `UnusedVariable` false positives for variables used as dynamic property or method names (`$this->$var`, `$this->{$var}`, `$this->$method()`).
+- `UndefinedClass` false positives for class names used as the argument to `class_exists()`, `interface_exists()`, or `trait_exists()`, and for usages of optional classes inside the guarded true-branch.
+- Conditional return types (`@return ($T is null ? X : Y)`) are now resolved at static method call sites, eliminating false `InvalidArgument` errors.
+- Short-circuit `&&`/`||` assignments are promoted from possibly-assigned to definitely-assigned when the branch is known to have executed (e.g. the true-branch of `&&`). Reduces `PossiblyUndefinedVariable` false positives in the Laravel benchmark from 31 to 7.
+- Composer root detection now skips `vendor/<org>/<pkg>/composer.json` manifests and walks up to the true project root, eliminating ~1,552 `UndefinedClass` false positives on standard Laravel projects.
+- `strtr($str, $pairs)` (2-argument array form) no longer fires `TooFewArguments`.
+- `TooManyArguments` false positives eliminated when a union type contains a bare `callable` (unknown arity) alongside a typed `TClosure`.
+- `UnusedVariable` false positives eliminated for variables read only inside a `finally` block (the save-restore pattern).
+- Nested `TConditional` return types (e.g. `($v is null ? array{} : ($v is array ? array<K,V> : array{V}))`) are now recursively resolved rather than returned as opaque conditional types.
+- `UndefinedProperty` false positives eliminated for property accesses guarded by `??` or `isset` (e.g. `$this->prop ?? null`).
+- `PossiblyUndefinedVariable` false positives eliminated for variables used as the left operand of `??` when the coalesced result is immediately compared against the fallback literal.
+- A bare `Closure` type now satisfies a typed `Closure(): T` parameter, eliminating false `InvalidArgument` errors.
+- `ingest_file` now evicts dependents' cached analysis when a file's content changes, preventing stale results from being replayed across incremental re-analysis.
+- `Enum::Case` and class constant accesses now resolve to the correct type instead of `mixed`.
+- `TooManyArguments` false positives eliminated for functions and methods that use `func_get_args()`/`func_num_args()`/`func_get_arg()` in their bodies.
+- `InvalidArgument` false positives eliminated for `Stringable` objects passed as `string` parameters in files without `declare(strict_types=1)`.
+- `array_keys(array<K, V>)` now returns `list<K>` instead of `list<mixed>`.
+- `preg_match` `$matches` parameter is now typed as `array<int, string>` via by-ref write-back.
+- `str_replace`/`str_ireplace` return type is narrowed to `string` when the subject is a scalar.
+- `hrtime()` return is narrowed to `int|float` when `$as_number` is `true`.
+- `NonExistentArrayOffset` is suppressed inside existence-check contexts (`isset`, `??`, `empty`).
+- Template parameters in supertype position are now treated as wildcards in `atomic_subtype`, eliminating false `InvalidTemplateParam` diagnostics for union-sub against union bounds.
+- `list<T>` is now inferred for the `$arr[] = $v` push notation instead of `array<mixed, T>`.
+- `$obj::class` passed as a `class-string<T>` argument no longer fires `InvalidArgument`.
+- Nested array assignment (`$arr[$k][] = $v`) now correctly propagates the innermost key type.
+- Template parameters inside array types in generic method returns are now correctly resolved.
+- Reference index gaps closed: class references recorded at the class identifier in static calls, `self`/`static`/`parent`/`ClassName` constant accesses, and inherited method calls use the declaring class.
+- PHP version filtering is now wired into the salsa database so `FileAnalyzer` honours `--php-version` correctly.
+- Parser now strips quotes from array shape keys in PHPDoc (`array{'key': T}` parses correctly).
+- `mysqli_init()` PHP 8.0 overload (returning `mysqli`) added to stubs.
+
+### Performance
+
+- Peak cold-start memory reduced by ~22 MiB: `MethodDef`/`FunctionDef` inferred return types changed from `Option<Type>` (176 B) to `Option<Arc<Type>>` (8 B); class analysis no longer materializes vendor/stub classes during the analyzed-file decomposition; `mimalloc` installed as the global allocator.
+
 ## [0.30.0] - 2026-05-28
 
 ### Fixed
