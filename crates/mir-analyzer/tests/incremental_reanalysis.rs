@@ -6,6 +6,14 @@ use std::sync::Arc;
 
 use mir_analyzer::{AnalysisSession, BatchOptions, FileAnalyzer, PhpVersion, ReferenceKind};
 
+fn var_type(symbols: &[mir_analyzer::ResolvedSymbol], name: &str) -> String {
+    symbols
+        .iter()
+        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == name))
+        .map(|s| format!("{}", s.resolved_type))
+        .unwrap_or_else(|| "not found".to_string())
+}
+
 fn new_session() -> AnalysisSession {
     AnalysisSession::new(PhpVersion::LATEST)
 }
@@ -302,13 +310,13 @@ fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
     );
 }
 
-/// `FileAnalyzer::analyze` on b.php must reflect a return-type change in a.php
-/// after `ingest_file` updates a.php's definitions.
+/// After `ingest_file` updates a.php's return type, `FileAnalyzer::analyze` on
+/// b.php must immediately reflect the new type without any additional steps.
 ///
-/// This is the uncached path: `FileAnalyzer::analyze` always runs body analysis
-/// fresh against `snapshot_db()`. After `ingest_file(a.php, banana_src)`, the
-/// salsa DB has the new `Maker::make(): Banana` definition, so analysis of b.php
-/// must produce `$x: Banana`.
+/// Static cross-file type inference is covered by the phpt fixture
+/// `type_check_mismatch/cross_file_method_return.phpt`. This test covers the
+/// incremental guarantee: the salsa DB is live after `ingest_file` so the
+/// uncached `FileAnalyzer` path sees the updated definition instantly.
 #[test]
 fn file_analyzer_sees_fresh_return_type_after_ingest() {
     let a_src_v1 = "<?php\nclass Apple {}\nclass Maker { public function make(): Apple { return new Apple(); } }\n";
@@ -324,41 +332,20 @@ fn file_analyzer_sees_fresh_return_type_after_ingest() {
     session.ingest_file(file_b.clone(), Arc::from(b_src));
 
     let parsed_b = php_rs_parser::parse(b_src);
-    let analysis1 = FileAnalyzer::new(&session).analyze(
-        file_b.clone(),
-        b_src,
-        &parsed_b.program,
-        &parsed_b.source_map,
-    );
-    let x_type_v1 = analysis1
-        .symbols
-        .iter()
-        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == "x"))
-        .map(|s| format!("{}", s.resolved_type))
-        .unwrap_or_else(|| "not found".to_string());
-    assert_eq!(
-        x_type_v1, "Apple",
-        "$x must resolve to Apple before re-ingest; got {x_type_v1}"
-    );
 
     // Update a.php: Maker::make() now returns Banana.
     session.ingest_file(file_a.clone(), Arc::from(a_src_v2));
 
-    let analysis2 = FileAnalyzer::new(&session).analyze(
+    let analysis = FileAnalyzer::new(&session).analyze(
         file_b.clone(),
         b_src,
         &parsed_b.program,
         &parsed_b.source_map,
     );
-    let x_type_v2 = analysis2
-        .symbols
-        .iter()
-        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == "x"))
-        .map(|s| format!("{}", s.resolved_type))
-        .unwrap_or_else(|| "not found".to_string());
+    let x_ty = var_type(&analysis.symbols, "x");
     assert_eq!(
-        x_type_v2, "Banana",
-        "$x must resolve to Banana after ingest_file updates a.php; got {x_type_v2}"
+        x_ty, "Banana",
+        "$x must resolve to Banana immediately after ingest_file updates a.php; got {x_ty}"
     );
 }
 
