@@ -22,6 +22,16 @@ pub(crate) fn extract_callable_params(
     union: &Type,
     ea: &ExpressionAnalyzer<'_>,
 ) -> Option<Vec<ParamInfo>> {
+    // If the union contains a bare callable (unknown arity), we cannot determine
+    // arity statically — bail out to avoid false positives from sibling TClosure members.
+    if union
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TCallable { params: None, .. }))
+    {
+        return None;
+    }
+
     for atomic in &union.types {
         match atomic {
             Atomic::TClosure { params, .. } => {
