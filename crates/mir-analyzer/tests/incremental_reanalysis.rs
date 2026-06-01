@@ -4,7 +4,7 @@ mod common;
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{AnalysisSession, BatchOptions, FileAnalyzer, PhpVersion, ReferenceKind};
 
 fn new_session() -> AnalysisSession {
     AnalysisSession::new(PhpVersion::LATEST)
@@ -299,5 +299,134 @@ fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
         issues2.is_empty(),
         "re_analyze_file must not report false InvalidReturnType after body-only change; \
          got: {issues2:?}"
+    );
+}
+
+/// `FileAnalyzer::analyze` on b.php must reflect a return-type change in a.php
+/// after `ingest_file` updates a.php's definitions.
+///
+/// This is the uncached path: `FileAnalyzer::analyze` always runs body analysis
+/// fresh against `snapshot_db()`. After `ingest_file(a.php, banana_src)`, the
+/// salsa DB has the new `Maker::make(): Banana` definition, so analysis of b.php
+/// must produce `$x: Banana`.
+#[test]
+fn file_analyzer_sees_fresh_return_type_after_ingest() {
+    let a_src_v1 = "<?php\nclass Apple {}\nclass Maker { public function make(): Apple { return new Apple(); } }\n";
+    let a_src_v2 = "<?php\nclass Banana {}\nclass Maker { public function make(): Banana { return new Banana(); } }\n";
+    // Read $x so that a Variable("x") symbol is emitted by body analysis.
+    let b_src = "<?php\n$x = (new Maker)->make();\n$_ = $x;\n";
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file_a: Arc<str> = Arc::from("a.php");
+    let file_b: Arc<str> = Arc::from("b.php");
+
+    session.ingest_file(file_a.clone(), Arc::from(a_src_v1));
+    session.ingest_file(file_b.clone(), Arc::from(b_src));
+
+    let parsed_b = php_rs_parser::parse(b_src);
+    let analysis1 = FileAnalyzer::new(&session).analyze(
+        file_b.clone(),
+        b_src,
+        &parsed_b.program,
+        &parsed_b.source_map,
+    );
+    let x_type_v1 = analysis1
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == "x"))
+        .map(|s| format!("{}", s.resolved_type))
+        .unwrap_or_else(|| "not found".to_string());
+    assert_eq!(
+        x_type_v1, "Apple",
+        "$x must resolve to Apple before re-ingest; got {x_type_v1}"
+    );
+
+    // Update a.php: Maker::make() now returns Banana.
+    session.ingest_file(file_a.clone(), Arc::from(a_src_v2));
+
+    let analysis2 = FileAnalyzer::new(&session).analyze(
+        file_b.clone(),
+        b_src,
+        &parsed_b.program,
+        &parsed_b.source_map,
+    );
+    let x_type_v2 = analysis2
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == "x"))
+        .map(|s| format!("{}", s.resolved_type))
+        .unwrap_or_else(|| "not found".to_string());
+    assert_eq!(
+        x_type_v2, "Banana",
+        "$x must resolve to Banana after ingest_file updates a.php; got {x_type_v2}"
+    );
+}
+
+/// `re_analyze_file` on b.php must NOT return a stale cache hit after
+/// `ingest_file` changed a.php's return type.
+///
+/// Before the fix, `ingest_file(a.php)` did not evict dependent cache entries,
+/// so `re_analyze_file(b.php, same_content)` hit b.php's stale cache entry and
+/// returned the old (now wrong) results.
+///
+/// The test starts with a valid state (no issues), then makes a.php produce a
+/// type mismatch. Without the fix, re_analyze_file(b.php) would still return
+/// "no issues" (stale cache). With the fix, it re-analyses and returns the new
+/// InvalidArgument.
+#[test]
+fn re_analyze_file_evicts_dependents_after_ingest() {
+    let src_dir = create_temp_dir("ingest_evicts_dependents");
+    let cache_dir = create_temp_dir("ingest_evicts_dependents_cache");
+
+    // Both classes exist in both versions — only the return type changes so Banana stays defined.
+    // v1: make() returns Banana — b.php's call to expect_banana is valid, no InvalidArgument.
+    let a_src_v1 = "<?php\nclass Apple {}\nclass Banana {}\nclass Maker { public function make(): Banana { return new Banana(); } }\n";
+    // v2: make() now returns Apple — b.php's call to expect_banana(Apple) is now an InvalidArgument.
+    let a_src_v2 = "<?php\nclass Apple {}\nclass Banana {}\nclass Maker { public function make(): Apple { return new Apple(); } }\n";
+    let b_src =
+        "<?php\nfunction expect_banana(Banana $v): void {}\nexpect_banana((new Maker)->make());\n";
+
+    let file_a = write_file(&src_dir, "a.php", a_src_v1);
+    let file_b = write_file(&src_dir, "b.php", b_src);
+    let file_a_path = file_a.to_string_lossy().to_string();
+    let file_b_path = file_b.to_string_lossy().to_string();
+
+    // First pass: populate the cache. b.php is valid (no issues) and gets cached.
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let initial = session.analyze_paths(&[file_a.clone(), file_b.clone()], &BatchOptions::new());
+    assert!(
+        initial
+            .issues
+            .iter()
+            .all(|i| i.kind.name() != "InvalidArgument"),
+        "initial analysis must be clean; got: {:?}",
+        initial
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
+    );
+
+    // Update a.php via ingest_file (LSP-style: only a.php is being edited).
+    // This must evict b.php's cache entry so the stale "no issues" result
+    // is not replayed on the next re_analyze_file(b.php) call.
+    session.ingest_file(Arc::from(file_a_path.as_str()), Arc::from(a_src_v2));
+
+    // b.php content is unchanged, so a stale cache hit would return "no issues".
+    // With the fix, b.php's entry is evicted and re-analysis finds InvalidArgument.
+    let result = session.re_analyze_file(&file_b_path, b_src, &BatchOptions::new());
+    let has_invalid_arg = result
+        .issues
+        .iter()
+        .any(|i| i.kind.name() == "InvalidArgument");
+    assert!(
+        has_invalid_arg,
+        "re_analyze_file must re-analyse b.php after ingest_file updated a.php's return type; \
+         expected InvalidArgument but got: {:?}",
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
     );
 }

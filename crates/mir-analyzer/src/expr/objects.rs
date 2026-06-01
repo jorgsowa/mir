@@ -443,17 +443,24 @@ impl<'a> ExpressionAnalyzer<'a> {
             Arc::from(format!("{}::{}", fqcn, const_name)),
             cca.member.span,
         );
+
+        let here = crate::db::Fqcn::from_str(self.db, &fqcn);
+        let found = crate::db::find_class_constant_in_chain(self.db, here, &const_name);
+        let const_ty = found
+            .as_ref()
+            .map(|(_, c)| c.ty.clone())
+            .unwrap_or_else(Type::mixed);
+
         self.record_symbol(
             cca.member.span,
             ReferenceKind::ConstantAccess {
                 class: Arc::from(fqcn.as_str()),
                 constant: Arc::from(const_name.as_str()),
             },
-            Type::mixed(),
+            const_ty.clone(),
         );
 
-        let const_exists = crate::db::class_constant_exists_in_chain(self.db, &fqcn, &const_name);
-        if !const_exists && !crate::db::has_unknown_ancestor(self.db, &fqcn) {
+        if found.is_none() && !crate::db::has_unknown_ancestor(self.db, &fqcn) {
             self.emit(
                 IssueKind::UndefinedConstant {
                     name: format!("{fqcn}::{const_name}"),
@@ -462,7 +469,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 expr_span,
             );
         }
-        Type::mixed()
+        const_ty
     }
 
     pub(super) fn resolve_property_type(

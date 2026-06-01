@@ -17,7 +17,7 @@ use mir_codebase::storage::{
     ClassDef, ConstantDef, EnumDef, FnParam, FunctionDef, InterfaceDef, MethodDef, PropertyDef,
     TraitDef,
 };
-use mir_types::Name;
+use mir_types::{Atomic, Name};
 
 use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile};
 
@@ -612,7 +612,10 @@ pub fn find_class_constant_in_class<'db>(
         if let Some(case) = e.cases.get(name) {
             return Some(mir_codebase::storage::ConstantDef {
                 name: case.name.clone(),
-                ty: mir_types::Type::mixed(),
+                ty: mir_types::Type::single(Atomic::TNamedObject {
+                    fqcn: Name::new(e.fqcn.as_ref()),
+                    type_params: mir_types::union::empty_type_params(),
+                }),
                 visibility: None,
                 is_final: false,
                 location: case.location.clone(),
