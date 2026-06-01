@@ -235,6 +235,14 @@ impl CallAnalyzer {
             } else {
                 ret_substituted
             };
+            let ret = ret.resolve_conditional_returns(|param_name| {
+                resolved
+                    .params
+                    .iter()
+                    .position(|p| p.name.as_ref() == param_name)
+                    .and_then(|idx| arg_types.get(idx))
+                    .cloned()
+            });
             ea.record_symbol(
                 call.method.span,
                 ReferenceKind::StaticCall {
