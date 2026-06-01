@@ -449,6 +449,12 @@ impl<'a> StatementsAnalyzer<'a> {
             if finally_ctx.diverges {
                 result.diverges = true;
             }
+            // Variables read in the finally block count as used — propagate reads back
+            // so that the save-restore pattern (assign before try, restore in finally)
+            // is not falsely flagged as UnusedVariable.
+            for name in finally_ctx.read_vars.iter() {
+                result.read_vars.insert(*name);
+            }
         }
 
         *ctx = result;
