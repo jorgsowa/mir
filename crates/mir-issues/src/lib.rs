@@ -155,7 +155,8 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_cast/`.
     InvalidCast { from: String, to: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/invalid_operand/` (planned).
+    /// Emitted by `mir-analyzer/src/expr/binary.rs` for arithmetic on
+    /// non-numeric operands. Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     InvalidOperand {
         op: String,
         left: String,
