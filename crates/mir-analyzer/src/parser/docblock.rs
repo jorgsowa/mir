@@ -135,12 +135,12 @@ impl DocblockParser {
                         ));
                     }
                 }
-                "extends" => {
+                "extends" | "template-extends" | "phpstan-extends" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         result.extends = Some(parse_type_string(body_str.trim()));
                     }
                 }
-                "implements" => {
+                "implements" | "template-implements" | "phpstan-implements" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         result.implements.push(parse_type_string(body_str.trim()));
                     }
@@ -927,13 +927,35 @@ fn find_matching_paren(s: &str) -> Option<usize> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Parse template tag format: `T`, `T of Bound`, or `T as Bound`
+/// Parse template tag format: `T`, `T of Bound`, or `T as Bound`.
+///
+/// For single-line docblocks (e.g. `/** @template T @param T $x @return T */`)
+/// `phpdoc_parser` hands us a body that runs all the way to the closing `*/`,
+/// so the body may carry trailing tags (`T @param T $x @return T`). The template
+/// name is the first whitespace-delimited token and any `of`/`as` bound is only
+/// parsed up to the next `@` tag.
 fn parse_template_line(_tag_name: &str, body: Option<String>) -> Option<(String, Option<String>)> {
     let body = body?;
+    let body = body.trim();
+    // Stop at the next embedded tag so single-line docblocks don't swallow the
+    // following `@param`/`@return` tokens into the template name/bound.
+    let body = match body.find(" @") {
+        Some(idx) => body[..idx].trim_end(),
+        None => body,
+    };
+    if body.is_empty() {
+        return None;
+    }
     if let Some((name, bound)) = body.split_once(" of ").or_else(|| body.split_once(" as ")) {
-        Some((name.trim().to_string(), Some(bound.trim().to_string())))
+        let bound = bound.trim();
+        Some((
+            name.trim().to_string(),
+            (!bound.is_empty()).then(|| bound.to_string()),
+        ))
     } else {
-        Some((body.trim().to_string(), None))
+        // No bound: take just the first whitespace-delimited token as the name.
+        let name = body.split_whitespace().next().unwrap_or(body);
+        Some((name.to_string(), None))
     }
 }
 
@@ -1492,6 +1514,74 @@ mod tests {
         assert_eq!(parsed.templates.len(), 1);
         assert_eq!(parsed.templates[0].0, "T");
         assert_eq!(parsed.templates[0].2, Variance::Contravariant);
+    }
+
+    #[test]
+    fn parse_template_single_line_does_not_over_read() {
+        // E1: single-line docblock — the @template body runs to the closing `*/`,
+        // so the parser used to take `T @param T $x @return T` as the template name.
+        let doc = "/** @template T @param T $x @return T */";
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.templates.len(), 1);
+        assert_eq!(parsed.templates[0].0, "T");
+        assert!(parsed.templates[0].1.is_none(), "expected no bound");
+    }
+
+    #[test]
+    fn parse_template_multiline_with_bound_still_works() {
+        // E1 regression guard: a normal multi-line `@template T of Base` keeps name + bound.
+        let doc = r#"/**
+         * @template T of Base
+         */"#;
+        let parsed = DocblockParser::parse(doc);
+        assert_eq!(parsed.templates.len(), 1);
+        assert_eq!(parsed.templates[0].0, "T");
+        let bound = parsed.templates[0].1.as_ref().expect("expected a bound");
+        assert!(bound.contains(
+            |t| matches!(t, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == "Base")
+        ));
+    }
+
+    #[test]
+    fn parse_template_extends_alias() {
+        // E2: `@template-extends` / `@phpstan-extends` route into `extends`.
+        for tag in ["template-extends", "phpstan-extends"] {
+            let doc = format!("/** @{tag} Base<User> */");
+            let parsed = DocblockParser::parse(&doc);
+            let extends = parsed
+                .extends
+                .unwrap_or_else(|| panic!("@{tag} should populate extends"));
+            assert!(
+                extends.contains(|t| matches!(
+                    t,
+                    Atomic::TNamedObject { fqcn, type_params }
+                        if fqcn.as_ref() == "Base" && !type_params.is_empty()
+                )),
+                "@{tag} should produce a generic Base<User>"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_template_implements_alias() {
+        // E2: `@template-implements` / `@phpstan-implements` route into `implements`.
+        for tag in ["template-implements", "phpstan-implements"] {
+            let doc = format!("/** @{tag} Iter<User> */");
+            let parsed = DocblockParser::parse(&doc);
+            assert_eq!(
+                parsed.implements.len(),
+                1,
+                "@{tag} should populate implements"
+            );
+            assert!(
+                parsed.implements[0].contains(|t| matches!(
+                    t,
+                    Atomic::TNamedObject { fqcn, type_params }
+                        if fqcn.as_ref() == "Iter" && !type_params.is_empty()
+                )),
+                "@{tag} should produce a generic Iter<User>"
+            );
+        }
     }
 
     #[test]

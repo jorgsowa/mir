@@ -85,14 +85,40 @@ impl<'a> DefinitionCollector<'a> {
             match &member.kind {
                 ClassMemberKind::Method(m) => {
                     if m.name.as_deref() == Some("__construct") {
+                        // Promoted-constructor properties take their type from the
+                        // native type hint, falling back to the constructor's
+                        // `@param` docblock — so `@param T $value` (with `@template T`
+                        // on the class) types the promoted `$value` property as the
+                        // template param `T`, enabling generic member inference.
+                        let ctor_doc = self.parse_docblock_from_node_or_preceding(
+                            m.doc_comment.as_ref(),
+                            member.span.start,
+                        );
+                        let ctor_template_names: std::collections::HashSet<String> = ctor_doc
+                            .templates
+                            .iter()
+                            .map(|(n, _, _)| n.to_string())
+                            .chain(class_template_names.iter().cloned())
+                            .collect();
                         for p in m.params.iter() {
                             if p.visibility.is_some() {
                                 let param_name = p.name.as_deref().unwrap_or_default();
-                                let ty = self.resolve_union_opt(
-                                    p.type_hint
-                                        .as_ref()
-                                        .map(|h| type_from_hint_owned(h, Some(&fqcn))),
-                                );
+                                let ty = self
+                                    .resolve_union_opt(
+                                        p.type_hint
+                                            .as_ref()
+                                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                                    )
+                                    .or_else(|| {
+                                        ctor_doc.get_param_type(param_name).cloned().map(|u| {
+                                            self.resolve_union_doc_with_templates(
+                                                u,
+                                                &ctor_template_names,
+                                                &fqcn,
+                                                &class_template_params,
+                                            )
+                                        })
+                                    });
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
                                     ty,

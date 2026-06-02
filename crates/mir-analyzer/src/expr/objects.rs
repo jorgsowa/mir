@@ -7,6 +7,29 @@ use mir_types::{Atomic, Type};
 use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
+/// Widen scalar literal atomics to their base type when forming a `new`
+/// receiver's generic `type_params`. Carrying a literal type param into the
+/// receiver (e.g. `Box<5>` from `new Box(5)`) is over-narrow and risks false
+/// positives downstream (e.g. `$box->set(6)` where `set(T)` and `T=5` would
+/// wrongly reject `6`). Mirrors `stmt::widen_for_check`, plus `true`/`false`
+/// → `bool`.
+fn widen_type_param(ty: &Type) -> Type {
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    out.possibly_undefined = ty.possibly_undefined;
+    for atomic in &ty.types {
+        let widened = match atomic {
+            Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => Atomic::TInt,
+            Atomic::TLiteralString(_) => Atomic::TString,
+            Atomic::TLiteralFloat(_, _) => Atomic::TFloat,
+            Atomic::TTrue | Atomic::TFalse => Atomic::TBool,
+            other => other.clone(),
+        };
+        out.add_type(widened);
+    }
+    out
+}
+
 fn is_valid_class_name_type(ty: &Type) -> bool {
     // Class names must be strings or class-string types only.
     // Mixed is not allowed - must be explicit string or class-string.
@@ -40,6 +63,68 @@ fn expr_name_str(expr: &Expr) -> Option<&str> {
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
+    /// Infer the class-level generic type params for `new Class(...)` from the
+    /// constructor argument types.
+    ///
+    /// Given `@template T` on the class and a constructor parameter typed `T`,
+    /// `new Box(5)` binds `T → int` and returns `[int]` (in the class's declared
+    /// template-param order) so the result is `Box<int>`. Returns the cached
+    /// empty params when the class is non-generic or nothing could be inferred,
+    /// preserving the previous behaviour for ordinary instantiations.
+    fn infer_new_type_params(
+        &self,
+        fqcn: &Arc<str>,
+        ctor_params: Option<&[mir_codebase::storage::FnParam]>,
+        arg_types: &[Type],
+    ) -> Arc<[Type]> {
+        let empty = mir_types::union::empty_type_params();
+        let class_tps = match crate::db::class_template_params(self.db, fqcn) {
+            Some(tps) if !tps.is_empty() => tps,
+            _ => return empty,
+        };
+        let Some(ctor_params) = ctor_params else {
+            return empty;
+        };
+
+        // Bind class templates ONLY from constructor ARGUMENTS (no bound/mixed
+        // fallback). A template the constructor never binds is absent from the
+        // map, so it stays `mixed` (bare) in the emitted `type_params` — it must
+        // NOT be fabricated to its declared bound, or a later `T`-typed method
+        // call would falsely substitute the param to the bound and reject valid
+        // args (e.g. `@template T of Base`, `__construct(int $id)` → `new Repo(5)`
+        // must be bare `Repo`, never `Repo<Base>`).
+        let bindings =
+            crate::generic::infer_arg_template_bindings(&class_tps, ctor_params, arg_types);
+
+        // Emit the inferred bindings in the class's declared template-param order
+        // so `build_class_bindings` zips them back correctly at the call site.
+        // A template bound from an argument → its (widened) inferred type;
+        // otherwise → `mixed`. Only consider the receiver "concrete" when at
+        // least one template was bound from an argument — otherwise keep the
+        // bare (un-parameterised) type, preserving prior behaviour for ordinary
+        // / non-generic / uninferable instantiations.
+        let mut params: Vec<Type> = Vec::with_capacity(class_tps.len());
+        let mut any_concrete = false;
+        for tp in class_tps.iter() {
+            match bindings.get(&mir_types::Name::from(tp.name.as_ref())) {
+                Some(ty) if !ty.is_mixed() => {
+                    // Widen scalar literals to their base type so the receiver
+                    // does not carry an over-narrow type param (e.g. `new Box(5)`
+                    // → `Box<int>`, not `Box<5>`, so a later `$box->set(6)` for
+                    // `set(T)` is not wrongly rejected).
+                    any_concrete = true;
+                    params.push(widen_type_param(ty));
+                }
+                _ => params.push(Type::mixed()),
+            }
+        }
+        if any_concrete {
+            mir_types::union::vec_to_type_params(params)
+        } else {
+            empty
+        }
+    }
+
     pub(super) fn analyze_new(
         &mut self,
         n: &NewExpr,
@@ -70,6 +155,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
 
+        // Generic type params inferred from constructor arguments, attached to
+        // the resulting `TNamedObject` so member-access substitution works.
+        let mut inferred_type_params: Arc<[Type]> = mir_types::union::empty_type_params();
         let class_ty = match &n.class.kind {
             ExprKind::Identifier(name) => {
                 let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
@@ -126,23 +214,35 @@ impl<'a> ExpressionAnalyzer<'a> {
                         "__construct",
                     )
                     .map(|(_, s)| (s.params.to_vec(), s.template_params.clone()));
-                    if let Some((ctor_params, ctor_templates)) = ctor_params_and_templates {
+                    if let Some((ctor_params, ctor_templates)) = &ctor_params_and_templates {
                         crate::call::check_constructor_args(
                             self,
                             &fqcn,
                             crate::call::CheckArgsParams {
                                 fn_name: "__construct",
-                                params: &ctor_params,
+                                params: ctor_params,
                                 arg_types: &arg_types,
                                 arg_spans: &arg_spans,
                                 arg_names: &arg_names,
                                 arg_can_be_byref: &arg_can_be_byref,
                                 call_span,
                                 has_spread: n.args.iter().any(|a| a.unpack),
-                                template_params: &ctor_templates,
+                                template_params: ctor_templates,
                             },
                         );
                     }
+                    // Infer class-level generic type params from the constructor
+                    // arguments (e.g. `new Box(5)` → `Box<int>` for `@template T`
+                    // with `__construct(T $value)`). This lets later member access
+                    // (`$b->get()`) substitute the receiver's bindings into return
+                    // types, including UNANNOTATED inferred returns.
+                    inferred_type_params = self.infer_new_type_params(
+                        &fqcn,
+                        ctor_params_and_templates
+                            .as_ref()
+                            .map(|(p, _)| p.as_slice()),
+                        &arg_types,
+                    );
                 }
                 crate::call::ARG_TYPES_BUF.with(|b| {
                     let mut g = b.borrow_mut();
@@ -152,7 +252,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 });
                 let ty = Type::single(Atomic::TNamedObject {
                     fqcn: mir_types::Name::from(fqcn.as_ref()),
-                    type_params: mir_types::union::empty_type_params(),
+                    type_params: std::mem::replace(
+                        &mut inferred_type_params,
+                        mir_types::union::empty_type_params(),
+                    ),
                 });
                 self.record_symbol(
                     n.class.span,
