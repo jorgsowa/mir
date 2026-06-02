@@ -9,6 +9,4 @@ class A
     }
 }
 ===expect===
-MethodSignatureMustOmitReturnType
-===ignore===
-TODO
+ParseError@4:36-4:40: Parse error: Method __construct() cannot declare a return type

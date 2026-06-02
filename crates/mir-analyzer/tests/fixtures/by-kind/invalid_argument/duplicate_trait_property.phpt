@@ -8,6 +8,4 @@ trait T {
 }
 
 ===expect===
-DuplicateProperty
-===ignore===
-TODO
+ParseError@4:5-4:32: Parse error: Cannot redeclare property $foo

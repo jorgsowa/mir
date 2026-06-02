@@ -12,6 +12,4 @@ final class Person
 
 new Person(name: "", 0);
 ===expect===
-InvalidNamedArgument
-===ignore===
-TODO
+ParseError@10:22-10:23: Parse error: cannot use positional argument after named argument

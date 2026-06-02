@@ -9,6 +9,4 @@ Continue is not break
                             continue 2;
                     }
 ===expect===
-ContinueOutsideLoop
-===ignore===
-TODO
+ParseError@6:29-6:37: Parse error: Cannot 'continue' 2 levels
