@@ -5,6 +5,4 @@ Invalid array offset
 $x = ["a"];
 $y = $x["b"];
 ===expect===
-InvalidArrayOffset
-===ignore===
-TODO
+NonExistentArrayOffset@3:9-3:12: Array offset 'b' does not exist

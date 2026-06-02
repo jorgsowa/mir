@@ -25,6 +25,4 @@ try {
     echo $a;
 }
 ===expect===
-PossiblyUndefinedGlobalVariable
-===ignore===
-TODO
+PossiblyUndefinedVariable@22:10-22:12: Variable $a might not be defined

@@ -4,6 +4,4 @@ Circular reference
 <?php
 class A extends A {}
 ===expect===
-CircularReference
-===ignore===
-TODO
+CircularInheritance@2:0-2:20: Class A has a circular inheritance chain

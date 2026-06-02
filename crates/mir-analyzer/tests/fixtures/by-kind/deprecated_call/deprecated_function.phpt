@@ -7,6 +7,4 @@ function a(): void {}
 a();
 
 ===expect===
-DeprecatedFunction
-===ignore===
-TODO
+DeprecatedCall@4:1-4:4: Call to deprecated function a

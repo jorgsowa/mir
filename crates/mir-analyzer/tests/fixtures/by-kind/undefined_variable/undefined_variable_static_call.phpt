@@ -4,6 +4,4 @@ Undefined variable static call
 <?php
 $foo::bar();
 ===expect===
-UndefinedGlobalVariable
-===ignore===
-TODO
+UndefinedVariable@2:1-2:5: Variable $foo is not defined

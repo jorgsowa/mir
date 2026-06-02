@@ -17,6 +17,4 @@ class C {
     }
 }
 ===expect===
-TraitMethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@12:4-12:30: Method C::foo() signature mismatch: return type 'B' is not a subtype of parent 'A'

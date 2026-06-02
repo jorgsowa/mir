@@ -16,6 +16,4 @@ if (rand(0, 1)) {
 
 echo $b;
 ===expect===
-PossiblyUndefinedGlobalVariable
-===ignore===
-TODO
+PossiblyUndefinedVariable@14:6-14:8: Variable $b might not be defined
