@@ -239,6 +239,55 @@ impl CallAnalyzer {
                 mir_types::Atomic::TObject | mir_types::Atomic::TTemplateParam { .. } => {
                     result.add_type(mir_types::Atomic::TMixed);
                 }
+                mir_types::Atomic::TClosure {
+                    params,
+                    return_type,
+                    ..
+                } => {
+                    let method_name_lower = method_name.to_lowercase();
+                    match method_name_lower.as_str() {
+                        "bindto" => {
+                            // bindTo($newThis, $newScope = 'static'): ?Closure
+                            // Preserve the closure's params and return_type, update this_type
+                            let new_this = arg_types.first().cloned().unwrap_or_else(Type::null);
+                            let this_type = {
+                                let non_null = new_this.remove_null();
+                                if non_null.is_empty() {
+                                    None
+                                } else {
+                                    Some(Box::new(non_null))
+                                }
+                            };
+                            let mut bound = Type::single(mir_types::Atomic::TClosure {
+                                params: params.clone(),
+                                return_type: return_type.clone(),
+                                this_type,
+                            });
+                            bound.add_type(mir_types::Atomic::TNull);
+                            result.merge_with(&bound);
+                        }
+                        "call" => {
+                            // call($newThis, ...$args): mixed
+                            // Immediately invokes the closure, returns its return_type (not nullable)
+                            result.merge_with(return_type);
+                        }
+                        _ => {
+                            // Other methods (e.g. __invoke) dispatch through the Closure stub
+                            let closure_fqcn: Arc<str> = Arc::from("Closure");
+                            result.merge_with(&resolve_method_return(
+                                ea,
+                                ctx,
+                                call,
+                                span,
+                                method_name,
+                                &closure_fqcn,
+                                &[],
+                                &arg_types,
+                                &arg_spans,
+                            ));
+                        }
+                    }
+                }
                 _ => {
                     result.add_type(mir_types::Atomic::TMixed);
                 }

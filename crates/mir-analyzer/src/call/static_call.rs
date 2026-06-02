@@ -161,6 +161,39 @@ impl CallAnalyzer {
             }
         }
 
+        // Closure::bind($closure, $newThis, $newScope = 'static'): ?Closure
+        // Preserve the closure's params and return_type, update this_type
+        if fqcn_arc.as_ref() == "Closure" && method_name_lower == "bind" {
+            if let Some(closure_arg) = arg_types.first() {
+                for atomic in &closure_arg.types {
+                    if let mir_types::Atomic::TClosure {
+                        params,
+                        return_type,
+                        ..
+                    } = atomic
+                    {
+                        let new_this = arg_types.get(1).cloned().unwrap_or_else(Type::null);
+                        let this_type = {
+                            let non_null = new_this.remove_null();
+                            if non_null.is_empty() {
+                                None
+                            } else {
+                                Some(Box::new(non_null))
+                            }
+                        };
+                        let mut result = Type::single(mir_types::Atomic::TClosure {
+                            params: params.clone(),
+                            return_type: return_type.clone(),
+                            this_type,
+                        });
+                        result.add_type(mir_types::Atomic::TNull);
+                        return result;
+                    }
+                }
+            }
+            // If we can't determine the closure type from the first arg, fall through to stub resolution
+        }
+
         let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower);
 
         if let Some(resolved) = resolved {
