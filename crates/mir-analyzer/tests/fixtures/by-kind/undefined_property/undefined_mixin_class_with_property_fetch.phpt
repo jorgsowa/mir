@@ -7,6 +7,4 @@ class A {}
 
 (new A)->foo;
 ===expect===
-UndefinedPropertyFetch
-===ignore===
-TODO
+UndefinedProperty@5:10-5:13: Property A::$foo does not exist

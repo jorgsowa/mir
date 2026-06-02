@@ -14,6 +14,4 @@ class A {
 /** @method D foo(int $s) */
 class B extends A {}
 ===expect===
-ImplementedParamTypeMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@12:0-12:20: Method B::foo() signature mismatch: parameter $s type 'int' is narrower than parent type 'string'

@@ -20,6 +20,5 @@ switch (gettype($a)) {
         testString($a);
 }
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO
+InvalidArgument@14:17-14:19: Argument $var of testInt() expects 'int', got '1|"two"'
+InvalidArgument@17:20-17:22: Argument $var of testString() expects 'string', got '1|"two"'

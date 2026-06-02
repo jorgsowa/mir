@@ -4,6 +4,4 @@ Builtin functioninvalid argument with weak types
 <?php
 $s = substr(5, 4);
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO
+InvalidArgument@2:13-2:14: Argument $string of substr() expects 'string', got '5'

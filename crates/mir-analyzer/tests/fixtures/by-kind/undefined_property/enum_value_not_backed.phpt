@@ -11,6 +11,4 @@ enum Suit {
 
 echo Suit::Hearts->value;
 ===expect===
-UndefinedPropertyFetch
-===ignore===
-TODO
+UndefinedProperty@9:20-9:25: Property Suit::$value does not exist

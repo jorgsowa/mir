@@ -12,6 +12,4 @@ class A {
     }
 }
 ===expect===
-InvalidPropertyAssignmentValue
-===ignore===
-TODO
+InvalidPropertyAssignment@8:9-8:23: Property $foo expects 'string', cannot assign '5'

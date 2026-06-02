@@ -6,6 +6,4 @@ function fooFoo(): string {
     return 5;
 }
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO
+InvalidReturnType@3:5-3:14: Return type '5' is not compatible with declared 'string'

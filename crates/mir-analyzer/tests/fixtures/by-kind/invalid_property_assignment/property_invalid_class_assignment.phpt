@@ -31,6 +31,4 @@ class A {
 $a = new A();
 $a->foo = new SomeOtherPropertyType();
 ===expect===
-InvalidPropertyAssignmentValue
-===ignore===
-TODO
+InvalidPropertyAssignment@29:1-29:38: Property $foo expects 'PropertyType', cannot assign 'Bar\SomeOtherPropertyType'

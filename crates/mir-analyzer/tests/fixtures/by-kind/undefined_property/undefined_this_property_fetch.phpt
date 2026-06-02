@@ -8,6 +8,4 @@ class A {
     }
 }
 ===expect===
-UndefinedThisPropertyFetch
-===ignore===
-TODO
+UndefinedProperty@4:21-4:24: Property A::$foo does not exist

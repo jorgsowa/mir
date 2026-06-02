@@ -7,6 +7,4 @@ class A {
 }
 (new A)->__invoke(1);
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO
+InvalidArgument@5:19-5:20: Argument $p of __invoke() expects 'string', got '1'

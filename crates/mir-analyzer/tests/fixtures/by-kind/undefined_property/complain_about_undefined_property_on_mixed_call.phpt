@@ -10,6 +10,4 @@ class C {
     }
 }
 ===expect===
-UndefinedThisPropertyFetch
-===ignore===
-TODO
+UndefinedProperty@6:24-6:25: Property C::$d does not exist

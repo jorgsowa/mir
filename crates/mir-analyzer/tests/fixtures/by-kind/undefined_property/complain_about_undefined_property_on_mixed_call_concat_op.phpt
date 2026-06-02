@@ -11,6 +11,4 @@ class A {
     }
 }
 ===expect===
-UndefinedThisPropertyFetch
-===ignore===
-TODO
+UndefinedProperty@7:32-7:35: Property A::$baz does not exist
