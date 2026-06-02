@@ -9,6 +9,4 @@ class A {
     }
 }
 ===expect===
-InvalidToString
-===ignore===
-TODO
+InvalidToString@3:27-6:28: Method A::__toString() must return a string

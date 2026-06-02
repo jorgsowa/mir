@@ -6,6 +6,4 @@ class A {
     function __toString() { }
 }
 ===expect===
-InvalidToString
-===ignore===
-TODO
+InvalidToString@3:27-3:30: Method A::__toString() must return a string

@@ -414,6 +414,44 @@ pub(crate) fn emit_unused_params(
     }
 }
 
+/// A `__toString` method must return a `string`. Emits `InvalidToString` when
+/// the effective return type (declared if present, else inferred from the body)
+/// is definitely not a string. Conservative: `mixed`/empty types are skipped so
+/// incomplete inference never produces a false positive.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn check_to_string_return(
+    fqcn: &str,
+    declared_return: Option<&mir_types::Type>,
+    inferred: &mir_types::Type,
+    body_span: &php_ast::Span,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    let effective = declared_return.unwrap_or(inferred);
+    if effective.is_mixed() || effective.is_empty() {
+        return;
+    }
+    if effective.types.iter().all(|a| a.is_string()) {
+        return;
+    }
+    let (line, col_start) = offset_to_line_col(source, body_span.start, source_map);
+    let (line_end, col_end) = offset_to_line_col(source, body_span.end, source_map);
+    issues.push(mir_issues::Issue::new(
+        mir_issues::IssueKind::InvalidToString {
+            class: fqcn.to_string(),
+        },
+        mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: col_end.max(col_start + 1),
+        },
+    ));
+}
+
 pub(crate) fn emit_unused_variables(
     ctx: &crate::flow_state::FlowState,
     file: &Arc<str>,

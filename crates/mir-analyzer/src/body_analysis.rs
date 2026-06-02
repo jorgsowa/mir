@@ -885,6 +885,7 @@ impl<'a> BodyAnalyzer<'a> {
             let (params, return_ty, template_params, declared_throws) =
                 method_chain_signature(self.db, fqcn, method_name);
 
+            let declared_return = return_ty.clone();
             let is_ctor = method_name == "__construct";
             let mut ctx = FlowState::for_method_with_templates(
                 &params,
@@ -918,6 +919,19 @@ impl<'a> BodyAnalyzer<'a> {
             emit_unused_params(&params, &ctx, method_name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
+
+            if self.mode == AnalysisMode::Full && method_name.eq_ignore_ascii_case("__tostring") {
+                crate::diagnostics::check_to_string_return(
+                    fqcn,
+                    declared_return.as_ref(),
+                    &inferred,
+                    &body.span,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
+            }
 
             self.record_method_inference(fqcn, method_name, &inferred);
         }

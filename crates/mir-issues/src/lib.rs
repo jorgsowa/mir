@@ -359,6 +359,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
     PossiblyInvalidClone { ty: String },
+    /// A `__toString` method that does not return a `string`.
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/implicit_to_string_cast/`.
+    InvalidToString { class: String },
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/circular_inheritance/`.
     CircularInheritance { class: String },
@@ -411,6 +415,7 @@ impl IssueKind {
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
             | IssueKind::InvalidClone { .. }
+            | IssueKind::InvalidToString { .. }
             | IssueKind::TypeCheckMismatch { .. } => Severity::Error,
 
             // Warnings (shown at default error level)
@@ -605,6 +610,7 @@ impl IssueKind {
             IssueKind::MixedClone => "MIR1204",
             IssueKind::InvalidClone { .. } => "MIR1205",
             IssueKind::PossiblyInvalidClone { .. } => "MIR1206",
+            IssueKind::InvalidToString { .. } => "MIR1207",
 
             // Trait (1300-1399)
             IssueKind::InvalidTraitUse { .. } => "MIR1300",
@@ -702,6 +708,7 @@ impl IssueKind {
             IssueKind::MixedClone => "MixedClone",
             IssueKind::InvalidClone { .. } => "InvalidClone",
             IssueKind::PossiblyInvalidClone { .. } => "PossiblyInvalidClone",
+            IssueKind::InvalidToString { .. } => "InvalidToString",
             IssueKind::CircularInheritance { .. } => "CircularInheritance",
             IssueKind::InvalidTraitUse { .. } => "InvalidTraitUse",
         }
@@ -1004,6 +1011,9 @@ impl IssueKind {
             IssueKind::InvalidClone { ty } => format!("cannot clone non-object {ty}"),
             IssueKind::PossiblyInvalidClone { ty } => {
                 format!("cannot clone possibly non-object {ty}")
+            }
+            IssueKind::InvalidToString { class } => {
+                format!("Method {class}::__toString() must return a string")
             }
             IssueKind::CircularInheritance { class } => {
                 format!("Class {class} has a circular inheritance chain")
@@ -1368,6 +1378,7 @@ mod code_tests {
             IssueKind::MixedClone,
             IssueKind::InvalidClone { ty: s() },
             IssueKind::PossiblyInvalidClone { ty: s() },
+            IssueKind::InvalidToString { class: s() },
             IssueKind::InvalidTraitUse {
                 trait_name: s(),
                 reason: s(),
@@ -1450,9 +1461,9 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 79 = current variant count. If this assertion fires after you added
+        // 80 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 79);
+        assert_eq!(one_of_each().len(), 80);
     }
 }
