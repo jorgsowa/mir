@@ -12,6 +12,4 @@ function foo() : bool {
     }
 }
 ===expect===
-InvalidReturnType
-===ignore===
-TODO
+InvalidReturnType@2:23-10:24: Return type 'void' is not compatible with declared 'bool'

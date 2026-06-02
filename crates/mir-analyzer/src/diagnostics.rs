@@ -452,6 +452,85 @@ pub(crate) fn check_to_string_return(
     ));
 }
 
+/// True when a declared return type obliges every code path to `return` a
+/// value, so falling off the end of the body is an error. Conservative:
+/// `void`/`never`/`mixed`/nullable returns are exempt (falling off yields
+/// `null`, which those accept or which is moot), and iterable/generator-like
+/// returns are exempt because a generator body legitimately never returns.
+fn return_requires_value(t: &mir_types::Type) -> bool {
+    use mir_types::Atomic;
+    if t.is_empty() || t.is_void() || t.is_never() || t.is_mixed() || t.is_nullable() {
+        return false;
+    }
+    // Conditional and template return types are resolved per-call/contextually;
+    // an empty-bodied stub with such a return must not be flagged (mirrors the
+    // exemption in `analyze_return_stmt`).
+    if t.types.iter().any(|a| {
+        matches!(
+            a,
+            Atomic::TConditional { .. } | Atomic::TTemplateParam { .. }
+        )
+    }) {
+        return false;
+    }
+    !t.types.iter().any(|a| match a {
+        Atomic::TNamedObject { fqcn, .. } => {
+            let n = fqcn.trim_start_matches('\\');
+            n.eq_ignore_ascii_case("Generator")
+                || n.eq_ignore_ascii_case("Iterator")
+                || n.eq_ignore_ascii_case("IteratorAggregate")
+                || n.eq_ignore_ascii_case("Traversable")
+                || n.eq_ignore_ascii_case("iterable")
+        }
+        // `iterable` and array returns also cover generator bodies.
+        Atomic::TArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. } => true,
+        _ => false,
+    })
+}
+
+/// Emit `InvalidReturnType` when a value-returning function/method can reach the
+/// end of its body without returning. `diverges` is the flow flag after body
+/// analysis: `true` means every path already returned/threw/exited.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn check_missing_return(
+    declared_return: Option<&mir_types::Type>,
+    diverges: bool,
+    body_span: &php_ast::Span,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<mir_issues::Issue>,
+) {
+    if diverges {
+        return;
+    }
+    let Some(declared) = declared_return else {
+        return;
+    };
+    if !return_requires_value(declared) {
+        return;
+    }
+    let (line, col_start) = offset_to_line_col(source, body_span.start, source_map);
+    let (line_end, col_end) = offset_to_line_col(source, body_span.end, source_map);
+    issues.push(mir_issues::Issue::new(
+        mir_issues::IssueKind::InvalidReturnType {
+            expected: format!("{declared}"),
+            actual: "void".to_string(),
+        },
+        mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: col_end.max(col_start + 1),
+        },
+    ));
+}
+
 pub(crate) fn emit_unused_variables(
     ctx: &crate::flow_state::FlowState,
     file: &Arc<str>,

@@ -612,6 +612,7 @@ impl<'a> BodyAnalyzer<'a> {
             ),
         };
 
+        let declared_return = return_ty.clone();
         let mut ctx = FlowState::for_method_with_templates(
             &params,
             return_ty,
@@ -638,11 +639,24 @@ impl<'a> BodyAnalyzer<'a> {
         );
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
+        let body_diverges = ctx.diverges;
         drop(sa);
 
         emit_unused_params(&params, &ctx, "", file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
+
+        if self.mode == AnalysisMode::Full {
+            crate::diagnostics::check_missing_return(
+                declared_return.as_ref(),
+                body_diverges,
+                &decl.body.span,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+        }
 
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
@@ -914,11 +928,24 @@ impl<'a> BodyAnalyzer<'a> {
             );
             sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
+            let body_diverges = ctx.diverges;
             drop(sa);
 
             emit_unused_params(&params, &ctx, method_name, file, all_issues);
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
+
+            if self.mode == AnalysisMode::Full && !is_ctor {
+                crate::diagnostics::check_missing_return(
+                    declared_return.as_ref(),
+                    body_diverges,
+                    &body.span,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
+            }
 
             if self.mode == AnalysisMode::Full && method_name.eq_ignore_ascii_case("__tostring") {
                 crate::diagnostics::check_to_string_return(
