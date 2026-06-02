@@ -14,6 +14,4 @@ class B extends A {
     }
 }
 ===expect===
-Method B::fooFoo has fewer parameters than parent method A::fooFoo
-===ignore===
-TODO
+MethodSignatureMismatch@9:4-9:42: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)

@@ -18,6 +18,4 @@ class B implements A {
     }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@14:4-14:42: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent T::foofoo() (2)

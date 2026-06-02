@@ -451,6 +451,36 @@ impl<'a> ClassAnalyzer<'a> {
                 );
             }
 
+            // ---- d2. Child must not declare fewer parameters than parent -----
+            // A child accepting fewer positional params cannot handle every call
+            // the parent could (an LSP violation PHP rejects). A trailing
+            // variadic absorbs the extras, so it is exempt. Constructors are
+            // exempt from signature compatibility in PHP, and private parent
+            // methods are not real overrides.
+            if method_name_lower.as_ref() != "__construct"
+                && parent.visibility != Visibility::Private
+                && own_params.len() < parent_params.len()
+                && !own_params.iter().any(|p| p.is_variadic)
+            {
+                issues.push(
+                    Issue::new(
+                        IssueKind::MethodSignatureMismatch {
+                            class: fqcn.to_string(),
+                            method: method_name_lower.to_string(),
+                            detail: format!(
+                                "method has fewer parameters ({}) than parent {}::{}() ({})",
+                                own_params.len(),
+                                parent_fqcn,
+                                method_name_lower,
+                                parent_params.len()
+                            ),
+                        },
+                        loc.clone(),
+                    )
+                    .with_snippet(method_name_lower.to_string()),
+                );
+            }
+
             // ---- e. Param types must not be narrowed (contravariance) --------
             // For each positional param present in both parent and child:
             //   parent_param_type must be a subtype of child_param_type.
