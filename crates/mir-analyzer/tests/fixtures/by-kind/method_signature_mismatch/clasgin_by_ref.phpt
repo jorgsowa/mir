@@ -13,6 +13,4 @@ class B extends A {
   }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@8:2-8:41: Method B::foo() signature mismatch: parameter $a must not be passed by reference to match parent A::foo()

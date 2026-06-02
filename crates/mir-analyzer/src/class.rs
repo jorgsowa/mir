@@ -481,6 +481,35 @@ impl<'a> ClassAnalyzer<'a> {
                 );
             }
 
+            // ---- d3. by-reference-ness of shared params must match -----------
+            // A parameter that is by-value in the parent but by-reference in the
+            // child (or vice versa) changes the calling contract — PHP rejects
+            // the override. Constructors are exempt.
+            if method_name_lower.as_ref() != "__construct" {
+                let shared = parent_params.len().min(own_params.len());
+                if let Some(i) =
+                    (0..shared).find(|&i| parent_params[i].is_byref != own_params[i].is_byref)
+                {
+                    issues.push(
+                        Issue::new(
+                            IssueKind::MethodSignatureMismatch {
+                                class: fqcn.to_string(),
+                                method: method_name_lower.to_string(),
+                                detail: format!(
+                                    "parameter ${} must {}be passed by reference to match parent {}::{}()",
+                                    own_params[i].name.as_ref().trim_start_matches('$'),
+                                    if parent_params[i].is_byref { "" } else { "not " },
+                                    parent_fqcn,
+                                    method_name_lower
+                                ),
+                            },
+                            loc.clone(),
+                        )
+                        .with_snippet(method_name_lower.to_string()),
+                    );
+                }
+            }
+
             // ---- e. Param types must not be narrowed (contravariance) --------
             // For each positional param present in both parent and child:
             //   parent_param_type must be a subtype of child_param_type.
