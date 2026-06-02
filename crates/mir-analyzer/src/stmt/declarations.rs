@@ -140,7 +140,15 @@ impl<'a> StatementsAnalyzer<'a> {
                         is_optional: p.default.is_some() || p.variadic,
                     })
                     .collect();
-                (ast_params, None)
+                // Anonymous classes are not collected into storage, so derive
+                // the declared return type straight from the AST hint — without
+                // this, return-type checks (e.g. `return 5` from a `: string`
+                // method) are silently skipped for anonymous-class methods.
+                let ret = method
+                    .return_type
+                    .as_ref()
+                    .map(|h| crate::parser::type_from_hint_owned(h, Some(fqcn.as_ref())));
+                (ast_params, ret)
             };
             let is_ctor = method_name == "__construct";
             let mut method_ctx = FlowState::for_method(
