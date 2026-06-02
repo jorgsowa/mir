@@ -5,6 +5,4 @@ Bad array by ref
 function fooFoo(array &$a): void {}
 fooFoo([1, 2, 3]);
 ===expect===
-InvalidPassByReference
-===ignore===
-TODO
+InvalidPassByReference@3:8-3:17: Argument $a of fooFoo() must be passed by reference

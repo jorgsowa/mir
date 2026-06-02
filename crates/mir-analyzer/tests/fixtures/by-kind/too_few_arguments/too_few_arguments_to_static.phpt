@@ -8,6 +8,4 @@ class A {
 
 A::fooFoo();
 ===expect===
-TooFewArguments
-===ignore===
-TODO
+TooFewArguments@6:1-6:12: Too few arguments for fooFoo(): expected 1, got 0

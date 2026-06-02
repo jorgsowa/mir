@@ -5,6 +5,4 @@ Null argument
 function fooFoo(int $a): void {}
 fooFoo(null);
 ===expect===
-NullArgument
-===ignore===
-TODO
+NullArgument@3:8-3:12: Argument $a of fooFoo() cannot be null

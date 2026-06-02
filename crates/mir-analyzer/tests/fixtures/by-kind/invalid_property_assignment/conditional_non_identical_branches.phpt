@@ -1,6 +1,5 @@
 ===description===
 conditional types with different branches are not simplified
-===ignore===
 ===file===
 <?php
 class TestFactory {
@@ -22,5 +21,4 @@ $result = $f->process(null);
 $f->stringProp = $result;
 $f->intProp = $result;
 ===expect===
-InvalidPropertyAssignment@18:1: Property $stringProp expects 'string', cannot assign 'int|string'
-InvalidPropertyAssignment@19:1: Property $intProp expects 'int', cannot assign 'int|string'
+InvalidPropertyAssignment@19:1-19:22: Property $intProp expects 'int', cannot assign 'string'

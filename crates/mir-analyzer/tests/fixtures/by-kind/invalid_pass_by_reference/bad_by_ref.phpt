@@ -5,6 +5,4 @@ Bad by ref
 function fooFoo(string &$v): void {}
 fooFoo("a");
 ===expect===
-InvalidPassByReference
-===ignore===
-TODO
+InvalidPassByReference@3:8-3:11: Argument $v of fooFoo() must be passed by reference

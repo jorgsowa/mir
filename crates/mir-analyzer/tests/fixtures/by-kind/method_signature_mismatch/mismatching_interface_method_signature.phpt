@@ -12,6 +12,4 @@ class B implements A {
     }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@7:4-7:45: Method B::foofoo() signature mismatch: parameter $a type 'string' is narrower than parent type 'int'

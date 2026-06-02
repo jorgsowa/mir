@@ -19,6 +19,4 @@ function bar(Foo $foo): int {
     };
 }
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@13:53-13:57: Argument $_ of baz() expects 'C', got 'B'

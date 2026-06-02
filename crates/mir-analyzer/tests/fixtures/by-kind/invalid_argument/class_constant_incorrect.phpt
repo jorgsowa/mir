@@ -12,6 +12,4 @@ class C {
 function foo($s) : void {}
 foo("for");
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@10:5-10:10: Argument $s of foo() expects '"foo"|"bar"|Ns\C::A|Ns\C::B', got '"for"'

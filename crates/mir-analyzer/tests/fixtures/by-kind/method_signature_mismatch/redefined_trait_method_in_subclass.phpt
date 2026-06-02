@@ -16,6 +16,4 @@ class C extends B {
     }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@12:4-12:45: Method C::foofoo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0

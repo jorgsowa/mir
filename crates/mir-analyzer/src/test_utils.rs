@@ -586,15 +586,36 @@ pub fn run_fixture(path: &str) {
     // code happens to declare an uncalled global function. Fixtures that
     // explicitly set `suppress=...` keep their replacement semantics; this
     // only fills in the default.
+    //
+    // The dead-code group (UnusedMethod/Property/Function) is suppressed
+    // all-or-nothing so the `dead_code_enabled` path filter below keeps its
+    // current semantics. A second group of *incidental* diagnostics
+    // (UnusedParam, UnusedVariable, MissingThrowsDocblock) is suppressed
+    // per-kind: each is dropped unless the fixture's `===expect===` references
+    // it. These kinds fire on almost any realistic snippet (an unused closure
+    // parameter, a throw without a docblock), so a fixture that's focused on,
+    // say, InvalidArgument shouldn't have to also assert every incidental
+    // UnusedParam its example code happens to produce.
     if fixture.config.suppressed_issue_kinds.is_none() {
         let dead = crate::batch::dead_code_issue_kinds();
         let expects_dead_code = fixture
             .expected
             .iter()
             .any(|e| dead.contains(&e.kind_name.as_str()));
-        if !expects_dead_code {
-            fixture.config.suppressed_issue_kinds =
-                Some(dead.iter().map(|s| (*s).to_string()).collect());
+        let mut suppress: rustc_hash::FxHashSet<String> = if expects_dead_code {
+            Default::default()
+        } else {
+            dead.iter().map(|s| (*s).to_string()).collect()
+        };
+        const INCIDENTAL: &[&str] = &["UnusedParam", "UnusedVariable", "MissingThrowsDocblock"];
+        for kind in INCIDENTAL {
+            let expected = fixture.expected.iter().any(|e| e.kind_name == *kind);
+            if !expected {
+                suppress.insert((*kind).to_string());
+            }
+        }
+        if !suppress.is_empty() {
+            fixture.config.suppressed_issue_kinds = Some(suppress);
         }
     }
     let file_refs: Vec<(&str, &str)> = fixture

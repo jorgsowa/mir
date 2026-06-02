@@ -8,6 +8,4 @@ namespace Ns;
 function foo($s) : void {}
 foo(7.8);
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+InvalidArgument@6:5-6:8: Argument $s of foo() expects 'Ns\1.2|Ns\3.4|Ns\5.6', got '7.8'

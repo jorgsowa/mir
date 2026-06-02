@@ -8,6 +8,4 @@ class A {
 
 (new A)->fooFoo(5, "dfd");
 ===expect===
-TooManyArguments
-===ignore===
-TODO
+TooManyArguments@6:20-6:25: Too many arguments for fooFoo(): expected 1, got 2

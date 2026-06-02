@@ -20,6 +20,4 @@ function callDangerous(): void {
     }
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@11:5-11:7: Variable $s is never read

@@ -8,6 +8,4 @@ class A {
 
 (new A)->fooFoo();
 ===expect===
-TooFewArguments
-===ignore===
-TODO
+TooFewArguments@6:1-6:18: Too few arguments for fooFoo(): expected 1, got 0
