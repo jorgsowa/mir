@@ -226,12 +226,16 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
                 entry.set_var(&var_name, key_ty.clone());
+                // Emit ResolvedSymbol for key variable at binding position
+                self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
             }
         }
         let value_var = extract_simple_var(&fe.value);
         let value_destructure_vars = extract_destructure_vars(&fe.value);
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
+            // Emit ResolvedSymbol for value variable at binding position
+            self.record_symbol_for_var(fe.value.span, vname, value_ty.clone());
         } else {
             for vname in &value_destructure_vars {
                 entry.set_var(vname, Type::mixed());

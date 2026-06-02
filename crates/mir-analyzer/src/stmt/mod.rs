@@ -332,6 +332,16 @@ impl<'a> StatementsAnalyzer<'a> {
         ea
     }
 
+    fn record_symbol_for_var(&mut self, span: php_ast::Span, var_name: &str, ty: Type) {
+        use crate::symbol::ReferenceKind;
+        self.symbols.push(ResolvedSymbol {
+            file: self.file.clone(),
+            span,
+            kind: ReferenceKind::Variable(Arc::from(var_name)),
+            resolved_type: ty,
+        });
+    }
+
     fn offset_to_line_col(&self, offset: u32) -> (u32, u16) {
         crate::diagnostics::offset_to_line_col(self.source, offset, self.source_map)
     }
