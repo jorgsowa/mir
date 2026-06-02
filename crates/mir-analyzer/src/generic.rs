@@ -22,6 +22,32 @@ pub fn infer_template_bindings(
     params: &[FnParam],
     arg_types: &[Type],
 ) -> FxHashMap<Name, Type> {
+    let mut bindings = infer_arg_template_bindings(template_params, params, arg_types);
+
+    // For any template not bound through arguments, fall back to its bound
+    // (or mixed if no bound is declared).
+    for tp in template_params {
+        bindings
+            .entry(Name::from(tp.name.as_ref()))
+            .or_insert_with(|| tp.bound.clone().unwrap_or_else(Type::mixed));
+    }
+
+    bindings
+}
+
+/// Infer template parameter bindings ONLY from the argument types, without the
+/// bound/mixed fallback fill that [`infer_template_bindings`] applies.
+///
+/// A template that no argument binds is simply ABSENT from the returned map —
+/// it is *not* inferred to its declared bound. This is the correct primitive for
+/// parameterising a `new` receiver: a bounded template the constructor never
+/// references must stay `mixed` (bare) downstream, so a later `T`-typed method
+/// call does not falsely substitute the param to the bound and reject valid args.
+pub fn infer_arg_template_bindings(
+    template_params: &[TemplateParam],
+    params: &[FnParam],
+    arg_types: &[Type],
+) -> FxHashMap<Name, Type> {
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
     let template_names: std::collections::HashSet<Name> = template_params
         .iter()
@@ -32,14 +58,6 @@ pub fn infer_template_bindings(
         if let Some(param_ty) = &param.ty {
             infer_from_pair(param_ty, arg_ty, &template_names, &mut bindings);
         }
-    }
-
-    // For any template not bound through arguments, fall back to its bound
-    // (or mixed if no bound is declared).
-    for tp in template_params {
-        bindings
-            .entry(Name::from(tp.name.as_ref()))
-            .or_insert_with(|| tp.bound.clone().unwrap_or_else(Type::mixed));
     }
 
     bindings
