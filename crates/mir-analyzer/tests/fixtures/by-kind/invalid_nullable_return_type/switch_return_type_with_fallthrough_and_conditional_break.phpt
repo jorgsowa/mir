@@ -16,6 +16,4 @@ class A {
     }
 }
 ===expect===
-InvalidNullableReturnType
-===ignore===
-TODO
+InvalidReturnType@4:30-13:31: Return type 'void' is not compatible with declared 'bool'
