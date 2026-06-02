@@ -12,7 +12,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_binary_expr(
         &mut self,
         b: &BinaryExpr,
-        _span: Span,
+        span: Span,
         ctx: &mut FlowState,
     ) -> Type {
         use BinaryOp as B;
@@ -75,7 +75,31 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::Mul
             | BinaryOp::Div
             | BinaryOp::Mod
-            | BinaryOp::Pow => infer_arithmetic(&left_ty, &right_ty),
+            | BinaryOp::Pow => {
+                // `array + array` is the valid array-union operation; everything
+                // else requires numeric operands. Flag an operand only when it is
+                // *definitely* non-numeric (a non-numeric literal string, array,
+                // object, or enum case) so unions / general strings never FP.
+                let both_arrays = b.op == BinaryOp::Add
+                    && !left_ty.types.is_empty()
+                    && left_ty.types.iter().all(Atomic::is_array)
+                    && !right_ty.types.is_empty()
+                    && right_ty.types.iter().all(Atomic::is_array);
+                if !both_arrays
+                    && (operand_is_non_numeric(&left_ty) || operand_is_non_numeric(&right_ty))
+                {
+                    self.emit(
+                        IssueKind::InvalidOperand {
+                            op: arithmetic_op_symbol(b.op).to_string(),
+                            left: left_ty.to_string(),
+                            right: right_ty.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+                infer_arithmetic(&left_ty, &right_ty)
+            }
 
             BinaryOp::Concat => {
                 self.check_implicit_to_string_cast(&left_ty, b.left.span);
@@ -132,4 +156,52 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
     }
+}
+
+/// The source symbol for an arithmetic operator, for `InvalidOperand` messages.
+fn arithmetic_op_symbol(op: BinaryOp) -> &'static str {
+    match op {
+        BinaryOp::Add => "+",
+        BinaryOp::Sub => "-",
+        BinaryOp::Mul => "*",
+        BinaryOp::Div => "/",
+        BinaryOp::Mod => "%",
+        BinaryOp::Pow => "**",
+        _ => "?",
+    }
+}
+
+/// Whether `s` is a PHP numeric string (so `"5" + 3` is valid). Conservative:
+/// anything that doesn't cleanly parse is treated as numeric to avoid false
+/// positives.
+fn is_numeric_string(s: &str) -> bool {
+    let t = s.trim();
+    !t.is_empty() && (t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok())
+}
+
+/// Whether every member of `ty` is *definitely* a non-numeric value for
+/// arithmetic. Returns `false` for empty/`mixed`/unions that include any
+/// possibly-numeric member, so only clear errors are flagged.
+fn operand_is_non_numeric(ty: &Type) -> bool {
+    if ty.types.is_empty() || ty.is_mixed() {
+        return false;
+    }
+    ty.types.iter().all(|a| match a {
+        Atomic::TLiteralString(s) => !is_numeric_string(s),
+        Atomic::TArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TObject
+        | Atomic::TNamedObject { .. }
+        | Atomic::TStaticObject { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TParent { .. }
+        | Atomic::TIntersection { .. }
+        | Atomic::TClosure { .. }
+        | Atomic::TLiteralEnumCase { .. } => true,
+        // int/float/numeric/bool/null and general/class strings are left alone.
+        _ => false,
+    })
 }

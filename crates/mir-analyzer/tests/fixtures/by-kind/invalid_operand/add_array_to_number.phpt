@@ -4,6 +4,4 @@ Add array to number
 <?php
 $a = [1] + 1;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@2:6-2:13: Operator '+' not supported between 'array{0: 1}' and '1'

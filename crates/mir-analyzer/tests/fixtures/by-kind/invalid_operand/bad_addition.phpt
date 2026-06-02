@@ -4,6 +4,4 @@ Bad addition
 <?php
 $a = "b" + 5;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@2:6-2:13: Operator '+' not supported between '"b"' and '5'
