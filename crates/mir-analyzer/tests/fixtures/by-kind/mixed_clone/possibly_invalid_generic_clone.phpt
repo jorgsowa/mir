@@ -10,6 +10,4 @@ function foo($a): void {
     clone $a;
 }
 ===expect===
-PossiblyInvalidClone
-===ignore===
-TODO
+PossiblyInvalidClone@7:5-7:13: cannot clone possibly non-object int|Exception

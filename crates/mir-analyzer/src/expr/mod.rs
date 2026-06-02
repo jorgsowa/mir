@@ -4,7 +4,7 @@ use std::sync::Arc;
 use php_ast::owned::ExprKind;
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location, Severity};
-use mir_types::{Atomic, Type};
+use mir_types::{Atomic, CloneValidity, Type};
 
 use crate::body_analysis::AnalysisMode;
 use crate::db::MirDatabase;
@@ -202,16 +202,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- clone ------------------------------------------------------
             ExprKind::Clone(inner) => {
                 let ty = self.analyze(inner, ctx);
-                if ty.is_mixed() {
-                    self.emit(IssueKind::MixedClone, Severity::Info, expr.span);
-                }
+                self.check_clone_target(&ty, expr.span);
                 ty
             }
             ExprKind::CloneWith(inner, _props) => {
                 let ty = self.analyze(inner, ctx);
-                if ty.is_mixed() {
-                    self.emit(IssueKind::MixedClone, Severity::Info, expr.span);
-                }
+                self.check_clone_target(&ty, expr.span);
                 ty
             }
 
@@ -466,6 +462,30 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         self.issues.add(issue);
+    }
+
+    /// Emit a clone diagnostic when `ty` is (possibly) not an object. `mixed`
+    /// takes precedence (matching the historical `MixedClone` behaviour), then
+    /// definite non-objects (`InvalidClone`) and mixed object/non-object unions
+    /// (`PossiblyInvalidClone`).
+    fn check_clone_target(&mut self, ty: &Type, span: php_ast::Span) {
+        if ty.is_mixed() {
+            self.emit(IssueKind::MixedClone, Severity::Info, span);
+            return;
+        }
+        match ty.clone_validity() {
+            CloneValidity::Invalid => self.emit(
+                IssueKind::InvalidClone { ty: ty.to_string() },
+                Severity::Error,
+                span,
+            ),
+            CloneValidity::PossiblyInvalid => self.emit(
+                IssueKind::PossiblyInvalidClone { ty: ty.to_string() },
+                Severity::Info,
+                span,
+            ),
+            CloneValidity::Cloneable | CloneValidity::Unknown => {}
+        }
     }
 
     fn check_interpolation_implicit_to_string_cast(&mut self, ty: &Type, span: php_ast::Span) {

@@ -5,6 +5,4 @@ Possibly invalid int clone
 $a = rand(0, 1) ? 5 : new Exception();
 clone $a;
 ===expect===
-PossiblyInvalidClone
-===ignore===
-TODO
+PossiblyInvalidClone@3:1-3:9: cannot clone possibly non-object 5|Exception

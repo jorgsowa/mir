@@ -11,4 +11,5 @@ pub use atomic::Variance;
 pub use compact::SimpleType;
 pub use location::Location;
 pub use symbol::Name;
+pub use union::CloneValidity;
 pub use union::Type;

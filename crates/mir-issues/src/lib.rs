@@ -351,6 +351,14 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
     MixedClone,
+    /// `clone` of a value that is definitely not an object (e.g. `int`, `string`).
+    /// Emitted by `mir-analyzer/src/expr/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
+    InvalidClone { ty: String },
+    /// `clone` of a union where some members are not objects (e.g. `int|Exception`).
+    /// Emitted by `mir-analyzer/src/expr/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
+    PossiblyInvalidClone { ty: String },
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/circular_inheritance/`.
     CircularInheritance { class: String },
@@ -402,6 +410,7 @@ impl IssueKind {
             | IssueKind::CircularInheritance { .. }
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
+            | IssueKind::InvalidClone { .. }
             | IssueKind::TypeCheckMismatch { .. } => Severity::Error,
 
             // Warnings (shown at default error level)
@@ -431,7 +440,8 @@ impl IssueKind {
             | IssueKind::PossiblyInvalidArgument { .. }
             | IssueKind::PossiblyNullPropertyFetch { .. }
             | IssueKind::PossiblyNullMethodCall { .. }
-            | IssueKind::PossiblyNullArrayAccess => Severity::Info,
+            | IssueKind::PossiblyNullArrayAccess
+            | IssueKind::PossiblyInvalidClone { .. } => Severity::Info,
 
             // Info
             IssueKind::RedundantCondition { .. }
@@ -593,6 +603,8 @@ impl IssueKind {
             IssueKind::MixedMethodCall { .. } => "MIR1202",
             IssueKind::MixedPropertyFetch { .. } => "MIR1203",
             IssueKind::MixedClone => "MIR1204",
+            IssueKind::InvalidClone { .. } => "MIR1205",
+            IssueKind::PossiblyInvalidClone { .. } => "MIR1206",
 
             // Trait (1300-1399)
             IssueKind::InvalidTraitUse { .. } => "MIR1300",
@@ -688,6 +700,8 @@ impl IssueKind {
             IssueKind::MixedMethodCall { .. } => "MixedMethodCall",
             IssueKind::MixedPropertyFetch { .. } => "MixedPropertyFetch",
             IssueKind::MixedClone => "MixedClone",
+            IssueKind::InvalidClone { .. } => "InvalidClone",
+            IssueKind::PossiblyInvalidClone { .. } => "PossiblyInvalidClone",
             IssueKind::CircularInheritance { .. } => "CircularInheritance",
             IssueKind::InvalidTraitUse { .. } => "InvalidTraitUse",
         }
@@ -987,6 +1001,10 @@ impl IssueKind {
                 format!("Property ${property} fetched on mixed type")
             }
             IssueKind::MixedClone => "cannot clone mixed".to_string(),
+            IssueKind::InvalidClone { ty } => format!("cannot clone non-object {ty}"),
+            IssueKind::PossiblyInvalidClone { ty } => {
+                format!("cannot clone possibly non-object {ty}")
+            }
             IssueKind::CircularInheritance { class } => {
                 format!("Class {class} has a circular inheritance chain")
             }
@@ -1348,6 +1366,8 @@ mod code_tests {
             IssueKind::MixedMethodCall { method: s() },
             IssueKind::MixedPropertyFetch { property: s() },
             IssueKind::MixedClone,
+            IssueKind::InvalidClone { ty: s() },
+            IssueKind::PossiblyInvalidClone { ty: s() },
             IssueKind::InvalidTraitUse {
                 trait_name: s(),
                 reason: s(),
@@ -1430,9 +1450,9 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 77 = current variant count. If this assertion fires after you added
+        // 79 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 77);
+        assert_eq!(one_of_each().len(), 79);
     }
 }

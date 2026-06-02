@@ -341,6 +341,45 @@ impl Atomic {
         )
     }
 
+    /// Whether this atomic can never be an object instance — so `clone`-ing it
+    /// is invalid. Conservative: ambiguous atomics (`mixed`, `callable`,
+    /// `never`, conditionals, template params, enum cases, intersections,
+    /// object types) all return `false` so they never trigger a false positive.
+    pub fn is_definitely_non_object(&self) -> bool {
+        matches!(
+            self,
+            Atomic::TString
+                | Atomic::TLiteralString(_)
+                | Atomic::TCallableString
+                | Atomic::TClassString(_)
+                | Atomic::TNonEmptyString
+                | Atomic::TNumericString
+                | Atomic::TInterfaceString
+                | Atomic::TEnumString
+                | Atomic::TTraitString
+                | Atomic::TInt
+                | Atomic::TLiteralInt(_)
+                | Atomic::TIntRange { .. }
+                | Atomic::TPositiveInt
+                | Atomic::TNegativeInt
+                | Atomic::TNonNegativeInt
+                | Atomic::TFloat
+                | Atomic::TLiteralFloat(..)
+                | Atomic::TBool
+                | Atomic::TTrue
+                | Atomic::TFalse
+                | Atomic::TNull
+                | Atomic::TVoid
+                | Atomic::TArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }
+                | Atomic::TScalar
+                | Atomic::TNumeric
+        )
+    }
+
     /// Whether this atomic is a callable variant.
     pub fn is_callable(&self) -> bool {
         matches!(self, Atomic::TCallable { .. } | Atomic::TClosure { .. })

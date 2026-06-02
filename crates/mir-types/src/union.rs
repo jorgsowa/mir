@@ -27,6 +27,19 @@ pub fn vec_to_type_params(v: Vec<Type>) -> Arc<[Type]> {
 // Most unions contain 1-2 atomics (e.g. `string|null`), so we inline two.
 pub type AtomicVec = SmallVec<[Atomic; 2]>;
 
+/// Result of classifying a type for `clone` validity (see [`Type::clone_validity`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloneValidity {
+    /// Every member is (or may be) an object — cloning is fine.
+    Cloneable,
+    /// Every member is definitely a non-object — cloning is an error.
+    Invalid,
+    /// Some members are non-objects, some are objects — cloning may be an error.
+    PossiblyInvalid,
+    /// Empty/unknown type — no diagnostic.
+    Unknown,
+}
+
 // ---------------------------------------------------------------------------
 // Type — the primary type carrier
 // ---------------------------------------------------------------------------
@@ -138,6 +151,35 @@ impl Type {
 
     pub fn is_never(&self) -> bool {
         self.types.iter().all(|t| matches!(t, Atomic::TNever)) && !self.types.is_empty()
+    }
+
+    /// Classify this type for `clone` validity. Recurses into template-param
+    /// bounds (like [`Type::is_mixed`]). Callers handle `mixed` separately.
+    pub fn clone_validity(&self) -> CloneValidity {
+        if self.types.is_empty() {
+            return CloneValidity::Unknown;
+        }
+        let mut has_non_object = false;
+        let mut has_other = false; // object or ambiguous (callable, mixed, conditional, …)
+        for t in &self.types {
+            match t {
+                Atomic::TTemplateParam { as_type, .. } => match as_type.clone_validity() {
+                    CloneValidity::Invalid => has_non_object = true,
+                    CloneValidity::PossiblyInvalid => {
+                        has_non_object = true;
+                        has_other = true;
+                    }
+                    CloneValidity::Cloneable | CloneValidity::Unknown => has_other = true,
+                },
+                other if other.is_definitely_non_object() => has_non_object = true,
+                _ => has_other = true,
+            }
+        }
+        match (has_non_object, has_other) {
+            (true, false) => CloneValidity::Invalid,
+            (true, true) => CloneValidity::PossiblyInvalid,
+            _ => CloneValidity::Cloneable,
+        }
     }
 
     pub fn is_void(&self) -> bool {
