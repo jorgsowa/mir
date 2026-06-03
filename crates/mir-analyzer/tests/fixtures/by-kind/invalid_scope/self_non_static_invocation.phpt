@@ -10,6 +10,4 @@ class A {
     }
 }
 ===expect===
-NonStaticSelfCall
-===ignore===
-TODO
+NonStaticSelfCall@6:9-6:23: Non-static method A::fooFoo() cannot be called on self:: in a static context

@@ -45,6 +45,9 @@ pub enum IssueKind {
     // --- Undefined ----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/variables.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_scope/`.
+    /// Emitted by `mir-analyzer/src/call/static_call.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_scope/self_non_static_invocation.phpt`.
+    NonStaticSelfCall { class: String, method: String },
     InvalidScope {
         /// `true` when inside a class but in a static method; `false` when outside a class.
         in_class: bool,
@@ -443,7 +446,8 @@ impl IssueKind {
     pub fn default_severity(&self) -> Severity {
         match self {
             // Errors (always blocking)
-            IssueKind::InvalidScope { .. }
+            IssueKind::NonStaticSelfCall { .. }
+            | IssueKind::InvalidScope { .. }
             | IssueKind::UndefinedVariable { .. }
             | IssueKind::UndefinedFunction { .. }
             | IssueKind::UndefinedMethod { .. }
@@ -578,6 +582,7 @@ impl IssueKind {
     pub fn code(&self) -> &'static str {
         match self {
             // Undefined (0001-0099)
+            IssueKind::NonStaticSelfCall { .. } => "MIR0216",
             IssueKind::InvalidScope { .. } => "MIR0001",
             IssueKind::UndefinedVariable { .. } => "MIR0002",
             IssueKind::UndefinedFunction { .. } => "MIR0003",
@@ -708,6 +713,7 @@ impl IssueKind {
     /// Identifier name used in config and `@psalm-suppress` / `@suppress` annotations.
     pub fn name(&self) -> &'static str {
         match self {
+            IssueKind::NonStaticSelfCall { .. } => "NonStaticSelfCall",
             IssueKind::InvalidScope { .. } => "InvalidScope",
             IssueKind::UndefinedVariable { .. } => "UndefinedVariable",
             IssueKind::UndefinedFunction { .. } => "UndefinedFunction",
@@ -808,6 +814,9 @@ impl IssueKind {
     /// Human-readable message for this issue.
     pub fn message(&self) -> String {
         match self {
+            IssueKind::NonStaticSelfCall { class, method } => {
+                format!("Non-static method {class}::{method}() cannot be called on self:: in a static context")
+            }
             IssueKind::InvalidScope { in_class } => {
                 if *in_class {
                     "$this cannot be used in a static method".to_string()
@@ -1318,6 +1327,10 @@ mod code_tests {
         let s = || String::new();
         vec![
             IssueKind::InvalidScope { in_class: false },
+            IssueKind::NonStaticSelfCall {
+                class: s(),
+                method: s(),
+            },
             IssueKind::UndefinedVariable { name: s() },
             IssueKind::UndefinedFunction { name: s() },
             IssueKind::UndefinedMethod {

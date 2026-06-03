@@ -50,6 +50,9 @@ pub struct FlowState {
     /// Whether we are inside a constructor.
     pub inside_constructor: bool,
 
+    /// Whether we are inside a static method body.
+    pub inside_static_method: bool,
+
     /// Whether `strict_types=1` is declared for this file.
     pub strict_types: bool,
 
@@ -120,6 +123,7 @@ impl FlowState {
             inside_loop: false,
             inside_finally: false,
             inside_constructor: false,
+            inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashSet::default(),
             read_vars: FxHashSet::default(),
@@ -300,6 +304,8 @@ impl FlowState {
                 byref_param_names.insert(name);
             }
         }
+
+        ctx.inside_static_method = is_static;
 
         // Inject $this for non-static methods so that $this->method() can be
         // resolved without hitting the mixed-receiver early-return guard.

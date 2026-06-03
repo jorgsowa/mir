@@ -254,6 +254,22 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            // Detect non-static method called via self::/static:: from a static context.
+            if !resolved.is_static
+                && !method_name.starts_with("__")
+                && is_self_parent_call
+                && ctx.inside_static_method
+                && !crate::db::has_method_in_chain(ea.db, fqcn.as_str(), "__callStatic")
+            {
+                ea.emit(
+                    IssueKind::NonStaticSelfCall {
+                        class: fqcn.clone(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Error,
+                    span,
+                );
+            }
             if resolved.is_internal {
                 let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
                 let method_namespace =
