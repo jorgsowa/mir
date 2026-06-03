@@ -92,6 +92,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Variable(name) => {
                 let name_str = name.trim_start_matches('$').to_string();
                 let name_sym = mir_types::Name::from(name_str.as_str());
+                // Assigning to $this is not allowed
+                if name_str == "this" {
+                    self.emit(
+                        IssueKind::InvalidScope {
+                            in_class: ctx.self_fqcn.is_some(),
+                        },
+                        Severity::Error,
+                        span,
+                    );
+                }
                 ctx.set_var(&name_str, ty);
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(target.span.end);
