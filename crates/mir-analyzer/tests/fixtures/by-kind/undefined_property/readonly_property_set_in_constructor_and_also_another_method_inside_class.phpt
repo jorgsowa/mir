@@ -17,6 +17,4 @@ class A {
     }
 }
 ===expect===
-InaccessibleProperty
-===ignore===
-TODO
+ReadonlyPropertyAssignment@13:9-13:31: Cannot assign to readonly property A::$bar outside of constructor
