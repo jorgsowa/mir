@@ -5,6 +5,4 @@ Invalid g m p operation
 $a = gmp_init(2);
 $b = "a" + $a;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@3:6-3:14: Operator '+' not supported between '"a"' and 'mixed'

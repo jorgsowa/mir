@@ -16,6 +16,5 @@ function foo(int $i) : void {
     if ($a) {}
 }
 ===expect===
-PossiblyUndefinedVariable
-===ignore===
-TODO
+PossiblyUndefinedVariable@13:9-13:11: Variable $a might not be defined
+RedundantCondition@13:9-13:11: Condition is always true/false for type 'true'
