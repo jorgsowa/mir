@@ -268,6 +268,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_method_access/`.
     OverriddenMethodAccess { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_method/direct_constructor_call*.phpt`.
+    DirectConstructorCall { class: String },
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/final_class_extended/`.
     FinalClassExtended { parent: String, child: String },
@@ -447,6 +450,7 @@ impl IssueKind {
         match self {
             // Errors (always blocking)
             IssueKind::NonStaticSelfCall { .. }
+            | IssueKind::DirectConstructorCall { .. }
             | IssueKind::InvalidScope { .. }
             | IssueKind::UndefinedVariable { .. }
             | IssueKind::UndefinedFunction { .. }
@@ -583,6 +587,7 @@ impl IssueKind {
         match self {
             // Undefined (0001-0099)
             IssueKind::NonStaticSelfCall { .. } => "MIR0216",
+            IssueKind::DirectConstructorCall { .. } => "MIR0217",
             IssueKind::InvalidScope { .. } => "MIR0001",
             IssueKind::UndefinedVariable { .. } => "MIR0002",
             IssueKind::UndefinedFunction { .. } => "MIR0003",
@@ -714,6 +719,7 @@ impl IssueKind {
     pub fn name(&self) -> &'static str {
         match self {
             IssueKind::NonStaticSelfCall { .. } => "NonStaticSelfCall",
+            IssueKind::DirectConstructorCall { .. } => "DirectConstructorCall",
             IssueKind::InvalidScope { .. } => "InvalidScope",
             IssueKind::UndefinedVariable { .. } => "UndefinedVariable",
             IssueKind::UndefinedFunction { .. } => "UndefinedFunction",
@@ -816,6 +822,9 @@ impl IssueKind {
         match self {
             IssueKind::NonStaticSelfCall { class, method } => {
                 format!("Non-static method {class}::{method}() cannot be called statically")
+            }
+            IssueKind::DirectConstructorCall { class } => {
+                format!("Cannot call constructor of {class} directly")
             }
             IssueKind::InvalidScope { in_class } => {
                 if *in_class {
@@ -1331,6 +1340,7 @@ mod code_tests {
                 class: s(),
                 method: s(),
             },
+            IssueKind::DirectConstructorCall { class: s() },
             IssueKind::UndefinedVariable { name: s() },
             IssueKind::UndefinedFunction { name: s() },
             IssueKind::UndefinedMethod {

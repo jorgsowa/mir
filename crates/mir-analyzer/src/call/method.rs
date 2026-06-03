@@ -103,6 +103,23 @@ impl CallAnalyzer {
             }
         };
 
+        // Flag explicit __construct() calls
+        if method_name.eq_ignore_ascii_case("__construct") {
+            // Detect the class from the object type
+            for atomic in &obj_ty.types {
+                if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+                    ea.emit(
+                        IssueKind::DirectConstructorCall {
+                            class: fqcn.to_string(),
+                        },
+                        Severity::Error,
+                        span,
+                    );
+                    break;
+                }
+            }
+        }
+
         // Always analyze arguments — even when the receiver is null/mixed and we
         // return early — so that variable reads inside args are tracked and side
         // effects (taint, etc.) are recorded.

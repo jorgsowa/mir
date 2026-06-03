@@ -9,6 +9,4 @@ $a = new A;
 $a->__construct();
 
 ===expect===
-DirectConstructorCall
-===ignore===
-TODO
+DirectConstructorCall@6:1-6:18: Cannot call constructor of A directly
