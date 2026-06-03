@@ -1,7 +1,7 @@
 ===description===
 magic properties methods and mixin are available
 ===config===
-suppress=UndefinedProperty,MixedMethodCall,UnusedFunction
+suppress=MixedMethodCall,UnusedFunction
 ===file===
 <?php
 class User {

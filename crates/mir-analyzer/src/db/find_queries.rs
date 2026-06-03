@@ -763,7 +763,8 @@ fn find_method_in_mixins<'db>(
 
 /// Walk the inheritance chain of `fqcn` and return the first property
 /// matching `name`, along with the FQCN of the class that declared it.
-/// Properties are case-sensitive in PHP.
+/// Properties are case-sensitive in PHP. Also searches `@mixin` classes via a
+/// separate cycle-safe walk so they don't pollute `has_unknown_ancestor`.
 pub fn find_property_in_chain<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
@@ -773,6 +774,40 @@ pub fn find_property_in_chain<'db>(
         let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
         if let Some(p) = find_property_in_class(db, here, name) {
             return Some((ancestor.clone(), p));
+        }
+    }
+    // Separate @mixin walk — cycle-safe, depth-first.
+    let mut visited_mixins = std::collections::HashSet::<Arc<str>>::new();
+    find_property_in_mixins(db, fqcn, name, &mut visited_mixins)
+}
+
+fn find_property_in_mixins<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: &str,
+    visited: &mut std::collections::HashSet<Arc<str>>,
+) -> Option<(Arc<str>, PropertyDef)> {
+    let class = find_class_like(db, fqcn)?;
+    for m in class.mixins() {
+        let mixin_fqcn: Arc<str> = if let Some(pos) = m.find('<') {
+            Arc::from(&m[..pos])
+        } else {
+            m.clone()
+        };
+        if !visited.insert(mixin_fqcn.clone()) {
+            continue;
+        }
+        let mixin_here = Fqcn::new(db, Name::new(mixin_fqcn.as_ref()));
+        // Walk the mixin's full inheritance chain.
+        for ancestor in class_ancestors_by_fqcn(db, mixin_here).iter() {
+            let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
+            if let Some(p) = find_property_in_class(db, here, name) {
+                return Some((ancestor.clone(), p));
+            }
+        }
+        // Recurse into the mixin's own mixins.
+        if let Some(result) = find_property_in_mixins(db, mixin_here, name, visited) {
+            return Some(result);
         }
     }
     None
