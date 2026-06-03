@@ -667,6 +667,7 @@ impl<'a> DefinitionCollector<'a> {
                     deprecated: None,
                     is_internal: false,
                     is_pure: false,
+                    is_override: false,
                     location: location.clone(),
                     docstring: None,
                     is_virtual: true,
@@ -1074,6 +1075,13 @@ impl<'a> DefinitionCollector<'a> {
             .collect();
 
         let method_name = m.name.as_deref().unwrap_or_default();
+        let is_override = m.attributes.iter().any(|a| {
+            a.name
+                .parts
+                .last()
+                .map(|p| p.as_ref().eq_ignore_ascii_case("Override"))
+                .unwrap_or(false)
+        });
         Some(MethodDef {
             name: Arc::from(method_name),
             fqcn: class_fqcn.into(),
@@ -1091,6 +1099,7 @@ impl<'a> DefinitionCollector<'a> {
             deprecated: doc.deprecated.as_deref().map(Arc::from),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
+            is_override,
             is_virtual: false,
             location: span.map(|s| self.location(s.start, s.end)),
             docstring: if doc.description.trim().is_empty() {

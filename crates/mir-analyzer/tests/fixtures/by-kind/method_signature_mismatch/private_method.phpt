@@ -12,6 +12,4 @@ class C2 extends C {
 }
 
 ===expect===
-InvalidOverride
-===ignore===
-TODO
+InvalidOverride@7:4-7:15: Method C2::f() has #[Override] but parent method C::f() is private

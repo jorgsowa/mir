@@ -142,7 +142,16 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_overrides(fqcn, location.as_ref(), &mut issues);
         }
 
-        // ---- 5. Circular inheritance detection --------------------------------
+        // ---- 5. Interface-level #[Override] check --------------------------
+        // Interfaces are not included in the class loop above, so scan them
+        // separately for #[Override] on methods that have no parent interface method.
+        for (iface_fqcn, _iface) in
+            crate::db::analyzed_interface_defs(self.db, &self.analyzed_files)
+        {
+            self.check_overrides(&iface_fqcn, None, &mut issues);
+        }
+
+        // ---- 6. Circular inheritance detection --------------------------------
         self.check_circular_class_inheritance(&mut issues);
         self.check_circular_interface_inheritance(&mut issues);
 
@@ -329,11 +338,6 @@ impl<'a> ClassAnalyzer<'a> {
                         .map(|m| (anc.clone(), m))
                 });
 
-            let (parent_fqcn, parent) = match parent_method {
-                Some(m) => m,
-                None => continue, // not an override
-            };
-
             let own_location = own.location.clone();
             let loc = issue_location(
                 own_location.as_ref(),
@@ -341,6 +345,49 @@ impl<'a> ClassAnalyzer<'a> {
                     .as_ref()
                     .and_then(|l| self.sources.get(&l.file).copied()),
             );
+
+            let (parent_fqcn, parent) = match parent_method {
+                Some(m) => m,
+                None => {
+                    // #[Override] declared but no parent method exists.
+                    if own.is_override {
+                        let mut issue = Issue::new(
+                            IssueKind::InvalidOverride {
+                                class: fqcn.to_string(),
+                                method: method_name_lower.to_string(),
+                                detail: "no parent method exists to override".to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources)
+                        {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                    continue;
+                }
+            };
+
+            // #[Override] with a private parent method — private methods are
+            // not visible to subclasses and cannot be overridden.
+            if own.is_override && parent.visibility == Visibility::Private {
+                let mut issue = Issue::new(
+                    IssueKind::InvalidOverride {
+                        class: fqcn.to_string(),
+                        method: method_name_lower.to_string(),
+                        detail: format!(
+                            "parent method {}::{}() is private",
+                            parent_fqcn, method_name_lower
+                        ),
+                    },
+                    loc.clone(),
+                );
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
 
             // ---- a. Cannot override a final method -------------------------
             if parent.is_final {
@@ -358,7 +405,37 @@ impl<'a> ClassAnalyzer<'a> {
                 issues.push(issue);
             }
 
-            // ---- b. Visibility must not be reduced -------------------------
+            // ---- b. Static/non-static mismatch --------------------------------
+            // A non-static child method cannot override a static parent method
+            // and vice versa — PHP treats these as different methods in practice
+            // but the static contract is part of the signature.
+            if parent.is_static != own.is_static {
+                let detail = if parent.is_static {
+                    format!(
+                        "cannot override static method {}::{}() with a non-static method",
+                        parent_fqcn, method_name_lower
+                    )
+                } else {
+                    format!(
+                        "cannot override non-static method {}::{}() with a static method",
+                        parent_fqcn, method_name_lower
+                    )
+                };
+                let mut issue = Issue::new(
+                    IssueKind::MethodSignatureMismatch {
+                        class: fqcn.to_string(),
+                        method: method_name_lower.to_string(),
+                        detail,
+                    },
+                    loc.clone(),
+                );
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+
+            // ---- c. Visibility must not be reduced -------------------------
             if visibility_reduced(own.visibility, parent.visibility) {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {

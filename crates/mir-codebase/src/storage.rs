@@ -360,6 +360,9 @@ pub struct MethodDef {
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub is_pure: bool,
+    /// True when the method has the `#[Override]` PHP attribute.
+    #[serde(default)]
+    pub is_override: bool,
     pub location: Option<Location>,
     /// Plain-text description from the docblock (text before `@tag` lines).
     /// Used for hover info.

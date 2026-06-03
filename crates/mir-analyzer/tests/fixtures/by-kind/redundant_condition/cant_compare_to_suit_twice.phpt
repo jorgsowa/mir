@@ -1,5 +1,7 @@
 ===description===
 Cant compare to suit twice
+===ignore===
+TODO: requires enum-case narrowing through === (Suit::Clubs parsed as ClassConstAccess not StaticPropertyAccess)
 ===file===
 <?php
 enum Suit {
@@ -18,5 +20,3 @@ function foo(Suit $s): void {
 }
 ===expect===
 RedundantCondition
-===ignore===
-TODO

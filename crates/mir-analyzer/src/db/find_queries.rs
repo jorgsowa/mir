@@ -435,6 +435,32 @@ pub fn analyzed_class_defs(
     out
 }
 
+/// Like [`analyzed_class_defs`] but returns interface definitions from
+/// analyzed files. Used to check `#[Override]` on interface methods.
+pub fn analyzed_interface_defs(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<(Arc<str>, Arc<mir_codebase::storage::InterfaceDef>)> {
+    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
+        db.all_source_files()
+    } else {
+        analyzed_files
+            .iter()
+            .filter_map(|p| db.lookup_source_file(p))
+            .collect()
+    };
+    files.sort_by_key(|a| a.path(db));
+    let mut out = Vec::new();
+    for sf in files {
+        let defs = collect_file_definitions(db, sf);
+        for iface in defs.slice.interfaces.iter() {
+            out.push((iface.fqcn.clone(), iface.clone()));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 #[salsa::tracked]
 pub fn interface_def_at(
     db: &dyn MirDatabase,
@@ -565,6 +591,7 @@ pub fn find_method_in_class<'db>(
                 is_virtual: false,
                 is_internal: false,
                 is_pure: false,
+                is_override: false,
                 deprecated: None,
                 location: None,
                 docstring: None,

@@ -8,6 +8,4 @@ interface I {
 }
 
 ===expect===
-InvalidOverride
-===ignore===
-TODO
+InvalidOverride@3:4-3:15: Method I::f() has #[Override] but no parent method exists to override

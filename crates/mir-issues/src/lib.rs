@@ -272,6 +272,14 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/`.
     AbstractInstantiation { class: String },
+    /// Emitted by `mir-analyzer/src/class.rs` when `#[Override]` is declared
+    /// but no overridable parent method exists.
+    /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
+    InvalidOverride {
+        class: String,
+        method: String,
+        detail: String,
+    },
 
     // --- Security (taint) ---------------------------------------------------
     /// Not yet emitted (generic taint sink; specific sinks use `TaintedHtml`, `TaintedSql`, `TaintedShell`).
@@ -416,6 +424,7 @@ impl IssueKind {
             | IssueKind::FinalClassExtended { .. }
             | IssueKind::FinalMethodOverridden { .. }
             | IssueKind::AbstractInstantiation { .. }
+            | IssueKind::InvalidOverride { .. }
             | IssueKind::InvalidTemplateParam { .. }
             | IssueKind::ReadonlyPropertyAssignment { .. }
             | IssueKind::ParseError { .. }
@@ -594,6 +603,7 @@ impl IssueKind {
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
             IssueKind::CircularInheritance { .. } => "MIR0707",
+            IssueKind::InvalidOverride { .. } => "MIR0708",
 
             // Security / taint (0800-0899)
             IssueKind::TaintedInput { .. } => "MIR0800",
@@ -699,6 +709,7 @@ impl IssueKind {
             IssueKind::FinalClassExtended { .. } => "FinalClassExtended",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
+            IssueKind::InvalidOverride { .. } => "InvalidOverride",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
             IssueKind::InvalidTemplateParam { .. } => "InvalidTemplateParam",
             IssueKind::ShadowedTemplateParam { .. } => "ShadowedTemplateParam",
@@ -963,6 +974,13 @@ impl IssueKind {
             }
             IssueKind::AbstractInstantiation { class } => {
                 format!("Cannot instantiate abstract class {class}")
+            }
+            IssueKind::InvalidOverride {
+                class,
+                method,
+                detail,
+            } => {
+                format!("Method {class}::{method}() has #[Override] but {detail}")
             }
 
             IssueKind::TaintedInput { sink } => format!("Tainted input reaching sink '{sink}'"),
@@ -1358,6 +1376,11 @@ mod code_tests {
                 parent: s(),
             },
             IssueKind::AbstractInstantiation { class: s() },
+            IssueKind::InvalidOverride {
+                class: s(),
+                method: s(),
+                detail: s(),
+            },
             IssueKind::CircularInheritance { class: s() },
             IssueKind::TaintedInput { sink: s() },
             IssueKind::TaintedHtml,

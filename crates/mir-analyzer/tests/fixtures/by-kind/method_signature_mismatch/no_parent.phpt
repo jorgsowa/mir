@@ -8,6 +8,4 @@ class C {
 }
 
 ===expect===
-InvalidOverride
-===ignore===
-TODO
+InvalidOverride@3:4-3:15: Method C::f() has #[Override] but no parent method exists to override

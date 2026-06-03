@@ -14,6 +14,4 @@ class B extends A {
     }
 }
 ===expect===
-Method B::fooFoo has more required parameters than parent method A::fooFoo
-===ignore===
-TODO
+MethodSignatureMismatch@9:4-9:61: Method B::foofoo() signature mismatch: overriding method requires 3 argument(s) but parent requires 2
