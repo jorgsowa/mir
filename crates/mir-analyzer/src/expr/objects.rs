@@ -239,6 +239,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 template_params: ctor_templates,
                             },
                         );
+                    } else if !arg_types.is_empty()
+                        && !n.args.iter().any(|a| a.unpack)
+                        && crate::db::class_exists(self.db, fqcn.as_ref())
+                    {
+                        // Class has no constructor but arguments were passed —
+                        // PHP's implicit constructor accepts zero arguments.
+                        self.emit(
+                            mir_issues::IssueKind::TooManyArguments {
+                                fn_name: format!("{fqcn}::__construct"),
+                                expected: 0,
+                                actual: arg_types.len(),
+                            },
+                            mir_issues::Severity::Error,
+                            call_span,
+                        );
                     }
                     // Infer class-level generic type params from the constructor
                     // arguments (e.g. `new Box(5)` → `Box<int>` for `@template T`
