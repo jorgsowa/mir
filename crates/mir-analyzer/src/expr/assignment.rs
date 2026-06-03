@@ -282,6 +282,32 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             } else {
                                 let current = ctx.get_var(name_str);
+                                // Check if assigning to array offset of a non-array scalar
+                                if !current.is_mixed()
+                                    && !current.types.is_empty()
+                                    && current.types.iter().all(|a| {
+                                        matches!(
+                                            a,
+                                            Atomic::TInt
+                                                | Atomic::TLiteralInt(_)
+                                                | Atomic::TIntRange { .. }
+                                                | Atomic::TPositiveInt
+                                                | Atomic::TFloat
+                                                | Atomic::TLiteralFloat(_, _)
+                                                | Atomic::TBool
+                                                | Atomic::TTrue
+                                                | Atomic::TFalse
+                                        )
+                                    })
+                                {
+                                    self.emit(
+                                        IssueKind::InvalidArrayAssignment {
+                                            ty: current.to_string(),
+                                        },
+                                        Severity::Error,
+                                        span,
+                                    );
+                                }
                                 let updated = match &key_chain.last().unwrap() {
                                     None => widen_array_as_list(&current, &wrapped_value),
                                     Some(_) => widen_array_with_value_and_key(

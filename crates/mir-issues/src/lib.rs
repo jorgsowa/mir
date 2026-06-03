@@ -155,6 +155,9 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/invalid_array_access/`.
     InvalidArrayAccess { ty: String },
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_array_assignment/`.
+    InvalidArrayAssignment { ty: String },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_property_assignment/`.
     InvalidPropertyAssignment {
         property: String,
@@ -502,6 +505,7 @@ impl IssueKind {
             | IssueKind::NullableReturnStatement { .. }
             | IssueKind::InvalidPropertyFetch { .. }
             | IssueKind::InvalidArrayAccess { .. }
+            | IssueKind::InvalidArrayAssignment { .. }
             | IssueKind::InvalidPropertyAssignment { .. }
             | IssueKind::InvalidArrayOffset { .. }
             | IssueKind::NonExistentArrayOffset { .. }
@@ -627,6 +631,7 @@ impl IssueKind {
             IssueKind::InvalidPassByReference { .. } => "MIR0205",
             IssueKind::InvalidPropertyFetch { .. } => "MIR0218",
             IssueKind::InvalidArrayAccess { .. } => "MIR0219",
+            IssueKind::InvalidArrayAssignment { .. } => "MIR0220",
             IssueKind::InvalidPropertyAssignment { .. } => "MIR0206",
             IssueKind::InvalidCast { .. } => "MIR0207",
             IssueKind::InvalidStaticInvocation { .. } => "MIR0215",
@@ -758,6 +763,7 @@ impl IssueKind {
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
             IssueKind::InvalidArrayAccess { .. } => "InvalidArrayAccess",
+            IssueKind::InvalidArrayAssignment { .. } => "InvalidArrayAssignment",
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
             IssueKind::InvalidCast { .. } => "InvalidCast",
             IssueKind::InvalidStaticInvocation { .. } => "InvalidStaticInvocation",
@@ -942,6 +948,9 @@ impl IssueKind {
             }
             IssueKind::InvalidArrayAccess { ty } => {
                 format!("Cannot use [] operator on non-array type '{ty}'")
+            }
+            IssueKind::InvalidArrayAssignment { ty } => {
+                format!("Cannot use [] assignment on non-array type '{ty}'")
             }
             IssueKind::InvalidPropertyAssignment {
                 property,
@@ -1426,6 +1435,7 @@ mod code_tests {
             },
             IssueKind::InvalidPropertyFetch { ty: s() },
             IssueKind::InvalidArrayAccess { ty: s() },
+            IssueKind::InvalidArrayAssignment { ty: s() },
             IssueKind::InvalidPropertyAssignment {
                 property: s(),
                 expected: s(),
