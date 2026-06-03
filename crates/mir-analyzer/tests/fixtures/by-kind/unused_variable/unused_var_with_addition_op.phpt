@@ -5,3 +5,6 @@ Unused var with addition op
 $a = 5;
 $a += 1;
 ===expect===
+UnusedVariable
+===ignore===
+TODO

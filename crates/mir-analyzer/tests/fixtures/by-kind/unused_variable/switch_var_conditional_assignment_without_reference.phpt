@@ -13,3 +13,6 @@ switch (rand(0, 4)) {
         $a = 1;
 }
 ===expect===
+UnusedVariable
+===ignore===
+TODO

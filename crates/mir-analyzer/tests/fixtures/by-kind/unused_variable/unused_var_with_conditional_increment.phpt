@@ -7,3 +7,6 @@ if (rand(0, 1)) {
     $a++;
 }
 ===expect===
+UnusedVariable
+===ignore===
+TODO

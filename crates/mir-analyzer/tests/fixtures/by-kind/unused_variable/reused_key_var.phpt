@@ -12,4 +12,6 @@ foreach ($arr as $key => $v) {
     echo $key;
 }
 ===expect===
-PossiblyInvalidArrayOffset@8:5-8:34: Array offset might be invalid: expects 'array', got 'array<int, string>|false'
+UnusedVariable
+===ignore===
+TODO

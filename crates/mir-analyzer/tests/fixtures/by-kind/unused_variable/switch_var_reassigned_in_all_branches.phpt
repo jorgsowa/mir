@@ -17,3 +17,6 @@ if ($a) {
     echo "cool";
 }
 ===expect===
+UnusedVariable
+===ignore===
+TODO

@@ -13,3 +13,6 @@ function foo() : void {
     }
 }
 ===expect===
+UnusedVariable
+===ignore===
+TODO

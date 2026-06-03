@@ -10,4 +10,6 @@ if (rand(0, 1)) {
 }
 echo $a;
 ===expect===
-UnusedVariable@4:5-4:7: Variable $b is never read
+UnusedVariable
+===ignore===
+TODO

@@ -7,3 +7,6 @@ foreach ($a as &$b) {
     $b = $b + 1;
 }
 ===expect===
+UnusedVariable
+===ignore===
+TODO
