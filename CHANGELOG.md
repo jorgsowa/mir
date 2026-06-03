@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-06-04
+
+### Added
+
+- `TooManyArguments` (MIR0203) is now emitted when arguments are passed to a class that has no explicit `__construct()` method (the implicit constructor accepts zero arguments).
+- `InvalidScope` (MIR0001) is now emitted when `$this` is assigned a value outside a class context.
+- `InvalidArrayAssignment` (MIR0220) is now emitted when a subscript assignment (`$x[] = …` or `$x[k] = …`) is performed on a scalar type (`int`, `bool`, `float`).
+- `InvalidArrayAccess` (MIR0219) is now emitted when subscript access is performed on a scalar type. String subscript indexing (`$str[0]`) remains valid.
+- `InvalidPropertyFetch` (MIR0218) is now emitted when a property is accessed on a scalar or non-object type.
+- `DirectConstructorCall` (MIR0217) is now emitted for explicit `$obj->__construct()` calls on object instances.
+- `NonStaticSelfCall` (MIR0216) is now emitted when `self::`/`static::` is used to call a non-static method in a static context.
+- `InvalidStaticInvocation` (MIR0215) is now emitted when a non-static method is called with a concrete class name (`ClassName::method()`) and the class has no `__callStatic`.
+- `InterfaceInstantiation` (MIR0709) is now emitted when `new` is used directly on an interface.
+- `DeprecatedProperty` (MIR1005) is now emitted when a property marked with `@deprecated` or `#[Deprecated]` is read or written.
+- `DeprecatedInterface` (MIR1006) is now emitted when a deprecated interface is implemented.
+- `DeprecatedTrait` (MIR1007) is now emitted when a deprecated trait is used.
+- `DeprecatedConstant` (MIR1008) is now emitted when a deprecated class constant or enum case is accessed.
+- `DeprecatedClass`, `DeprecatedMethod`, and `DeprecatedCall` detection expanded: `#[Deprecated]` is now recognised on user-defined methods and functions; deprecated classes are caught in static calls, constant access, and type hints.
+- `DeprecatedMethodCall` is now emitted when cloning an object whose `__clone()` method is deprecated.
+- `InvalidCast` is now emitted when `(string)` is applied to a concrete class that does not implement `__toString()`.
+- `InvalidCatch` (MIR1503) is now emitted when a `catch` clause names a type that does not extend `Throwable`.
+- `ImplicitToStringCast` (MIR1501) is now emitted when a `Stringable` object is passed where a `string` is expected, making the implicit `__toString()` call visible.
+- `InvalidOperand` (MIR0213) now covers: arithmetic on non-numeric operands, bitwise operations on objects and arrays, boolean operands in bitwise expressions, boolean increment (`$b++`), and array members in string concatenation.
+- `PossiblyNullOperand` (MIR0214) is now emitted when a null value is used as a divisor in `/` or `%`.
+- `UnusedForeachValue` is now emitted when the value variable in a `foreach` loop is never read.
+- `UnusedVariable` dead-write detection: a variable that is assigned and then overwritten before being read is now flagged.
+- `UnusedVariable` is now detected in top-level PHP scripts, not only inside functions and methods.
+- `InvalidOverride` (MIR0708) is now emitted when `#[Override]` is applied to a method that has no overridable parent, or whose parent method is `private`.
+- `MethodSignatureMismatch` now catches: abstract re-declaration of a concrete method, multi-interface return-type conflicts, by-reference parameter mismatch, overrides that drop parent parameters, and static/non-static mismatch.
+- Generic type inference at instantiation: `new Box(5)` now infers `Box<int>` by binding class `@template` parameters from constructor argument types.
+- Unannotated generic method returns: methods whose parameters carry template types now resolve concrete return types at call sites without an explicit `@return` annotation.
+- `@readonly` docblock annotation on properties is now treated the same as the native `readonly` keyword for the `ReadonlyPropertyAssignment` check.
+
+### Fixed
+
+- `@mixin` property resolution: properties declared on `@mixin` classes are now found via the full inheritance chain, eliminating `UndefinedProperty` false positives for mixin-based patterns.
+- Narrowing false positive: possibly-undefined variables no longer cause the `else`/`elseif` branch to be incorrectly marked as unreachable.
+- Narrowing in `elseif`/`else` chains: each failed `elseif` condition is now applied as a negative narrowing to the `else` branch.
+- `UnusedVariable` false positives in loops: pre-loop writes are cleared after the loop body iterates, preventing them from being re-introduced through the else path.
+- `UnusedVariable` false positives for variables passed to `compact()`: those variables are now marked as consumed.
+- Return type checking now applies inside anonymous-class methods.
+- Stub cache corruption on the second analysis run: `#[serde(skip_serializing_if = "Option::is_none")]` is unsafe with bincode (a non-self-describing format) — the `None` discriminant byte was omitted on write while deserialization still expected it, causing misaligned reads and a runaway allocation. Removed `skip_serializing_if` from the `deprecated` field on `PropertyDef`, `ConstantDef`, `InterfaceDef`, `TraitDef`, and `EnumCaseDef`. Stub cache format version bumped to 4 to invalidate stale on-disk entries.
+
 ## [0.31.0] - 2026-06-01
 
 ### Added
