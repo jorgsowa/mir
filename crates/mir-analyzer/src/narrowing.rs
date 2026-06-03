@@ -322,9 +322,15 @@ pub fn narrow_from_condition(
                 };
                 if !narrowed.is_empty() {
                     ctx.set_var(&var_name, narrowed);
-                } else if !current.is_empty() && !current.is_mixed() {
+                } else if !current.is_empty()
+                    && !current.is_mixed()
+                    && ctx.var_is_defined(&var_name)
+                {
                     // The variable's type can never satisfy this truthiness
                     // constraint → this branch is statically unreachable.
+                    // Possibly-undefined variables are exempt: an unset
+                    // variable reads as null (falsy), so the branch stays
+                    // reachable at runtime.
                     ctx.diverges = true;
                 }
             }
