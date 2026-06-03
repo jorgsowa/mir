@@ -5,6 +5,4 @@ Possibly invalid concat
 $b = rand(0, 1) ? [] : "hello";
 echo $b . "goodbye";
 ===expect===
-PossiblyInvalidOperand
-===ignore===
-TODO
+PossiblyInvalidOperand@3:6-3:20: Operator '.' might not be supported between 'array{}|"hello"' and '"goodbye"'

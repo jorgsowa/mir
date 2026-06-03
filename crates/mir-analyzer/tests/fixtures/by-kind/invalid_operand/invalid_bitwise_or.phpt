@@ -4,6 +4,4 @@ Invalid bitwise or
 <?php
 $a = "x" | new stdClass;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@2:6-2:24: Operator '|' not supported between '"x"' and 'stdClass'

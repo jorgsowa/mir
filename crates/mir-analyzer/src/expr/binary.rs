@@ -8,6 +8,30 @@ use php_ast::owned::{BinaryExpr, ExprKind};
 use php_ast::Span;
 use std::sync::Arc;
 
+pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
+    if ty.types.is_empty() || ty.is_mixed() {
+        return false;
+    }
+    ty.types.iter().all(|a| {
+        matches!(
+            a,
+            Atomic::TArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }
+                | Atomic::TObject
+                | Atomic::TNamedObject { .. }
+                | Atomic::TStaticObject { .. }
+                | Atomic::TSelf { .. }
+                | Atomic::TParent { .. }
+                | Atomic::TIntersection { .. }
+                | Atomic::TClosure { .. }
+                | Atomic::TLiteralEnumCase { .. }
+        )
+    })
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_binary_expr(
         &mut self,
@@ -85,18 +109,29 @@ impl<'a> ExpressionAnalyzer<'a> {
                     && left_ty.types.iter().all(Atomic::is_array)
                     && !right_ty.types.is_empty()
                     && right_ty.types.iter().all(Atomic::is_array);
-                if !both_arrays
-                    && (operand_is_non_numeric(&left_ty) || operand_is_non_numeric(&right_ty))
-                {
-                    self.emit(
-                        IssueKind::InvalidOperand {
-                            op: arithmetic_op_symbol(b.op).to_string(),
-                            left: left_ty.to_string(),
-                            right: right_ty.to_string(),
-                        },
-                        Severity::Warning,
-                        span,
-                    );
+                if !both_arrays {
+                    if operand_is_non_numeric(&left_ty) || operand_is_non_numeric(&right_ty) {
+                        self.emit(
+                            IssueKind::InvalidOperand {
+                                op: arithmetic_op_symbol(b.op).to_string(),
+                                left: left_ty.to_string(),
+                                right: right_ty.to_string(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    } else if matches!(b.op, BinaryOp::Div | BinaryOp::Mod)
+                        && operand_contains_null(&right_ty)
+                    {
+                        self.emit(
+                            IssueKind::PossiblyNullOperand {
+                                op: arithmetic_op_symbol(b.op).to_string(),
+                                ty: right_ty.to_string(),
+                            },
+                            Severity::Info,
+                            span,
+                        );
+                    }
                 }
                 infer_arithmetic(&left_ty, &right_ty)
             }
@@ -104,6 +139,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             BinaryOp::Concat => {
                 self.check_implicit_to_string_cast(&left_ty, b.left.span);
                 self.check_implicit_to_string_cast(&right_ty, b.right.span);
+                // Flag when a union member is an array (not stringifiable).
+                if operand_has_any_array_member(&left_ty) || operand_has_any_array_member(&right_ty)
+                {
+                    self.emit(
+                        IssueKind::PossiblyInvalidOperand {
+                            op: ".".to_string(),
+                            left: left_ty.to_string(),
+                            right: right_ty.to_string(),
+                        },
+                        Severity::Info,
+                        span,
+                    );
+                }
                 Type::single(Atomic::TString)
             }
 
@@ -131,7 +179,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             | BinaryOp::BitwiseOr
             | BinaryOp::BitwiseXor
             | BinaryOp::ShiftLeft
-            | BinaryOp::ShiftRight => Type::single(Atomic::TInt),
+            | BinaryOp::ShiftRight => {
+                if operand_is_non_bitwise(&left_ty) || operand_is_non_bitwise(&right_ty) {
+                    self.emit(
+                        IssueKind::InvalidOperand {
+                            op: bitwise_op_symbol(b.op).to_string(),
+                            left: left_ty.to_string(),
+                            right: right_ty.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+                Type::single(Atomic::TInt)
+            }
 
             BinaryOp::Pipe => right_ty,
             BinaryOp::Instanceof => Type::single(Atomic::TBool),
@@ -171,6 +232,18 @@ fn arithmetic_op_symbol(op: BinaryOp) -> &'static str {
     }
 }
 
+/// The source symbol for a bitwise operator, for `InvalidOperand` messages.
+fn bitwise_op_symbol(op: BinaryOp) -> &'static str {
+    match op {
+        BinaryOp::BitwiseAnd => "&",
+        BinaryOp::BitwiseOr => "|",
+        BinaryOp::BitwiseXor => "^",
+        BinaryOp::ShiftLeft => "<<",
+        BinaryOp::ShiftRight => ">>",
+        _ => "?",
+    }
+}
+
 /// Whether `s` is a PHP numeric string (so `"5" + 3` is valid). Conservative:
 /// anything that doesn't cleanly parse is treated as numeric to avoid false
 /// positives.
@@ -203,5 +276,24 @@ fn operand_is_non_numeric(ty: &Type) -> bool {
         | Atomic::TLiteralEnumCase { .. } => true,
         // int/float/numeric/bool/null and general/class strings are left alone.
         _ => false,
+    })
+}
+
+/// Whether `ty` contains `null` (potential division-by-zero when used as divisor).
+fn operand_contains_null(ty: &Type) -> bool {
+    ty.types.iter().any(|a| matches!(a, Atomic::TNull))
+}
+
+/// Whether `ty` has any array member (arrays cannot be concatenated).
+fn operand_has_any_array_member(ty: &Type) -> bool {
+    ty.types.iter().any(|a| {
+        matches!(
+            a,
+            Atomic::TArray { .. }
+                | Atomic::TList { .. }
+                | Atomic::TNonEmptyArray { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { .. }
+        )
     })
 }

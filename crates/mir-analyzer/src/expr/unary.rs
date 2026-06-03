@@ -1,6 +1,8 @@
+use super::binary::operand_is_non_bitwise;
 use super::helpers::extract_simple_var;
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
+use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::{UnaryPostfixOp, UnaryPrefixOp};
 use php_ast::owned::{UnaryPostfixExpr, UnaryPrefixExpr};
@@ -22,7 +24,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             UnaryPrefixOp::Plus => operand_ty,
-            UnaryPrefixOp::BitwiseNot => Type::single(Atomic::TInt),
+            UnaryPrefixOp::BitwiseNot => {
+                if operand_is_non_bitwise(&operand_ty) {
+                    self.emit(
+                        IssueKind::InvalidOperand {
+                            op: "~".to_string(),
+                            left: operand_ty.to_string(),
+                            right: String::new(),
+                        },
+                        Severity::Warning,
+                        u.operand.span,
+                    );
+                }
+                Type::single(Atomic::TInt)
+            }
             UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement => {
                 if let Some(var_name) = extract_simple_var(&u.operand) {
                     let ty = ctx.get_var(&var_name);

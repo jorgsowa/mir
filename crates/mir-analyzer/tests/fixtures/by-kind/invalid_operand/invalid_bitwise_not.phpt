@@ -4,6 +4,4 @@ Invalid bitwise not
 <?php
 $a = ~new stdClass;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@2:7-2:19: Operator '~' not supported between 'stdClass' and ''

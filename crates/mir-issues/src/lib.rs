@@ -155,13 +155,24 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_cast/`.
     InvalidCast { from: String, to: String },
-    /// Emitted by `mir-analyzer/src/expr/binary.rs` for arithmetic on
-    /// non-numeric operands. Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
+    /// Emitted by `mir-analyzer/src/expr/binary.rs` and `unary.rs` for operations on
+    /// non-numeric or non-bitwise-compatible operands.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     InvalidOperand {
         op: String,
         left: String,
         right: String,
     },
+    /// Emitted when a union-typed operand has some non-numeric/non-stringifiable members.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
+    PossiblyInvalidOperand {
+        op: String,
+        left: String,
+        right: String,
+    },
+    /// Emitted when a divisor operand could be null (potential division by zero).
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
+    PossiblyNullOperand { op: String, ty: String },
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/` (planned).
     MismatchingDocblockReturnType { declared: String, inferred: String },
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_param_type/` (planned).
@@ -447,7 +458,9 @@ impl IssueKind {
             | IssueKind::PossiblyNullPropertyFetch { .. }
             | IssueKind::PossiblyNullMethodCall { .. }
             | IssueKind::PossiblyNullArrayAccess
-            | IssueKind::PossiblyInvalidClone { .. } => Severity::Info,
+            | IssueKind::PossiblyInvalidClone { .. }
+            | IssueKind::PossiblyInvalidOperand { .. }
+            | IssueKind::PossiblyNullOperand { .. } => Severity::Info,
 
             // Info
             IssueKind::RedundantCondition { .. }
@@ -542,6 +555,8 @@ impl IssueKind {
             IssueKind::InvalidPropertyAssignment { .. } => "MIR0206",
             IssueKind::InvalidCast { .. } => "MIR0207",
             IssueKind::InvalidOperand { .. } => "MIR0208",
+            IssueKind::PossiblyInvalidOperand { .. } => "MIR0213",
+            IssueKind::PossiblyNullOperand { .. } => "MIR0214",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
             IssueKind::InvalidStringClass { .. } => "MIR0211",
@@ -658,6 +673,8 @@ impl IssueKind {
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
             IssueKind::InvalidCast { .. } => "InvalidCast",
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
+            IssueKind::PossiblyInvalidOperand { .. } => "PossiblyInvalidOperand",
+            IssueKind::PossiblyNullOperand { .. } => "PossiblyNullOperand",
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
@@ -829,6 +846,12 @@ impl IssueKind {
             }
             IssueKind::InvalidOperand { op, left, right } => {
                 format!("Operator '{op}' not supported between '{left}' and '{right}'")
+            }
+            IssueKind::PossiblyInvalidOperand { op, left, right } => {
+                format!("Operator '{op}' might not be supported between '{left}' and '{right}'")
+            }
+            IssueKind::PossiblyNullOperand { op, ty } => {
+                format!("Operator '{op}' operand '{ty}' might be null")
             }
             IssueKind::MismatchingDocblockReturnType { declared, inferred } => {
                 format!("Docblock return type '{declared}' does not match inferred '{inferred}'")
@@ -1255,6 +1278,12 @@ mod code_tests {
                 left: s(),
                 right: s(),
             },
+            IssueKind::PossiblyInvalidOperand {
+                op: s(),
+                left: s(),
+                right: s(),
+            },
+            IssueKind::PossiblyNullOperand { op: s(), ty: s() },
             IssueKind::MismatchingDocblockReturnType {
                 declared: s(),
                 inferred: s(),
