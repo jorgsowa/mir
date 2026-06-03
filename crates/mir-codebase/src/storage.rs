@@ -397,7 +397,7 @@ pub struct PropertyDef {
     pub default: Option<Type>,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation, if present.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub deprecated: Option<Arc<str>>,
 }
 
@@ -414,7 +414,7 @@ pub struct ConstantDef {
     pub is_final: bool,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation, if present.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub deprecated: Option<Arc<str>>,
 }
 
@@ -491,7 +491,7 @@ pub struct InterfaceDef {
     pub template_params: Vec<TemplateParam>,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation, if present.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub deprecated: Option<Arc<str>>,
 }
 
@@ -517,7 +517,7 @@ pub struct TraitDef {
     #[serde(default)]
     pub require_implements: Vec<Arc<str>>,
     /// `@deprecated` docblock annotation, if present.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub deprecated: Option<Arc<str>>,
 }
 
@@ -531,7 +531,7 @@ pub struct EnumCaseDef {
     pub value: Option<Type>,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation, if present.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub deprecated: Option<Arc<str>>,
 }
 

@@ -161,8 +161,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
-                            let here = crate::db::Fqcn::new(db, *fqcn);
-                            let prop_def = crate::db::find_property_in_class(db, here, &prop_name);
+                            let prop_def = crate::db::find_property_in_chain(
+                                db,
+                                crate::db::Fqcn::new(db, *fqcn),
+                                &prop_name,
+                            )
+                            .map(|(_, p)| p);
                             // Emit DeprecatedProperty if the property is deprecated
                             if let Some(ref p) = prop_def {
                                 if let Some(msg) = &p.deprecated {

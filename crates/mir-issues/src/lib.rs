@@ -1690,9 +1690,9 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 80 = current variant count. If this assertion fires after you added
+        // 96 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 80);
+        assert_eq!(one_of_each().len(), 96);
     }
 }
