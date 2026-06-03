@@ -132,6 +132,7 @@ impl<'a> DefinitionCollector<'a> {
                 own_constants,
                 template_params,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
+                deprecated: iface_doc.deprecated.as_deref().map(Arc::from),
             }));
 
         ControlFlow::Continue(())

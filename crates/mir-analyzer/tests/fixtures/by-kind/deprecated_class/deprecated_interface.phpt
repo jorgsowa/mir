@@ -7,6 +7,4 @@ interface Container {}
 
 class A implements Container {}
 ===expect===
-DeprecatedInterface
-===ignore===
-TODO
+DeprecatedInterface@5:0-5:31: Interface Container is deprecated

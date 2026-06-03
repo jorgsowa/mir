@@ -487,6 +487,9 @@ pub struct InterfaceDef {
     pub own_constants: IndexMap<Arc<str>, ConstantDef>,
     pub template_params: Vec<TemplateParam>,
     pub location: Option<Location>,
+    /// `@deprecated` docblock annotation, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -510,6 +513,9 @@ pub struct TraitDef {
     /// `@psalm-require-implements` / `@phpstan-require-implements` — FQCNs that using classes must implement.
     #[serde(default)]
     pub require_implements: Vec<Arc<str>>,
+    /// `@deprecated` docblock annotation, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------

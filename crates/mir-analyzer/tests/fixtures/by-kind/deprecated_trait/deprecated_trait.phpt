@@ -10,6 +10,4 @@ class C {
 }
 
 ===expect===
-DeprecatedTrait
-===ignore===
-TODO
+DeprecatedTrait@5:0-5:9: Trait T is deprecated

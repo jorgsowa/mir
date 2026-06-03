@@ -168,7 +168,9 @@ impl ClassLike {
     pub fn deprecated(&self) -> Option<&Arc<str>> {
         match self {
             ClassLike::Class(c) => c.deprecated.as_ref(),
-            _ => None,
+            ClassLike::Interface(i) => i.deprecated.as_ref(),
+            ClassLike::Trait(t) => t.deprecated.as_ref(),
+            ClassLike::Enum(_) => None,
         }
     }
 

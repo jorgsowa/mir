@@ -196,6 +196,7 @@ impl<'a> DefinitionCollector<'a> {
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             require_extends,
             require_implements,
+            deprecated: trait_doc.deprecated.as_deref().map(Arc::from),
         }));
 
         ControlFlow::Continue(())

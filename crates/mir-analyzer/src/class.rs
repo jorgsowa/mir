@@ -125,6 +125,65 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
 
+            // ---- 1b. Deprecated interface / trait checks -----------------------
+            {
+                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                if let Some(cls) = crate::db::find_class_like(self.db, here) {
+                    for iface_fqcn in cls.interfaces() {
+                        let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+                        if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
+                            if let Some(msg) = iface.deprecated() {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::DeprecatedInterface {
+                                        name: iface_fqcn.to_string(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
+                        }
+                    }
+                    for trait_fqcn in cls.class_traits() {
+                        let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                        if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
+                            if let Some(msg) = t.deprecated() {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::DeprecatedTrait {
+                                        name: trait_fqcn.to_string(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
+                        }
+                    }
+                }
+            }
+
             // Skip abstract classes for "must implement" checks
             if is_abstract {
                 // Still check override compatibility for abstract classes

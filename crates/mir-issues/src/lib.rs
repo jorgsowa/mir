@@ -324,6 +324,18 @@ pub enum IssueKind {
         property: String,
         message: Option<Arc<str>>,
     },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_class/deprecated_interface*.phpt`.
+    DeprecatedInterface {
+        name: String,
+        message: Option<Arc<str>>,
+    },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_trait/`.
+    DeprecatedTrait {
+        name: String,
+        message: Option<Arc<str>>,
+    },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_method_call/`.
     DeprecatedMethodCall {
@@ -498,6 +510,8 @@ impl IssueKind {
             | IssueKind::UnusedFunction { .. }
             | IssueKind::DeprecatedCall { .. }
             | IssueKind::DeprecatedProperty { .. }
+            | IssueKind::DeprecatedInterface { .. }
+            | IssueKind::DeprecatedTrait { .. }
             | IssueKind::DeprecatedMethodCall { .. }
             | IssueKind::DeprecatedMethod { .. }
             | IssueKind::DeprecatedClass { .. }
@@ -635,6 +649,8 @@ impl IssueKind {
             // Deprecation / internal (1000-1099)
             IssueKind::DeprecatedCall { .. } => "MIR1000",
             IssueKind::DeprecatedProperty { .. } => "MIR1005",
+            IssueKind::DeprecatedInterface { .. } => "MIR1006",
+            IssueKind::DeprecatedTrait { .. } => "MIR1007",
             IssueKind::DeprecatedMethodCall { .. } => "MIR1001",
             IssueKind::DeprecatedMethod { .. } => "MIR1002",
             IssueKind::DeprecatedClass { .. } => "MIR1003",
@@ -739,6 +755,8 @@ impl IssueKind {
             IssueKind::TaintedShell => "TaintedShell",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
             IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
+            IssueKind::DeprecatedInterface { .. } => "DeprecatedInterface",
+            IssueKind::DeprecatedTrait { .. } => "DeprecatedTrait",
             IssueKind::DeprecatedMethodCall { .. } => "DeprecatedMethodCall",
             IssueKind::DeprecatedMethod { .. } => "DeprecatedMethod",
             IssueKind::DeprecatedClass { .. } => "DeprecatedClass",
@@ -1025,6 +1043,14 @@ impl IssueKind {
                 message,
             } => {
                 let base = format!("Property {class}::${property} is deprecated");
+                append_deprecation_message(base, message)
+            }
+            IssueKind::DeprecatedInterface { name, message } => {
+                let base = format!("Interface {name} is deprecated");
+                append_deprecation_message(base, message)
+            }
+            IssueKind::DeprecatedTrait { name, message } => {
+                let base = format!("Trait {name} is deprecated");
                 append_deprecation_message(base, message)
             }
             IssueKind::DeprecatedMethodCall {
@@ -1436,6 +1462,14 @@ mod code_tests {
             IssueKind::DeprecatedProperty {
                 class: s(),
                 property: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedInterface {
+                name: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedTrait {
+                name: s(),
                 message: None,
             },
             IssueKind::DeprecatedMethodCall {
