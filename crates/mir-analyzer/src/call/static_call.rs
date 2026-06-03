@@ -232,6 +232,28 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            // Detect non-static method called statically.
+            // Skip: self/static/parent callers (might be called from instance context),
+            //        magic method names (__xxx), classes with __callStatic magic.
+            let is_self_parent_call = if let ExprKind::Identifier(id) = &call.class.kind {
+                matches!(id.as_ref(), "self" | "static" | "parent")
+            } else {
+                false
+            };
+            if !resolved.is_static
+                && !method_name.starts_with("__")
+                && !is_self_parent_call
+                && !crate::db::has_method_in_chain(ea.db, fqcn.as_str(), "__callStatic")
+            {
+                ea.emit(
+                    IssueKind::InvalidStaticInvocation {
+                        class: fqcn.clone(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Error,
+                    span,
+                );
+            }
             if resolved.is_internal {
                 let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
                 let method_namespace =

@@ -155,6 +155,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_cast/`.
     InvalidCast { from: String, to: String },
+    /// Emitted by `mir-analyzer/src/call/static_call.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_method/static_invocation*.phpt`.
+    InvalidStaticInvocation { class: String, method: String },
     /// Emitted by `mir-analyzer/src/expr/binary.rs` and `unary.rs` for operations on
     /// non-numeric or non-bitwise-compatible operands.
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
@@ -451,6 +454,7 @@ impl IssueKind {
             | IssueKind::InvalidPassByReference { .. }
             | IssueKind::InvalidThrow { .. }
             | IssueKind::InvalidCatch { .. }
+            | IssueKind::InvalidStaticInvocation { .. }
             | IssueKind::UnimplementedAbstractMethod { .. }
             | IssueKind::UnimplementedInterfaceMethod { .. }
             | IssueKind::MethodSignatureMismatch { .. }
@@ -601,6 +605,7 @@ impl IssueKind {
             IssueKind::InvalidPassByReference { .. } => "MIR0205",
             IssueKind::InvalidPropertyAssignment { .. } => "MIR0206",
             IssueKind::InvalidCast { .. } => "MIR0207",
+            IssueKind::InvalidStaticInvocation { .. } => "MIR0215",
             IssueKind::InvalidOperand { .. } => "MIR0208",
             IssueKind::PossiblyInvalidOperand { .. } => "MIR0213",
             IssueKind::PossiblyNullOperand { .. } => "MIR0214",
@@ -726,6 +731,7 @@ impl IssueKind {
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
             IssueKind::InvalidCast { .. } => "InvalidCast",
+            IssueKind::InvalidStaticInvocation { .. } => "InvalidStaticInvocation",
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
             IssueKind::PossiblyInvalidOperand { .. } => "PossiblyInvalidOperand",
             IssueKind::PossiblyNullOperand { .. } => "PossiblyNullOperand",
@@ -904,6 +910,9 @@ impl IssueKind {
             }
             IssueKind::InvalidCast { from, to } => {
                 format!("Cannot cast '{from}' to '{to}'")
+            }
+            IssueKind::InvalidStaticInvocation { class, method } => {
+                format!("Non-static method {class}::{method}() cannot be called statically")
             }
             IssueKind::InvalidOperand { op, left, right } => {
                 format!("Operator '{op}' not supported between '{left}' and '{right}'")
@@ -1371,6 +1380,10 @@ mod code_tests {
                 actual: s(),
             },
             IssueKind::InvalidCast { from: s(), to: s() },
+            IssueKind::InvalidStaticInvocation {
+                class: s(),
+                method: s(),
+            },
             IssueKind::InvalidOperand {
                 op: s(),
                 left: s(),
