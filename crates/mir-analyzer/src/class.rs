@@ -328,15 +328,22 @@ impl<'a> ClassAnalyzer<'a> {
             } else {
                 Arc::from(method_name.to_lowercase().as_str())
             };
-            // Walk ancestors (skipping self) for an inherited definition.
-            let parent_method = crate::db::class_ancestors_by_fqcn(self.db, here)
-                .iter()
-                .skip(1)
-                .find_map(|anc| {
-                    let here2 = crate::db::Fqcn::from_str(self.db, anc.as_ref());
-                    crate::db::find_method_in_class(self.db, here2, method_name_lower.as_ref())
-                        .map(|m| (anc.clone(), m))
-                });
+            // Collect ALL ancestors (skipping self) that define this method.
+            // The first one is the "primary parent" for structural checks (final,
+            // visibility, static, abstract). All are checked for signature
+            // compatibility (return type, param types) so that conflicts across
+            // multiple interfaces are caught.
+            let all_parent_methods: Vec<(Arc<str>, Arc<mir_codebase::storage::MethodDef>)> =
+                crate::db::class_ancestors_by_fqcn(self.db, here)
+                    .iter()
+                    .skip(1)
+                    .filter_map(|anc| {
+                        let here2 = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+                        crate::db::find_method_in_class(self.db, here2, method_name_lower.as_ref())
+                            .map(|m| (anc.clone(), m))
+                    })
+                    .collect();
+            let parent_method = all_parent_methods.first().cloned();
 
             let own_location = own.location.clone();
             let loc = issue_location(
@@ -387,6 +394,25 @@ impl<'a> ClassAnalyzer<'a> {
                     issue = issue.with_snippet(snippet);
                 }
                 issues.push(issue);
+            }
+
+            // ---- a0. Cannot re-declare a concrete method as abstract --------
+            // PHP rejects making a concrete parent method abstract in a subclass.
+            if own.is_abstract && !parent.is_abstract {
+                issues.push(
+                    Issue::new(
+                        IssueKind::MethodSignatureMismatch {
+                            class: fqcn.to_string(),
+                            method: method_name_lower.to_string(),
+                            detail: format!(
+                                "cannot make non-abstract method {}::{}() abstract",
+                                parent_fqcn, method_name_lower
+                            ),
+                        },
+                        loc.clone(),
+                    )
+                    .with_snippet(method_name_lower.to_string()),
+                );
             }
 
             // ---- a. Cannot override a final method -------------------------
@@ -450,25 +476,28 @@ impl<'a> ClassAnalyzer<'a> {
                 issues.push(issue);
             }
 
-            // ---- c. Return type must be covariant --------------------------
-            let parent_return_type = parent.return_type.as_deref().cloned();
+            // ---- c. Return type must be covariant (check ALL ancestors) -----
+            // Check every ancestor that defines this method: a class implementing
+            // two interfaces with conflicting return types must be flagged even if
+            // it satisfies the first interface's contract.
             let own_return_type = own.return_type.as_deref().cloned();
-            if let (Some(child_ret), Some(parent_ret)) =
-                (own_return_type.as_ref(), parent_return_type.as_ref())
-            {
-                let parent_from_docblock = parent_ret.from_docblock;
-                let involves_named_objects = Self::type_has_named_objects(child_ret)
-                    || Self::type_has_named_objects(parent_ret);
-                let involves_self_static = self.type_has_self_or_static(child_ret)
-                    || self.type_has_self_or_static(parent_ret);
-
-                if !parent_from_docblock
-                    && !parent_ret.is_mixed()
-                    && !child_ret.is_mixed()
-                    && !self.return_type_has_template(parent_ret)
-                {
-                    let child_file = own_location.as_ref().map(|l| l.file.as_ref()).unwrap_or("");
-
+            if let Some(child_ret) = own_return_type.as_ref() {
+                let child_file = own_location.as_ref().map(|l| l.file.as_ref()).unwrap_or("");
+                for (idx, (p_fqcn, p)) in all_parent_methods.iter().enumerate() {
+                    let Some(parent_ret) = p.return_type.as_deref() else {
+                        continue;
+                    };
+                    if parent_ret.from_docblock
+                        || parent_ret.is_mixed()
+                        || child_ret.is_mixed()
+                        || self.return_type_has_template(parent_ret)
+                    {
+                        continue;
+                    }
+                    let involves_named_objects = Self::type_has_named_objects(child_ret)
+                        || Self::type_has_named_objects(parent_ret);
+                    let involves_self_static = self.type_has_self_or_static(child_ret)
+                        || self.type_has_self_or_static(parent_ret);
                     let compatible = if (involves_named_objects || involves_self_static)
                         && self.type_has_only_object_atoms(child_ret)
                         && self.type_has_only_object_atoms(parent_ret)
@@ -481,16 +510,27 @@ impl<'a> ClassAnalyzer<'a> {
                     } else {
                         Self::scalar_return_types_compatible(child_ret, parent_ret)
                     };
-
                     if !compatible {
+                        // Primary parent uses the original message format for
+                        // backwards-compatibility with existing fixtures. Additional
+                        // ancestors include the declaring class to clarify which
+                        // contract is violated.
+                        let detail = if idx == 0 {
+                            format!(
+                                "return type '{child_ret}' is not a subtype of parent '{parent_ret}'"
+                            )
+                        } else {
+                            format!(
+                                "return type '{child_ret}' is not a subtype of {p_fqcn}::{}() '{parent_ret}'",
+                                method_name_lower
+                            )
+                        };
                         issues.push(
                             Issue::new(
                                 IssueKind::MethodSignatureMismatch {
                                     class: fqcn.to_string(),
                                     method: method_name_lower.to_string(),
-                                    detail: format!(
-                                        "return type '{child_ret}' is not a subtype of parent '{parent_ret}'"
-                                    ),
+                                    detail,
                                 },
                                 loc.clone(),
                             )

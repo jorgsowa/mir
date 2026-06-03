@@ -14,6 +14,4 @@ class A implements I1, I2 {
   }
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@9:2-9:33: Method A::foo() signature mismatch: return type 'string' is not a subtype of I2::foo() 'int'
