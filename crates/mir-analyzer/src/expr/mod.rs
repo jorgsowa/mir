@@ -203,6 +203,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Clone(inner) => {
                 let ty = self.analyze(inner, ctx);
                 self.check_clone_target(&ty, expr.span);
+                self.check_clone_deprecated(&ty, expr.span);
                 ty
             }
             ExprKind::CloneWith(inner, _props) => {
@@ -485,6 +486,32 @@ impl<'a> ExpressionAnalyzer<'a> {
                 span,
             ),
             CloneValidity::Cloneable | CloneValidity::Unknown => {}
+        }
+    }
+
+    /// Emit DeprecatedMethodCall if the cloned object has a deprecated __clone() method.
+    fn check_clone_deprecated(&mut self, ty: &Type, span: php_ast::Span) {
+        for atomic in &ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                let fqcn_str = fqcn.as_ref();
+                if let Some((_, method)) = crate::db::find_method_in_chain(
+                    self.db,
+                    crate::db::Fqcn::from_str(self.db, fqcn_str),
+                    "__clone",
+                ) {
+                    if let Some(msg) = &method.deprecated {
+                        self.emit(
+                            IssueKind::DeprecatedMethodCall {
+                                class: fqcn_str.to_string(),
+                                method: "__clone".to_string(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            Severity::Info,
+                            span,
+                        );
+                    }
+                }
+            }
         }
     }
 
