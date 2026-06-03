@@ -347,6 +347,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_throw/`.
     InvalidThrow { ty: String },
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_catch/`.
+    InvalidCatch { ty: String },
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_throws_docblock/`.
     MissingThrowsDocblock { class: String },
@@ -421,6 +424,7 @@ impl IssueKind {
             | IssueKind::InvalidNamedArgument { .. }
             | IssueKind::InvalidPassByReference { .. }
             | IssueKind::InvalidThrow { .. }
+            | IssueKind::InvalidCatch { .. }
             | IssueKind::UnimplementedAbstractMethod { .. }
             | IssueKind::UnimplementedInterfaceMethod { .. }
             | IssueKind::MethodSignatureMismatch { .. }
@@ -651,6 +655,7 @@ impl IssueKind {
 
             // Other (1500-1599)
             IssueKind::InvalidThrow { .. } => "MIR1500",
+            IssueKind::InvalidCatch { .. } => "MIR1503",
             IssueKind::ImplicitToStringCast { .. } => "MIR1501",
             IssueKind::ImplicitFloatToIntCast { .. } => "MIR1502",
         }
@@ -731,6 +736,7 @@ impl IssueKind {
             IssueKind::MissingReturnType { .. } => "MissingReturnType",
             IssueKind::MissingParamType { .. } => "MissingParamType",
             IssueKind::InvalidThrow { .. } => "InvalidThrow",
+            IssueKind::InvalidCatch { .. } => "InvalidCatch",
             IssueKind::MissingThrowsDocblock { .. } => "MissingThrowsDocblock",
             IssueKind::ImplicitToStringCast { .. } => "ImplicitToStringCast",
             IssueKind::ImplicitFloatToIntCast { .. } => "ImplicitFloatToIntCast",
@@ -1034,6 +1040,9 @@ impl IssueKind {
             }
             IssueKind::InvalidThrow { ty } => {
                 format!("Thrown type '{ty}' does not extend Throwable")
+            }
+            IssueKind::InvalidCatch { ty } => {
+                format!("Caught type '{ty}' does not extend Throwable")
             }
             IssueKind::MissingThrowsDocblock { class } => {
                 format!("Exception {class} is thrown but not declared in @throws")
@@ -1448,6 +1457,7 @@ mod code_tests {
             },
             IssueKind::ParseError { message: s() },
             IssueKind::InvalidThrow { ty: s() },
+            IssueKind::InvalidCatch { ty: s() },
             IssueKind::ImplicitToStringCast { class: s() },
             IssueKind::ImplicitFloatToIntCast { from: s() },
         ]

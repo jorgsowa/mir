@@ -436,6 +436,31 @@ impl<'a> StatementsAnalyzer<'a> {
                             col_start,
                             col_end: col_end.max(col_start + 1),
                         });
+                        // Check if the caught type extends Throwable
+                        if crate::db::class_exists(self.db, &resolved) {
+                            let is_throwable = resolved == "Throwable"
+                                || crate::db::extends_or_implements(
+                                    self.db,
+                                    &resolved,
+                                    "Throwable",
+                                );
+                            if !is_throwable && !crate::db::has_unknown_ancestor(self.db, &resolved)
+                            {
+                                let (line_end, col_end2) = self.offset_to_line_col(span.end);
+                                self.issues.add(Issue::new(
+                                    IssueKind::InvalidCatch {
+                                        ty: resolved.clone(),
+                                    },
+                                    Location {
+                                        file: self.file.clone(),
+                                        line,
+                                        line_end,
+                                        col_start,
+                                        col_end: col_end2.max(col_start + 1),
+                                    },
+                                ));
+                            }
+                        }
                     }
                 }
             }
