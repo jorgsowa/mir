@@ -605,6 +605,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_readonly: prop.read_only,
                     default: None,
                     location: location.clone(),
+                    deprecated: None,
                 },
             );
         }

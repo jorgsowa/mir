@@ -152,9 +152,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;
                             let here = crate::db::Fqcn::new(db, *fqcn);
+                            let prop_def = crate::db::find_property_in_class(db, here, &prop_name);
+                            // Emit DeprecatedProperty if the property is deprecated
+                            if let Some(ref p) = prop_def {
+                                if let Some(msg) = &p.deprecated {
+                                    self.emit(
+                                        IssueKind::DeprecatedProperty {
+                                            class: fqcn.to_string(),
+                                            property: prop_name.clone(),
+                                            message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                        },
+                                        Severity::Info,
+                                        span,
+                                    );
+                                }
+                            }
                             let prop_info: Option<(bool, Option<Type>)> =
-                                crate::db::find_property_in_class(db, here, &prop_name)
-                                    .map(|p| (p.is_readonly, p.ty.clone()));
+                                prop_def.map(|p| (p.is_readonly, p.ty.clone()));
                             if let Some((is_readonly, prop_ty)) = prop_info {
                                 if is_readonly && !ctx.inside_constructor {
                                     self.emit(

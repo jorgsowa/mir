@@ -410,6 +410,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Arc::from(format!("{}::{}", resolved, prop_name)),
                         spa.member.span,
                     );
+                    // Check if the static property is deprecated
+                    let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
+                    if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name) {
+                        if let Some(msg) = &p.1.deprecated {
+                            self.emit(
+                                IssueKind::DeprecatedProperty {
+                                    class: resolved.clone(),
+                                    property: prop_name.to_string(),
+                                    message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                },
+                                Severity::Info,
+                                spa.member.span,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -632,12 +647,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if crate::db::class_kind(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
-                    let prop_found: Option<Type> = crate::db::find_property_in_chain(
+                    let prop_result = crate::db::find_property_in_chain(
                         self.db,
                         crate::db::Fqcn::new(self.db, *fqcn),
                         prop_name,
-                    )
-                    .map(|(_, p)| p.ty.unwrap_or_else(Type::mixed));
+                    );
+                    if let Some((_, ref p)) = prop_result {
+                        if let Some(msg) = &p.deprecated {
+                            self.emit(
+                                IssueKind::DeprecatedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                    message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
+                    }
+                    let prop_found: Option<Type> =
+                        prop_result.map(|(_, p)| p.ty.unwrap_or_else(Type::mixed));
                     if let Some(ty) = prop_found {
                         self.record_ref(Arc::from(format!("{}::{}", fqcn, prop_name)), span);
                         return ty;

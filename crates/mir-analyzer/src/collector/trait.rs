@@ -83,6 +83,7 @@ impl<'a> DefinitionCollector<'a> {
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
+                                    deprecated: None,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
                             }
@@ -128,6 +129,7 @@ impl<'a> DefinitionCollector<'a> {
                             is_readonly: p.is_readonly,
                             default: None,
                             location: Some(self.location(member.span.start, member.span.end)),
+                            deprecated: prop_doc.deprecated.as_deref().map(Arc::from),
                         },
                     );
                 }

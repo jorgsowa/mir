@@ -126,6 +126,7 @@ impl<'a> DefinitionCollector<'a> {
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
+                                    deprecated: None,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
                             }
@@ -173,6 +174,19 @@ impl<'a> DefinitionCollector<'a> {
                         is_readonly: p.is_readonly || decl.modifiers.is_readonly,
                         default: p.default.as_ref().map(|_| mir_types::Type::mixed()),
                         location: Some(self.location(member.span.start, member.span.end)),
+                        deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
+                            if p.attributes.iter().any(|a| {
+                                a.name
+                                    .parts
+                                    .last()
+                                    .map(|part| part.as_ref().eq_ignore_ascii_case("Deprecated"))
+                                    .unwrap_or(false)
+                            }) {
+                                Some(Arc::from(""))
+                            } else {
+                                None
+                            }
+                        }),
                     };
                     own_properties.insert(Arc::from(prop_name), prop);
                 }

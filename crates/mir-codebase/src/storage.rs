@@ -396,6 +396,9 @@ pub struct PropertyDef {
     pub is_readonly: bool,
     pub default: Option<Type>,
     pub location: Option<Location>,
+    /// `@deprecated` docblock annotation, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------

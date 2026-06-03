@@ -317,6 +317,13 @@ pub enum IssueKind {
         name: String,
         message: Option<Arc<str>>,
     },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_property/deprecated_property_*.phpt`.
+    DeprecatedProperty {
+        class: String,
+        property: String,
+        message: Option<Arc<str>>,
+    },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_method_call/`.
     DeprecatedMethodCall {
@@ -490,6 +497,7 @@ impl IssueKind {
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
             | IssueKind::DeprecatedCall { .. }
+            | IssueKind::DeprecatedProperty { .. }
             | IssueKind::DeprecatedMethodCall { .. }
             | IssueKind::DeprecatedMethod { .. }
             | IssueKind::DeprecatedClass { .. }
@@ -626,6 +634,7 @@ impl IssueKind {
 
             // Deprecation / internal (1000-1099)
             IssueKind::DeprecatedCall { .. } => "MIR1000",
+            IssueKind::DeprecatedProperty { .. } => "MIR1005",
             IssueKind::DeprecatedMethodCall { .. } => "MIR1001",
             IssueKind::DeprecatedMethod { .. } => "MIR1002",
             IssueKind::DeprecatedClass { .. } => "MIR1003",
@@ -729,6 +738,7 @@ impl IssueKind {
             IssueKind::TaintedSql => "TaintedSql",
             IssueKind::TaintedShell => "TaintedShell",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
+            IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
             IssueKind::DeprecatedMethodCall { .. } => "DeprecatedMethodCall",
             IssueKind::DeprecatedMethod { .. } => "DeprecatedMethod",
             IssueKind::DeprecatedClass { .. } => "DeprecatedClass",
@@ -1007,6 +1017,14 @@ impl IssueKind {
 
             IssueKind::DeprecatedCall { name, message } => {
                 let base = format!("Call to deprecated function {name}");
+                append_deprecation_message(base, message)
+            }
+            IssueKind::DeprecatedProperty {
+                class,
+                property,
+                message,
+            } => {
+                let base = format!("Property {class}::${property} is deprecated");
                 append_deprecation_message(base, message)
             }
             IssueKind::DeprecatedMethodCall {
@@ -1413,6 +1431,11 @@ mod code_tests {
             IssueKind::ShadowedTemplateParam { name: s() },
             IssueKind::DeprecatedCall {
                 name: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedProperty {
+                class: s(),
+                property: s(),
                 message: None,
             },
             IssueKind::DeprecatedMethodCall {

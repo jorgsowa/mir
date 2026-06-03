@@ -15,6 +15,4 @@ class A{
 }
 
 ===expect===
-DeprecatedProperty
-===ignore===
-TODO
+DeprecatedProperty@10:9-10:24: Property A::$foo is deprecated
