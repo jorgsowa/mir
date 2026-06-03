@@ -437,6 +437,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Severity::Error,
                             cca.class.span,
                         );
+                    } else {
+                        // Check if the class is deprecated
+                        let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
+                        if let Some(class) = crate::db::find_class_like(self.db, here) {
+                            if let Some(msg) = class.deprecated() {
+                                self.emit(
+                                    IssueKind::DeprecatedClass {
+                                        name: resolved.clone(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    Severity::Info,
+                                    cca.class.span,
+                                );
+                            }
+                        }
                     }
                     self.record_ref(Arc::from(resolved.as_str()), cca.class.span);
                 }
@@ -563,6 +578,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             cca.member.span,
         );
 
+        let here = crate::db::Fqcn::from_str(self.db, &fqcn);
+        // Check if the class is deprecated
+        if let Some(class) = crate::db::find_class_like(self.db, here) {
+            if let Some(msg) = class.deprecated() {
+                self.emit(
+                    IssueKind::DeprecatedClass {
+                        name: fqcn.clone(),
+                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                    },
+                    Severity::Info,
+                    cca.class.span,
+                );
+            }
+        }
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         let found = crate::db::find_class_constant_in_chain(self.db, here, &const_name);
         let const_ty = found

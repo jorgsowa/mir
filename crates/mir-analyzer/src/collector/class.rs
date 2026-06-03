@@ -275,7 +275,20 @@ impl<'a> DefinitionCollector<'a> {
             is_abstract: decl.modifiers.is_abstract,
             is_final: decl.modifiers.is_final,
             is_readonly: decl.modifiers.is_readonly,
-            deprecated: class_doc.deprecated.as_deref().map(Arc::from),
+            deprecated: class_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
+                // Also detect #[Deprecated] / #[\Deprecated] PHP attribute
+                if decl.attributes.iter().any(|a| {
+                    a.name
+                        .parts
+                        .last()
+                        .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
+                        .unwrap_or(false)
+                }) {
+                    Some(Arc::from(""))
+                } else {
+                    None
+                }
+            }),
             is_internal: class_doc.is_internal,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             type_aliases: type_aliases

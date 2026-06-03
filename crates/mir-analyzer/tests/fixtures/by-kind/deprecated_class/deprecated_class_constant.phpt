@@ -11,6 +11,4 @@ class Foo {
 
 echo Foo::FOO;
 ===expect===
-DeprecatedClass
-===ignore===
-TODO
+DeprecatedClass@9:6-9:9: Class Foo is deprecated

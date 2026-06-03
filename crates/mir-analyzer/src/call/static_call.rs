@@ -126,6 +126,22 @@ impl CallAnalyzer {
 
         if matches!(&call.class.kind, ExprKind::Identifier(_)) {
             ea.record_ref(Arc::from(fqcn.as_str()), call.class.span);
+            // Check if the class is deprecated (skip self/static/parent)
+            if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_str());
+                if let Some(class) = crate::db::find_class_like(ea.db, here) {
+                    if let Some(msg) = class.deprecated() {
+                        ea.emit(
+                            IssueKind::DeprecatedClass {
+                                name: fqcn.clone(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            Severity::Info,
+                            call.class.span,
+                        );
+                    }
+                }
+            }
         }
 
         let arg_types: Vec<Type> = call

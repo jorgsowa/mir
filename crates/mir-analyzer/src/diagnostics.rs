@@ -120,6 +120,33 @@ pub(crate) fn check_type_hint_classes(
                     )
                     .with_snippet(crate::parser::span_text(source, hint.span).unwrap_or_default()),
                 );
+            } else {
+                // Class exists — check if it's deprecated
+                let here = crate::db::Fqcn::from_str(db, resolved.as_str());
+                if let Some(class) = crate::db::find_class_like(db, here) {
+                    if let Some(msg) = class.deprecated() {
+                        let (line, col_start) =
+                            offset_to_line_col(source, hint.span.start, source_map);
+                        let (line_end, col_end) = if hint.span.start < hint.span.end {
+                            offset_to_line_col(source, hint.span.end, source_map)
+                        } else {
+                            (line, col_start)
+                        };
+                        issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::DeprecatedClass {
+                                name: resolved,
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        ));
+                    }
+                }
             }
         }
         TypeHintKind::Nullable(inner) => {

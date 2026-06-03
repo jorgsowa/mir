@@ -9,6 +9,4 @@ class DeprecatedClass{}
 
 function foo(DeprecatedClass $deprecatedClass): void {}
 ===expect===
-DeprecatedClass
-===ignore===
-TODO
+DeprecatedClass@7:14-7:29: Class DeprecatedClass is deprecated
