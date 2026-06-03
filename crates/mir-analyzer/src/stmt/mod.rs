@@ -468,7 +468,23 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut iter = current.clone();
             body(self, &mut iter);
 
-            let next = FlowState::merge_branches(pre, iter, None);
+            let mut next = FlowState::merge_branches(pre, iter.clone(), None);
+
+            // When the loop body reads a variable that was pending before the loop,
+            // the pre-loop write was consumed on the "loop ran" path.  The
+            // merge_branches call above uses pre.clone() as the else-path ("loop
+            // never ran"), which reintroduces those pre-loop pending writes into
+            // the union.  Only remove a variable from the result when its current
+            // location in `next` still matches the pre-loop location — meaning
+            // the loop body read the old value but did NOT write a new one.
+            // If the loop body wrote a new value (different location), keep it.
+            for name in iter.read_vars.iter() {
+                if let Some(&pre_loc) = pre.last_write_locs.get(name) {
+                    if next.last_write_locs.get(name) == Some(&pre_loc) {
+                        next.last_write_locs.remove(name);
+                    }
+                }
+            }
 
             if vars_stabilized(&prev_vars, &next.vars) {
                 current = next;
