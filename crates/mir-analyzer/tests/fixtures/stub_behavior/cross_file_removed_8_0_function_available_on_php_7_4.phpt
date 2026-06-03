@@ -11,5 +11,3 @@ function format_hebrew(string $text): void {
 <?php
 format_hebrew('שלום');
 ===expect===
-===ignore===
-TODO

@@ -11,5 +11,3 @@ function check_contains(string $text, string $needle): void {
 <?php
 check_contains('hello world', 'world');
 ===expect===
-===ignore===
-TODO

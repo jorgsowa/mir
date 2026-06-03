@@ -10,5 +10,3 @@ function zipArrays(array $a, array $b): array {
 <?php
 $pairs = zipArrays([1, 2], ['a', 'b']);
 ===expect===
-===ignore===
-TODO

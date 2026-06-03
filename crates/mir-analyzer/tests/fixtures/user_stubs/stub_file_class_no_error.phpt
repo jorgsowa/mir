@@ -14,5 +14,3 @@ function boot(): void {
     $client->connect('https://example.com');
 }
 ===expect===
-===ignore===
-TODO

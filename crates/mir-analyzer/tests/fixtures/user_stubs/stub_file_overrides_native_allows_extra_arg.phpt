@@ -9,5 +9,3 @@ function strlen(string $string, string $encoding = 'UTF-8'): int { return 0; }
 <?php
 strlen('hello', 'ASCII');
 ===expect===
-===ignore===
-TODO

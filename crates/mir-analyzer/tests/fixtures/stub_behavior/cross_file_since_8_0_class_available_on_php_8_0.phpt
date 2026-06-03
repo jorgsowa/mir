@@ -11,5 +11,3 @@ function make_weak_cache(): void {
 <?php
 make_weak_cache();
 ===expect===
-===ignore===
-TODO

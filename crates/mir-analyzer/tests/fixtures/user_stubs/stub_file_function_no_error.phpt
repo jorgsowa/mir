@@ -9,5 +9,3 @@ function my_helper(string $s): string { return $s; }
 <?php
 $result = my_helper('hello');
 ===expect===
-===ignore===
-TODO

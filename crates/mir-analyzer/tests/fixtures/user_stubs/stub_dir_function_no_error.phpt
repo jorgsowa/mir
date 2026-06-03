@@ -16,5 +16,3 @@ function handle(string $token, string $key): void {
     }
 }
 ===expect===
-===ignore===
-TODO

@@ -10,5 +10,3 @@ function now(): \DateTimeImmutable {
 $dt = now();
 $formatted = $dt->format('Y-m-d');
 ===expect===
-===ignore===
-TODO

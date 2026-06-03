@@ -28,5 +28,3 @@ try {
     echo $e->getMessage();
 }
 ===expect===
-===ignore===
-TODO

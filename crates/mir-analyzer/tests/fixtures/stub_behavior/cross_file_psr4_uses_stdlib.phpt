@@ -25,5 +25,3 @@ $f = new LogFormatter();
 $result = $f->format(new \DateTimeImmutable());
 $keys = $f->keys(['a' => 1, 'b' => 2]);
 ===expect===
-===ignore===
-TODO

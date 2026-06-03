@@ -15,5 +15,3 @@ if ($result !== false) {
     $first = $result[1];
 }
 ===expect===
-===ignore===
-TODO

@@ -12,5 +12,3 @@ function countWord(string $output): int {
 <?php
 $result = countWord('some text with info here');
 ===expect===
-===ignore===
-TODO

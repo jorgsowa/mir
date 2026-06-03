@@ -16,5 +16,3 @@ if ($stdin !== false) {
     $isTty = isTerminalStream($stdin);
 }
 ===expect===
-===ignore===
-TODO

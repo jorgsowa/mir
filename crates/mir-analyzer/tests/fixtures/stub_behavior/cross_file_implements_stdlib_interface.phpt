@@ -23,5 +23,3 @@ function process(\Iterator $it): void {
 $list = new NumberList([1, 2, 3]);
 process($list);
 ===expect===
-===ignore===
-TODO
