@@ -815,7 +815,7 @@ impl IssueKind {
     pub fn message(&self) -> String {
         match self {
             IssueKind::NonStaticSelfCall { class, method } => {
-                format!("Non-static method {class}::{method}() cannot be called on self:: in a static context")
+                format!("Non-static method {class}::{method}() cannot be called statically")
             }
             IssueKind::InvalidScope { in_class } => {
                 if *in_class {
