@@ -1096,7 +1096,19 @@ impl<'a> DefinitionCollector<'a> {
             template_params,
             assertions: self.build_assertions(&doc),
             throws,
-            deprecated: doc.deprecated.as_deref().map(Arc::from),
+            deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
+                if m.attributes.iter().any(|a| {
+                    a.name
+                        .parts
+                        .last()
+                        .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
+                        .unwrap_or(false)
+                }) {
+                    Some(Arc::from(""))
+                } else {
+                    None
+                }
+            }),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure,
             is_override,
