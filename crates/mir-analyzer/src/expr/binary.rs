@@ -120,6 +120,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Severity::Warning,
                             span,
                         );
+                    } else if operand_has_any_non_numeric_member(&left_ty)
+                        || operand_has_any_non_numeric_member(&right_ty)
+                    {
+                        self.emit(
+                            IssueKind::PossiblyInvalidOperand {
+                                op: arithmetic_op_symbol(b.op).to_string(),
+                                left: left_ty.to_string(),
+                                right: right_ty.to_string(),
+                            },
+                            Severity::Info,
+                            span,
+                        );
                     } else if matches!(b.op, BinaryOp::Div | BinaryOp::Mod)
                         && operand_contains_null(&right_ty)
                     {
@@ -277,6 +289,31 @@ fn operand_is_non_numeric(ty: &Type) -> bool {
         // int/float/numeric/bool/null and general/class strings are left alone.
         _ => false,
     })
+}
+
+/// Whether `ty` has *any* member that is definitely non-numeric but the type
+/// as a whole is not all-non-numeric. Used for `PossiblyInvalidOperand`.
+fn operand_has_any_non_numeric_member(ty: &Type) -> bool {
+    if ty.types.is_empty() || ty.is_mixed() {
+        return false;
+    }
+    ty.types.iter().any(|a| match a {
+        Atomic::TLiteralString(s) => !is_numeric_string(s),
+        Atomic::TArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TObject
+        | Atomic::TNamedObject { .. }
+        | Atomic::TStaticObject { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TParent { .. }
+        | Atomic::TIntersection { .. }
+        | Atomic::TClosure { .. }
+        | Atomic::TLiteralEnumCase { .. } => true,
+        _ => false,
+    }) && !operand_is_non_numeric(ty)
 }
 
 /// Whether `ty` contains `null` (potential division-by-zero when used as divisor).

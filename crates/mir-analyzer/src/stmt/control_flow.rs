@@ -100,7 +100,24 @@ impl<'a> StatementsAnalyzer<'a> {
             self.db,
             &self.file,
         );
+        // Redundancy of the outer if condition depends only on its own narrowing, not elseifs.
         let else_unreachable_from_narrowing = else_ctx.diverges;
+        // In the else branch all elseif conditions also failed — narrow them out for better
+        // type accuracy in the else body (e.g. string|array|int becomes int after is_string
+        // and is_array elseifs). Only applied when the else is itself reachable.
+        if !else_ctx.diverges {
+            for elseif in if_stmt.elseif_branches.iter() {
+                if !else_ctx.diverges {
+                    narrow_from_condition(
+                        &elseif.condition,
+                        &mut else_ctx,
+                        false,
+                        self.db,
+                        &self.file,
+                    );
+                }
+            }
+        }
         if !else_ctx.diverges {
             if let Some(else_branch) = &if_stmt.else_branch {
                 self.analyze_stmt(else_branch, &mut else_ctx);

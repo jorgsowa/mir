@@ -53,4 +53,3 @@ UnusedParam@11:25-11:36: Parameter $msg is never used
 UnusedParam@15:25-15:36: Parameter $msg is never used
 UnusedParam@19:25-19:36: Parameter $key is never used
 RedundantCondition@29:15-29:40: Condition is always true/false for type 'bool'
-UndefinedMethod@45:9-45:28: Method File::get() does not exist
