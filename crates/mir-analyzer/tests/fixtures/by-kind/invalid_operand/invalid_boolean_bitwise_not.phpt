@@ -4,6 +4,4 @@ Invalid boolean bitwise not
 <?php
 $a = ~true;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@2:7-2:11: Operator '~' not supported between 'true' and ''

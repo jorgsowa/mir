@@ -28,6 +28,9 @@ pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
                 | Atomic::TIntersection { .. }
                 | Atomic::TClosure { .. }
                 | Atomic::TLiteralEnumCase { .. }
+                | Atomic::TBool
+                | Atomic::TTrue
+                | Atomic::TFalse
         )
     })
 }
