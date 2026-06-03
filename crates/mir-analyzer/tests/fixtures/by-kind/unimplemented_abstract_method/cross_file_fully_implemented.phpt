@@ -11,5 +11,3 @@ class Circle extends Shape {
     public function area(): float { return 3.14; }
 }
 ===expect===
-===ignore===
-TODO

@@ -6,5 +6,3 @@ function helper(): void {}
 
 call_user_func("helper");
 ===expect===
-===ignore===
-TODO

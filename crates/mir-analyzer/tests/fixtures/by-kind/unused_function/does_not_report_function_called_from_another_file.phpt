@@ -7,5 +7,3 @@ function helper(): void {}
 <?php
 helper();
 ===expect===
-===ignore===
-TODO

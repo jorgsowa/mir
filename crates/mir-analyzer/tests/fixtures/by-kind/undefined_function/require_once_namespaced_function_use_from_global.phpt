@@ -14,5 +14,3 @@ function run(): string {
     return helper();
 }
 ===expect===
-===ignore===
-TODO
