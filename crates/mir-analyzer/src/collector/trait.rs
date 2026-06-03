@@ -153,6 +153,7 @@ impl<'a> DefinitionCollector<'a> {
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
+                            deprecated: None,
                         },
                     );
                 }

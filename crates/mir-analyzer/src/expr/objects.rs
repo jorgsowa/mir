@@ -609,6 +609,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         let found = crate::db::find_class_constant_in_chain(self.db, here, &const_name);
+        // Check if the constant is deprecated
+        if let Some((_, ref c)) = found {
+            if let Some(msg) = &c.deprecated {
+                self.emit(
+                    IssueKind::DeprecatedConstant {
+                        class: fqcn.clone(),
+                        constant: const_name.clone(),
+                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                    },
+                    Severity::Info,
+                    cca.member.span,
+                );
+            }
+        }
         let const_ty = found
             .as_ref()
             .map(|(_, c)| c.ty.clone())

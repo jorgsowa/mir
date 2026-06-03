@@ -41,12 +41,32 @@ impl DefinitionCollector<'_> {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
                     let case_name = c.name.as_deref().unwrap_or_default();
+                    let case_doc = c
+                        .doc_comment
+                        .as_ref()
+                        .map(|d| crate::parser::DocblockParser::parse(&d.text))
+                        .unwrap_or_default();
+                    let case_deprecated =
+                        case_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
+                            if c.attributes.iter().any(|a| {
+                                a.name
+                                    .parts
+                                    .last()
+                                    .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
+                                    .unwrap_or(false)
+                            }) {
+                                Some(Arc::from(""))
+                            } else {
+                                None
+                            }
+                        });
                     cases.insert(
                         Arc::from(case_name),
                         EnumCaseDef {
                             name: Arc::from(case_name),
                             value: c.value.as_ref().map(|_| Type::mixed()),
                             location: Some(self.location(member.span.start, member.span.end)),
+                            deprecated: case_deprecated,
                         },
                     );
                 }
@@ -70,6 +90,7 @@ impl DefinitionCollector<'_> {
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
+                            deprecated: None,
                         },
                     );
                 }

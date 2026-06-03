@@ -653,6 +653,7 @@ pub fn find_class_constant_in_class<'db>(
                 visibility: None,
                 is_final: false,
                 location: case.location.clone(),
+                deprecated: case.deprecated.clone(),
             });
         }
     }

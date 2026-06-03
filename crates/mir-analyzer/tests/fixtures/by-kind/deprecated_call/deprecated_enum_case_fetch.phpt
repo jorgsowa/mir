@@ -12,6 +12,4 @@ enum Foo {
 Foo::B;
 
 ===expect===
-DeprecatedConstant
-===ignore===
-TODO
+DeprecatedConstant@9:6-9:7: Constant Foo::B is deprecated

@@ -324,6 +324,13 @@ pub enum IssueKind {
         property: String,
         message: Option<Arc<str>>,
     },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_call/deprecated_class_const_fetch*.phpt`.
+    DeprecatedConstant {
+        class: String,
+        constant: String,
+        message: Option<Arc<str>>,
+    },
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_class/deprecated_interface*.phpt`.
     DeprecatedInterface {
@@ -510,6 +517,7 @@ impl IssueKind {
             | IssueKind::UnusedFunction { .. }
             | IssueKind::DeprecatedCall { .. }
             | IssueKind::DeprecatedProperty { .. }
+            | IssueKind::DeprecatedConstant { .. }
             | IssueKind::DeprecatedInterface { .. }
             | IssueKind::DeprecatedTrait { .. }
             | IssueKind::DeprecatedMethodCall { .. }
@@ -651,6 +659,7 @@ impl IssueKind {
             IssueKind::DeprecatedProperty { .. } => "MIR1005",
             IssueKind::DeprecatedInterface { .. } => "MIR1006",
             IssueKind::DeprecatedTrait { .. } => "MIR1007",
+            IssueKind::DeprecatedConstant { .. } => "MIR1008",
             IssueKind::DeprecatedMethodCall { .. } => "MIR1001",
             IssueKind::DeprecatedMethod { .. } => "MIR1002",
             IssueKind::DeprecatedClass { .. } => "MIR1003",
@@ -755,6 +764,7 @@ impl IssueKind {
             IssueKind::TaintedShell => "TaintedShell",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
             IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
+            IssueKind::DeprecatedConstant { .. } => "DeprecatedConstant",
             IssueKind::DeprecatedInterface { .. } => "DeprecatedInterface",
             IssueKind::DeprecatedTrait { .. } => "DeprecatedTrait",
             IssueKind::DeprecatedMethodCall { .. } => "DeprecatedMethodCall",
@@ -1043,6 +1053,14 @@ impl IssueKind {
                 message,
             } => {
                 let base = format!("Property {class}::${property} is deprecated");
+                append_deprecation_message(base, message)
+            }
+            IssueKind::DeprecatedConstant {
+                class,
+                constant,
+                message,
+            } => {
+                let base = format!("Constant {class}::{constant} is deprecated");
                 append_deprecation_message(base, message)
             }
             IssueKind::DeprecatedInterface { name, message } => {
@@ -1462,6 +1480,11 @@ mod code_tests {
             IssueKind::DeprecatedProperty {
                 class: s(),
                 property: s(),
+                message: None,
+            },
+            IssueKind::DeprecatedConstant {
+                class: s(),
+                constant: s(),
                 message: None,
             },
             IssueKind::DeprecatedInterface {

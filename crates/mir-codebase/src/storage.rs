@@ -413,6 +413,9 @@ pub struct ConstantDef {
     #[serde(default)]
     pub is_final: bool,
     pub location: Option<Location>,
+    /// `@deprecated` docblock annotation, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +530,9 @@ pub struct EnumCaseDef {
     pub name: Arc<str>,
     pub value: Option<Type>,
     pub location: Option<Location>,
+    /// `@deprecated` docblock annotation, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<Arc<str>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
