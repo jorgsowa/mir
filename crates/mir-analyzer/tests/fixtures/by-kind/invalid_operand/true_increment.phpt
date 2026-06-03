@@ -5,6 +5,4 @@ True increment
 $a = true;
 $a++;
 ===expect===
-InvalidOperand
-===ignore===
-TODO
+InvalidOperand@3:1-3:3: Operator '++' not supported between 'true' and ''

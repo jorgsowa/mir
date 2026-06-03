@@ -7,6 +7,17 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::{UnaryPostfixOp, UnaryPrefixOp};
 use php_ast::owned::{UnaryPostfixExpr, UnaryPrefixExpr};
 
+/// Returns true when every member of `ty` is definitively `true` or `bool`
+/// (not `false` — that case is reserved for a future FalseOperand kind).
+fn operand_is_definitely_bool(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && !ty.is_mixed()
+        && ty
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TTrue | Atomic::TBool))
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_unary_prefix(
         &mut self,
@@ -68,6 +79,26 @@ impl<'a> ExpressionAnalyzer<'a> {
         let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPostfixOp::PostIncrement | UnaryPostfixOp::PostDecrement => {
+                // Flag increment/decrement on a definitely-bool operand.
+                // PHP silently no-ops on bool but this is almost always a bug.
+                // Only fires when ALL union members are TTrue/TBool (never on
+                // int|bool). TFalse is reserved for the future FalseOperand kind.
+                if operand_is_definitely_bool(&operand_ty) {
+                    let op = if u.op == UnaryPostfixOp::PostIncrement {
+                        "++"
+                    } else {
+                        "--"
+                    };
+                    self.emit(
+                        IssueKind::InvalidOperand {
+                            op: op.to_string(),
+                            left: operand_ty.to_string(),
+                            right: String::new(),
+                        },
+                        Severity::Warning,
+                        u.operand.span,
+                    );
+                }
                 if let Some(var_name) = extract_simple_var(&u.operand) {
                     let new_ty = if operand_ty
                         .contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
