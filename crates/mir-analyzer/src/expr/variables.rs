@@ -44,6 +44,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         ctx.read_vars.insert(mir_types::Name::from(name_str));
+        ctx.mark_consumed(name_str);
         let ty = if name_str == "this" && !ctx.var_is_defined("this") {
             Type::never()
         } else {

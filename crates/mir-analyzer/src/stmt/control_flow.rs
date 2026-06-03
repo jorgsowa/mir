@@ -405,6 +405,12 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut non_diverging_catches: Vec<FlowState> = vec![];
         for catch in tc.catches.iter() {
             let mut catch_ctx = catch_base.clone();
+            // For dead-write tracking, the catch block starts from the pre-try state:
+            // an exception can be thrown at any point in the try body, so we don't know
+            // which writes from the try body were committed before the throw.
+            // Inheriting try-body last_write_locs would cause false "dead write" reports
+            // when a catch block re-assigns variables also written in the try body.
+            catch_ctx.last_write_locs = pre_ctx.last_write_locs.clone();
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
                 if self.mode == crate::body_analysis::AnalysisMode::Full {

@@ -9,6 +9,4 @@ while (rand(0, 1)) {
     break;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@5:5-5:7: Variable $a is never read

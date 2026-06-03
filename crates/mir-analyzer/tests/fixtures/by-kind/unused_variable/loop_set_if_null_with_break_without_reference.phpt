@@ -13,6 +13,5 @@ while (rand(0, 1)) {
     $a = 5;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+RedundantCondition@5:9-5:20: Condition is always true/false for type 'bool'
+UnusedVariable@10:5-10:7: Variable $a is never read

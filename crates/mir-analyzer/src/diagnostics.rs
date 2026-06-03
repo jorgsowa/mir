@@ -540,22 +540,27 @@ pub(crate) fn emit_unused_variables(
         "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV", "GLOBALS",
         "argv", "argc",
     ];
-    for name in ctx.assigned_vars.iter() {
-        if ctx.param_names.contains(name) {
-            continue;
-        }
-        if SUPERGLOBALS.contains(&name.as_str()) {
-            continue;
-        }
-        if name == "this" {
-            continue;
-        }
-        if name.starts_with('_') {
-            continue;
-        }
-        if !ctx.read_vars.contains(name) {
-            let (line, col_start, line_end, col_end) =
-                ctx.var_locations.get(name).copied().unwrap_or((1, 0, 1, 0));
+
+    // Helper: should we skip this variable name?
+    let skip = |name: &mir_types::Name| -> bool {
+        ctx.param_names.contains(name)
+            || SUPERGLOBALS.contains(&name.as_str())
+            || name == "this"
+            || name.starts_with('_')
+    };
+
+    // Emit at most one UnusedVariable per variable name to avoid noise from
+    // multiple dead-write occurrences in complex control flow.
+    let mut emitted_names: rustc_hash::FxHashSet<mir_types::Name> =
+        rustc_hash::FxHashSet::default();
+
+    let mut push = |name: mir_types::Name, // Name is Copy
+                    line: u32,
+                    col_start: u16,
+                    line_end: u32,
+                    col_end: u16,
+                    issues: &mut Vec<mir_issues::Issue>| {
+        if emitted_names.insert(name) {
             issues.push(mir_issues::Issue::new(
                 mir_issues::IssueKind::UnusedVariable {
                     name: name.to_string(),
@@ -568,6 +573,37 @@ pub(crate) fn emit_unused_variables(
                     col_end: col_end.max(col_start + 1),
                 },
             ));
+        }
+    };
+
+    // Dead writes: values overwritten without being read (detected at overwrite time).
+    // These are emitted at the location of the overwritten (dead) write.
+    for (name, line, col_start, line_end, col_end) in &ctx.dead_writes {
+        if skip(name) {
+            continue;
+        }
+        push(*name, *line, *col_start, *line_end, *col_end, issues);
+    }
+
+    // Remaining pending writes: variables with a write that was never consumed.
+    // This covers both "variable never read at all" and compound-op results not read.
+    for (name, (line, col_start, line_end, col_end)) in &ctx.last_write_locs {
+        if skip(name) {
+            continue;
+        }
+        push(*name, *line, *col_start, *line_end, *col_end, issues);
+    }
+
+    // Fallback for variables in assigned_vars that lack last_write_locs entries
+    // (e.g. created via set_var without record_var_location in older code paths).
+    for name in ctx.assigned_vars.iter() {
+        if skip(name) {
+            continue;
+        }
+        if !ctx.read_vars.contains(name) && !ctx.last_write_locs.contains_key(name) {
+            let (line, col_start, line_end, col_end) =
+                ctx.var_locations.get(name).copied().unwrap_or((1, 0, 1, 0));
+            push(*name, line, col_start, line_end, col_end, issues);
         }
     }
 }

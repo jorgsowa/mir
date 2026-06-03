@@ -13,6 +13,4 @@ switch (rand(0, 4)) {
         $a = 1;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@10:9-10:11: Variable $a is never read

@@ -13,6 +13,4 @@ foreach ([1, 2, 3] as $a) {
 
 if ($i) {}
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@2:1-2:3: Variable $i is never read

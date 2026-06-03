@@ -13,6 +13,4 @@ if (rand(0, 1)) {
     }
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@6:9-6:11: Variable $a is never read

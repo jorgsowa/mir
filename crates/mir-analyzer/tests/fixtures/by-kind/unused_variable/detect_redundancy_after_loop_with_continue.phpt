@@ -13,6 +13,4 @@ foreach ([1, 2, 3] as $_) {
     throw new Exception($gap);
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@2:1-2:5: Variable $gap is never read

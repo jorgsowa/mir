@@ -81,6 +81,16 @@ pub struct FlowState {
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
 
+    /// Tracks the most-recent unread write location per variable.
+    /// When a variable is written, its entry is updated. When the variable
+    /// is read as an r-value, its entry is removed (the write was consumed).
+    /// Entries remaining at end-of-scope are dead (last write never read).
+    pub last_write_locs: FxHashMap<Name, (u32, u16, u32, u16)>,
+
+    /// Dead writes collected during analysis: writes that were overwritten
+    /// without being read first. Accumulated via union across branches.
+    pub dead_writes: Vec<(Name, u32, u16, u32, u16)>,
+
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
     /// Arc-shared — set once at context construction, never mutated during analysis.
@@ -113,6 +123,8 @@ impl FlowState {
             byref_param_names: Arc::new(FxHashSet::default()),
             diverges: false,
             var_locations: FxHashMap::default(),
+            last_write_locs: FxHashMap::default(),
+            dead_writes: Vec::new(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
         };
@@ -345,7 +357,8 @@ impl FlowState {
         self.tainted_vars.contains(&sym)
     }
 
-    /// Record the location of the first assignment to a variable (first-write-wins).
+    /// Record the location of the first assignment to a variable (first-write-wins)
+    /// and update the dead-write tracking for this variable.
     pub fn record_var_location(
         &mut self,
         name: &str,
@@ -354,10 +367,46 @@ impl FlowState {
         line_end: u32,
         col_end: u16,
     ) {
-        let name = Name::from(name.trim_start_matches('$'));
+        let sym = Name::from(name.trim_start_matches('$'));
         self.var_locations
-            .entry(name)
+            .entry(sym)
             .or_insert((line, col_start, line_end, col_end));
+        self.record_write(name, line, col_start, line_end, col_end);
+    }
+
+    /// Record a write to a variable for dead-write tracking.
+    ///
+    /// If the variable had an unread write since the last read, that previous
+    /// write is collected as a dead write. The new write location becomes the
+    /// current pending write.
+    ///
+    /// Call this alongside `record_var_location` at every PHP-level assignment
+    /// (but NOT for type-narrowing `set_var` calls in the narrowing engine).
+    pub fn record_write(
+        &mut self,
+        name: &str,
+        line: u32,
+        col_start: u16,
+        line_end: u32,
+        col_end: u16,
+    ) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        if let Some(old_loc) = self.last_write_locs.get(&sym).copied() {
+            // Previous write was overwritten without being read → dead write.
+            self.dead_writes
+                .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
+        }
+        self.last_write_locs
+            .insert(sym, (line, col_start, line_end, col_end));
+    }
+
+    /// Mark a variable as consumed by an r-value read.
+    ///
+    /// This clears the pending write entry so the write is no longer considered
+    /// dead. Call this whenever a variable is used as an expression value.
+    pub fn mark_consumed(&mut self, name: &str) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        self.last_write_locs.remove(&sym);
     }
 
     /// Remove a variable from the context (after `unset`).
@@ -395,7 +444,10 @@ impl FlowState {
             // Variables read in the diverging branch still count as used.
             for name in if_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
+                result.last_write_locs.remove(name);
             }
+            // Dead writes from the diverging branch are still dead.
+            result.dead_writes.extend(if_ctx.dead_writes);
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -406,7 +458,9 @@ impl FlowState {
             // Variables read in the diverging branch still count as used.
             for name in else_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
+                result.last_write_locs.remove(name);
             }
+            result.dead_writes.extend(else_ctx.dead_writes);
             return result;
         }
         // If both diverge, the code after the if is unreachable.
@@ -417,6 +471,8 @@ impl FlowState {
             for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
                 result.read_vars.insert(*name);
             }
+            result.dead_writes.extend(if_ctx.dead_writes);
+            result.dead_writes.extend(else_ctx.dead_writes);
             return result;
         }
 
@@ -544,6 +600,31 @@ impl FlowState {
             .chain(else_ctx.var_locations.iter())
         {
             result.var_locations.entry(*name).or_insert(*loc);
+        }
+
+        // Dead writes: accumulate from both branches (union).
+        result.dead_writes.extend(if_ctx.dead_writes);
+        result.dead_writes.extend(else_ctx.dead_writes);
+
+        // Last write locs: union from both branches, plus pre_ctx variables that
+        // are still pending in BOTH branches (meaning neither branch nor the
+        // condition consumed them). Variables present in pre_ctx but absent from
+        // both branches were consumed on all paths (e.g. read in condition) and
+        // must not be re-added.
+        result.last_write_locs = FxHashMap::default();
+        for (name, loc) in if_ctx.last_write_locs.iter() {
+            result.last_write_locs.entry(*name).or_insert(*loc);
+        }
+        for (name, loc) in else_ctx.last_write_locs.iter() {
+            result.last_write_locs.entry(*name).or_insert(*loc);
+        }
+        // Re-add pre_ctx variables that survived into BOTH branches unchanged.
+        for (name, loc) in pre.last_write_locs.iter() {
+            if if_ctx.last_write_locs.contains_key(name)
+                && else_ctx.last_write_locs.contains_key(name)
+            {
+                result.last_write_locs.entry(*name).or_insert(*loc);
+            }
         }
 
         // After merging branches, the merged context does not diverge

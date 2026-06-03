@@ -5,6 +5,4 @@ Unused var with increment
 $a = 5;
 $a++;
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@3:1-3:3: Variable $a is never read

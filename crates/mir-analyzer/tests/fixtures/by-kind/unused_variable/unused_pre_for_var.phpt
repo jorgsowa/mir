@@ -8,6 +8,4 @@ for ($i = 0; $i < 10; $i++) {
     echo $i;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@2:1-2:3: Variable $i is never read

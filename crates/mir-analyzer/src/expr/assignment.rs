@@ -92,13 +92,17 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Variable(name) => {
                 let name_str = name.trim_start_matches('$').to_string();
                 let name_sym = mir_types::Name::from(name_str.as_str());
-                if ctx.byref_param_names.contains(&name_sym) {
-                    ctx.read_vars.insert(name_sym);
-                }
                 ctx.set_var(&name_str, ty);
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(target.span.end);
-                ctx.record_var_location(&name_str, line, col_start, line_end, col_end);
+                if ctx.byref_param_names.contains(&name_sym) {
+                    // Byref/global write: mark as read (externally observable) and clear
+                    // any pending dead-write entry rather than creating a new one.
+                    ctx.read_vars.insert(name_sym);
+                    ctx.mark_consumed(&name_str);
+                } else {
+                    ctx.record_var_location(&name_str, line, col_start, line_end, col_end);
+                }
             }
             ExprKind::Array(elements) => {
                 let has_non_array = ty.contains(|a| matches!(a, Atomic::TFalse | Atomic::TNull));
@@ -290,6 +294,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(var_name) = extract_simple_var(inner) {
                     ctx.read_vars
                         .insert(mir_types::Name::from(var_name.as_str()));
+                    ctx.mark_consumed(&var_name);
                     let var_ty = ctx.get_var(&var_name);
                     for atomic in &var_ty.types {
                         if let Atomic::TLiteralString(accessed_var_name) = atomic {

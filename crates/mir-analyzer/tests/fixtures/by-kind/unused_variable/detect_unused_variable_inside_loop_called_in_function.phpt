@@ -12,6 +12,4 @@ function bar() : void {
     }
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@8:9-8:11: Variable $i is never read

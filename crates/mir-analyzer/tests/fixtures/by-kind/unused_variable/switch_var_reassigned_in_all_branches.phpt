@@ -17,6 +17,4 @@ if ($a) {
     echo "cool";
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+UnusedVariable@2:1-2:3: Variable $a is never read
