@@ -601,6 +601,7 @@ pub fn run_fixture(path: &str) {
             "UnusedParam",
             "UnusedVariable",
             "UnusedForeachValue",
+            "InvalidCast",
             "MissingThrowsDocblock",
         ];
         if fixture.config.suppressed_issue_kinds.is_none() {

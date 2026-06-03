@@ -121,6 +121,40 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
+                // Check for InvalidCast from a concrete class without __toString.
+                // Interfaces/abstract classes are skipped since an implementing subclass
+                // may provide __toString; only flag concrete (instantiatable) classes.
+                else {
+                    for atom in inner_ty.types.iter() {
+                        if let Atomic::TNamedObject { fqcn, .. } = atom {
+                            let fqcn_str = fqcn.as_str();
+                            let here = crate::db::Fqcn::from_str(self.db, fqcn_str);
+                            let is_concrete = crate::db::find_class_like(self.db, here)
+                                .map(|c| matches!(c, crate::db::ClassLike::Class(_)))
+                                .unwrap_or(false);
+                            if !is_concrete {
+                                continue;
+                            }
+                            let has_to_string = crate::db::find_method_in_chain(
+                                self.db,
+                                crate::db::Fqcn::from_str(self.db, fqcn_str),
+                                "__tostring",
+                            )
+                            .is_some();
+                            if !has_to_string {
+                                self.emit(
+                                    IssueKind::InvalidCast {
+                                        from: inner_ty.to_string(),
+                                        to: "string".to_string(),
+                                    },
+                                    Severity::Warning,
+                                    inner.span,
+                                );
+                                break;
+                            }
+                        }
+                    }
+                }
                 Type::single(Atomic::TString)
             }
             CastKind::Bool => {
