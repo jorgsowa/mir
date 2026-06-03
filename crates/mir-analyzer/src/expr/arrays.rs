@@ -141,6 +141,34 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
+        // InvalidArrayAccess: definitely non-subscriptable type (not array, not string, not object)
+        if !arr_ty.is_mixed()
+            && !arr_ty.types.is_empty()
+            && arr_ty.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TInt
+                        | Atomic::TLiteralInt(_)
+                        | Atomic::TIntRange { .. }
+                        | Atomic::TPositiveInt
+                        | Atomic::TFloat
+                        | Atomic::TLiteralFloat(_, _)
+                        | Atomic::TBool
+                        | Atomic::TTrue
+                        | Atomic::TFalse
+                )
+            })
+        {
+            self.emit(
+                IssueKind::InvalidArrayAccess {
+                    ty: arr_ty.to_string(),
+                },
+                Severity::Error,
+                expr.span,
+            );
+            return Type::mixed();
+        }
+
         if arr_ty.contains(|t| matches!(t, Atomic::TNull)) && arr_ty.is_single() {
             self.emit(IssueKind::NullArrayAccess, Severity::Error, expr.span);
             return Type::mixed();
