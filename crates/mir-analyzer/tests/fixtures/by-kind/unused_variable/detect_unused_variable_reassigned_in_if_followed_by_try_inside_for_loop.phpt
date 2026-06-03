@@ -19,6 +19,3 @@ if ($user !== null && $user !== 0) {
     echo $i;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO

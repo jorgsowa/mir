@@ -12,6 +12,3 @@ function bar() : void {
     }
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO

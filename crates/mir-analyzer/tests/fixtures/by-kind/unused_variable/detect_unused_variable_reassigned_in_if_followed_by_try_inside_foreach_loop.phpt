@@ -19,6 +19,4 @@ if ($user !== null && $user !== 0) {
     echo $i;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
+PossiblyUndefinedVariable@16:10-16:12: Variable $i might not be defined

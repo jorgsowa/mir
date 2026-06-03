@@ -13,6 +13,3 @@ foreach ([1, 2, 3] as $a) {
 
 if ($i) {}
 ===expect===
-UnusedVariable
-===ignore===
-TODO

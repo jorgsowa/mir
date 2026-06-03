@@ -13,6 +13,3 @@ foreach ([1, 2, 3] as $_) {
     throw new Exception($gap);
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO

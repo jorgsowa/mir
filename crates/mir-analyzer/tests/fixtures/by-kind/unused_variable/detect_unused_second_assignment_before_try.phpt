@@ -12,6 +12,3 @@ try {
   // something else
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO

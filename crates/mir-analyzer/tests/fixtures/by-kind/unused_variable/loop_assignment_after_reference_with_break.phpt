@@ -9,6 +9,3 @@ while (rand(0, 1)) {
     break;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO

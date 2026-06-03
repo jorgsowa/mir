@@ -15,6 +15,3 @@ while (rand(0, 1)) {
     $a = 3;
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO

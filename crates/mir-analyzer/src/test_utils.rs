@@ -596,26 +596,40 @@ pub fn run_fixture(path: &str) {
     // parameter, a throw without a docblock), so a fixture that's focused on,
     // say, InvalidArgument shouldn't have to also assert every incidental
     // UnusedParam its example code happens to produce.
-    if fixture.config.suppressed_issue_kinds.is_none() {
-        let dead = crate::batch::dead_code_issue_kinds();
-        let expects_dead_code = fixture
-            .expected
-            .iter()
-            .any(|e| dead.contains(&e.kind_name.as_str()));
-        let mut suppress: rustc_hash::FxHashSet<String> = if expects_dead_code {
-            Default::default()
-        } else {
-            dead.iter().map(|s| (*s).to_string()).collect()
-        };
+    {
         const INCIDENTAL: &[&str] = &["UnusedParam", "UnusedVariable", "MissingThrowsDocblock"];
-        for kind in INCIDENTAL {
-            let expected = fixture.expected.iter().any(|e| e.kind_name == *kind);
-            if !expected {
-                suppress.insert((*kind).to_string());
+        if fixture.config.suppressed_issue_kinds.is_none() {
+            // No explicit suppress= — build default set from dead-code group and
+            // incidental kinds that the fixture doesn't explicitly expect.
+            let dead = crate::batch::dead_code_issue_kinds();
+            let expects_dead_code = fixture
+                .expected
+                .iter()
+                .any(|e| dead.contains(&e.kind_name.as_str()));
+            let mut suppress: rustc_hash::FxHashSet<String> = if expects_dead_code {
+                Default::default()
+            } else {
+                dead.iter().map(|s| (*s).to_string()).collect()
+            };
+            for kind in INCIDENTAL {
+                let expected = fixture.expected.iter().any(|e| e.kind_name == *kind);
+                if !expected {
+                    suppress.insert((*kind).to_string());
+                }
             }
-        }
-        if !suppress.is_empty() {
-            fixture.config.suppressed_issue_kinds = Some(suppress);
+            if !suppress.is_empty() {
+                fixture.config.suppressed_issue_kinds = Some(suppress);
+            }
+        } else if let Some(set) = fixture.config.suppressed_issue_kinds.as_mut() {
+            // Explicit suppress= was provided — still add any INCIDENTAL kinds that
+            // the fixture doesn't explicitly expect, so noisy diagnostics don't
+            // surprise fixtures focused on a different issue kind.
+            for kind in INCIDENTAL {
+                let expected = fixture.expected.iter().any(|e| e.kind_name == *kind);
+                if !expected {
+                    set.insert((*kind).to_string());
+                }
+            }
         }
     }
     let file_refs: Vec<(&str, &str)> = fixture

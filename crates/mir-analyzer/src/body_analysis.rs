@@ -342,6 +342,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
             drop(sa);
+            crate::diagnostics::emit_unused_variables(&ctx, &file, &mut all_issues);
             all_issues.extend(buf.into_issues());
         }
 
@@ -403,6 +404,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
             drop(sa);
+            crate::diagnostics::emit_unused_variables(&ctx, &file, &mut all_issues);
             all_issues.extend(buf.into_issues());
         }
 

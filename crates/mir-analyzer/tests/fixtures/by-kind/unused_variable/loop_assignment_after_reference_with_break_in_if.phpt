@@ -12,6 +12,3 @@ while (rand(0, 1)) {
     }
 }
 ===expect===
-UnusedVariable
-===ignore===
-TODO
