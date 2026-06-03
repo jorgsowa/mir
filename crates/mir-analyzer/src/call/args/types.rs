@@ -167,6 +167,22 @@ pub(crate) fn check_one(
             arg_span,
         );
     }
+
+    // When a Stringable object is implicitly coerced to string, emit ImplicitToStringCast.
+    if stringable_coercion_ok(arg_ty, param_ty, ea) {
+        if let Some(fqcn) = arg_ty.types.iter().find_map(|a| match a {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn } => Some(fqcn.to_string()),
+            _ => None,
+        }) {
+            ea.emit(
+                IssueKind::ImplicitToStringCast { class: fqcn },
+                Severity::Warning,
+                arg_span,
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

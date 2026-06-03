@@ -8,4 +8,4 @@ $s = <<<EOT
 Value: {$f}
 EOT;
 ===expect===
-ImplicitToStringCast@5:9-5:11: Class Foo does not implement __toString()
+ImplicitToStringCast@5:9-5:11: Class Foo is implicitly cast to string

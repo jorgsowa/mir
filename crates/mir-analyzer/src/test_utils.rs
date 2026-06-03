@@ -602,6 +602,7 @@ pub fn run_fixture(path: &str) {
             "UnusedVariable",
             "UnusedForeachValue",
             "InvalidCast",
+            "ImplicitToStringCast",
             "MissingThrowsDocblock",
         ];
         if fixture.config.suppressed_issue_kinds.is_none() {

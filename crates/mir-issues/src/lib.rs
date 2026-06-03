@@ -1119,7 +1119,7 @@ impl IssueKind {
                 format!("Exception {class} is thrown but not declared in @throws")
             }
             IssueKind::ImplicitToStringCast { class } => {
-                format!("Class {class} does not implement __toString()")
+                format!("Class {class} is implicitly cast to string")
             }
             IssueKind::ImplicitFloatToIntCast { from } => {
                 format!("Implicit cast from {from} to int truncates the fractional part")

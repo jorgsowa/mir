@@ -9,13 +9,11 @@ class A {
     }
 }
 
-/** 
+/**
  * @param string|int $b
- * @mutation-free 
+ * @mutation-free
  */
 function fooFoo($b): void {}
 fooFoo(new A());
 ===expect===
-ImplicitToStringCast
-===ignore===
-TODO
+ImplicitToStringCast@14:8-14:15: Class A is implicitly cast to string
