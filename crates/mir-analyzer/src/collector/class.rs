@@ -171,7 +171,9 @@ impl<'a> DefinitionCollector<'a> {
                         inferred_ty: None,
                         visibility: Self::convert_visibility(p.visibility),
                         is_static: p.is_static,
-                        is_readonly: p.is_readonly || decl.modifiers.is_readonly,
+                        is_readonly: p.is_readonly
+                            || decl.modifiers.is_readonly
+                            || prop_doc.is_readonly,
                         default: p.default.as_ref().map(|_| mir_types::Type::mixed()),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
