@@ -5,6 +5,4 @@ Interface instantiation
 interface myInterface{}
 new myInterface();
 ===expect===
-InterfaceInstantiation
-===ignore===
-TODO
+InterfaceInstantiation@3:5-3:16: Cannot instantiate interface myInterface

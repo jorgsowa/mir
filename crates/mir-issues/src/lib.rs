@@ -278,6 +278,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/`.
     AbstractInstantiation { class: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/interface_instantiation.phpt`.
+    InterfaceInstantiation { class: String },
     /// Emitted by `mir-analyzer/src/class.rs` when `#[Override]` is declared
     /// but no overridable parent method exists.
     /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
@@ -461,6 +464,7 @@ impl IssueKind {
             | IssueKind::FinalClassExtended { .. }
             | IssueKind::FinalMethodOverridden { .. }
             | IssueKind::AbstractInstantiation { .. }
+            | IssueKind::InterfaceInstantiation { .. }
             | IssueKind::InvalidOverride { .. }
             | IssueKind::InvalidTemplateParam { .. }
             | IssueKind::ReadonlyPropertyAssignment { .. }
@@ -646,6 +650,7 @@ impl IssueKind {
             IssueKind::FinalClassExtended { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
+            IssueKind::InterfaceInstantiation { .. } => "MIR0709",
             IssueKind::CircularInheritance { .. } => "MIR0707",
             IssueKind::InvalidOverride { .. } => "MIR0708",
 
@@ -760,6 +765,7 @@ impl IssueKind {
             IssueKind::FinalClassExtended { .. } => "FinalClassExtended",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
+            IssueKind::InterfaceInstantiation { .. } => "InterfaceInstantiation",
             IssueKind::InvalidOverride { .. } => "InvalidOverride",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
             IssueKind::InvalidTemplateParam { .. } => "InvalidTemplateParam",
@@ -1036,6 +1042,9 @@ impl IssueKind {
             }
             IssueKind::AbstractInstantiation { class } => {
                 format!("Cannot instantiate abstract class {class}")
+            }
+            IssueKind::InterfaceInstantiation { class } => {
+                format!("Cannot instantiate interface {class}")
             }
             IssueKind::InvalidOverride {
                 class,
@@ -1470,6 +1479,7 @@ mod code_tests {
                 parent: s(),
             },
             IssueKind::AbstractInstantiation { class: s() },
+            IssueKind::InterfaceInstantiation { class: s() },
             IssueKind::InvalidOverride {
                 class: s(),
                 method: s(),

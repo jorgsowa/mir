@@ -197,6 +197,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 n.class.span,
                             );
                         }
+                        if class.is_interface() {
+                            self.emit(
+                                IssueKind::InterfaceInstantiation {
+                                    class: fqcn.to_string(),
+                                },
+                                Severity::Error,
+                                n.class.span,
+                            );
+                        }
                         if let Some(msg) = class.deprecated() {
                             self.emit(
                                 IssueKind::DeprecatedClass {
