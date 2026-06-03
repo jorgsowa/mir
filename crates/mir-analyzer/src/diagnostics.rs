@@ -549,8 +549,8 @@ pub(crate) fn emit_unused_variables(
             || name.starts_with('_')
     };
 
-    // Emit at most one UnusedVariable per variable name to avoid noise from
-    // multiple dead-write occurrences in complex control flow.
+    // Emit at most one UnusedVariable/UnusedForeachValue per variable name to avoid
+    // noise from multiple dead-write occurrences in complex control flow.
     let mut emitted_names: rustc_hash::FxHashSet<mir_types::Name> =
         rustc_hash::FxHashSet::default();
 
@@ -561,10 +561,17 @@ pub(crate) fn emit_unused_variables(
                     col_end: u16,
                     issues: &mut Vec<mir_issues::Issue>| {
         if emitted_names.insert(name) {
-            issues.push(mir_issues::Issue::new(
+            let kind = if ctx.foreach_value_var_names.contains(&name) {
+                mir_issues::IssueKind::UnusedForeachValue {
+                    name: name.to_string(),
+                }
+            } else {
                 mir_issues::IssueKind::UnusedVariable {
                     name: name.to_string(),
-                },
+                }
+            };
+            issues.push(mir_issues::Issue::new(
+                kind,
                 mir_issues::Location {
                     file: file.clone(),
                     line,

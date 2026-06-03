@@ -232,6 +232,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/dead_code.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unused_function/`.
     UnusedFunction { name: String },
+    /// Emitted by `mir-analyzer/src/diagnostics.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_foreach_value/`.
+    UnusedForeachValue { name: String },
 
     // --- Readonly -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
@@ -455,6 +458,7 @@ impl IssueKind {
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. }
+            | IssueKind::UnusedForeachValue { .. }
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::InvalidStringClass { .. } => Severity::Warning,
 
@@ -590,6 +594,7 @@ impl IssueKind {
             IssueKind::UnusedMethod { .. } => "MIR0503",
             IssueKind::UnusedProperty { .. } => "MIR0504",
             IssueKind::UnusedFunction { .. } => "MIR0505",
+            IssueKind::UnusedForeachValue { .. } => "MIR0506",
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
@@ -702,6 +707,7 @@ impl IssueKind {
             IssueKind::UnusedMethod { .. } => "UnusedMethod",
             IssueKind::UnusedProperty { .. } => "UnusedProperty",
             IssueKind::UnusedFunction { .. } => "UnusedFunction",
+            IssueKind::UnusedForeachValue { .. } => "UnusedForeachValue",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
@@ -921,6 +927,9 @@ impl IssueKind {
             }
             IssueKind::UnusedFunction { name } => {
                 format!("Function {name}() is never called")
+            }
+            IssueKind::UnusedForeachValue { name } => {
+                format!("Foreach value ${name} is never read")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
@@ -1344,6 +1353,7 @@ mod code_tests {
                 property: s(),
             },
             IssueKind::UnusedFunction { name: s() },
+            IssueKind::UnusedForeachValue { name: s() },
             IssueKind::ReadonlyPropertyAssignment {
                 class: s(),
                 property: s(),

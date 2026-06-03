@@ -12,6 +12,4 @@ function getLastNum(array $a): int {
     return 4;
 }
 ===expect===
-UnusedForeachValue
-===ignore===
-TODO
+UnusedVariable@7:9-7:14: Variable $last is never read

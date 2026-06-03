@@ -91,6 +91,10 @@ pub struct FlowState {
     /// without being read first. Accumulated via union across branches.
     pub dead_writes: Vec<(Name, u32, u16, u32, u16)>,
 
+    /// Variables that are foreach iteration values in this scope.
+    /// Used to emit UnusedForeachValue instead of UnusedVariable for these names.
+    pub foreach_value_var_names: FxHashSet<Name>,
+
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
     /// Arc-shared — set once at context construction, never mutated during analysis.
@@ -125,6 +129,7 @@ impl FlowState {
             var_locations: FxHashMap::default(),
             last_write_locs: FxHashMap::default(),
             dead_writes: Vec::new(),
+            foreach_value_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
         };
@@ -448,6 +453,9 @@ impl FlowState {
             }
             // Dead writes from the diverging branch are still dead.
             result.dead_writes.extend(if_ctx.dead_writes);
+            for name in if_ctx.foreach_value_var_names.iter() {
+                result.foreach_value_var_names.insert(*name);
+            }
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -461,6 +469,9 @@ impl FlowState {
                 result.last_write_locs.remove(name);
             }
             result.dead_writes.extend(else_ctx.dead_writes);
+            for name in else_ctx.foreach_value_var_names.iter() {
+                result.foreach_value_var_names.insert(*name);
+            }
             return result;
         }
         // If both diverge, the code after the if is unreachable.
@@ -473,6 +484,13 @@ impl FlowState {
             }
             result.dead_writes.extend(if_ctx.dead_writes);
             result.dead_writes.extend(else_ctx.dead_writes);
+            for name in if_ctx
+                .foreach_value_var_names
+                .iter()
+                .chain(else_ctx.foreach_value_var_names.iter())
+            {
+                result.foreach_value_var_names.insert(*name);
+            }
             return result;
         }
 
@@ -591,6 +609,15 @@ impl FlowState {
         // Read vars: union — if either branch reads a var, it counts as read
         for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
             result.read_vars.insert(*name);
+        }
+
+        // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
+        for name in if_ctx
+            .foreach_value_var_names
+            .iter()
+            .chain(else_ctx.foreach_value_var_names.iter())
+        {
+            result.foreach_value_var_names.insert(*name);
         }
 
         // Var locations: keep the earliest known span for each variable

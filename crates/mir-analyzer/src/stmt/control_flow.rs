@@ -5,7 +5,7 @@ use php_ast::owned::{
 };
 
 use mir_issues::{Issue, IssueKind, Location};
-use mir_types::{Atomic, Type};
+use mir_types::{Atomic, Name, Type};
 
 use crate::db;
 use crate::expr::{extract_destructure_vars, extract_simple_var};
@@ -251,6 +251,15 @@ impl<'a> StatementsAnalyzer<'a> {
         let value_destructure_vars = extract_destructure_vars(&fe.value);
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
+            // Track this as a foreach value variable so emit_unused_variables can
+            // emit UnusedForeachValue instead of UnusedVariable for dead writes.
+            entry
+                .foreach_value_var_names
+                .insert(Name::from(vname.as_str()));
+            // Record the header assignment so it appears in last_write_locs and
+            // triggers UnusedForeachValue when the value is never read in the body.
+            let (line, line_end, col_start, col_end) = self.span_to_location(fe.value.span);
+            entry.record_write(vname.as_str(), line, col_start, line_end, col_end);
             // Emit ResolvedSymbol for value variable at binding position
             self.record_symbol_for_var(fe.value.span, vname, value_ty.clone());
         } else {

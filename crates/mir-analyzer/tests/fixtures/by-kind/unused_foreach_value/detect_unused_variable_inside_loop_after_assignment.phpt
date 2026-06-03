@@ -8,6 +8,4 @@ function foo() : void {
     }
 }
 ===expect===
-UnusedForeachValue
-===ignore===
-TODO
+UnusedForeachValue@4:9-4:11: Foreach value $i is never read

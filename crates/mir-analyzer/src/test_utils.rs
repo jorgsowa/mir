@@ -597,7 +597,12 @@ pub fn run_fixture(path: &str) {
     // say, InvalidArgument shouldn't have to also assert every incidental
     // UnusedParam its example code happens to produce.
     {
-        const INCIDENTAL: &[&str] = &["UnusedParam", "UnusedVariable", "MissingThrowsDocblock"];
+        const INCIDENTAL: &[&str] = &[
+            "UnusedParam",
+            "UnusedVariable",
+            "UnusedForeachValue",
+            "MissingThrowsDocblock",
+        ];
         if fixture.config.suppressed_issue_kinds.is_none() {
             // No explicit suppress= — build default set from dead-code group and
             // incidental kinds that the fixture doesn't explicitly expect.
