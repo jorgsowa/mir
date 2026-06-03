@@ -36,8 +36,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut trait_uses: Vec<Arc<str>> = vec![];
         let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
 
-        let class_doc =
-            self.parse_docblock_from_node_or_preceding(decl.doc_comment.as_ref(), stmt_span.start);
+        let class_doc = self.parse_docblock_from_node(decl.doc_comment.as_ref());
 
         let class_doc_span = decl
             .doc_comment
@@ -90,10 +89,7 @@ impl<'a> DefinitionCollector<'a> {
                         // `@param` docblock — so `@param T $value` (with `@template T`
                         // on the class) types the promoted `$value` property as the
                         // template param `T`, enabling generic member inference.
-                        let ctor_doc = self.parse_docblock_from_node_or_preceding(
-                            m.doc_comment.as_ref(),
-                            member.span.start,
-                        );
+                        let ctor_doc = self.parse_docblock_from_node(m.doc_comment.as_ref());
                         let ctor_template_names: std::collections::HashSet<String> = ctor_doc
                             .templates
                             .iter()
@@ -149,10 +145,7 @@ impl<'a> DefinitionCollector<'a> {
                     }
                 }
                 ClassMemberKind::Property(p) => {
-                    let prop_doc = self.parse_docblock_from_node_or_preceding(
-                        p.doc_comment.as_ref(),
-                        member.span.start,
-                    );
+                    let prop_doc = self.parse_docblock_from_node(p.doc_comment.as_ref());
                     let prop_doc_span = p
                         .doc_comment
                         .as_ref()
@@ -184,10 +177,7 @@ impl<'a> DefinitionCollector<'a> {
                     own_properties.insert(Arc::from(prop_name), prop);
                 }
                 ClassMemberKind::ClassConst(c) => {
-                    let const_doc = self.parse_docblock_from_node_or_preceding(
-                        c.doc_comment.as_ref(),
-                        member.span.start,
-                    );
+                    let const_doc = self.parse_docblock_from_node(c.doc_comment.as_ref());
                     let const_doc_span = c
                         .doc_comment
                         .as_ref()

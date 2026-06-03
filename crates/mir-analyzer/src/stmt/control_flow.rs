@@ -205,14 +205,14 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_foreach_stmt(
         &mut self,
         fe: &ForeachStmt,
-        stmt_span: php_ast::Span,
+        stmt: &php_ast::owned::Stmt,
         ctx: &mut FlowState,
     ) {
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types(&arr_ty);
 
         if let Some(vname) = extract_simple_var(&fe.value) {
-            let doc = crate::parser::find_preceding_docblock(self.source, stmt_span.start);
+            let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
             if let Some(ann) = self.extract_var_annotation_from(doc.as_deref()) {
                 if ann.name.as_deref() == Some(vname.as_str()) {
                     value_ty = ann.ty;

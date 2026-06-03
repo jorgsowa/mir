@@ -85,10 +85,7 @@ impl<'a> DefinitionCollector<'a> {
                     }
                 }
                 ClassMemberKind::ClassConst(c) => {
-                    let const_doc = self.parse_docblock_from_node_or_preceding(
-                        c.doc_comment.as_ref(),
-                        member.span.start,
-                    );
+                    let const_doc = self.parse_docblock_from_node(c.doc_comment.as_ref());
                     let const_doc_span = c
                         .doc_comment
                         .as_ref()

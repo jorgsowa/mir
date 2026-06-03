@@ -79,9 +79,10 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_return_stmt(
         &mut self,
         opt_expr: &Option<Box<Expr>>,
-        stmt_span: php_ast::Span,
+        stmt: &php_ast::owned::Stmt,
         ctx: &mut crate::flow_state::FlowState,
     ) {
+        let stmt_span = stmt.span;
         if let Some(expr) = opt_expr {
             let ret_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
 

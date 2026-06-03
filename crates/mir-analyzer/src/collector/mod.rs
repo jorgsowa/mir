@@ -221,18 +221,12 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    /// Parse a docblock from a node's doc_comment, falling back to preceding docblock if not found.
-    fn parse_docblock_from_node_or_preceding(
+    fn parse_docblock_from_node(
         &self,
         doc_comment: Option<&php_ast::owned::Comment>,
-        span_start: u32,
     ) -> crate::parser::ParsedDocblock {
         doc_comment
             .map(|c| crate::parser::DocblockParser::parse(&c.text))
-            .or_else(|| {
-                crate::parser::find_preceding_docblock(self.source, span_start)
-                    .map(|t| crate::parser::DocblockParser::parse(&t))
-            })
             .unwrap_or_default()
     }
 
@@ -702,11 +696,10 @@ impl<'a> DefinitionCollector<'a> {
         let php_ast::owned::StmtKind::Global(vars) = &stmt.kind else {
             return;
         };
-        let Some(doc_text) = crate::parser::find_preceding_docblock(self.source, stmt.span.start)
-        else {
+        let Some(doc_comment) = stmt.leading_doc_comment() else {
             return;
         };
-        let parsed = crate::parser::DocblockParser::parse(&doc_text);
+        let parsed = crate::parser::DocblockParser::parse(&doc_comment.text);
         self.emit_docblock_issues(&parsed, stmt.span.start);
         let Some(var_type) = parsed.var_type else {
             return;
@@ -812,10 +805,6 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                         .doc_comment
                         .as_ref()
                         .map(|c| crate::parser::DocblockParser::parse(&c.text))
-                        .or_else(|| {
-                            crate::parser::find_preceding_docblock(self.source, item.span.start)
-                                .map(|t| crate::parser::DocblockParser::parse(&t))
-                        })
                         .unwrap_or_default();
                     let const_doc_span = item
                         .doc_comment
@@ -845,13 +834,10 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                             if let Some(name_arg) = call.args.first() {
                                 if let php_ast::owned::ExprKind::String(name) = &name_arg.value.kind
                                 {
-                                    // Check for @since/@removed on the docblock preceding this define().
-                                    let define_doc = crate::parser::find_preceding_docblock(
-                                        self.source,
-                                        stmt.span.start,
-                                    )
-                                    .map(|t| crate::parser::DocblockParser::parse(&t))
-                                    .unwrap_or_default();
+                                    let define_doc = stmt
+                                        .leading_doc_comment()
+                                        .map(|c| crate::parser::DocblockParser::parse(&c.text))
+                                        .unwrap_or_default();
                                     self.emit_docblock_issues(&define_doc, stmt.span.start);
                                     if self.version_allows(&define_doc) {
                                         let fqn: Arc<str> = Arc::from(&**name);

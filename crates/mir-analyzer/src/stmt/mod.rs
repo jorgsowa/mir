@@ -196,7 +196,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
             // ---- Return -------------------------------------------------------
             StmtKind::Return(opt_expr) => {
-                self.analyze_return_stmt(opt_expr, stmt.span, ctx);
+                self.analyze_return_stmt(opt_expr, stmt, ctx);
             }
 
             // ---- Throw --------------------------------------------------------
@@ -226,7 +226,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
             // ---- Foreach ------------------------------------------------------
             StmtKind::Foreach(fe) => {
-                self.analyze_foreach_stmt(fe, stmt.span, ctx);
+                self.analyze_foreach_stmt(fe, stmt, ctx);
             }
 
             // ---- Switch -------------------------------------------------------

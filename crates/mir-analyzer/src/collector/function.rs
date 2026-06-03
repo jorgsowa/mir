@@ -153,8 +153,7 @@ impl DefinitionCollector<'_> {
             short_name.clone()
         };
 
-        let doc =
-            self.parse_docblock_from_node_or_preceding(decl.doc_comment.as_ref(), stmt_span.start);
+        let doc = self.parse_docblock_from_node(decl.doc_comment.as_ref());
         let doc_span = decl
             .doc_comment
             .as_ref()
