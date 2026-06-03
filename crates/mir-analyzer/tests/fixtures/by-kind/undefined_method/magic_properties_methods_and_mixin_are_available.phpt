@@ -1,5 +1,7 @@
 ===description===
 magic properties methods and mixin are available
+===config===
+suppress=UndefinedProperty,MixedMethodCall,UnusedFunction
 ===file===
 <?php
 class User {
@@ -29,5 +31,3 @@ function test(DynamicModel $model): void {
     strlen($model->title);
 }
 ===expect===
-===ignore===
-TODO
