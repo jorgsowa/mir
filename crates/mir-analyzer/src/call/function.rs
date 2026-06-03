@@ -250,6 +250,7 @@ impl CallAnalyzer {
             for arg in call.args.iter() {
                 if let ExprKind::String(name) = &arg.value.kind {
                     ctx.read_vars.insert(mir_types::Name::from(name.as_ref()));
+                    ctx.mark_consumed(name.as_ref());
                 }
             }
         }
