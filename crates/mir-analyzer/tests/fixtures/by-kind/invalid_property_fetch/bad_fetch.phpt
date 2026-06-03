@@ -5,6 +5,4 @@ Bad fetch
 $a = "hello";
 echo $a->foo;
 ===expect===
-InvalidPropertyFetch
-===ignore===
-TODO
+InvalidPropertyFetch@3:6-3:13: Cannot fetch property on non-object type '"hello"'

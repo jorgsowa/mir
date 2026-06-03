@@ -323,6 +323,43 @@ impl<'a> ExpressionAnalyzer<'a> {
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
 
+        // InvalidPropertyFetch: all types are scalar/non-object
+        if !obj_ty.is_mixed()
+            && !obj_ty.types.is_empty()
+            && obj_ty.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TInt
+                        | Atomic::TLiteralInt(_)
+                        | Atomic::TIntRange { .. }
+                        | Atomic::TPositiveInt
+                        | Atomic::TFloat
+                        | Atomic::TLiteralFloat(_, _)
+                        | Atomic::TString
+                        | Atomic::TNonEmptyString
+                        | Atomic::TNumericString
+                        | Atomic::TLiteralString(_)
+                        | Atomic::TBool
+                        | Atomic::TTrue
+                        | Atomic::TFalse
+                        | Atomic::TArray { .. }
+                        | Atomic::TNonEmptyArray { .. }
+                        | Atomic::TList { .. }
+                        | Atomic::TNonEmptyList { .. }
+                        | Atomic::TKeyedArray { .. }
+                )
+            })
+        {
+            self.emit(
+                IssueKind::InvalidPropertyFetch {
+                    ty: obj_ty.to_string(),
+                },
+                Severity::Error,
+                expr_span,
+            );
+            return Type::mixed();
+        }
+
         if obj_ty.contains(|t| matches!(t, Atomic::TNull)) && obj_ty.is_single() {
             self.emit(
                 IssueKind::NullPropertyFetch {

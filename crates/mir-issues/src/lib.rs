@@ -148,6 +148,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/args.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_pass_by_reference/`.
     InvalidPassByReference { fn_name: String, param: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_property_fetch/bad_fetch.phpt`.
+    InvalidPropertyFetch { ty: String },
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_property_assignment/`.
     InvalidPropertyAssignment {
@@ -494,6 +497,7 @@ impl IssueKind {
             | IssueKind::NullMethodCall { .. }
             | IssueKind::NullArrayAccess
             | IssueKind::NullableReturnStatement { .. }
+            | IssueKind::InvalidPropertyFetch { .. }
             | IssueKind::InvalidPropertyAssignment { .. }
             | IssueKind::InvalidArrayOffset { .. }
             | IssueKind::NonExistentArrayOffset { .. }
@@ -617,6 +621,7 @@ impl IssueKind {
             IssueKind::TooManyArguments { .. } => "MIR0203",
             IssueKind::InvalidNamedArgument { .. } => "MIR0204",
             IssueKind::InvalidPassByReference { .. } => "MIR0205",
+            IssueKind::InvalidPropertyFetch { .. } => "MIR0218",
             IssueKind::InvalidPropertyAssignment { .. } => "MIR0206",
             IssueKind::InvalidCast { .. } => "MIR0207",
             IssueKind::InvalidStaticInvocation { .. } => "MIR0215",
@@ -746,6 +751,7 @@ impl IssueKind {
             IssueKind::TooManyArguments { .. } => "TooManyArguments",
             IssueKind::InvalidNamedArgument { .. } => "InvalidNamedArgument",
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
+            IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
             IssueKind::InvalidPropertyAssignment { .. } => "InvalidPropertyAssignment",
             IssueKind::InvalidCast { .. } => "InvalidCast",
             IssueKind::InvalidStaticInvocation { .. } => "InvalidStaticInvocation",
@@ -924,6 +930,9 @@ impl IssueKind {
                     "Argument ${} of {}() must be passed by reference",
                     param, fn_name
                 )
+            }
+            IssueKind::InvalidPropertyFetch { ty } => {
+                format!("Cannot fetch property on non-object type '{ty}'")
             }
             IssueKind::InvalidPropertyAssignment {
                 property,
@@ -1406,6 +1415,7 @@ mod code_tests {
                 fn_name: s(),
                 param: s(),
             },
+            IssueKind::InvalidPropertyFetch { ty: s() },
             IssueKind::InvalidPropertyAssignment {
                 property: s(),
                 expected: s(),
