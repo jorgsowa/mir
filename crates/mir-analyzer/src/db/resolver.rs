@@ -90,21 +90,30 @@ pub fn source_file_for_fqcn<'db>(
     // across all registered SourceFiles.
     let name = fqcn.name(db);
     let lower = name.ascii_lowercase();
-    let index = crate::db::workspace_index(db);
-    if let Some(loc) = index.class_like.get(&lower) {
-        return Some(match loc {
-            crate::db::SymbolLoc::Class { file, .. }
-            | crate::db::SymbolLoc::Interface { file, .. }
-            | crate::db::SymbolLoc::Trait { file, .. }
-            | crate::db::SymbolLoc::Enum { file, .. } => *file,
-            _ => return None,
-        });
+    // Resolve the (file, kind) tuple from the frozen index when present
+    // (batch pass), else the live index. The three lookups (class_like and
+    // functions keyed lowercase, constants keyed case-sensitive) all read the
+    // same index, so we resolve to a `Copy` `SourceFile` before the borrow ends.
+    let lookup = |index: &crate::db::WorkspaceSymbolIndex| -> Option<crate::db::SourceFile> {
+        if let Some(loc) = index.class_like.get(&lower) {
+            return match loc {
+                crate::db::SymbolLoc::Class { file, .. }
+                | crate::db::SymbolLoc::Interface { file, .. }
+                | crate::db::SymbolLoc::Trait { file, .. }
+                | crate::db::SymbolLoc::Enum { file, .. } => Some(*file),
+                _ => None,
+            };
+        }
+        if let Some(crate::db::SymbolLoc::Function { file, .. }) = index.functions.get(&lower) {
+            return Some(*file);
+        }
+        if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constants.get(&name) {
+            return Some(*file);
+        }
+        None
+    };
+    match db.frozen_workspace_index() {
+        Some(frozen) => lookup(frozen),
+        None => lookup(&crate::db::workspace_index(db)),
     }
-    if let Some(crate::db::SymbolLoc::Function { file, .. }) = index.functions.get(&lower) {
-        return Some(*file);
-    }
-    if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constants.get(&name) {
-        return Some(*file);
-    }
-    None
 }

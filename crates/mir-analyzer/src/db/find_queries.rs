@@ -505,8 +505,14 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     // process-global DashMap. The hot body-analysis path becomes alloc-free after
     // warmup.
     let key = fqcn.name(db).ascii_lowercase();
-    let index = crate::db::workspace_index(db);
-    let loc = index.class_like.get(&key).copied()?;
+    // Prefer the frozen, borrow-only index (set on the batch body/class pass)
+    // to avoid cloning the singleton's three Arcs on every call; fall back to
+    // the live index on the canonical/open-file db. `.copied()` ends the borrow
+    // before the `*_def_at` salsa calls below.
+    let loc = match db.frozen_workspace_index() {
+        Some(frozen) => frozen.class_like.get(&key).copied(),
+        None => crate::db::workspace_index(db).class_like.get(&key).copied(),
+    }?;
     match loc {
         SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32).map(ClassLike::Class),
         SymbolLoc::Interface { file, idx } => {
@@ -523,8 +529,11 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
     use crate::db::SymbolLoc;
     let key = fqn.name(db).ascii_lowercase();
-    let index = crate::db::workspace_index(db);
-    let SymbolLoc::Function { file, idx } = index.functions.get(&key).copied()? else {
+    let loc = match db.frozen_workspace_index() {
+        Some(frozen) => frozen.functions.get(&key).copied(),
+        None => crate::db::workspace_index(db).functions.get(&key).copied(),
+    };
+    let SymbolLoc::Function { file, idx } = loc? else {
         return None;
     };
     function_def_at(db, file, idx as u32)
@@ -537,9 +546,13 @@ pub fn find_global_constant<'db>(
     fqn: Fqcn<'db>,
 ) -> Option<Arc<mir_types::Type>> {
     use crate::db::SymbolLoc;
+    // Constants are keyed case-sensitively (raw name), unlike class_like/functions.
     let key = fqn.name(db);
-    let index = crate::db::workspace_index(db);
-    if let Some(SymbolLoc::Constant { file, idx }) = index.constants.get(&key).copied() {
+    let const_loc = match db.frozen_workspace_index() {
+        Some(frozen) => frozen.constants.get(&key).copied(),
+        None => crate::db::workspace_index(db).constants.get(&key).copied(),
+    };
+    if let Some(SymbolLoc::Constant { file, idx }) = const_loc {
         let defs = collect_file_definitions(db, file);
         if let Some((_, ty)) = defs.slice.constants.get(idx) {
             return Some(Arc::new(ty.clone()));

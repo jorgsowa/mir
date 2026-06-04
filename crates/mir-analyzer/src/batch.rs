@@ -436,10 +436,16 @@ impl AnalysisSession {
 
         let _t_class_checks = _t0.elapsed();
 
-        let db_main = {
+        let mut db_main = {
             let guard = self.db.salsa.read();
             (**guard).clone()
         };
+        // All index mutation for the body pass is done (lazy_load_missing_classes
+        // + refresh ran above; lazy_load_from_body_issues runs *after* this pass
+        // on a separate db). Freeze the index on this ephemeral clone so each
+        // find_class_like borrows it instead of cloning the singleton's three
+        // Arcs per call — the per-worker `map_with` clone bumps the refcount once.
+        db_main.freeze_workspace_index();
 
         // ---- Body analysis: function/method bodies in parallel --------------
         let body_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =

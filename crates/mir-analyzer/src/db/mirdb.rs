@@ -189,6 +189,32 @@ pub struct MirDbStorage {
     /// wholesale by `rebuild_workspace_symbol_index`; maintained incrementally
     /// by `merge_precomputed_into_workspace_index` / `update_workspace_index_for_file`.
     index_decl_counts: Arc<parking_lot::RwLock<crate::db::IndexDeclCounts>>,
+    /// Frozen, borrow-only snapshot of the workspace symbol index for a
+    /// single read-only analysis pass. Set ONLY on ephemeral per-pass db
+    /// clones (the batch body/class passes) via [`freeze_workspace_index`];
+    /// the canonical `self.db` clone always leaves this `None`.
+    ///
+    /// When `Some`, `find_class_like` / `find_function` / `find_global_constant`
+    /// **borrow** `&WorkspaceSymbolIndex` through it (`frozen_workspace_index`)
+    /// instead of calling `workspace_index(db)`, which clones the singleton's
+    /// three `Arc<FxHashMap>`s on every call — cross-core atomic refcount
+    /// traffic that makes the parallel body pass scale *negatively*. The
+    /// borrow moves the Arc refcount only once per worker (at `map_with`
+    /// clone), so the hot path is atomic-free.
+    ///
+    /// Correct by construction: the index is immutable for the duration of a
+    /// frozen pass (all lazy-loading completes before the freeze), so a frozen
+    /// read is byte-identical to the live `workspace_index(db)` it replaces.
+    ///
+    /// Holds the singleton **handle** alongside the snapshot so the borrow path
+    /// can register a salsa dependency by reading `handle.revision(db)` (a
+    /// `Copy` field, no map clone) — see [`MirDatabase::frozen_workspace_index`].
+    /// The handle is cached here (not re-read from `workspace_symbol_index_input`
+    /// per call) so the hot path takes no `parking_lot` read-lock either.
+    frozen_index: Option<(
+        crate::db::WorkspaceSymbolIndexSingleton,
+        Arc<crate::db::WorkspaceSymbolIndex>,
+    )>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -222,6 +248,7 @@ impl Default for MirDbStorage {
             workspace_symbol_index_input: Arc::default(),
             file_decl_snapshots: Arc::default(),
             index_decl_counts: Arc::default(),
+            frozen_index: None,
         };
         db.init_workspace_revision();
         db
@@ -448,6 +475,18 @@ impl MirDatabase for MirDbStorage {
         *self.workspace_symbol_index_input.read()
     }
 
+    fn frozen_workspace_index(&self) -> Option<&crate::db::WorkspaceSymbolIndex> {
+        let (handle, index) = self.frozen_index.as_ref()?;
+        // Register a salsa dependency on the workspace index BEFORE the caller's
+        // map lookup (and unconditionally, so even a miss — a negative result —
+        // carries the dep). Reading the `Copy` `revision` field is a real input
+        // read that joins the active tracked query's dep set, but clones no maps.
+        // This is what keeps `class_ancestors_by_fqcn` & friends correct across
+        // a mid-run index mutation while still avoiding the per-call Arc clones.
+        let _ = handle.revision(self);
+        Some(index.as_ref())
+    }
+
     fn all_source_files(&self) -> Vec<SourceFile> {
         self.source_files.values().copied().collect()
     }
@@ -482,6 +521,31 @@ impl MirDbStorage {
     /// processed by `collect_and_ingest_file` in the same session.
     pub fn prime_parse_cache(&self, hash: [u8; 32], slice: Arc<StubSlice>) {
         self.parse_cache.insert(hash, slice);
+    }
+
+    /// Snapshot the current workspace symbol index into this db clone's
+    /// borrow-only `frozen_index`, so a subsequent read-only analysis pass can
+    /// **borrow** the index per `find_class_like` call instead of cloning the
+    /// singleton's three `Arc<FxHashMap>`s on every lookup.
+    ///
+    /// Call this ONLY on an ephemeral, per-pass `MirDbStorage` clone (e.g. the
+    /// `db_main` used by the batch body pass) **after all index mutation for
+    /// that pass has completed** (all lazy-loading done). The frozen view is
+    /// then immutable for the pass, so each borrowed read is byte-identical to
+    /// the `workspace_index(self)` clone it replaces — no staleness window.
+    ///
+    /// Never call this on the canonical `self.db` clone: leaving `frozen_index`
+    /// `None` there is what keeps the open-file / LSP path (which mutates the
+    /// index mid-analysis via lazy-load) reading the live singleton.
+    pub fn freeze_workspace_index(&mut self) {
+        // Only freeze when the singleton is populated: the borrow path anchors
+        // its salsa dep on the singleton's `revision` field. With no singleton
+        // (e.g. unit-test dbs that never rebuild), leave `frozen_index` None so
+        // callers fall back to the live `workspace_index(db)` (tracked query).
+        if let Some(handle) = self.workspace_symbol_index_singleton() {
+            let index = handle.index(self);
+            self.frozen_index = Some((handle, Arc::new(index)));
+        }
     }
 
     /// Rebuild the `WorkspaceSymbolIndexSingleton` salsa input from scratch.
@@ -584,13 +648,20 @@ impl MirDbStorage {
             Some(s) => {
                 let old = s.index(self);
                 if old != new_index {
+                    // Bump `revision` in lockstep with `index` so frozen-path
+                    // readers (which anchor on `revision` to avoid cloning the
+                    // maps) are invalidated exactly when the index changes.
+                    let next = s.revision(self).wrapping_add(1);
                     s.set_index(self)
                         .with_durability(salsa::Durability::HIGH)
                         .to(new_index);
+                    s.set_revision(self)
+                        .with_durability(salsa::Durability::HIGH)
+                        .to(next);
                 }
             }
             None => {
-                let s = WorkspaceSymbolIndexSingleton::builder(new_index)
+                let s = WorkspaceSymbolIndexSingleton::builder(new_index, 0)
                     .durability(salsa::Durability::HIGH)
                     .new(self);
                 *self.workspace_symbol_index_input.write() = Some(s);

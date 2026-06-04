@@ -288,6 +288,18 @@ pub struct IndexDeclCounts {
 #[salsa::input]
 pub struct WorkspaceSymbolIndexSingleton {
     pub index: WorkspaceSymbolIndex,
+    /// Monotonic counter bumped in lockstep with `index` (in
+    /// `MirDbStorage::set_workspace_index`, the single write chokepoint).
+    ///
+    /// Lets the frozen-then-borrow fast path register a salsa dependency on
+    /// the workspace index **without** cloning the three `Arc<FxHashMap>`s in
+    /// `index`: a frozen reader reads this `Copy` field (a real salsa input
+    /// read, so it joins the active query's dep set) and then borrows the
+    /// pre-snapshotted maps. Tracked callers that resolve a class through the
+    /// frozen path (e.g. `class_ancestors_by_fqcn`) therefore still get
+    /// invalidated when the index mutates — without this, a negative memo
+    /// (class-not-found) computed pre-load would never be re-run post-load.
+    pub revision: u64,
 }
 
 /// Lightweight FQCN→location index. Built lazily per workspace revision;

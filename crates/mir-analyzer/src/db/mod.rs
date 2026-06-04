@@ -111,6 +111,17 @@ pub trait MirDatabase: salsa::Database {
     /// query when `None`.
     fn workspace_symbol_index_singleton(&self) -> Option<WorkspaceSymbolIndexSingleton>;
 
+    /// Borrow a frozen, immutable snapshot of the workspace symbol index, if
+    /// this db clone has one (set via `MirDbStorage::freeze_workspace_index`
+    /// on an ephemeral read-only pass). Returns `None` on the canonical db and
+    /// every clone that hasn't been frozen — callers fall back to
+    /// `workspace_index(db)`.
+    ///
+    /// Borrow-only (`Option<&_>`): the hot `find_class_like` path reads the
+    /// index with zero per-call atomics instead of cloning the singleton's
+    /// three `Arc`s on every lookup. See the `frozen_index` field docs.
+    fn frozen_workspace_index(&self) -> Option<&WorkspaceSymbolIndex>;
+
     /// Snapshot every registered SourceFile. Side channel — not
     /// salsa-tracked; tracked queries that consult this must also
     /// read `workspace_revision().revision(db)` so file add/remove
