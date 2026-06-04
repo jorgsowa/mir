@@ -182,7 +182,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                             }
                             let prop_info: Option<(bool, Option<Type>)> =
-                                prop_def.map(|p| (p.is_readonly, p.ty.clone()));
+                                prop_def.map(|p| (p.is_readonly, p.ty.as_deref().cloned()));
                             if let Some((is_readonly, prop_ty)) = prop_info {
                                 if is_readonly && !ctx.inside_constructor {
                                     self.emit(

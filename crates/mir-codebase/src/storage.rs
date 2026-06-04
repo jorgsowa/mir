@@ -301,6 +301,13 @@ pub fn wrap_return_type(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
 }
 
+/// Helper to wrap a `PropertyDef` type field (`ty`/`inferred_ty`/`default`) in
+/// an interned `Arc<Type>`, deduplicating common property types via the global
+/// pool. See [`PropertyDef`].
+pub fn wrap_property_type(ty: Option<Type>) -> Option<Arc<Type>> {
+    ty.map(interned_types::intern_or_wrap)
+}
+
 // ---------------------------------------------------------------------------
 // Assertion — `@psalm-assert`, `@psalm-assert-if-true`, etc.
 // ---------------------------------------------------------------------------
@@ -389,12 +396,30 @@ impl MethodDef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PropertyDef {
     pub name: Arc<str>,
-    pub ty: Option<Type>,
-    pub inferred_ty: Option<Type>,
+    /// Declared/inferred/default types. Stored as `Option<Arc<Type>>` (8 B)
+    /// rather than inline `Option<Type>` (176 B, no niche) and interned via the
+    /// global pool on construction/deserialization — common property types
+    /// (`string`, `int`, a shared class type) dedup to one allocation. Mirrors
+    /// `FnParam::ty`. On-disk format is unchanged (the serde helpers (de)serialize
+    /// the inner `Type` transparently).
+    #[serde(
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub ty: Option<Arc<Type>>,
+    #[serde(
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub inferred_ty: Option<Arc<Type>>,
     pub visibility: Visibility,
     pub is_static: bool,
     pub is_readonly: bool,
-    pub default: Option<Type>,
+    #[serde(
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub default: Option<Arc<Type>>,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation, if present.
     #[serde(default)]

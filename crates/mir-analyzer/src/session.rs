@@ -994,7 +994,7 @@ impl AnalysisSession {
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
                 let (_, p) = crate::db::find_property_in_chain(&db, here, name)
                     .ok_or(crate::SymbolLookupError::NotFound)?;
-                let ty = p.ty.clone().unwrap_or_else(Type::mixed);
+                let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                 Ok(crate::HoverInfo {
                     ty,
                     docstring: None,

@@ -740,8 +740,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                     }
-                    let prop_found: Option<Type> =
-                        prop_result.map(|(_, p)| p.ty.unwrap_or_else(Type::mixed));
+                    let prop_found: Option<Type> = prop_result
+                        .map(|(_, p)| p.ty.as_deref().cloned().unwrap_or_else(Type::mixed));
                     if let Some(ty) = prop_found {
                         self.record_ref(Arc::from(format!("{}::{}", fqcn, prop_name)), span);
                         return ty;

@@ -74,12 +74,14 @@ impl<'a> DefinitionCollector<'a> {
                                 );
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
-                                    ty,
+                                    ty: mir_codebase::storage::wrap_property_type(ty),
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: p.is_readonly,
-                                    default: p.default.as_ref().map(|_| Type::mixed()),
+                                    default: mir_codebase::storage::wrap_property_type(
+                                        p.default.as_ref().map(|_| Type::mixed()),
+                                    ),
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -118,10 +120,12 @@ impl<'a> DefinitionCollector<'a> {
                         Arc::from(prop_name),
                         PropertyDef {
                             name: Arc::from(prop_name),
-                            ty: self.resolve_union_opt(
-                                p.type_hint
-                                    .as_ref()
-                                    .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                            ty: mir_codebase::storage::wrap_property_type(
+                                self.resolve_union_opt(
+                                    p.type_hint
+                                        .as_ref()
+                                        .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                                ),
                             ),
                             inferred_ty: None,
                             visibility: Self::convert_visibility(p.visibility),

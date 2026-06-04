@@ -598,7 +598,7 @@ impl<'a> DefinitionCollector<'a> {
                 Arc::from(prop.name.as_str()),
                 PropertyDef {
                     name: Arc::from(prop.name.as_str()),
-                    ty,
+                    ty: mir_codebase::storage::wrap_property_type(ty),
                     inferred_ty: None,
                     visibility: Visibility::Public,
                     is_static: false,

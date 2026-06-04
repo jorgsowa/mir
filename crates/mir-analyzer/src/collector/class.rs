@@ -117,12 +117,14 @@ impl<'a> DefinitionCollector<'a> {
                                     });
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
-                                    ty,
+                                    ty: mir_codebase::storage::wrap_property_type(ty),
                                     inferred_ty: None,
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: decl.modifiers.is_readonly,
-                                    default: p.default.as_ref().map(|_| mir_types::Type::mixed()),
+                                    default: mir_codebase::storage::wrap_property_type(
+                                        p.default.as_ref().map(|_| mir_types::Type::mixed()),
+                                    ),
                                     location: Some(
                                         self.location(member.span.start, member.span.end),
                                     ),
@@ -167,14 +169,16 @@ impl<'a> DefinitionCollector<'a> {
                     let ty = prop_doc.var_type.map(|t| self.resolve_union(t)).or(hint_ty);
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
-                        ty,
+                        ty: mir_codebase::storage::wrap_property_type(ty),
                         inferred_ty: None,
                         visibility: Self::convert_visibility(p.visibility),
                         is_static: p.is_static,
                         is_readonly: p.is_readonly
                             || decl.modifiers.is_readonly
                             || prop_doc.is_readonly,
-                        default: p.default.as_ref().map(|_| mir_types::Type::mixed()),
+                        default: mir_codebase::storage::wrap_property_type(
+                            p.default.as_ref().map(|_| mir_types::Type::mixed()),
+                        ),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                             if p.attributes.iter().any(|a| {
