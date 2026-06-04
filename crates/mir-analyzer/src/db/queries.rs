@@ -291,7 +291,7 @@ pub fn collect_file_definitions_uncached(
     // Fast path 1: in-process parse cache (populated by collect_and_ingest_file).
     // Avoids re-parsing files that were already processed in the same session.
     // Safe inside a tracked query: content-addressed by source hash, not mutated.
-    if let Some(cached) = db.parse_cache().get(&content_hash).map(|r| Arc::clone(&*r)) {
+    if let Some(cached) = db.parse_cache().get(&content_hash) {
         crate::metrics::record_stub_cache_hit();
         if cached.file.as_deref() == Some(&*path) {
             // Path matches — share the Arc directly (no data clone needed).
@@ -375,7 +375,15 @@ pub fn collect_file_definitions_uncached(
     }
 }
 
-#[salsa::tracked]
+/// `lru = 4096` caps the number of `FileDefinitions` results held in Salsa's
+/// memo table. Without an LRU, every vendor class file ever loaded in a
+/// long-running LSP session retains its `Arc<StubSlice>` in the memo
+/// indefinitely, even after the file is evicted from the session via
+/// `invalidate_file`. 4096 safely exceeds the typical simultaneous active-file
+/// count (stubs ≈120 + vendor hundreds + workspace hundreds) so active files
+/// are never churned; vendor files loaded and later evicted are displaced by
+/// subsequent queries, freeing their StubSlice allocations.
+#[salsa::tracked(lru = 4096)]
 pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileDefinitions {
     collect_file_definitions_uncached(db, file)
 }

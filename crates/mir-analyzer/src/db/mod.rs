@@ -132,7 +132,7 @@ pub trait MirDatabase: salsa::Database {
     /// salsa-tracked. Populated by `collect_and_ingest_file` so that
     /// `collect_file_definitions_uncached` avoids re-parsing files that were
     /// already parsed in the same session.
-    fn parse_cache(&self) -> Arc<dashmap::DashMap<[u8; 32], Arc<mir_codebase::StubSlice>>>;
+    fn parse_cache(&self) -> Arc<crate::parse_cache::ParseCache>;
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
@@ -163,8 +163,8 @@ pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 pub use self::workspace::{
     collect_file_declarations, workspace_classes, workspace_functions, workspace_global_vars,
-    workspace_index, workspace_symbol_index, FileDeclarations, GlobalVarMap, SymbolLoc,
-    WorkspaceRevision, WorkspaceSymbolIndex, WorkspaceSymbolIndexSingleton,
+    workspace_index, workspace_symbol_index, FileDeclarations, GlobalVarMap, IndexDeclCounts,
+    SymbolLoc, SymbolTier, WorkspaceRevision, WorkspaceSymbolIndex, WorkspaceSymbolIndexSingleton,
 };
 
 // Sub-modules

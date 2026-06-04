@@ -228,6 +228,51 @@ pub enum SymbolLoc {
     Constant { file: SourceFile, idx: usize },
 }
 
+impl SymbolLoc {
+    /// The `SourceFile` this symbol is declared in.
+    pub fn file(&self) -> SourceFile {
+        match self {
+            SymbolLoc::Class { file, .. }
+            | SymbolLoc::Interface { file, .. }
+            | SymbolLoc::Trait { file, .. }
+            | SymbolLoc::Enum { file, .. }
+            | SymbolLoc::Function { file, .. }
+            | SymbolLoc::Constant { file, .. } => *file,
+        }
+    }
+}
+
+/// Precedence tier for a symbol declaration, mirroring the 3-pass priority of
+/// the full [`crate::db::MirDbStorage::rebuild_workspace_symbol_index`]:
+///
+/// 1. `NativeStub` — built-in PHP stub files (`path` starts with `stubs/`);
+///    first-write-wins among themselves.
+/// 2. `UserFile` — analyzed project / vendor files; overwrite native stubs.
+/// 3. `UserStub` — user-provided stub files; overwrite everything.
+///
+/// Stored implicitly (derived from a [`SymbolLoc`]'s file) so the incremental
+/// merge in `merge_precomputed_into_workspace_index` can decide precedence per-insert
+/// regardless of the order chunks arrive in during background indexing.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum SymbolTier {
+    NativeStub = 0,
+    UserFile = 1,
+    UserStub = 2,
+}
+
+/// Per-symbol-kind declarer counts maintained alongside the workspace symbol
+/// index singleton. `counts[name]` = number of registered files that declare
+/// `name`. Used by the incremental subtract path
+/// ([`crate::db::MirDbStorage::update_workspace_index_for_file`]) to decide
+/// whether removing a file's declaration of `name` is safe (count drops to 0)
+/// or ambiguous (another file still declares it → fall back to full rebuild).
+#[derive(Default, Clone)]
+pub struct IndexDeclCounts {
+    pub class_like: FxHashMap<Name, u32>,
+    pub functions: FxHashMap<Name, u32>,
+    pub constants: FxHashMap<Name, u32>,
+}
+
 /// Salsa input singleton holding the pre-built [`WorkspaceSymbolIndex`].
 ///
 /// Written imperatively by `MirDbStorage::rebuild_workspace_symbol_index` after

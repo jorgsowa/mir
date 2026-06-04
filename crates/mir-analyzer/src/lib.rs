@@ -16,9 +16,12 @@ pub(crate) mod expr;
 pub mod file_analyzer;
 pub(crate) mod flow_state;
 pub(crate) mod generic;
+pub mod indexing;
 #[doc(hidden)]
 pub mod metrics;
 pub(crate) mod narrowing;
+#[doc(hidden)]
+pub mod parse_cache;
 #[doc(hidden)]
 pub mod parser;
 pub mod php_version;
@@ -39,6 +42,7 @@ pub use batch::{
     analyze_source, dead_code_issue_kinds, discover_files, AnalysisResult, BatchOptions,
 };
 pub use file_analyzer::{BatchFileAnalyzer, FileAnalysis, FileAnalyzer, ParsedFile};
+pub use indexing::{IndexBatchOutcome, IndexCancel, IndexParallelism};
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};

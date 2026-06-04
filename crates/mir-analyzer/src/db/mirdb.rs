@@ -45,6 +45,82 @@ impl Clone for PendingRefLocs {
     }
 }
 
+/// Classify a file's precedence tier for the workspace symbol index.
+/// User stubs win over everything; native stub files (`stubs/…`) lose to
+/// analyzed user/vendor files.
+fn symbol_tier(
+    file: SourceFile,
+    db: &dyn MirDatabase,
+    user_stubs: &rustc_hash::FxHashSet<Arc<str>>,
+) -> crate::db::SymbolTier {
+    use crate::db::SymbolTier;
+    let path = file.path(db);
+    if user_stubs.contains(path.as_ref()) {
+        SymbolTier::UserStub
+    } else if path.starts_with("stubs/") {
+        SymbolTier::NativeStub
+    } else {
+        SymbolTier::UserFile
+    }
+}
+
+/// Tier-aware insert into one index map + declarer-count bump. Overwrites the
+/// existing entry only if the new tier outranks it (or ties at a non-native
+/// tier, where last-write-wins matches the full-rebuild `insert` semantics;
+/// native-stub ties keep the first, matching `or_insert`).
+fn tier_insert(
+    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
+    counts: &mut FxHashMap<Name, u32>,
+    key: Name,
+    loc: crate::db::SymbolLoc,
+    new_tier: crate::db::SymbolTier,
+    db: &dyn MirDatabase,
+    user_stubs: &rustc_hash::FxHashSet<Arc<str>>,
+) {
+    use crate::db::SymbolTier;
+    *counts.entry(key).or_insert(0) += 1;
+    match map.get(&key) {
+        None => {
+            map.insert(key, loc);
+        }
+        Some(existing) => {
+            let existing_tier = symbol_tier(existing.file(), db, user_stubs);
+            let overwrite = new_tier > existing_tier
+                || (new_tier == existing_tier && new_tier != SymbolTier::NativeStub);
+            if overwrite {
+                map.insert(key, loc);
+            }
+        }
+    }
+}
+
+/// Subtract one file's declarations from an index map + counts. Assumes the
+/// caller has already ruled out the ambiguous case (count > 1 while this file
+/// owns the winning entry). Removes the map entry only when no other file
+/// declares the name (count → 0) and the entry currently points at `file`.
+fn subtract_decls(
+    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
+    counts: &mut FxHashMap<Name, u32>,
+    entries: &[(Name, crate::db::SymbolLoc)],
+    file: SourceFile,
+) {
+    for (key, _) in entries {
+        let remaining = match counts.get_mut(key) {
+            Some(c) => {
+                *c = c.saturating_sub(1);
+                *c
+            }
+            None => 0,
+        };
+        if remaining == 0 {
+            counts.remove(key);
+            if map.get(key).map(|l| l.file()) == Some(file) {
+                map.remove(key);
+            }
+        }
+    }
+}
+
 #[salsa::db]
 #[derive(Clone)]
 pub struct MirDbStorage {
@@ -92,7 +168,7 @@ pub struct MirDbStorage {
     /// file versions are naturally evicted (different hash → different key).
     /// DashMap (64 shards) replaces a single RwLock so parallel workers contend
     /// on independent shards instead of serialising at a single write lock.
-    parse_cache: Arc<dashmap::DashMap<[u8; 32], Arc<StubSlice>>>,
+    parse_cache: Arc<crate::parse_cache::ParseCache>,
     /// Pre-built FQCN symbol index singleton. Written imperatively by
     /// `rebuild_workspace_symbol_index` and read by `find_class_like` /
     /// `find_function` / `find_global_constant` via `singleton.index(db)`
@@ -106,6 +182,13 @@ pub struct MirDbStorage {
     /// skipped, keeping the singleton's revision unchanged.
     file_decl_snapshots:
         Arc<parking_lot::RwLock<FxHashMap<SourceFile, crate::db::FileDeclarations>>>,
+    /// Per-symbol declarer counts kept in lockstep with the workspace symbol
+    /// index singleton. Lets `update_workspace_index_for_file` decide whether
+    /// removing a file's declaration of a name is safe (count → 0) or ambiguous
+    /// (another file still declares it → fall back to full rebuild). Rebuilt
+    /// wholesale by `rebuild_workspace_symbol_index`; maintained incrementally
+    /// by `merge_precomputed_into_workspace_index` / `update_workspace_index_for_file`.
+    index_decl_counts: Arc<parking_lot::RwLock<crate::db::IndexDeclCounts>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -138,6 +221,7 @@ impl Default for MirDbStorage {
             parse_cache: Arc::default(),
             workspace_symbol_index_input: Arc::default(),
             file_decl_snapshots: Arc::default(),
+            index_decl_counts: Arc::default(),
         };
         db.init_workspace_revision();
         db
@@ -185,7 +269,11 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
-        let idx = crate::db::workspace_symbol_index(self);
+        // Route through `workspace_index` so this reads the incrementally
+        // maintained singleton (same source of truth as `find_class_like`)
+        // rather than the O(N) tracked `workspace_symbol_index` query, which
+        // re-runs on every revision bump during indexing.
+        let idx = crate::db::workspace_index(self);
         let lower = Name::new(symbol).ascii_lowercase();
         let case_sensitive = Name::new(symbol);
         // Class-like and function keys are case-folded (PHP semantics).
@@ -377,7 +465,7 @@ impl MirDatabase for MirDbStorage {
         self.stub_cache.read().clone()
     }
 
-    fn parse_cache(&self) -> Arc<dashmap::DashMap<[u8; 32], Arc<StubSlice>>> {
+    fn parse_cache(&self) -> Arc<crate::parse_cache::ParseCache> {
         self.parse_cache.clone()
     }
 }
@@ -414,58 +502,83 @@ impl MirDbStorage {
     /// `ingest_file` that detects a declaration change.
     pub fn rebuild_workspace_symbol_index(&mut self) {
         use crate::db::{
-            collect_file_declarations, FileDeclarations, SymbolLoc, WorkspaceSymbolIndex,
-            WorkspaceSymbolIndexSingleton,
+            collect_file_declarations, FileDeclarations, IndexDeclCounts, SymbolLoc,
+            WorkspaceSymbolIndex,
         };
-        use salsa::Setter as _;
 
         let files = self.all_source_files();
-        let user_stub_files = self.user_stub_source_files();
+        let user_stubs = self.user_stub_paths.read().clone();
 
         let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut counts = IndexDeclCounts::default();
         let mut new_snapshots: FxHashMap<SourceFile, FileDeclarations> = FxHashMap::default();
 
-        // Immutable borrow scope: collect declarations from all files.
+        // Single pass over all files. Tier-aware insertion (native stub <
+        // user file < user stub) makes the result independent of iteration
+        // order for distinct symbols and matches the 3-pass precedence of the
+        // tracked `workspace_symbol_index` query — the incremental merge path
+        // reuses the exact same `tier_insert` rule.
         {
             let db: &dyn MirDatabase = &*self;
             for &file in files.iter() {
+                let tier = symbol_tier(file, db, &user_stubs);
                 let decls = collect_file_declarations(db, file);
                 for (key, loc) in &decls.class_like {
-                    class_like.entry(*key).or_insert(*loc);
+                    tier_insert(
+                        &mut class_like,
+                        &mut counts.class_like,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
                 }
                 for (key, loc) in &decls.functions {
-                    functions.entry(*key).or_insert(*loc);
+                    tier_insert(
+                        &mut functions,
+                        &mut counts.functions,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
                 }
                 for (key, loc) in &decls.constants {
-                    constants.entry(*key).or_insert(*loc);
+                    tier_insert(
+                        &mut constants,
+                        &mut counts.constants,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
                 }
                 new_snapshots.insert(file, decls);
-            }
-            // User stubs override native stubs for the same symbol.
-            for &file in user_stub_files.iter() {
-                let decls = collect_file_declarations(db, file);
-                for (key, loc) in &decls.class_like {
-                    class_like.insert(*key, *loc);
-                }
-                for (key, loc) in &decls.functions {
-                    functions.insert(*key, *loc);
-                }
-                for (key, loc) in &decls.constants {
-                    constants.insert(*key, *loc);
-                }
             }
         }
 
         *self.file_decl_snapshots.write() = new_snapshots;
+        *self.index_decl_counts.write() = counts;
 
         let new_index = WorkspaceSymbolIndex {
             class_like: Arc::new(class_like),
             functions: Arc::new(functions),
             constants: Arc::new(constants),
         };
+        self.set_workspace_index(new_index);
+    }
 
+    /// Commit a freshly-built [`WorkspaceSymbolIndex`] onto the singleton
+    /// input (creating it on first call), at `Durability::HIGH`. Skips the
+    /// write when the new index is `Arc::ptr_eq`-equal to the existing one.
+    fn set_workspace_index(&mut self, new_index: crate::db::WorkspaceSymbolIndex) {
+        use crate::db::WorkspaceSymbolIndexSingleton;
+        use salsa::Setter as _;
         let existing = *self.workspace_symbol_index_input.read();
         match existing {
             Some(s) => {
@@ -483,6 +596,282 @@ impl MirDbStorage {
                 *self.workspace_symbol_index_input.write() = Some(s);
             }
         }
+    }
+
+    /// Build the workspace symbol index from **precomputed** per-file
+    /// declarations — no `collect_file_declarations` (no parse) runs here, so
+    /// the write window is just map construction. The caller computes `decls`
+    /// off-lock (on a snapshot). Used by [`crate::AnalysisSession::index_batch`]
+    /// for the first chunk that seeds the singleton, keeping the write-lock hold
+    /// short even on a large initial set.
+    pub fn build_workspace_index_from_decls(
+        &mut self,
+        decls: Vec<(SourceFile, crate::db::FileDeclarations)>,
+    ) {
+        use crate::db::{IndexDeclCounts, SymbolLoc};
+        let user_stubs = self.user_stub_paths.read().clone();
+        let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut counts = IndexDeclCounts::default();
+        let mut snaps = FxHashMap::default();
+        {
+            let db: &dyn MirDatabase = &*self;
+            for (file, d) in &decls {
+                let tier = symbol_tier(*file, db, &user_stubs);
+                for (key, loc) in &d.class_like {
+                    tier_insert(
+                        &mut class_like,
+                        &mut counts.class_like,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
+                }
+                for (key, loc) in &d.functions {
+                    tier_insert(
+                        &mut functions,
+                        &mut counts.functions,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
+                }
+                for (key, loc) in &d.constants {
+                    tier_insert(
+                        &mut constants,
+                        &mut counts.constants,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
+                }
+            }
+        }
+        for (file, d) in decls {
+            snaps.insert(file, d);
+        }
+        *self.file_decl_snapshots.write() = snaps;
+        *self.index_decl_counts.write() = counts;
+        let new_index = crate::db::WorkspaceSymbolIndex {
+            class_like: Arc::new(class_like),
+            functions: Arc::new(functions),
+            constants: Arc::new(constants),
+        };
+        self.set_workspace_index(new_index);
+    }
+
+    /// Incrementally merge **precomputed** per-file declarations into the
+    /// existing singleton — no parse runs under the lock. Mirror of
+    /// [`Self::merge_precomputed_into_workspace_index`] but with the (off-lock)
+    /// declaration collection already done by the caller. Files already present
+    /// in `file_decl_snapshots` are skipped (avoids double-counting). No-op if
+    /// the singleton hasn't been created yet.
+    pub fn merge_precomputed_into_workspace_index(
+        &mut self,
+        decls: &[(SourceFile, crate::db::FileDeclarations)],
+    ) {
+        let Some(singleton) = *self.workspace_symbol_index_input.read() else {
+            let mut snaps = self.file_decl_snapshots.write();
+            for (file, d) in decls {
+                snaps.entry(*file).or_insert_with(|| d.clone());
+            }
+            return;
+        };
+        let user_stubs = self.user_stub_paths.read().clone();
+        let cur = singleton.index(self);
+        let mut class_like = (*cur.class_like).clone();
+        let mut functions = (*cur.functions).clone();
+        let mut constants = (*cur.constants).clone();
+        let mut counts = self.index_decl_counts.write();
+        let mut to_store: Vec<(SourceFile, crate::db::FileDeclarations)> = Vec::new();
+        {
+            let db: &dyn MirDatabase = &*self;
+            let snaps = self.file_decl_snapshots.read();
+            for (file, d) in decls {
+                if snaps.contains_key(file) {
+                    continue;
+                }
+                let tier = symbol_tier(*file, db, &user_stubs);
+                for (key, loc) in &d.class_like {
+                    tier_insert(
+                        &mut class_like,
+                        &mut counts.class_like,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
+                }
+                for (key, loc) in &d.functions {
+                    tier_insert(
+                        &mut functions,
+                        &mut counts.functions,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
+                }
+                for (key, loc) in &d.constants {
+                    tier_insert(
+                        &mut constants,
+                        &mut counts.constants,
+                        *key,
+                        *loc,
+                        tier,
+                        db,
+                        &user_stubs,
+                    );
+                }
+                to_store.push((*file, d.clone()));
+            }
+        }
+        drop(counts);
+        {
+            let mut snaps = self.file_decl_snapshots.write();
+            for (file, d) in to_store {
+                snaps.insert(file, d);
+            }
+        }
+        let new_index = crate::db::WorkspaceSymbolIndex {
+            class_like: Arc::new(class_like),
+            functions: Arc::new(functions),
+            constants: Arc::new(constants),
+        };
+        self.set_workspace_index(new_index);
+    }
+
+    /// Incrementally update the singleton for ONE edited file: subtract its old
+    /// declarations (from `file_decl_snapshots`) and add its new ones.
+    ///
+    /// Returns `true` if the update was applied incrementally. Returns `false`
+    /// — having made **no** mutation — when subtraction is ambiguous (a removed
+    /// name is still declared by another file and this file was the winning
+    /// entry, so the replacement loc is unknown); the caller must then call
+    /// [`Self::rebuild_workspace_symbol_index`].
+    ///
+    /// Also returns `false` if no singleton exists yet (nothing to update).
+    pub fn update_workspace_index_for_file(&mut self, file: SourceFile) -> bool {
+        use crate::db::{collect_file_declarations, SymbolLoc};
+        let Some(singleton) = *self.workspace_symbol_index_input.read() else {
+            return false;
+        };
+        let user_stubs = self.user_stub_paths.read().clone();
+        let old_decls = self.file_decl_snapshots.read().get(&file).cloned();
+
+        // Compute the new declarations once. If the declared NAMES are
+        // unchanged (body-only edit — `FileDeclarations` PartialEq is name-only)
+        // do nothing: no singleton write, so the HIGH-durability dep does not
+        // invalidate body-analysis memos. This is the warm-cache guarantee.
+        let new_decls = {
+            let db: &dyn MirDatabase = &*self;
+            collect_file_declarations(db, file)
+        };
+        if old_decls.as_ref() == Some(&new_decls) {
+            return true;
+        }
+
+        let tier = {
+            let db: &dyn MirDatabase = &*self;
+            symbol_tier(file, db, &user_stubs)
+        };
+
+        let cur = singleton.index(self);
+        let mut class_like = (*cur.class_like).clone();
+        let mut functions = (*cur.functions).clone();
+        let mut constants = (*cur.constants).clone();
+        let mut counts = self.index_decl_counts.write();
+
+        // Dry-run ambiguity check on the OLD decls before mutating anything.
+        if let Some(old) = &old_decls {
+            let ambiguous = |entries: &[(Name, SymbolLoc)],
+                             map: &FxHashMap<Name, SymbolLoc>,
+                             cnt: &FxHashMap<Name, u32>|
+             -> bool {
+                entries.iter().any(|(key, _)| {
+                    let c = cnt.get(key).copied().unwrap_or(0);
+                    // count > 1 means another file also declares it; if this
+                    // file currently owns the winning entry we can't cheaply
+                    // recompute the replacement → ambiguous.
+                    c > 1 && map.get(key).map(|l| l.file()) == Some(file)
+                })
+            };
+            if ambiguous(&old.class_like, &class_like, &counts.class_like)
+                || ambiguous(&old.functions, &functions, &counts.functions)
+                || ambiguous(&old.constants, &constants, &counts.constants)
+            {
+                return false;
+            }
+        }
+
+        // Subtract old decls.
+        if let Some(old) = &old_decls {
+            subtract_decls(
+                &mut class_like,
+                &mut counts.class_like,
+                &old.class_like,
+                file,
+            );
+            subtract_decls(&mut functions, &mut counts.functions, &old.functions, file);
+            subtract_decls(&mut constants, &mut counts.constants, &old.constants, file);
+        }
+
+        // Add new decls.
+        {
+            let db: &dyn MirDatabase = &*self;
+            for (key, loc) in &new_decls.class_like {
+                tier_insert(
+                    &mut class_like,
+                    &mut counts.class_like,
+                    *key,
+                    *loc,
+                    tier,
+                    db,
+                    &user_stubs,
+                );
+            }
+            for (key, loc) in &new_decls.functions {
+                tier_insert(
+                    &mut functions,
+                    &mut counts.functions,
+                    *key,
+                    *loc,
+                    tier,
+                    db,
+                    &user_stubs,
+                );
+            }
+            for (key, loc) in &new_decls.constants {
+                tier_insert(
+                    &mut constants,
+                    &mut counts.constants,
+                    *key,
+                    *loc,
+                    tier,
+                    db,
+                    &user_stubs,
+                );
+            }
+        }
+        drop(counts);
+        self.file_decl_snapshots.write().insert(file, new_decls);
+
+        let new_index = crate::db::WorkspaceSymbolIndex {
+            class_like: Arc::new(class_like),
+            functions: Arc::new(functions),
+            constants: Arc::new(constants),
+        };
+        self.set_workspace_index(new_index);
+        true
     }
 
     /// Check whether the declared names in `file` differ from the last
@@ -626,9 +1015,25 @@ impl MirDbStorage {
         sf
     }
 
-    /// Remove the Salsa SourceFile handle for `path` from the registry.
+    /// Remove the Salsa SourceFile handle for `path` from the registry and
+    /// drop its contribution to the workspace symbol index singleton.
+    ///
+    /// The index must be updated here: with `bump_workspace_revision` no longer
+    /// nulling the singleton, a stale entry could otherwise keep resolving a
+    /// removed file's symbols (the salsa input itself is never deleted). If the
+    /// incremental subtract is ambiguous, the singleton is nulled so the next
+    /// lookup falls back to the tracked query / a finalize rebuilds it.
     pub fn remove_source_file(&mut self, path: &str) {
+        let sf = self.source_files.get(path).copied();
         if Arc::make_mut(&mut self.source_files).remove(path).is_some() {
+            if let Some(sf) = sf {
+                if self.workspace_symbol_index_input.read().is_some()
+                    && !self.remove_file_from_workspace_index(sf)
+                {
+                    *self.workspace_symbol_index_input.write() = None;
+                }
+                self.file_decl_snapshots.write().remove(&sf);
+            }
             self.bump_workspace_revision();
         }
     }
@@ -646,6 +1051,17 @@ impl MirDbStorage {
     /// Bump the workspace revision so tracked `workspace_*` queries
     /// reading it invalidate. Lazily creates the singleton input on
     /// first call.
+    ///
+    /// **Does NOT null the workspace symbol index singleton.** In the
+    /// eager-static-input model the singleton is maintained incrementally
+    /// (`merge_precomputed_into_workspace_index` on add, `update_/remove_..._index`
+    /// on edit/remove). Nulling here was the source of the warm-cache churn:
+    /// every lazily-added file destroyed the singleton and forced an O(N)
+    /// fallback rebuild that cascade-invalidated body-analysis memos. The
+    /// invariant is now: **whoever mutates the input set is responsible for
+    /// refreshing the singleton** (bulk-register paths call merge/finalize;
+    /// edits call update; removes call remove). Steady-state body-only edits
+    /// add no files, never bump, and never touch the singleton.
     fn bump_workspace_revision(&mut self) {
         use salsa::Setter as _;
         let existing = *self.workspace_revision_input.read();
@@ -659,11 +1075,68 @@ impl MirDbStorage {
                 *self.workspace_revision_input.write() = Some(rev);
             }
         }
-        // A new file was added to the workspace. The pre-built symbol index
-        // singleton no longer covers all registered files; clear it so
-        // `find_class_like` / `find_function` fall back to the tracked
-        // `workspace_symbol_index` query until an explicit rebuild is done.
-        *self.workspace_symbol_index_input.write() = None;
+    }
+
+    /// Subtract one file's declarations from the singleton without re-adding
+    /// (used on file removal). Returns `false` (no mutation) if subtraction is
+    /// ambiguous — the caller then nulls the singleton to force a fallback
+    /// rebuild. Returns `true` if applied or if there's nothing to do.
+    fn remove_file_from_workspace_index(&mut self, file: SourceFile) -> bool {
+        let Some(singleton) = *self.workspace_symbol_index_input.read() else {
+            return true;
+        };
+        let old_decls = self.file_decl_snapshots.read().get(&file).cloned();
+        let Some(old) = old_decls else {
+            return true; // never indexed → nothing to subtract
+        };
+        let cur = singleton.index(self);
+        let mut class_like = (*cur.class_like).clone();
+        let mut functions = (*cur.functions).clone();
+        let mut constants = (*cur.constants).clone();
+        let mut counts = self.index_decl_counts.write();
+
+        let ambiguous = |entries: &[(Name, crate::db::SymbolLoc)],
+                         map: &FxHashMap<Name, crate::db::SymbolLoc>,
+                         cnt: &FxHashMap<Name, u32>|
+         -> bool {
+            entries.iter().any(|(key, _)| {
+                cnt.get(key).copied().unwrap_or(0) > 1
+                    && map.get(key).map(|l| l.file()) == Some(file)
+            })
+        };
+        if ambiguous(&old.class_like, &class_like, &counts.class_like)
+            || ambiguous(&old.functions, &functions, &counts.functions)
+            || ambiguous(&old.constants, &constants, &counts.constants)
+        {
+            return false;
+        }
+        subtract_decls(
+            &mut class_like,
+            &mut counts.class_like,
+            &old.class_like,
+            file,
+        );
+        subtract_decls(&mut functions, &mut counts.functions, &old.functions, file);
+        subtract_decls(&mut constants, &mut counts.constants, &old.constants, file);
+        drop(counts);
+
+        let new_index = crate::db::WorkspaceSymbolIndex {
+            class_like: Arc::new(class_like),
+            functions: Arc::new(functions),
+            constants: Arc::new(constants),
+        };
+        self.set_workspace_index(new_index);
+        true
+    }
+
+    /// Current workspace generation counter. Bumped on every file add/remove.
+    /// Exposed as the "are we up to date" epoch for background indexing
+    /// ([`crate::AnalysisSession::index_generation`]).
+    pub fn workspace_revision_value(&self) -> u64 {
+        self.workspace_revision_input
+            .read()
+            .map(|r| r.revision(self))
+            .unwrap_or(0)
     }
 
     /// Number of source files currently registered.

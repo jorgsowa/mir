@@ -1,37 +1,34 @@
-//! Open-file (LSP / `FileAnalyzer`) lazy-load completeness.
+//! Open-file (LSP / `FileAnalyzer`) diagnostic completeness under the eager
+//! background-indexing model.
 //!
-//! `tests/lazy_load.rs` exercises the *batch* path (`analyze_paths`), which
-//! already runs a full declared-type-closure fixpoint, so its diagnostics are
-//! complete. This file exercises the *open-file* path
-//! (`AnalysisSession::ingest_file` + `FileAnalyzer::analyze`), which the LSP
-//! uses for the currently-edited buffer.
+//! `tests/lazy_load.rs` exercises the *batch* path (`analyze_paths`). This file
+//! exercises the *open-file* path (`AnalysisSession::ingest_file` +
+//! `FileAnalyzer::analyze`), which the LSP uses for the currently-edited buffer.
 //!
-//! For full open-file diagnostics, the loader must follow the same closure the
-//! batch path does: not just the classes syntactically referenced in the open
-//! file, but their inheritance chains and the classes named in their method
-//! signatures (return / parameter / property types). Otherwise a value whose
-//! type comes from a vendor method's return type, or a member inherited from a
-//! vendor parent, is invisible — the type silently degrades and the diagnostic
-//! is missed.
+//! In the eager-static-input model the consumer indexes the project + vendor
+//! files up front (`index_batch` + `finalize_index`), so the workspace symbol
+//! index is complete and `find_class_like` resolves any class — including types
+//! reached only through a method's return type or an inheritance chain. The
+//! open-file path then needs no transitive lazy-load fixpoint: a single pass
+//! against the complete index produces the same diagnostics the batch path does.
 //!
-//! Each test below is a 0 -> 1 flip: the expected diagnostic is *missed* when
-//! the closure is too shallow and *surfaces* once the transitive declared-type
-//! closure is loaded.
+//! Each test is a 0 -> 1 flip proving the relevant type was resolved through the
+//! eagerly-built index rather than silently degrading to `mixed`.
 
 mod common;
 
 use std::fs;
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+use mir_analyzer::{AnalysisSession, FileAnalyzer, IndexCancel, IndexParallelism, PhpVersion};
 
 use self::common::create_temp_dir;
 
-/// Set up a PSR-4 project (`App\` -> `src/`) with the given lazily-loadable
-/// library files written under `src/`, then analyze `open_src` through the
-/// open-file path (`ingest_file` + `FileAnalyzer::analyze`). The library files
-/// are NOT ingested up front — they must be discovered via lazy loading during
-/// analysis, exactly as vendor code would be for an open buffer.
+/// Set up a PSR-4 project (`App\` -> `src/`) with the given library files under
+/// `src/`, eagerly index them (as the background indexer would at session
+/// start), then analyze `open_src` through the open-file path. After indexing
+/// the input set is static, so the open file's references — and the types
+/// reachable only through their signatures / inheritance — all resolve.
 fn analyze_open_file_with_psr4(
     lib_files: &[(&str, &str)],
     open_name: &str,
@@ -49,7 +46,25 @@ fn analyze_open_file_with_psr4(
     .unwrap();
     let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
 
+    // Enumerate the project's library files before moving the map into the session.
+    let index_files: Vec<(Arc<str>, Arc<str>)> = psr4
+        .project_files()
+        .into_iter()
+        .filter_map(|p| {
+            let t = fs::read_to_string(&p).ok()?;
+            Some((
+                Arc::from(p.to_string_lossy().as_ref()),
+                Arc::from(t.as_str()),
+            ))
+        })
+        .collect();
+
     let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+
+    // Eager background-index pass over the project's library files.
+    let cancel = IndexCancel::new();
+    session.index_batch(&index_files, IndexParallelism::Sequential, &cancel);
+    session.finalize_index();
 
     let open_path: Arc<str> = Arc::from(root.path().join(open_name).to_string_lossy().as_ref());
     let open_src_arc: Arc<str> = Arc::from(open_src);

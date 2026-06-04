@@ -27,14 +27,9 @@ fn enabled() -> bool {
 pub struct Counters {
     /// Number of `FileAnalyzer::analyze` invocations.
     pub file_analyses: AtomicU64,
-    /// Number of body-analysis invocations summed across all analyses. Equals
-    /// `file_analyses` if the retry loop never iterated.
+    /// Number of body-analysis invocations summed across all analyses.
     pub body_analysis_runs: AtomicU64,
-    /// Iterations of the retry loop (`file_analyzer.rs`'s
-    /// `MAX_LAZY_LOAD_ITERATIONS` block) that actually executed.
-    pub retry_iterations: AtomicU64,
-    /// Lazy loads attempted (one per unresolved FQCN passed to
-    /// `load_class_transitive`).
+    /// Lazy loads attempted (one per unresolved FQCN passed to `load_class`).
     pub lazy_loads_attempted: AtomicU64,
     /// Lazy loads that resolved to a class (the call returned `Some`).
     pub lazy_loads_resolved: AtomicU64,
@@ -69,7 +64,6 @@ pub struct Counters {
 static COUNTERS: Counters = Counters {
     file_analyses: AtomicU64::new(0),
     body_analysis_runs: AtomicU64::new(0),
-    retry_iterations: AtomicU64::new(0),
     lazy_loads_attempted: AtomicU64::new(0),
     lazy_loads_resolved: AtomicU64::new(0),
     body_analysis_micros: AtomicU64::new(0),
@@ -93,12 +87,6 @@ pub fn record_body_analysis(duration_micros: u64) {
         COUNTERS
             .body_analysis_micros
             .fetch_add(duration_micros, Ordering::Relaxed);
-    }
-}
-
-pub fn record_retry_iteration() {
-    if enabled() {
-        COUNTERS.retry_iterations.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -247,7 +235,6 @@ pub fn dump() -> Option<String> {
     }
     let analyses = COUNTERS.file_analyses.load(Ordering::Relaxed);
     let body_analysis_runs = COUNTERS.body_analysis_runs.load(Ordering::Relaxed);
-    let retries = COUNTERS.retry_iterations.load(Ordering::Relaxed);
     let attempts = COUNTERS.lazy_loads_attempted.load(Ordering::Relaxed);
     let resolved = COUNTERS.lazy_loads_resolved.load(Ordering::Relaxed);
     let body_analysis_micros = COUNTERS.body_analysis_micros.load(Ordering::Relaxed);
@@ -258,11 +245,6 @@ pub fn dump() -> Option<String> {
     let ll_source_unreadable = COUNTERS.ll_fail_source_unreadable.load(Ordering::Relaxed);
     let ll_ingest_missing = COUNTERS.ll_fail_ingest_then_missing.load(Ordering::Relaxed);
 
-    let avg_iterations = if analyses == 0 {
-        0.0
-    } else {
-        body_analysis_runs as f64 / analyses as f64
-    };
     let avg_pass2_us = body_analysis_micros
         .checked_div(body_analysis_runs)
         .unwrap_or(0);
@@ -271,9 +253,8 @@ pub fn dump() -> Option<String> {
     Some(format!(
         "mir metrics:\n  \
          file analyses        : {analyses}\n  \
-         pass-2 runs          : {body_analysis_runs}  (avg per analysis: {avg_iterations:.3})\n  \
-         retry iterations     : {retries}\n  \
-         pass-2 wall time     : {body_analysis_micros} us  (avg/run: {avg_pass2_us} us)\n  \
+         body analysis runs   : {body_analysis_runs}\n  \
+         body analysis time   : {body_analysis_micros} us  (avg/run: {avg_pass2_us} us)\n  \
          lazy load attempts   : {attempts}  resolved: {resolved}\n  \
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \

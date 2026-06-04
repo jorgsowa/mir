@@ -440,6 +440,41 @@ impl Psr4Map {
         self.vendor_eager_files.clone()
     }
 
+    /// Every vendor file the analyzer should index eagerly, for the
+    /// rust-analyzer-style static-input model: the union of
+    ///
+    /// 1. [`Self::vendor_files`] — PSR-4 / PSR-0 walked directories + extra paths,
+    /// 2. classmap file targets — packages that use `classmap:` autoload (no
+    ///    PSR-4 prefix), which [`Self::vendor_files`] does NOT walk, and
+    /// 3. [`Self::vendor_eager_files`] — `autoload.files` globals.
+    ///
+    /// Deduplicated by path. Non-existent classmap targets (stale generated
+    /// file) are skipped. This is the work-list a consumer feeds to the chunked
+    /// background indexer ([`crate::AnalysisSession::index_batch`]).
+    pub fn all_vendor_files(&self) -> Vec<PathBuf> {
+        let mut seen: rustc_hash::FxHashSet<PathBuf> = rustc_hash::FxHashSet::default();
+        let mut out = Vec::new();
+        let mut push = |p: PathBuf, out: &mut Vec<PathBuf>| {
+            if seen.insert(p.clone()) {
+                out.push(p);
+            }
+        };
+        for p in self.vendor_files() {
+            push(p, &mut out);
+        }
+        // Classmap-only packages are not covered by vendor_files() (which walks
+        // only PSR-4/PSR-0 dirs + extra paths). Include their file targets.
+        for p in self.classmap.values() {
+            if p.is_file() {
+                push(p.clone(), &mut out);
+            }
+        }
+        for p in self.vendor_eager_files() {
+            push(p, &mut out);
+        }
+        out
+    }
+
     /// Number of FQCN entries known to the classmap. Used by callers that want
     /// to log/verify the classmap loaded successfully.
     pub fn classmap_len(&self) -> usize {

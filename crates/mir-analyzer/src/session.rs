@@ -361,17 +361,30 @@ impl AnalysisSession {
     /// site.
     pub fn prepare_ast_for_analysis(&self, program: &php_ast::owned::Program, file: &str) {
         self.ensure_stubs_for_ast(program);
-        self.preload_psr4_classes_for_ast(program, file);
+        self.priority_index_for_ast(program, file);
     }
 
-    /// Scan a parsed AST for class references and lazy-load any that are
-    /// PSR-4-resolvable but not yet registered as `SourceFile` inputs, together
-    /// with their full declared-type closure (see [`Self::load_class_transitive`]).
-    /// After this call, `find_class_like` can pull-resolve not just the
-    /// referenced classes but the types named in their signatures and
-    /// inheritance chains — so open-file diagnostics are as complete as the
-    /// batch path, without a post-analysis retry loop.
-    pub fn preload_psr4_classes_for_ast(&self, program: &php_ast::owned::Program, file: &str) {
+    /// Priority-index the classes directly referenced by `file`'s AST.
+    ///
+    /// In the eager-static-input model the background indexer
+    /// ([`Self::index_batch`]) walks the whole vendor tree, but it may not have
+    /// reached every file the open buffer references yet. To avoid a transient
+    /// false `UndefinedClass` during the warm-up window, this **reorders** that
+    /// static work: it resolves the buffer's *direct* class references and
+    /// loads any not-yet-indexed ones immediately, jumping them to the front of
+    /// the queue.
+    ///
+    /// This is bounded by the number of distinct direct references in **one**
+    /// file — no transitive BFS, no depth/total budget, no pinning. Inheritance
+    /// ancestors and signature types of those classes are picked up by the
+    /// background walk (or, for navigation, by [`Self::hover`] /
+    /// [`Self::definition_of`]). Because `bump_workspace_revision` no longer
+    /// nulls the workspace index singleton, each [`Self::load_class`] here costs
+    /// only a resolver lookup + parse (or cache hit) + one tier-aware merge,
+    /// invalidating just the actively-analyzed file's memo once — not the whole
+    /// cache. Once background indexing completes this is a no-op (every
+    /// reference already resolves).
+    pub fn priority_index_for_ast(&self, program: &php_ast::owned::Program, file: &str) {
         if self.resolver.is_none() {
             return;
         }
@@ -380,7 +393,7 @@ impl AnalysisSession {
             return;
         }
         // Resolve names against the file's namespace/imports up front, then
-        // drop the snapshot before lazy-loading (which mutates inputs).
+        // drop the snapshot before loading (which mutates inputs).
         let resolved: Vec<String> = {
             let db = self.snapshot_db();
             refs.into_iter()
@@ -388,17 +401,9 @@ impl AnalysisSession {
                 .collect()
         };
         for fqcn in resolved {
-            // Load each referenced class together with its declared-type closure
-            // (inheritance chain + signature types) so member access and chained
-            // calls on lazily-loaded types type-check in a single pass.
-            //
-            // Depth 3 is empirically the knee of the curve: on Laravel hub files
-            // it produces diagnostics identical to the unbounded (depth-10)
-            // closure while loading ~2-3× fewer classes (e.g. 117 vs 314 for
-            // Builder.php), roughly halving cold-open latency. Depth 2 is cheaper
-            // still but measurably less complete (leaves more types unresolved).
-            // `load_class_transitive` short-circuits classes already present.
-            self.load_class_transitive(&fqcn, 3);
+            // load_class is a no-op when the class is already indexed (the
+            // common case once the background walk has passed this file).
+            self.load_class(&fqcn);
         }
     }
 
@@ -508,17 +513,19 @@ impl AnalysisSession {
         // the resolver on the next FileAnalyzer iteration.
         self.evict_unresolvable_for_file(&file);
 
-        // If the workspace symbol index singleton has already been built,
-        // check whether this edit changed any declared names. If so, rebuild
-        // the singleton so subsequent `find_class_like` / `find_function`
-        // calls see the new names. Body-only edits skip this (name-only
-        // PartialEq on FileDeclarations returns equal → no rebuild → the
-        // HIGH-durability singleton dep short-circuits in O(1)).
+        // If the workspace symbol index singleton has already been built, keep
+        // it consistent with this edit *incrementally*: subtract the file's old
+        // declarations and add its new ones (tier-aware). Body-only edits are a
+        // no-op inside `update_workspace_index_for_file` (name-only
+        // FileDeclarations equality → no singleton write → the HIGH-durability
+        // dep does not invalidate body-analysis memos). Only the rare ambiguous
+        // case (a removed name still declared by another file, where this file
+        // owned the winning entry) falls back to a full O(N) rebuild.
         {
             let mut guard = self.db.salsa.write();
             if guard.workspace_symbol_index_singleton().is_some() {
                 if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
-                    if guard.file_declarations_changed(sf) {
+                    if !guard.update_workspace_index_for_file(sf) {
                         guard.rebuild_workspace_symbol_index();
                     }
                 }
@@ -617,6 +624,161 @@ impl AnalysisSession {
         }
     }
 
+    /// The workspace generation epoch — the rust-analyzer-style "are we up to
+    /// date" counter. Bumped whenever a file is added or removed. A consumer
+    /// records this alongside the diagnostics it publishes for a file; when the
+    /// value later advances (background indexing registered more files), those
+    /// files become candidates for re-analysis + re-publish.
+    pub fn index_generation(&self) -> u64 {
+        self.db.salsa.read().workspace_revision_value()
+    }
+
+    /// Index one bounded chunk of `(path, text)` files — the chunked background
+    /// indexing primitive.
+    ///
+    /// For each chunk this: (1) registers the files as `Durability::HIGH` salsa
+    /// inputs in one short write window, (2) parses them to prime the in-process
+    /// and on-disk declaration caches (in parallel when `parallelism ==
+    /// `[`IndexParallelism::Rayon`]; sequentially for wasm / single-thread
+    /// consumers), and (3) merges their declarations into the workspace symbol
+    /// index singleton **incrementally** (no full rebuild) so partially-indexed
+    /// symbols resolve immediately.
+    ///
+    /// The library spawns no thread: the consumer pumps chunks from its own
+    /// driver (LSP worker thread, or one chunk per wasm event-loop tick),
+    /// re-checking higher-priority work between calls. `cancel` is honoured at
+    /// chunk boundaries so an edit can abandon queued indexing cheaply.
+    ///
+    /// **Contract:** index the workspace *incrementally* through this method;
+    /// don't bulk-register the entire file set up front and then index — the
+    /// first call lazily seeds the singleton from the currently-registered set
+    /// (built-in stubs + this chunk), so keeping that initial set small keeps
+    /// the first call cheap. Call [`Self::finalize_index`] once after the last
+    /// chunk to reconcile authoritatively.
+    ///
+    /// **Responsiveness:** parsing / declaration collection happens off the
+    /// salsa write lock (on a snapshot); only the cheap symbol-map merge runs
+    /// under the lock, so the write window per chunk is short and an interactive
+    /// read on another thread blocks at most that long. Note that, per salsa's
+    /// snapshot model, a *cancellable query* in flight on another thread (e.g.
+    /// `hover`, `definition_of`, `FileAnalyzer::analyze`) when this batch takes
+    /// the write lock may unwind with `salsa::Cancelled`; a multi-threaded
+    /// consumer should catch that and retry the request (the rust-analyzer
+    /// pattern). A single-threaded consumer that interleaves requests *between*
+    /// `index_batch` calls never observes cancellation.
+    pub fn index_batch(
+        &self,
+        files: &[(Arc<str>, Arc<str>)],
+        parallelism: crate::IndexParallelism,
+        cancel: &crate::IndexCancel,
+    ) -> crate::IndexBatchOutcome {
+        if files.is_empty() || cancel.is_cancelled() {
+            return crate::IndexBatchOutcome {
+                registered: 0,
+                cancelled: cancel.is_cancelled(),
+                generation: self.index_generation(),
+            };
+        }
+        self.ensure_all_stubs();
+
+        // 1. Register the chunk as HIGH-durability inputs — one short write
+        //    window, then release the lock so interactive requests interleave.
+        let sources: Vec<crate::db::SourceFile> = {
+            let mut guard = self.db.salsa.write();
+            files
+                .iter()
+                .map(|(file, source)| {
+                    guard.upsert_source_file_with_durability(
+                        file.clone(),
+                        source.clone(),
+                        salsa::Durability::HIGH,
+                    )
+                })
+                .collect()
+        };
+        let registered = sources.len();
+
+        if cancel.is_cancelled() {
+            return crate::IndexBatchOutcome {
+                registered,
+                cancelled: true,
+                generation: self.index_generation(),
+            };
+        }
+
+        // Is this the seed chunk (no singleton yet)? If so we must collect decls
+        // for the whole currently-registered set (stubs + this chunk); otherwise
+        // just this chunk.
+        let seed = self
+            .db
+            .salsa
+            .read()
+            .workspace_symbol_index_singleton()
+            .is_none();
+        let snap = self.db.snapshot_db();
+        let to_collect: Vec<crate::db::SourceFile> = if seed {
+            snap.all_source_files()
+        } else {
+            sources.clone()
+        };
+
+        // 2. Collect per-file declarations OFF the write lock (on a snapshot).
+        //    This is where parsing happens — crucially NOT while holding the
+        //    write lock, so concurrent interactive reads are not blocked for the
+        //    parse duration. Also primes the shared parse/disk caches.
+        let collect_one = |db: &crate::db::MirDbStorage, sf: crate::db::SourceFile| {
+            (sf, crate::db::collect_file_declarations(db, sf))
+        };
+        let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
+            if parallelism == crate::IndexParallelism::Rayon {
+                use rayon::prelude::*;
+                to_collect
+                    .par_iter()
+                    .map_with(snap.clone(), |db, &sf| collect_one(db, sf))
+                    .collect()
+            } else {
+                to_collect
+                    .iter()
+                    .map(|&sf| collect_one(&snap, sf))
+                    .collect()
+            };
+        drop(snap);
+
+        if cancel.is_cancelled() {
+            return crate::IndexBatchOutcome {
+                registered,
+                cancelled: true,
+                generation: self.index_generation(),
+            };
+        }
+
+        // 3. Apply to the singleton under a SHORT write window — only cheap map
+        //    construction / merge runs here (no parse).
+        {
+            let mut guard = self.db.salsa.write();
+            if guard.workspace_symbol_index_singleton().is_none() {
+                guard.build_workspace_index_from_decls(decls);
+            } else {
+                guard.merge_precomputed_into_workspace_index(&decls);
+            }
+        }
+
+        crate::IndexBatchOutcome {
+            registered,
+            cancelled: cancel.is_cancelled(),
+            generation: self.index_generation(),
+        }
+    }
+
+    /// Authoritative full rebuild of the workspace symbol index. Call once
+    /// after the consumer has pumped every [`Self::index_batch`] chunk (end of
+    /// warm-up) to reconcile the incrementally-merged index against the full
+    /// registered set. Cheap after indexing — every file's declarations are
+    /// already cached.
+    pub fn finalize_index(&self) {
+        self.db.salsa.write().rebuild_workspace_symbol_index();
+    }
+
     /// Drop a file's contribution to the session: codebase definitions,
     /// reference locations, salsa input handle, cache entry, and outgoing
     /// reverse-dependency edges. Cache entries of *dependent* files are
@@ -644,6 +806,9 @@ impl AnalysisSession {
         // unresolvable until the file (or another with matching symbols) is
         // ingested again. Selective evict mirrors the ingest path.
         self.evict_unresolvable_for_file(file);
+        // Vendor files are static in the eager-index model — closing a project
+        // buffer never evicts them (no per-file pinning). Memory is bounded by
+        // the LRU on `collect_file_definitions` and the parse cache instead.
     }
 
     /// Number of files currently tracked in this session's salsa input set.
@@ -760,8 +925,10 @@ impl AnalysisSession {
             crate::Name::Method { class, .. }
             | crate::Name::Property { class, .. }
             | crate::Name::ClassConstant { class, .. } => {
-                // 10 mirrors the default depth used by reanalyze_dependents.
-                self.load_class_transitive(class.as_ref(), 10);
+                // Fault in the owning class for navigation if the background
+                // indexer hasn't reached it yet. Its inheritance ancestors
+                // resolve through the (eagerly-built) workspace symbol index.
+                self.load_class(class.as_ref());
             }
             _ => {}
         }
@@ -1134,67 +1301,6 @@ impl AnalysisSession {
         }
     }
 
-    /// Lazy-load the full *declared-type closure* transitively reachable from
-    /// `fqcn`: not just its parent / interface / trait inheritance chain, but
-    /// also the classes named in its members' signatures (method return /
-    /// parameter types, property types, constant types, generic args, mixins,
-    /// `@throws`). This mirrors the batch path's
-    /// [`crate::batch::collect_class_referenced_fqcns`] closure, so an open
-    /// buffer gets the same complete diagnostics the CLI produces: a value
-    /// whose type comes from a vendor method's return type, or a member
-    /// inherited from a vendor parent, resolves instead of degrading to `mixed`.
-    ///
-    /// Walks at most `max_depth` levels (default in batch analysis is 10).
-    /// Returns the number of classes successfully loaded (not counting classes
-    /// that were already present).
-    pub fn load_class_transitive(&self, fqcn: &str, max_depth: usize) -> usize {
-        if self.resolver.is_none() {
-            return 0;
-        }
-        let mut loaded = 0;
-        let mut frontier: Vec<String> = vec![fqcn.to_string()];
-        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::default();
-
-        for _ in 0..max_depth {
-            if frontier.is_empty() {
-                break;
-            }
-            // Phase 1: load every class in this frontier level (mutates inputs).
-            let mut to_expand: Vec<String> = Vec::with_capacity(frontier.len());
-            for name in frontier.drain(..) {
-                if !visited.insert(name.clone()) {
-                    continue;
-                }
-                let was_present = self.contains_class(&name);
-                if !self.load_class(&name).is_loaded() {
-                    continue;
-                }
-                if !was_present {
-                    loaded += 1;
-                }
-                to_expand.push(name);
-            }
-
-            // Phase 2: follow the declared-type closure of every resolved class
-            // — including already-present ones, so a class loaded shallowly
-            // elsewhere still gets its references expanded. One db snapshot for
-            // the whole level (all loads above are committed); `visited` and
-            // `contains_class` keep re-walks cheap and loop-free.
-            let mut next: Vec<String> = Vec::new();
-            if !to_expand.is_empty() {
-                let db = self.snapshot_db();
-                for name in &to_expand {
-                    let here = crate::db::Fqcn::from_str(&db, name.as_str());
-                    if let Some(class) = crate::db::find_class_like(&db, here) {
-                        crate::batch::collect_class_referenced_fqcns(&class, &mut next);
-                    }
-                }
-            }
-            frontier = next;
-        }
-        loaded
-    }
-
     /// Evict every negative-cache entry whose stored resolver-mapped path
     /// equals `file`. FQCNs cached as never-resolvable (path `None`) are left
     /// alone — no source-text change can make them resolvable.
@@ -1245,7 +1351,27 @@ impl AnalysisSession {
     ///
     /// Cross-file inferred return types are resolved on demand via salsa.
     pub fn reanalyze_dependents(&self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
+        self.reanalyze_dependents_cancellable(file, &crate::IndexCancel::new())
+    }
+
+    /// Cancellable variant of [`Self::reanalyze_dependents`].
+    ///
+    /// The consumer flips `cancel` (typically because a newer edit arrived) to
+    /// abandon the re-analysis; the flag is checked at each file boundary. Salsa
+    /// cannot unwind the plain-Rust body-analysis walk mid-flight, so a file
+    /// already in progress finishes, but no further files are started. Files
+    /// skipped due to cancellation are simply absent from the returned vec —
+    /// the consumer should drop a stale flag and start fresh work on each edit.
+    pub fn reanalyze_dependents_cancellable(
+        &self,
+        file: &str,
+        cancel: &crate::IndexCancel,
+    ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
         use rayon::prelude::*;
+
+        if cancel.is_cancelled() {
+            return Vec::new();
+        }
 
         // Phase 1: compute dependents + gather their sources outside the
         // analysis loop so each worker has everything it needs.
@@ -1268,9 +1394,13 @@ impl AnalysisSession {
         // Phase 2: parallel parse + analyze. Each rayon worker gets its own
         // database snapshot via FileAnalyzer; writes are isolated to the
         // session's canonical db (none happen here since we only run body analysis).
+        // Each worker short-circuits when cancellation has been requested.
         with_source
             .into_par_iter()
-            .map(|(file, source)| {
+            .filter_map(|(file, source)| {
+                if cancel.is_cancelled() {
+                    return None;
+                }
                 let parsed = php_rs_parser::parse(source.as_ref());
                 let analyzer = crate::FileAnalyzer::new(self);
                 let analysis = analyzer.analyze(
@@ -1279,7 +1409,7 @@ impl AnalysisSession {
                     &parsed.program,
                     &parsed.source_map,
                 );
-                (file, analysis)
+                Some((file, analysis))
             })
             .collect()
     }
@@ -1327,17 +1457,23 @@ impl AnalysisSession {
     /// });
     /// ```
     ///
-    /// Internally walks the inheritance chain of each loaded class to a
-    /// shallow depth so member access on imported types type-checks without
-    /// the user paying the cost on their first navigation.
+    /// Uses a single shared-visited two-tier BFS across all pending imports
+    /// (see [`Self::load_classes_transitive_bounded`]) with a shallow depth so
+    /// member access on imported types type-checks without pulling in the
+    /// entire vendor tree.
     pub fn prefetch_imports(&self, file: &str) -> usize {
         let pending = self.pending_lazy_loads(file);
+        if pending.is_empty() {
+            return 0;
+        }
+        // Fault in each imported FQCN directly (single-file load + tier-merge).
+        // Inheritance ancestors / signature types resolve through the eagerly
+        // built workspace symbol index — no transitive walk needed here.
         let mut loaded = 0;
-        for fqcn in pending {
-            // Use the transitive walker with a small depth so we pick up
-            // parent classes / interfaces needed for member resolution, but
-            // don't recursively pull in the entire vendor tree.
-            loaded += self.load_class_transitive(&fqcn, 2);
+        for fqcn in &pending {
+            if self.load_class(fqcn.as_ref()).is_loaded() {
+                loaded += 1;
+            }
         }
         loaded
     }

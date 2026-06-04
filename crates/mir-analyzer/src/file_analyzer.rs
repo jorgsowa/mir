@@ -1,14 +1,13 @@
 //! Per-file analysis entry point for incremental analysis.
 //!
-//! [`FileAnalyzer`] runs single-pass body analysis against an [`AnalysisSession`] and
-//! returns issues + resolved symbols for one file. Unlike
-//! [`crate::ProjectAnalyzer::re_analyze_file`], it does **not** run the
-//! inference-only body analysis sweep — that's a batch concern. For cross-file
-//! inferred return types, schedule a project-wide inference sweep on idle.
-//!
-//! Caller is responsible for parsing the file and passing owned AST.
-//! The session must already have definition collection state for any files whose definitions
-//! this analysis depends on; call [`AnalysisSession::ingest_file`] first.
+//! [`FileAnalyzer`] runs a **single** body-analysis pass against an
+//! [`AnalysisSession`] snapshot. In the eager-static-input model the workspace
+//! symbol index is built up front by the background indexer
+//! ([`AnalysisSession::index_batch`]), so `find_class_like` resolves vendor
+//! classes directly — there is no lazy-load / retry loop. The only on-demand
+//! work is [`AnalysisSession::priority_index_for_ast`], which faults in the
+//! open file's *direct* references if the background walk hasn't reached them
+//! yet, keeping warm-up free of transient false positives.
 //!
 //! For batch multi-file analysis, use [`BatchFileAnalyzer::analyze_batch`]
 //! which parallelizes analysis across multiple pre-parsed files.
@@ -58,13 +57,12 @@ impl<'a> FileAnalyzer<'a> {
         Self { session }
     }
 
-    /// Run body analysis against a db snapshot.
+    /// Run a single body-analysis pass against a frozen db snapshot.
     ///
-    /// body analysis runs against a cloned db snapshot — the lock is not held during
-    /// analysis, so concurrent edits and reads on the session proceed without
-    /// blocking on this call. PSR-4-mapped classes referenced in the AST are
-    /// pre-loaded before body analysis so `find_class_like` resolves them in a single
-    /// pass via the salsa query graph.
+    /// `priority_index_for_ast` runs first to fault in any of this file's
+    /// direct class references not yet reached by the background indexer; then
+    /// one snapshot is analyzed and its reference locations committed. The lock
+    /// is not held during analysis, so concurrent edits and reads proceed.
     pub fn analyze(
         &self,
         file: Arc<str>,
@@ -73,13 +71,23 @@ impl<'a> FileAnalyzer<'a> {
         source_map: &SourceMap,
     ) -> FileAnalysis {
         crate::metrics::record_file_analysis();
+
+        // Priority-index the buffer's direct class references so any not yet
+        // reached by the background indexer resolve in this single pass (no
+        // transient false UndefinedClass during warm-up). Once indexing
+        // completes this is a no-op.
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());
 
         let _scope = crate::metrics::BodyAnalysisScope::new();
+
+        // Single pass against a frozen snapshot. With the eager-static-input
+        // model the workspace index is complete (or priority-indexed for this
+        // file's direct refs), so there are no body-analysis "misses" to fault
+        // in — no retry loop, no whole-file re-analysis.
         let db = self.session.snapshot_db();
         let driver = BodyAnalyzer::new(&db, self.session.php_version());
-        let (issues, symbols) = driver.analyze_bodies(program, file, source, source_map);
+        let (issues, symbols) = driver.analyze_bodies(program, file.clone(), source, source_map);
         self.session
             .commit_ref_locs_batch(db.take_pending_ref_locs());
         FileAnalysis { issues, symbols }

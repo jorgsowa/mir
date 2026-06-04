@@ -232,10 +232,7 @@ impl AnalyzerDb {
         // Check in-process parse cache first (fastest path, avoids even disk I/O).
         {
             let guard = self.salsa.read();
-            let cached = guard
-                .parse_cache()
-                .get(&content_hash)
-                .map(|r| Arc::clone(&*r));
+            let cached = guard.parse_cache().get(&content_hash);
             drop(guard);
             if let Some(cached) = cached {
                 crate::metrics::record_stub_cache_hit();
