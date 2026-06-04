@@ -199,6 +199,18 @@ impl AnalysisSession {
         self.db.collect_and_ingest_file(file, src, php_version)
     }
 
+    /// Rebuild the workspace symbol index singleton from every registered source
+    /// file. Required in the batch path because `workspace_index` reads the
+    /// maintained singleton, and that singleton is built from vendor *before*
+    /// `analyze_paths` registers project files (and before `lazy_load_*` faults
+    /// in referenced classes). Without refreshing it, `find_class_like` /
+    /// `class_exists` miss every project and lazy-loaded class, yielding false
+    /// `UndefinedClass`. Cheap after the definition caches are warm (no parsing).
+    fn refresh_workspace_index(&self) {
+        let mut guard = self.db.salsa.write();
+        guard.rebuild_workspace_symbol_index();
+    }
+
     /// Load the configured PHP version + built-in stubs + user stubs into
     /// the shared db. Called by [`Self::analyze_paths`] and
     /// [`Self::collect_definitions`].
@@ -388,6 +400,13 @@ impl AnalysisSession {
                 });
         }
         let _t_prewarm_ms = (_t0.elapsed() - _t_ingest).as_secs_f64() * 1000.0;
+
+        // Fold the freshly-registered project files into the workspace symbol
+        // index singleton. The singleton may have been built from vendor before
+        // this run (CLI indexes vendor before analyze_paths); since adding files
+        // no longer nulls it, project classes would otherwise be invisible to
+        // find_class_like and reported as false UndefinedClass.
+        self.refresh_workspace_index();
 
         // ---- Lazy-load unknown classes via PSR-4 ----------------------------
         let _t_before_lazy = _t0.elapsed();
@@ -655,6 +674,10 @@ impl AnalysisSession {
             for mut issues in per_file_issues {
                 all_issues.append(&mut issues);
             }
+
+            // Make the just-loaded classes visible to the next iteration's
+            // transitive scan and to the caller's post-lazy-load snapshot.
+            self.refresh_workspace_index();
         }
     }
 
@@ -697,6 +720,10 @@ impl AnalysisSession {
                     let _ = self.collect_and_ingest_source(file, &src, php_version);
                 }
             }
+
+            // Make the loaded classes visible to the type_exists() check below
+            // (and to the reanalysis snapshot) so resolved files are detected.
+            self.refresh_workspace_index();
 
             self.lazy_load_missing_classes(psr4.clone(), php_version, all_issues);
 
