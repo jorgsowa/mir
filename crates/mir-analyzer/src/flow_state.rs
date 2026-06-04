@@ -9,6 +9,30 @@ use mir_types::{Name, Type};
 /// small and branch-local (cleared at merge unless one branch diverges).
 type ClassExistsGuards = FxHashSet<Arc<str>>;
 
+/// A dead write: `(variable, line, col_start, line_end, col_end)`.
+type DeadWrite = (Name, u32, u16, u32, u16);
+
+/// Append `src` dead writes onto `dst`, skipping entries already present.
+///
+/// Critical for bounding memory in `merge_branches`: both branch contexts are
+/// derived from `pre`, so each already contains all of `pre`'s dead writes.
+/// Naively concatenating them onto a `pre`-derived `dst` re-includes `pre`'s
+/// entries on every merge — under nested-loop fixpoint analysis the `Vec` then
+/// grows multiplicatively (≈3× per merge → exponential, reaching gigabytes).
+/// A dead write is uniquely identified by its `(variable, location)` tuple, so
+/// deduplication is also semantically correct (one diagnostic per location).
+fn extend_dead_writes_dedup(dst: &mut Vec<DeadWrite>, src: Vec<DeadWrite>) {
+    if src.is_empty() {
+        return;
+    }
+    let mut seen: FxHashSet<DeadWrite> = dst.iter().copied().collect();
+    for dw in src {
+        if seen.insert(dw) {
+            dst.push(dw);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // FlowState
 // ---------------------------------------------------------------------------
@@ -458,7 +482,7 @@ impl FlowState {
                 result.last_write_locs.remove(name);
             }
             // Dead writes from the diverging branch are still dead.
-            result.dead_writes.extend(if_ctx.dead_writes);
+            extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
             for name in if_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
@@ -474,7 +498,7 @@ impl FlowState {
                 result.read_vars.insert(*name);
                 result.last_write_locs.remove(name);
             }
-            result.dead_writes.extend(else_ctx.dead_writes);
+            extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
             for name in else_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
@@ -488,8 +512,11 @@ impl FlowState {
             for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
                 result.read_vars.insert(*name);
             }
-            result.dead_writes.extend(if_ctx.dead_writes);
-            result.dead_writes.extend(else_ctx.dead_writes);
+            // `result` is `pre.clone()`; both branches already contain pre's
+            // dead writes, so rebuild deduped rather than concatenating.
+            result.dead_writes.clear();
+            extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
+            extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
             for name in if_ctx
                 .foreach_value_var_names
                 .iter()
@@ -635,9 +662,15 @@ impl FlowState {
             result.var_locations.entry(*name).or_insert(*loc);
         }
 
-        // Dead writes: accumulate from both branches (union).
-        result.dead_writes.extend(if_ctx.dead_writes);
-        result.dead_writes.extend(else_ctx.dead_writes);
+        // Dead writes: union of both branches, deduplicated. `result` is
+        // `pre.clone()` and both branches descend from `pre`, so they already
+        // contain pre's dead writes — rebuild from the branches rather than
+        // concatenating onto pre's copy (which would grow the Vec ~3× per merge
+        // → exponential under nested-loop fixpoint analysis; see
+        // `extend_dead_writes_dedup`).
+        result.dead_writes.clear();
+        extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
+        extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
 
         // Last write locs: union from both branches, plus pre_ctx variables that
         // are still pending in BOTH branches (meaning neither branch nor the
