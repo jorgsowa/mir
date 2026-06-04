@@ -8,7 +8,7 @@ use owo_colors::OwoColorize;
 
 use mir_analyzer::{
     dead_code_issue_kinds, discover_files, AnalysisResult, AnalysisSession, BatchOptions,
-    PhpVersion,
+    IndexCancel, IndexParallelism, PhpVersion,
 };
 
 use crate::config::Config;
@@ -109,7 +109,7 @@ pub fn run_composer_flow(
                 );
             }
         }
-        session.collect_definitions(&vendor_files);
+        index_vendor_chunked(&session, &vendor_files);
     }
 
     let show_progress = !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
@@ -208,7 +208,7 @@ pub fn run_plain_flow(
                     vendor_files.len()
                 );
             }
-            session.collect_definitions(&vendor_files);
+            index_vendor_chunked(&session, &vendor_files);
         }
     }
 
@@ -221,6 +221,54 @@ pub fn run_plain_flow(
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+/// Default number of vendor files indexed per `index_batch` chunk. Sized for a
+/// short write-lock window; override with `MIR_INDEX_CHUNK` for tuning.
+const VENDOR_INDEX_CHUNK: usize = 512;
+
+/// Build the workspace symbol index from vendor files via the chunked
+/// background-indexing engine (`index_batch` + `finalize_index`) instead of the
+/// one-shot `collect_definitions`.
+///
+/// The CLI is a batch run with no concurrent interactive reads and no
+/// cancellation, so the per-chunk short-write-window and `IndexCancel` are inert
+/// here — the win over `collect_definitions` is **transient peak RSS**: this
+/// reads and collects one chunk at a time, so the all-files read buffer and the
+/// all-files `StubSlice` clones never coexist. The registered file *texts* are
+/// retained by salsa either way.
+///
+/// No `finalize_index` (full rebuild) is issued: each `index_batch` merges its
+/// chunk into the singleton incrementally, and `incremental_index_matches_-
+/// full_rebuild` proves the incrementally-merged index equals a full rebuild for
+/// arbitrary chunk order — so a trailing rebuild here would be pure duplicate
+/// work. (A long-lived consumer that *edits* after warm-up still calls
+/// `finalize_index` once; a one-shot batch run that only reads does not.)
+fn index_vendor_chunked(session: &AnalysisSession, vendor_files: &[PathBuf]) {
+    use rayon::prelude::*;
+
+    let chunk_size = std::env::var("MIR_INDEX_CHUNK")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(VENDOR_INDEX_CHUNK);
+
+    let cancel = IndexCancel::new();
+    for paths in vendor_files.chunks(chunk_size) {
+        // Read this chunk's texts off-thread, in parallel, then index and drop —
+        // keeping only one chunk's worth of transient buffers alive at a time.
+        let pairs: Vec<(Arc<str>, Arc<str>)> = paths
+            .par_iter()
+            .filter_map(|p| {
+                let src = std::fs::read_to_string(p).ok()?;
+                Some((
+                    Arc::from(p.to_string_lossy().as_ref()),
+                    Arc::from(src.as_str()),
+                ))
+            })
+            .collect();
+        session.index_batch(&pairs, IndexParallelism::Rayon, &cancel);
+    }
+}
 
 pub fn default_cache_dir() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
