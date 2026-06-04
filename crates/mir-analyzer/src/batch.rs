@@ -622,16 +622,38 @@ impl AnalysisSession {
                 break;
             }
 
-            for (fqcn, path) in to_load {
-                loaded.insert(fqcn);
-                if let Ok(src) = std::fs::read_to_string(&path) {
+            // Mark everything queued as loaded up-front so a file that fails to
+            // read isn't retried on the next depth iteration (matches the serial
+            // behaviour, where `loaded.insert` ran before the read attempt).
+            for (fqcn, _) in &to_load {
+                loaded.insert(fqcn.clone());
+            }
+
+            // Read + parse + ingest the missing classes in parallel. The parse
+            // and definition walk inside `collect_and_ingest_source` already run
+            // off the salsa write lock (it takes the lock only for the brief
+            // input upsert), so fanning the per-file work across the rayon pool
+            // turns this previously-serial phase — the dominant cost on the lazy
+            // path — concurrent. `collect()` on a rayon map preserves input
+            // order, so the resulting issue ordering matches the serial version.
+            let per_file_issues: Vec<Vec<Issue>> = to_load
+                .par_iter()
+                .map(|(_, path)| -> Vec<Issue> {
+                    let Ok(src) = std::fs::read_to_string(path) else {
+                        return Vec::new();
+                    };
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let is_vendor = file.contains("/vendor/") || file.contains("\\vendor\\");
                     let defs = self.collect_and_ingest_source(file, &src, php_version);
-                    if !is_vendor {
-                        all_issues.extend(Arc::unwrap_or_clone(defs.issues));
+                    if is_vendor {
+                        Vec::new()
+                    } else {
+                        Arc::unwrap_or_clone(defs.issues)
                     }
-                }
+                })
+                .collect();
+            for mut issues in per_file_issues {
+                all_issues.append(&mut issues);
             }
         }
     }
