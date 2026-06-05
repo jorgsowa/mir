@@ -397,6 +397,19 @@ fn resolve_method_return<'a>(
                 span,
             );
         }
+        if method_name != resolved.name.as_ref()
+            && method_name.eq_ignore_ascii_case(resolved.name.as_ref())
+        {
+            ea.emit(
+                IssueKind::WrongCaseMethod {
+                    class: fqcn.to_string(),
+                    used: method_name.to_string(),
+                    canonical: resolved.name.to_string(),
+                },
+                Severity::Info,
+                call.method.span,
+            );
+        }
         if resolved.is_internal {
             let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
             let method_namespace = extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());

@@ -121,9 +121,39 @@ pub(crate) fn check_type_hint_classes(
                     .with_snippet(crate::parser::span_text(source, hint.span).unwrap_or_default()),
                 );
             } else {
-                // Class exists — check if it's deprecated
+                // Class exists — check for wrong case and deprecation
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if let Some(class) = crate::db::find_class_like(db, here) {
+                    let written_short = name_str.rsplit('\\').next().unwrap_or(&name_str);
+                    let canonical_short = class
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(class.fqcn().as_ref());
+                    if written_short != canonical_short
+                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let (line, col_start) =
+                            offset_to_line_col(source, hint.span.start, source_map);
+                        let (line_end, col_end) = if hint.span.start < hint.span.end {
+                            offset_to_line_col(source, hint.span.end, source_map)
+                        } else {
+                            (line, col_start)
+                        };
+                        issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::WrongCaseClass {
+                                used: written_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        ));
+                    }
                     if let Some(msg) = class.deprecated() {
                         let (line, col_start) =
                             offset_to_line_col(source, hint.span.start, source_map);

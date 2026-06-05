@@ -83,6 +83,38 @@ impl<'a> ClassAnalyzer<'a> {
                     .unwrap_or(false);
                 let parent_deprecated: Option<Arc<str>> =
                     parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
+                if let Some(canonical) = parent_pulled.as_ref() {
+                    let used_short = parent_fqcn
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(parent_fqcn.as_ref());
+                    let canonical_short = canonical
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(canonical.fqcn().as_ref());
+                    if used_short != canonical_short
+                        && used_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::WrongCaseClass {
+                                used: used_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
                 if parent_pulled.is_some() {
                     if parent_is_final {
                         let loc = issue_location(
@@ -132,6 +164,38 @@ impl<'a> ClassAnalyzer<'a> {
                     for iface_fqcn in cls.interfaces() {
                         let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
                         if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
+                            let used_short = iface_fqcn
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(iface_fqcn.as_ref());
+                            let canonical_short = iface
+                                .fqcn()
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(iface.fqcn().as_ref());
+                            if used_short != canonical_short
+                                && used_short.eq_ignore_ascii_case(canonical_short)
+                            {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::WrongCaseClass {
+                                        used: used_short.to_string(),
+                                        canonical: canonical_short.to_string(),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
                             if let Some(msg) = iface.deprecated() {
                                 let loc = issue_location(
                                     location.as_ref(),
@@ -158,6 +222,35 @@ impl<'a> ClassAnalyzer<'a> {
                     for trait_fqcn in cls.class_traits() {
                         let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
                         if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
+                            let used_short = trait_fqcn
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(trait_fqcn.as_ref());
+                            let canonical_short =
+                                t.fqcn().rsplit('\\').next().unwrap_or(t.fqcn().as_ref());
+                            if used_short != canonical_short
+                                && used_short.eq_ignore_ascii_case(canonical_short)
+                            {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::WrongCaseClass {
+                                        used: used_short.to_string(),
+                                        canonical: canonical_short.to_string(),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
                             if let Some(msg) = t.deprecated() {
                                 let loc = issue_location(
                                     location.as_ref(),

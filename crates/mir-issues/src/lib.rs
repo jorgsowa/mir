@@ -444,6 +444,21 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_trait_use/`.
     InvalidTraitUse { trait_name: String, reason: String },
+
+    // --- Case sensitivity (PHP 8.6 deprecation) -----------------------------
+    /// Emitted by `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/wrong_case_function/`.
+    WrongCaseFunction { used: String, canonical: String },
+    /// Emitted by `mir-analyzer/src/call/method.rs` and `src/call/static_call.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/wrong_case_method/`.
+    WrongCaseMethod {
+        class: String,
+        used: String,
+        canonical: String,
+    },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs` and `src/call/static_call.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/wrong_case_class/`.
+    WrongCaseClass { used: String, canonical: String },
 }
 
 fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
@@ -564,7 +579,10 @@ impl IssueKind {
             | IssueKind::MixedPropertyFetch { .. }
             | IssueKind::MixedClone
             | IssueKind::ShadowedTemplateParam { .. }
-            | IssueKind::MissingThrowsDocblock { .. } => Severity::Info,
+            | IssueKind::MissingThrowsDocblock { .. }
+            | IssueKind::WrongCaseFunction { .. }
+            | IssueKind::WrongCaseMethod { .. }
+            | IssueKind::WrongCaseClass { .. } => Severity::Info,
         }
     }
 
@@ -691,6 +709,9 @@ impl IssueKind {
 
             // Deprecation / internal (1000-1099)
             IssueKind::DeprecatedCall { .. } => "MIR1000",
+            IssueKind::WrongCaseFunction { .. } => "MIR1009",
+            IssueKind::WrongCaseMethod { .. } => "MIR1010",
+            IssueKind::WrongCaseClass { .. } => "MIR1011",
             IssueKind::DeprecatedProperty { .. } => "MIR1005",
             IssueKind::DeprecatedInterface { .. } => "MIR1006",
             IssueKind::DeprecatedTrait { .. } => "MIR1007",
@@ -832,6 +853,9 @@ impl IssueKind {
             IssueKind::InvalidToString { .. } => "InvalidToString",
             IssueKind::CircularInheritance { .. } => "CircularInheritance",
             IssueKind::InvalidTraitUse { .. } => "InvalidTraitUse",
+            IssueKind::WrongCaseFunction { .. } => "WrongCaseFunction",
+            IssueKind::WrongCaseMethod { .. } => "WrongCaseMethod",
+            IssueKind::WrongCaseClass { .. } => "WrongCaseClass",
         }
     }
 
@@ -1205,6 +1229,19 @@ impl IssueKind {
             }
             IssueKind::InvalidTraitUse { trait_name, reason } => {
                 format!("Trait {trait_name} used incorrectly: {reason}")
+            }
+            IssueKind::WrongCaseFunction { used, canonical } => {
+                format!("Function name '{used}' has incorrect casing; use '{canonical}'")
+            }
+            IssueKind::WrongCaseMethod {
+                class,
+                used,
+                canonical,
+            } => {
+                format!("Method name '{class}::{used}' has incorrect casing; use '{canonical}'")
+            }
+            IssueKind::WrongCaseClass { used, canonical } => {
+                format!("Class name '{used}' has incorrect casing; use '{canonical}'")
             }
         }
     }
@@ -1616,6 +1653,19 @@ mod code_tests {
             IssueKind::InvalidCatch { ty: s() },
             IssueKind::ImplicitToStringCast { class: s() },
             IssueKind::ImplicitFloatToIntCast { from: s() },
+            IssueKind::WrongCaseFunction {
+                used: s(),
+                canonical: s(),
+            },
+            IssueKind::WrongCaseMethod {
+                class: s(),
+                used: s(),
+                canonical: s(),
+            },
+            IssueKind::WrongCaseClass {
+                used: s(),
+                canonical: s(),
+            },
         ]
     }
 
@@ -1690,9 +1740,9 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 96 = current variant count. If this assertion fires after you added
+        // 99 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 96);
+        assert_eq!(one_of_each().len(), 99);
     }
 }

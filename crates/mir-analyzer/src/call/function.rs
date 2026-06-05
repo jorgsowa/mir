@@ -273,6 +273,26 @@ impl CallAnalyzer {
                 );
             }
 
+            {
+                let used_short = fn_name.rsplit('\\').next().unwrap_or(&fn_name);
+                let canonical_short = resolved
+                    .fqn
+                    .rsplit('\\')
+                    .next()
+                    .unwrap_or(resolved.fqn.as_ref());
+                if used_short != canonical_short && used_short.eq_ignore_ascii_case(canonical_short)
+                {
+                    ea.emit(
+                        IssueKind::WrongCaseFunction {
+                            used: used_short.to_string(),
+                            canonical: canonical_short.to_string(),
+                        },
+                        Severity::Info,
+                        call.name.span,
+                    );
+                }
+            }
+
             check_args(
                 ea,
                 CheckArgsParams {

@@ -86,6 +86,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Severity::Error,
                             b.right.span,
                         );
+                    } else {
+                        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                        if let Some(class) = crate::db::find_class_like(self.db, here) {
+                            let written_short = name.rsplit('\\').next().unwrap_or(name.as_ref());
+                            let canonical_short = class
+                                .fqcn()
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(class.fqcn().as_ref());
+                            if written_short != canonical_short
+                                && written_short.eq_ignore_ascii_case(canonical_short)
+                            {
+                                self.emit(
+                                    IssueKind::WrongCaseClass {
+                                        used: written_short.to_string(),
+                                        canonical: canonical_short.to_string(),
+                                    },
+                                    Severity::Info,
+                                    b.right.span,
+                                );
+                            }
+                        }
                     }
                     self.record_ref(fqcn, b.right.span);
                 }

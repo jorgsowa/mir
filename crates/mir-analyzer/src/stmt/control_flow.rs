@@ -438,6 +438,33 @@ impl<'a> StatementsAnalyzer<'a> {
                         });
                         // Check if the caught type extends Throwable
                         if crate::db::class_exists(self.db, &resolved) {
+                            let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
+                            if let Some(class) = crate::db::find_class_like(self.db, here) {
+                                let written_short = raw.rsplit('\\').next().unwrap_or(raw.as_str());
+                                let canonical_short = class
+                                    .fqcn()
+                                    .rsplit('\\')
+                                    .next()
+                                    .unwrap_or(class.fqcn().as_ref());
+                                if written_short != canonical_short
+                                    && written_short.eq_ignore_ascii_case(canonical_short)
+                                {
+                                    let (line_end, col_end2) = self.offset_to_line_col(span.end);
+                                    self.issues.add(Issue::new(
+                                        IssueKind::WrongCaseClass {
+                                            used: written_short.to_string(),
+                                            canonical: canonical_short.to_string(),
+                                        },
+                                        Location {
+                                            file: self.file.clone(),
+                                            line,
+                                            line_end,
+                                            col_start,
+                                            col_end: col_end2.max(col_start + 1),
+                                        },
+                                    ));
+                                }
+                            }
                             let is_throwable = resolved == "Throwable"
                                 || crate::db::extends_or_implements(
                                     self.db,

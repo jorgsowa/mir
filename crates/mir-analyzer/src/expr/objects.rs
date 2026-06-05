@@ -216,6 +216,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 n.class.span,
                             );
                         }
+                        // Check for case mismatch between written name and canonical
+                        let written_short = name.rsplit('\\').next().unwrap_or(name.as_ref());
+                        let canonical_short = class
+                            .fqcn()
+                            .rsplit('\\')
+                            .next()
+                            .unwrap_or(class.fqcn().as_ref());
+                        if written_short != canonical_short
+                            && written_short.eq_ignore_ascii_case(canonical_short)
+                        {
+                            self.emit(
+                                IssueKind::WrongCaseClass {
+                                    used: written_short.to_string(),
+                                    canonical: canonical_short.to_string(),
+                                },
+                                Severity::Info,
+                                n.class.span,
+                            );
+                        }
                     }
                     let ctor_params_and_templates = crate::db::find_method_in_chain(
                         self.db,

@@ -624,7 +624,14 @@ pub fn find_method_in_class<'db>(
                 is_byref: false,
                 is_optional: false,
             };
-            return Some(synth(name, Arc::from(vec![value_param])));
+            // Use canonical PHP casing for the synthesized method name so that
+            // case-sensitivity checks compare against the correct form.
+            let canonical_name = if lower == "tryfrom" {
+                "tryFrom"
+            } else {
+                "from"
+            };
+            return Some(synth(canonical_name, Arc::from(vec![value_param])));
         }
     }
     None

@@ -140,6 +140,30 @@ impl CallAnalyzer {
                             call.class.span,
                         );
                     }
+                    // Check for case mismatch between the written class name and canonical
+                    let written_short = if let ExprKind::Identifier(name) = &call.class.kind {
+                        name.rsplit('\\').next().unwrap_or(name.as_ref())
+                    } else {
+                        ""
+                    };
+                    let canonical_short = class
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(class.fqcn().as_ref());
+                    if !written_short.is_empty()
+                        && written_short != canonical_short
+                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        ea.emit(
+                            IssueKind::WrongCaseClass {
+                                used: written_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            Severity::Info,
+                            call.class.span,
+                        );
+                    }
                 }
             }
         }
@@ -230,6 +254,19 @@ impl CallAnalyzer {
                     },
                     Severity::Info,
                     span,
+                );
+            }
+            if method_name != resolved.name.as_ref()
+                && method_name.eq_ignore_ascii_case(resolved.name.as_ref())
+            {
+                ea.emit(
+                    IssueKind::WrongCaseMethod {
+                        class: fqcn.clone(),
+                        used: method_name.to_string(),
+                        canonical: resolved.name.to_string(),
+                    },
+                    Severity::Info,
+                    call.method.span,
                 );
             }
             // Detect non-static method called statically.
