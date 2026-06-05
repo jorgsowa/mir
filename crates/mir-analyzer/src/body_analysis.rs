@@ -464,6 +464,9 @@ impl<'a> BodyAnalyzer<'a> {
                         );
                     }
                 }
+                StmtKind::Use(use_decl) => {
+                    check_use_decl_casing(use_decl, self.db, file, source, source_map, all_issues);
+                }
                 _ => {}
             }
         }
@@ -534,6 +537,9 @@ impl<'a> BodyAnalyzer<'a> {
                             all_symbols,
                         );
                     }
+                }
+                StmtKind::Use(use_decl) => {
+                    check_use_decl_casing(use_decl, self.db, file, source, source_map, all_issues);
                 }
                 _ => {}
             }
@@ -1607,6 +1613,80 @@ fn seed_param_locations(
         let (line_end, col_end) =
             crate::diagnostics::offset_to_line_col(source, p.span.end, source_map);
         ctx.record_var_location(name, line, col_start, line_end, col_end);
+    }
+}
+
+fn check_use_decl_casing(
+    use_decl: &php_ast::owned::UseDecl,
+    db: &dyn crate::db::MirDatabase,
+    file: &std::sync::Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    all_issues: &mut Vec<Issue>,
+) {
+    use php_ast::ast::UseKind;
+    for item in use_decl.uses.iter() {
+        let effective_kind = item.kind.unwrap_or(use_decl.kind);
+        let full_name = crate::parser::name_to_string_owned(&item.name)
+            .trim_start_matches('\\')
+            .to_string();
+        if full_name.is_empty() {
+            continue;
+        }
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, item.span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, item.span.end, source_map);
+        let loc = mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: col_end.max(col_start + 1),
+        };
+        match effective_kind {
+            UseKind::Normal => {
+                let here = crate::db::Fqcn::from_str(db, &full_name);
+                if let Some(class) = crate::db::find_class_like(db, here) {
+                    let written_short = full_name.rsplit('\\').next().unwrap_or(full_name.as_str());
+                    let canonical_short = class
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(class.fqcn().as_ref());
+                    if written_short != canonical_short
+                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        all_issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::WrongCaseClass {
+                                used: written_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        ));
+                    }
+                }
+            }
+            UseKind::Function => {
+                let here = crate::db::Fqcn::from_str(db, &full_name);
+                if let Some(func) = crate::db::find_function(db, here) {
+                    let written_short = full_name.rsplit('\\').next().unwrap_or(full_name.as_str());
+                    let canonical_short = func.fqn.rsplit('\\').next().unwrap_or(func.fqn.as_ref());
+                    if written_short != canonical_short
+                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        all_issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::WrongCaseFunction {
+                                used: written_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        ));
+                    }
+                }
+            }
+            UseKind::Const => {}
+        }
     }
 }
 

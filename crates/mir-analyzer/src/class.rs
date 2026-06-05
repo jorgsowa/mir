@@ -281,6 +281,7 @@ impl<'a> ClassAnalyzer<'a> {
             if is_abstract {
                 // Still check override compatibility for abstract classes
                 self.check_overrides(fqcn, location.as_ref(), &mut issues);
+                self.check_magic_method_casing(fqcn, &mut issues);
                 continue;
             }
 
@@ -292,6 +293,9 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- 4. Method override compatibility ------------------------------
             self.check_overrides(fqcn, location.as_ref(), &mut issues);
+
+            // ---- 5. Magic method casing ----------------------------------------
+            self.check_magic_method_casing(fqcn, &mut issues);
         }
 
         // ---- 5. Interface-level #[Override] check --------------------------
@@ -449,6 +453,44 @@ impl<'a> ClassAnalyzer<'a> {
     /// templates, or mixed — those cases are skipped by the caller.
     fn scalar_param_type_narrowed(parent_ty: &mir_types::Type, child_ty: &mir_types::Type) -> bool {
         !parent_ty.is_subtype_structural(child_ty)
+    }
+
+    fn check_magic_method_casing(&self, fqcn: &Arc<str>, issues: &mut Vec<Issue>) {
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        let Some(class) = crate::db::find_class_like(self.db, here) else {
+            return;
+        };
+        let own_methods: Vec<Arc<mir_codebase::storage::MethodDef>> =
+            class.own_methods().iter().map(|(_, m)| m.clone()).collect();
+        for own in own_methods {
+            let method_name = own.name.as_ref();
+            let lower = method_name.to_ascii_lowercase();
+            let Some(canonical) = canonical_magic_name(&lower) else {
+                continue;
+            };
+            if method_name == canonical {
+                continue;
+            }
+            let own_location = own.location.clone();
+            let loc = issue_location(
+                own_location.as_ref(),
+                own_location
+                    .as_ref()
+                    .and_then(|l| self.sources.get(&l.file).copied()),
+            );
+            let mut issue = Issue::new(
+                IssueKind::WrongCaseMethod {
+                    class: fqcn.to_string(),
+                    used: method_name.to_string(),
+                    canonical: canonical.to_string(),
+                },
+                loc,
+            );
+            if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                issue = issue.with_snippet(snippet);
+            }
+            issues.push(issue);
+        }
     }
 
     fn check_overrides(
@@ -1157,6 +1199,29 @@ fn issue_location(storage_loc: Option<&mir_types::Location>, source: Option<&str
         line_end,
         col_start: loc.col_start,
         col_end,
+    }
+}
+
+fn canonical_magic_name(lower: &str) -> Option<&'static str> {
+    match lower {
+        "__construct" => Some("__construct"),
+        "__destruct" => Some("__destruct"),
+        "__call" => Some("__call"),
+        "__callstatic" => Some("__callStatic"),
+        "__get" => Some("__get"),
+        "__set" => Some("__set"),
+        "__isset" => Some("__isset"),
+        "__unset" => Some("__unset"),
+        "__sleep" => Some("__sleep"),
+        "__wakeup" => Some("__wakeup"),
+        "__serialize" => Some("__serialize"),
+        "__unserialize" => Some("__unserialize"),
+        "__tostring" => Some("__toString"),
+        "__invoke" => Some("__invoke"),
+        "__set_state" => Some("__set_state"),
+        "__clone" => Some("__clone"),
+        "__debuginfo" => Some("__debugInfo"),
+        _ => None,
     }
 }
 
