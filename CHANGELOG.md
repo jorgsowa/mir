@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-06-05
+
+### Added
+
+- Eager + background vendor indexing with configurable chunk size and memory targets (controlled via `--vendor-memory` flag; defaults to 128 MiB chunks).
+
+### Fixed
+
+- Fixed exponential memory growth when analyzing files with nested conditional branches and repeated dead-write tracking. `FlowState::merge_branches` now deduplicates dead writes instead of concatenating, preventing allocation of gigabytes of memory on large projects like Laravel (NotificationSender.php was OOM-ing at 20GB; now uses 33MB).
+- Fixed workspace index singleton cache refresh when analyzing project and lazy-loaded classes, ensuring proper resolution in batch analysis.
+
+### Changed
+
+- Vendor indexing now uses the chunked indexing engine for more predictable memory usage and streaming behavior.
+
+### Performance
+
+- Subtype-check results are now cached per pass (rather than globally) in the body analysis pass, improving cache locality for concurrent analyses.
+- Workspace index is now borrowed frozen during body pass analysis, eliminating write-lock contention.
+- `PropertyDef` type fields changed from `Option<Type>` to `Option<Arc<Type>>`, reducing per-property overhead by 168 bytes.
+- `lazy_load_missing_classes` ingest loop is now parallelized, speeding up vendor class loading in batch mode.
+
 ## [0.32.0] - 2026-06-04
 
 ### Added
