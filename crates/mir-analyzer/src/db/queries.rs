@@ -167,10 +167,48 @@ pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_na
     crate::db::find_class_constant_in_chain(db, here, const_name).is_some()
 }
 
+/// Subtype check: does `child` extend or implement `ancestor`?
+///
+/// Run on every assignment / arg / return / throw-catch type-compatibility
+/// check — by far the hottest consumer of FQCN interning (`ustr::Ustr::from`
+/// takes a global lock). The same `(child, ancestor)` pairs recur constantly,
+/// so when a **pass-scoped** subtype cache is present (set on the batch body
+/// pass via `freeze_workspace_index`) we hash the raw `&str` pair and return
+/// **before** any interning. The cache is sound for the same reason the frozen
+/// index is: the class graph is immutable for the duration of the pass, so a
+/// memoized answer can't go stale. On the canonical / open-file db the cache is
+/// absent (`None`) and every call recomputes — correct under mid-analysis
+/// mutation, just not accelerated.
 pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
     if child == ancestor {
         return true;
     }
+    let Some(cache) = db.subtype_cache() else {
+        return extends_or_implements_uncached(db, child, ancestor);
+    };
+    use std::hash::{Hash, Hasher};
+    let mut h1 = rustc_hash::FxHasher::default();
+    child.hash(&mut h1);
+    let mut h2 = rustc_hash::FxHasher::default();
+    ancestor.hash(&mut h2);
+    let key = (h1.finish(), h2.finish());
+    // Collision-safe: the stored strings are verified against the lookup pair,
+    // so a hash collision degrades to a recompute, never a wrong answer.
+    if let Some(entry) = cache.get(&key) {
+        if entry.0.as_ref() == child && entry.1.as_ref() == ancestor {
+            return entry.2;
+        }
+    }
+    let result = extends_or_implements_uncached(db, child, ancestor);
+    // `or_insert_with` so a colliding entry (different pair, same hash) is left
+    // intact — that pair just won't be cached.
+    cache
+        .entry(key)
+        .or_insert_with(|| (Box::from(child), Box::from(ancestor), result));
+    result
+}
+
+fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, child);
     let Some(class) = crate::db::find_class_like(db, here) else {
         return false;

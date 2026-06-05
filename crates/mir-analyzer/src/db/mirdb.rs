@@ -215,6 +215,11 @@ pub struct MirDbStorage {
         crate::db::WorkspaceSymbolIndexSingleton,
         Arc<crate::db::WorkspaceSymbolIndex>,
     )>,
+    /// Pass-scoped subtype-check cache, set alongside `frozen_index` on the
+    /// ephemeral body-pass clone and shared across rayon workers. `None` on the
+    /// canonical / open-file db. See [`crate::db::SubtypeCache`] and
+    /// [`MirDatabase::subtype_cache`].
+    subtype_cache: Option<Arc<crate::db::SubtypeCache>>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -249,6 +254,7 @@ impl Default for MirDbStorage {
             file_decl_snapshots: Arc::default(),
             index_decl_counts: Arc::default(),
             frozen_index: None,
+            subtype_cache: None,
         };
         db.init_workspace_revision();
         db
@@ -487,6 +493,10 @@ impl MirDatabase for MirDbStorage {
         Some(index.as_ref())
     }
 
+    fn subtype_cache(&self) -> Option<&crate::db::SubtypeCache> {
+        self.subtype_cache.as_deref()
+    }
+
     fn all_source_files(&self) -> Vec<SourceFile> {
         self.source_files.values().copied().collect()
     }
@@ -538,14 +548,19 @@ impl MirDbStorage {
     /// `None` there is what keeps the open-file / LSP path (which mutates the
     /// index mid-analysis via lazy-load) reading the live singleton.
     pub fn freeze_workspace_index(&mut self) {
-        // Only freeze when the singleton is populated: the borrow path anchors
-        // its salsa dep on the singleton's `revision` field. With no singleton
-        // (e.g. unit-test dbs that never rebuild), leave `frozen_index` None so
-        // callers fall back to the live `workspace_index(db)` (tracked query).
+        // Only freeze the index when the singleton is populated: the borrow path
+        // anchors its salsa dep on the singleton's `revision` field. With no
+        // singleton (e.g. unit-test dbs that never rebuild), leave `frozen_index`
+        // None so callers fall back to the live `workspace_index(db)`.
         if let Some(handle) = self.workspace_symbol_index_singleton() {
             let index = handle.index(self);
             self.frozen_index = Some((handle, Arc::new(index)));
         }
+        // Begin the pass-scoped subtype cache. Sound regardless of the singleton:
+        // its validity rests only on the class graph being immutable for the
+        // pass (the caller freezes after all lazy-loading), the same invariant
+        // as the frozen index. Dropped when this ephemeral db clone is dropped.
+        self.subtype_cache = Some(Arc::new(crate::db::SubtypeCache::default()));
     }
 
     /// Rebuild the `WorkspaceSymbolIndexSingleton` salsa input from scratch.

@@ -8,6 +8,15 @@ use mir_types::{Name, Type};
 /// file's `StubSlice` so producing a snapshot is O(1) per file.
 pub type FileImportSnapshot = (Arc<str>, Arc<FxHashMap<Name, Name>>);
 
+/// Pass-scoped cache for `extends_or_implements`, keyed by the FxHash of the
+/// `(child, ancestor)` `&str` pair so lookups need no interning. The stored
+/// `(child, ancestor, result)` lets the lookup verify the strings against the
+/// key — a hash collision degrades to a recompute, never a wrong subtype
+/// answer. Shared across body-pass workers via `Arc` (DashMap is sharded for
+/// concurrent access); created and dropped per frozen pass, so it cannot
+/// outlive the immutable-graph window that makes it sound.
+pub type SubtypeCache = dashmap::DashMap<(u64, u64), (Box<str>, Box<str>, bool)>;
+
 // MirDatabase trait
 
 /// Salsa database trait for mir incremental analysis.
@@ -121,6 +130,12 @@ pub trait MirDatabase: salsa::Database {
     /// index with zero per-call atomics instead of cloning the singleton's
     /// three `Arc`s on every lookup. See the `frozen_index` field docs.
     fn frozen_workspace_index(&self) -> Option<&WorkspaceSymbolIndex>;
+
+    /// Pass-scoped memoization cache for `extends_or_implements`, present only
+    /// on a frozen read-only pass (set alongside `frozen_workspace_index`).
+    /// `None` on the canonical / open-file db, where the class graph can mutate
+    /// mid-analysis and a cache would go stale. See [`SubtypeCache`].
+    fn subtype_cache(&self) -> Option<&SubtypeCache>;
 
     /// Snapshot every registered SourceFile. Side channel — not
     /// salsa-tracked; tracked queries that consult this must also
