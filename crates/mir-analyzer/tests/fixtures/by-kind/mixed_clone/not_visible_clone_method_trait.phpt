@@ -11,6 +11,4 @@ class b {
 
 clone new b;
 ===expect===
-InvalidClone
-===ignore===
-TODO
+InvalidClone@9:1-9:12: cannot clone non-object b

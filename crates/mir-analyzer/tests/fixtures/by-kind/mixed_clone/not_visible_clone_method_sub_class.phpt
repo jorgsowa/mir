@@ -9,6 +9,4 @@ class b extends a {}
 
 clone new b;
 ===expect===
-InvalidClone
-===ignore===
-TODO
+InvalidClone@7:1-7:12: cannot clone non-object b

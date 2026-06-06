@@ -203,12 +203,14 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Clone(inner) => {
                 let ty = self.analyze(inner, ctx);
                 self.check_clone_target(&ty, expr.span);
+                self.check_clone_visibility(&ty, expr.span, ctx.self_fqcn.as_deref());
                 self.check_clone_deprecated(&ty, expr.span);
                 ty
             }
             ExprKind::CloneWith(inner, _props) => {
                 let ty = self.analyze(inner, ctx);
                 self.check_clone_target(&ty, expr.span);
+                self.check_clone_visibility(&ty, expr.span, ctx.self_fqcn.as_deref());
                 ty
             }
 
@@ -509,6 +511,51 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Severity::Info,
                             span,
                         );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Emit InvalidClone if the object's __clone() is private and the current
+    /// class context doesn't have access to it.
+    /// Only runs when the type union is purely cloneable (not already flagged
+    /// by check_clone_target for non-object members).
+    fn check_clone_visibility(
+        &mut self,
+        ty: &Type,
+        span: php_ast::Span,
+        caller_fqcn: Option<&str>,
+    ) {
+        use mir_codebase::storage::Visibility;
+        use mir_types::CloneValidity;
+        // Skip if the type already has structural clone issues (non-object components)
+        match ty.clone_validity() {
+            CloneValidity::Invalid | CloneValidity::PossiblyInvalid => return,
+            _ => {}
+        }
+        for atomic in &ty.types {
+            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                let fqcn_str = fqcn.as_ref();
+                if let Some((owner_fqcn, method)) = crate::db::find_method_in_chain(
+                    self.db,
+                    crate::db::Fqcn::from_str(self.db, fqcn_str),
+                    "__clone",
+                ) {
+                    if method.visibility == Visibility::Private {
+                        // Private __clone is accessible only from within the declaring class
+                        let accessible = caller_fqcn
+                            .map(|c| c.eq_ignore_ascii_case(owner_fqcn.as_ref()))
+                            .unwrap_or(false);
+                        if !accessible {
+                            self.emit(
+                                IssueKind::InvalidClone {
+                                    ty: fqcn_str.to_string(),
+                                },
+                                Severity::Error,
+                                span,
+                            );
+                        }
                     }
                 }
             }
