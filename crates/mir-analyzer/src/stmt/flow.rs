@@ -106,14 +106,48 @@ impl<'a> StatementsAnalyzer<'a> {
                 // Check return type compatibility. Special case: `void` functions must not
                 // return any value (named_object_return_compatible considers TVoid compatible
                 // with TNull, so handle void separately to avoid false suppression).
-                if !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
+                let has_invalid = !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                     && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
-                        || return_type_is_invalid(&check_ty, declared, self.db, &self.file))
-                {
+                        || return_type_is_invalid(&check_ty, declared, self.db, &self.file));
+                if has_invalid {
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(
                         mir_issues::Issue::new(
                             IssueKind::InvalidReturnType {
+                                expected: format!("{declared}"),
+                                actual: format!("{ret_ty}"),
+                            },
+                            Location {
+                                file: self.file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        )
+                        .with_snippet(
+                            crate::parser::span_text(self.source, stmt_span).unwrap_or_default(),
+                        ),
+                    );
+                } else if !declared.is_void()
+                    && !declared.is_mixed()
+                    && !declared.contains(|t| matches!(t, Atomic::TNull))
+                    && !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
+                    && check_ty.contains(|t| matches!(t, Atomic::TNull))
+                    && !check_ty.remove_null().is_empty()
+                    && !return_type_is_invalid(
+                        &check_ty.remove_null(),
+                        declared,
+                        self.db,
+                        &self.file,
+                    )
+                {
+                    // The actual type contains null but declared doesn't allow it,
+                    // and the non-null part is otherwise compatible → NullableReturnStatement.
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
+                    self.issues.add(
+                        mir_issues::Issue::new(
+                            IssueKind::NullableReturnStatement {
                                 expected: format!("{declared}"),
                                 actual: format!("{ret_ty}"),
                             },

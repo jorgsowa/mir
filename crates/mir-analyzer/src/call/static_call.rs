@@ -292,11 +292,12 @@ impl CallAnalyzer {
                 );
             }
             // Detect non-static method called via self::/static:: from a static context.
+            // Note: __callStatic only intercepts UNDEFINED methods, so we don't suppress here
+            // when the method is explicitly defined as non-static.
             if !resolved.is_static
                 && !method_name.starts_with("__")
                 && is_self_parent_call
                 && ctx.inside_static_method
-                && !crate::db::has_method_in_chain(ea.db, fqcn.as_str(), "__callStatic")
             {
                 ea.emit(
                     IssueKind::NonStaticSelfCall {
