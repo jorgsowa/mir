@@ -303,6 +303,22 @@ pub(crate) fn check_class_attributes(
                     source_map,
                     issues,
                 );
+                // `#[Attribute]` on a class constant is invalid
+                for attr in c.attributes.iter() {
+                    if is_attribute_class_annotation(attr) {
+                        let loc = span_to_location(
+                            file,
+                            source,
+                            source_map,
+                            attr.span.start,
+                            attr.span.end,
+                        );
+                        issues.push(invalid_attr(
+                            "#[Attribute] can only be applied to classes, not constants",
+                            loc,
+                        ));
+                    }
+                }
             }
             _ => {}
         }

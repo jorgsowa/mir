@@ -8,6 +8,4 @@ class Foo {
 }
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO
+InvalidAttribute@3:7-3:16: #[Attribute] can only be applied to classes, not constants
