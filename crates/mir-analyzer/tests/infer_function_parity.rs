@@ -135,7 +135,7 @@ fn is_cross_function_diagnostic(kind: &mir_issues::IssueKind) -> bool {
             | UnimplementedInterfaceMethod { .. }
             | MethodSignatureMismatch { .. }
             | OverriddenMethodAccess { .. }
-            | FinalClassExtended { .. }
+            | InvalidExtendClass { .. }
             | FinalMethodOverridden { .. }
     )
 }

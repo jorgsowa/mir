@@ -124,7 +124,7 @@ impl<'a> ClassAnalyzer<'a> {
                                 .and_then(|l| self.sources.get(&l.file).copied()),
                         );
                         let mut issue = Issue::new(
-                            IssueKind::FinalClassExtended {
+                            IssueKind::InvalidExtendClass {
                                 parent: parent_fqcn.to_string(),
                                 child: fqcn.to_string(),
                             },

@@ -159,7 +159,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             af.is_static,
         );
+        let this_sym = mir_types::Name::from("this");
         for (name, ty) in ctx.vars.iter() {
+            // Static arrow functions don't capture $this from the outer scope.
+            if af.is_static && *name == this_sym {
+                continue;
+            }
             if !arrow_ctx.vars.contains_key(name) {
                 std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(*name, ty.clone());
                 std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(*name);

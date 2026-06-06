@@ -259,6 +259,7 @@ impl DocblockParser {
                 "pure" => result.is_pure = true,
                 "immutable" => result.is_immutable = true,
                 "readonly" => result.is_readonly = true,
+                "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                 "api" | "psalm-api" => result.is_api = true,
                 "psalm-assert-if-true" | "phpstan-assert-if-true" => {
@@ -445,6 +446,8 @@ pub struct ParsedDocblock {
     pub is_immutable: bool,
     pub is_readonly: bool,
     pub is_api: bool,
+    /// `@final` — class should be treated as final even without the PHP `final` keyword.
+    pub is_final: bool,
     /// `@inheritDoc` or `{@inheritDoc}` was present — documentation should be
     /// inherited from the nearest ancestor that has a real docblock.
     pub is_inherit_doc: bool,

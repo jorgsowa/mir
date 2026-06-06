@@ -281,8 +281,8 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/direct_constructor_call*.phpt`.
     DirectConstructorCall { class: String },
     /// Emitted by `mir-analyzer/src/class.rs`.
-    /// Fixtures: `tests/fixtures/by-kind/final_class_extended/`.
-    FinalClassExtended { parent: String, child: String },
+    /// Fixtures: `tests/fixtures/by-kind/invalid_extend_class/`.
+    InvalidExtendClass { parent: String, child: String },
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/final_method_overridden/`.
     FinalMethodOverridden {
@@ -498,7 +498,7 @@ impl IssueKind {
             | IssueKind::UnimplementedAbstractMethod { .. }
             | IssueKind::UnimplementedInterfaceMethod { .. }
             | IssueKind::MethodSignatureMismatch { .. }
-            | IssueKind::FinalClassExtended { .. }
+            | IssueKind::InvalidExtendClass { .. }
             | IssueKind::FinalMethodOverridden { .. }
             | IssueKind::AbstractInstantiation { .. }
             | IssueKind::InterfaceInstantiation { .. }
@@ -696,7 +696,7 @@ impl IssueKind {
             IssueKind::UnimplementedInterfaceMethod { .. } => "MIR0701",
             IssueKind::MethodSignatureMismatch { .. } => "MIR0702",
             IssueKind::OverriddenMethodAccess { .. } => "MIR0703",
-            IssueKind::FinalClassExtended { .. } => "MIR0704",
+            IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
             IssueKind::InterfaceInstantiation { .. } => "MIR0709",
@@ -822,7 +822,7 @@ impl IssueKind {
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
             IssueKind::OverriddenMethodAccess { .. } => "OverriddenMethodAccess",
-            IssueKind::FinalClassExtended { .. } => "FinalClassExtended",
+            IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
             IssueKind::InterfaceInstantiation { .. } => "InterfaceInstantiation",
@@ -1095,7 +1095,7 @@ impl IssueKind {
                     "Cannot assign to readonly property {class}::${property} outside of constructor"
                 )
             }
-            IssueKind::FinalClassExtended { parent, child } => {
+            IssueKind::InvalidExtendClass { parent, child } => {
                 format!("Class {child} cannot extend final class {parent}")
             }
             IssueKind::InvalidTemplateParam {
@@ -1570,7 +1570,7 @@ mod code_tests {
                 class: s(),
                 method: s(),
             },
-            IssueKind::FinalClassExtended {
+            IssueKind::InvalidExtendClass {
                 parent: s(),
                 child: s(),
             },
