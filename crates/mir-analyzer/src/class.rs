@@ -949,6 +949,47 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
         }
+
+        // ---- Property visibility must not be reduced -------------------------
+        let own_properties: Vec<(Arc<str>, mir_codebase::storage::PropertyDef)> = class
+            .own_properties()
+            .map(|props| props.iter().map(|(k, p)| (k.clone(), p.clone())).collect())
+            .unwrap_or_default();
+        for (_, own_prop) in own_properties {
+            let prop_name = own_prop.name.clone();
+            // Look up the same property name in ancestors (skip self = first entry)
+            let parent_prop = crate::db::class_ancestors_by_fqcn(self.db, here)
+                .iter()
+                .skip(1)
+                .find_map(|anc| {
+                    let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+                    crate::db::find_property_in_class(self.db, anc_here, prop_name.as_ref())
+                        .map(|p| (anc.clone(), p))
+                });
+            let Some((_parent_fqcn, parent_prop)) = parent_prop else {
+                continue;
+            };
+            if visibility_reduced(own_prop.visibility, parent_prop.visibility) {
+                let loc = issue_location(
+                    own_prop.location.as_ref(),
+                    own_prop
+                        .location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                );
+                let mut issue = Issue::new(
+                    IssueKind::OverriddenPropertyAccess {
+                        class: fqcn.to_string(),
+                        property: prop_name.to_string(),
+                    },
+                    loc,
+                );
+                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------

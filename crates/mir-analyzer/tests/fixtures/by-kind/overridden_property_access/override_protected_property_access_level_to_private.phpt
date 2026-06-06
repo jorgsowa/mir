@@ -12,6 +12,4 @@ class B extends A {
     private $foo;
 }
 ===expect===
-OverriddenPropertyAccess
-===ignore===
-TODO
+OverriddenPropertyAccess@9:4-9:17: Property B::$foo overrides with less visibility

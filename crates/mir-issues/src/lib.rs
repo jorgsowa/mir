@@ -277,6 +277,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/class.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_method_access/`.
     OverriddenMethodAccess { class: String, method: String },
+    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/overridden_property_access/`.
+    OverriddenPropertyAccess { class: String, property: String },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/direct_constructor_call*.phpt`.
     DirectConstructorCall { class: String },
@@ -533,6 +536,7 @@ impl IssueKind {
             | IssueKind::UndefinedProperty { .. }
             | IssueKind::InvalidOperand { .. }
             | IssueKind::OverriddenMethodAccess { .. }
+            | IssueKind::OverriddenPropertyAccess { .. }
             | IssueKind::ImplicitToStringCast { .. }
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. }
@@ -696,6 +700,7 @@ impl IssueKind {
             IssueKind::UnimplementedInterfaceMethod { .. } => "MIR0701",
             IssueKind::MethodSignatureMismatch { .. } => "MIR0702",
             IssueKind::OverriddenMethodAccess { .. } => "MIR0703",
+            IssueKind::OverriddenPropertyAccess { .. } => "MIR0710",
             IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
@@ -822,6 +827,7 @@ impl IssueKind {
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
             IssueKind::OverriddenMethodAccess { .. } => "OverriddenMethodAccess",
+            IssueKind::OverriddenPropertyAccess { .. } => "OverriddenPropertyAccess",
             IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
@@ -1089,6 +1095,9 @@ impl IssueKind {
             }
             IssueKind::OverriddenMethodAccess { class, method } => {
                 format!("Method {class}::{method}() overrides with less visibility")
+            }
+            IssueKind::OverriddenPropertyAccess { class, property } => {
+                format!("Property {class}::${property} overrides with less visibility")
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
                 format!(
@@ -1569,6 +1578,10 @@ mod code_tests {
             IssueKind::OverriddenMethodAccess {
                 class: s(),
                 method: s(),
+            },
+            IssueKind::OverriddenPropertyAccess {
+                class: s(),
+                property: s(),
             },
             IssueKind::InvalidExtendClass {
                 parent: s(),
