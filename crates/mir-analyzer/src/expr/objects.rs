@@ -690,7 +690,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         let found = crate::db::find_class_constant_in_chain(self.db, here, &const_name);
         // Check if the constant is deprecated
-        if let Some((_, ref c)) = found {
+        if let Some((ref owner_fqcn, ref c)) = found {
             if let Some(msg) = &c.deprecated {
                 self.emit(
                     IssueKind::DeprecatedConstant {
@@ -699,6 +699,40 @@ impl<'a> ExpressionAnalyzer<'a> {
                         message: Some(msg.clone()).filter(|m| !m.is_empty()),
                     },
                     Severity::Info,
+                    cca.member.span,
+                );
+            }
+            // Visibility check: private constants are only accessible from the
+            // declaring class; protected constants only from the declaring class
+            // or its subclasses.
+            use mir_codebase::storage::Visibility;
+            let inaccessible = match c.visibility {
+                Some(Visibility::Private) => {
+                    // Accessible only from the exact declaring class
+                    ctx.self_fqcn
+                        .as_deref()
+                        .map(|s| !s.eq_ignore_ascii_case(owner_fqcn))
+                        .unwrap_or(true)
+                }
+                Some(Visibility::Protected) => {
+                    // Accessible from the declaring class or a subclass
+                    let caller = ctx.self_fqcn.as_deref().unwrap_or("");
+                    if caller.is_empty() {
+                        true
+                    } else {
+                        !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
+                            && !caller.eq_ignore_ascii_case(owner_fqcn)
+                    }
+                }
+                _ => false,
+            };
+            if inaccessible {
+                self.emit(
+                    IssueKind::InaccessibleClassConstant {
+                        class: fqcn.clone(),
+                        constant: const_name.clone(),
+                    },
+                    Severity::Error,
                     cca.member.span,
                 );
             }

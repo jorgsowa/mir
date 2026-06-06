@@ -70,6 +70,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/variables.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_constant/`.
     UndefinedConstant { name: String },
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/invalid_*_class_const_fetch*.phpt`.
+    InaccessibleClassConstant { class: String, constant: String },
     /// Emitted by `mir-analyzer/src/expr/variables.rs`.
     /// Fixtures: `tests/fixtures/by-kind/possibly_undefined_variable/`.
     PossiblyUndefinedVariable { name: String },
@@ -492,6 +495,7 @@ impl IssueKind {
             | IssueKind::UndefinedMethod { .. }
             | IssueKind::UndefinedClass { .. }
             | IssueKind::UndefinedConstant { .. }
+            | IssueKind::InaccessibleClassConstant { .. }
             | IssueKind::InvalidReturnType { .. }
             | IssueKind::InvalidArgument { .. }
             | IssueKind::TooFewArguments { .. }
@@ -639,6 +643,7 @@ impl IssueKind {
             IssueKind::UndefinedClass { .. } => "MIR0005",
             IssueKind::UndefinedProperty { .. } => "MIR0006",
             IssueKind::UndefinedConstant { .. } => "MIR0007",
+            IssueKind::InaccessibleClassConstant { .. } => "MIR0008",
             IssueKind::PossiblyUndefinedVariable { .. } => "MIR0008",
             IssueKind::UndefinedTrait { .. } => "MIR0009",
 
@@ -782,6 +787,7 @@ impl IssueKind {
             IssueKind::UndefinedClass { .. } => "UndefinedClass",
             IssueKind::UndefinedProperty { .. } => "UndefinedProperty",
             IssueKind::UndefinedConstant { .. } => "UndefinedConstant",
+            IssueKind::InaccessibleClassConstant { .. } => "InaccessibleClassConstant",
             IssueKind::PossiblyUndefinedVariable { .. } => "PossiblyUndefinedVariable",
             IssueKind::UndefinedTrait { .. } => "UndefinedTrait",
             IssueKind::InvalidStringClass { .. } => "InvalidStringClass",
@@ -907,6 +913,9 @@ impl IssueKind {
                 format!("Property {class}::${property} does not exist")
             }
             IssueKind::UndefinedConstant { name } => format!("Constant {name} is not defined"),
+            IssueKind::InaccessibleClassConstant { class, constant } => {
+                format!("Cannot access constant {class}::{constant}")
+            }
             IssueKind::PossiblyUndefinedVariable { name } => {
                 format!("Variable ${name} might not be defined")
             }
@@ -1446,6 +1455,10 @@ mod code_tests {
                 property: s(),
             },
             IssueKind::UndefinedConstant { name: s() },
+            IssueKind::InaccessibleClassConstant {
+                class: s(),
+                constant: s(),
+            },
             IssueKind::PossiblyUndefinedVariable { name: s() },
             IssueKind::NullArgument {
                 param: s(),
