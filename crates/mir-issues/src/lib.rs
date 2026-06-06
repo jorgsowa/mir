@@ -445,6 +445,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/invalid_trait_use/`.
     InvalidTraitUse { trait_name: String, reason: String },
 
+    // --- Attribute validation -----------------------------------------------
+    /// Emitted by `mir-analyzer/src/attributes.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_attribute/`.
+    InvalidAttribute { message: String },
+
     // --- Case sensitivity (PHP 8.6 deprecation) -----------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/wrong_case_function/`.
@@ -582,7 +587,8 @@ impl IssueKind {
             | IssueKind::MissingThrowsDocblock { .. }
             | IssueKind::WrongCaseFunction { .. }
             | IssueKind::WrongCaseMethod { .. }
-            | IssueKind::WrongCaseClass { .. } => Severity::Info,
+            | IssueKind::WrongCaseClass { .. }
+            | IssueKind::InvalidAttribute { .. } => Severity::Info,
         }
     }
 
@@ -743,6 +749,9 @@ impl IssueKind {
             // Parse (1400-1499)
             IssueKind::ParseError { .. } => "MIR1400",
 
+            // Attribute (1600-1699)
+            IssueKind::InvalidAttribute { .. } => "MIR1600",
+
             // Other (1500-1599)
             IssueKind::InvalidThrow { .. } => "MIR1500",
             IssueKind::InvalidCatch { .. } => "MIR1503",
@@ -856,6 +865,7 @@ impl IssueKind {
             IssueKind::WrongCaseFunction { .. } => "WrongCaseFunction",
             IssueKind::WrongCaseMethod { .. } => "WrongCaseMethod",
             IssueKind::WrongCaseClass { .. } => "WrongCaseClass",
+            IssueKind::InvalidAttribute { .. } => "InvalidAttribute",
         }
     }
 
@@ -1243,6 +1253,7 @@ impl IssueKind {
             IssueKind::WrongCaseClass { used, canonical } => {
                 format!("Class name '{used}' has incorrect casing; use '{canonical}'")
             }
+            IssueKind::InvalidAttribute { message } => message.clone(),
         }
     }
 }

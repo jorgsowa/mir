@@ -1,0 +1,490 @@
+//! Attribute validation — checks `#[...]` attribute usages against PHP rules.
+//!
+//! ## Checks performed
+//!
+//! ### Structural checks (AST only)
+//! - `#[Attribute]` used on function / method / property / parameter → `InvalidAttribute`
+//! - Class decorated with `#[Attribute]` is abstract → `InvalidAttribute`
+//! - Interface decorated with `#[Attribute]` → `InvalidAttribute`
+//! - Trait decorated with `#[Attribute]` → `InvalidAttribute`
+//! - Attribute class has a private constructor → `InvalidAttribute`
+//!
+//! ### Cross-file checks (requires database)
+//! - Class used as `#[SomeClass]` does not have `#[Attribute]` annotation → `InvalidAttribute`
+//! - Attribute applied to element that doesn't match its declared target → `InvalidAttribute`
+//! - Same non-repeatable attribute applied twice on the same element → `InvalidAttribute`
+
+use std::sync::Arc;
+
+use mir_issues::{Issue, IssueKind, Location};
+use php_ast::owned::{
+    Attribute, ClassDecl, ClassMemberKind, FunctionDecl, InterfaceDecl, TraitDecl,
+};
+use php_rs_parser::source_map::SourceMap;
+
+const ATTR_IS_REPEATABLE: i64 = 64;
+const ATTR_TARGET_ALL: i64 = 127;
+use crate::db::{find_class_like, resolve_name, Fqcn, MirDatabase};
+use crate::diagnostics::offset_to_line_col;
+
+// ---------------------------------------------------------------------------
+// Target bitmask constants (mirror PHP's Attribute class)
+// ---------------------------------------------------------------------------
+
+const TARGET_CLASS: i64 = 1;
+const TARGET_FUNCTION: i64 = 2;
+const TARGET_METHOD: i64 = 4;
+const TARGET_PROPERTY: i64 = 8;
+const TARGET_CLASS_CONSTANT: i64 = 16;
+const TARGET_PARAMETER: i64 = 32;
+
+// ---------------------------------------------------------------------------
+// Location helpers
+// ---------------------------------------------------------------------------
+
+fn span_to_location(
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    start: u32,
+    end: u32,
+) -> Location {
+    let (line, col_start) = offset_to_line_col(source, start, source_map);
+    let (line_end, col_end) = offset_to_line_col(source, end, source_map);
+    Location {
+        file: file.clone(),
+        line,
+        line_end,
+        col_start,
+        col_end,
+    }
+}
+
+fn invalid_attr(message: impl Into<String>, loc: Location) -> Issue {
+    Issue::new(
+        IssueKind::InvalidAttribute {
+            message: message.into(),
+        },
+        loc,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Attribute name helper
+// ---------------------------------------------------------------------------
+
+fn is_attribute_class_annotation(attr: &Attribute) -> bool {
+    attr.name
+        .parts
+        .last()
+        .map(|p| p.as_ref().eq_ignore_ascii_case("Attribute"))
+        .unwrap_or(false)
+}
+
+/// Resolve the fully-qualified name of an attribute reference in `file` context.
+fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> String {
+    let raw = attr
+        .name
+        .parts
+        .iter()
+        .map(|p| p.as_ref())
+        .collect::<Vec<_>>()
+        .join("\\");
+    resolve_name(db, file, &raw)
+}
+
+// ---------------------------------------------------------------------------
+// Structural checks (no database needed)
+// ---------------------------------------------------------------------------
+
+/// Check that `#[Attribute]` (the PHP built-in) is not placed on a function or its parameters.
+pub(crate) fn check_function_attributes(
+    decl: &FunctionDecl,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    for attr in decl.attributes.iter() {
+        if !is_attribute_class_annotation(attr) {
+            continue;
+        }
+        let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+        issues.push(invalid_attr(
+            "#[Attribute] can only be applied to classes, not functions",
+            loc,
+        ));
+    }
+    check_attribute_list(
+        &decl.attributes,
+        TARGET_FUNCTION,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+    );
+    for param in decl.params.iter() {
+        // `#[Attribute]` on a function parameter is invalid
+        for attr in param.attributes.iter() {
+            if is_attribute_class_annotation(attr) {
+                let loc =
+                    span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+                issues.push(invalid_attr(
+                    "#[Attribute] can only be applied to classes, not parameters",
+                    loc,
+                ));
+            }
+        }
+        check_attribute_list(
+            &param.attributes,
+            TARGET_PARAMETER,
+            db,
+            file,
+            source,
+            source_map,
+            issues,
+        );
+    }
+}
+
+/// Check attribute placement rules for a class declaration.
+///
+/// - `#[Attribute]` on abstract class → invalid
+/// - `#[Attribute]` class with private constructor → invalid
+/// - All `#[...]` attributes: validate against database if possible
+pub(crate) fn check_class_attributes(
+    decl: &ClassDecl,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    // Check 1: `#[Attribute]` on abstract class
+    if decl.modifiers.is_abstract {
+        for attr in decl.attributes.iter() {
+            if !is_attribute_class_annotation(attr) {
+                continue;
+            }
+            let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+            issues.push(invalid_attr(
+                "Abstract classes cannot be attribute classes",
+                loc,
+            ));
+        }
+    }
+
+    // Check 2: `#[Attribute]` class has private constructor
+    let class_has_attribute = decl.attributes.iter().any(is_attribute_class_annotation);
+    if class_has_attribute {
+        for member in decl.body.members.iter() {
+            let ClassMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
+            let method_name = method.name.as_deref().unwrap_or("");
+            if !method_name.eq_ignore_ascii_case("__construct") {
+                continue;
+            }
+            if matches!(method.visibility, Some(php_ast::ast::Visibility::Private)) {
+                let loc =
+                    span_to_location(file, source, source_map, member.span.start, member.span.end);
+                issues.push(invalid_attr(
+                    "Attribute class constructor must not be private",
+                    loc,
+                ));
+            }
+        }
+    }
+
+    // Check 3: Validate `#[...]` attribute usages against the database for
+    // the class itself, its methods, and their parameters.
+    check_attribute_list(
+        &decl.attributes,
+        TARGET_CLASS,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+    );
+
+    for member in decl.body.members.iter() {
+        match &member.kind {
+            ClassMemberKind::Method(method) => {
+                check_attribute_list(
+                    &method.attributes,
+                    TARGET_METHOD,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                );
+                for param in method.params.iter() {
+                    check_attribute_list(
+                        &param.attributes,
+                        TARGET_PARAMETER,
+                        db,
+                        file,
+                        source,
+                        source_map,
+                        issues,
+                    );
+                    // `#[Attribute]` on a method parameter is invalid
+                    for attr in param.attributes.iter() {
+                        if is_attribute_class_annotation(attr) {
+                            let loc = span_to_location(
+                                file,
+                                source,
+                                source_map,
+                                attr.span.start,
+                                attr.span.end,
+                            );
+                            issues.push(invalid_attr(
+                                "#[Attribute] can only be applied to classes, not parameters",
+                                loc,
+                            ));
+                        }
+                    }
+                }
+                // `#[Attribute]` on a method is invalid
+                for attr in method.attributes.iter() {
+                    if is_attribute_class_annotation(attr) {
+                        let loc = span_to_location(
+                            file,
+                            source,
+                            source_map,
+                            attr.span.start,
+                            attr.span.end,
+                        );
+                        issues.push(invalid_attr(
+                            "#[Attribute] can only be applied to classes, not methods",
+                            loc,
+                        ));
+                    }
+                }
+            }
+            ClassMemberKind::Property(prop) => {
+                check_attribute_list(
+                    &prop.attributes,
+                    TARGET_PROPERTY,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                );
+                // `#[Attribute]` on a property is invalid
+                for attr in prop.attributes.iter() {
+                    if is_attribute_class_annotation(attr) {
+                        let loc = span_to_location(
+                            file,
+                            source,
+                            source_map,
+                            attr.span.start,
+                            attr.span.end,
+                        );
+                        issues.push(invalid_attr(
+                            "#[Attribute] can only be applied to classes, not properties",
+                            loc,
+                        ));
+                    }
+                }
+            }
+            ClassMemberKind::ClassConst(c) => {
+                check_attribute_list(
+                    &c.attributes,
+                    TARGET_CLASS_CONSTANT,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Check attribute placement on an interface (interfaces can't be attribute classes).
+pub(crate) fn check_interface_attributes(
+    decl: &InterfaceDecl,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    for attr in decl.attributes.iter() {
+        if !is_attribute_class_annotation(attr) {
+            continue;
+        }
+        let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+        issues.push(invalid_attr("Interfaces cannot be attribute classes", loc));
+    }
+    // Also check method attributes inside the interface
+    for member in decl.body.members.iter() {
+        let ClassMemberKind::Method(method) = &member.kind else {
+            continue;
+        };
+        check_attribute_list(
+            &method.attributes,
+            TARGET_METHOD,
+            db,
+            file,
+            source,
+            source_map,
+            issues,
+        );
+    }
+}
+
+/// Check attribute placement on a trait (traits can't be attribute classes).
+pub(crate) fn check_trait_attributes(
+    decl: &TraitDecl,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    for attr in decl.attributes.iter() {
+        if !is_attribute_class_annotation(attr) {
+            continue;
+        }
+        let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+        issues.push(invalid_attr("Traits cannot be attribute classes", loc));
+    }
+    // Also validate attributes on trait members
+    for member in decl.body.members.iter() {
+        match &member.kind {
+            ClassMemberKind::Method(method) => {
+                check_attribute_list(
+                    &method.attributes,
+                    TARGET_METHOD,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                );
+            }
+            ClassMemberKind::Property(prop) => {
+                check_attribute_list(
+                    &prop.attributes,
+                    TARGET_PROPERTY,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cross-file attribute list validation
+// ---------------------------------------------------------------------------
+
+/// Validate a list of `#[...]` attributes applied to a PHP element with the
+/// given `target_flag` (one of the `TARGET_*` constants above).
+///
+/// For each attribute in the list:
+/// 1. Looks up the attribute class. If not found or not an attribute class,
+///    emits `InvalidAttribute`.
+/// 2. If found and has a target mask, checks that `target_flag` is set.
+/// 3. Checks for duplicate non-repeatable attributes.
+fn check_attribute_list(
+    attrs: &[Attribute],
+    target_flag: i64,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    let mut seen_fqcns: Vec<(String, u32)> = Vec::new(); // (fqcn, span.start)
+
+    for attr in attrs {
+        // Skip the `Attribute` annotation itself — it is validated elsewhere.
+        if is_attribute_class_annotation(attr) {
+            continue;
+        }
+
+        let fqcn = resolve_attr_name(db, file.as_ref(), attr);
+        let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+
+        let class_like = find_class_like(db, Fqcn::from_str(db, &fqcn));
+        match class_like {
+            None => {
+                // Class not found — UndefinedClass is handled separately; skip here.
+            }
+            Some(cl) => {
+                // Only plain `Class` entities can be attribute classes.
+                use crate::db::ClassLike;
+                let maybe_flags = match &cl {
+                    ClassLike::Class(c) => c.attribute_flags,
+                    // Interfaces, traits, enums cannot be attribute classes.
+                    _ => None,
+                };
+
+                match maybe_flags {
+                    None => {
+                        // Class has no `#[Attribute]` annotation → not an attribute class.
+                        let short = attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
+                        issues.push(invalid_attr(
+                            format!("Class {short} does not have an #[Attribute] annotation"),
+                            loc.clone(),
+                        ));
+                    }
+                    Some(flags) => {
+                        // Check target mismatch (skip for TARGET_ALL = 127).
+                        if flags != ATTR_TARGET_ALL && (flags & target_flag) == 0 {
+                            let short = attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
+                            issues.push(invalid_attr(
+                                format!("Attribute {short} cannot be used on this target"),
+                                loc.clone(),
+                            ));
+                        }
+
+                        // Check repeat (IS_REPEATABLE = 64).
+                        if (flags & ATTR_IS_REPEATABLE) == 0 {
+                            if let Some((_prev_fqcn, prev_start)) =
+                                seen_fqcns.iter().find(|(f, _)| f == &fqcn)
+                            {
+                                let prev_loc = span_to_location(
+                                    file,
+                                    source,
+                                    source_map,
+                                    *prev_start,
+                                    *prev_start,
+                                );
+                                let short =
+                                    attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
+                                // Emit on the first occurrence (prev_loc), matching Psalm's behavior.
+                                issues.push(invalid_attr(
+                                    format!("Attribute {short} is not repeatable"),
+                                    prev_loc,
+                                ));
+                                // Also emit on the duplicate occurrence.
+                                issues.push(invalid_attr(
+                                    format!("Attribute {short} is not repeatable"),
+                                    loc.clone(),
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                // Record this attribute to detect future repeats.
+                seen_fqcns.push((fqcn, attr.span.start));
+            }
+        }
+    }
+}

@@ -1,6 +1,7 @@
 use rustc_hash::FxHashMap;
 
 pub(crate) mod analyzer_db;
+pub(crate) mod attributes;
 pub mod batch;
 pub(crate) mod body_analysis;
 #[doc(hidden)]

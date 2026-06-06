@@ -6,6 +6,4 @@ Attribute invalid target function
 function foo(): void {}
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO
+InvalidAttribute@2:3-2:12: #[Attribute] can only be applied to classes, not functions

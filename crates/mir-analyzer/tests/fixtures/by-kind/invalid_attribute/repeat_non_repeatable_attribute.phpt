@@ -9,6 +9,3 @@ class Foo {}
 class Baz {}
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO

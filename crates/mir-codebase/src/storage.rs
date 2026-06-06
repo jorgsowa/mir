@@ -470,6 +470,11 @@ pub struct ClassDef {
     pub is_readonly: bool,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
+    /// Attribute target flags if this class has `#[Attribute]` annotation.
+    /// `None` = not an attribute class. The value is a bitmask of PHP's
+    /// `Attribute::TARGET_*` constants (e.g. `Attribute::TARGET_CLASS = 1`).
+    #[serde(default)]
+    pub attribute_flags: Option<i64>,
     pub location: Option<Location>,
     /// Per-`use` statement locations for each used trait: `(fqcn, location)` in
     /// declaration order, parallel to `traits`.  Absent from older serialized

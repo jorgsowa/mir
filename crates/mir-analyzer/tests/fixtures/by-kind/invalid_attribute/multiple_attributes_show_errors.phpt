@@ -12,6 +12,4 @@ class Bar {}
 class Baz {}
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO
+InvalidAttribute@8:8-8:11: Attribute Bar cannot be used on this target

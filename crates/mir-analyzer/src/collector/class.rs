@@ -323,6 +323,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
             }),
             is_internal: class_doc.is_internal,
+            attribute_flags: parse_attribute_flags(&decl.attributes),
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             type_aliases: type_aliases
                 .iter()
@@ -345,5 +346,77 @@ impl<'a> DefinitionCollector<'a> {
 
         self.slice.classes.push(std::sync::Arc::new(storage));
         ControlFlow::Continue(())
+    }
+}
+
+/// PHP `Attribute::TARGET_*` and `IS_REPEATABLE` constants.
+const ATTR_TARGET_CLASS: i64 = 1;
+const ATTR_TARGET_FUNCTION: i64 = 2;
+const ATTR_TARGET_METHOD: i64 = 4;
+const ATTR_TARGET_PROPERTY: i64 = 8;
+const ATTR_TARGET_CLASS_CONSTANT: i64 = 16;
+const ATTR_TARGET_PARAMETER: i64 = 32;
+pub(crate) const ATTR_IS_REPEATABLE: i64 = 64;
+pub(crate) const ATTR_TARGET_ALL: i64 = 127;
+
+/// Parse the value of `#[Attribute(...)]` flags from a class's attribute list.
+/// Returns `None` if no `#[Attribute]` is present, `Some(flags)` otherwise.
+pub(crate) fn parse_attribute_flags(attrs: &[php_ast::owned::Attribute]) -> Option<i64> {
+    for attr in attrs {
+        let last = attr.name.parts.last()?;
+        if !last.as_ref().eq_ignore_ascii_case("Attribute") {
+            continue;
+        }
+        // Found `#[Attribute]` or `#[\Attribute]`.
+        // Extract the flags from the first argument (if any).
+        let flags = if attr.args.is_empty() {
+            ATTR_TARGET_ALL
+        } else {
+            eval_attribute_flags_expr(&attr.args[0].value).unwrap_or(ATTR_TARGET_ALL)
+        };
+        return Some(flags);
+    }
+    None
+}
+
+/// Recursively evaluate a PHP constant expression as an integer bitmask.
+/// Only handles the patterns found in `#[Attribute(...)]` annotations:
+/// - `Attribute::TARGET_*` / `Attribute::IS_REPEATABLE` class constants
+/// - Integer literals
+/// - Bitwise OR of the above
+fn eval_attribute_flags_expr(expr: &php_ast::owned::Expr) -> Option<i64> {
+    use php_ast::ast::BinaryOp;
+    use php_ast::owned::ExprKind;
+    match &expr.kind {
+        ExprKind::Int(n) => Some(*n),
+        ExprKind::Parenthesized(inner) => eval_attribute_flags_expr(inner),
+        ExprKind::Binary(b) if b.op == BinaryOp::BitwiseOr => {
+            let l = eval_attribute_flags_expr(&b.left)?;
+            let r = eval_attribute_flags_expr(&b.right)?;
+            Some(l | r)
+        }
+        ExprKind::ClassConstAccess(access) => {
+            // `Attribute::TARGET_CLASS` etc.
+            let member = match &access.member.kind {
+                ExprKind::Identifier(s) => s.as_ref(),
+                _ => return None,
+            };
+            resolve_attribute_constant(member)
+        }
+        _ => None,
+    }
+}
+
+fn resolve_attribute_constant(name: &str) -> Option<i64> {
+    match name {
+        "TARGET_CLASS" => Some(ATTR_TARGET_CLASS),
+        "TARGET_FUNCTION" => Some(ATTR_TARGET_FUNCTION),
+        "TARGET_METHOD" => Some(ATTR_TARGET_METHOD),
+        "TARGET_PROPERTY" => Some(ATTR_TARGET_PROPERTY),
+        "TARGET_CLASS_CONSTANT" => Some(ATTR_TARGET_CLASS_CONSTANT),
+        "TARGET_PARAMETER" | "TARGET_CONSTANT" => Some(ATTR_TARGET_PARAMETER),
+        "IS_REPEATABLE" => Some(ATTR_IS_REPEATABLE),
+        "TARGET_ALL" => Some(ATTR_TARGET_ALL),
+        _ => None,
     }
 }

@@ -556,6 +556,9 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
+        crate::attributes::check_function_attributes(
+            decl, self.db, file, source, source_map, all_issues,
+        );
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
@@ -811,6 +814,9 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
+        crate::attributes::check_class_attributes(
+            decl, self.db, file, source, source_map, all_issues,
+        );
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
@@ -1356,6 +1362,10 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
+        crate::attributes::check_trait_attributes(
+            decl, self.db, file, source, source_map, all_issues,
+        );
+
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
@@ -1568,6 +1578,9 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
+        crate::attributes::check_interface_attributes(
+            decl, self.db, file, source, source_map, all_issues,
+        );
         use php_ast::owned::ClassMemberKind;
         for parent in decl.extends.iter() {
             check_name_class(

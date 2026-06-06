@@ -5,6 +5,4 @@ Attribute invalid target parameter
 function foo(#[Attribute] string $_bar): void {}
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO
+InvalidAttribute@2:16-2:25: #[Attribute] can only be applied to classes, not parameters
