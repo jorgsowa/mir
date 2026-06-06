@@ -463,6 +463,31 @@ pub fn analyzed_interface_defs(
     out
 }
 
+/// Like [`analyzed_interface_defs`] but returns enum definitions from analyzed files.
+pub fn analyzed_enum_defs(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<(Arc<str>, Arc<mir_codebase::storage::EnumDef>)> {
+    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
+        db.all_source_files()
+    } else {
+        analyzed_files
+            .iter()
+            .filter_map(|p| db.lookup_source_file(p))
+            .collect()
+    };
+    files.sort_by_key(|a| a.path(db));
+    let mut out = Vec::new();
+    for sf in files {
+        let defs = collect_file_definitions(db, sf);
+        for e in defs.slice.enums.iter() {
+            out.push((e.fqcn.clone(), e.clone()));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 #[salsa::tracked]
 pub fn interface_def_at(
     db: &dyn MirDatabase,

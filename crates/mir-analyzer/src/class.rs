@@ -298,13 +298,90 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_magic_method_casing(fqcn, &mut issues);
         }
 
-        // ---- 5. Interface-level #[Override] check --------------------------
+        // ---- 5. Interface-level #[Override] check + extends casing --------
         // Interfaces are not included in the class loop above, so scan them
         // separately for #[Override] on methods that have no parent interface method.
-        for (iface_fqcn, _iface) in
-            crate::db::analyzed_interface_defs(self.db, &self.analyzed_files)
+        for (iface_fqcn, iface) in crate::db::analyzed_interface_defs(self.db, &self.analyzed_files)
         {
             self.check_overrides(&iface_fqcn, None, &mut issues);
+            let location = iface.location.clone();
+            for parent_iface_fqcn in iface.extends.iter() {
+                let here = crate::db::Fqcn::from_str(self.db, parent_iface_fqcn.as_ref());
+                if let Some(canonical) = crate::db::find_class_like(self.db, here) {
+                    let used_short = parent_iface_fqcn
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(parent_iface_fqcn.as_ref());
+                    let canonical_short = canonical
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(canonical.fqcn().as_ref());
+                    if used_short != canonical_short
+                        && used_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::WrongCaseClass {
+                                used: used_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
+            self.check_magic_method_casing(&iface_fqcn, &mut issues);
+        }
+
+        // ---- 5b. Enum-level implements casing + magic methods ---------------
+        for (enum_fqcn, enum_def) in crate::db::analyzed_enum_defs(self.db, &self.analyzed_files) {
+            let location = enum_def.location.clone();
+            for iface_fqcn in enum_def.interfaces.iter() {
+                let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+                if let Some(canonical) = crate::db::find_class_like(self.db, here) {
+                    let used_short = iface_fqcn
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(iface_fqcn.as_ref());
+                    let canonical_short = canonical
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(canonical.fqcn().as_ref());
+                    if used_short != canonical_short
+                        && used_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::WrongCaseClass {
+                                used: used_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
+            self.check_magic_method_casing(&enum_fqcn, &mut issues);
         }
 
         // ---- 6. Circular inheritance detection --------------------------------
