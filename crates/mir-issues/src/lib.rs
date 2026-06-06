@@ -452,6 +452,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/attributes.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_attribute/`.
     InvalidAttribute { message: String },
+    /// Emitted by `mir-analyzer/src/attributes.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_class/missing_attribute_on_*.phpt`.
+    UndefinedAttributeClass { name: String },
 
     // --- Case sensitivity (PHP 8.6 deprecation) -----------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
@@ -592,7 +595,8 @@ impl IssueKind {
             | IssueKind::WrongCaseFunction { .. }
             | IssueKind::WrongCaseMethod { .. }
             | IssueKind::WrongCaseClass { .. }
-            | IssueKind::InvalidAttribute { .. } => Severity::Info,
+            | IssueKind::InvalidAttribute { .. }
+            | IssueKind::UndefinedAttributeClass { .. } => Severity::Info,
         }
     }
 
@@ -756,6 +760,7 @@ impl IssueKind {
 
             // Attribute (1600-1699)
             IssueKind::InvalidAttribute { .. } => "MIR1600",
+            IssueKind::UndefinedAttributeClass { .. } => "MIR1601",
 
             // Other (1500-1599)
             IssueKind::InvalidThrow { .. } => "MIR1500",
@@ -872,6 +877,7 @@ impl IssueKind {
             IssueKind::WrongCaseMethod { .. } => "WrongCaseMethod",
             IssueKind::WrongCaseClass { .. } => "WrongCaseClass",
             IssueKind::InvalidAttribute { .. } => "InvalidAttribute",
+            IssueKind::UndefinedAttributeClass { .. } => "UndefinedAttributeClass",
         }
     }
 
@@ -1263,6 +1269,9 @@ impl IssueKind {
                 format!("Class name '{used}' has incorrect casing; use '{canonical}'")
             }
             IssueKind::InvalidAttribute { message } => message.clone(),
+            IssueKind::UndefinedAttributeClass { name } => {
+                format!("Attribute class {name} does not exist")
+            }
         }
     }
 }
@@ -1690,6 +1699,8 @@ mod code_tests {
                 used: s(),
                 canonical: s(),
             },
+            IssueKind::InvalidAttribute { message: s() },
+            IssueKind::UndefinedAttributeClass { name: s() },
         ]
     }
 

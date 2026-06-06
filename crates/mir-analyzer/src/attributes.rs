@@ -423,7 +423,11 @@ fn check_attribute_list(
         let class_like = find_class_like(db, Fqcn::from_str(db, &fqcn));
         match class_like {
             None => {
-                // Class not found — UndefinedClass is handled separately; skip here.
+                // Class not found — emit UndefinedAttributeClass.
+                issues.push(Issue::new(
+                    IssueKind::UndefinedAttributeClass { name: fqcn.clone() },
+                    loc.clone(),
+                ));
             }
             Some(cl) => {
                 // Only plain `Class` entities can be attribute classes.
