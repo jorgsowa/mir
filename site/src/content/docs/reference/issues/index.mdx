@@ -7,7 +7,7 @@ sidebar:
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-All 76 issue types mir can emit, grouped by category. Each issue has a stable
+All 108 issue types mir can emit, grouped by category. Each issue has a stable
 `MIR####` code that appears in CLI output and JSON/SARIF — see
 [Error codes](./codes/) for the full numeric index.
 
@@ -17,7 +17,7 @@ Select a category to drill into individual issues.
   <LinkCard
     title="Undefined"
     href="./undefined/undefined-variable/"
-    description="UndefinedVariable · PossiblyUndefinedVariable · UndefinedFunction · UndefinedMethod · UndefinedClass · UndefinedProperty · UndefinedConstant"
+    description="UndefinedVariable · PossiblyUndefinedVariable · UndefinedFunction · UndefinedMethod · UndefinedClass · UndefinedProperty · UndefinedConstant · ParentNotFound · InaccessibleClassConstant"
   />
   <LinkCard
     title="Nullability"
@@ -27,7 +27,7 @@ Select a category to drill into individual issues.
   <LinkCard
     title="Type Mismatches"
     href="./type-mismatches/invalid-return-type/"
-    description="InvalidReturnType · InvalidArgument · TooFewArguments · TooManyArguments · InvalidNamedArgument · InvalidPassByReference · InvalidPropertyAssignment · InvalidCast · InvalidOperand · MismatchingDocblock(Return|Param)Type"
+    description="InvalidReturnType · InvalidArgument · TooFewArguments · TooManyArguments · InvalidNamedArgument · InvalidPassByReference · InvalidPropertyAssignment · InvalidCast · InvalidOperand · MismatchingDocblock(Return|Param)Type · InvalidStringClass · PossiblyInvalidOperand · PossiblyNullOperand · InvalidStaticInvocation · NonStaticSelfCall · DirectConstructorCall · InvalidPropertyFetch · InvalidArrayAccess · InvalidArrayAssignment"
   />
   <LinkCard
     title="Array"
@@ -37,17 +37,17 @@ Select a category to drill into individual issues.
   <LinkCard
     title="Redundancy"
     href="./redundancy/redundant-condition/"
-    description="RedundantCondition · RedundantCast · UnnecessaryVarAnnotation · TypeDoesNotContainType"
+    description="RedundantCondition · RedundantCast · UnnecessaryVarAnnotation · TypeDoesNotContainType · ParadoxicalCondition"
   />
   <LinkCard
     title="Dead Code"
     href="./dead-code/unused-variable/"
-    description="UnusedVariable · UnusedParam · UnusedMethod · UnusedProperty · UnusedFunction · UnreachableCode"
+    description="UnusedVariable · UnusedParam · UnusedMethod · UnusedProperty · UnusedFunction · UnreachableCode · UnusedForeachValue"
   />
   <LinkCard
     title="Inheritance"
     href="./inheritance/unimplemented-abstract-method/"
-    description="UnimplementedAbstractMethod · UnimplementedInterfaceMethod · MethodSignatureMismatch · OverriddenMethodAccess · FinalClassExtended · FinalMethodOverridden · AbstractInstantiation · CircularInheritance"
+    description="UnimplementedAbstractMethod · UnimplementedInterfaceMethod · MethodSignatureMismatch · OverriddenMethodAccess · InvalidExtendClass · FinalMethodOverridden · AbstractInstantiation · CircularInheritance · InvalidOverride · InterfaceInstantiation · OverriddenPropertyAccess"
   />
   <LinkCard
     title="Security"
@@ -62,6 +62,11 @@ Select a category to drill into individual issues.
   <LinkCard
     title="Other"
     href="./other/deprecated-method/"
-    description="Deprecated* · InternalMethod · Missing(Return|Param)Type · Mixed* · InvalidThrow · MissingThrowsDocblock · ReadonlyPropertyAssignment · ParseError · InvalidDocblock · InvalidTraitUse · Implicit*Cast"
+    description="Deprecated* · InternalMethod · WrongCase* · Missing(Return|Param)Type · Mixed* · InvalidClone · PossiblyInvalidClone · InvalidToString · InvalidThrow · InvalidCatch · MissingThrowsDocblock · ReadonlyPropertyAssignment · ParseError · InvalidDocblock · InvalidTraitUse · Implicit*Cast"
+  />
+  <LinkCard
+    title="Attributes"
+    href="./attributes/invalid-attribute/"
+    description="InvalidAttribute · UndefinedAttributeClass · DuplicateClass"
   />
 </CardGrid>

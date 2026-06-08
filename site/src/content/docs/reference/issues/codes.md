@@ -36,6 +36,7 @@ issues keep their code.
 | MIR1300–1399  | Trait                     |
 | MIR1400–1499  | Parse                     |
 | MIR1500–1599  | Other                     |
+| MIR1600–1699  | Attributes                |
 
 ## All codes
 
@@ -50,6 +51,8 @@ issues keep their code.
 | MIR0007  | UndefinedConstant             | [undefined/undefined-constant](../undefined/undefined-constant/) |
 | MIR0008  | PossiblyUndefinedVariable     | [undefined/possibly-undefined-variable](../undefined/possibly-undefined-variable/) |
 | MIR0009  | UndefinedTrait                | [undefined/undefined-trait](../undefined/undefined-trait/) |
+| MIR0010  | ParentNotFound                | [undefined/parent-not-found](../undefined/parent-not-found/) |
+| MIR0011  | InaccessibleClassConstant     | [undefined/inaccessible-class-constant](../undefined/inaccessible-class-constant/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](../nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](../nullability/null-property-fetch/) |
 | MIR0102  | NullMethodCall                | [nullability/null-method-call](../nullability/null-method-call/) |
@@ -71,6 +74,16 @@ issues keep their code.
 | MIR0208  | InvalidOperand                | [type-mismatches/invalid-operand](../type-mismatches/invalid-operand/) |
 | MIR0209  | MismatchingDocblockReturnType | [type-mismatches/mismatching-docblock-return-type](../type-mismatches/mismatching-docblock-return-type/) |
 | MIR0210  | MismatchingDocblockParamType  | [type-mismatches/mismatching-docblock-param-type](../type-mismatches/mismatching-docblock-param-type/) |
+| MIR0211  | InvalidStringClass            | [type-mismatches/invalid-string-class](../type-mismatches/invalid-string-class/) |
+| MIR0212  | TypeCheckMismatch             | [type-mismatches/type-check-mismatch](../type-mismatches/type-check-mismatch/) |
+| MIR0213  | PossiblyInvalidOperand        | [type-mismatches/possibly-invalid-operand](../type-mismatches/possibly-invalid-operand/) |
+| MIR0214  | PossiblyNullOperand           | [type-mismatches/possibly-null-operand](../type-mismatches/possibly-null-operand/) |
+| MIR0215  | InvalidStaticInvocation       | [type-mismatches/invalid-static-invocation](../type-mismatches/invalid-static-invocation/) |
+| MIR0216  | NonStaticSelfCall             | [type-mismatches/non-static-self-call](../type-mismatches/non-static-self-call/) |
+| MIR0217  | DirectConstructorCall         | [type-mismatches/direct-constructor-call](../type-mismatches/direct-constructor-call/) |
+| MIR0218  | InvalidPropertyFetch          | [type-mismatches/invalid-property-fetch](../type-mismatches/invalid-property-fetch/) |
+| MIR0219  | InvalidArrayAccess            | [type-mismatches/invalid-array-access](../type-mismatches/invalid-array-access/) |
+| MIR0220  | InvalidArrayAssignment        | [type-mismatches/invalid-array-assignment](../type-mismatches/invalid-array-assignment/) |
 | MIR0300  | InvalidArrayOffset            | [array/invalid-array-offset](../array/invalid-array-offset/) |
 | MIR0301  | NonExistentArrayOffset        | [array/non-existent-array-offset](../array/non-existent-array-offset/) |
 | MIR0302  | PossiblyInvalidArrayOffset    | [array/possibly-invalid-array-offset](../array/possibly-invalid-array-offset/) |
@@ -78,21 +91,26 @@ issues keep their code.
 | MIR0401  | RedundantCast                 | [redundancy/redundant-cast](../redundancy/redundant-cast/) |
 | MIR0402  | UnnecessaryVarAnnotation      | [redundancy/unnecessary-var-annotation](../redundancy/unnecessary-var-annotation/) |
 | MIR0403  | TypeDoesNotContainType        | [redundancy/type-does-not-contain-type](../redundancy/type-does-not-contain-type/) |
+| MIR0404  | ParadoxicalCondition          | [redundancy/paradoxical-condition](../redundancy/paradoxical-condition/) |
 | MIR0500  | UnusedVariable                | [dead-code/unused-variable](../dead-code/unused-variable/) |
 | MIR0501  | UnusedParam                   | [dead-code/unused-param](../dead-code/unused-param/) |
 | MIR0502  | UnreachableCode               | [dead-code/unreachable-code](../dead-code/unreachable-code/) |
 | MIR0503  | UnusedMethod                  | [dead-code/unused-method](../dead-code/unused-method/) |
 | MIR0504  | UnusedProperty                | [dead-code/unused-property](../dead-code/unused-property/) |
 | MIR0505  | UnusedFunction                | [dead-code/unused-function](../dead-code/unused-function/) |
+| MIR0506  | UnusedForeachValue            | [dead-code/unused-foreach-value](../dead-code/unused-foreach-value/) |
 | MIR0600  | ReadonlyPropertyAssignment    | [other/readonly-property-assignment](../other/readonly-property-assignment/) |
 | MIR0700  | UnimplementedAbstractMethod   | [inheritance/unimplemented-abstract-method](../inheritance/unimplemented-abstract-method/) |
 | MIR0701  | UnimplementedInterfaceMethod  | [inheritance/unimplemented-interface-method](../inheritance/unimplemented-interface-method/) |
 | MIR0702  | MethodSignatureMismatch       | [inheritance/method-signature-mismatch](../inheritance/method-signature-mismatch/) |
 | MIR0703  | OverriddenMethodAccess        | [inheritance/overridden-method-access](../inheritance/overridden-method-access/) |
-| MIR0704  | FinalClassExtended            | [inheritance/final-class-extended](../inheritance/final-class-extended/) |
+| MIR0704  | InvalidExtendClass            | [inheritance/invalid-extend-class](../inheritance/invalid-extend-class/) |
 | MIR0705  | FinalMethodOverridden         | [inheritance/final-method-overridden](../inheritance/final-method-overridden/) |
 | MIR0706  | AbstractInstantiation         | [inheritance/abstract-instantiation](../inheritance/abstract-instantiation/) |
 | MIR0707  | CircularInheritance           | [inheritance/circular-inheritance](../inheritance/circular-inheritance/) |
+| MIR0708  | InvalidOverride               | [inheritance/invalid-override](../inheritance/invalid-override/) |
+| MIR0709  | InterfaceInstantiation        | [inheritance/interface-instantiation](../inheritance/interface-instantiation/) |
+| MIR0710  | OverriddenPropertyAccess      | [inheritance/overridden-property-access](../inheritance/overridden-property-access/) |
 | MIR0800  | TaintedInput                  | [security/tainted-input](../security/tainted-input/) |
 | MIR0801  | TaintedHtml                   | [security/tainted-html](../security/tainted-html/) |
 | MIR0802  | TaintedSql                    | [security/tainted-sql](../security/tainted-sql/) |
@@ -104,6 +122,13 @@ issues keep their code.
 | MIR1002  | DeprecatedMethod              | [other/deprecated-method](../other/deprecated-method/) |
 | MIR1003  | DeprecatedClass               | [other/deprecated-class](../other/deprecated-class/) |
 | MIR1004  | InternalMethod                | [other/internal-method](../other/internal-method/) |
+| MIR1005  | DeprecatedProperty            | [other/deprecated-property](../other/deprecated-property/) |
+| MIR1006  | DeprecatedInterface           | [other/deprecated-interface](../other/deprecated-interface/) |
+| MIR1007  | DeprecatedTrait               | [other/deprecated-trait](../other/deprecated-trait/) |
+| MIR1008  | DeprecatedConstant            | [other/deprecated-constant](../other/deprecated-constant/) |
+| MIR1009  | WrongCaseFunction             | [other/wrong-case-function](../other/wrong-case-function/) |
+| MIR1010  | WrongCaseMethod               | [other/wrong-case-method](../other/wrong-case-method/) |
+| MIR1011  | WrongCaseClass                | [other/wrong-case-class](../other/wrong-case-class/) |
 | MIR1100  | MissingReturnType             | [other/missing-return-type](../other/missing-return-type/) |
 | MIR1101  | MissingParamType              | [other/missing-param-type](../other/missing-param-type/) |
 | MIR1102  | MissingThrowsDocblock         | [other/missing-throws-docblock](../other/missing-throws-docblock/) |
@@ -113,8 +138,15 @@ issues keep their code.
 | MIR1202  | MixedMethodCall               | [other/mixed-method-call](../other/mixed-method-call/) |
 | MIR1203  | MixedPropertyFetch            | [other/mixed-property-fetch](../other/mixed-property-fetch/) |
 | MIR1204  | MixedClone                    | [other/mixed-clone](../other/mixed-clone/) |
+| MIR1205  | InvalidClone                  | [other/invalid-clone](../other/invalid-clone/) |
+| MIR1206  | PossiblyInvalidClone          | [other/possibly-invalid-clone](../other/possibly-invalid-clone/) |
+| MIR1207  | InvalidToString               | [other/invalid-to-string](../other/invalid-to-string/) |
 | MIR1300  | InvalidTraitUse               | [other/invalid-trait-use](../other/invalid-trait-use/) |
 | MIR1400  | ParseError                    | [other/parse-error](../other/parse-error/) |
 | MIR1500  | InvalidThrow                  | [other/invalid-throw](../other/invalid-throw/) |
 | MIR1501  | ImplicitToStringCast          | [other/implicit-to-string-cast](../other/implicit-to-string-cast/) |
 | MIR1502  | ImplicitFloatToIntCast        | [other/implicit-float-to-int-cast](../other/implicit-float-to-int-cast/) |
+| MIR1503  | InvalidCatch                  | [other/invalid-catch](../other/invalid-catch/) |
+| MIR1600  | InvalidAttribute              | [attributes/invalid-attribute](../attributes/invalid-attribute/) |
+| MIR1601  | UndefinedAttributeClass       | [attributes/undefined-attribute-class](../attributes/undefined-attribute-class/) |
+| MIR1602  | DuplicateClass                | [attributes/duplicate-class](../attributes/duplicate-class/) |
