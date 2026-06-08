@@ -302,6 +302,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/`.
     AbstractInstantiation { class: String },
+    /// Emitted by `mir-analyzer/src/call/static_call.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/prevent_abstract_method_call.phpt`.
+    AbstractMethodCall { class: String, method: String },
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/interface_instantiation.phpt`.
     InterfaceInstantiation { class: String },
@@ -517,6 +520,7 @@ impl IssueKind {
             | IssueKind::InvalidExtendClass { .. }
             | IssueKind::FinalMethodOverridden { .. }
             | IssueKind::AbstractInstantiation { .. }
+            | IssueKind::AbstractMethodCall { .. }
             | IssueKind::InterfaceInstantiation { .. }
             | IssueKind::InvalidOverride { .. }
             | IssueKind::InvalidTemplateParam { .. }
@@ -722,6 +726,7 @@ impl IssueKind {
             IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
+            IssueKind::AbstractMethodCall { .. } => "MIR0711",
             IssueKind::InterfaceInstantiation { .. } => "MIR0709",
             IssueKind::CircularInheritance { .. } => "MIR0707",
             IssueKind::InvalidOverride { .. } => "MIR0708",
@@ -853,6 +858,7 @@ impl IssueKind {
             IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
+            IssueKind::AbstractMethodCall { .. } => "AbstractMethodCall",
             IssueKind::InterfaceInstantiation { .. } => "InterfaceInstantiation",
             IssueKind::InvalidOverride { .. } => "InvalidOverride",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
@@ -1160,6 +1166,9 @@ impl IssueKind {
             }
             IssueKind::AbstractInstantiation { class } => {
                 format!("Cannot instantiate abstract class {class}")
+            }
+            IssueKind::AbstractMethodCall { class, method } => {
+                format!("Cannot call abstract method {class}::{method}()")
             }
             IssueKind::InterfaceInstantiation { class } => {
                 format!("Cannot instantiate interface {class}")
@@ -1635,6 +1644,10 @@ mod code_tests {
                 parent: s(),
             },
             IssueKind::AbstractInstantiation { class: s() },
+            IssueKind::AbstractMethodCall {
+                class: s(),
+                method: s(),
+            },
             IssueKind::InterfaceInstantiation { class: s() },
             IssueKind::InvalidOverride {
                 class: s(),
@@ -1812,6 +1825,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 106);
+        assert_eq!(one_of_each().len(), 107);
     }
 }

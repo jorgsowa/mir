@@ -274,14 +274,23 @@ impl CallAnalyzer {
                     call.method.span,
                 );
             }
-            // Detect non-static method called statically.
-            // Skip: self/static/parent callers (might be called from instance context),
-            //        magic method names (__xxx), classes with __callStatic magic.
+            // Detect call to an abstract method via an explicit class name.
+            // Skip self/static/parent callers: those resolve to a concrete subclass at runtime.
             let is_self_parent_call = if let ExprKind::Identifier(id) = &call.class.kind {
                 matches!(id.as_ref(), "self" | "static" | "parent")
             } else {
                 false
             };
+            if resolved.is_abstract && !is_self_parent_call {
+                ea.emit(
+                    IssueKind::AbstractMethodCall {
+                        class: fqcn.clone(),
+                        method: method_name.to_string(),
+                    },
+                    Severity::Error,
+                    span,
+                );
+            }
             if !resolved.is_static
                 && !method_name.starts_with("__")
                 && !is_self_parent_call
