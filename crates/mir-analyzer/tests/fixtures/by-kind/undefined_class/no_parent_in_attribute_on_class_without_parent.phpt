@@ -13,3 +13,4 @@ class SomeAttr
 class A {}
 
 ===expect===
+ParentNotFound@9:12-9:18: Cannot use parent:: when current class has no parent

@@ -943,6 +943,15 @@ impl<'a> BodyAnalyzer<'a> {
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
+        crate::attributes::check_parent_in_class_attrs(
+            &decl.attributes,
+            parent_fqcn.is_some(),
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
+
         if let Some(parent) = &decl.extends {
             crate::diagnostics::check_name_class_for_extends(
                 parent,
