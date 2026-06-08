@@ -21,6 +21,4 @@ function dangerous() : string {
     return "hello";
 }
 ===expect===
-NullableReturnStatement
-===ignore===
-TODO
+NullableReturnStatement@8:9-8:19: Return type 'string|null' is not compatible with declared 'string'

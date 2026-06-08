@@ -14,6 +14,4 @@ class B extends A {
     }
 }
 ===expect===
-Argument 2 of B::fooFoo has wrong type \
-===ignore===
-TODO
+MethodSignatureMismatch@9:4-9:50: Method B::foofoo() signature mismatch: parameter $b type 'int' is narrower than parent type 'bool'

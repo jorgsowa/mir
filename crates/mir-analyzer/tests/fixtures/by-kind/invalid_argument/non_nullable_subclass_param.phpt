@@ -14,6 +14,4 @@ class B extends A {
     }
 }
 ===expect===
-Argument 1 of B::foo has wrong type \
-===ignore===
-TODO
+MethodSignatureMismatch@9:4-9:44: Method B::foo() signature mismatch: parameter $s type 'string' is narrower than parent type 'string|null'

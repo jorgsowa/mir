@@ -21,6 +21,5 @@ class A {
 $a = new A();
 $a->bar = "goodbye";
 ===expect===
-InaccessibleProperty
-===ignore===
-TODO
+ReadonlyPropertyAssignment@14:9-14:29: Cannot assign to readonly property A::$bar outside of constructor
+ReadonlyPropertyAssignment@19:1-19:20: Cannot assign to readonly property A::$bar outside of constructor
