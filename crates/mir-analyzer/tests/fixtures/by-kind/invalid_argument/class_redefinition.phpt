@@ -5,6 +5,4 @@ Class redefinition
 class Foo {}
 class Foo {}
 ===expect===
-DuplicateClass
-===ignore===
-TODO
+DuplicateClass@3:1-3:13: Class Foo has already been defined

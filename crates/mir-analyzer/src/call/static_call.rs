@@ -122,6 +122,11 @@ impl CallAnalyzer {
             }
         };
 
+        // Detect `parent::` used in a class that has no parent.
+        if fqcn.to_lowercase() == "parent" && ctx.parent_fqcn.is_none() && ctx.self_fqcn.is_some() {
+            ea.emit(IssueKind::ParentNotFound, Severity::Error, call.class.span);
+        }
+
         let fqcn = resolve_static_class(&fqcn, ctx);
 
         if matches!(&call.class.kind, ExprKind::Identifier(_)) {

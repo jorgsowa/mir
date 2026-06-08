@@ -79,6 +79,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_trait/`.
     UndefinedTrait { name: String },
+    /// Emitted when `parent::` is used in a class that has no parent.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_class/no_parent*.phpt`.
+    ParentNotFound,
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_string_class/`.
     InvalidStringClass { actual: String },
@@ -473,6 +476,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs` and `src/call/static_call.rs`.
     /// Fixtures: `tests/fixtures/by-kind/wrong_case_class/`.
     WrongCaseClass { used: String, canonical: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/class_redefinition*.phpt`.
+    DuplicateClass { name: String },
 }
 
 fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
@@ -525,7 +531,8 @@ impl IssueKind {
             | IssueKind::UndefinedTrait { .. }
             | IssueKind::InvalidClone { .. }
             | IssueKind::InvalidToString { .. }
-            | IssueKind::TypeCheckMismatch { .. } => Severity::Error,
+            | IssueKind::TypeCheckMismatch { .. }
+            | IssueKind::ParentNotFound => Severity::Error,
 
             // Warnings (shown at default error level)
             IssueKind::NullArgument { .. }
@@ -601,6 +608,7 @@ impl IssueKind {
             | IssueKind::WrongCaseClass { .. }
             | IssueKind::InvalidAttribute { .. }
             | IssueKind::UndefinedAttributeClass { .. } => Severity::Info,
+            IssueKind::DuplicateClass { .. } => Severity::Error,
         }
     }
 
@@ -643,9 +651,10 @@ impl IssueKind {
             IssueKind::UndefinedClass { .. } => "MIR0005",
             IssueKind::UndefinedProperty { .. } => "MIR0006",
             IssueKind::UndefinedConstant { .. } => "MIR0007",
-            IssueKind::InaccessibleClassConstant { .. } => "MIR0008",
+            IssueKind::InaccessibleClassConstant { .. } => "MIR0011",
             IssueKind::PossiblyUndefinedVariable { .. } => "MIR0008",
             IssueKind::UndefinedTrait { .. } => "MIR0009",
+            IssueKind::ParentNotFound => "MIR0010",
 
             // Nullability (0100-0199)
             IssueKind::NullArgument { .. } => "MIR0100",
@@ -766,6 +775,7 @@ impl IssueKind {
             // Attribute (1600-1699)
             IssueKind::InvalidAttribute { .. } => "MIR1600",
             IssueKind::UndefinedAttributeClass { .. } => "MIR1601",
+            IssueKind::DuplicateClass { .. } => "MIR1602",
 
             // Other (1500-1599)
             IssueKind::InvalidThrow { .. } => "MIR1500",
@@ -790,6 +800,7 @@ impl IssueKind {
             IssueKind::InaccessibleClassConstant { .. } => "InaccessibleClassConstant",
             IssueKind::PossiblyUndefinedVariable { .. } => "PossiblyUndefinedVariable",
             IssueKind::UndefinedTrait { .. } => "UndefinedTrait",
+            IssueKind::ParentNotFound => "ParentNotFound",
             IssueKind::InvalidStringClass { .. } => "InvalidStringClass",
             IssueKind::NullArgument { .. } => "NullArgument",
             IssueKind::NullPropertyFetch { .. } => "NullPropertyFetch",
@@ -884,6 +895,7 @@ impl IssueKind {
             IssueKind::WrongCaseClass { .. } => "WrongCaseClass",
             IssueKind::InvalidAttribute { .. } => "InvalidAttribute",
             IssueKind::UndefinedAttributeClass { .. } => "UndefinedAttributeClass",
+            IssueKind::DuplicateClass { .. } => "DuplicateClass",
         }
     }
 
@@ -920,6 +932,9 @@ impl IssueKind {
                 format!("Variable ${name} might not be defined")
             }
             IssueKind::UndefinedTrait { name } => format!("Trait {name} does not exist"),
+            IssueKind::ParentNotFound => {
+                "Cannot use parent:: when current class has no parent".to_string()
+            }
             IssueKind::InvalidStringClass { actual } => {
                 format!("Dynamic class instantiation requires string or class-string type, got '{actual}'")
             }
@@ -1281,6 +1296,9 @@ impl IssueKind {
             IssueKind::UndefinedAttributeClass { name } => {
                 format!("Attribute class {name} does not exist")
             }
+            IssueKind::DuplicateClass { name } => {
+                format!("Class {name} has already been defined")
+            }
         }
     }
 }
@@ -1460,6 +1478,8 @@ mod code_tests {
                 constant: s(),
             },
             IssueKind::PossiblyUndefinedVariable { name: s() },
+            IssueKind::UndefinedTrait { name: s() },
+            IssueKind::ParentNotFound,
             IssueKind::NullArgument {
                 param: s(),
                 fn_name: s(),
@@ -1714,6 +1734,7 @@ mod code_tests {
             },
             IssueKind::InvalidAttribute { message: s() },
             IssueKind::UndefinedAttributeClass { name: s() },
+            IssueKind::DuplicateClass { name: s() },
         ]
     }
 
@@ -1788,9 +1809,9 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 99 = current variant count. If this assertion fires after you added
+        // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 99);
+        assert_eq!(one_of_each().len(), 106);
     }
 }

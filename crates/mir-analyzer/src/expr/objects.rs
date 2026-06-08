@@ -520,6 +520,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         if expr_name_str(&cca.member) == Some("class") {
             if let ExprKind::Identifier(id) = &cca.class.kind {
                 let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                if resolved.as_str() == "parent"
+                    && ctx.parent_fqcn.is_none()
+                    && ctx.self_fqcn.is_some()
+                {
+                    self.emit(IssueKind::ParentNotFound, Severity::Error, cca.class.span);
+                }
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                     if !crate::db::class_exists(self.db, &resolved)
                         && !self.in_class_exists_arg
@@ -620,6 +626,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     "parent" => {
                         let Some(parent_fqcn) = &ctx.parent_fqcn else {
+                            if ctx.self_fqcn.is_some() {
+                                self.emit(
+                                    IssueKind::ParentNotFound,
+                                    Severity::Error,
+                                    cca.class.span,
+                                );
+                            }
                             return Type::mixed();
                         };
                         let exists = crate::db::class_constant_exists_in_chain(

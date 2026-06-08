@@ -9,6 +9,4 @@ namespace Aye {
     class Foo {}
 }
 ===expect===
-DuplicateClass
-===ignore===
-TODO
+DuplicateClass@6:5-6:17: Class Aye\Foo has already been defined

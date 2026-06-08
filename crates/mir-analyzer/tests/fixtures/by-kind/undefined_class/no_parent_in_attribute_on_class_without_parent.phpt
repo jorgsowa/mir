@@ -13,6 +13,3 @@ class SomeAttr
 class A {}
 
 ===expect===
-ParentNotFound
-===ignore===
-TODO

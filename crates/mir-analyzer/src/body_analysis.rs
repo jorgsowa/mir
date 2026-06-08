@@ -193,6 +193,111 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
         .collect()
 }
 
+/// Walk top-level statements (recursing into braced namespaces) and collect
+/// every class-like declaration as `(fqcn, span)`. The `ns_prefix` tracks the
+/// current resolved namespace (e.g. `"Aye\\"` or `""`).
+fn collect_class_spans(
+    stmts: &[php_ast::owned::Stmt],
+    ns_prefix: &str,
+    out: &mut Vec<(String, php_ast::Span)>,
+) {
+    use php_ast::owned::{NamespaceBody, StmtKind};
+    for stmt in stmts {
+        match &stmt.kind {
+            StmtKind::Class(d) => {
+                let name = d.name.as_ref().and_then(|n| n.as_deref()).unwrap_or("");
+                let fqcn = format!("{ns_prefix}{name}");
+                out.push((fqcn, stmt.span));
+            }
+            StmtKind::Namespace(ns) => {
+                let raw_ns = ns
+                    .name
+                    .as_ref()
+                    .map(|n| {
+                        n.parts
+                            .iter()
+                            .map(|p| p.as_ref())
+                            .collect::<Vec<_>>()
+                            .join("\\")
+                    })
+                    .unwrap_or_default();
+                let child_prefix = if raw_ns.is_empty() {
+                    String::new()
+                } else {
+                    format!("{raw_ns}\\")
+                };
+                match &ns.body {
+                    NamespaceBody::Braced(block) => {
+                        collect_class_spans(&block.stmts, &child_prefix, out);
+                    }
+                    NamespaceBody::Simple => {}
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Emit `DuplicateClass` for any class FQCN declared more than once in `stmts`.
+fn check_duplicate_classes(
+    stmts: &[php_ast::owned::Stmt],
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    let mut spans: Vec<(String, php_ast::Span)> = Vec::new();
+    // Detect the top-level namespace (unbraced) to compute the correct prefix.
+    let ns_prefix = {
+        use php_ast::owned::{NamespaceBody, StmtKind};
+        stmts
+            .iter()
+            .find_map(|s| {
+                if let StmtKind::Namespace(ns) = &s.kind {
+                    if matches!(&ns.body, NamespaceBody::Simple) {
+                        return ns.name.as_ref().map(|n| {
+                            format!(
+                                "{}\\",
+                                n.parts
+                                    .iter()
+                                    .map(|p| p.as_ref())
+                                    .collect::<Vec<_>>()
+                                    .join("\\")
+                            )
+                        });
+                    }
+                }
+                None
+            })
+            .unwrap_or_default()
+    };
+    collect_class_spans(stmts, &ns_prefix, &mut spans);
+
+    let mut seen: std::collections::HashMap<String, ()> = std::collections::HashMap::new();
+    for (fqcn, span) in &spans {
+        let key = fqcn.to_lowercase();
+        if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
+            e.insert(());
+        } else {
+            // Emit on the second (and subsequent) occurrences.
+            let (line, col_start) =
+                crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+            let (line_end, col_end) =
+                crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+            issues.push(Issue::new(
+                mir_issues::IssueKind::DuplicateClass { name: fqcn.clone() },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end,
+                },
+            ));
+        }
+    }
+}
+
 pub(crate) struct BodyAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
@@ -295,6 +400,10 @@ impl<'a> BodyAnalyzer<'a> {
 
         let mut all_issues = Vec::new();
         let mut all_symbols = Vec::new();
+
+        if self.mode == AnalysisMode::Full {
+            check_duplicate_classes(&program.stmts, &file, source, source_map, &mut all_issues);
+        }
 
         self.analyze_top_level_stmts(
             &program.stmts,
