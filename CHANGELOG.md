@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-06-08
+
+### Added
+
+- `WrongCaseClass` (MIR1009), `WrongCaseFunction` (MIR1010), `WrongCaseMethod` (MIR1011) — new Info-severity diagnostics for case-sensitive identifier references (PHP 8.6 RFC). Covers `new` expressions, static calls, `instanceof`, type hints, `catch` clauses, `extends`/`implements`/`use`-trait declarations, built-in and user-defined functions, instance and static method calls, and `use` import declarations.
+- `WrongCaseMethod` now fires when a magic method is defined with wrong casing (e.g. `__CONSTRUCT` instead of `__construct`).
+- `InvalidAttribute` (MIR1600) — detects invalid `#[Attribute]` usages: applying `#[Attribute]` to a function, method, property, or parameter; abstract, interface, or trait classes marked as `#[Attribute]`; attribute classes with a private constructor; classes used as attributes without the `#[Attribute]` annotation; attributes applied to elements not matching their declared target; and non-repeatable attributes used more than once on the same element.
+- `UndefinedAttributeClass` — emitted when an attribute references a class that does not exist in the codebase.
+- `InaccessibleClassConstant` (MIR0011) — emitted when a private or protected class constant is accessed from a context that does not have visibility.
+- `DuplicateClass` (MIR1602) — emitted when the same class name is declared more than once within a file, including across braced namespace blocks.
+- `ParentNotFound` (MIR0010) — emitted when `parent::` is used (static call, constant access, property fetch, or `parent::class`) inside a class that has no declared parent.
+- `OverriddenPropertyAccess` — emitted when a subclass reduces the visibility of an inherited property (`public→protected`, `public→private`, `protected→private`).
+- `NullableReturnStatement` — emitted when a function whose return type is non-nullable has a return path that could be null (the non-null part is otherwise compatible with the declared type).
+- `InvalidClone` now also fires when cloning a named object whose `__clone()` method is `private` and the caller does not have access.
+- `@final` docblock annotation is now treated as equivalent to the native `final` keyword for `InvalidExtendClass` detection.
+
+### Fixed
+
+- `ATTR_TARGET_ALL` corrected from 127 to 63 (the correct sum of the six `TARGET_*` flags). The wrong value accidentally set bit 6 (`IS_REPEATABLE = 64`), making every `#[Attribute]` class without explicit target flags appear repeatable and silently suppressing the "not repeatable" diagnostic.
+- `NonStaticSelfCall` no longer suppresses the diagnostic when the class defines `__callStatic`. `__callStatic` only intercepts *undefined* static methods, not explicitly-defined non-static ones.
+- `$this` no longer leaks into static arrow functions when resolving captured outer scope.
+
+### Changed
+
+- `FinalClassExtended` renamed to `InvalidExtendClass` to align with Psalm's naming. Update any inline `@mir-suppress FinalClassExtended` annotations to `@mir-suppress InvalidExtendClass`.
+
 ## [0.33.0] - 2026-06-05
 
 ### Added
