@@ -18,6 +18,4 @@ function processUserDataInvalid(array $data) : User {
     return new User(...$data);
 }
 ===expect===
-TooFewArguments
-===ignore===
-TODO
+InvalidArgument@15:21-15:29: Argument $id of User::__construct() expects 'int', got 'int|string'

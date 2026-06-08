@@ -17,6 +17,4 @@ class A {
     }
 }
 ===expect===
-InvalidPropertyAssignmentValue
-===ignore===
-TODO
+InvalidReturnType@13:9-13:25: Return type 'int' is not compatible with declared 'string'

@@ -19,6 +19,5 @@ if (is_string($a->getValue())) {
     echo strlen($a->getValue());
 }
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO
+PossiblyNullArgument@16:17-16:31: Argument $string of strlen() might be null
+InvalidArgument@16:17-16:31: Argument $string of strlen() expects 'string', got 'int|string|null'

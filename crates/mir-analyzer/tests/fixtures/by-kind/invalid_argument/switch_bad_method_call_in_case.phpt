@@ -10,6 +10,4 @@ switch (true) {
         break;
 }
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO
+InvalidArgument@6:11-6:13: Argument $p of f() expects 'string', got 'bool'

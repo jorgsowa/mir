@@ -16,6 +16,4 @@ class C {
     protected function foo(string $s) : void {}
 }
 ===expect===
-TooFewArguments
-===ignore===
-TODO
+MethodSignatureMismatch@13:4-13:47: Method C::foo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
