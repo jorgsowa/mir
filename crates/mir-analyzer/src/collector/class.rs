@@ -357,7 +357,7 @@ const ATTR_TARGET_PROPERTY: i64 = 8;
 const ATTR_TARGET_CLASS_CONSTANT: i64 = 16;
 const ATTR_TARGET_PARAMETER: i64 = 32;
 pub(crate) const ATTR_IS_REPEATABLE: i64 = 64;
-pub(crate) const ATTR_TARGET_ALL: i64 = 127;
+pub(crate) const ATTR_TARGET_ALL: i64 = 63;
 
 /// Parse the value of `#[Attribute(...)]` flags from a class's attribute list.
 /// Returns `None` if no `#[Attribute]` is present, `Some(flags)` otherwise.

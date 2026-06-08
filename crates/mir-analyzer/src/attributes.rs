@@ -23,7 +23,7 @@ use php_ast::owned::{
 use php_rs_parser::source_map::SourceMap;
 
 const ATTR_IS_REPEATABLE: i64 = 64;
-const ATTR_TARGET_ALL: i64 = 127;
+const ATTR_TARGET_ALL: i64 = 63;
 use crate::db::{find_class_like, resolve_name, Fqcn, MirDatabase};
 use crate::diagnostics::offset_to_line_col;
 
@@ -404,6 +404,40 @@ pub(crate) fn check_trait_attributes(
     }
 }
 
+/// Emit `ParentNotFound` for any `parent::class` expression found in a flat
+/// attribute argument list when the containing class has no parent.
+pub(crate) fn check_parent_in_class_attrs(
+    attrs: &[Attribute],
+    has_parent: bool,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+) {
+    if has_parent {
+        return;
+    }
+    use php_ast::owned::ExprKind;
+    for attr in attrs {
+        for arg in attr.args.iter() {
+            if let ExprKind::ClassConstAccess(cca) = &arg.value.kind {
+                if let ExprKind::Identifier(id) = &cca.class.kind {
+                    if id.as_ref().eq_ignore_ascii_case("parent") {
+                        let loc = span_to_location(
+                            file,
+                            source,
+                            source_map,
+                            cca.class.span.start,
+                            cca.class.span.end,
+                        );
+                        issues.push(Issue::new(IssueKind::ParentNotFound, loc));
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Cross-file attribute list validation
 // ---------------------------------------------------------------------------
@@ -464,7 +498,7 @@ fn check_attribute_list(
                         ));
                     }
                     Some(flags) => {
-                        // Check target mismatch (skip for TARGET_ALL = 127).
+                        // Check target mismatch (skip for TARGET_ALL = 63).
                         if flags != ATTR_TARGET_ALL && (flags & target_flag) == 0 {
                             let short = attr.name.parts.last().map(|p| p.as_ref()).unwrap_or(&fqcn);
                             issues.push(invalid_attr(
