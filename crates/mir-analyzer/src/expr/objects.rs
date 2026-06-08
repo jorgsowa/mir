@@ -812,8 +812,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.record_ref(Arc::from(format!("{}::{}", fqcn, prop_name)), span);
                         return ty;
                     }
-                    if !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())
-                        && !crate::db::has_method_in_chain(self.db, fqcn.as_ref(), "__get")
+                    let get_method = crate::db::find_method_in_chain(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                        "__get",
+                    );
+                    if get_method.is_none()
+                        && !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())
                         && !self.in_existence_check
                     {
                         self.emit(
@@ -825,7 +830,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             span,
                         );
                     }
-                    return Type::mixed();
+                    return get_method
+                        .and_then(|(_, m)| m.effective_return_type().cloned())
+                        .unwrap_or_else(Type::mixed);
                 }
                 Atomic::TNamedObject { fqcn, .. }
                     if crate::db::class_kind(self.db, fqcn.as_ref()).is_some_and(|k| k.is_enum) =>
