@@ -6,7 +6,7 @@ enum Color: string {
     case Red = 'red';
     case Blue = 'blue';
 }
-$x = Color::tryFrom('red');
-$y = Color::from('blue');
-$z = Color::cases();
+Color::tryFrom('red');
+Color::from('blue');
+Color::cases();
 ===expect===

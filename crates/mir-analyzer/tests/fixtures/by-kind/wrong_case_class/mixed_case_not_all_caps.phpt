@@ -3,8 +3,8 @@ Mixed case variants (not all-caps) are also detected.
 ===file===
 <?php
 class HttpClient {}
-$c = new httpclient();
-$d = new HttpCLIENT();
+new httpclient();
+new HttpCLIENT();
 ===expect===
-WrongCaseClass@3:10-3:20: Class name 'httpclient' has incorrect casing; use 'HttpClient'
-WrongCaseClass@4:10-4:20: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'
+WrongCaseClass@3:5-3:15: Class name 'httpclient' has incorrect casing; use 'HttpClient'
+WrongCaseClass@4:5-4:15: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'

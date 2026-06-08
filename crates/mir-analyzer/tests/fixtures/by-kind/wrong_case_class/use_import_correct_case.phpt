@@ -11,5 +11,5 @@ class MyClass {}
 
 use Lib\MyClass;
 
-$x = new MyClass();
+new MyClass();
 ===expect===
