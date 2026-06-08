@@ -11,7 +11,7 @@ class MyClass {}
 
 use Lib\myClass;
 
-new myClass();
+$x = new myClass();
 ===expect===
 Main.php: WrongCaseClass@3:5-3:16: Class name 'myClass' has incorrect casing; use 'MyClass'
-Main.php: WrongCaseClass@5:5-5:12: Class name 'myClass' has incorrect casing; use 'MyClass'
+Main.php: WrongCaseClass@5:10-5:17: Class name 'myClass' has incorrect casing; use 'MyClass'

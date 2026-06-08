@@ -6,6 +6,6 @@ class Stringable2 {
     public function __toString(): string { return "x"; }
 }
 $s = new Stringable2();
-$s->__TOSTRING();
+$x = $s->__TOSTRING();
 ===expect===
-WrongCaseMethod@6:5-6:15: Method name 'Stringable2::__TOSTRING' has incorrect casing; use '__toString'
+WrongCaseMethod@6:10-6:20: Method name 'Stringable2::__TOSTRING' has incorrect casing; use '__toString'

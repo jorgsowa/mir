@@ -4,5 +4,5 @@ Correct case class name in instanceof is not reported.
 <?php
 class MyException extends \Exception {}
 $e = new MyException();
-$e instanceof MyException;
+$result = $e instanceof MyException;
 ===expect===
