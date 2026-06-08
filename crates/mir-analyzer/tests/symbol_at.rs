@@ -873,3 +873,58 @@ fn inherited_static_call_symbol_keys_by_declaring_class() {
         "codebase_key should match an entry in symbol_reference_locations"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Gap #9 — trait insteadof conflict resolution
+// ---------------------------------------------------------------------------
+
+#[test]
+fn gap_trait_insteadof_definition_ignores_conflict_resolution() {
+    // When two traits define the same method and one is excluded via `insteadof`,
+    // a method call should resolve to the *winning* trait, not the excluded one.
+    //
+    // class MyClass { use A, B { B::hello insteadof A; } }
+    // $obj->hello() must resolve to B::hello, not A::hello.
+    let dir = create_temp_dir("test");
+    let src = "<?php\n\
+trait A {\n\
+    public function hello(): string { return 'A'; }\n\
+}\n\
+trait B {\n\
+    public function hello(): string { return 'B'; }\n\
+}\n\
+class MyClass {\n\
+    use A, B {\n\
+        B::hello insteadof A;\n\
+    }\n\
+}\n\
+function caller(): void { $obj = new MyClass(); $obj->hello(); }\n";
+
+    let file = write_file(&dir, "insteadof.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let sym = result
+        .symbols
+        .iter()
+        .find(|s| matches!(&s.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "hello"))
+        .expect("MethodCall(hello) must be recorded");
+
+    let key = sym.codebase_key().unwrap();
+    assert_eq!(
+        key, "B::hello",
+        "insteadof should route $obj->hello() to B::hello, not A::hello"
+    );
+
+    let offset = src.find("->hello").unwrap() as u32 + 2;
+    let sym_at = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve $obj->hello()");
+    let key_at = sym_at.codebase_key().unwrap();
+    assert_eq!(
+        key_at, "B::hello",
+        "symbol_at codebase_key must also be B::hello after insteadof resolution"
+    );
+}

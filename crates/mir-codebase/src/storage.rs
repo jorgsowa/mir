@@ -487,6 +487,11 @@ pub struct ClassDef {
     /// Raw import-type declarations (`(local_name, original_name, from_class)`) — resolved during finalization.
     #[serde(default)]
     pub pending_import_types: Vec<(Arc<str>, Arc<str>, Arc<str>)>,
+    /// Trait precedence exclusions from `insteadof` declarations in this class's `use` blocks.
+    /// Maps method_name_lowercase → list of trait FQCNs whose version of the method is excluded.
+    /// E.g. `use A, B { B::hello insteadof A; }` stores `"hello" → ["A"]`.
+    #[serde(default)]
+    pub trait_insteadof: IndexMap<Arc<str>, Vec<Arc<str>>>,
 }
 
 impl ClassDef {

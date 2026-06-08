@@ -35,6 +35,8 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_constants = indexmap::IndexMap::new();
         let mut trait_uses: Vec<Arc<str>> = vec![];
         let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
+        let mut trait_insteadof: indexmap::IndexMap<Arc<str>, Vec<Arc<str>>> =
+            indexmap::IndexMap::new();
 
         let class_doc = self.parse_docblock_from_node(decl.doc_comment.as_ref());
 
@@ -237,6 +239,25 @@ impl<'a> DefinitionCollector<'a> {
                         trait_use_locations.push((fqcn.clone(), loc));
                         trait_uses.push(fqcn);
                     }
+                    for adaptation in tu.adaptations.iter() {
+                        if let php_ast::owned::TraitAdaptationKind::Precedence {
+                            method,
+                            insteadof,
+                            ..
+                        } = &adaptation.kind
+                        {
+                            let method_lower: Arc<str> =
+                                name_to_string_owned(method).to_ascii_lowercase().into();
+                            for excluded in insteadof.iter() {
+                                let excluded_fqcn: Arc<str> =
+                                    self.resolve_name(&name_to_string_owned(excluded)).into();
+                                trait_insteadof
+                                    .entry(method_lower.clone())
+                                    .or_default()
+                                    .push(excluded_fqcn);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -342,6 +363,7 @@ impl<'a> DefinitionCollector<'a> {
                     )
                 })
                 .collect(),
+            trait_insteadof,
         };
 
         self.slice.classes.push(std::sync::Arc::new(storage));

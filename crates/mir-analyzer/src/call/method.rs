@@ -49,7 +49,7 @@ pub(super) fn resolve_method_from_db(
 ) -> Option<ResolvedMethod> {
     let db = ea.db;
 
-    if let Some((owner_fqcn, storage)) = crate::db::find_method_in_chain(
+    if let Some((owner_fqcn, storage)) = crate::db::find_method_respecting_precedence(
         db,
         crate::db::Fqcn::from_str(db, fqcn.as_ref()),
         method_name_lower,
@@ -338,7 +338,7 @@ impl CallAnalyzer {
                 // type for unresolvable calls (__call, unknown methods).
                 let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
                 let fqcn_arc = Arc::from(fqcn_resolved.as_str());
-                let declaring_class = crate::db::find_method_in_chain(
+                let declaring_class = crate::db::find_method_respecting_precedence(
                     ea.db,
                     crate::db::Fqcn::from_str(ea.db, &fqcn_arc),
                     &method_name.to_ascii_lowercase(),

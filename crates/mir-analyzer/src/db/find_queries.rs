@@ -774,6 +774,85 @@ pub fn find_method_in_chain<'db>(
     find_method_in_mixins(db, fqcn, name, &mut visited_mixins)
 }
 
+/// Walk the inheritance chain of `fqcn` respecting `insteadof` trait precedence
+/// rules. When a class declares `use A, B { B::hello insteadof A; }`, this
+/// function skips `A::hello` and returns `B::hello` instead.
+///
+/// Falls back to the plain [`find_method_in_chain`] walk for non-class kinds
+/// (traits, interfaces) and includes `@mixin` resolution.
+pub fn find_method_respecting_precedence<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: &str,
+) -> Option<(Arc<str>, Arc<MethodDef>)> {
+    let lower = name.to_ascii_lowercase();
+    let mut visited = std::collections::HashSet::<Arc<str>>::new();
+    walk_method_with_precedence(db, fqcn, &lower, &mut visited).or_else(|| {
+        // @mixin fallback — same as find_method_in_chain
+        let mut visited_mixins = std::collections::HashSet::<Arc<str>>::new();
+        find_method_in_mixins(db, fqcn, name, &mut visited_mixins)
+    })
+}
+
+fn walk_method_with_precedence<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    method_lower: &str,
+    visited: &mut std::collections::HashSet<Arc<str>>,
+) -> Option<(Arc<str>, Arc<MethodDef>)> {
+    let class_name: Arc<str> = fqcn.name(db).into();
+    if !visited.insert(class_name.clone()) {
+        return None;
+    }
+    let class = find_class_like(db, fqcn)?;
+
+    // Check this class/trait's own methods first.
+    if let Some(m) = find_method_in_class(db, fqcn, method_lower) {
+        return Some((class_name, m));
+    }
+
+    // For a plain class: respect its insteadof exclusions when walking its traits.
+    if let ClassLike::Class(cls) = &class {
+        let excluded: std::collections::HashSet<Arc<str>> = cls
+            .trait_insteadof
+            .get(method_lower)
+            .map(|v| v.iter().cloned().collect())
+            .unwrap_or_default();
+
+        for trait_fqcn in cls.traits.iter() {
+            if excluded.contains(trait_fqcn) {
+                continue;
+            }
+            let here = Fqcn::new(db, Name::new(trait_fqcn.as_ref()));
+            if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
+                return Some(result);
+            }
+        }
+        if let Some(ref parent) = cls.parent {
+            let here = Fqcn::new(db, Name::new(parent.as_ref()));
+            if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
+                return Some(result);
+            }
+        }
+        for iface_fqcn in cls.interfaces.iter() {
+            let here = Fqcn::new(db, Name::new(iface_fqcn.as_ref()));
+            if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
+                return Some(result);
+            }
+        }
+        return None;
+    }
+
+    // For traits and interfaces: plain ancestor walk (no per-class insteadof).
+    for ancestor_fqcn in class.ancestor_fqcns() {
+        let here = Fqcn::new(db, Name::new(ancestor_fqcn.as_ref()));
+        if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
+            return Some(result);
+        }
+    }
+    None
+}
+
 fn find_method_in_mixins<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,
