@@ -477,6 +477,11 @@ impl FlowState {
     /// `else`, `case`, ternary arm, …). The returned context can be mutated
     /// independently and later reconciled via [`Self::merge_branches`].
     pub fn branch(&self) -> FlowState {
+        crate::metrics::record_flow_branch(
+            self.read_vars.len(),
+            self.var_locations.len(),
+            self.last_write_locs.len(),
+        );
         self.clone()
     }
 

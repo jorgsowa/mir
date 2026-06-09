@@ -64,6 +64,18 @@ pub struct Counters {
     /// O(N) short-name scan over all workspace functions. Non-zero means we
     /// should build a short-name → FQN index.
     pub fn_short_name_scans: AtomicU64,
+
+    // FlowState::branch() clone profiling — upper bound on COW savings.
+    // "upper bound" because COW only helps branches that never write the field;
+    // branches that do write still pay the clone (just deferred to make_mut).
+    /// Total FlowState::branch() calls.
+    pub flow_branch_calls: AtomicU64,
+    /// Sum of read_vars.len() at each branch() call.
+    pub flow_branch_read_vars_entries: AtomicU64,
+    /// Sum of var_locations.len() at each branch() call.
+    pub flow_branch_var_locs_entries: AtomicU64,
+    /// Sum of last_write_locs.len() at each branch() call.
+    pub flow_branch_last_write_entries: AtomicU64,
 }
 
 static COUNTERS: Counters = Counters {
@@ -79,6 +91,10 @@ static COUNTERS: Counters = Counters {
     ll_fail_source_unreadable: AtomicU64::new(0),
     ll_fail_ingest_then_missing: AtomicU64::new(0),
     fn_short_name_scans: AtomicU64::new(0),
+    flow_branch_calls: AtomicU64::new(0),
+    flow_branch_read_vars_entries: AtomicU64::new(0),
+    flow_branch_var_locs_entries: AtomicU64::new(0),
+    flow_branch_last_write_entries: AtomicU64::new(0),
 };
 
 pub fn record_file_analysis() {
@@ -162,6 +178,21 @@ impl FailureSamples {
 pub fn record_fn_short_name_scan() {
     if enabled() {
         COUNTERS.fn_short_name_scans.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+pub fn record_flow_branch(read_vars: usize, var_locs: usize, last_write: usize) {
+    if enabled() {
+        COUNTERS.flow_branch_calls.fetch_add(1, Ordering::Relaxed);
+        COUNTERS
+            .flow_branch_read_vars_entries
+            .fetch_add(read_vars as u64, Ordering::Relaxed);
+        COUNTERS
+            .flow_branch_var_locs_entries
+            .fetch_add(var_locs as u64, Ordering::Relaxed);
+        COUNTERS
+            .flow_branch_last_write_entries
+            .fetch_add(last_write as u64, Ordering::Relaxed);
     }
 }
 
@@ -257,10 +288,28 @@ pub fn dump() -> Option<String> {
     let ll_source_unreadable = COUNTERS.ll_fail_source_unreadable.load(Ordering::Relaxed);
     let ll_ingest_missing = COUNTERS.ll_fail_ingest_then_missing.load(Ordering::Relaxed);
     let fn_short_scans = COUNTERS.fn_short_name_scans.load(Ordering::Relaxed);
+    let branch_calls = COUNTERS.flow_branch_calls.load(Ordering::Relaxed);
+    let branch_read_vars = COUNTERS
+        .flow_branch_read_vars_entries
+        .load(Ordering::Relaxed);
+    let branch_var_locs = COUNTERS
+        .flow_branch_var_locs_entries
+        .load(Ordering::Relaxed);
+    let branch_last_write = COUNTERS
+        .flow_branch_last_write_entries
+        .load(Ordering::Relaxed);
 
     let avg_pass2_us = body_analysis_micros
         .checked_div(body_analysis_runs)
         .unwrap_or(0);
+
+    // Compute upper-bound clone bytes per run: entry counts × per-entry bytes.
+    // Name = 4B (interned u32), map entry overhead ~50B for FxHash open-addressing.
+    // These are UPPER bounds — COW only helps write-free branches.
+    let entry_bytes: u64 = 54; // Name(4) + value(16 max) + ~34B hashmap overhead per slot
+    let read_vars_ub_mb = branch_read_vars * entry_bytes / 1_000_000;
+    let var_locs_ub_mb = branch_var_locs * entry_bytes * 2 / 1_000_000; // value=(u32,u16,u32,u16)=12B
+    let last_write_ub_mb = branch_last_write * entry_bytes * 2 / 1_000_000;
 
     let samples = render_samples();
     Some(format!(
@@ -272,6 +321,10 @@ pub fn dump() -> Option<String> {
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \
          stub cache           : hits {cache_hits}  misses {cache_misses}\n  \
-         fn short-name scans  : {fn_short_scans}{samples}"
+         fn short-name scans  : {fn_short_scans}\n  \
+         flow branch()        : {branch_calls} calls\n  \
+           read_vars          : {branch_read_vars} total entries  (~{read_vars_ub_mb} MB upper bound)\n  \
+           var_locations      : {branch_var_locs} total entries  (~{var_locs_ub_mb} MB upper bound)\n  \
+           last_write_locs    : {branch_last_write} total entries  (~{last_write_ub_mb} MB upper bound){samples}"
     ))
 }
