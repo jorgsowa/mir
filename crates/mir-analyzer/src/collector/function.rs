@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{wrap_return_type, FnParam, FunctionDef, TemplateParam};
+use mir_codebase::storage::{
+    wrap_return_type, wrap_template_bound, FnParam, FunctionDef, TemplateParam,
+};
 use mir_types::Name;
 
 use super::DefinitionCollector;
@@ -180,9 +182,9 @@ impl DefinitionCollector<'_> {
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
-                bound: bound.clone().map(|b| {
+                bound: wrap_template_bound(bound.clone().map(|b| {
                     self.resolve_union_doc_with_templates(b, &template_names, fqn.as_str(), &[])
-                }),
+                })),
                 defining_entity: fqn.as_str().into(),
                 variance: *variance,
             })

@@ -1,6 +1,6 @@
 use super::DefinitionCollector;
 use crate::parser::name_to_string_owned;
-use mir_codebase::storage::{ConstantDef, InterfaceDef, TemplateParam};
+use mir_codebase::storage::{wrap_template_bound, ConstantDef, InterfaceDef, TemplateParam};
 use mir_types::Type;
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;
@@ -42,14 +42,14 @@ impl<'a> DefinitionCollector<'a> {
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
-                bound: bound.clone().map(|b| {
+                bound: wrap_template_bound(bound.clone().map(|b| {
                     self.resolve_union_doc_with_templates(
                         b,
                         &iface_template_names,
                         fqcn.as_str(),
                         &[],
                     )
-                }),
+                })),
                 defining_entity: fqcn.as_str().into(),
                 variance: *variance,
             })

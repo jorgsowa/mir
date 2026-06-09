@@ -273,9 +273,9 @@ fn check_duplicate_classes(
     };
     collect_class_spans(stmts, &ns_prefix, &mut spans);
 
-    let mut seen: std::collections::HashMap<String, ()> = std::collections::HashMap::new();
+    let mut seen: FxHashMap<Name, ()> = FxHashMap::default();
     for (fqcn, span) in &spans {
-        let key = fqcn.to_lowercase();
+        let key = Name::from(fqcn.as_str()).ascii_lowercase();
         if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
             e.insert(());
         } else {

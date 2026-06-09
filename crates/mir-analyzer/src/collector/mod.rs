@@ -16,8 +16,8 @@ use php_ast::owned::{Program, StmtKind};
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use crate::php_version::PhpVersion;
 use mir_codebase::storage::{
-    wrap_return_type, Assertion, FnParam, MethodDef, PropertyDef, StubSlice, TemplateParam,
-    Visibility,
+    wrap_return_type, wrap_template_bound, Assertion, FnParam, MethodDef, PropertyDef, StubSlice,
+    TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
 use mir_types::{Atomic, Location, Name, Type};
@@ -319,7 +319,7 @@ impl<'a> DefinitionCollector<'a> {
                     let bound = template_params
                         .iter()
                         .find(|tp| tp.name.as_ref() == fqcn.as_ref())
-                        .and_then(|tp| tp.bound.clone())
+                        .and_then(|tp| tp.bound.as_deref().cloned())
                         .unwrap_or_else(Type::mixed);
 
                     // This is a template parameter reference
@@ -1010,14 +1010,14 @@ impl<'a> DefinitionCollector<'a> {
             .iter()
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
-                bound: bound.clone().map(|b| {
+                bound: wrap_template_bound(bound.clone().map(|b| {
                     self.resolve_union_doc_with_templates(
                         b,
                         &template_names,
                         class_fqcn,
                         class_template_params,
                     )
-                }),
+                })),
                 defining_entity: class_fqcn.into(),
                 variance: *variance,
             })

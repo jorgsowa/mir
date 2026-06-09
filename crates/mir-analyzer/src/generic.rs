@@ -29,7 +29,7 @@ pub fn infer_template_bindings(
     for tp in template_params {
         bindings
             .entry(Name::from(tp.name.as_ref()))
-            .or_insert_with(|| tp.bound.clone().unwrap_or_else(Type::mixed));
+            .or_insert_with(|| tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed));
     }
 
     bindings
@@ -84,7 +84,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
                     && !inferred.is_mixed()
                     && !is_subtype(db, inferred, &resolved_bound)
                 {
-                    violations.push((&tp.name, inferred, bound));
+                    violations.push((&tp.name, inferred, bound.as_ref()));
                 }
             }
         }

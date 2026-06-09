@@ -165,10 +165,31 @@ impl std::fmt::Display for Visibility {
     }
 }
 
+fn serialize_template_bound<S>(value: &Option<Arc<Type>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    value.as_deref().serialize(serializer)
+}
+
+fn deserialize_template_bound<'de, D>(deserializer: D) -> Result<Option<Arc<Type>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<Type>::deserialize(deserializer).map(|opt| opt.map(interned_types::intern_or_wrap))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateParam {
     pub name: Name,
-    pub bound: Option<Type>,
+    /// Declared upper bound, e.g. `@template T of Traversable`.
+    /// Stored as `Option<Arc<Type>>` so common bounds (e.g. `object`, `mixed`)
+    /// are deduplicated across all template params via the global intern table.
+    #[serde(
+        serialize_with = "serialize_template_bound",
+        deserialize_with = "deserialize_template_bound"
+    )]
+    pub bound: Option<Arc<Type>>,
     /// The entity (class or function FQN) that declared this template param.
     pub defining_entity: Name,
     pub variance: mir_types::Variance,
@@ -305,6 +326,11 @@ pub fn wrap_return_type(ty: Option<Type>) -> Option<Arc<Type>> {
 /// an interned `Arc<Type>`, deduplicating common property types via the global
 /// pool. See [`PropertyDef`].
 pub fn wrap_property_type(ty: Option<Type>) -> Option<Arc<Type>> {
+    ty.map(interned_types::intern_or_wrap)
+}
+
+/// Helper to wrap a `TemplateParam.bound` in an interned `Arc<Type>`.
+pub fn wrap_template_bound(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
 }
 

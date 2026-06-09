@@ -68,14 +68,14 @@ impl<'a> DefinitionCollector<'a> {
             .map(
                 |(name, bound, variance)| mir_codebase::storage::TemplateParam {
                     name: name.as_str().into(),
-                    bound: bound.clone().map(|b| {
+                    bound: mir_codebase::storage::wrap_template_bound(bound.clone().map(|b| {
                         self.resolve_union_doc_with_templates(
                             b,
                             &class_template_names,
                             fqcn.as_str(),
                             &[],
                         )
-                    }),
+                    })),
                     defining_entity: fqcn.as_str().into(),
                     variance: *variance,
                 },

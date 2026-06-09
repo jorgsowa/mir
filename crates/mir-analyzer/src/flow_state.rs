@@ -133,11 +133,47 @@ pub struct FlowState {
     pub class_exists_guards: ClassExistsGuards,
 }
 
+/// Pre-built superglobal initial state, shared across all FlowState instances.
+///
+/// PHP superglobals are always in scope. Building them fresh per scope costs
+/// ~11 Arc allocations + map insertions per function/method. A static snapshot
+/// lets each new scope start with a cheap Arc clone; the first local-variable
+/// write triggers `Arc::make_mut`, which COW-copies at that point — identical
+/// semantics, zero extra allocations on the common path.
+fn superglobal_vars() -> &'static Arc<FxHashMap<Name, Arc<Type>>> {
+    static VARS: std::sync::OnceLock<Arc<FxHashMap<Name, Arc<Type>>>> = std::sync::OnceLock::new();
+    VARS.get_or_init(|| {
+        let mixed = Arc::new(mir_types::Type::mixed());
+        let mut map = FxHashMap::default();
+        for sg in &[
+            "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
+            "GLOBALS", "argv", "argc",
+        ] {
+            map.insert(Name::from(*sg), Arc::clone(&mixed));
+        }
+        Arc::new(map)
+    })
+}
+
+fn superglobal_assigned() -> &'static Arc<FxHashSet<Name>> {
+    static ASSIGNED: std::sync::OnceLock<Arc<FxHashSet<Name>>> = std::sync::OnceLock::new();
+    ASSIGNED.get_or_init(|| {
+        let set: FxHashSet<Name> = [
+            "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
+            "GLOBALS", "argv", "argc",
+        ]
+        .iter()
+        .map(|s| Name::from(*s))
+        .collect();
+        Arc::new(set)
+    })
+}
+
 impl FlowState {
     pub fn new() -> Self {
-        let mut ctx = Self {
-            vars: Arc::new(FxHashMap::default()),
-            assigned_vars: Arc::new(FxHashSet::default()),
+        Self {
+            vars: Arc::clone(superglobal_vars()),
+            assigned_vars: Arc::clone(superglobal_assigned()),
             possibly_assigned_vars: Arc::new(FxHashSet::default()),
             self_fqcn: None,
             parent_fqcn: None,
@@ -160,23 +196,7 @@ impl FlowState {
             foreach_value_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
-        };
-        // PHP superglobals — always in scope in any context.
-        // Also includes $argv/$argc which are auto-populated at global scope in CLI scripts
-        // (when register_argc_argv is on, the default for CLI).
-        {
-            let vars = Arc::make_mut(&mut ctx.vars);
-            let assigned = Arc::make_mut(&mut ctx.assigned_vars);
-            for sg in &[
-                "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV",
-                "GLOBALS", "argv", "argc",
-            ] {
-                let sym = Name::from(*sg);
-                vars.insert(sym, Arc::new(mir_types::Type::mixed()));
-                assigned.insert(sym);
-            }
         }
-        ctx
     }
 
     /// Create a context seeded with the given parameters.
@@ -266,7 +286,7 @@ impl FlowState {
                 let tp_sym = Name::from(tp.name.as_ref());
                 template_param_names.insert(tp_sym);
                 if let Some(bound) = &tp.bound {
-                    template_bounds_map.insert(tp_sym, bound.clone());
+                    template_bounds_map.insert(tp_sym, (**bound).clone());
                 }
             }
         }
