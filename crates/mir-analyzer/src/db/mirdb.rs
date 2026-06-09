@@ -1127,6 +1127,16 @@ impl MirDbStorage {
                     *self.workspace_symbol_index_input.write() = None;
                 }
                 self.file_decl_snapshots.write().remove(&sf);
+                // Free the file text. The salsa input slot is immortal in 0.27
+                // (no delete API), but the Arc<str> content — potentially hundreds
+                // of KB per file — can be dropped now. This also invalidates any
+                // still-cached memo for this file, accelerating LRU eviction.
+                {
+                    use salsa::Setter as _;
+                    sf.set_text(self)
+                        .with_durability(salsa::Durability::LOW)
+                        .to(Arc::from(""));
+                }
             }
             self.bump_workspace_revision();
         }

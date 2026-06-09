@@ -3,6 +3,7 @@ use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
 use std::alloc::{GlobalAlloc, Layout};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -655,6 +656,68 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     eprintln!();
 }
 
+/// Memory probe for file-removal churn.
+///
+/// Ingests all project files into a fresh session, snapshots live bytes, then
+/// removes every project file via `invalidate_file`. Measures how many bytes
+/// are freed immediately vs. retained as orphaned salsa input slots.
+///
+/// With text-nulling: file content (Arc<str> text) is dropped on removal, so
+/// retained bytes should be small (path strings + salsa slot overhead only).
+/// Without text-nulling: full file text stays alive in the immortal input slot.
+fn bench_file_removal_memory_probe(_c: &mut Criterion) {
+    let root = fixtures_root();
+    if skip_if_missing(&root) {
+        return;
+    }
+    let project_files = discover_files(&root.join("src"));
+
+    let sources: Vec<(Arc<str>, Arc<str>)> = project_files
+        .iter()
+        .filter_map(|p| {
+            let src = std::fs::read_to_string(p).ok()?;
+            Some((
+                Arc::from(p.to_string_lossy().as_ref()),
+                Arc::from(src.as_str()),
+            ))
+        })
+        .collect();
+
+    let total_text_bytes: usize = sources.iter().map(|(_, t)| t.len()).sum();
+
+    eprintln!(
+        "\n=== FILE-REMOVAL MEMORY PROBE ({} project files, {:.1} MiB text) ===\n",
+        sources.len(),
+        total_text_bytes as f64 / 1_048_576.0,
+    );
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    for (path, text) in &sources {
+        session.ingest_file(path.clone(), text.clone());
+    }
+
+    let live_before = G_LIVE.0.load(Relaxed);
+    reset_alloc_counters();
+    G_LIVE.0.store(live_before, Relaxed);
+    G_PEAK.0.store(live_before, Relaxed);
+
+    for (path, _) in &sources {
+        session.invalidate_file(path.as_ref());
+    }
+
+    let live_after = G_LIVE.0.load(Relaxed);
+    let freed = (live_before - live_after).max(0) as f64 / 1_048_576.0;
+    let retained = live_after as f64 / 1_048_576.0;
+
+    eprintln!(
+        "  freed on removal: {:>7.1} MiB  ({:.0}% of text content)",
+        freed,
+        freed * 1_048_576.0 / total_text_bytes as f64 * 100.0,
+    );
+    eprintln!("  retained (slots): {:>7.1} MiB\n", retained);
+}
+
 criterion_group!(
     benches,
     bench_full_analysis,
@@ -665,5 +728,6 @@ criterion_group!(
     bench_full_analysis_detailed,
     bench_vendor_collection_phase_breakdown,
     bench_vendor_collection_cache_cold_vs_warm,
+    bench_file_removal_memory_probe,
 );
 criterion_main!(benches);
