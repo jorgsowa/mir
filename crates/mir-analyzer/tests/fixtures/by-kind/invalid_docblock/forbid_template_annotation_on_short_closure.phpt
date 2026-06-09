@@ -6,6 +6,3 @@ Forbid template annotation on short closure
 fn(): bool => false;
 
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

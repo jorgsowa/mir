@@ -11,6 +11,3 @@ $r = new ReflectionClass(Foo::class);
 $r->getAttributes(Attr::class);
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO

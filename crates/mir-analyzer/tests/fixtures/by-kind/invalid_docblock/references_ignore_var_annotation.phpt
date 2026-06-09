@@ -7,6 +7,3 @@ $a = 1;
 $b = &$a;
 
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

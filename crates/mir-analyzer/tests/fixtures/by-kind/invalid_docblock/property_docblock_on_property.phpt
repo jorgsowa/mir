@@ -7,6 +7,3 @@ class A {
   public array $arr;
 }
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

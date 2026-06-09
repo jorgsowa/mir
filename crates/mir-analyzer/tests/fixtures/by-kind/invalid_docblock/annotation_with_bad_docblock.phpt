@@ -11,6 +11,3 @@ class ParentClass {
  */
 class Child extends ParentClass {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

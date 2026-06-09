@@ -9,6 +9,3 @@ interface I {
     public static function foo($value);
 }
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

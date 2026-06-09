@@ -10,6 +10,3 @@ $r = new ReflectionParameter("foo", "bar");
 $r->getAttributes(NonAttr::class);
 
 ===expect===
-InvalidAttribute
-===ignore===
-TODO

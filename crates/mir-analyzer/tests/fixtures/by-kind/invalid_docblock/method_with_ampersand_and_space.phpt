@@ -7,6 +7,3 @@ Method with ampersand and space
  */
 class Foo {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

@@ -9,6 +9,3 @@ function scope(int $a){
     return $a;
 }
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

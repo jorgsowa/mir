@@ -10,6 +10,3 @@ namespace Barrr;
 
 class A {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

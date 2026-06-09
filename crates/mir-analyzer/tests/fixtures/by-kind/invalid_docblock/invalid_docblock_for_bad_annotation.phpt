@@ -7,6 +7,3 @@ Invalid docblock for bad annotation
  */
 function foo(array &$ar) : void {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

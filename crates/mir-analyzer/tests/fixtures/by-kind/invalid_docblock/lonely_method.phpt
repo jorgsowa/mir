@@ -7,6 +7,3 @@ Lonely method
  */
 class C {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

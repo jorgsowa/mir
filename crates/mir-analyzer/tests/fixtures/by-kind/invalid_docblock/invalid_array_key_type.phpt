@@ -8,6 +8,3 @@ Invalid array key type
  */
 function foo($arg) {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

@@ -12,6 +12,4 @@ Parse bad method annotation
                         }
                     }
 ===expect===
-InvalidDocblock
-===ignore===
-TODO
+UndefinedVariable@7:34-7:36: Variable $b is not defined

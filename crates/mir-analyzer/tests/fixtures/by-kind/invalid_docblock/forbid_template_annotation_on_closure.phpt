@@ -6,6 +6,3 @@ Forbid template annotation on closure
 function (): void {};
 
 ===expect===
-InvalidDocblock
-===ignore===
-TODO

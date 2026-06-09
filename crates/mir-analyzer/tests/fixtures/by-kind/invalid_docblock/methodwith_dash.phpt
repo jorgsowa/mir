@@ -9,6 +9,3 @@ Methodwith dash
  */
 abstract class TestClassA {}
 ===expect===
-InvalidDocblock
-===ignore===
-TODO
