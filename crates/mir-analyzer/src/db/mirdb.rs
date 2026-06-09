@@ -138,6 +138,11 @@ pub struct MirDbStorage {
     pending_ref_locs: PendingRefLocs,
     /// File path → Salsa SourceFile input handle.
     source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
+    /// Paths removed via `remove_source_file`. The `SourceFile` handle remains
+    /// in `source_files` (salsa inputs are immortal in 0.27); this set makes
+    /// the deleted state explicit and auditable, and provides the foundation
+    /// for the Phase M2 tracked-struct migration.
+    deleted_files: Arc<HashSet<Arc<str>>>,
     /// Side-channel resolver state. The `ResolverConfig` salsa input is
     /// lazily created on first `set_resolver` call; its `revision` is
     /// bumped on every subsequent change so dependent tracked queries
@@ -244,6 +249,7 @@ impl Default for MirDbStorage {
             symbol_referencers: SymbolReferencers::default(),
             pending_ref_locs: PendingRefLocs::default(),
             source_files: Arc::default(),
+            deleted_files: Arc::default(),
             resolver_state: Arc::default(),
             workspace_revision_input: Arc::default(),
             user_stub_paths: Arc::default(),
@@ -1088,6 +1094,7 @@ impl MirDbStorage {
     ) -> SourceFile {
         use salsa::Setter as _;
         if let Some(&sf) = self.source_files.get(&path) {
+            Arc::make_mut(&mut self.deleted_files).remove(path.as_ref());
             if sf.text(self) != text {
                 sf.set_text(self).with_durability(durability).to(text);
             }
@@ -1112,6 +1119,7 @@ impl MirDbStorage {
     pub fn remove_source_file(&mut self, path: &str) {
         let sf = self.source_files.get(path).copied();
         if Arc::make_mut(&mut self.source_files).remove(path).is_some() {
+            Arc::make_mut(&mut self.deleted_files).insert(Arc::from(path));
             if let Some(sf) = sf {
                 if self.workspace_symbol_index_input.read().is_some()
                     && !self.remove_file_from_workspace_index(sf)

@@ -164,7 +164,7 @@ unsafe impl salsa::Update for FileDeclarations {
 /// Extract the declared names from one source file without exposing body
 /// content.  Used as the input to `workspace_symbol_index` so that body-only
 /// edits don't propagate to the workspace-wide FQCN index.
-#[salsa::tracked]
+#[salsa::tracked(lru = 4096)]
 pub fn collect_file_declarations(db: &dyn MirDatabase, file: SourceFile) -> FileDeclarations {
     let defs = collect_file_definitions(db, file);
     let mut class_like = Vec::new();
