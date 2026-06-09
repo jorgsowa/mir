@@ -16,6 +16,4 @@ enum Suit {
     }
 }
 ===expect===
-UnhandledMatchCondition
-===ignore===
-TODO
+UnhandledMatchCondition@9:16-12:17: Unhandled match condition: Suit::Spades

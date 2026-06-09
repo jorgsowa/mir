@@ -244,6 +244,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/stmt/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unreachable_code/`.
     UnreachableCode,
+    /// Emitted by `mir-analyzer/src/expr/conditional.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unreachable_code/`.
+    UnhandledMatchCondition { detail: String },
     /// Emitted by `mir-analyzer/src/dead_code.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unused_method/`.
     UnusedMethod { class: String, method: String },
@@ -560,6 +563,7 @@ impl IssueKind {
             | IssueKind::UnusedVariable { .. }
             | IssueKind::UnusedForeachValue { .. }
             | IssueKind::ParadoxicalCondition { .. }
+            | IssueKind::UnhandledMatchCondition { .. }
             | IssueKind::InvalidStringClass { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -704,6 +708,7 @@ impl IssueKind {
             IssueKind::UnnecessaryVarAnnotation { .. } => "MIR0402",
             IssueKind::TypeDoesNotContainType { .. } => "MIR0403",
             IssueKind::ParadoxicalCondition { .. } => "MIR0404",
+            IssueKind::UnhandledMatchCondition { .. } => "MIR0405",
 
             // Dead code (0500-0599)
             IssueKind::UnusedVariable { .. } => "MIR0500",
@@ -843,6 +848,7 @@ impl IssueKind {
             IssueKind::UnnecessaryVarAnnotation { .. } => "UnnecessaryVarAnnotation",
             IssueKind::TypeDoesNotContainType { .. } => "TypeDoesNotContainType",
             IssueKind::ParadoxicalCondition { .. } => "ParadoxicalCondition",
+            IssueKind::UnhandledMatchCondition { .. } => "UnhandledMatchCondition",
             IssueKind::UnusedVariable { .. } => "UnusedVariable",
             IssueKind::UnusedParam { .. } => "UnusedParam",
             IssueKind::UnreachableCode => "UnreachableCode",
@@ -1094,6 +1100,9 @@ impl IssueKind {
             }
             IssueKind::ParadoxicalCondition { value } => {
                 format!("Value {value} is duplicated; this branch can never be reached")
+            }
+            IssueKind::UnhandledMatchCondition { detail } => {
+                format!("Unhandled match condition: {detail}")
             }
 
             IssueKind::UnusedVariable { name } => format!("Variable ${name} is never read"),
@@ -1598,6 +1607,7 @@ mod code_tests {
             IssueKind::UnusedVariable { name: s() },
             IssueKind::UnusedParam { name: s() },
             IssueKind::UnreachableCode,
+            IssueKind::UnhandledMatchCondition { detail: s() },
             IssueKind::UnusedMethod {
                 class: s(),
                 method: s(),
@@ -1825,6 +1835,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 107);
+        assert_eq!(one_of_each().len(), 108);
     }
 }

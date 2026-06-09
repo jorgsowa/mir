@@ -16,6 +16,3 @@ foreach (Suit::cases() as $case) {
     };
 }
 ===expect===
-UnhandledMatchCondition
-===ignore===
-TODO

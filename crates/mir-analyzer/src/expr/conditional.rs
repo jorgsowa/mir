@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
-use mir_types::Type;
-use php_ast::owned::{ExprKind, MatchExpr, NullCoalesceExpr, TernaryExpr};
+use mir_types::{atomic::Atomic, Type};
+use php_ast::owned::{ExprKind, MatchArm, MatchExpr, NullCoalesceExpr, TernaryExpr};
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_ternary(&mut self, t: &TernaryExpr, ctx: &mut FlowState) -> Type {
@@ -67,7 +69,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn analyze_match(&mut self, m: &MatchExpr, ctx: &mut FlowState) -> Type {
+    pub(super) fn analyze_match(
+        &mut self,
+        m: &MatchExpr,
+        span: php_ast::Span,
+        ctx: &mut FlowState,
+    ) -> Type {
         // Flag match-arm conditions whose literal value repeats an earlier arm —
         // the duplicate branch can never be reached. Only literal conditions are
         // compared, so dynamic conditions are never flagged.
@@ -128,10 +135,163 @@ impl<'a> ExpressionAnalyzer<'a> {
                 ctx.read_vars.insert(*name);
             }
         }
+
+        // Exhaustiveness check: emit UnhandledMatchCondition if the match does not
+        // cover all possible values and has no default (conditions: None) arm.
+        if let Some(detail) = self.check_match_exhaustiveness(&subject_ty, &m.arms, ctx) {
+            self.emit(
+                IssueKind::UnhandledMatchCondition { detail },
+                Severity::Warning,
+                span,
+            );
+        }
+
         if result.is_empty() {
             Type::mixed()
         } else {
             result
         }
+    }
+
+    fn check_match_exhaustiveness(
+        &self,
+        subject_ty: &Type,
+        arms: &[MatchArm],
+        ctx: &FlowState,
+    ) -> Option<String> {
+        // An empty match has no arms at all — every value is unmatched.
+        if arms.is_empty() {
+            return Some("no arms".to_string());
+        }
+
+        // A default arm (conditions: None) makes the match exhaustive.
+        if arms.iter().any(|a| a.conditions.is_none()) {
+            return None;
+        }
+
+        // Case 1: Subject is a finite union of string literals.
+        let string_atoms: Vec<Arc<str>> = subject_ty
+            .types
+            .iter()
+            .filter_map(|a| {
+                if let Atomic::TLiteralString(s) = a {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !string_atoms.is_empty() && string_atoms.len() == subject_ty.types.len() {
+            let covered: rustc_hash::FxHashSet<Box<str>> = arms
+                .iter()
+                .filter_map(|a| a.conditions.as_deref())
+                .flatten()
+                .filter_map(|cond| {
+                    if let ExprKind::String(s) = &cond.kind {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let mut uncovered: Vec<&str> = string_atoms
+                .iter()
+                .filter(|s| !covered.contains(s.as_ref()))
+                .map(|s| s.as_ref())
+                .collect();
+            uncovered.sort();
+
+            if !uncovered.is_empty() {
+                let cases = uncovered
+                    .iter()
+                    .map(|s| format!("\"{s}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Some(cases);
+            }
+            return None;
+        }
+
+        // Case 2: Subject is a single named object (or self/static) that is a pure
+        // (non-backed) enum. Extract the FQCN from TNamedObject, TSelf, or TStaticObject.
+        let enum_fqcn_opt: Option<String> = if subject_ty.types.len() == 1 {
+            match &subject_ty.types[0] {
+                Atomic::TNamedObject { fqcn, .. } => Some(fqcn.to_string()),
+                Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
+                    if fqcn.is_empty() {
+                        ctx.self_fqcn.as_deref().map(str::to_string)
+                    } else {
+                        Some(fqcn.to_string())
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if let Some(enum_fqcn) = enum_fqcn_opt {
+            let here = crate::db::Fqcn::new(self.db, mir_types::Name::new(&enum_fqcn));
+            if let Some(crate::db::ClassLike::Enum(enum_def)) =
+                crate::db::find_class_like(self.db, here)
+            {
+                if enum_def.scalar_type.is_none() {
+                    let covered: rustc_hash::FxHashSet<String> = arms
+                        .iter()
+                        .filter_map(|a| a.conditions.as_deref())
+                        .flatten()
+                        .filter_map(|cond| {
+                            if let ExprKind::ClassConstAccess(cca) = &cond.kind {
+                                let resolved_class = match &cca.class.kind {
+                                    ExprKind::Identifier(id) => {
+                                        let r = crate::db::resolve_name(
+                                            self.db,
+                                            &self.file,
+                                            id.as_ref(),
+                                        );
+                                        if r == "self" || r == "static" {
+                                            ctx.self_fqcn.as_deref().unwrap_or("").to_string()
+                                        } else {
+                                            r
+                                        }
+                                    }
+                                    _ => return None,
+                                };
+                                if !resolved_class.eq_ignore_ascii_case(&enum_fqcn) {
+                                    return None;
+                                }
+                                let member = match &cca.member.kind {
+                                    ExprKind::Identifier(s) | ExprKind::Variable(s) => s.as_ref(),
+                                    _ => return None,
+                                };
+                                Some(member.to_lowercase())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    let mut uncovered: Vec<&str> = enum_def
+                        .cases
+                        .keys()
+                        .filter(|k| !covered.contains(&k.to_lowercase()))
+                        .map(|k| k.as_ref())
+                        .collect();
+                    uncovered.sort();
+
+                    if !uncovered.is_empty() {
+                        let cases = uncovered
+                            .iter()
+                            .map(|c| format!("{enum_fqcn}::{c}"))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        return Some(cases);
+                    }
+                    return None;
+                }
+            }
+        }
+
+        None
     }
 }

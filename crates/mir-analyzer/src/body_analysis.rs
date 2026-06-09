@@ -546,7 +546,7 @@ impl<'a> BodyAnalyzer<'a> {
                     );
                 }
                 StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, file, source, source_map, all_issues);
+                    self.analyze_enum_decl(decl, file, source, source_map, all_issues, all_symbols);
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(decl, file, source, source_map, all_issues);
@@ -618,7 +618,15 @@ impl<'a> BodyAnalyzer<'a> {
                     );
                 }
                 StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, file, source, source_map, all_issues);
+                    self.analyze_enum_decl_typed(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        type_envs,
+                        all_symbols,
+                    );
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(decl, file, source, source_map, all_issues);
@@ -1658,8 +1666,13 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
+        use crate::flow_state::FlowState;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
         use php_ast::owned::EnumMemberKind;
+
         for iface in decl.implements.iter() {
             check_name_class(
                 iface,
@@ -1671,6 +1684,11 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
             );
         }
+
+        let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let resolved = resolve_name(self.db, file.as_ref(), enum_name);
+        let fqcn: &str = &resolved;
+
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 continue;
@@ -1685,6 +1703,122 @@ impl<'a> BodyAnalyzer<'a> {
             if let Some(hint) = &method.return_type {
                 self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
             }
+
+            let Some(body) = &method.body else {
+                continue;
+            };
+            let method_name = method.name.as_deref().unwrap_or("");
+
+            let (params, return_ty, _, declared_throws) =
+                method_chain_signature(self.db, fqcn, method_name);
+
+            let mut ctx = FlowState::for_method(
+                &params,
+                return_ty,
+                declared_throws,
+                Some(Arc::from(fqcn)),
+                None,
+                Some(Arc::from(fqcn)),
+                false,
+                false,
+                method.is_static,
+            );
+            seed_param_locations(&mut ctx, &method.params, source, source_map);
+
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                self.db,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+                self.php_version,
+                self.mode,
+            );
+            sa.analyze_stmts(&body.stmts, &mut ctx);
+            let inferred = merge_return_types(&sa.return_types);
+            drop(sa);
+
+            emit_unused_params(&params, &ctx, method_name, file, all_issues);
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_issues());
+
+            self.record_method_inference(fqcn, method_name, &inferred);
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn analyze_enum_decl_typed(
+        &self,
+        decl: &php_ast::owned::EnumDecl,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        type_envs: &mut rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use crate::flow_state::FlowState;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+        use php_ast::owned::EnumMemberKind;
+
+        // Run the full enum body analysis (same as the untyped path).
+        self.analyze_enum_decl(decl, file, source, source_map, all_issues, all_symbols);
+
+        // Additionally record type environments for LSP hover/go-to-def.
+        let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let resolved = resolve_name(self.db, file.as_ref(), enum_name);
+        let fqcn: &str = &resolved;
+
+        for member in decl.body.members.iter() {
+            let EnumMemberKind::Method(method) = &member.kind else {
+                continue;
+            };
+            let Some(body) = &method.body else {
+                continue;
+            };
+            let method_name = method.name.as_deref().unwrap_or("");
+            let (params, return_ty, _, declared_throws) =
+                method_chain_signature(self.db, fqcn, method_name);
+
+            let mut ctx = FlowState::for_method(
+                &params,
+                return_ty,
+                declared_throws,
+                Some(Arc::from(fqcn)),
+                None,
+                Some(Arc::from(fqcn)),
+                false,
+                false,
+                method.is_static,
+            );
+            seed_param_locations(&mut ctx, &method.params, source, source_map);
+
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                self.db,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+                self.php_version,
+                self.mode,
+            );
+            sa.analyze_stmts(&body.stmts, &mut ctx);
+            drop(sa);
+
+            type_envs.insert(
+                crate::type_env::ScopeId::Method {
+                    class: Arc::from(fqcn),
+                    method: Arc::from(method_name),
+                },
+                crate::type_env::TypeEnv::new(ctx.vars.clone()),
+            );
+
+            drop(buf);
         }
     }
 

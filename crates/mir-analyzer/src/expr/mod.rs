@@ -275,7 +275,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::CallableCreate(cc) => self.callable_create_type(cc),
 
             // --- Match expression ------------------------------------------
-            ExprKind::Match(m) => self.analyze_match(m, ctx),
+            ExprKind::Match(m) => self.analyze_match(m, expr.span, ctx),
 
             // --- Throw as expression (PHP 8) --------------------------------
             ExprKind::ThrowExpr(e) => {
