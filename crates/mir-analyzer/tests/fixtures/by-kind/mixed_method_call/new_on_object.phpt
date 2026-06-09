@@ -8,6 +8,4 @@ function f(object $o): object
 }
 
 ===expect===
-MixedMethodCall
-===ignore===
-TODO
+InvalidStringClass@4:16-4:18: Dynamic class instantiation requires string or class-string type, got 'object'

@@ -12,6 +12,4 @@ interface X {
     public function boo(A $class): void {}
 }
 ===expect===
-MismatchingDocblockParamType
-===ignore===
-TODO
+ParseError@9:5-9:43: Parse error: interface method cannot contain a body
