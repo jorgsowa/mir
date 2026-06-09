@@ -6,3 +6,4 @@ Forbid template annotation on short closure
 fn(): bool => false;
 
 ===expect===
+InvalidDocblock@3:0-3:0: Invalid docblock: @template annotations are not supported on closures or arrow functions

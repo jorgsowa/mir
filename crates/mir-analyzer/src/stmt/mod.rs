@@ -186,6 +186,32 @@ impl<'a> StatementsAnalyzer<'a> {
         match &stmt.kind {
             // ---- Expression statement ----------------------------------------
             StmtKind::Expression(expr) => {
+                // @template on a closure or arrow function is not valid
+                if matches!(
+                    expr.kind,
+                    php_ast::owned::ExprKind::Closure(_)
+                        | php_ast::owned::ExprKind::ArrowFunction(_)
+                ) {
+                    if let Some(raw_doc) = doc.as_deref() {
+                        let parsed = crate::parser::DocblockParser::parse(raw_doc);
+                        if !parsed.templates.is_empty() {
+                            let lc = self.source_map.offset_to_line_col(stmt.span.start);
+                            let line = lc.line + 1;
+                            self.issues.add(Issue::new(
+                                IssueKind::InvalidDocblock {
+                                    message: "@template annotations are not supported on closures or arrow functions".to_string(),
+                                },
+                                Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    line_end: line,
+                                    col_start: 0,
+                                    col_end: 0,
+                                },
+                            ));
+                        }
+                    }
+                }
                 self.analyze_expression_stmt(expr, ctx);
             }
 
