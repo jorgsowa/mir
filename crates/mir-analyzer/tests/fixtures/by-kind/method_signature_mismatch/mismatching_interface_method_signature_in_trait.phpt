@@ -15,6 +15,4 @@ class B implements A {
     use T;
 }
 ===expect===
-MethodSignatureMismatch
-===ignore===
-TODO
+MethodSignatureMismatch@11:0-11:22: Method B::foofoo() signature mismatch: method has fewer parameters (1) than interface A::foofoo() (2)
