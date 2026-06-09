@@ -216,10 +216,11 @@ impl DocblockParser {
                     }
                 }
                 "method" | "psalm-method" => {
-                    if let Some(body_str) = body_text(&tag.body) {
-                        if let Some(m) = parse_method_line(&body_str) {
-                            result.methods.push(m);
-                        }
+                    let body_str = body_text(&tag.body).unwrap_or_default().trim().to_string();
+                    if let Some(err) = validate_method_body(&body_str) {
+                        result.invalid_annotations.push(err);
+                    } else if let Some(m) = parse_method_line(&body_str) {
+                        result.methods.push(m);
                     }
                 }
                 "psalm-type" | "phpstan-type" => {
@@ -1314,6 +1315,101 @@ fn validate_type_str(s: &str, tag: &str) -> Option<String> {
         if p.starts_with('$') && p != "$this" {
             return Some(format!("@{tag} contains variable `{p}` in type position"));
         }
+        if let Some(err) = validate_generic_semantics(p, tag) {
+            return Some(err);
+        }
+    }
+    None
+}
+
+/// Validates semantic constraints on generic type expressions like `int<min, max>` and `array<key, value>`.
+fn validate_generic_semantics(s: &str, tag: &str) -> Option<String> {
+    let lower = s.to_lowercase();
+    let (name, inner) = extract_generic_content(s)?;
+    match lower[..name.len()].as_ref() {
+        "int" => validate_int_range_inner(inner, tag),
+        "array" | "non-empty-array" => validate_array_key_inner(inner, tag),
+        _ => None,
+    }
+}
+
+/// Extracts `(name, inner)` from `Name<inner>`. Returns `None` if not a generic.
+fn extract_generic_content(s: &str) -> Option<(&str, &str)> {
+    let lt = s.find('<')?;
+    let name = s[..lt].trim();
+    if name.is_empty() {
+        return None;
+    }
+    let after_lt = &s[lt + 1..];
+    let mut depth = 1i32;
+    for (i, ch) in after_lt.char_indices() {
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some((name, &after_lt[..i]));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn validate_int_range_inner(inner: &str, tag: &str) -> Option<String> {
+    let mut parts = inner.splitn(2, ',');
+    let min_str = parts.next()?.trim();
+    let max_str = parts.next()?.trim();
+
+    if min_str == "max" {
+        return Some(format!(
+            "@{tag} has invalid int range: `max` must be the second argument, not the first"
+        ));
+    }
+    if max_str == "min" {
+        return Some(format!(
+            "@{tag} has invalid int range: `min` must be the first argument, not the second"
+        ));
+    }
+
+    let is_valid_bound = |s: &str| s == "min" || s == "max" || s.parse::<i64>().is_ok();
+
+    if !is_valid_bound(min_str) {
+        return Some(format!(
+            "@{tag} has invalid int range boundary `{min_str}`: must be an integer literal, `min`, or `max`"
+        ));
+    }
+    if !is_valid_bound(max_str) {
+        return Some(format!(
+            "@{tag} has invalid int range boundary `{max_str}`: must be an integer literal, `min`, or `max`"
+        ));
+    }
+
+    if let (Ok(lo), Ok(hi)) = (min_str.parse::<i64>(), max_str.parse::<i64>()) {
+        if lo > hi {
+            return Some(format!(
+                "@{tag} has invalid int range: min ({lo}) must not be greater than max ({hi})"
+            ));
+        }
+    }
+    None
+}
+
+fn validate_array_key_inner(inner: &str, tag: &str) -> Option<String> {
+    let params = split_generics(inner);
+    if params.len() < 2 {
+        return None;
+    }
+    let key_str = params[0].trim();
+    // Only flag types that are fundamentally invalid as PHP array keys (float, bool variants).
+    // Reference types like `object` are technically invalid array keys in PHP but are
+    // left to the template-bound checker (InvalidTemplateParam) to handle more precisely.
+    let invalid_key_types = ["float", "bool", "true", "false"];
+    if invalid_key_types.contains(&key_str.to_lowercase().as_str()) {
+        return Some(format!(
+            "@{tag} has invalid array key type `{key_str}`: must be a subtype of int|string"
+        ));
     }
     None
 }
@@ -1346,6 +1442,74 @@ fn has_empty_generics(s: &str) -> bool {
         }
     }
     false
+}
+
+/// Validate `@method` body for common errors before parsing.
+/// Returns `Some(error_message)` if the annotation is invalid.
+fn validate_method_body(s: &str) -> Option<String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Some("@method annotation is missing a method definition".to_string());
+    }
+    // Strip optional `static` prefix
+    let rest = if s.to_lowercase().starts_with("static ") {
+        s["static ".len()..].trim_start()
+    } else {
+        s
+    };
+    // Extract the method name (the token immediately before `(`)
+    let open = rest.find('(').unwrap_or(rest.len());
+    let prefix = rest[..open].trim();
+    let parts: Vec<&str> = prefix.split_whitespace().collect();
+    let name = parts.last().unwrap_or(&"");
+    // Check for invalid characters in method name (e.g., dash)
+    if !name.is_empty() && !is_valid_php_identifier(name) {
+        return Some(format!(
+            "@method has invalid method name `{name}`: must be a valid PHP identifier"
+        ));
+    }
+    // Validate parameters for by-ref annotations
+    if rest.contains('(') {
+        let params_str = rest;
+        let open_pos = params_str.find('(').unwrap();
+        let after_open = &params_str[open_pos + 1..];
+        if let Some(rel_close) = find_matching_paren(&params_str[open_pos..]) {
+            let close_pos = open_pos + rel_close;
+            let inner = params_str[open_pos + 1..close_pos].trim();
+            if !inner.is_empty() {
+                for param in split_generics(inner) {
+                    let param = param.trim();
+                    if param.starts_with('&') {
+                        return Some(format!(
+                            "@method parameter `{param}` uses by-reference (`&`) which is not supported in @method annotations"
+                        ));
+                    }
+                    // Detect `type & $name` pattern (ampersand with space before `$`)
+                    if let Some(amp_pos) = param.find('&') {
+                        let before_amp = &param[..amp_pos];
+                        let after_amp = param[amp_pos + 1..].trim_start();
+                        if !before_amp.trim().is_empty() && after_amp.starts_with('$') {
+                            return Some(format!(
+                                "@method parameter `{param}` uses by-reference (`&`) which is not supported in @method annotations"
+                            ));
+                        }
+                    }
+                }
+            }
+        } else {
+            let _ = after_open;
+        }
+    }
+    None
+}
+
+fn is_valid_php_identifier(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_alphanumeric() || c == '_')
 }
 
 /// Parse `[static] [ReturnType] name(...)` for @method tags.

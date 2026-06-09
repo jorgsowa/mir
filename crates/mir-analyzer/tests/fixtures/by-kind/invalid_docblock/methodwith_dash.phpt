@@ -9,3 +9,4 @@ Methodwith dash
  */
 abstract class TestClassA {}
 ===expect===
+InvalidDocblock@2:0-2:0: Invalid docblock: @method has invalid method name `exchange-connect`: must be a valid PHP identifier

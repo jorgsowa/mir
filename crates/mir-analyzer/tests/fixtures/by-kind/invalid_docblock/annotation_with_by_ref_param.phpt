@@ -11,3 +11,4 @@ class ParentClass {
  */
 class Child extends ParentClass {}
 ===expect===
+InvalidDocblock@6:0-6:0: Invalid docblock: @method parameter `&$a` uses by-reference (`&`) which is not supported in @method annotations
