@@ -67,10 +67,11 @@ function convert_uudecode(string $string): string|false {}
 /**
  * Absolute value
  * @link https://php.net/manual/en/function.abs.php
- * @param int|float $num <p>
+ * @template T of int|float
+ * @param T $num <p>
  * The numeric value to process
  * </p>
- * @return float|int The absolute value of number. If the
+ * @return T The absolute value of number. If the
  * argument number is
  * of type float, the return type is also float,
  * otherwise it is integer (as float usually has a
