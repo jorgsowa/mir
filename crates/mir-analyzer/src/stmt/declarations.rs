@@ -1,8 +1,31 @@
 use super::StatementsAnalyzer;
 use crate::flow_state::FlowState;
 use mir_types::Name;
-use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl};
+use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl, Param};
+use php_ast::Span;
 use std::sync::Arc;
+
+/// Return the tight byte-offset span covering only the `$name` token within a
+/// parameter declaration, falling back to the full param span when not found.
+fn param_name_span(source: &str, p: &Param) -> Span {
+    let Some(raw) = p.name.as_deref() else {
+        return p.span;
+    };
+    let bare = raw.trim_start_matches('$');
+    let range_start = p.span.start as usize;
+    let range_end = (p.span.end as usize).min(source.len());
+    let slice = &source[range_start..range_end];
+    let needle = format!("${bare}");
+    if let Some(rel) = slice.find(needle.as_str()) {
+        let start = p.span.start + rel as u32;
+        Span {
+            start,
+            end: start + needle.len() as u32,
+        }
+    } else {
+        p.span
+    }
+}
 
 impl<'a> StatementsAnalyzer<'a> {
     pub(crate) fn analyze_function_decl_stmt(&mut self, decl: &FunctionDecl, ctx: &mut FlowState) {
@@ -75,6 +98,13 @@ impl<'a> StatementsAnalyzer<'a> {
             ctx.strict_types,
             true,
         );
+        for p in decl.params.iter() {
+            if let Some(raw) = p.name.as_deref() {
+                let trimmed = raw.trim_start_matches('$');
+                let ty = fn_ctx.get_var(trimmed);
+                self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
+            }
+        }
         let mut sa = StatementsAnalyzer::new(
             self.db,
             self.file.clone(),
@@ -162,6 +192,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 is_ctor,
                 method.is_static,
             );
+            for p in method.params.iter() {
+                if let Some(raw) = p.name.as_deref() {
+                    let trimmed = raw.trim_start_matches('$');
+                    let ty = method_ctx.get_var(trimmed);
+                    self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
+                }
+            }
             let mut sa = StatementsAnalyzer::new(
                 self.db,
                 self.file.clone(),

@@ -2,10 +2,32 @@ use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::stmt::widen_for_check;
+use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
-use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind};
+use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind, Param};
+use php_ast::Span;
 use std::sync::Arc;
+
+fn param_name_span(source: &str, p: &Param) -> Span {
+    let Some(raw) = p.name.as_deref() else {
+        return p.span;
+    };
+    let bare = raw.trim_start_matches('$');
+    let range_start = p.span.start as usize;
+    let range_end = (p.span.end as usize).min(source.len());
+    let slice = &source[range_start..range_end];
+    let needle = format!("${bare}");
+    if let Some(rel) = slice.find(needle.as_str()) {
+        let start = p.span.start + rel as u32;
+        Span {
+            start,
+            end: start + needle.len() as u32,
+        }
+    } else {
+        p.span
+    }
+}
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_closure(&mut self, c: &ClosureExpr, ctx: &mut FlowState) -> Type {
@@ -40,6 +62,17 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             c.is_static,
         );
+        for p in c.params.iter() {
+            if let Some(raw) = p.name.as_deref() {
+                let trimmed = raw.trim_start_matches('$');
+                let ty = closure_ctx.get_var(trimmed);
+                self.record_symbol(
+                    param_name_span(self.source, p),
+                    ReferenceKind::Variable(Arc::from(trimmed)),
+                    ty,
+                );
+            }
+        }
         for use_var in c.use_vars.iter() {
             let name = use_var.name.trim_start_matches('$');
             // Check if variable is defined in parent context
@@ -168,6 +201,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             if !arrow_ctx.vars.contains_key(name) {
                 std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(*name, ty.clone());
                 std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(*name);
+            }
+        }
+
+        for p in af.params.iter() {
+            if let Some(raw) = p.name.as_deref() {
+                let trimmed = raw.trim_start_matches('$');
+                // Use arrow_ctx.get_var to get the resolved type (params take priority
+                // over outer-scope vars of the same name since they were inserted first).
+                let ty = arrow_ctx.get_var(trimmed);
+                self.record_symbol(
+                    param_name_span(self.source, p),
+                    ReferenceKind::Variable(Arc::from(trimmed)),
+                    ty,
+                );
             }
         }
 

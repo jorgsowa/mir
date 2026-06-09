@@ -740,6 +740,7 @@ impl<'a> BodyAnalyzer<'a> {
             Some(&template_params),
         );
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
+        record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.db,
@@ -1040,6 +1041,7 @@ impl<'a> BodyAnalyzer<'a> {
                 Some(&template_params),
             );
             seed_param_locations(&mut ctx, &method.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1164,6 +1166,7 @@ impl<'a> BodyAnalyzer<'a> {
             true,
         );
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
+        record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.db,
@@ -1317,6 +1320,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method.is_static,
             );
             seed_param_locations(&mut ctx, &method.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1528,6 +1532,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method.is_static,
             );
             seed_param_locations(&mut ctx, &method.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1613,6 +1618,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method.is_static,
             );
             seed_param_locations(&mut ctx, &method.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1710,6 +1716,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method.is_static,
             );
             seed_param_locations(&mut ctx, &method.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1781,6 +1788,7 @@ impl<'a> BodyAnalyzer<'a> {
                 method.is_static,
             );
             seed_param_locations(&mut ctx, &method.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
             let mut buf = IssueBuffer::new();
             let mut sa = StatementsAnalyzer::new(
@@ -1864,6 +1872,55 @@ fn seed_param_locations(
         let (line_end, col_end) =
             crate::diagnostics::offset_to_line_col(source, p.span.end, source_map);
         ctx.record_var_location(name, line, col_start, line_end, col_end);
+    }
+}
+
+/// Return the tight byte-offset span for only the `$name` token in a
+/// parameter declaration. Falls back to the full param span when not found.
+fn param_name_span(source: &str, p: &php_ast::owned::Param) -> php_ast::Span {
+    let Some(raw) = p.name.as_deref() else {
+        return p.span;
+    };
+    let bare = raw.trim_start_matches('$');
+    let range_start = p.span.start as usize;
+    let range_end = (p.span.end as usize).min(source.len());
+    let slice = &source[range_start..range_end];
+    let needle = format!("${bare}");
+    if let Some(rel) = slice.find(needle.as_str()) {
+        let start = p.span.start + rel as u32;
+        php_ast::Span {
+            start,
+            end: start + needle.len() as u32,
+        }
+    } else {
+        p.span
+    }
+}
+
+/// Push one `Variable` symbol per parameter declaration into `all_symbols`.
+/// Called immediately after [`seed_param_locations`] at every function/method body entry.
+fn record_param_symbols(
+    all_symbols: &mut Vec<ResolvedSymbol>,
+    file: &Arc<str>,
+    source: &str,
+    ast_params: &[php_ast::owned::Param],
+    ctx: &crate::flow_state::FlowState,
+) {
+    use crate::symbol::ReferenceKind;
+    for p in ast_params {
+        let Some(raw) = p.name.as_deref() else {
+            continue;
+        };
+        let bare = raw.trim_start_matches('$');
+        let span = param_name_span(source, p);
+        let ty = ctx.get_var(bare);
+        all_symbols.push(ResolvedSymbol {
+            file: file.clone(),
+            span,
+            expr_span: None,
+            kind: ReferenceKind::Variable(Arc::from(bare)),
+            resolved_type: ty,
+        });
     }
 }
 

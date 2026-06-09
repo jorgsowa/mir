@@ -1005,3 +1005,112 @@ fn symbol_at_chain_gap_returns_innermost_enclosing_call() {
         sym.kind
     );
 }
+
+// ---------------------------------------------------------------------------
+// Regression: parameter declaration sites must be recorded as symbols
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_param_declaration_function() {
+    // symbol_at on `$user` at its declaration site should return Variable("user")
+    // with the declared type (User), not None.
+    let src =
+        "<?php\nclass User {}\nfunction greet(User $user): string { return $user->getName(); }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    // Find the byte offset of `$user` in the parameter declaration.
+    let decl_offset = src.find("User $user").unwrap() as u32 + 5; // skip "User " → points at '$'
+
+    let sym = result
+        .symbol_at("<source>", decl_offset)
+        .expect("symbol_at must return a symbol at the parameter declaration");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "user"),
+        "expected Variable(user) at param declaration, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_param_declaration_method() {
+    let src =
+        "<?php\nclass Greeter { public function greet(string $name): string { return $name; } }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let decl_offset = src.find("string $name").unwrap() as u32 + 7; // skip "string " → '$'
+
+    let sym = result
+        .symbol_at("<source>", decl_offset)
+        .expect("symbol_at must return a symbol at the method parameter declaration");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "name"),
+        "expected Variable(name) at method param declaration, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_param_declaration_closure() {
+    let src = "<?php\n$fn = function(int $x): int { return $x * 2; };\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let decl_offset = src.find("int $x").unwrap() as u32 + 4; // skip "int " → '$'
+
+    let sym = result
+        .symbol_at("<source>", decl_offset)
+        .expect("symbol_at must return a symbol at the closure parameter declaration");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "x"),
+        "expected Variable(x) at closure param declaration, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_param_declaration_arrow_function() {
+    let src = "<?php\n$fn = fn(int $n) => $n + 1;\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let decl_offset = src.find("int $n").unwrap() as u32 + 4; // skip "int " → '$'
+
+    let sym = result
+        .symbol_at("<source>", decl_offset)
+        .expect("symbol_at must return a symbol at the arrow function parameter declaration");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "n"),
+        "expected Variable(n) at arrow fn param declaration, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_param_declaration_tight_span() {
+    // The declaration symbol span must cover only the `$name` token,
+    // not the entire `TypeHint $name` parameter declaration.
+    let src = "<?php\nfunction foo(string $val): void {}\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    // Find the `$val` offset directly.
+    let dollar_off = src.find("$val").unwrap() as u32;
+
+    // symbol_at on `$val` must return Variable(val).
+    let sym = result
+        .symbol_at("<source>", dollar_off)
+        .expect("symbol_at must find Variable(val) on `$val` in param declaration");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "val"),
+        "expected Variable(val), got {:?}",
+        sym.kind
+    );
+
+    // The recorded span must NOT cover `string` (the type hint prefix).
+    let string_off = src.find("string $val").unwrap() as u32;
+    let sym_at_type = result.symbol_at("<source>", string_off);
+    // Either no symbol at all on the type token, or a non-variable symbol.
+    if let Some(s) = sym_at_type {
+        assert!(
+            !matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == "val"),
+            "Variable(val) span must not cover the type hint token"
+        );
+    }
+}
