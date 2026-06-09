@@ -638,7 +638,35 @@ pub fn find_method_in_class<'db>(
             })
         };
         if lower == "cases" {
-            return Some(synth("cases", Arc::from([].as_ref())));
+            let enum_ty = mir_types::Type::single(Atomic::TNamedObject {
+                fqcn: Name::new(e.fqcn.as_ref()),
+                type_params: mir_types::union::empty_type_params(),
+            });
+            let cases_return = mir_types::Type::single(Atomic::TList {
+                value: Box::new(enum_ty),
+            });
+            return Some(Arc::new(mir_codebase::storage::MethodDef {
+                fqcn: e.fqcn.clone(),
+                name: Arc::from("cases"),
+                params: Arc::from([].as_ref()),
+                return_type: Some(Arc::new(cases_return)),
+                inferred_return_type: None,
+                visibility: mir_codebase::storage::Visibility::Public,
+                is_static: true,
+                is_abstract: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                is_final: false,
+                is_virtual: false,
+                is_internal: false,
+                is_pure: false,
+                is_override: false,
+                deprecated: None,
+                location: None,
+                docstring: None,
+            }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
             let value_param = FnParam {
