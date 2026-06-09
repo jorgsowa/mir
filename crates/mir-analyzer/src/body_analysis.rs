@@ -203,11 +203,16 @@ fn collect_class_spans(
     out: &mut Vec<(String, php_ast::Span)>,
 ) {
     use php_ast::owned::{NamespaceBody, StmtKind};
+    // Track the prefix of the current unbraced (`namespace A;`) namespace as we
+    // walk siblings. A file may switch namespaces several times, e.g.
+    // `namespace A; class Foo {} namespace B; class Foo {}` declares the distinct
+    // `A\Foo` and `B\Foo`, so each class must use the prefix in effect at its position.
+    let mut current_prefix = ns_prefix.to_string();
     for stmt in stmts {
         match &stmt.kind {
             StmtKind::Class(d) => {
                 let name = d.name.as_ref().and_then(|n| n.as_deref()).unwrap_or("");
-                let fqcn = format!("{ns_prefix}{name}");
+                let fqcn = format!("{current_prefix}{name}");
                 out.push((fqcn, stmt.span));
             }
             StmtKind::Namespace(ns) => {
@@ -231,7 +236,9 @@ fn collect_class_spans(
                     NamespaceBody::Braced(block) => {
                         collect_class_spans(&block.stmts, &child_prefix, out);
                     }
-                    NamespaceBody::Simple => {}
+                    // Unbraced: the classes that follow are flat siblings, so this
+                    // prefix applies until the next `namespace` statement.
+                    NamespaceBody::Simple => current_prefix = child_prefix,
                 }
             }
             _ => {}
@@ -248,31 +255,9 @@ fn check_duplicate_classes(
     issues: &mut Vec<Issue>,
 ) {
     let mut spans: Vec<(String, php_ast::Span)> = Vec::new();
-    // Detect the top-level namespace (unbraced) to compute the correct prefix.
-    let ns_prefix = {
-        use php_ast::owned::{NamespaceBody, StmtKind};
-        stmts
-            .iter()
-            .find_map(|s| {
-                if let StmtKind::Namespace(ns) = &s.kind {
-                    if matches!(&ns.body, NamespaceBody::Simple) {
-                        return ns.name.as_ref().map(|n| {
-                            format!(
-                                "{}\\",
-                                n.parts
-                                    .iter()
-                                    .map(|p| p.as_ref())
-                                    .collect::<Vec<_>>()
-                                    .join("\\")
-                            )
-                        });
-                    }
-                }
-                None
-            })
-            .unwrap_or_default()
-    };
-    collect_class_spans(stmts, &ns_prefix, &mut spans);
+    // `collect_class_spans` tracks the active (unbraced) namespace prefix itself,
+    // so the global namespace is the correct starting point.
+    collect_class_spans(stmts, "", &mut spans);
 
     let mut seen: FxHashMap<Name, ()> = FxHashMap::default();
     for (fqcn, span) in &spans {
