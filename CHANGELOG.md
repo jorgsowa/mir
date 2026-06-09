@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-06-09
+
+### Added
+
+- `UnhandledMatchCondition` — emitted when a `match` expression is non-exhaustive: empty match (no arms), string literal union subject with uncovered values, or pure (non-backed) enum subject with missing cases. Enum method bodies are now included in the body-analysis pipeline, enabling exhaustiveness detection inside enum methods.
+- `AbstractMethodCall` now fires when an abstract static method is called by explicit class name (e.g. `Base::bar()` where `bar()` is abstract). Self/static/parent calls remain exempt.
+- `InvalidDocblock` now covers three additional categories: `int<min,max>` ranges with invalid boundaries or wrong ordering; `array<K,V>` with a key type that is not a subtype of `int|string`; and `@method` annotations that are empty, contain invalid characters, or declare by-reference parameters.
+- `InvalidDocblock` is now also emitted for `@template` annotations on closure and arrow-function expressions, where they have no effect.
+- Trait method signatures are now checked against interface requirements: when a class implements an interface via `use T`, the trait method's signature is compared against the interface declaration and `MethodSignatureMismatch` is emitted for incompatible signatures.
+- Trait `insteadof` conflict resolution is now applied during method lookup (go-to-definition and call resolution resolve to the winning trait instead of whichever was indexed first).
+
+### Fixed
+
+- `__get` return type is now propagated to magic property-access inference: accesses that fall through to `__get` carry the declared return type instead of always resolving to `mixed`.
+- `enum::cases()` now synthesizes `list<EnumType>` instead of `mixed`, allowing `foreach` loop variables to be typed as the specific enum and enabling `UnhandledMatchCondition` to fire on enum matches.
+- `SourceFile` text is now freed on removal: the `Arc<str>` content is nulled immediately after workspace index cleanup, releasing file content memory that was previously retained indefinitely due to Salsa 0.27 lacking a delete API.
+- Salsa LRU cap added to `collect_file_declarations` (`lru = 4096`), matching the existing cap on `collect_file_definitions`, preventing unbounded memo accumulation for removed files.
+- `deleted_files` tracking added to `MirDbStorage` so removed files are explicitly auditable and provide the foundation for future tracked-struct GC.
+
+### Performance
+
+- Variable types stored in `FlowState` and `InferredFileTypes` are now deduplicated via `wrap_var_type`, backed by the existing `intern_or_wrap` pool. Common scalars hit an O(1) fast path; merged types that equal a prior type are also deduplicated, making `Arc::ptr_eq` shortcuts in merge code fire more often.
+- `FlowState::new()` no longer allocates a fresh map for the 11 PHP superglobals on every function/method scope entry. Pre-built `Arc` statics are shared via COW, saving ~140 MiB of allocation churn on the project-only analysis pass (measured on Laravel).
+- `TemplateParam.bound` changed from `Option<Type>` (176 B inline) to `Option<Arc<Type>>` via `intern_or_wrap`, saving ~36 MiB of allocation churn on the project-only analysis pass.
+
 ## [0.34.0] - 2026-06-08
 
 ### Added
