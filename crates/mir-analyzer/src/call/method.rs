@@ -347,8 +347,9 @@ impl CallAnalyzer {
                 )
                 .map(|(owner, _)| owner)
                 .unwrap_or(fqcn_arc);
-                ea.record_symbol(
+                ea.record_symbol_with_expr_span(
                     call.method.span,
+                    span,
                     ReferenceKind::MethodCall {
                         class: declaring_class,
                         method: Arc::from(method_name),

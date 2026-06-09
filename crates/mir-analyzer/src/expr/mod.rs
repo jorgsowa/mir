@@ -118,6 +118,23 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.symbols.push(ResolvedSymbol {
             file: self.file.clone(),
             span,
+            expr_span: None,
+            kind,
+            resolved_type,
+        });
+    }
+
+    pub fn record_symbol_with_expr_span(
+        &mut self,
+        span: php_ast::Span,
+        expr_span: php_ast::Span,
+        kind: ReferenceKind,
+        resolved_type: Type,
+    ) {
+        self.symbols.push(ResolvedSymbol {
+            file: self.file.clone(),
+            span,
+            expr_span: Some(expr_span),
             kind,
             resolved_type,
         });

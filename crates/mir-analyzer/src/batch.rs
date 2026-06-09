@@ -1447,9 +1447,31 @@ impl AnalysisResult {
         byte_offset: u32,
     ) -> Option<&crate::symbol::ResolvedSymbol> {
         let range = self.symbols_by_file.get(file)?;
-        self.symbols[range.clone()]
+        let symbols = &self.symbols[range.clone()];
+
+        // Primary: cursor is on an identifier token.
+        if let Some(sym) = symbols
             .iter()
             .filter(|s| s.span.start <= byte_offset && byte_offset < s.span.end)
             .min_by_key(|s| s.span.end - s.span.start)
+        {
+            return Some(sym);
+        }
+
+        // Fallback: cursor is in a call-expression gap (e.g. the whitespace or
+        // argument list between two chained method calls).  Match against the
+        // full expression span recorded for call-like symbols and return the
+        // innermost (smallest) enclosing call, mirroring what an AST-walk to
+        // the innermost containing call expression would produce.
+        symbols
+            .iter()
+            .filter(|s| {
+                s.expr_span
+                    .is_some_and(|es| es.start <= byte_offset && byte_offset < es.end)
+            })
+            .min_by_key(|s| {
+                let es = s.expr_span.unwrap();
+                es.end - es.start
+            })
     }
 }

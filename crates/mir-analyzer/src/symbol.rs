@@ -15,8 +15,16 @@ use php_ast::Span;
 pub struct ResolvedSymbol {
     /// Absolute path of the file this symbol was found in.
     pub file: Arc<str>,
-    /// Byte-offset span in the source file.
+    /// Byte-offset span covering only the identifier token (method name,
+    /// function name, variable sigil+name, etc.).  Used for precise
+    /// go-to-definition and reference highlighting.
     pub span: Span,
+    /// Byte-offset span of the full call expression, e.g. the entire
+    /// `$obj->method(args)` node.  Set only for call-like symbols (method
+    /// calls, static calls, function calls).  `symbol_at` uses this as a
+    /// fallback so that a cursor sitting in the whitespace between two
+    /// chained method calls still resolves to the innermost enclosing call.
+    pub expr_span: Option<Span>,
     /// What kind of symbol this is.
     pub kind: ReferenceKind,
     /// The resolved type at this location.

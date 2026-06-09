@@ -928,3 +928,80 @@ function caller(): void { $obj = new MyClass(); $obj->hello(); }\n";
         "symbol_at codebase_key must also be B::hello after insteadof resolution"
     );
 }
+
+// ---------------------------------------------------------------------------
+// symbol_at — method-chain gap fallback (expr_span)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_chain_gap_returns_innermost_enclosing_call() {
+    // When the cursor sits in the whitespace between two chained method calls
+    // (e.g. the "\n  ->" between `->where('id')` and `->limit(10)`), symbol_at
+    // should fall back to the innermost call expression whose expr_span contains
+    // the offset rather than returning None.
+    let dir = create_temp_dir("test");
+    // Use concat! so the "  ->" indentation is not stripped by a Rust
+    // string-continuation backslash.
+    let src = concat!(
+        "<?php\n",
+        "class Builder {\n",
+        "    public function where(string $col): static { return $this; }\n",
+        "    public function limit(int $n): static { return $this; }\n",
+        "}\n",
+        "$q = new Builder();\n",
+        "$q->where('id')\n",
+        "  ->limit(10);\n",
+    );
+
+    let file = write_file(&dir, "chain_gap.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    // Cursor on `where` identifier — exact match.
+    let where_id_off = src.find("->where(").unwrap() as u32 + 2;
+    let sym = result
+        .symbol_at(file_str, where_id_off)
+        .expect("symbol_at should find `where` on its identifier");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "where"),
+        "expected MethodCall(where), got {:?}",
+        sym.kind
+    );
+
+    // Cursor on `(` immediately after `where` — inside the call expression,
+    // not on the identifier.  Should resolve to `where` via expr_span.
+    let where_open_paren = where_id_off + "where".len() as u32;
+    let sym = result
+        .symbol_at(file_str, where_open_paren)
+        .expect("symbol_at should find `where` from inside its argument list");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "where"),
+        "expected MethodCall(where) at '(', got {:?}",
+        sym.kind
+    );
+
+    // Cursor on `\n` (the chain gap after `->where('id')`).  Should resolve to
+    // `limit` — the innermost call whose expr_span encloses the newline.
+    let newline_off = (src.find("->where('id')").unwrap() + "->where('id')".len()) as u32;
+    let sym = result
+        .symbol_at(file_str, newline_off)
+        .expect("symbol_at must not return None for a chain-gap cursor");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "limit"),
+        "expected MethodCall(limit) at chain-gap newline, got {:?}",
+        sym.kind
+    );
+
+    // Cursor on `->` before `limit` — still in the gap.
+    let arrow_off = src.find("  ->limit").unwrap() as u32 + 2;
+    let sym = result
+        .symbol_at(file_str, arrow_off)
+        .expect("symbol_at must not return None on `->` before limit");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "limit"),
+        "expected MethodCall(limit) on `->`, got {:?}",
+        sym.kind
+    );
+}

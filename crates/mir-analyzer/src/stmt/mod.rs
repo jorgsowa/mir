@@ -363,6 +363,7 @@ impl<'a> StatementsAnalyzer<'a> {
         self.symbols.push(ResolvedSymbol {
             file: self.file.clone(),
             span,
+            expr_span: None,
             kind: ReferenceKind::Variable(Arc::from(var_name)),
             resolved_type: ty,
         });
