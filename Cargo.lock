@@ -801,7 +801,7 @@ dependencies = [
  "php-ast",
  "php-lexer",
  "php-rs-parser",
- "phpdoc-parser 0.16.0",
+ "phpdoc-parser",
  "quick-xml 0.40.1",
  "rayon",
  "rustc-hash",
@@ -980,17 +980,8 @@ dependencies = [
  "miette",
  "php-ast",
  "php-lexer",
- "phpdoc-parser 0.17.0",
+ "phpdoc-parser",
  "thiserror",
-]
-
-[[package]]
-name = "phpdoc-parser"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6fd494534ef78dfb5408b302ca4c6bd8a5e9501afab885e8657444c7cd0d60d"
-dependencies = [
- "serde",
 ]
 
 [[package]]
