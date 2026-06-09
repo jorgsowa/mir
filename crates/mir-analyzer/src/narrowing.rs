@@ -540,7 +540,7 @@ fn narrow_or_isset_true(
                 for (var_name, original_type, was_assigned) in original_vars {
                     let sym = mir_types::Name::from(var_name.as_str());
                     std::sync::Arc::make_mut(&mut ctx.vars)
-                        .insert(sym, std::sync::Arc::new(original_type));
+                        .insert(sym, mir_codebase::storage::wrap_var_type(original_type));
                     if !was_assigned {
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars).remove(&sym);
                     }

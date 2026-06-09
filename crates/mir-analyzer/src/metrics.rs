@@ -59,6 +59,11 @@ pub struct Counters {
     /// FQCN normalization mismatch, definition-collection collection gap, or
     /// resolver-points-at-wrong-file.
     pub ll_fail_ingest_then_missing: AtomicU64,
+
+    /// Number of times `lookup_function_node_for_decl` fell through to the
+    /// O(N) short-name scan over all workspace functions. Non-zero means we
+    /// should build a short-name → FQN index.
+    pub fn_short_name_scans: AtomicU64,
 }
 
 static COUNTERS: Counters = Counters {
@@ -73,6 +78,7 @@ static COUNTERS: Counters = Counters {
     ll_fail_resolver_none: AtomicU64::new(0),
     ll_fail_source_unreadable: AtomicU64::new(0),
     ll_fail_ingest_then_missing: AtomicU64::new(0),
+    fn_short_name_scans: AtomicU64::new(0),
 };
 
 pub fn record_file_analysis() {
@@ -150,6 +156,12 @@ impl FailureSamples {
         if bucket.len() < 40 && !bucket.iter().any(|s| s == fqcn) {
             bucket.push(fqcn.to_string());
         }
+    }
+}
+
+pub fn record_fn_short_name_scan() {
+    if enabled() {
+        COUNTERS.fn_short_name_scans.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -244,6 +256,7 @@ pub fn dump() -> Option<String> {
     let ll_resolver_none = COUNTERS.ll_fail_resolver_none.load(Ordering::Relaxed);
     let ll_source_unreadable = COUNTERS.ll_fail_source_unreadable.load(Ordering::Relaxed);
     let ll_ingest_missing = COUNTERS.ll_fail_ingest_then_missing.load(Ordering::Relaxed);
+    let fn_short_scans = COUNTERS.fn_short_name_scans.load(Ordering::Relaxed);
 
     let avg_pass2_us = body_analysis_micros
         .checked_div(body_analysis_runs)
@@ -258,6 +271,7 @@ pub fn dump() -> Option<String> {
          lazy load attempts   : {attempts}  resolved: {resolved}\n  \
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \
-         stub cache           : hits {cache_hits}  misses {cache_misses}{samples}"
+         stub cache           : hits {cache_hits}  misses {cache_misses}\n  \
+         fn short-name scans  : {fn_short_scans}{samples}"
     ))
 }

@@ -522,7 +522,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     let mut functions: FxHashMap<Arc<str>, Arc<Type>> =
         FxHashMap::with_capacity_and_hasher(inferred.functions.len(), Default::default());
     for (fqn, ty) in inferred.functions {
-        functions.insert(fqn, Arc::new(ty));
+        functions.insert(fqn, mir_codebase::storage::wrap_var_type(ty));
     }
 
     let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
@@ -533,7 +533,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         } else {
             Arc::from(name.to_lowercase().as_str())
         };
-        methods.insert((fqcn, name_lower), Arc::new(ty));
+        methods.insert((fqcn, name_lower), mir_codebase::storage::wrap_var_type(ty));
     }
 
     InferredFileTypes {

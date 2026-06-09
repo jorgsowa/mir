@@ -60,7 +60,7 @@ pub(super) fn widen_unstable(
             if !Arc::ptr_eq(ty, pre_ty) && **ty != **pre_ty {
                 let mut merged = (**ty).clone();
                 merged.merge_with(pre_ty);
-                *ty = Arc::new(merged);
+                *ty = mir_codebase::storage::wrap_var_type(merged);
             }
         } else if loop_guaranteed {
             // Variable is new in loop and loop is guaranteed to execute.

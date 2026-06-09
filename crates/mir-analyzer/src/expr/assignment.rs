@@ -286,8 +286,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         value: Box::new(wrapped_value),
                                     }),
                                 };
-                                std::sync::Arc::make_mut(&mut ctx.vars)
-                                    .insert(name_sym, std::sync::Arc::new(init_ty));
+                                std::sync::Arc::make_mut(&mut ctx.vars).insert(
+                                    name_sym,
+                                    mir_codebase::storage::wrap_var_type(init_ty),
+                                );
                                 std::sync::Arc::make_mut(&mut ctx.assigned_vars).insert(name_sym);
                                 let (line, col_start) = self.offset_to_line_col(base.span.start);
                                 let (line_end, col_end) = self.offset_to_line_col(base.span.end);

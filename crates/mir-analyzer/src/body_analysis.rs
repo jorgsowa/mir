@@ -166,6 +166,7 @@ fn lookup_function_node_for_decl(
     if let Some(f) = try_lookup(fn_name) {
         return Some((Arc::from(fn_name), f));
     }
+    crate::metrics::record_fn_short_name_scan();
     for fqn in crate::db::workspace_functions(db).iter() {
         let short = fqn.rsplit('\\').next().unwrap_or(fqn.as_ref());
         if short == fn_name {

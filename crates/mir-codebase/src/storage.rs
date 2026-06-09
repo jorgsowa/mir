@@ -334,6 +334,14 @@ pub fn wrap_template_bound(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
 }
 
+/// Wrap a variable type in an interned `Arc<Type>`. Use instead of
+/// `Arc::new(ty)` at `FlowState::set_var` and parameter-init sites so that
+/// common scalars (string, int, bool, null, mixed) share a static Arc rather
+/// than allocating a fresh one per assignment.
+pub fn wrap_var_type(ty: Type) -> Arc<Type> {
+    interned_types::intern_or_wrap(ty)
+}
+
 // ---------------------------------------------------------------------------
 // Assertion — `@psalm-assert`, `@psalm-assert-if-true`, etc.
 // ---------------------------------------------------------------------------
