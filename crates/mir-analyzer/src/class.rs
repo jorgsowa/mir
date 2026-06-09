@@ -505,6 +505,78 @@ impl<'a> ClassAnalyzer<'a> {
                         issue = issue.with_snippet(snippet);
                     }
                     issues.push(issue);
+                } else {
+                    // When the implementation is provided by a trait (not the class's own method
+                    // or a parent class method), check signature compatibility against the
+                    // interface. The regular check_overrides only covers own methods.
+                    let class_fqcn_key = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                    if let Some((impl_class, impl_method)) =
+                        crate::db::find_method_respecting_precedence(
+                            self.db,
+                            class_fqcn_key,
+                            &method_name_lower,
+                        )
+                    {
+                        if crate::db::class_kind(self.db, impl_class.as_ref())
+                            .is_some_and(|k| k.is_trait)
+                        {
+                            if let Some(iface_method) =
+                                crate::db::find_method_in_class(self.db, here, &method_name_lower)
+                            {
+                                let impl_params = &impl_method.params;
+                                let iface_params = &iface_method.params;
+                                let impl_required = impl_params
+                                    .iter()
+                                    .filter(|p| !p.is_optional && !p.is_variadic)
+                                    .count();
+                                let iface_required = iface_params
+                                    .iter()
+                                    .filter(|p| !p.is_optional && !p.is_variadic)
+                                    .count();
+                                let has_variadic = impl_params.iter().any(|p| p.is_variadic);
+
+                                let detail = if !has_variadic
+                                    && impl_params.len() < iface_params.len()
+                                {
+                                    Some(format!(
+                                        "method has fewer parameters ({}) than interface {}::{}() ({})",
+                                        impl_params.len(),
+                                        iface_fqcn,
+                                        method_name_lower,
+                                        iface_params.len()
+                                    ))
+                                } else if impl_required > iface_required {
+                                    Some(format!(
+                                        "overriding method requires {impl_required} argument(s) but interface requires {iface_required}"
+                                    ))
+                                } else {
+                                    None
+                                };
+
+                                if let Some(detail) = detail {
+                                    let loc = issue_location(
+                                        cls_location,
+                                        cls_location
+                                            .and_then(|l| self.sources.get(&l.file).copied()),
+                                    );
+                                    let mut issue = Issue::new(
+                                        IssueKind::MethodSignatureMismatch {
+                                            class: fqcn.to_string(),
+                                            method: method_name_lower.to_string(),
+                                            detail,
+                                        },
+                                        loc,
+                                    );
+                                    if let Some(snippet) =
+                                        extract_snippet(cls_location, &self.sources)
+                                    {
+                                        issue = issue.with_snippet(snippet);
+                                    }
+                                    issues.push(issue);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
