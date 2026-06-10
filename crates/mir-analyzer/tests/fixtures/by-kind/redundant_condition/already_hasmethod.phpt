@@ -1,7 +1,5 @@
 ===description===
 Already hasmethod
-===ignore===
-TODO
 ===file===
 <?php
 class A {

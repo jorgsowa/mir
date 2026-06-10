@@ -1,7 +1,5 @@
 ===description===
 Coerced class
-===ignore===
-TODO
 ===file===
 <?php
 class NullableClass {
