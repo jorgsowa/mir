@@ -1839,6 +1839,10 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
             );
         }
+        let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
+        let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);
+
         for member in decl.body.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
@@ -1852,6 +1856,69 @@ impl<'a> BodyAnalyzer<'a> {
             }
             if let Some(hint) = &method.return_type {
                 self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            }
+
+            let method_name = method.name.as_deref().unwrap_or("");
+            let stored = crate::db::find_method_in_class(self.db, iface_fqcn_ref, method_name);
+
+            if self.mode == AnalysisMode::Full {
+                let stored_return = stored.as_ref().and_then(|m| m.return_type.as_deref());
+                if method.return_type.is_none() && stored_return.is_none() {
+                    let fn_name = format!("{iface_fqcn}::{method_name}");
+                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                        source,
+                        member.span.start,
+                        source_map,
+                    );
+                    let (line_end, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::MissingReturnType { fn_name },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
+                }
+
+                if let Some(stored_method) = &stored {
+                    let fn_name = format!("{iface_fqcn}::{method_name}");
+                    for (ast_param, stored_param) in
+                        method.params.iter().zip(stored_method.params.iter())
+                    {
+                        if ast_param.type_hint.is_none() && stored_param.ty.is_none() {
+                            let param_name = ast_param
+                                .name
+                                .as_deref()
+                                .unwrap_or("")
+                                .trim_start_matches('$')
+                                .to_string();
+                            let span = param_name_span(source, ast_param);
+                            let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                                source, span.start, source_map,
+                            );
+                            let (line_end, col_end) = crate::diagnostics::offset_to_line_col(
+                                source, span.end, source_map,
+                            );
+                            all_issues.push(mir_issues::Issue::new(
+                                mir_issues::IssueKind::MissingParamType {
+                                    fn_name: fn_name.clone(),
+                                    param: param_name,
+                                },
+                                mir_issues::Location {
+                                    file: file.clone(),
+                                    line,
+                                    line_end,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
+                                },
+                            ));
+                        }
+                    }
+                }
             }
         }
     }
