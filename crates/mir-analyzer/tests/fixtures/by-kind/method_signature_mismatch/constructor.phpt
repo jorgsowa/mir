@@ -1,7 +1,5 @@
 ===description===
 Constructor
-===ignore===
-TODO
 ===file===
 <?php
 /**

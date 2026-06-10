@@ -1,7 +1,5 @@
 ===description===
 All matched default impossible
-===ignore===
-TODO
 ===file===
 <?php
 function foo() : string {

@@ -1,7 +1,5 @@
 ===description===
 Suppress unused suppression by itself is not suppressed
-===ignore===
-TODO
 ===file===
 <?php
 class Foo {

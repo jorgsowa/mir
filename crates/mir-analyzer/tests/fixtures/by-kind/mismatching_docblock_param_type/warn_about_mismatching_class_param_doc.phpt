@@ -1,7 +1,5 @@
 ===description===
 Warn about mismatching class param doc
-===ignore===
-TODO
 ===file===
 <?php
 class A {}

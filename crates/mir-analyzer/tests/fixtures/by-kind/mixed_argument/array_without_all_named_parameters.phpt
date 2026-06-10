@@ -1,7 +1,5 @@
 ===description===
 Array without all named parameters
-===ignore===
-TODO
 ===file===
 <?php
 class User {

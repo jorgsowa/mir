@@ -1,7 +1,5 @@
 ===description===
 Get class exterior arg string type
-===ignore===
-TODO
 ===file===
 <?php
 /** @return void */

@@ -1,7 +1,5 @@
 ===description===
 Call on void
-===ignore===
-TODO
 ===file===
 <?php
 class A {

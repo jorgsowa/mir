@@ -1,7 +1,5 @@
 ===description===
 Annotation with sealed
-===ignore===
-TODO
 ===file===
 <?php
 class ParentClass {

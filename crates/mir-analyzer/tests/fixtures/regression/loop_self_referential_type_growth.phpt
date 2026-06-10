@@ -65,6 +65,6 @@ class NotificationSender
 MixedClone@9:21-9:40: cannot clone mixed
 MixedMethodCall@12:30-12:57: Method via() called on mixed type
 MixedClone@13:33-13:48: cannot clone mixed
-UndefinedClass@39:26-39:49: Class SendQueuedNotifications does not exist
-MixedMethodCall@39:21-41:42: Method onQueue() called on mixed type
 MixedMethodCall@38:17-44:18: Method dispatch() called on mixed type
+MixedMethodCall@39:21-41:42: Method onQueue() called on mixed type
+UndefinedClass@39:26-39:49: Class SendQueuedNotifications does not exist

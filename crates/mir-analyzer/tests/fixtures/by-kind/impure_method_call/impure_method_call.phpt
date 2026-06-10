@@ -1,7 +1,5 @@
 ===description===
 Impure method call
-===ignore===
-TODO
 ===file===
 <?php
 namespace Bar;

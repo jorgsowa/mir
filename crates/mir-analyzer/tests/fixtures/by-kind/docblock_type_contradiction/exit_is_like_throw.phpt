@@ -1,7 +1,5 @@
 ===description===
 Exit is like throw
-===ignore===
-TODO
 ===file===
 <?php
 /**

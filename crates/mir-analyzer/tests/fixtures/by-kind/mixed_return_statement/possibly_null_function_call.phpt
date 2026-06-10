@@ -1,7 +1,5 @@
 ===description===
 Possibly null function call
-===ignore===
-TODO
 ===file===
 <?php
 /**

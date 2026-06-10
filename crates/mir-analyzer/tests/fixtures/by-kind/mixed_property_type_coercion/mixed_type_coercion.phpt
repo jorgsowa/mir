@@ -1,7 +1,5 @@
 ===description===
 Mixed type coercion
-===ignore===
-TODO
 ===file===
 <?php
 class A {

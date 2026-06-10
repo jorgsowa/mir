@@ -1,7 +1,5 @@
 ===description===
 Impossible case value
-===ignore===
-TODO
 ===file===
 <?php
 $a = rand(0, 1) ? "a" : "b";

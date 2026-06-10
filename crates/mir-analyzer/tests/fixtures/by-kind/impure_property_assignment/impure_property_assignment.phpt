@@ -1,7 +1,5 @@
 ===description===
 Impure property assignment
-===ignore===
-TODO
 ===file===
 <?php
 namespace Bar;

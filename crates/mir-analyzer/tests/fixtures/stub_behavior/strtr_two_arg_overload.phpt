@@ -6,4 +6,3 @@ $result = strtr('hello world', ['hello' => 'goodbye']);
 /** @mir-check $result is string */
 echo $result;
 ===expect===
-

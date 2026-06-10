@@ -1,7 +1,5 @@
 ===description===
 Match true impossible
-===ignore===
-TODO
 ===file===
 <?php
 $foo = new stdClass();

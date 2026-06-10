@@ -1,7 +1,5 @@
 ===description===
 Tainted llm prompt from concatenated input
-===ignore===
-TODO
 ===file===
 <?php
 class LlmAgent {

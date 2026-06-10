@@ -1,7 +1,5 @@
 ===description===
 Assert redundant inferior
-===ignore===
-TODO
 ===file===
 <?php
 /**

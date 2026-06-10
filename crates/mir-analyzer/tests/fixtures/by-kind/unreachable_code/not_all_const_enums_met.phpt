@@ -1,7 +1,5 @@
 ===description===
 Not all const enums met
-===ignore===
-TODO
 ===file===
 <?php
 class Airport {

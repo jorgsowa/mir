@@ -1,7 +1,5 @@
 ===description===
 Magic setter undefined property
-===ignore===
-TODO
 ===file===
 <?php
 /**

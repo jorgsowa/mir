@@ -50,12 +50,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             | AssignOp::Pow => {
                 let lhs_ty = self.analyze(&a.target, ctx);
                 let result_ty = infer_arithmetic(&lhs_ty, &rhs_ty);
-                if let Some(var_name) = extract_simple_var(&a.target) {
-                    ctx.set_var(&var_name, result_ty.clone());
-                    let (line, col_start) = self.offset_to_line_col(a.target.span.start);
-                    let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
-                    ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
-                }
+                self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                 result_ty
             }
             AssignOp::Coalesce => {

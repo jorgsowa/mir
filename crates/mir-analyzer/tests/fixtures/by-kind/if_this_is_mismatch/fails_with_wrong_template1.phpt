@@ -1,7 +1,5 @@
 ===description===
 Fails with wrong template1
-===ignore===
-TODO
 ===file===
 <?php
 

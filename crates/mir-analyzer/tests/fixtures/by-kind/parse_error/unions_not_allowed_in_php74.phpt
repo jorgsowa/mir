@@ -1,7 +1,5 @@
 ===description===
 Unions not allowed in p h p74
-===ignore===
-TODO
 ===config===
 php_version=7.4
 ===file===

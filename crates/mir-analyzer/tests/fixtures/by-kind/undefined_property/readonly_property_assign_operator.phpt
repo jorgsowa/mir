@@ -1,7 +1,5 @@
 ===description===
 Readonly property assign operator
-===ignore===
-TODO
 ===file===
 <?php
 class Test {
@@ -18,3 +16,4 @@ $test = new Test(5);
 
 $test->prop += 1;
 ===expect===
+ReadonlyPropertyAssignment@14:1-14:17: Cannot assign to readonly property Test::$prop outside of constructor

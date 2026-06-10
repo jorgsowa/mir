@@ -1,7 +1,5 @@
 ===description===
 Tainted llm prompt from user input
-===ignore===
-TODO
 ===file===
 <?php
 class LlmAgent {

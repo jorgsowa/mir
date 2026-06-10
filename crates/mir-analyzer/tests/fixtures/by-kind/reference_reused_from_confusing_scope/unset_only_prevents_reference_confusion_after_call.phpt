@@ -1,7 +1,5 @@
 ===description===
 Unset only prevents reference confusion after call
-===ignore===
-TODO
 ===file===
 <?php
 $arr = [1, 2, 3];

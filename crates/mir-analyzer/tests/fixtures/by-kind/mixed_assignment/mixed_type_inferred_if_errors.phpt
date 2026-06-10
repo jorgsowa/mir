@@ -1,7 +1,5 @@
 ===description===
 Mixed type inferred if errors
-===ignore===
-TODO
 ===file===
 <?php
 class A {}

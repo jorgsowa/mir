@@ -1,7 +1,5 @@
 ===description===
 Use of global makes function impure
-===ignore===
-TODO
 ===file===
 <?php
 /** @pure */

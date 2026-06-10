@@ -1,7 +1,5 @@
 ===description===
 Psalm magic interface wrong property write
-===ignore===
-TODO
 ===file===
 <?php
 /**
