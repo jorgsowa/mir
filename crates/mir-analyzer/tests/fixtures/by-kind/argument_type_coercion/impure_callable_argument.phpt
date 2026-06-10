@@ -1,7 +1,5 @@
 ===description===
 Impure callable argument
-===ignore===
-TODO
 ===file===
 <?php
 /**

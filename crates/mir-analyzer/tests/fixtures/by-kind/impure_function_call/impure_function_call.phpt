@@ -1,7 +1,5 @@
 ===description===
 ImpureFunctionCall
-===ignore===
-TODO
 ===file===
 <?php
 /**
