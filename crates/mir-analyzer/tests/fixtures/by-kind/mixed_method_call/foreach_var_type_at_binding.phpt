@@ -1,10 +1,5 @@
 ===description===
 Foreach iteration variable type recorded at binding position
-
-===ignore===
-@mir-check validates the variable type in the flow context, not the ResolvedSymbol
-emission itself. The actual goal (having ResolvedSymbol at the binding span for
-hover/inlay-hints) is verified implicitly through type availability.
 ===file===
 <?php
 class User {

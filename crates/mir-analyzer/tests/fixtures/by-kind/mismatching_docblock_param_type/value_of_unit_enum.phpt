@@ -1,7 +1,5 @@
 ===description===
 Value of unit enum
-===ignore===
-TODO
 ===file===
 <?php
     enum Foo
