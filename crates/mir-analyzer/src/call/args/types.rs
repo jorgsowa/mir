@@ -206,7 +206,9 @@ pub(crate) fn check_one(
     }
 
     // When a Stringable object is implicitly coerced to string, emit ImplicitToStringCast.
-    if stringable_coercion_ok(arg_ty, param_ty, ea) {
+    // Skip if the arg already satisfies a non-string arm of the union directly — in that
+    // case no coercion occurs (e.g. Throwable arg + @param Throwable|string).
+    if stringable_coercion_ok(arg_ty, param_ty, ea) && !named_object_subtype(arg_ty, param_ty, ea) {
         if let Some(fqcn) = arg_ty.types.iter().find_map(|a| match a {
             Atomic::TNamedObject { fqcn, .. }
             | Atomic::TSelf { fqcn }
