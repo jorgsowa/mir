@@ -5,6 +5,4 @@ String function call
 $bad_one = "hello";
 $a = $bad_one(1);
 ===expect===
-MixedAssignment
-===ignore===
-TODO
+MixedAssignment@3:1-3:17: Variable $a is assigned a mixed type

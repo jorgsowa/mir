@@ -11,6 +11,4 @@ $foo = "A";
 /** @suppress InvalidStringClass */
 $b = $foo::bar();
 ===expect===
-MixedAssignment
-===ignore===
-TODO
+MixedAssignment@9:1-9:17: Variable $b is assigned a mixed type

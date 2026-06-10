@@ -606,6 +606,8 @@ pub fn run_fixture(path: &str) {
             "MissingThrowsDocblock",
             "MissingReturnType",
             "MissingParamType",
+            "MixedArgument",
+            "MixedAssignment",
         ];
         if fixture.config.suppressed_issue_kinds.is_none() {
             // No explicit suppress= — build default set from dead-code group and

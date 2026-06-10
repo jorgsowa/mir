@@ -84,6 +84,20 @@ pub(crate) fn check_one(
         template_params,
     );
 
+    // When the arg is mixed and the param expects a specific type, emit MixedArgument
+    // (and skip further type checks — mixed is inherently unchecked).
+    if arg_ty.is_mixed() && !param_ty.is_mixed() {
+        ea.emit(
+            IssueKind::MixedArgument {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+            },
+            Severity::Info,
+            arg_span,
+        );
+        return;
+    }
+
     let param_accepts_false = param_ty.contains(|t| matches!(t, Atomic::TFalse | Atomic::TBool));
     if !param_accepts_false
         && !param_ty.is_mixed()

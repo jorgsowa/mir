@@ -7,6 +7,4 @@ function fooFoo(int $a): void {}
 $a = "hello";
 fooFoo($a);
 ===expect===
-MixedArgument
-===ignore===
-TODO
+MixedArgument@5:8-5:10: Argument $a of fooFoo() is mixed

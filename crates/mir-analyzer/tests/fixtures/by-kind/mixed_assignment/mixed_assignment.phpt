@@ -6,6 +6,4 @@ Mixed assignment
 $a = 5;
 $b = $a;
 ===expect===
-MixedAssignment
-===ignore===
-TODO
+MixedAssignment@4:1-4:8: Variable $b is assigned a mixed type

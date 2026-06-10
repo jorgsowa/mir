@@ -102,6 +102,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
+                if ty.is_mixed() && name_str != "this" {
+                    self.emit(
+                        IssueKind::MixedAssignment {
+                            var: name_str.clone(),
+                        },
+                        Severity::Info,
+                        span,
+                    );
+                }
                 ctx.set_var(&name_str, ty);
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(target.span.end);
