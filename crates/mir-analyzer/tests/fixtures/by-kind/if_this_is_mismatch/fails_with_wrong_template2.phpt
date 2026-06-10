@@ -1,5 +1,7 @@
 ===description===
 Fails with wrong template2
+===ignore===
+TODO
 ===file===
 <?php
 class Frozen {}

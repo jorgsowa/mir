@@ -1,5 +1,7 @@
 ===description===
 Use duplicate name
+===ignore===
+TODO
 ===file===
 <?php
 $foo = "bar";

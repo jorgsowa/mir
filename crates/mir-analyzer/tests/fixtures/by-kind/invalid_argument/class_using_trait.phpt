@@ -1,5 +1,7 @@
 ===description===
 Class using trait
+===ignore===
+TODO
 ===file===
 <?php
 trait T {

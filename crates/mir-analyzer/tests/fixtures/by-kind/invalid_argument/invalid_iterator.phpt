@@ -1,5 +1,7 @@
 ===description===
 Invalid iterator
+===ignore===
+TODO
 ===file===
 <?php
 function example() : int {

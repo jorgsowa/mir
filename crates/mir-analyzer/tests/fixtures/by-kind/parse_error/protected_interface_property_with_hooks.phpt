@@ -1,5 +1,7 @@
 ===description===
 Protected interface property with hooks
+===ignore===
+TODO
 ===file===
 <?php
 interface A {

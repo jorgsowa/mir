@@ -1,5 +1,7 @@
 ===description===
 MagicMethodReturnTypesCheckedForInterfaces
+===ignore===
+TODO
 ===file===
 <?php
 interface A

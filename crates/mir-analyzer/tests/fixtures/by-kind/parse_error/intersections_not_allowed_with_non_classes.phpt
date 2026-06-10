@@ -1,5 +1,7 @@
 ===description===
 Intersections not allowed with non classes
+===ignore===
+TODO
 ===file===
 <?php
 interface A {

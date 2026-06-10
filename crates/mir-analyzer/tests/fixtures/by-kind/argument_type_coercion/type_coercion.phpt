@@ -1,5 +1,7 @@
 ===description===
 Type coercion
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

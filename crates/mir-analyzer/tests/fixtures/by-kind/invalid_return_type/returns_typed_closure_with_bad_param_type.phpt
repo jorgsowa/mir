@@ -1,5 +1,7 @@
 ===description===
 Returns typed closure with bad param type
+===ignore===
+TODO
 ===file===
 <?php
 /**

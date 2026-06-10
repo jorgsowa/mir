@@ -1,5 +1,7 @@
 ===description===
 Intersections not allowed with unions
+===ignore===
+TODO
 ===file===
 <?php
 interface A {

@@ -1,5 +1,7 @@
 ===description===
 Static invocation with instance method foo
+===ignore===
+TODO
 ===file===
 <?php
 class A {

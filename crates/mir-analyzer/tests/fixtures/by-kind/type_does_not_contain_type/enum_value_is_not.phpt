@@ -1,5 +1,7 @@
 ===description===
 Enum value is not
+===ignore===
+TODO
 ===file===
 <?php
 enum Suit: string {

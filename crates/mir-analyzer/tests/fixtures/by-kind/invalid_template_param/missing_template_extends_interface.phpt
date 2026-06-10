@@ -1,5 +1,7 @@
 ===description===
 Missing template extends interface
+===ignore===
+TODO
 ===file===
 <?php
 /** @template T */

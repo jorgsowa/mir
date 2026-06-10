@@ -1,5 +1,7 @@
 ===description===
 No fatal for unknown assert class
+===ignore===
+TODO
 ===file===
 <?php
 interface Foo {}

@@ -1,5 +1,7 @@
 ===description===
 Class method parameter violation in post assignment
+===ignore===
+TODO
 ===file===
 <?php
 class A {

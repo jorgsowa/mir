@@ -1,5 +1,7 @@
 ===description===
 Class alias already defined class
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

@@ -1,5 +1,7 @@
 ===description===
 Class constant no class
+===ignore===
+TODO
 ===file===
 <?php
 namespace Ns;

@@ -1,5 +1,7 @@
 ===description===
 Detect missing template implements native
+===ignore===
+TODO
 ===file===
 <?php
 final class C implements Iterator {

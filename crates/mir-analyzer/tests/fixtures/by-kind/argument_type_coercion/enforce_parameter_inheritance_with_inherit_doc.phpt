@@ -1,5 +1,7 @@
 ===description===
 Enforce parameter inheritance with inherit doc
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

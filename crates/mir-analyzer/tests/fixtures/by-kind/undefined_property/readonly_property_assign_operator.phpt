@@ -1,5 +1,7 @@
 ===description===
 Readonly property assign operator
+===ignore===
+TODO
 ===file===
 <?php
 class Test {

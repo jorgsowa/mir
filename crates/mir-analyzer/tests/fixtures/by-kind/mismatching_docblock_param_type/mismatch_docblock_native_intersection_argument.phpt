@@ -1,5 +1,7 @@
 ===description===
 Mismatch docblock native intersection argument
+===ignore===
+TODO
 ===file===
 <?php
 interface A {

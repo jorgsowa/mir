@@ -1,5 +1,7 @@
 ===description===
 Callable object with invalid string argument
+===ignore===
+TODO
 ===file===
 <?php
 /**

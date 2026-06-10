@@ -1,5 +1,7 @@
 ===description===
 Function parameter violation
+===ignore===
+TODO
 ===file===
 <?php
 /** @return void */

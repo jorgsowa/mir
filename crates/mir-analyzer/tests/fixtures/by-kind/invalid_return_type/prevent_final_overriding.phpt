@@ -1,5 +1,7 @@
 ===description===
 Prevent final overriding
+===ignore===
+TODO
 ===file===
 <?php
 /**

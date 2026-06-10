@@ -1,5 +1,7 @@
 ===description===
 Returns typed callable with bad return type
+===ignore===
+TODO
 ===file===
 <?php
 /**

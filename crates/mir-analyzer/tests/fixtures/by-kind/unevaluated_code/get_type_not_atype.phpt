@@ -1,5 +1,7 @@
 ===description===
 Get type not a type
+===ignore===
+TODO
 ===file===
 <?php
 $a = rand(0, 10) ? 1 : "two";

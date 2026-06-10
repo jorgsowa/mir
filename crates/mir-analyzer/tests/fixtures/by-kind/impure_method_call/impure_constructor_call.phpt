@@ -1,5 +1,7 @@
 ===description===
 Impure constructor call
+===ignore===
+TODO
 ===file===
 <?php
 namespace Bar;

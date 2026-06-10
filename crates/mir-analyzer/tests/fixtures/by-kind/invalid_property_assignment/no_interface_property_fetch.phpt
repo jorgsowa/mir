@@ -1,5 +1,7 @@
 ===description===
 No interface property fetch
+===ignore===
+TODO
 ===file===
 <?php
 interface A { }

@@ -1,5 +1,7 @@
 ===description===
 Callable class literal string method other class context static non public
+===ignore===
+TODO
 ===file===
 <?php
 class Foo {

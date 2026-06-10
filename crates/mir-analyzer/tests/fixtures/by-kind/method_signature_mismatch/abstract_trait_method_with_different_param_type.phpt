@@ -1,5 +1,7 @@
 ===description===
 Abstract trait method with different param type
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

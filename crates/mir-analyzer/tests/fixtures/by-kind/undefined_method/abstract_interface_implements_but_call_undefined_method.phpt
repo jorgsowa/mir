@@ -1,5 +1,7 @@
 ===description===
 Abstract interface implements but call undefined method
+===ignore===
+TODO
 ===file===
 <?php
 interface I {

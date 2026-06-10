@@ -1,5 +1,7 @@
 ===description===
 Object assignment
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

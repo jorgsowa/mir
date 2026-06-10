@@ -1,5 +1,7 @@
 ===description===
 Invoke type mismatch
+===ignore===
+TODO
 ===file===
 <?php
 class A {

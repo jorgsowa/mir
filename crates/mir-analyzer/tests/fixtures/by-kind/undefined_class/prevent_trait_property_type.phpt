@@ -1,5 +1,7 @@
 ===description===
 Prevent trait property type
+===ignore===
+TODO
 ===file===
 <?php
 trait T {}

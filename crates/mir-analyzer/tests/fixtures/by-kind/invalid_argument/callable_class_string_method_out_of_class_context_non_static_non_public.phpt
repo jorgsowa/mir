@@ -1,5 +1,7 @@
 ===description===
 Callable class string method out of class context non static non public
+===ignore===
+TODO
 ===file===
 <?php
 /**

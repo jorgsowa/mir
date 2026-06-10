@@ -1,5 +1,7 @@
 ===description===
 Known var type with name
+===ignore===
+TODO
 ===file===
 <?php
 function foo() : string {

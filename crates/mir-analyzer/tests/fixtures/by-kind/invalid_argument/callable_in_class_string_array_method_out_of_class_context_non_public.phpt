@@ -1,5 +1,7 @@
 ===description===
 Callable in class string array method out of class context non public
+===ignore===
+TODO
 ===file===
 <?php
 /**

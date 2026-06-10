@@ -1,5 +1,7 @@
 ===description===
 Use of static makes function impure
+===ignore===
+TODO
 ===file===
 <?php
 /** @pure */

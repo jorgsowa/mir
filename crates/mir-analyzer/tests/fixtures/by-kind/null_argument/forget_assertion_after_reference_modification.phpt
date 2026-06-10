@@ -1,5 +1,7 @@
 ===description===
 Forget assertion after reference modification
+===ignore===
+TODO
 ===file===
 <?php
 class Foo

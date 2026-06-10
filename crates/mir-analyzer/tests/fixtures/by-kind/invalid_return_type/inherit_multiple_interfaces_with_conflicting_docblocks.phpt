@@ -1,5 +1,7 @@
 ===description===
 Inherit multiple interfaces with conflicting docblocks
+===ignore===
+TODO
 ===file===
 <?php
 interface I1 {

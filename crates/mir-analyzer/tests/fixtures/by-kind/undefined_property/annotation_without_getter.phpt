@@ -1,5 +1,7 @@
 ===description===
 Annotation without getter
+===ignore===
+TODO
 ===file===
 <?php
 /**

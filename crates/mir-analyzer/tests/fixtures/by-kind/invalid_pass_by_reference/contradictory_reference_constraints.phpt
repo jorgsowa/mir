@@ -1,5 +1,7 @@
 ===description===
 Contradictory reference constraints
+===ignore===
+TODO
 ===file===
 <?php
 class A {

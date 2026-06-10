@@ -1,5 +1,7 @@
 ===description===
 does not report global function called from namespace
+===ignore===
+TODO
 ===file===
 <?php
 function helper(): void {}

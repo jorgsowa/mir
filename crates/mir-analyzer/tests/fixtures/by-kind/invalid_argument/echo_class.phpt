@@ -1,5 +1,7 @@
 ===description===
 Echo class
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

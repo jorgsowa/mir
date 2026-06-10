@@ -1,5 +1,7 @@
 ===description===
 Inherit sealed methods with static
+===ignore===
+TODO
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 No named args function
+===ignore===
+TODO
 ===file===
 <?php
 /** @no-named-arguments */

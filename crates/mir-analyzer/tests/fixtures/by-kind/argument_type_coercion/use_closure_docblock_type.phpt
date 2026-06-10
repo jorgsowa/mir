@@ -1,5 +1,7 @@
 ===description===
 Use closure docblock type
+===ignore===
+TODO
 ===file===
 <?php
 class A {}

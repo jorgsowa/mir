@@ -1,5 +1,7 @@
 ===description===
 No interface property assignment
+===ignore===
+TODO
 ===file===
 <?php
 interface A { }

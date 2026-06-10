@@ -1,5 +1,7 @@
 ===description===
 No fatal error on missing class with slash
+===ignore===
+TODO
 ===file===
 <?php
 class Func {

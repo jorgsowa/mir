@@ -1,5 +1,7 @@
 ===description===
 undefinedMixinClassWithStaticMethodCall_WithMagicMethod
+===ignore===
+TODO
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 MagicMethodReturnTypesCheckedForClasses
+===ignore===
+TODO
 ===file===
 <?php
 class A

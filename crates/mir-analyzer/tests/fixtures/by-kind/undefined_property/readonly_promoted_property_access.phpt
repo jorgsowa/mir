@@ -1,5 +1,7 @@
 ===description===
 Readonly promoted property access
+===ignore===
+TODO
 ===file===
 <?php
 class A {

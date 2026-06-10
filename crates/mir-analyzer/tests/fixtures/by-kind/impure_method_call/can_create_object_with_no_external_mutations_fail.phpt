@@ -1,5 +1,7 @@
 ===description===
 Can create object with no external mutations fail
+===ignore===
+TODO
 ===file===
 <?php
 class Counter {

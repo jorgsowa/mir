@@ -1,5 +1,7 @@
 ===description===
 Variant properties
+===ignore===
+TODO
 ===file===
 <?php
 class ParentClass

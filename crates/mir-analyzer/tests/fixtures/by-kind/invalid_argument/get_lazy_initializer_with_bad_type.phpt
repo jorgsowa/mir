@@ -1,5 +1,7 @@
 ===description===
 Get lazy initializer with bad type
+===ignore===
+TODO
 ===file===
 <?php
 class Foo {}

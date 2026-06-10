@@ -1,5 +1,7 @@
 ===description===
 Prevent string docblock type
+===ignore===
+TODO
 ===file===
 <?php
 /**

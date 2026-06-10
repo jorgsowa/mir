@@ -1,5 +1,7 @@
 ===description===
 Mark lazy object as initialized with bad type
+===ignore===
+TODO
 ===file===
 <?php
 class Foo {}

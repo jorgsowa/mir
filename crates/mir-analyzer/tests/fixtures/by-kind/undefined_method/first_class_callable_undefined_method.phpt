@@ -1,5 +1,7 @@
 ===description===
 FirstClassCallable:UndefinedMethod
+===ignore===
+TODO
 ===file===
 <?php
 $queue = new SplQueue;

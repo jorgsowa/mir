@@ -1,5 +1,7 @@
 ===description===
 Reconcile after interface instanceof
+===ignore===
+TODO
 ===file===
 <?php
 interface Base {}

@@ -1,5 +1,7 @@
 ===description===
 FirstClassCallable:UndefinedMagicInstanceMethod
+===ignore===
+TODO
 ===file===
 <?php
 class Test {

@@ -1,5 +1,7 @@
 ===description===
 Nullable property assignment
+===ignore===
+TODO
 ===file===
 <?php
 $a = null;

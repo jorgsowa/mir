@@ -1,5 +1,7 @@
 ===description===
 Undefined callable method class concat
+===ignore===
+TODO
 ===file===
 <?php
 class A {

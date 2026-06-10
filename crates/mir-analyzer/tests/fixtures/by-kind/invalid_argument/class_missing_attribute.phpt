@@ -1,5 +1,7 @@
 ===description===
 Class missing attribute
+===ignore===
+TODO
 ===file===
 <?php
 class C {

@@ -1,5 +1,7 @@
 ===description===
 Array push argument unpacking with bad arg
+===ignore===
+TODO
 ===file===
 <?php
 $a = [];

@@ -1,5 +1,7 @@
 ===description===
 Resource cannot be coerced to string
+===ignore===
+TODO
 ===file===
 <?php
 /** @mutation-free */

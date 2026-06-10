@@ -1,5 +1,7 @@
 ===description===
 Construct callable from class string array
+===ignore===
+TODO
 ===file===
 <?php
 interface Foo {

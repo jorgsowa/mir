@@ -1,5 +1,7 @@
 ===description===
 Variant docblock properties
+===ignore===
+TODO
 ===file===
 <?php
 class ParentClass

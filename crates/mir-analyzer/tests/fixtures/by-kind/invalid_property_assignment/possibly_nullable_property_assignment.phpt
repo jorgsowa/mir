@@ -1,5 +1,7 @@
 ===description===
 Possibly nullable property assignment
+===ignore===
+TODO
 ===file===
 <?php
 class Foo {

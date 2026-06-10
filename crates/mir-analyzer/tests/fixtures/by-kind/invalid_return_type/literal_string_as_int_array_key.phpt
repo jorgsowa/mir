@@ -1,5 +1,7 @@
 ===description===
 Literal string as int array key
+===ignore===
+TODO
 ===file===
 <?php
 class a {

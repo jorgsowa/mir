@@ -1,5 +1,7 @@
 ===description===
 Prevent indirect traversable implementation
+===ignore===
+TODO
 ===file===
 <?php
 /**

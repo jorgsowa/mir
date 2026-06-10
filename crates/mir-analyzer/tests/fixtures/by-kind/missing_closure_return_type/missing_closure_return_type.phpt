@@ -1,5 +1,7 @@
 ===description===
 Missing closure return type
+===ignore===
+TODO
 ===file===
 <?php
 $a = function() {

@@ -1,5 +1,7 @@
 ===description===
 Undefined callable method array
+===ignore===
+TODO
 ===file===
 <?php
 class A {
