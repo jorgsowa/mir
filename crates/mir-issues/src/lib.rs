@@ -462,6 +462,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_trait_use/`.
     InvalidTraitUse { trait_name: String, reason: String },
+    /// Emitted by `mir-analyzer/src/expr/mod.rs` and `mir-analyzer/src/call/function.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/` (var_dump, shell_exec, backtick).
+    ForbiddenCode { message: String },
 
     // --- Attribute validation -----------------------------------------------
     /// Emitted by `mir-analyzer/src/attributes.rs`.
@@ -567,7 +570,8 @@ impl IssueKind {
             | IssueKind::UnusedForeachValue { .. }
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::UnhandledMatchCondition { .. }
-            | IssueKind::InvalidStringClass { .. } => Severity::Warning,
+            | IssueKind::InvalidStringClass { .. }
+            | IssueKind::ForbiddenCode { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -783,6 +787,7 @@ impl IssueKind {
 
             // Trait (1300-1399)
             IssueKind::InvalidTraitUse { .. } => "MIR1300",
+            IssueKind::ForbiddenCode { .. } => "MIR1301",
 
             // Parse (1400-1499)
             IssueKind::ParseError { .. } => "MIR1400",
@@ -908,6 +913,7 @@ impl IssueKind {
             IssueKind::InvalidToString { .. } => "InvalidToString",
             IssueKind::CircularInheritance { .. } => "CircularInheritance",
             IssueKind::InvalidTraitUse { .. } => "InvalidTraitUse",
+            IssueKind::ForbiddenCode { .. } => "ForbiddenCode",
             IssueKind::WrongCaseFunction { .. } => "WrongCaseFunction",
             IssueKind::WrongCaseMethod { .. } => "WrongCaseMethod",
             IssueKind::WrongCaseClass { .. } => "WrongCaseClass",
@@ -1323,6 +1329,7 @@ impl IssueKind {
             IssueKind::UndefinedAttributeClass { name } => {
                 format!("Attribute class {name} does not exist")
             }
+            IssueKind::ForbiddenCode { message } => message.clone(),
             IssueKind::DuplicateClass { name } => {
                 format!("Class {name} has already been defined")
             }
@@ -1770,6 +1777,7 @@ mod code_tests {
             },
             IssueKind::InvalidAttribute { message: s() },
             IssueKind::UndefinedAttributeClass { name: s() },
+            IssueKind::ForbiddenCode { message: s() },
             IssueKind::DuplicateClass { name: s() },
         ]
     }
@@ -1848,6 +1856,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 109);
+        assert_eq!(one_of_each().len(), 110);
     }
 }

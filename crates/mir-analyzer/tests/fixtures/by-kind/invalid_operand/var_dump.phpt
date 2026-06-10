@@ -4,6 +4,4 @@ Var dump
 <?php
 var_dump("hello");
 ===expect===
-ForbiddenCode
-===ignore===
-TODO
+ForbiddenCode@2:1-2:18: Use of var_dump is forbidden

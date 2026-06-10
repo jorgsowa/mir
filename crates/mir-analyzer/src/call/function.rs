@@ -136,6 +136,18 @@ impl CallAnalyzer {
             .strip_prefix('\\')
             .map(|s: &str| s.to_string())
             .unwrap_or(fn_name);
+        if matches!(
+            fn_name.to_ascii_lowercase().as_str(),
+            "var_dump" | "shell_exec"
+        ) {
+            ea.emit(
+                IssueKind::ForbiddenCode {
+                    message: format!("Use of {} is forbidden", fn_name),
+                },
+                Severity::Warning,
+                span,
+            );
+        }
         let resolved_fn_name: String = {
             let imports = ea.db.file_imports(&ea.file);
             let qualified = if let Some(imported) = imports.get(&Name::new(fn_name.as_str())) {

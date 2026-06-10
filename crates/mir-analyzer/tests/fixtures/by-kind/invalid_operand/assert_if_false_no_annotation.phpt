@@ -14,6 +14,3 @@ if (isInvalidString($myString)) {
     echo "Ma chaine " . $myString;
 }
 ===expect===
-PossiblyNullOperand
-===ignore===
-TODO

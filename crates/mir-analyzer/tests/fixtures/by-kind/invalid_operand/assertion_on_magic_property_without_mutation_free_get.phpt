@@ -22,6 +22,4 @@ if (assertString($a)) {
 function requiresString(string $_str): void {}
 
 ===expect===
-A::__get is not mutation-free
-===ignore===
-TODO
+PossiblyNullArgument@16:20-16:25: Argument $_str of requiresString() might be null

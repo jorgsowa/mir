@@ -5,6 +5,3 @@ False increment
 $a = false;
 $a++;
 ===expect===
-FalseOperand
-===ignore===
-TODO

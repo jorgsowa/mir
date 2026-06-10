@@ -159,7 +159,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TString)
             }
             ExprKind::Nowdoc { .. } => Type::single(Atomic::TString),
-            ExprKind::ShellExec(_) => Type::single(Atomic::TString),
+            ExprKind::ShellExec(_) => {
+                self.emit(
+                    IssueKind::ForbiddenCode {
+                        message: "Use of shell_exec (backtick) is forbidden".to_string(),
+                    },
+                    Severity::Warning,
+                    expr.span,
+                );
+                Type::single(Atomic::TString)
+            }
 
             // --- Variables --------------------------------------------------
             ExprKind::Variable(name) => self.analyze_variable(name.as_ref(), expr, ctx),

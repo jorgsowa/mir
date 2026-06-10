@@ -4,6 +4,3 @@ Possibly invalid bitwise not
 <?php
 $a = ~(rand(0, 1) ? 2 : null);
 ===expect===
-PossiblyInvalidOperand
-===ignore===
-TODO

@@ -23,6 +23,3 @@ function gen() : Generator {
     yield from $arr;
 }
 ===expect===
-PossibleRawObjectIteration
-===ignore===
-TODO

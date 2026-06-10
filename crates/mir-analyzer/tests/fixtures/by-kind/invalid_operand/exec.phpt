@@ -4,6 +4,4 @@ Exec
 <?php
 shell_exec("rm -rf");
 ===expect===
-ForbiddenCode
-===ignore===
-TODO
+ForbiddenCode@2:1-2:21: Use of shell_exec is forbidden

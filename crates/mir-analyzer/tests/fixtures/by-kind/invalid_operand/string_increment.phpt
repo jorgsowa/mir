@@ -5,6 +5,3 @@ String increment
 $a = "hello";
 $a++;
 ===expect===
-StringIncrement
-===ignore===
-TODO

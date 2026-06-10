@@ -4,6 +4,3 @@ Invalid exponent
 <?php
 $a = "x" ^ 1;
 ===expect===
-InvalidOperand
-===ignore===
-TODO

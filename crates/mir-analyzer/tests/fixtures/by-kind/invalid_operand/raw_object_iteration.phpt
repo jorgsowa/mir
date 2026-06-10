@@ -12,6 +12,3 @@ function example() : Generator {
     yield from $arr;
 }
 ===expect===
-RawObjectIteration
-===ignore===
-TODO

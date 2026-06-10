@@ -4,6 +4,4 @@ Exec ticks
 <?php
 `rm -rf`;
 ===expect===
-ForbiddenCode
-===ignore===
-TODO
+ForbiddenCode@2:1-2:9: Use of shell_exec (backtick) is forbidden
