@@ -1,7 +1,5 @@
 ===description===
 Call root function from namespace
-===ignore===
-TODO
 ===file===
 <?php
 namespace {

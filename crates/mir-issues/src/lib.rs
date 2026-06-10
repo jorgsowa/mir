@@ -151,6 +151,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/args.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_named_argument/`.
     InvalidNamedArgument { fn_name: String, name: String },
+    /// Emitted when a function/method tagged `@no-named-arguments` is called with named args.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_named_argument/`.
+    InvalidNamedArguments { fn_name: String },
     /// Emitted by `mir-analyzer/src/call/args.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_pass_by_reference/`.
     InvalidPassByReference { fn_name: String, param: String },
@@ -551,6 +554,7 @@ impl IssueKind {
             | IssueKind::TooFewArguments { .. }
             | IssueKind::TooManyArguments { .. }
             | IssueKind::InvalidNamedArgument { .. }
+            | IssueKind::InvalidNamedArguments { .. }
             | IssueKind::InvalidPassByReference { .. }
             | IssueKind::InvalidThrow { .. }
             | IssueKind::InvalidCatch { .. }
@@ -733,6 +737,7 @@ impl IssueKind {
             IssueKind::TooFewArguments { .. } => "MIR0202",
             IssueKind::TooManyArguments { .. } => "MIR0203",
             IssueKind::InvalidNamedArgument { .. } => "MIR0204",
+            IssueKind::InvalidNamedArguments { .. } => "MIR0224",
             IssueKind::InvalidPassByReference { .. } => "MIR0205",
             IssueKind::InvalidPropertyFetch { .. } => "MIR0218",
             IssueKind::InvalidArrayAccess { .. } => "MIR0219",
@@ -890,6 +895,7 @@ impl IssueKind {
             IssueKind::TooFewArguments { .. } => "TooFewArguments",
             IssueKind::TooManyArguments { .. } => "TooManyArguments",
             IssueKind::InvalidNamedArgument { .. } => "InvalidNamedArgument",
+            IssueKind::InvalidNamedArguments { .. } => "InvalidNamedArguments",
             IssueKind::InvalidPassByReference { .. } => "InvalidPassByReference",
             IssueKind::InvalidPropertyFetch { .. } => "InvalidPropertyFetch",
             IssueKind::InvalidArrayAccess { .. } => "InvalidArrayAccess",
@@ -1093,6 +1099,9 @@ impl IssueKind {
             }
             IssueKind::InvalidNamedArgument { fn_name, name } => {
                 format!("{}() has no parameter named ${}", fn_name, name)
+            }
+            IssueKind::InvalidNamedArguments { fn_name } => {
+                format!("{}() does not accept named arguments", fn_name)
             }
             IssueKind::InvalidPassByReference { fn_name, param } => {
                 format!(
@@ -1654,6 +1663,7 @@ mod code_tests {
                 fn_name: s(),
                 name: s(),
             },
+            IssueKind::InvalidNamedArguments { fn_name: s() },
             IssueKind::InvalidPassByReference {
                 fn_name: s(),
                 param: s(),
@@ -1960,6 +1970,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 120);
+        assert_eq!(one_of_each().len(), 121);
     }
 }

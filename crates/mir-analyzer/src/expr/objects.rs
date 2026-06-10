@@ -241,8 +241,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                         "__construct",
                     )
-                    .map(|(_, s)| (s.params.to_vec(), s.template_params.clone()));
-                    if let Some((ctor_params, ctor_templates)) = &ctor_params_and_templates {
+                    .map(|(_, s)| {
+                        (
+                            s.params.to_vec(),
+                            s.template_params.clone(),
+                            s.no_named_arguments,
+                        )
+                    });
+                    if let Some((ctor_params, ctor_templates, ctor_no_named_args)) =
+                        &ctor_params_and_templates
+                    {
                         crate::call::check_constructor_args(
                             self,
                             &fqcn,
@@ -256,6 +264,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 call_span,
                                 has_spread: n.args.iter().any(|a| a.unpack),
                                 template_params: ctor_templates,
+                                no_named_arguments: *ctor_no_named_args,
                             },
                         );
                     } else if !arg_types.is_empty()
@@ -283,7 +292,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &fqcn,
                         ctor_params_and_templates
                             .as_ref()
-                            .map(|(p, _)| p.as_slice()),
+                            .map(|(p, _, _)| p.as_slice()),
                         &arg_types,
                     );
                 }

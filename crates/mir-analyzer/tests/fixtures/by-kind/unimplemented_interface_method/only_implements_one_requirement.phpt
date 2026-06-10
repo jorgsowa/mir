@@ -1,7 +1,5 @@
 ===description===
 Only implements one requirement
-===ignore===
-TODO
 ===file===
 <?php
 use ImplementationRequirementsTraitImposesImplementationRequirements;

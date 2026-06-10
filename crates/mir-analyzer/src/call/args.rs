@@ -33,6 +33,8 @@ pub struct CheckArgsParams<'a> {
     pub call_span: Span,
     pub has_spread: bool,
     pub template_params: &'a [TemplateParam],
+    /// True when the function/method is tagged `@no-named-arguments`.
+    pub no_named_arguments: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -188,10 +190,19 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         call_span,
         has_spread,
         template_params,
+        no_named_arguments,
     } = p;
 
     let bindings = counts::check_counts(
-        ea, fn_name, params, arg_types, arg_spans, arg_names, call_span, has_spread,
+        ea,
+        fn_name,
+        params,
+        arg_types,
+        arg_spans,
+        arg_names,
+        call_span,
+        has_spread,
+        no_named_arguments,
     );
 
     for ArgBinding {

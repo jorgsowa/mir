@@ -18,6 +18,7 @@ pub(super) fn check_counts(
     arg_names: &[Option<String>],
     call_span: Span,
     has_spread: bool,
+    no_named_arguments: bool,
 ) -> Vec<ArgBinding> {
     let variadic_index = params.iter().position(|p| p.is_variadic);
     let max_positional = variadic_index.unwrap_or(params.len());
@@ -26,6 +27,24 @@ pub(super) fn check_counts(
     let mut positional = 0usize;
     let mut seen_named = false;
     let mut has_shape_error = false;
+
+    // @no-named-arguments: emit per named arg before the regular processing.
+    if no_named_arguments {
+        for (i, span) in arg_spans.iter().enumerate() {
+            if has_spread && i > 0 {
+                break;
+            }
+            if let Some(Some(_)) = arg_names.get(i) {
+                ea.emit(
+                    IssueKind::InvalidNamedArguments {
+                        fn_name: fn_name.to_string(),
+                    },
+                    Severity::Error,
+                    *span,
+                );
+            }
+        }
+    }
 
     for (i, (ty, span)) in arg_types.iter().zip(arg_spans.iter()).enumerate() {
         if has_spread && i > 0 {

@@ -320,6 +320,7 @@ impl DefinitionCollector<'_> {
                 }
             }),
             is_pure: doc.is_pure,
+            no_named_arguments: doc.no_named_arguments,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             docstring,
         };

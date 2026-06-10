@@ -359,6 +359,7 @@ impl CallAnalyzer {
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
                     template_params: &resolved.template_params,
+                    no_named_arguments: resolved.no_named_arguments,
                 },
             );
             let owner_fqcn = resolved.owner_fqcn.clone();

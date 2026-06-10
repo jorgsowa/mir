@@ -27,6 +27,7 @@ struct ResolvedFn {
     assertions: Vec<Assertion>,
     return_ty_raw: Type,
     throws: Arc<[Arc<str>]>,
+    no_named_arguments: bool,
 }
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
@@ -48,6 +49,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             assertions: f.assertions.clone(),
             return_ty_raw,
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
+            no_named_arguments: f.no_named_arguments,
         });
     }
     None
@@ -273,6 +275,7 @@ impl CallAnalyzer {
             let params = resolved.params;
             let template_params = resolved.template_params;
             let return_ty_raw = resolved.return_ty_raw;
+            let no_named_arguments = resolved.no_named_arguments;
 
             if let Some(msg) = deprecated {
                 ea.emit(
@@ -325,6 +328,7 @@ impl CallAnalyzer {
                     call_span: span,
                     has_spread: call.args.iter().any(|a| a.unpack),
                     template_params: &template_params,
+                    no_named_arguments,
                 },
             );
 

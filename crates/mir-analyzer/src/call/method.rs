@@ -40,6 +40,7 @@ pub(super) struct ResolvedMethod {
     pub(super) template_params: Vec<TemplateParam>,
     pub(super) return_ty_raw: Type,
     pub(super) throws: Arc<[Arc<str>]>,
+    pub(super) no_named_arguments: bool,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -81,6 +82,7 @@ pub(super) fn resolve_method_from_db(
             template_params: storage.template_params.clone(),
             return_ty_raw,
             throws: storage.throws.clone().into(),
+            no_named_arguments: storage.no_named_arguments,
         });
     }
 
@@ -486,6 +488,7 @@ fn resolve_method_return<'a>(
                 call_span: span,
                 has_spread: call.args.iter().any(|a| a.unpack),
                 template_params: &resolved.template_params,
+                no_named_arguments: resolved.no_named_arguments,
             },
         );
 
