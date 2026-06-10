@@ -181,7 +181,14 @@ impl AnalyzerDb {
         // over native stubs for the same symbol in workspace_symbol_index.
         for (path, source) in &path_sources {
             let path_arc: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
-            guard.upsert_source_file(path_arc.clone(), Arc::from(source.as_str()));
+            // HIGH durability: user stubs are loaded once and never change within
+            // a session (guarded by user_stubs_loaded). This lets salsa skip
+            // O(N_user_stubs) dep-verification on every project-file edit.
+            guard.upsert_source_file_with_durability(
+                path_arc.clone(),
+                Arc::from(source.as_str()),
+                salsa::Durability::HIGH,
+            );
             guard.register_user_stub_path(path_arc);
         }
         self.user_stubs_loaded
