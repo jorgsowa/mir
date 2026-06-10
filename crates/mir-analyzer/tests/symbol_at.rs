@@ -1114,3 +1114,121 @@ fn symbol_at_param_declaration_tight_span() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// symbol_at — negated instanceof guard narrows receiver type (issue #6)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_negated_instanceof_guard_narrows_receiver_type() {
+    // After `if (!$subject instanceof Post) { return; }`, $subject is narrowed
+    // to Post. symbol_at at the $subject token in the method-call receiver must
+    // return resolved_type == "Post", not "Post|Comment".
+    let src = r#"<?php
+class Post { public function getTitle(): string { return ''; } }
+class Comment {}
+/** @param Post|Comment $subject */
+function test(Post|Comment $subject): void {
+    if (!$subject instanceof Post) {
+        return;
+    }
+    $subject->getTitle();
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+
+    // Find the `$subject` token in `$subject->getTitle()`:
+    // occurrences are: docblock, param decl, guard condition, method-call receiver.
+    let off0 = src.find("$subject").unwrap();
+    let off1 = src[off0 + 1..].find("$subject").unwrap() + off0 + 1;
+    let off2 = src[off1 + 1..].find("$subject").unwrap() + off1 + 1;
+    let receiver_off = (src[off2 + 1..].find("$subject").unwrap() + off2 + 1) as u32;
+
+    let sym = result
+        .symbol_at("<source>", receiver_off)
+        .expect("symbol_at must find a symbol at $subject in the method-call receiver");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "subject"),
+        "expected Variable(subject), got {:?}",
+        sym.kind
+    );
+
+    let ty = format!("{}", sym.resolved_type);
+    assert_eq!(
+        ty, "Post",
+        "after negated instanceof guard, $subject must be narrowed to Post, got {ty}"
+    );
+}
+
+#[test]
+fn symbol_at_negated_instanceof_guard_narrows_mixed_receiver_type() {
+    // Same pattern but with mixed parameter type (two occurrences before receiver).
+    let src = r#"<?php
+class Post { public function getTitle(): string { return ''; } }
+function test(mixed $subject): void {
+    if (!$subject instanceof Post) {
+        return;
+    }
+    $subject->getTitle();
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+
+    // Two occurrences before the receiver: param decl, guard condition.
+    let off0 = src.find("$subject").unwrap();
+    let off1 = src[off0 + 1..].find("$subject").unwrap() + off0 + 1;
+    let receiver_off = (src[off1 + 1..].find("$subject").unwrap() + off1 + 1) as u32;
+
+    let sym = result
+        .symbol_at("<source>", receiver_off)
+        .expect("symbol_at must find a symbol at $subject in the method-call receiver");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "subject"),
+        "expected Variable(subject), got {:?}",
+        sym.kind
+    );
+
+    let ty = format!("{}", sym.resolved_type);
+    assert_eq!(
+        ty, "Post",
+        "after negated instanceof guard, mixed $subject must be narrowed to Post, got {ty}"
+    );
+}
+
+#[test]
+fn symbol_at_negated_instanceof_guard_method_call_resolves_to_narrowed_class() {
+    // After the negated guard, the method call `$subject->getTitle()` must
+    // resolve as MethodCall { class: "Post", method: "getTitle" }, not
+    // MethodCall { class: "mixed" } or unresolved.
+    let src = r#"<?php
+class Post { public function getTitle(): string { return ''; } }
+class Comment {}
+function test(Post|Comment $subject): void {
+    if (!$subject instanceof Post) {
+        return;
+    }
+    $subject->getTitle();
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+
+    // Find MethodCall(Post, getTitle) in the recorded symbols.
+    let method_sym = result.symbols.iter().find(|s| {
+        matches!(&s.kind, ReferenceKind::MethodCall { class, method }
+            if class.as_ref() == "Post" && method.as_ref() == "getTitle")
+    });
+
+    assert!(
+        method_sym.is_some(),
+        "expected MethodCall {{ class: Post, method: getTitle }} after negated instanceof guard; \
+         found: {:?}",
+        result
+            .symbols
+            .iter()
+            .filter(|s| matches!(&s.kind, ReferenceKind::MethodCall { .. }))
+            .map(|s| &s.kind)
+            .collect::<Vec<_>>()
+    );
+}
