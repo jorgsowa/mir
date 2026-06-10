@@ -71,6 +71,11 @@ pub struct FlowState {
     /// Whether we are currently inside a finally block.
     pub inside_finally: bool,
 
+    /// Whether the current function body contains a `yield` expression, making
+    /// it a generator. Set via pre-scan before statement analysis begins so
+    /// that early `return;` before the first yield is not misreported.
+    pub is_generator: bool,
+
     /// Whether we are inside a constructor.
     pub inside_constructor: bool,
 
@@ -182,6 +187,7 @@ impl FlowState {
             fn_declared_throws: Arc::from([]),
             inside_loop: false,
             inside_finally: false,
+            is_generator: false,
             inside_constructor: false,
             inside_static_method: false,
             strict_types: false,

@@ -19,5 +19,4 @@ function notagenerator() : Generator {
     return generator2();
 }
 ===expect===
-InvalidReturnType@4:9-4:16: Return type 'void' is not compatible with declared 'Generator'
 InvalidReturnType@14:9-14:16: Return type 'void' is not compatible with declared 'Generator'

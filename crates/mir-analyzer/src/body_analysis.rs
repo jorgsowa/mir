@@ -825,6 +825,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         let body_diverges = ctx.diverges;
@@ -834,7 +835,7 @@ impl<'a> BodyAnalyzer<'a> {
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_issues());
 
-        if self.mode == AnalysisMode::Full {
+        if self.mode == AnalysisMode::Full && !ctx.is_generator {
             crate::diagnostics::check_missing_return(
                 declared_return.as_ref(),
                 body_diverges,
@@ -964,6 +965,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
@@ -1149,6 +1151,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            ctx.is_generator = body_has_yield(&body.stmts);
             sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             let body_diverges = ctx.diverges;
@@ -1158,7 +1161,7 @@ impl<'a> BodyAnalyzer<'a> {
             emit_unused_variables(&ctx, file, all_issues);
             all_issues.extend(buf.into_issues());
 
-            if self.mode == AnalysisMode::Full && !is_ctor {
+            if self.mode == AnalysisMode::Full && !is_ctor && !ctx.is_generator {
                 crate::diagnostics::check_missing_return(
                     declared_return.as_ref(),
                     body_diverges,
@@ -1273,6 +1276,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
         drop(sa);
@@ -1450,6 +1454,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            ctx.is_generator = body_has_yield(&body.stmts);
             sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
@@ -1684,6 +1689,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            ctx.is_generator = body_has_yield(&body.stmts);
             sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
@@ -1792,6 +1798,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            ctx.is_generator = body_has_yield(&body.stmts);
             sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
@@ -1890,6 +1897,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            ctx.is_generator = body_has_yield(&body.stmts);
             sa.analyze_stmts(&body.stmts, &mut ctx);
             let inferred = merge_return_types(&sa.return_types);
             drop(sa);
@@ -1962,6 +1970,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            ctx.is_generator = body_has_yield(&body.stmts);
             sa.analyze_stmts(&body.stmts, &mut ctx);
             drop(sa);
 
@@ -2230,6 +2239,48 @@ fn check_use_decl_casing(
             UseKind::Const => {}
         }
     }
+}
+
+/// Returns `true` if `stmts` contains any `yield` expression at any depth,
+/// NOT descending into nested function/closure/arrow-function bodies (those
+/// are separate generators with their own contexts).
+pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
+    use php_ast::owned::visitor::{walk_owned_expr, walk_owned_stmt, OwnedVisitor};
+    use php_ast::owned::{ExprKind, StmtKind};
+    use std::ops::ControlFlow;
+
+    struct YieldFinder;
+
+    impl OwnedVisitor for YieldFinder {
+        fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
+            match &stmt.kind {
+                // These are separate declaration scopes — don't descend.
+                StmtKind::Function(_)
+                | StmtKind::Class(_)
+                | StmtKind::Interface(_)
+                | StmtKind::Trait(_)
+                | StmtKind::Enum(_) => ControlFlow::Continue(()),
+                _ => walk_owned_stmt(self, stmt),
+            }
+        }
+
+        fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
+            match &expr.kind {
+                ExprKind::Yield(_) => ControlFlow::Break(()),
+                // Closures and arrow functions are separate function scopes.
+                ExprKind::Closure(_) | ExprKind::ArrowFunction(_) => ControlFlow::Continue(()),
+                _ => walk_owned_expr(self, expr),
+            }
+        }
+    }
+
+    let mut finder = YieldFinder;
+    for stmt in stmts {
+        if finder.visit_stmt(stmt).is_break() {
+            return true;
+        }
+    }
+    false
 }
 
 pub fn merge_return_types(return_types: &[Type]) -> Type {

@@ -168,28 +168,32 @@ impl<'a> StatementsAnalyzer<'a> {
             self.return_types.push(ret_ty);
         } else {
             self.return_types.push(Type::single(Atomic::TVoid));
-            // Bare `return;` from a non-void declared function is an error.
-            if let Some(declared) = &ctx.fn_return_type.clone() {
-                if !declared.is_void() && !declared.is_mixed() {
-                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
-                    self.issues.add(
-                        mir_issues::Issue::new(
-                            IssueKind::InvalidReturnType {
-                                expected: format!("{declared}"),
-                                actual: "void".to_string(),
-                            },
-                            Location {
-                                file: self.file.clone(),
-                                line,
-                                line_end,
-                                col_start,
-                                col_end: col_end.max(col_start + 1),
-                            },
-                        )
-                        .with_snippet(
-                            crate::parser::span_text(self.source, stmt_span).unwrap_or_default(),
-                        ),
-                    );
+            // Bare `return;` from a non-void declared function is an error,
+            // except inside a generator where it terminates iteration.
+            if !ctx.is_generator {
+                if let Some(declared) = &ctx.fn_return_type.clone() {
+                    if !declared.is_void() && !declared.is_mixed() {
+                        let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
+                        self.issues.add(
+                            mir_issues::Issue::new(
+                                IssueKind::InvalidReturnType {
+                                    expected: format!("{declared}"),
+                                    actual: "void".to_string(),
+                                },
+                                Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    line_end,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
+                                },
+                            )
+                            .with_snippet(
+                                crate::parser::span_text(self.source, stmt_span)
+                                    .unwrap_or_default(),
+                            ),
+                        );
+                    }
                 }
             }
         }
