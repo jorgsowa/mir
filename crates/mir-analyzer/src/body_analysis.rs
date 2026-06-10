@@ -195,25 +195,71 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
 }
 
 /// Walk top-level statements (recursing into braced namespaces) and collect
-/// every class-like declaration as `(fqcn, span)`. The `ns_prefix` tracks the
-/// current resolved namespace (e.g. `"Aye\\"` or `""`).
-fn collect_class_spans(
+/// Kind of a top-level symbol declaration, used for duplicate detection.
+#[derive(Clone, Copy)]
+enum DeclKind {
+    Class,
+    Interface,
+    Trait,
+    Enum,
+    Function,
+}
+
+/// Collect the fully-qualified name, span, and kind of every top-level
+/// declaration in `stmts`. The `ns_prefix` tracks the current resolved
+/// namespace (e.g. `"Aye\\"` or `""`).
+///
+/// Classes, interfaces, traits, and enums share one PHP symbol namespace;
+/// functions occupy a separate namespace. Both are collected into the same
+/// output vec so the caller can build the appropriate seen-maps.
+fn collect_decl_spans(
     stmts: &[php_ast::owned::Stmt],
     ns_prefix: &str,
-    out: &mut Vec<(String, php_ast::Span)>,
+    out: &mut Vec<(String, php_ast::Span, DeclKind)>,
 ) {
     use php_ast::owned::{NamespaceBody, StmtKind};
     // Track the prefix of the current unbraced (`namespace A;`) namespace as we
     // walk siblings. A file may switch namespaces several times, e.g.
     // `namespace A; class Foo {} namespace B; class Foo {}` declares the distinct
-    // `A\Foo` and `B\Foo`, so each class must use the prefix in effect at its position.
+    // `A\Foo` and `B\Foo`, so each symbol must use the prefix in effect at its position.
     let mut current_prefix = ns_prefix.to_string();
     for stmt in stmts {
         match &stmt.kind {
             StmtKind::Class(d) => {
                 let name = d.name.as_ref().and_then(|n| n.as_deref()).unwrap_or("");
-                let fqcn = format!("{current_prefix}{name}");
-                out.push((fqcn, stmt.span));
+                out.push((
+                    format!("{current_prefix}{name}"),
+                    stmt.span,
+                    DeclKind::Class,
+                ));
+            }
+            StmtKind::Interface(d) => {
+                let name = d.name.as_deref().unwrap_or("");
+                out.push((
+                    format!("{current_prefix}{name}"),
+                    stmt.span,
+                    DeclKind::Interface,
+                ));
+            }
+            StmtKind::Trait(d) => {
+                let name = d.name.as_deref().unwrap_or("");
+                out.push((
+                    format!("{current_prefix}{name}"),
+                    stmt.span,
+                    DeclKind::Trait,
+                ));
+            }
+            StmtKind::Enum(d) => {
+                let name = d.name.as_deref().unwrap_or("");
+                out.push((format!("{current_prefix}{name}"), stmt.span, DeclKind::Enum));
+            }
+            StmtKind::Function(d) => {
+                let name = d.name.as_deref().unwrap_or("");
+                out.push((
+                    format!("{current_prefix}{name}"),
+                    stmt.span,
+                    DeclKind::Function,
+                ));
             }
             StmtKind::Namespace(ns) => {
                 let raw_ns = ns
@@ -234,10 +280,10 @@ fn collect_class_spans(
                 };
                 match &ns.body {
                     NamespaceBody::Braced(block) => {
-                        collect_class_spans(&block.stmts, &child_prefix, out);
+                        collect_decl_spans(&block.stmts, &child_prefix, out);
                     }
-                    // Unbraced: the classes that follow are flat siblings, so this
-                    // prefix applies until the next `namespace` statement.
+                    // Unbraced: the declarations that follow are flat siblings,
+                    // so this prefix applies until the next `namespace` statement.
                     NamespaceBody::Simple => current_prefix = child_prefix,
                 }
             }
@@ -246,22 +292,32 @@ fn collect_class_spans(
     }
 }
 
-/// Emit `DuplicateClass` for any class FQCN declared more than once in `stmts`.
-fn check_duplicate_classes(
+/// Emit `Duplicate*` issues for any symbol declared more than once in `stmts`.
+///
+/// Classes, interfaces, traits, and enums share one PHP symbol namespace
+/// (a `class Foo` and an `interface Foo` in the same file is a fatal error).
+/// Functions occupy their own namespace and are checked independently.
+fn check_duplicate_declarations(
     stmts: &[php_ast::owned::Stmt],
     file: &Arc<str>,
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<Issue>,
 ) {
-    let mut spans: Vec<(String, php_ast::Span)> = Vec::new();
-    // `collect_class_spans` tracks the active (unbraced) namespace prefix itself,
-    // so the global namespace is the correct starting point.
-    collect_class_spans(stmts, "", &mut spans);
+    let mut decls: Vec<(String, php_ast::Span, DeclKind)> = Vec::new();
+    collect_decl_spans(stmts, "", &mut decls);
 
-    let mut seen: FxHashMap<Name, ()> = FxHashMap::default();
-    for (fqcn, span) in &spans {
-        let key = Name::from(fqcn.as_str()).ascii_lowercase();
+    // Class-like namespace: class + interface + trait + enum all share one map.
+    let mut seen_class_like: FxHashMap<Name, ()> = FxHashMap::default();
+    // Function namespace is separate.
+    let mut seen_fns: FxHashMap<Name, ()> = FxHashMap::default();
+
+    for (fqn, span, kind) in &decls {
+        let key = Name::from(fqn.as_str()).ascii_lowercase();
+        let seen = match kind {
+            DeclKind::Function => &mut seen_fns,
+            _ => &mut seen_class_like,
+        };
         if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
             e.insert(());
         } else {
@@ -270,8 +326,19 @@ fn check_duplicate_classes(
                 crate::diagnostics::offset_to_line_col(source, span.start, source_map);
             let (line_end, col_end) =
                 crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+            let issue_kind = match kind {
+                DeclKind::Class => mir_issues::IssueKind::DuplicateClass { name: fqn.clone() },
+                DeclKind::Interface => {
+                    mir_issues::IssueKind::DuplicateInterface { name: fqn.clone() }
+                }
+                DeclKind::Trait => mir_issues::IssueKind::DuplicateTrait { name: fqn.clone() },
+                DeclKind::Enum => mir_issues::IssueKind::DuplicateEnum { name: fqn.clone() },
+                DeclKind::Function => {
+                    mir_issues::IssueKind::DuplicateFunction { name: fqn.clone() }
+                }
+            };
             issues.push(Issue::new(
-                mir_issues::IssueKind::DuplicateClass { name: fqcn.clone() },
+                issue_kind,
                 mir_issues::Location {
                     file: file.clone(),
                     line,
@@ -388,7 +455,13 @@ impl<'a> BodyAnalyzer<'a> {
         let mut all_symbols = Vec::new();
 
         if self.mode == AnalysisMode::Full {
-            check_duplicate_classes(&program.stmts, &file, source, source_map, &mut all_issues);
+            check_duplicate_declarations(
+                &program.stmts,
+                &file,
+                source,
+                source_map,
+                &mut all_issues,
+            );
         }
 
         self.analyze_top_level_stmts(

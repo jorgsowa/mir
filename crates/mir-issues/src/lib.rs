@@ -511,6 +511,18 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/class_redefinition*.phpt`.
     DuplicateClass { name: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/interface_redefinition*.phpt`.
+    DuplicateInterface { name: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/trait_redefinition*.phpt`.
+    DuplicateTrait { name: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/enum_redefinition*.phpt`.
+    DuplicateEnum { name: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/function_redefinition*.phpt`.
+    DuplicateFunction { name: String },
 }
 
 fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
@@ -651,7 +663,11 @@ impl IssueKind {
             | IssueKind::WrongCaseClass { .. }
             | IssueKind::InvalidAttribute { .. }
             | IssueKind::UndefinedAttributeClass { .. } => Severity::Info,
-            IssueKind::DuplicateClass { .. } => Severity::Error,
+            IssueKind::DuplicateClass { .. }
+            | IssueKind::DuplicateInterface { .. }
+            | IssueKind::DuplicateTrait { .. }
+            | IssueKind::DuplicateEnum { .. }
+            | IssueKind::DuplicateFunction { .. } => Severity::Error,
         }
     }
 
@@ -829,6 +845,10 @@ impl IssueKind {
             IssueKind::InvalidAttribute { .. } => "MIR1600",
             IssueKind::UndefinedAttributeClass { .. } => "MIR1601",
             IssueKind::DuplicateClass { .. } => "MIR1602",
+            IssueKind::DuplicateInterface { .. } => "MIR1603",
+            IssueKind::DuplicateTrait { .. } => "MIR1604",
+            IssueKind::DuplicateEnum { .. } => "MIR1605",
+            IssueKind::DuplicateFunction { .. } => "MIR1606",
 
             // Other (1500-1599)
             IssueKind::InvalidThrow { .. } => "MIR1500",
@@ -959,6 +979,10 @@ impl IssueKind {
             IssueKind::InvalidAttribute { .. } => "InvalidAttribute",
             IssueKind::UndefinedAttributeClass { .. } => "UndefinedAttributeClass",
             IssueKind::DuplicateClass { .. } => "DuplicateClass",
+            IssueKind::DuplicateInterface { .. } => "DuplicateInterface",
+            IssueKind::DuplicateTrait { .. } => "DuplicateTrait",
+            IssueKind::DuplicateEnum { .. } => "DuplicateEnum",
+            IssueKind::DuplicateFunction { .. } => "DuplicateFunction",
         }
     }
 
@@ -1388,6 +1412,18 @@ impl IssueKind {
             IssueKind::ForbiddenCode { message } => message.clone(),
             IssueKind::DuplicateClass { name } => {
                 format!("Class {name} has already been defined")
+            }
+            IssueKind::DuplicateInterface { name } => {
+                format!("Interface {name} has already been defined")
+            }
+            IssueKind::DuplicateTrait { name } => {
+                format!("Trait {name} has already been defined")
+            }
+            IssueKind::DuplicateEnum { name } => {
+                format!("Enum {name} has already been defined")
+            }
+            IssueKind::DuplicateFunction { name } => {
+                format!("Function {name}() has already been defined")
             }
         }
     }
@@ -1844,6 +1880,10 @@ mod code_tests {
             IssueKind::UndefinedAttributeClass { name: s() },
             IssueKind::ForbiddenCode { message: s() },
             IssueKind::DuplicateClass { name: s() },
+            IssueKind::DuplicateInterface { name: s() },
+            IssueKind::DuplicateTrait { name: s() },
+            IssueKind::DuplicateEnum { name: s() },
+            IssueKind::DuplicateFunction { name: s() },
         ]
     }
 
@@ -1918,9 +1958,8 @@ mod code_tests {
     /// If you add a variant, add it to `one_of_each()` *and* bump this count.
     #[test]
     fn one_of_each_has_every_variant() {
-        // 106 = current variant count. If this assertion fires after you added
-        // a new variant, also add it to `one_of_each()` so the uniqueness
-        // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 116);
+        // If this assertion fires after you added a new variant, also add it
+        // to `one_of_each()` so the uniqueness and shape tests cover it.
+        assert_eq!(one_of_each().len(), 120);
     }
 }
