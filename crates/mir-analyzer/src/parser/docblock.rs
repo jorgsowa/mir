@@ -354,6 +354,17 @@ impl DocblockParser {
                         }
                     }
                 }
+                "trace" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        // Support both comma-separated and space-separated variable names
+                        for part in body_str.split([',', ' ']) {
+                            let var_name = part.trim().trim_start_matches('$').to_string();
+                            if !var_name.is_empty() {
+                                result.trace_vars.push(var_name);
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -480,6 +491,8 @@ pub struct ParsedDocblock {
     pub invalid_annotations: Vec<String>,
     /// `@mir-check $var is TYPE` — (var_name_without_dollar, type_string)
     pub mir_checks: Vec<(String, String)>,
+    /// `@trace $var1, $var2` or `@trace $var1 $var2` — variable names to trace
+    pub trace_vars: Vec<String>,
 }
 
 impl ParsedDocblock {

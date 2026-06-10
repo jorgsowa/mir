@@ -183,6 +183,27 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
 
+        // Emit `@trace $var` directives
+        if let Some(doc_str) = doc.as_deref() {
+            let trace_vars = crate::parser::DocblockParser::parse(doc_str).trace_vars;
+            for var_name in trace_vars {
+                let ty = ctx.get_var(&var_name);
+                self.issues.add(Issue::new(
+                    IssueKind::Trace {
+                        variable: var_name,
+                        type_info: ty.to_string(),
+                    },
+                    Location {
+                        file: self.file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
+                    },
+                ));
+            }
+        }
+
         match &stmt.kind {
             // ---- Expression statement ----------------------------------------
             StmtKind::Expression(expr) => {

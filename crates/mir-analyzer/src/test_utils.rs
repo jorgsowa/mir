@@ -610,6 +610,7 @@ pub fn run_fixture(path: &str) {
             "MixedArgument",
             "MixedAssignment",
             "ForbiddenCode",
+            "Trace",
         ];
         if fixture.config.suppressed_issue_kinds.is_none() {
             // No explicit suppress= — build default set from dead-code group and

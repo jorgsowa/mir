@@ -5,6 +5,3 @@ Undefined trace variable
 /** @trace $b */
 echo 1;
 ===expect===
-UndefinedTrace
-===ignore===
-TODO

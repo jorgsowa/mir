@@ -210,6 +210,10 @@ pub enum IssueKind {
         actual: String,
     },
 
+    /// Emitted by `@trace $var` docblock annotation. Shows inferred type.
+    /// Fixtures: `tests/fixtures/by-kind/trace/`.
+    Trace { variable: String, type_info: String },
+
     // --- Array issues -------------------------------------------------------
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/invalid_array_offset/` (planned).
     InvalidArrayOffset { expected: String, actual: String },
@@ -546,6 +550,7 @@ impl IssueKind {
             | IssueKind::InvalidToString { .. }
             | IssueKind::TypeCheckMismatch { .. }
             | IssueKind::ParentNotFound => Severity::Error,
+            IssueKind::Trace { .. } => Severity::Info,
 
             // Warnings (shown at default error level)
             IssueKind::NullArgument { .. }
@@ -704,6 +709,7 @@ impl IssueKind {
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
             IssueKind::InvalidStringClass { .. } => "MIR0211",
             IssueKind::TypeCheckMismatch { .. } => "MIR0212",
+            IssueKind::Trace { .. } => "MIR0221",
 
             // Array / offset (0300-0399)
             IssueKind::InvalidArrayOffset { .. } => "MIR0300",
@@ -850,6 +856,7 @@ impl IssueKind {
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
+            IssueKind::Trace { .. } => "Trace",
             IssueKind::InvalidArrayOffset { .. } => "InvalidArrayOffset",
             IssueKind::NonExistentArrayOffset { .. } => "NonExistentArrayOffset",
             IssueKind::PossiblyInvalidArrayOffset { .. } => "PossiblyInvalidArrayOffset",
@@ -1086,6 +1093,12 @@ impl IssueKind {
                 actual,
             } => {
                 format!("Type of ${var} is expected to be {expected}, got {actual}")
+            }
+            IssueKind::Trace {
+                variable,
+                type_info,
+            } => {
+                format!("Type of ${variable} is {type_info}")
             }
 
             IssueKind::InvalidArrayOffset { expected, actual } => {
@@ -1604,6 +1617,10 @@ mod code_tests {
                 expected: s(),
                 actual: s(),
             },
+            IssueKind::Trace {
+                variable: s(),
+                type_info: s(),
+            },
             IssueKind::InvalidArrayOffset {
                 expected: s(),
                 actual: s(),
@@ -1856,6 +1873,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 110);
+        assert_eq!(one_of_each().len(), 111);
     }
 }
