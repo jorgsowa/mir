@@ -42,6 +42,11 @@ pub(super) fn resolve_type_name(
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
 ) -> Name {
+    // Globally-qualified names (leading `\`) are already resolved — strip the
+    // backslash and return without prepending the current namespace.
+    if name.starts_with('\\') {
+        return Name::from(name.trim_start_matches('\\'));
+    }
     let stripped = name.trim_start_matches('\\');
     let first_part = stripped.split('\\').next().unwrap_or(stripped);
     if use_aliases.contains_key(first_part) {

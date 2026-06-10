@@ -123,7 +123,9 @@ fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Type {
 }
 
 fn normalize_fqcn(s: &str) -> String {
-    s.trim_start_matches('\\').to_string()
+    // Preserve a leading `\` for globally-qualified names so the collector's
+    // resolve_type_name can skip namespace prepending for them.
+    s.to_string()
 }
 
 /// Same as [`type_from_hint`] but for the owned (lifetime-free) AST.
