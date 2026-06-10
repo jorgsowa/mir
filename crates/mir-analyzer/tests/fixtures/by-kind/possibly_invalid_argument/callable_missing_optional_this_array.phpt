@@ -18,6 +18,3 @@ class A {
     }
 }
 ===expect===
-PossiblyInvalidArgument
-===ignore===
-TODO

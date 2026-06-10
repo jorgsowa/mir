@@ -170,16 +170,39 @@ pub(crate) fn check_one(
         // does not declare strict_types, so this is the common case.
         && !stringable_coercion_ok(arg_ty, param_ty, ea)
     {
-        ea.emit(
-            IssueKind::InvalidArgument {
-                param: param_name.to_string(),
-                fn_name: fn_name.to_string(),
-                expected: format!("{param_ty}"),
-                actual: invalid_argument_actual_type(arg_ty, param_ty, ea),
-            },
-            Severity::Error,
-            arg_span,
-        );
+        // For union arg types, check if any individual atomic fits the param.
+        // If some atomics fit and some don't → PossiblyInvalidArgument; otherwise → InvalidArgument.
+        let any_atomic_fits = !arg_ty.is_single()
+            && arg_ty.types.iter().any(|a| {
+                let single = Type::single(a.clone());
+                scalar_arg_fits_param(&single, param_ty)
+                    || named_object_subtype(&single, param_ty, ea)
+                    || array_list_compatible(&single, param_ty, ea)
+                    || stringable_coercion_ok(&single, param_ty, ea)
+            });
+        if any_atomic_fits {
+            ea.emit(
+                IssueKind::PossiblyInvalidArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("{param_ty}"),
+                    actual: format!("{arg_ty}"),
+                },
+                Severity::Info,
+                arg_span,
+            );
+        } else {
+            ea.emit(
+                IssueKind::InvalidArgument {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("{param_ty}"),
+                    actual: invalid_argument_actual_type(arg_ty, param_ty, ea),
+                },
+                Severity::Error,
+                arg_span,
+            );
+        }
     }
 
     // When a Stringable object is implicitly coerced to string, emit ImplicitToStringCast.

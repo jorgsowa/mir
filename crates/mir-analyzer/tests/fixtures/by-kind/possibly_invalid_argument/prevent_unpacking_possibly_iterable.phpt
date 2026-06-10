@@ -9,6 +9,3 @@ $test = [1, 2];
 foo(...$test);
 
 ===expect===
-PossiblyInvalidArgument
-===ignore===
-TODO

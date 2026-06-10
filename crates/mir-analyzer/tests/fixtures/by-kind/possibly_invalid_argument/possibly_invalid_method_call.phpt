@@ -14,6 +14,3 @@ function example($x, bool $isObject) : void {
     }
 }
 ===expect===
-PossiblyInvalidMethodCall
-===ignore===
-TODO

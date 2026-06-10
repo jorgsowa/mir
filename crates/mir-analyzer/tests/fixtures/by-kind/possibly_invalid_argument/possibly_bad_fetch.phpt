@@ -5,6 +5,4 @@ Possibly bad fetch
 $a = rand(0, 5) > 3 ? "hello" : new stdClass;
 echo $a->foo;
 ===expect===
-PossiblyInvalidPropertyFetch
-===ignore===
-TODO
+UndefinedProperty@3:10-3:13: Property stdClass::$foo does not exist

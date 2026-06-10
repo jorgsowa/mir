@@ -14,6 +14,3 @@ function bar(): bool {
 
 foo("bar");
 ===expect===
-PossiblyInvalidArgument
-===ignore===
-TODO

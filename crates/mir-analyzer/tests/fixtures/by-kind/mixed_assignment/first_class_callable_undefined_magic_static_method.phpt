@@ -13,6 +13,4 @@ $closure = Test::length(...);
 $length = $closure();
 
 ===expect===
-MixedAssignment
-===ignore===
-TODO
+MixedAssignment@10:1-10:21: Variable $length is assigned a mixed type
