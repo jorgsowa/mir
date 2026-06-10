@@ -101,22 +101,35 @@ impl<'a> DefinitionCollector<'a> {
                         for p in m.params.iter() {
                             if p.visibility.is_some() {
                                 let param_name = p.name.as_deref().unwrap_or_default();
-                                let ty = self
-                                    .resolve_union_opt(
-                                        p.type_hint
-                                            .as_ref()
-                                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
-                                    )
-                                    .or_else(|| {
-                                        ctor_doc.get_param_type(param_name).cloned().map(|u| {
-                                            self.resolve_union_doc_with_templates(
-                                                u,
-                                                &ctor_template_names,
-                                                &fqcn,
-                                                &class_template_params,
-                                            )
-                                        })
-                                    });
+                                let native_ty = self.resolve_union_opt(
+                                    p.type_hint
+                                        .as_ref()
+                                        .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                                );
+                                let resolve_doc = || {
+                                    ctor_doc.get_param_type(param_name).cloned().map(|u| {
+                                        self.resolve_union_doc_with_templates(
+                                            u,
+                                            &ctor_template_names,
+                                            &fqcn,
+                                            &class_template_params,
+                                        )
+                                    })
+                                };
+                                // When the native hint is a plain unspecialized `array`, prefer
+                                // the @param docblock if it provides a more specific generic array.
+                                let ty = if native_ty.as_ref().is_some_and(|t| {
+                                    t.types.len() == 1
+                                        && matches!(
+                                            &t.types[0],
+                                            Atomic::TArray { key, value }
+                                                if key.is_mixed() && value.is_mixed()
+                                        )
+                                }) {
+                                    resolve_doc().or(native_ty)
+                                } else {
+                                    native_ty.or_else(resolve_doc)
+                                };
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
                                     ty: mir_codebase::storage::wrap_property_type(ty),
