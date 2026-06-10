@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-06-10
+
+### Fixed
+
+- `DuplicateClass` no longer fires when two classes share the same name in separate unbraced namespace blocks.
+- `abs(int)` now returns `int` instead of `float|int`.
+- Symbol lookup now records parameter declaration sites as `Variable` symbols, enabling go-to-definition on function/method parameters.
+- Symbol lookup now resolves gap cursors in method chains via `expr_span` fallback, fixing missed definitions in chained calls.
+
+### Changed
+
+- PHP parser and phpdoc-parser updated to 0.17.0.
+
 ## [0.35.0] - 2026-06-09
 
 ### Added
