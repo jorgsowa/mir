@@ -976,6 +976,28 @@ impl<'a> BodyAnalyzer<'a> {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
                     );
+                } else if self.mode == AnalysisMode::Full {
+                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                        source,
+                        member.span.start,
+                        source_map,
+                    );
+                    let (line_end, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::MissingPropertyType {
+                            class: fqcn.to_string(),
+                            property: prop_name,
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
                 }
                 continue;
             }
@@ -1257,6 +1279,28 @@ impl<'a> BodyAnalyzer<'a> {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
                     );
+                } else if self.mode == AnalysisMode::Full {
+                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                        source,
+                        member.span.start,
+                        source_map,
+                    );
+                    let (line_end, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::MissingPropertyType {
+                            class: fqcn.to_string(),
+                            property: prop_name,
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
                 }
                 continue;
             }
@@ -1495,6 +1539,28 @@ impl<'a> BodyAnalyzer<'a> {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
                     );
+                } else if self.mode == AnalysisMode::Full {
+                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                        source,
+                        member.span.start,
+                        source_map,
+                    );
+                    let (line_end, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::MissingPropertyType {
+                            class: fqcn.to_string(),
+                            property: prop_name,
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
                 }
                 continue;
             }
@@ -1581,6 +1647,28 @@ impl<'a> BodyAnalyzer<'a> {
                     self.check_and_record_type_hint_classes(
                         hint, file, source, source_map, all_issues,
                     );
+                } else if self.mode == AnalysisMode::Full {
+                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                        source,
+                        member.span.start,
+                        source_map,
+                    );
+                    let (line_end, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::MissingPropertyType {
+                            class: fqcn.to_string(),
+                            property: prop_name,
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
                 }
                 continue;
             }

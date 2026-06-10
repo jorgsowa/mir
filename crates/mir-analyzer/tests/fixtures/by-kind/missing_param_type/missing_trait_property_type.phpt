@@ -10,6 +10,4 @@ class A {
     use T;
 }
 ===expect===
-MissingPropertyType
-===ignore===
-TODO
+MissingPropertyType@3:5-3:20: Property T::$foo has no type annotation

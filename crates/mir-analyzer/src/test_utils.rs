@@ -606,6 +606,7 @@ pub fn run_fixture(path: &str) {
             "MissingThrowsDocblock",
             "MissingReturnType",
             "MissingParamType",
+            "MissingPropertyType",
             "MixedArgument",
             "MixedAssignment",
         ];

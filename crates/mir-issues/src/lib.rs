@@ -406,6 +406,9 @@ pub enum IssueKind {
     MissingReturnType { fn_name: String },
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/missing_param_type/` (planned).
     MissingParamType { fn_name: String, param: String },
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/missing_param_type/` (property variants).
+    MissingPropertyType { class: String, property: String },
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_throw/`.
     InvalidThrow { ty: String },
@@ -600,6 +603,7 @@ impl IssueKind {
             | IssueKind::InternalMethod { .. }
             | IssueKind::MissingReturnType { .. }
             | IssueKind::MissingParamType { .. }
+            | IssueKind::MissingPropertyType { .. }
             | IssueKind::MismatchingDocblockReturnType { .. }
             | IssueKind::MismatchingDocblockParamType { .. }
             | IssueKind::InvalidDocblock { .. }
@@ -763,6 +767,7 @@ impl IssueKind {
             // Missing types / docblocks (1100-1199)
             IssueKind::MissingReturnType { .. } => "MIR1100",
             IssueKind::MissingParamType { .. } => "MIR1101",
+            IssueKind::MissingPropertyType { .. } => "MIR1104",
             IssueKind::MissingThrowsDocblock { .. } => "MIR1102",
             IssueKind::InvalidDocblock { .. } => "MIR1103",
 
@@ -885,6 +890,7 @@ impl IssueKind {
             IssueKind::InternalMethod { .. } => "InternalMethod",
             IssueKind::MissingReturnType { .. } => "MissingReturnType",
             IssueKind::MissingParamType { .. } => "MissingParamType",
+            IssueKind::MissingPropertyType { .. } => "MissingPropertyType",
             IssueKind::InvalidThrow { .. } => "InvalidThrow",
             IssueKind::InvalidCatch { .. } => "InvalidCatch",
             IssueKind::MissingThrowsDocblock { .. } => "MissingThrowsDocblock",
@@ -1253,6 +1259,9 @@ impl IssueKind {
             }
             IssueKind::MissingParamType { fn_name, param } => {
                 format!("Parameter ${param} of {fn_name}() has no type annotation")
+            }
+            IssueKind::MissingPropertyType { class, property } => {
+                format!("Property {class}::${property} has no type annotation")
             }
             IssueKind::InvalidThrow { ty } => {
                 format!("Thrown type '{ty}' does not extend Throwable")
@@ -1720,6 +1729,10 @@ mod code_tests {
                 fn_name: s(),
                 param: s(),
             },
+            IssueKind::MissingPropertyType {
+                class: s(),
+                property: s(),
+            },
             IssueKind::MissingThrowsDocblock { class: s() },
             IssueKind::InvalidDocblock { message: s() },
             IssueKind::MixedArgument {
@@ -1835,6 +1848,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 108);
+        assert_eq!(one_of_each().len(), 109);
     }
 }
