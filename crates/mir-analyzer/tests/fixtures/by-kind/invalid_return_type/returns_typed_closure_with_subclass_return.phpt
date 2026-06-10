@@ -1,5 +1,7 @@
 ===description===
 Returns typed closure with subclass return
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -19,6 +21,3 @@ function foo(Closure $f, Closure $g) : Closure {
     };
 }
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO

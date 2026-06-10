@@ -1,5 +1,7 @@
 ===description===
 Possibly null or mixed arg
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -19,6 +21,3 @@ function takesA(?A $a) : void {
     takesString($a->foo);
 }
 ===expect===
-PossiblyNullArgument
-===ignore===
-TODO

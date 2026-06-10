@@ -1,5 +1,7 @@
 ===description===
 Closure from callable invokable named class wrong args
+===ignore===
+TODO
 ===file===
 <?php
 namespace NS;
@@ -16,6 +18,3 @@ class NamedInvokable {
 
 acceptsIntToBool(Closure::fromCallable(new NamedInvokable));
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

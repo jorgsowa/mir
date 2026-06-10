@@ -1,5 +1,7 @@
 ===description===
 No intersection method
+===ignore===
+TODO
 ===file===
 <?php
 interface A {}
@@ -10,6 +12,3 @@ function f($p): void {
     $p->zugzug();
 }
 ===expect===
-UndefinedInterfaceMethod
-===ignore===
-TODO

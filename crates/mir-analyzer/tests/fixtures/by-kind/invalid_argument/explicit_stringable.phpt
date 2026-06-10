@@ -1,5 +1,7 @@
 ===description===
 Explicit stringable
+===ignore===
+TODO
 ===file===
 
                     <?php
@@ -10,6 +12,3 @@ class A implements Stringable {
 }
 
 ===expect===
-MissingOverrideAttribute
-===ignore===
-TODO

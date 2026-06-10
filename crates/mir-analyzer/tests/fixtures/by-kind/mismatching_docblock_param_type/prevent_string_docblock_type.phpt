@@ -1,5 +1,7 @@
 ===description===
 Prevent string docblock type
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ function map2(callable $mapper): void {}
 
 map2("foo");
 ===expect===
-MismatchingDocblockParamType
-===ignore===
-TODO

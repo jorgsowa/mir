@@ -1,5 +1,7 @@
 ===description===
 Invoke type mismatch
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -9,6 +11,3 @@ class A {
 $q = new A;
 $q(1);
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

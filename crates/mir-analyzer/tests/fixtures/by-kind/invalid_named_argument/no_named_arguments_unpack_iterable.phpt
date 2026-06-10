@@ -1,5 +1,7 @@
 ===description===
 No named arguments unpack iterable
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -13,6 +15,3 @@ $test = ["arg1" => 1, "arg2" => 2];
 foo(...$test);
 
 ===expect===
-NamedArgumentNotAllowed
-===ignore===
-TODO

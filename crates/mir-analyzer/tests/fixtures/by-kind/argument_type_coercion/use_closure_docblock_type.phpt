@@ -1,5 +1,7 @@
 ===description===
 Use closure docblock type
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -15,6 +17,3 @@ $getAButReallyB = /** @return A */ function() {
 takesA($getAButReallyB());
 takesB($getAButReallyB());
 ===expect===
-ArgumentTypeCoercion
-===ignore===
-TODO

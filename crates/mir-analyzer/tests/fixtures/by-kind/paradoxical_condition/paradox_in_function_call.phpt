@@ -1,5 +1,7 @@
 ===description===
 Paradox in function call
+===ignore===
+TODO
 ===file===
 <?php
 /** @return 1|2|3 */
@@ -17,6 +19,3 @@ switch(foo()) {
         echo "bar";
 }
 ===expect===
-ParadoxicalCondition
-===ignore===
-TODO

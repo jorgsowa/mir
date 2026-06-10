@@ -1,5 +1,7 @@
 ===description===
 All matched another impossible
+===ignore===
+TODO
 ===file===
 <?php
 function foo() : string {
@@ -11,6 +13,3 @@ function foo() : string {
     };
 }
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO

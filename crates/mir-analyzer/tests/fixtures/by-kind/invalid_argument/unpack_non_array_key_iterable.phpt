@@ -1,5 +1,7 @@
 ===description===
 Unpack non array key iterable
+===ignore===
+TODO
 ===file===
 <?php
 /** @suppress UnusedParam */
@@ -10,6 +12,3 @@ $test = null;
 foo(...$test);
 
 ===expect===
-InvalidArgument
-===ignore===
-TODO

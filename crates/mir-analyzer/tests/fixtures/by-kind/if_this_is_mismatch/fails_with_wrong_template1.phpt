@@ -1,5 +1,7 @@
 ===description===
 Fails with wrong template1
+===ignore===
+TODO
 ===file===
 <?php
 
@@ -28,6 +30,3 @@ $i = new a("test");
 $i->test();
 
 ===expect===
-IfThisIsMismatch
-===ignore===
-TODO

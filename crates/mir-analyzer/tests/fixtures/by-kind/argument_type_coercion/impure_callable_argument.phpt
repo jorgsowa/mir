@@ -1,5 +1,7 @@
 ===description===
 Impure callable argument
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -28,6 +30,4 @@ $c = max_by([1, 2, 3], function(int $a): int {
 
 echo $c;
 ===expect===
-ArgumentTypeCoercion
-===ignore===
-TODO
+RedundantCondition@13:13-13:56: Condition is always true/false for type 'bool'

@@ -1,5 +1,7 @@
 ===description===
 Non existent constant class
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function getVal()
     return 5;
 }
 ===expect===
-UndefinedDocblockClass
-===ignore===
-TODO

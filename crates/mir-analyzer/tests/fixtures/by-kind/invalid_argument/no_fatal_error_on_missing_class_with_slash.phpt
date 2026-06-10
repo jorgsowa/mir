@@ -1,5 +1,7 @@
 ===description===
 No fatal error on missing class with slash
+===ignore===
+TODO
 ===file===
 <?php
 class Func {
@@ -8,6 +10,3 @@ class Func {
 
 new Func("f", ["Foo", "bar"]);
 ===expect===
-InvalidArgument
-===ignore===
-TODO

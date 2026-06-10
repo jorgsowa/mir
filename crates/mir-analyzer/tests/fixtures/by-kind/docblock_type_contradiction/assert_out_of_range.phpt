@@ -1,5 +1,7 @@
 ===description===
 Assert out of range
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ function scope(int $a): void{
     assert($a === 0);
 }
 ===expect===
-DocblockTypeContradiction
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Encapsed concat with string creates string
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function foo(string $s1, string $s2): string {
     return "hello $s1 $s2";
 }
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO

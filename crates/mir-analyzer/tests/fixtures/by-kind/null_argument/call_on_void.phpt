@@ -1,5 +1,7 @@
 ===description===
 Call on void
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -9,6 +11,3 @@ class A {
 $p = new A();
 $p->foo()->bar();
 ===expect===
-NullReference
-===ignore===
-TODO

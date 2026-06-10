@@ -1,5 +1,7 @@
 ===description===
 Can create object with no external mutations fail
+===ignore===
+TODO
 ===file===
 <?php
 class Counter {
@@ -22,6 +24,3 @@ function makesACounter(int $i) : Counter {
     return $c;
 }
 ===expect===
-ImpureMethodCall
-===ignore===
-TODO

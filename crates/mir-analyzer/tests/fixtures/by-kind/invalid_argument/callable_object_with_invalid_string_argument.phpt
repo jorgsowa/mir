@@ -1,5 +1,7 @@
 ===description===
 Callable object with invalid string argument
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function takesCallableObject(object $object): void {
 }
 
 ===expect===
-InvalidArgument
-===ignore===
-TODO

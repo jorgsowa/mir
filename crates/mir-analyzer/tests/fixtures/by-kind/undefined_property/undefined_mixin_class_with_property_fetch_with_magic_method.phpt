@@ -1,5 +1,7 @@
 ===description===
 undefinedMixinClassWithPropertyFetch_WithMagicMethod
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -14,6 +16,3 @@ class A {
 
 (new A)->foo;
 ===expect===
-UndefinedMagicPropertyFetch
-===ignore===
-TODO

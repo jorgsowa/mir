@@ -1,5 +1,7 @@
 ===description===
 Assert value impossible
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -11,6 +13,3 @@ function assertFooBar(string $s) : void {
 $a = "";
 assertFooBar($a);
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO

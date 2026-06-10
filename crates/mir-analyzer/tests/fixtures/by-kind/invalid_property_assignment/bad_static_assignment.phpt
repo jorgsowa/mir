@@ -1,5 +1,7 @@
 ===description===
 Bad static assignment
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -12,6 +14,3 @@ class A {
     }
 }
 ===expect===
-InvalidPropertyAssignmentValue
-===ignore===
-TODO

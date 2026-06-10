@@ -1,5 +1,7 @@
 ===description===
 Callable with too many args
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function test(callable $fn): void {
 }
 
 ===expect===
-TooManyArguments
-===ignore===
-TODO

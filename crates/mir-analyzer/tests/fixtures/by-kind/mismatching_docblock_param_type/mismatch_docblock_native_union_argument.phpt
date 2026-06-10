@@ -1,5 +1,7 @@
 ===description===
 Mismatch docblock native union argument
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function test(int|bool $in): bool {
 }
 
 ===expect===
-MismatchingDocblockParamType
-===ignore===
-TODO

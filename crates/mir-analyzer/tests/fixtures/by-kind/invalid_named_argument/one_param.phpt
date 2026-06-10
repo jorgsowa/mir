@@ -1,5 +1,7 @@
 ===description===
 One param
+===ignore===
+TODO
 ===file===
 <?php
 interface I {
@@ -15,6 +17,3 @@ class C implements I {
     }
 }
 ===expect===
-Argument 1 of C::foo has wrong name $c, expecting $i as defined by I::foo
-===ignore===
-TODO

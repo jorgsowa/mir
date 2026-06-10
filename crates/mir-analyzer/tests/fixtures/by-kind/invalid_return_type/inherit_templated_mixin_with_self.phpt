@@ -1,5 +1,7 @@
 ===description===
 Inherit templated mixin with self
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -53,6 +55,3 @@ function test() : FooGrandChild {
     return (new FooGrandChild)->type();
 }
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO

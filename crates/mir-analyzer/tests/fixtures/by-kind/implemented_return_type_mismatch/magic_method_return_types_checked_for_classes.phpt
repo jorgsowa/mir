@@ -1,5 +1,7 @@
 ===description===
 MagicMethodReturnTypesCheckedForClasses
+===ignore===
+TODO
 ===file===
 <?php
 class A
@@ -13,6 +15,3 @@ class A
 class B extends A {}
 
 ===expect===
-ImplementedReturnTypeMismatch
-===ignore===
-TODO

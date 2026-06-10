@@ -1,5 +1,7 @@
 ===description===
 More specific callable
+===ignore===
+TODO
 ===file===
 <?php
 /** @param callable(string):void $c */
@@ -11,6 +13,3 @@ function takesCallable(callable $c) : void {
     takesSpecificCallable($c);
 }
 ===expect===
-MixedArgumentTypeCoercion
-===ignore===
-TODO

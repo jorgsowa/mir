@@ -1,5 +1,7 @@
 ===description===
 Invalid argument
+===ignore===
+TODO
 ===file===
 <?php
 #[Attribute]
@@ -13,6 +15,3 @@ class Foo
 #[Foo("foo")]
 class Bar{}
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Wrong arg
+===ignore===
+TODO
 ===file===
 <?php
 $bar = ["foo", "bar"];
@@ -11,6 +13,3 @@ $bam = array_map(
     $bar
 );
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Invalid iterator
+===ignore===
+TODO
 ===file===
 <?php
 function example() : int {
@@ -10,6 +12,3 @@ function example2() : Generator {
     yield from example();
 }
 ===expect===
-InvalidIterator
-===ignore===
-TODO

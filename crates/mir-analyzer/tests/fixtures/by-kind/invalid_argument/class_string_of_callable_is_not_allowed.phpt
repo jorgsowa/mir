@@ -1,5 +1,7 @@
 ===description===
 Class string of callable is not allowed
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -21,6 +23,3 @@ class Foo
 takesCallableObject(Foo::class);
 
 ===expect===
-class-string param can only target
-===ignore===
-TODO

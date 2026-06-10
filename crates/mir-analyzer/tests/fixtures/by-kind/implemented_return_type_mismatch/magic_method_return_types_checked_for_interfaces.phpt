@@ -1,5 +1,7 @@
 ===description===
 MagicMethodReturnTypesCheckedForInterfaces
+===ignore===
+TODO
 ===file===
 <?php
 interface A
@@ -13,6 +15,3 @@ interface A
 interface B extends A {}
 
 ===expect===
-ImplementedReturnTypeMismatch
-===ignore===
-TODO

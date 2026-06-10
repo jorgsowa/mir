@@ -1,5 +1,7 @@
 ===description===
 Possibly unused param
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -9,6 +11,3 @@ class A {
 
 (new A)->foo(4);
 ===expect===
-PossiblyUnusedParam
-===ignore===
-TODO

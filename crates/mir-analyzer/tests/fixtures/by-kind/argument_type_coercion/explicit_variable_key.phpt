@@ -1,5 +1,7 @@
 ===description===
 Explicit variable key
+===ignore===
+TODO
 ===file===
 <?php
 /** @param list<int> $a */
@@ -13,6 +15,3 @@ function getKey() {
 $a = [getKey() => 1];
 takesList($a);
 ===expect===
-ArgumentTypeCoercion
-===ignore===
-TODO

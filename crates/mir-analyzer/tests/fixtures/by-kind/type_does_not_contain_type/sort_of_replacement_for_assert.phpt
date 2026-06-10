@@ -1,5 +1,7 @@
 ===description===
 Sort of replacement for assert
+===ignore===
+TODO
 ===file===
 <?php
 namespace Bar;
@@ -19,6 +21,5 @@ function bar(?string $s) : string {
     return $s;
 }
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO
+UndefinedClass@10:19-10:28: Class Bar\Exception does not exist
+InvalidReturnType@16:5-16:15: Return type 'true' is not compatible with declared 'string'

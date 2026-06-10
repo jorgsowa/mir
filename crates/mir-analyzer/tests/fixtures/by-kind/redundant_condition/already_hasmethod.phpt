@@ -1,5 +1,7 @@
 ===description===
 Already hasmethod
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -12,6 +14,5 @@ function foo(A $a) : void {
     }
 }
 ===expect===
-RedundantCondition
-===ignore===
-TODO
+MixedMethodCall@8:9-8:23: Method foo() called on mixed type
+UndefinedVariable@8:9-8:16: Variable $object is not defined

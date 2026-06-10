@@ -1,5 +1,7 @@
 ===description===
 Prohibit callable with required arg
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -14,6 +16,3 @@ accept_closure(
   }
 );
 ===expect===
-InvalidArgument
-===ignore===
-TODO

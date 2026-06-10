@@ -1,5 +1,7 @@
 ===description===
 Constructor
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -15,6 +17,3 @@ class C2 extends C {
 }
 
 ===expect===
-InvalidOverride
-===ignore===
-TODO

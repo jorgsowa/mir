@@ -1,5 +1,7 @@
 ===description===
 No other string allowed for value of keyed array
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function getValue() {
 }
 
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

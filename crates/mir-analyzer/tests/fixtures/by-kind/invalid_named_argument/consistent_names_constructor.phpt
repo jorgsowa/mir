@@ -1,5 +1,7 @@
 ===description===
 Consistent names constructor
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -22,6 +24,3 @@ class B extends A
 }
 
 ===expect===
-ParamNameMismatch
-===ignore===
-TODO

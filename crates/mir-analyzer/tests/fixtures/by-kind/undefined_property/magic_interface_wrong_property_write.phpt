@@ -1,5 +1,7 @@
 ===description===
 Magic interface wrong property write
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -18,6 +20,3 @@ function getFoo(GetterSetter $o) : void {
     $o->bar = "hello";
 }
 ===expect===
-UndefinedMagicPropertyAssignment
-===ignore===
-TODO

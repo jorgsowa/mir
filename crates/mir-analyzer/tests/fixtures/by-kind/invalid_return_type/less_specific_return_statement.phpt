@@ -1,5 +1,7 @@
 ===description===
 Less specific return statement
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -9,6 +11,3 @@ function foo(A $a): B {
     return $a;
 }
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO

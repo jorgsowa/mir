@@ -1,5 +1,7 @@
 ===description===
 Assert redundant inferior
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ function scope(int $a): void{
     assert($a < 10);
 }
 ===expect===
-RedundantConditionGivenDocblockType
-===ignore===
-TODO

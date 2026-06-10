@@ -1,5 +1,7 @@
 ===description===
 Reference reuse foreach value
+===ignore===
+TODO
 ===file===
 <?php
 /** @var array<int> */
@@ -12,6 +14,3 @@ foreach ($arr as &$var) {
 $var = "foo";
 
 ===expect===
-ReferenceReusedFromConfusingScope
-===ignore===
-TODO

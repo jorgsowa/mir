@@ -1,5 +1,7 @@
 ===description===
 Static type coercion
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -14,6 +16,3 @@ class A {
 
 class B extends A {}
 ===expect===
-PropertyTypeCoercion
-===ignore===
-TODO

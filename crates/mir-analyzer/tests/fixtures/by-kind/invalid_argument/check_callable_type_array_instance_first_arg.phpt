@@ -1,5 +1,7 @@
 ===description===
 Check callable type array instance first arg
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -13,6 +15,3 @@ class C {
 
 f([new C, "m"]);
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

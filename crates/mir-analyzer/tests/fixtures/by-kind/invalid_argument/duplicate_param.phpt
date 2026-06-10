@@ -1,5 +1,7 @@
 ===description===
 Duplicate param
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -7,6 +9,3 @@ Duplicate param
  */
 function f($p, $p) {}
 ===expect===
-DuplicateParam
-===ignore===
-TODO

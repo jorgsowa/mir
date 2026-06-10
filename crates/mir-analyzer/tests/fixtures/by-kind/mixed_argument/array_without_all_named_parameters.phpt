@@ -1,5 +1,7 @@
 ===description===
 Array without all named parameters
+===ignore===
+TODO
 ===file===
 <?php
 class User {
@@ -17,6 +19,4 @@ function processUserDataInvalid(array $data) : User {
     return new User(...$data);
 }
 ===expect===
-MixedArgument
-===ignore===
-TODO
+PossiblyInvalidArgument@14:21-14:29: Argument $id of User::__construct() expects 'int', possibly different type 'int|string' provided

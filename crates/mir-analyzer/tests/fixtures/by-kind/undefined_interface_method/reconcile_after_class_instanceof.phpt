@@ -1,5 +1,7 @@
 ===description===
 Reconcile after class instanceof
+===ignore===
+TODO
 ===file===
 <?php
 interface Base {}
@@ -16,6 +18,3 @@ function foobar(Base $foo) : void {
     $foo->bar();
 }
 ===expect===
-UndefinedInterfaceMethod
-===ignore===
-TODO

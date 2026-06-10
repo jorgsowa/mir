@@ -1,5 +1,7 @@
 ===description===
 Callable object with missing string argument
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function takesCallableObject(object $object): void {
 }
 
 ===expect===
-TooFewArguments
-===ignore===
-TODO

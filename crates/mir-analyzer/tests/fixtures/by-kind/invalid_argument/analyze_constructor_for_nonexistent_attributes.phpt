@@ -1,5 +1,7 @@
 ===description===
 Analyze constructor for nonexistent attributes
+===ignore===
+TODO
 ===file===
 <?php
 class Foo
@@ -12,6 +14,3 @@ class Foo
 class Bar {}
 
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

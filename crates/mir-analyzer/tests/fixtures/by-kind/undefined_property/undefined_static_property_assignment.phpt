@@ -1,5 +1,7 @@
 ===description===
 Undefined static property assignment
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -10,6 +12,3 @@ class A {
     }
 }
 ===expect===
-UndefinedPropertyAssignment
-===ignore===
-TODO

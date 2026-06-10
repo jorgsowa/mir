@@ -1,5 +1,7 @@
 ===description===
 Callable instance array method out of class context non static non public
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -20,6 +22,3 @@ class Foo {
     }
 }
 ===expect===
-InvalidArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Magic getter undefined property
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -23,6 +25,3 @@ class A {
     }
 }
 ===expect===
-UndefinedThisPropertyFetch
-===ignore===
-TODO

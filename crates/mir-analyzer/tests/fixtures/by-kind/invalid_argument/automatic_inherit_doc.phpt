@@ -1,5 +1,7 @@
 ===description===
 Automatic inherit doc
+===ignore===
+TODO
 ===file===
 <?php
 class Y {
@@ -15,6 +17,3 @@ class X extends Y {
 
 (new X())->boo([1, 2]);
 ===expect===
-InvalidArgument
-===ignore===
-TODO

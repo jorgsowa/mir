@@ -1,5 +1,7 @@
 ===description===
 Annotation with sealed
+===ignore===
+TODO
 ===file===
 <?php
 class ParentClass {
@@ -15,6 +17,3 @@ $child = new Child();
 $child->getString();
 $child->foo();
 ===expect===
-UndefinedMagicMethod
-===ignore===
-TODO

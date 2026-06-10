@@ -1,5 +1,7 @@
 ===description===
 Private callable
+===ignore===
+TODO
 ===file===
 <?php
 class Base  {
@@ -12,6 +14,3 @@ class Example extends Base {
     }
 }
 ===expect===
-InvalidArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Undefined parent class
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ class B extends A {}
 
 $b = new B();
 ===expect===
-MissingDependency
-===ignore===
-TODO

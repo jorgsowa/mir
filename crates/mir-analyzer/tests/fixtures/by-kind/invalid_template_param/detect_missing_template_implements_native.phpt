@@ -1,5 +1,7 @@
 ===description===
 Detect missing template implements native
+===ignore===
+TODO
 ===file===
 <?php
 final class C implements Iterator {
@@ -19,6 +21,3 @@ final class C implements Iterator {
 }
 
 ===expect===
-MissingTemplateParam
-===ignore===
-TODO

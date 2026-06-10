@@ -1,5 +1,7 @@
 ===description===
 Reference reuse deeply nested
+===ignore===
+TODO
 ===file===
 <?php
 /** @var list<list<list<int>>> */
@@ -17,6 +19,3 @@ for ($i = 0; $i < count($arr); ++$i) {
 $var = "foo";
 
 ===expect===
-ReferenceReusedFromConfusingScope
-===ignore===
-TODO

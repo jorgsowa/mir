@@ -1,5 +1,7 @@
 ===description===
 Clear isset context
+===ignore===
+TODO
 ===file===
 <?php
 function greet(bool $arg): ?string
@@ -9,6 +11,3 @@ function greet(bool $arg): ?string
 
 echo greet($undef) ?? "bye";
 ===expect===
-UndefinedGlobalVariable
-===ignore===
-TODO

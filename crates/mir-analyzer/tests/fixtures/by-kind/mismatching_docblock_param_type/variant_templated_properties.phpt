@@ -1,5 +1,7 @@
 ===description===
 Variant templated properties
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -18,6 +20,3 @@ class AChild extends A {
     public $foo = 0;
 }
 ===expect===
-NonInvariantDocblockPropertyType
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Possibly invalid array access with nested array
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -11,6 +13,3 @@ function return_array() {
 $result = return_array();
 $v = $result[0]["key"];
 ===expect===
-PossiblyInvalidArrayOffset
-===ignore===
-TODO

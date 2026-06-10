@@ -1,5 +1,7 @@
 ===description===
 No crash on get class method call
+===ignore===
+TODO
 ===file===
 <?php
 class User {
@@ -14,6 +16,3 @@ class User {
     }
 }
 ===expect===
-InvalidStringClass
-===ignore===
-TODO

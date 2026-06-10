@@ -1,5 +1,7 @@
 ===description===
 undefinedMixinClassWithPropertyAssignment_WithMagicMethod
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -12,6 +14,3 @@ class A {
 
 (new A)->foo = "bar";
 ===expect===
-UndefinedDocblockClass
-===ignore===
-TODO

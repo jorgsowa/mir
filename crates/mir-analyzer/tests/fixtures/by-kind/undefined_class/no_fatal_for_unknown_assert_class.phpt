@@ -1,5 +1,7 @@
 ===description===
 No fatal for unknown assert class
+===ignore===
+TODO
 ===file===
 <?php
 interface Foo {}
@@ -29,6 +31,3 @@ assertInstanceOf($bar, Bar::class);
 
 $bar->sayHello();
 ===expect===
-UndefinedDocblockClass
-===ignore===
-TODO

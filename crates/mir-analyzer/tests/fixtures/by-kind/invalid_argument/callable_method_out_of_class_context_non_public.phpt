@@ -1,5 +1,7 @@
 ===description===
 Callable method out of class context non public
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -19,6 +21,3 @@ class Foo {
 $foo = new Foo();
 run(array($foo, "hello"));
 ===expect===
-InvalidArgument
-===ignore===
-TODO

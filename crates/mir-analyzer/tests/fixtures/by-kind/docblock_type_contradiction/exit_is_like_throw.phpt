@@ -1,5 +1,7 @@
 ===description===
 Exit is like throw
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -13,6 +15,3 @@ function foo(int $i): void {
     $a === "aaa";
 }
 ===expect===
-DocblockTypeContradiction
-===ignore===
-TODO

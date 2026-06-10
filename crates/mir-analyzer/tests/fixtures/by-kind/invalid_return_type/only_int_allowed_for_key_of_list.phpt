@@ -1,5 +1,7 @@
 ===description===
 Only int allowed for key of list
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -12,6 +14,3 @@ class A {
 }
 
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

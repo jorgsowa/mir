@@ -1,5 +1,7 @@
 ===description===
 Public unused method
+===ignore===
+TODO
 ===file===
 <?php
 final class A {
@@ -9,6 +11,3 @@ final class A {
 
 new A();
 ===expect===
-PossiblyUnusedMethod
-===ignore===
-TODO

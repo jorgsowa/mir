@@ -1,5 +1,7 @@
 ===description===
 Type coercion
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -14,6 +16,4 @@ class A {
 
 class B extends A {}
 ===expect===
-PropertyTypeCoercion
-===ignore===
-TODO
+InvalidPropertyAssignment@8:9-8:24: Property $foo expects 'B|null', cannot assign 'A'

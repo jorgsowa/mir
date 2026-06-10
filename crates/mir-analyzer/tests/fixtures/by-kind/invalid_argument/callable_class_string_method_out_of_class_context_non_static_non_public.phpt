@@ -1,5 +1,7 @@
 ===description===
 Callable class string method out of class context non static non public
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -18,6 +20,3 @@ class Foo {
 
 run("Foo::hello");
 ===expect===
-InvalidArgument
-===ignore===
-TODO

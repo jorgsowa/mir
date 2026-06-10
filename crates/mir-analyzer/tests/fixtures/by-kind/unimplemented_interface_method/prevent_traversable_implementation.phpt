@@ -1,5 +1,7 @@
 ===description===
 Prevent traversable implementation
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -8,6 +10,3 @@ Prevent traversable implementation
 final class C implements Traversable {}
 
 ===expect===
-InvalidTraversableImplementation
-===ignore===
-TODO

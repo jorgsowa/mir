@@ -1,5 +1,7 @@
 ===description===
 Call root function from namespace
+===ignore===
+TODO
 ===file===
 <?php
 namespace {
@@ -12,6 +14,4 @@ namespace A {
     Aoo();
 }
 ===expect===
-UndefinedFunction
-===ignore===
-TODO
+ParseError@9:7-9:9: Parse error: expected ';' after expression

@@ -1,5 +1,7 @@
 ===description===
 Magic setter invalid assignment type
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -23,6 +25,3 @@ class A {
     }
 }
 ===expect===
-InvalidPropertyAssignmentValue
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Assert impossible inferior
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ function scope(int $a): void{
     assert($a < 4);
 }
 ===expect===
-DocblockTypeContradiction
-===ignore===
-TODO

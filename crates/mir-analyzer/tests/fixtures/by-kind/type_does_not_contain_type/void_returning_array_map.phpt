@@ -1,5 +1,7 @@
 ===description===
 Void returning array map
+===ignore===
+TODO
 ===file===
 <?php
 $arr = array_map(
@@ -13,6 +15,3 @@ foreach ($arr as $a) {
     if ($a) {}
 }
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Returns typed closure from callable
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -28,6 +30,3 @@ function bar(Closure $f, Closure $g) : Closure {
     return foo($f, $g);
 }
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Reference reuse declared in else
+===ignore===
+TODO
 ===file===
 <?php
 /** @var array<int> */
@@ -14,6 +16,3 @@ if (!isset($arr[0])) {
 $var = "foo";
 
 ===expect===
-ReferenceReusedFromConfusingScope
-===ignore===
-TODO

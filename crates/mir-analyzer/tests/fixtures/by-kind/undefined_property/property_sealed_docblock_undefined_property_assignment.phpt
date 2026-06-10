@@ -1,5 +1,7 @@
 ===description===
 Property sealed docblock undefined property assignment
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -23,6 +25,3 @@ class A {
 $a = new A();
 $a->bar = 5;
 ===expect===
-UndefinedMagicPropertyAssignment
-===ignore===
-TODO

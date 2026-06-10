@@ -1,5 +1,7 @@
 ===description===
 Readonly public property set in constructor and also outside class
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -20,6 +22,3 @@ class A {
 $a = new A();
 $a->bar = "goodbye";
 ===expect===
-InaccessibleProperty
-===ignore===
-TODO

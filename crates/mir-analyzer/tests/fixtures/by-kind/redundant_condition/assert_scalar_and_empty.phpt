@@ -1,5 +1,7 @@
 ===description===
 Assert scalar and empty
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -22,6 +24,3 @@ function foo($bar) : void {
     if ($bar) {}
 }
 ===expect===
-RedundantConditionGivenDocblockType
-===ignore===
-TODO

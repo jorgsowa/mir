@@ -1,5 +1,7 @@
 ===description===
 Invalid docblock param default
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -8,6 +10,3 @@ Invalid docblock param default
  */
 function f($p = false) {}
 ===expect===
-InvalidParamDefault
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Class alias already defined class
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -14,6 +16,3 @@ function foo(A $a, B $b) : void {
     if ($a === $b) {}
 }
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO

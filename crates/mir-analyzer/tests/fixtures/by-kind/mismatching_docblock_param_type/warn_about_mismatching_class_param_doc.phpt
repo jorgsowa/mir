@@ -1,5 +1,7 @@
 ===description===
 Warn about mismatching class param doc
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -12,6 +14,3 @@ class X {
     public function boo(A $class): void {}
 }
 ===expect===
-MismatchingDocblockParamType
-===ignore===
-TODO

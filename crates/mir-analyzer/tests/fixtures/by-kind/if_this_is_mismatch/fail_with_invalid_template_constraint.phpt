@@ -1,5 +1,7 @@
 ===description===
 Fail with invalid template constraint
+===ignore===
+TODO
 ===file===
 <?php
 /** @template T */
@@ -25,6 +27,3 @@ final class ArrayList
 $list = new ArrayList();
 $numbers = $list->compact();
 ===expect===
-IfThisIsMismatch
-===ignore===
-TODO

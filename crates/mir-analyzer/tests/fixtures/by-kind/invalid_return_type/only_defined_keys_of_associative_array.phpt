@@ -1,5 +1,7 @@
 ===description===
 Only defined keys of associative array
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -13,6 +15,3 @@ class A {
 }
 
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

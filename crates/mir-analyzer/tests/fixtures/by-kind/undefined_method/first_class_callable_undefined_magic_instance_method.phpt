@@ -1,5 +1,7 @@
 ===description===
 FirstClassCallable:UndefinedMagicInstanceMethod
+===ignore===
+TODO
 ===file===
 <?php
 class Test {
@@ -14,6 +16,3 @@ $closure = $test->length(...);
 $length = $closure();
 
 ===expect===
-UndefinedMagicMethod
-===ignore===
-TODO

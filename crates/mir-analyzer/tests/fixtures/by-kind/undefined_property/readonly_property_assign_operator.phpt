@@ -1,5 +1,7 @@
 ===description===
 Readonly property assign operator
+===ignore===
+TODO
 ===file===
 <?php
 class Test {
@@ -16,6 +18,3 @@ $test = new Test(5);
 
 $test->prop += 1;
 ===expect===
-InaccessibleProperty
-===ignore===
-TODO

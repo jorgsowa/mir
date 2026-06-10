@@ -1,5 +1,7 @@
 ===description===
 Callable class string array method other class context non static public
+===ignore===
+TODO
 ===file===
 <?php
 class Foo {
@@ -23,6 +25,3 @@ class Bar {
     }
 }
 ===expect===
-InvalidArgument
-===ignore===
-TODO

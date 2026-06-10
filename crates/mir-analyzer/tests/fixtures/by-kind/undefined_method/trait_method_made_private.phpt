@@ -24,6 +24,5 @@ class D extends C {
     }
 }
 ===expect===
-InaccessibleMethod
-===ignore===
-TODO
+UndefinedMethod@14:9-14:26: Method C::traitFoo() does not exist
+UndefinedMethod@20:9-20:26: Method D::traitFoo() does not exist

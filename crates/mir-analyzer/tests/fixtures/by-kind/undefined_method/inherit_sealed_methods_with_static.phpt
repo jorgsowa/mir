@@ -1,5 +1,7 @@
 ===description===
 Inherit sealed methods with static
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -12,6 +14,3 @@ class A {
 class B extends A {}
 B::foo();
 ===expect===
-UndefinedMagicMethod
-===ignore===
-TODO

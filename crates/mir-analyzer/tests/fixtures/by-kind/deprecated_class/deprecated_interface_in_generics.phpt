@@ -1,5 +1,7 @@
 ===description===
 Deprecated interface in generics
+===ignore===
+TODO
 ===file===
 <?php
 /** @deprecated */
@@ -9,6 +11,3 @@ interface MyInterface {}
 class MyClass extends ArrayObject {}
 
 ===expect===
-DeprecatedInterface
-===ignore===
-TODO

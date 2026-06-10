@@ -17,4 +17,3 @@ class Dog extends Animal {
     public function make(): mixed { return new Box(); }
 }
 ===expect===
-MethodSignatureMismatch@9:4: Method Dog::make() signature mismatch: return type 'Box<int>' is not a subtype of parent 'Box<string>'

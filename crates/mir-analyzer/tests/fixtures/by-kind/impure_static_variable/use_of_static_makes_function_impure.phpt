@@ -1,5 +1,7 @@
 ===description===
 Use of static makes function impure
+===ignore===
+TODO
 ===file===
 <?php
 /** @pure */
@@ -10,6 +12,3 @@ function addCumulative(int $left) : int {
     return $left;
 }
 ===expect===
-ImpureStaticVariable
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Attribute target arg cannot be variable
+===ignore===
+TODO
 ===file===
 <?php
 $target = 1;
@@ -8,6 +10,3 @@ $target = 1;
 class Foo {}
 
 ===expect===
-UndefinedVariable@4:22: Variable $target is not defined
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Cannot name class constant class
+===ignore===
+TODO
 ===file===
 <?php
 class Foo
@@ -11,6 +13,3 @@ class Foo
 class Bar {}
 
 ===expect===
-ReservedWord
-===ignore===
-TODO

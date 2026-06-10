@@ -1,5 +1,7 @@
 ===description===
 Inherit param types
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -20,6 +22,3 @@ class B extends A {
 
 (new B)->foo(new stdClass);
 ===expect===
-InvalidArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 ImpureFunctionCall
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -34,6 +36,4 @@ $c = max_by([1, 2, 3], static function(int $a): int {
 echo $c;
 
 ===expect===
-ImpureFunctionCall
-===ignore===
-TODO
+RedundantCondition@18:13-18:56: Condition is always true/false for type 'bool'

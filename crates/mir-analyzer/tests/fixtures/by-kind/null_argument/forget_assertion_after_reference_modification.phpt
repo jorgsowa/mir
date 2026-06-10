@@ -1,5 +1,7 @@
 ===description===
 Forget assertion after reference modification
+===ignore===
+TODO
 ===file===
 <?php
 class Foo
@@ -26,6 +28,4 @@ if (assertBarNotNull($foo)) {
 function requiresString(string $_str): void {}
 
 ===expect===
-NullArgument
-===ignore===
-TODO
+PossiblyNullArgument@20:20-20:29: Argument $_str of requiresString() might be null

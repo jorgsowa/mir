@@ -1,5 +1,7 @@
 ===description===
 Array filter callback validation third arg0
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -7,6 +9,3 @@ Array filter callback validation third arg0
  */
 array_filter($arg, "abs", 0);
 ===expect===
-InvalidArgument
-===ignore===
-TODO

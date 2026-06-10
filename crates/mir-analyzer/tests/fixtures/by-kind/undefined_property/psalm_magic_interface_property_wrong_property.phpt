@@ -1,5 +1,7 @@
 ===description===
 Psalm magic interface property wrong property
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -18,6 +20,3 @@ function getBar(GetterSetter $o) : string {
     return $o->bar;
 }
 ===expect===
-UndefinedMagicPropertyFetch
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Bad array property
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -14,6 +16,3 @@ class C {
 $c = new C;
 $c->bb = [new A, new B];
 ===expect===
-InvalidPropertyAssignmentValue
-===ignore===
-TODO

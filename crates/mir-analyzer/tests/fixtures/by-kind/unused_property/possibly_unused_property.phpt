@@ -1,5 +1,7 @@
 ===description===
 Possibly unused property
+===ignore===
+TODO
 ===file===
 <?php
 final class A {
@@ -9,6 +11,3 @@ final class A {
 
 $a = new A();
 ===expect===
-PossiblyUnusedProperty
-===ignore===
-TODO

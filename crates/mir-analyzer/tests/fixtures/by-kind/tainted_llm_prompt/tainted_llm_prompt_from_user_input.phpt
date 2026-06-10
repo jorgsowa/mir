@@ -1,5 +1,7 @@
 ===description===
 Tainted llm prompt from user input
+===ignore===
+TODO
 ===file===
 <?php
 class LlmAgent {
@@ -12,6 +14,3 @@ class LlmAgent {
 $agent = new LlmAgent();
 $agent->prompt((string) $_GET["question"]);
 ===expect===
-TaintedLlmPrompt
-===ignore===
-TODO

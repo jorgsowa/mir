@@ -1,5 +1,7 @@
 ===description===
 Possibly false reference
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -9,6 +11,3 @@ class A {
 $a = rand(0, 1) ? new A : false;
 $a->bar();
 ===expect===
-PossiblyFalseReference
-===ignore===
-TODO

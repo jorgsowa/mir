@@ -1,5 +1,7 @@
 ===description===
 Returns typed closure with bad param type
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -14,6 +16,3 @@ function foo(Closure $f, Closure $g) : Closure {
     };
 }
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

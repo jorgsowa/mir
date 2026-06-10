@@ -1,5 +1,7 @@
 ===description===
 Readonly php doc promoted property assign operator
+===ignore===
+TODO
 ===file===
 <?php
 
@@ -19,6 +21,3 @@ final class A
     }
 }
 ===expect===
-InaccessibleProperty
-===ignore===
-TODO

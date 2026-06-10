@@ -1,5 +1,7 @@
 ===description===
 Prevent final overriding
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -24,6 +26,4 @@ class AGrandChild extends AChild {
 
 AGrandChild::getInstance()->foo();
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO
+UndefinedMethod@22:1-22:34: Method AChild::foo() does not exist

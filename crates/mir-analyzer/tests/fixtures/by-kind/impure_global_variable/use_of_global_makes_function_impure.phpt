@@ -1,5 +1,7 @@
 ===description===
 Use of global makes function impure
+===ignore===
+TODO
 ===file===
 <?php
 /** @pure */
@@ -11,6 +13,3 @@ function addCumulative(int $left) : int {
     return $left;
 }
 ===expect===
-ImpureGlobalVariable
-===ignore===
-TODO

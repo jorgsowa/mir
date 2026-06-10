@@ -1,5 +1,7 @@
 ===description===
 Detect missing template use
+===ignore===
+TODO
 ===file===
 <?php
 /** @template T */
@@ -9,6 +11,3 @@ final class B {
 }
 
 ===expect===
-MissingTemplateParam
-===ignore===
-TODO

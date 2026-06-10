@@ -1,5 +1,7 @@
 ===description===
 Enforce parameter inheritance with capitalized inherit doc
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -21,6 +23,3 @@ class Y extends X {
 
 (new Y())->boo(new A());
 ===expect===
-ArgumentTypeCoercion
-===ignore===
-TODO

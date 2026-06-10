@@ -1,5 +1,7 @@
 ===description===
 Enum value is not
+===ignore===
+TODO
 ===file===
 <?php
 enum Suit: string {
@@ -11,6 +13,3 @@ enum Suit: string {
 
 if (Suit::Hearts->value === "a") {}
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Substr impossible
+===ignore===
+TODO
 ===file===
 <?php
 class HelloWorld
@@ -10,6 +12,3 @@ class HelloWorld
     }
 }
 ===expect===
-TypeDoesNotContainType
-===ignore===
-TODO

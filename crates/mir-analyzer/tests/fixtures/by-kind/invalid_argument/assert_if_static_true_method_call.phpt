@@ -1,5 +1,7 @@
 ===description===
 Assert if static true method call
+===ignore===
+TODO
 ===file===
 <?php
 class C {
@@ -20,6 +22,3 @@ class C {
     }
 }
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

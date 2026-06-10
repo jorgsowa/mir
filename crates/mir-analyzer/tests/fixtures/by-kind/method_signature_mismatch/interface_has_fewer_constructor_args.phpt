@@ -1,5 +1,7 @@
 ===description===
 Interface has fewer constructor args
+===ignore===
+TODO
 ===file===
 <?php
 interface Foo {
@@ -10,6 +12,3 @@ class Bar implements Foo {
     public function __construct(bool $foo) {}
 }
 ===expect===
-ConstructorSignatureMismatch
-===ignore===
-TODO

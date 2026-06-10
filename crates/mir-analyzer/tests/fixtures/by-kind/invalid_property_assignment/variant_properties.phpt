@@ -1,5 +1,7 @@
 ===description===
 Variant properties
+===ignore===
+TODO
 ===file===
 <?php
 class ParentClass
@@ -12,6 +14,3 @@ class ChildClass extends ParentClass
     protected string $mightExist = "";
 }
 ===expect===
-NonInvariantPropertyType
-===ignore===
-TODO

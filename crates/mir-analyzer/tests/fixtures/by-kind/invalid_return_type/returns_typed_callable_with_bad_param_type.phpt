@@ -1,5 +1,7 @@
 ===description===
 Returns typed callable with bad param type
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -14,6 +16,3 @@ function foo(Closure $f, Closure $g) : callable {
     };
 }
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

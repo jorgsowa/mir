@@ -1,5 +1,7 @@
 ===description===
 Assert one of strings
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -12,6 +14,3 @@ function takesString(string $s) : void {
     if ($s === "c") {}
 }
 ===expect===
-DocblockTypeContradiction
-===ignore===
-TODO

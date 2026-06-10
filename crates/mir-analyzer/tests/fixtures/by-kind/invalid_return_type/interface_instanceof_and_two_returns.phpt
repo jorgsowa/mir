@@ -1,5 +1,7 @@
 ===description===
 Interface instanceof and two returns
+===ignore===
+TODO
 ===file===
 <?php
 interface A {}
@@ -17,6 +19,3 @@ function foo(A $i): B {
 
 foo(new C);
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 No named args method
+===ignore===
+TODO
 ===file===
 <?php
 class CustomerData
@@ -23,6 +25,3 @@ function foo(array $input) : CustomerData {
     );
 }
 ===expect===
-NamedArgumentNotAllowed
-===ignore===
-TODO

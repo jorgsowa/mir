@@ -1,5 +1,7 @@
 ===description===
 Mismatching docblock return types
+===ignore===
+TODO
 ===file===
 <?php
 interface I1 {
@@ -17,6 +19,3 @@ class A implements I1, I2 {
   }
 }
 ===expect===
-ImplementedReturnTypeMismatch
-===ignore===
-TODO

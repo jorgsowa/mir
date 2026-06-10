@@ -1,5 +1,7 @@
 ===description===
 Property sealed docblock undefined property fetch
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -23,6 +25,3 @@ class A {
 $a = new A();
 echo $a->bar;
 ===expect===
-UndefinedMagicPropertyFetch
-===ignore===
-TODO

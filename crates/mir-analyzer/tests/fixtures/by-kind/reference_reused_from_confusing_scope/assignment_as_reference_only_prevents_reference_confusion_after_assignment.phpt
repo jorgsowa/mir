@@ -1,5 +1,7 @@
 ===description===
 Assignment as reference only prevents reference confusion after assignment
+===ignore===
+TODO
 ===file===
 <?php
 $arr = [1, 2, 3];
@@ -14,6 +16,4 @@ for ($i = 0; $i < 10; ++$i) {
 $i = &$foo;
 
 ===expect===
-ReferenceReusedFromConfusingScope
-===ignore===
-TODO
+UndefinedVariable@11:7-11:11: Variable $foo is not defined

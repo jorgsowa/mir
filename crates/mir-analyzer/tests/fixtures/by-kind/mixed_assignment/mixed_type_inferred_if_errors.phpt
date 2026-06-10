@@ -1,5 +1,7 @@
 ===description===
 Mixed type inferred if errors
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -13,6 +15,3 @@ function foo($a): void {
     $cloned = clone $a;
 }
 ===expect===
-MixedAssignment
-===ignore===
-TODO

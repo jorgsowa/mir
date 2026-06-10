@@ -1,5 +1,7 @@
 ===description===
 Inaccessible private method from inherited trait
+===ignore===
+TODO
 ===file===
 <?php
 trait T {
@@ -17,6 +19,3 @@ class C extends B {
     }
 }
 ===expect===
-InaccessibleMethod
-===ignore===
-TODO

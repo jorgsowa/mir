@@ -1,5 +1,7 @@
 ===description===
 Undefined callable method array without class
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -12,6 +14,3 @@ function foo(callable $c): void {}
 
 foo(["A", "::barr"]);
 ===expect===
-InvalidArgument
-===ignore===
-TODO

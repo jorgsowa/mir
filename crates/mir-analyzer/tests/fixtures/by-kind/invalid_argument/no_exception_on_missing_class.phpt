@@ -1,5 +1,7 @@
 ===description===
 No exception on missing class
+===ignore===
+TODO
 ===file===
 <?php
 /** @suppress UndefinedClass */
@@ -15,6 +17,3 @@ class A
     }
 }
 ===expect===
-MissingConstructor
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Int range not contained
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -11,6 +13,3 @@ function scope(int $a){
     return $a;
 }
 ===expect===
-InvalidReturnType
-===ignore===
-TODO

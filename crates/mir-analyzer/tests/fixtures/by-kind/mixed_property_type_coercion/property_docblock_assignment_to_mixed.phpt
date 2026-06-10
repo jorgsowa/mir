@@ -1,5 +1,7 @@
 ===description===
 Property docblock assignment to mixed
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -25,6 +27,3 @@ function foo($b) : void {
     $a->__set("foo", $b);
 }
 ===expect===
-MixedPropertyTypeCoercion
-===ignore===
-TODO

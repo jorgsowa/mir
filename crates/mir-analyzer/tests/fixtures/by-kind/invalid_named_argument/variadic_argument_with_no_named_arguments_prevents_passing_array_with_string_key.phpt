@@ -1,5 +1,7 @@
 ===description===
 Variadic argument with no named arguments prevents passing array with string key
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -14,6 +16,3 @@ function foo(int ...$values): array
 foo(...["a" => 0]);
 
 ===expect===
-NamedArgumentNotAllowed
-===ignore===
-TODO

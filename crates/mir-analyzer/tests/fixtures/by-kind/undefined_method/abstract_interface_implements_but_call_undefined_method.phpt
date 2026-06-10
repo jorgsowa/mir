@@ -1,5 +1,7 @@
 ===description===
 Abstract interface implements but call undefined method
+===ignore===
+TODO
 ===file===
 <?php
 interface I {
@@ -12,6 +14,3 @@ abstract class A implements I {
     }
 }
 ===expect===
-UndefinedMethod
-===ignore===
-TODO

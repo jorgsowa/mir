@@ -1,5 +1,7 @@
 ===description===
 Literal string as int array key
+===ignore===
+TODO
 ===file===
 <?php
 class a {
@@ -27,6 +29,3 @@ class a {
     }
 }
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

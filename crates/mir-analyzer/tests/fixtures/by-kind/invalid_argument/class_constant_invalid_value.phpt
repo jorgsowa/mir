@@ -1,5 +1,7 @@
 ===description===
 Class constant invalid value
+===ignore===
+TODO
 ===file===
 <?php
 namespace NS {
@@ -16,6 +18,3 @@ namespace OtherNS {
     class C {}
 }
 ===expect===
-InvalidArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 Possibly bad assignment
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -12,6 +14,4 @@ class A {
     }
 }
 ===expect===
-PossiblyInvalidPropertyAssignmentValue
-===ignore===
-TODO
+InvalidPropertyAssignment@8:9-8:46: Property $foo expects 'string', cannot assign '5|"hello"'

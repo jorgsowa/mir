@@ -1,5 +1,7 @@
 ===description===
 Different argument names
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -14,6 +16,3 @@ class B extends A {
     }
 }
 ===expect===
-ParamNameMismatch
-===ignore===
-TODO

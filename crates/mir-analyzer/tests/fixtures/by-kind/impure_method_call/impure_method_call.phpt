@@ -1,5 +1,7 @@
 ===description===
 Impure method call
+===ignore===
+TODO
 ===file===
 <?php
 namespace Bar;
@@ -23,6 +25,3 @@ function filterOdd(int $i, A $a) : ?int {
     return null;
 }
 ===expect===
-ImpureMethodCall
-===ignore===
-TODO

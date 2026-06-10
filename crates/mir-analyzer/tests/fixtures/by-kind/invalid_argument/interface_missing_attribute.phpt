@@ -1,5 +1,7 @@
 ===description===
 Interface missing attribute
+===ignore===
+TODO
 ===file===
 <?php
 interface I {
@@ -11,6 +13,3 @@ interface I2 extends I {
 }
 
 ===expect===
-MissingOverrideAttribute
-===ignore===
-TODO

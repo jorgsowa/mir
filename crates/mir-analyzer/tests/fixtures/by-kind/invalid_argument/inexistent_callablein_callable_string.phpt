@@ -1,5 +1,7 @@
 ===description===
 Inexistent callablein callable string
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -11,6 +13,4 @@ function c(string $c): void {
 
 c("hii");
 ===expect===
-InvalidArgument
-===ignore===
-TODO
+UndefinedFunction@9:3-9:8: Function hii() is not defined

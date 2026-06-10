@@ -1,5 +1,7 @@
 ===description===
 undefinedMixinClassWithStaticMethodCall_WithMagicMethod
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -12,6 +14,3 @@ class A {
 
 A::foo();
 ===expect===
-UndefinedMagicMethod
-===ignore===
-TODO

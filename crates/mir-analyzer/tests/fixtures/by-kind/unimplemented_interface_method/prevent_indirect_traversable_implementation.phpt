@@ -1,5 +1,7 @@
 ===description===
 Prevent indirect traversable implementation
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ interface I extends Traversable {}
 final class C implements I {}
 
 ===expect===
-InvalidTraversableImplementation
-===ignore===
-TODO

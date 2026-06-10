@@ -1,5 +1,7 @@
 ===description===
 Bad custom function
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -13,6 +15,3 @@ function myFunction( string $foo ) : bool {
 
 takesFunction("myFunction");
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

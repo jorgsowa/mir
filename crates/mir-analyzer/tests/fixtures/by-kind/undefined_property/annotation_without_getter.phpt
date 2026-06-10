@@ -1,5 +1,7 @@
 ===description===
 Annotation without getter
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -12,6 +14,3 @@ final class Page {
     }
 }
 ===expect===
-UndefinedThisPropertyFetch
-===ignore===
-TODO

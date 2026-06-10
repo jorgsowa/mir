@@ -1,5 +1,7 @@
 ===description===
 Random value from magic getter is not mutation free
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -38,6 +40,3 @@ if (assertBIsOne($a)) {
 function takesOne(int $_arg): void {}
 
 ===expect===
-ImpureFunctionCall
-===ignore===
-TODO

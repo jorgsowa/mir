@@ -1,5 +1,7 @@
 ===description===
 Check callable type string
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -9,6 +11,3 @@ function f(callable $_p): void {}
 
 f("strcmp");
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

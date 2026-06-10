@@ -1,5 +1,7 @@
 ===description===
 Coerced class
+===ignore===
+TODO
 ===file===
 <?php
 class NullableClass {
@@ -24,6 +26,4 @@ class NullableBug {
     }
 }
 ===expect===
-LessSpecificReturnStatement
-===ignore===
-TODO
+InvalidArgument@20:27-20:42: Argument $className of mock() expects 'class-string|null', got '"NullableClass"'

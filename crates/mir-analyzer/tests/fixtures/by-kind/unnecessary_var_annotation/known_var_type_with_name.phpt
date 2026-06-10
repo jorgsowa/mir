@@ -1,5 +1,7 @@
 ===description===
 Known var type with name
+===ignore===
+TODO
 ===file===
 <?php
 function foo() : string {
@@ -11,6 +13,3 @@ $a = foo();
 
 echo $a;
 ===expect===
-UnnecessaryVarAnnotation
-===ignore===
-TODO

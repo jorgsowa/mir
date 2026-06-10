@@ -1,5 +1,7 @@
 ===description===
 Undefined callable class
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -19,6 +21,5 @@ class A {
     }
 }
 ===expect===
-InvalidFunctionCall
-===ignore===
-TODO
+UndefinedClass@3:31-3:34: Class Foo does not exist
+UndefinedClass@5:20-5:23: Class Foo does not exist

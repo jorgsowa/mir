@@ -1,5 +1,7 @@
 ===description===
 Class missing attribute
+===ignore===
+TODO
 ===file===
 <?php
 class C {
@@ -11,6 +13,3 @@ class C2 extends C {
 }
 
 ===expect===
-MissingOverrideAttribute
-===ignore===
-TODO

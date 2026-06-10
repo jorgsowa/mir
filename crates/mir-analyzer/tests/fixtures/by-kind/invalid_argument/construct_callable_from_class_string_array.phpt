@@ -1,5 +1,7 @@
 ===description===
 Construct callable from class string array
+===ignore===
+TODO
 ===file===
 <?php
 interface Foo {
@@ -20,6 +22,3 @@ function foo(string $c) : void {
     takesCallableReturningString([$c, "bar"]);
 }
 ===expect===
-InvalidArgument
-===ignore===
-TODO

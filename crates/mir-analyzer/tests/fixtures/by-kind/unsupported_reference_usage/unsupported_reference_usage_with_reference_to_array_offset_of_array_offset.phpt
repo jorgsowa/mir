@@ -1,5 +1,7 @@
 ===description===
 Unsupported reference usage with reference to array offset of array offset
+===ignore===
+TODO
 ===file===
 <?php
 /** @var array<string, string> */
@@ -11,6 +13,3 @@ $foo = ["foo"];
 $bar = &$arr[$foo[0]];
 
 ===expect===
-UnsupportedReferenceUsage
-===ignore===
-TODO

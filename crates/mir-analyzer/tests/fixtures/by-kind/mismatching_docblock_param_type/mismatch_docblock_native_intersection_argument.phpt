@@ -1,5 +1,7 @@
 ===description===
 Mismatch docblock native intersection argument
+===ignore===
+TODO
 ===file===
 <?php
 interface A {
@@ -17,6 +19,3 @@ function test(A&B $in): void {
 }
 
 ===expect===
-MismatchingDocblockParamType
-===ignore===
-TODO

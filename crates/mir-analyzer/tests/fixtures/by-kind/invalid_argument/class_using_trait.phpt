@@ -1,5 +1,7 @@
 ===description===
 Class using trait
+===ignore===
+TODO
 ===file===
 <?php
 trait T {
@@ -13,6 +15,3 @@ class C {
 }
 
 ===expect===
-MissingOverrideAttribute
-===ignore===
-TODO

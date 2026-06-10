@@ -1,5 +1,7 @@
 ===description===
 Expects non null and passed possibly null
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -12,6 +14,3 @@ function foo($mixed, $mixed_or_null): void {
     new Exception($mixed_or_null);
 }
 ===expect===
-PossiblyNullArgument
-===ignore===
-TODO

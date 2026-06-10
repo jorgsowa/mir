@@ -1,5 +1,7 @@
 ===description===
 Variant docblock properties
+===ignore===
+TODO
 ===file===
 <?php
 class ParentClass
@@ -14,6 +16,3 @@ class ChildClass extends ParentClass
     protected $mightExist = "";
 }
 ===expect===
-NonInvariantDocblockPropertyType
-===ignore===
-TODO

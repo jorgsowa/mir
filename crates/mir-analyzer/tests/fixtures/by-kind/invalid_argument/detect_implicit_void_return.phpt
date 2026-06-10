@@ -1,5 +1,7 @@
 ===description===
 Detect implicit void return
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -15,6 +17,3 @@ takesClosureReturningException(
     }
 );
 ===expect===
-InvalidArgument
-===ignore===
-TODO

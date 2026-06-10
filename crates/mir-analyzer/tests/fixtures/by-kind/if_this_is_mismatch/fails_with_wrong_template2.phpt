@@ -1,5 +1,7 @@
 ===description===
 Fails with wrong template2
+===ignore===
+TODO
 ===file===
 <?php
 class Frozen {}
@@ -48,6 +50,3 @@ $g = $f->freeze();
 $g->set("asd", 20);  // Fails
 
 ===expect===
-IfThisIsMismatch
-===ignore===
-TODO

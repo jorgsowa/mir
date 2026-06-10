@@ -1,5 +1,7 @@
 ===description===
 Array filter bad args
+===ignore===
+TODO
 ===file===
 <?php
 function foo(int $i) : bool {
@@ -8,6 +10,3 @@ function foo(int $i) : bool {
 
 array_filter(["hello"], "foo");
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

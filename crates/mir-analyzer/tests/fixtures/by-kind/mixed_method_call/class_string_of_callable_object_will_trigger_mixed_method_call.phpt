@@ -1,5 +1,7 @@
 ===description===
 Class string of callable object will trigger mixed method call
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -20,6 +22,3 @@ class Foo
 takesCallableObject(Foo::class);
 
 ===expect===
-MixedMethodCall
-===ignore===
-TODO

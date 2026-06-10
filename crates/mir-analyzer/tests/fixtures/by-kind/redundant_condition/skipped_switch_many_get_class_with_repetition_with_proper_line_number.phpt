@@ -1,5 +1,7 @@
 ===description===
 SKIPPED-switchManyGetClassWithRepetitionWithProperLineNumber
+===ignore===
+TODO
 ===file===
 <?php
 class A {}
@@ -18,6 +20,3 @@ function foo(A $a) : void {
     }
 }
 ===expect===
-RedundantCondition
-===ignore===
-TODO

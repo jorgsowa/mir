@@ -1,5 +1,7 @@
 ===description===
 Call namespaced function from empty namespace
+===ignore===
+TODO
 ===file===
 <?php
 namespace A {
@@ -12,6 +14,3 @@ namespace {
     foo();
 }
 ===expect===
-UndefinedFunction
-===ignore===
-TODO

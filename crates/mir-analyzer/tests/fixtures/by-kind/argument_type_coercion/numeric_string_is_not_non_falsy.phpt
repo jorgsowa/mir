@@ -1,5 +1,7 @@
 ===description===
 Numeric string is not non falsy
+===ignore===
+TODO
 ===file===
 <?php
 /** @param non-falsy-string $arg */
@@ -17,6 +19,4 @@ function bar(): string
 foo(bar());
 
 ===expect===
-ArgumentTypeCoercion
-===ignore===
-TODO
+InvalidReturnType@11:5-11:16: Return type '"0"' is not compatible with declared 'numeric-string'

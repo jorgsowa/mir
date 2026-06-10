@@ -1,5 +1,7 @@
 ===description===
 Array filter key callback
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -7,6 +9,3 @@ Array filter key callback
  */
 array_filter($arg, "strlen", ARRAY_FILTER_USE_KEY);
 ===expect===
-InvalidScalarArgument
-===ignore===
-TODO

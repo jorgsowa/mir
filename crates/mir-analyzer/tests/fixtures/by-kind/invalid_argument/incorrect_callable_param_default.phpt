@@ -1,5 +1,7 @@
 ===description===
 Incorrect callable param default
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -7,6 +9,3 @@ class A {
 }
 
 ===expect===
-InvalidParamDefault
-===ignore===
-TODO

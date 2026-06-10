@@ -1,5 +1,7 @@
 ===description===
 Inherit multiple interfaces with conflicting docblocks
+===ignore===
+TODO
 ===file===
 <?php
 interface I1 {
@@ -16,6 +18,3 @@ class A implements I1, I2 {
     }
 }
 ===expect===
-InvalidReturnType
-===ignore===
-TODO

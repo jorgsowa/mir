@@ -1,5 +1,7 @@
 ===description===
 Possibly nullable property assignment
+===ignore===
+TODO
 ===file===
 <?php
 class Foo {
@@ -11,6 +13,3 @@ $a = rand(0, 10) ? new Foo() : null;
 
 $a->foo = "hello";
 ===expect===
-PossiblyNullPropertyAssignment
-===ignore===
-TODO

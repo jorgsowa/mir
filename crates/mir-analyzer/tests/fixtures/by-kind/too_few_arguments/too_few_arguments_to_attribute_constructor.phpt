@@ -1,5 +1,7 @@
 ===description===
 Too few arguments to attribute constructor
+===ignore===
+TODO
 ===file===
 <?php
 namespace Foo;
@@ -12,6 +14,3 @@ class Table {
 #[Table()]
 class Video {}
 ===expect===
-TooFewArguments
-===ignore===
-TODO

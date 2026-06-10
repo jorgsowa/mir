@@ -1,5 +1,7 @@
 ===description===
 Class method parameter violation
+===ignore===
+TODO
 ===file===
 <?php
 class A {
@@ -16,6 +18,3 @@ $bar = 5;
 $a = new A($bar); // $bar is constrained to an int
 $bar = null; // ReferenceConstraintViolation issue emitted
 ===expect===
-ReferenceConstraintViolation
-===ignore===
-TODO

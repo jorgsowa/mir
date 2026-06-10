@@ -1,5 +1,7 @@
 ===description===
 Overwrite ordered with unpacked named param
+===ignore===
+TODO
 ===file===
 <?php
 function test(int $param, int $param2): void {
@@ -8,6 +10,3 @@ function test(int $param, int $param2): void {
 
 test(1, ...["param" => 2]);
 ===expect===
-InvalidNamedArgument
-===ignore===
-TODO

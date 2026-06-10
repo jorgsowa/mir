@@ -1,5 +1,7 @@
 ===description===
 Valid annotation with invalid variadic call
+===ignore===
+TODO
 ===file===
 <?php
 class ParentClass {
@@ -15,6 +17,3 @@ $child = new Child();
 
 $child->setInts([1, 2, 3]);
 ===expect===
-InvalidArgument
-===ignore===
-TODO

@@ -1,5 +1,7 @@
 ===description===
 No other int allowed in value of union literal ints
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -10,6 +12,3 @@ function getValue() {
 }
 
 ===expect===
-InvalidReturnStatement
-===ignore===
-TODO

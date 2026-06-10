@@ -1,5 +1,7 @@
 ===description===
 Prevent trait property type
+===ignore===
+TODO
 ===file===
 <?php
 trait T {}
@@ -9,6 +11,3 @@ class X {
   public $hm;
 }
 ===expect===
-UndefinedDocblockClass
-===ignore===
-TODO

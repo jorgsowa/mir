@@ -1,5 +1,7 @@
 ===description===
 Unset only prevents reference confusion after call
+===ignore===
+TODO
 ===file===
 <?php
 $arr = [1, 2, 3];
@@ -14,6 +16,3 @@ for ($i = 0; $i < 10; ++$i) {
 unset($i);
 
 ===expect===
-ReferenceReusedFromConfusingScope
-===ignore===
-TODO

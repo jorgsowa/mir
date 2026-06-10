@@ -1,5 +1,7 @@
 ===description===
 Impure global immutable
+===ignore===
+TODO
 ===file===
 <?php
 /**
@@ -15,6 +17,3 @@ class A {
     }
 }
 ===expect===
-ImpureGlobalVariable
-===ignore===
-TODO

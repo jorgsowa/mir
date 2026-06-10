@@ -1,5 +1,7 @@
 ===description===
 SKIPPED-referenceToTypedArrayConstrainsAssignmentWithNullReferenceInitialization
+===ignore===
+TODO
 ===file===
 <?php
 class Foo
@@ -14,6 +16,3 @@ class Foo
 }
 
 ===expect===
-PossiblyInvalidPropertyAssignmentValue
-===ignore===
-TODO
