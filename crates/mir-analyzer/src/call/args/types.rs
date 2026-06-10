@@ -208,6 +208,8 @@ pub(crate) fn check_one(
     // When a Stringable object is implicitly coerced to string, emit ImplicitToStringCast.
     // Skip if the arg already satisfies a non-string arm of the union directly — in that
     // case no coercion occurs (e.g. Throwable arg + @param Throwable|string).
+    // Skip if the arg explicitly implements \Stringable — that interface signals the cast
+    // is intentional (e.g. Laravel's Illuminate\Support\Stringable).
     if stringable_coercion_ok(arg_ty, param_ty, ea) && !named_object_subtype(arg_ty, param_ty, ea) {
         if let Some(fqcn) = arg_ty.types.iter().find_map(|a| match a {
             Atomic::TNamedObject { fqcn, .. }
@@ -215,11 +217,16 @@ pub(crate) fn check_one(
             | Atomic::TStaticObject { fqcn } => Some(fqcn.to_string()),
             _ => None,
         }) {
-            ea.emit(
-                IssueKind::ImplicitToStringCast { class: fqcn },
-                Severity::Warning,
-                arg_span,
-            );
+            let resolved = crate::db::resolve_name(ea.db, &ea.file, &fqcn);
+            if !crate::db::extends_or_implements(ea.db, &resolved, "Stringable")
+                && !crate::db::extends_or_implements(ea.db, &fqcn, "Stringable")
+            {
+                ea.emit(
+                    IssueKind::ImplicitToStringCast { class: fqcn },
+                    Severity::Warning,
+                    arg_span,
+                );
+            }
         }
     }
 }
