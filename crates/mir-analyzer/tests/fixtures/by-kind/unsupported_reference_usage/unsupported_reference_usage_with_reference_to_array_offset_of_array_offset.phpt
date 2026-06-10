@@ -1,7 +1,5 @@
 ===description===
 Unsupported reference usage with reference to array offset of array offset
-===ignore===
-TODO
 ===file===
 <?php
 /** @var array<string, string> */

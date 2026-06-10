@@ -1,7 +1,5 @@
 ===description===
 Reference reuse deeply nested
-===ignore===
-TODO
 ===file===
 <?php
 /** @var list<list<list<int>>> */

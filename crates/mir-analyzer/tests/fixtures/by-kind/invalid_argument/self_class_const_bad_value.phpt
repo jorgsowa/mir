@@ -1,7 +1,5 @@
 ===description===
 Self class const bad value
-===ignore===
-TODO
 ===file===
 <?php
 class A {

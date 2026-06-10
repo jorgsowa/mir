@@ -1,7 +1,5 @@
 ===description===
 Deprecated interface in generics
-===ignore===
-TODO
 ===file===
 <?php
 /** @deprecated */

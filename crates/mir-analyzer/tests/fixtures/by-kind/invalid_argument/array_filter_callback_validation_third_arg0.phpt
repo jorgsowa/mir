@@ -1,7 +1,5 @@
 ===description===
 Array filter callback validation third arg0
-===ignore===
-TODO
 ===file===
 <?php
 /**

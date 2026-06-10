@@ -1,7 +1,5 @@
 ===description===
 Array filter bad args
-===ignore===
-TODO
 ===file===
 <?php
 function foo(int $i) : bool {

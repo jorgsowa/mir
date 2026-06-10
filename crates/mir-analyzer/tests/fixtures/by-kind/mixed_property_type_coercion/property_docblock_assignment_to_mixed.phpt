@@ -1,7 +1,5 @@
 ===description===
 Property docblock assignment to mixed
-===ignore===
-TODO
 ===file===
 <?php
 /**

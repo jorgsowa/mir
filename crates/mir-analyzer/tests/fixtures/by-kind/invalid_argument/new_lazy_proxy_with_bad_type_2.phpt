@@ -1,7 +1,5 @@
 ===description===
 newLazyProxyWithBadType_2
-===ignore===
-TODO
 ===file===
 <?php
 class Foo {}

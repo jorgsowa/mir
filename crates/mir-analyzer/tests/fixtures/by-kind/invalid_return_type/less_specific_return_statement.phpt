@@ -1,7 +1,5 @@
 ===description===
 Less specific return statement
-===ignore===
-TODO
 ===file===
 <?php
 class A {}

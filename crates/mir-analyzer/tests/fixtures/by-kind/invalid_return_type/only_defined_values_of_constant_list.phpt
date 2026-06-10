@@ -1,7 +1,5 @@
 ===description===
 Only defined values of constant list
-===ignore===
-TODO
 ===file===
 <?php
 class A {

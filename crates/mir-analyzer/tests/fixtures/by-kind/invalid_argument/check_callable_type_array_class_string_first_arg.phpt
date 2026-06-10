@@ -1,7 +1,5 @@
 ===description===
 Check callable type array class string first arg
-===ignore===
-TODO
 ===file===
 <?php
 /**

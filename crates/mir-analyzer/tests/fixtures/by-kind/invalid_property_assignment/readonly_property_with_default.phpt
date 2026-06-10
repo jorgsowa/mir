@@ -1,7 +1,5 @@
 ===description===
 Readonly property with default
-===ignore===
-TODO
 ===file===
 <?php
 class A {

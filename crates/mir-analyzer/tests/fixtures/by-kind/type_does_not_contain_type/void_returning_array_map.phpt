@@ -1,7 +1,5 @@
 ===description===
 Void returning array map
-===ignore===
-TODO
 ===file===
 <?php
 $arr = array_map(

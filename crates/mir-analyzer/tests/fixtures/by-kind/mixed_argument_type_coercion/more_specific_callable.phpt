@@ -1,7 +1,5 @@
 ===description===
 More specific callable
-===ignore===
-TODO
 ===file===
 <?php
 /** @param callable(string):void $c */

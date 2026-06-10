@@ -1,7 +1,5 @@
 ===description===
 Variadic argument with no named arguments prevents passing array with string key
-===ignore===
-TODO
 ===file===
 <?php
 /**

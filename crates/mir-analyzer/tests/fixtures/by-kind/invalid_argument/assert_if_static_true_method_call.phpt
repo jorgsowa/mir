@@ -1,7 +1,5 @@
 ===description===
 Assert if static true method call
-===ignore===
-TODO
 ===file===
 <?php
 class C {

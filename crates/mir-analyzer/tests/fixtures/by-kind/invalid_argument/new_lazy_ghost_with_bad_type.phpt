@@ -1,7 +1,5 @@
 ===description===
 New lazy ghost with bad type
-===ignore===
-TODO
 ===file===
 <?php
 class Foo {}

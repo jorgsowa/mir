@@ -1,7 +1,5 @@
 ===description===
 Explicit variable key
-===ignore===
-TODO
 ===file===
 <?php
 /** @param list<int> $a */

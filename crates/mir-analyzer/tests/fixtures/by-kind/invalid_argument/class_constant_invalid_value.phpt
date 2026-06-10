@@ -1,7 +1,5 @@
 ===description===
 Class constant invalid value
-===ignore===
-TODO
 ===file===
 <?php
 namespace NS {

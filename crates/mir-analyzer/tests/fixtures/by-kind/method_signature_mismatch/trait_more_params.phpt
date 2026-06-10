@@ -1,7 +1,5 @@
 ===description===
 Trait more params
-===ignore===
-TODO
 ===file===
 <?php
 class A {

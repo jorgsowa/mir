@@ -1,7 +1,5 @@
 ===description===
 Is uninitialized lazy object with bad type
-===ignore===
-TODO
 ===file===
 <?php
 class Foo {}

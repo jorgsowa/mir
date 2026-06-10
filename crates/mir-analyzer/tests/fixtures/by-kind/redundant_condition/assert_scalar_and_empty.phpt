@@ -1,7 +1,5 @@
 ===description===
 Assert scalar and empty
-===ignore===
-TODO
 ===file===
 <?php
 /**

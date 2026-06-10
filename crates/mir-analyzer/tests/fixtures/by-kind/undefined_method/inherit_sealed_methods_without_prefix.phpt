@@ -1,7 +1,5 @@
 ===description===
 Inherit sealed methods without prefix
-===ignore===
-TODO
 ===file===
 <?php
 /**

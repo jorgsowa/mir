@@ -1,7 +1,5 @@
 ===description===
 No exception on missing class
-===ignore===
-TODO
 ===file===
 <?php
 /** @suppress UndefinedClass */

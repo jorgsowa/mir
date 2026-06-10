@@ -1,7 +1,5 @@
 ===description===
 Class string of callable object will trigger mixed method call
-===ignore===
-TODO
 ===file===
 <?php
 /**

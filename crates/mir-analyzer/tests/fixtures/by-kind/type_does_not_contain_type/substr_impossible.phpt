@@ -1,7 +1,5 @@
 ===description===
 Substr impossible
-===ignore===
-TODO
 ===file===
 <?php
 class HelloWorld

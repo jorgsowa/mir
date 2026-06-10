@@ -1,7 +1,5 @@
 ===description===
 Disallow subclasses for non inherited method params
-===ignore===
-TODO
 ===file===
 <?php
 class A {}

@@ -1,7 +1,5 @@
 ===description===
 Reference reuse declared in else
-===ignore===
-TODO
 ===file===
 <?php
 /** @var array<int> */

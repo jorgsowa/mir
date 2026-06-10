@@ -1,7 +1,5 @@
 ===description===
 Duplicate param
-===ignore===
-TODO
 ===file===
 <?php
 /**

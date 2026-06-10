@@ -1,7 +1,5 @@
 ===description===
 Static invocation with magic method foo
-===ignore===
-TODO
 ===file===
 <?php
 /**

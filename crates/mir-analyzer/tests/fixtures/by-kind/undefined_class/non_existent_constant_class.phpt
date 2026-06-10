@@ -1,7 +1,5 @@
 ===description===
 Non existent constant class
-===ignore===
-TODO
 ===file===
 <?php
 /**

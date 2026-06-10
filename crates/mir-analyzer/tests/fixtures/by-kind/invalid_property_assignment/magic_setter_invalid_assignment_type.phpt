@@ -1,7 +1,5 @@
 ===description===
 Magic setter invalid assignment type
-===ignore===
-TODO
 ===file===
 <?php
 /**

@@ -1,7 +1,5 @@
 ===description===
 Magic interface property wrong property
-===ignore===
-TODO
 ===file===
 <?php
 /**

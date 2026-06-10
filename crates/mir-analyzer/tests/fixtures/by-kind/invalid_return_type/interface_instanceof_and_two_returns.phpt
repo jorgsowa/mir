@@ -1,7 +1,5 @@
 ===description===
 Interface instanceof and two returns
-===ignore===
-TODO
 ===file===
 <?php
 interface A {}

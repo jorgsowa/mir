@@ -1,7 +1,5 @@
 ===description===
 Undefined callable class
-===ignore===
-TODO
 ===file===
 <?php
 class A {

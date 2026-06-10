@@ -1,7 +1,5 @@
 ===description===
 Property sealed docblock undefined property assignment
-===ignore===
-TODO
 ===file===
 <?php
 /**

@@ -1,7 +1,5 @@
 ===description===
 Detect missing template extends
-===ignore===
-TODO
 ===file===
 <?php
 /** @template T */

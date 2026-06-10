@@ -1,7 +1,5 @@
 ===description===
 SKIPPED-referenceToTypedArrayConstrainsAssignment
-===ignore===
-TODO
 ===file===
 <?php
 class Foo

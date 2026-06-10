@@ -1,7 +1,5 @@
 ===description===
 No return
-===ignore===
-TODO
 ===file===
 <?php
 $bar = ["foo", "bar"];

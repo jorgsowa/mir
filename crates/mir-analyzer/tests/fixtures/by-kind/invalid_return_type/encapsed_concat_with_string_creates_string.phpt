@@ -1,7 +1,5 @@
 ===description===
 Encapsed concat with string creates string
-===ignore===
-TODO
 ===file===
 <?php
 /**

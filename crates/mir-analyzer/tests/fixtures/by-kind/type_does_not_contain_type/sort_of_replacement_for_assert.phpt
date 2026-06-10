@@ -1,7 +1,5 @@
 ===description===
 Sort of replacement for assert
-===ignore===
-TODO
 ===file===
 <?php
 namespace Bar;

@@ -1,7 +1,5 @@
 ===description===
 Class method parameter violation
-===ignore===
-TODO
 ===file===
 <?php
 class A {

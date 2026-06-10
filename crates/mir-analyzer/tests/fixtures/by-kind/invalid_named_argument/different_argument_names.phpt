@@ -1,7 +1,5 @@
 ===description===
 Different argument names
-===ignore===
-TODO
 ===file===
 <?php
 class A {

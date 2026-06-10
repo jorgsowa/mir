@@ -1,7 +1,5 @@
 ===description===
 Inherit sealed methods
-===ignore===
-TODO
 ===file===
 <?php
 /**

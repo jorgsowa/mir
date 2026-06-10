@@ -1,7 +1,5 @@
 ===description===
 Readonly php doc promoted property assign operator
-===ignore===
-TODO
 ===file===
 <?php
 

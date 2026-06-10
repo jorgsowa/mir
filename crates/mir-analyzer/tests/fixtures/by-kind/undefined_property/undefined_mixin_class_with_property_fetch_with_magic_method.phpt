@@ -1,7 +1,5 @@
 ===description===
 undefinedMixinClassWithPropertyFetch_WithMagicMethod
-===ignore===
-TODO
 ===file===
 <?php
 /**

@@ -1,7 +1,5 @@
 ===description===
 Expects non null and passed possibly null
-===ignore===
-TODO
 ===file===
 <?php
 /**

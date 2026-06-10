@@ -1,7 +1,5 @@
 ===description===
 One param
-===ignore===
-TODO
 ===file===
 <?php
 interface I {

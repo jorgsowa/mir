@@ -1,7 +1,5 @@
 ===description===
 Overwrite ordered with unpacked named param
-===ignore===
-TODO
 ===file===
 <?php
 function test(int $param, int $param2): void {

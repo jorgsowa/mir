@@ -1,7 +1,5 @@
 ===description===
 Impure global immutable
-===ignore===
-TODO
 ===file===
 <?php
 /**

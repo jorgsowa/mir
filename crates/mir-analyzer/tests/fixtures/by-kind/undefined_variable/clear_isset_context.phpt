@@ -1,7 +1,5 @@
 ===description===
 Clear isset context
-===ignore===
-TODO
 ===file===
 <?php
 function greet(bool $arg): ?string
