@@ -262,7 +262,69 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-            ExprKind::StaticPropertyAccess(_) => {}
+            ExprKind::StaticPropertyAccess(spa) => {
+                if let ExprKind::Identifier(id) = &spa.class.kind {
+                    let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                    let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
+                        "self" | "static" => {
+                            ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
+                        }
+                        "parent" => ctx.parent_fqcn.clone(),
+                        s => Some(std::sync::Arc::from(s)),
+                    };
+                    if let Some(fqcn) = fqcn_opt {
+                        let prop_name_opt = match &spa.member.kind {
+                            ExprKind::Variable(name) | ExprKind::Identifier(name) => {
+                                Some(name.trim_start_matches('$').to_string())
+                            }
+                            _ => None,
+                        };
+                        if let Some(prop_name) = prop_name_opt {
+                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                            if let Some((_, prop_def)) =
+                                crate::db::find_property_in_chain(self.db, here, &prop_name)
+                            {
+                                if let Some(prop_ty) = prop_def.ty.as_deref() {
+                                    if !prop_ty.is_mixed() && !ty.is_mixed() {
+                                        let class_tp_names: FxHashSet<mir_types::Name> =
+                                            crate::db::class_template_params(
+                                                self.db,
+                                                fqcn.as_ref(),
+                                            )
+                                            .map(|tps| {
+                                                tps.iter()
+                                                    .map(|tp| {
+                                                        mir_types::Name::from(tp.name.as_ref())
+                                                    })
+                                                    .collect()
+                                            })
+                                            .unwrap_or_default();
+                                        let skip = type_refs_any_template(prop_ty, &class_tp_names)
+                                            || type_refs_any_template(&ty, &class_tp_names)
+                                            || type_refs_any_template(
+                                                &ty,
+                                                &ctx.template_param_names,
+                                            );
+                                        if !skip
+                                            && !property_assign_compatible(&ty, prop_ty, self.db)
+                                        {
+                                            self.emit(
+                                                IssueKind::InvalidPropertyAssignment {
+                                                    property: prop_name.clone(),
+                                                    expected: format!("{prop_ty}"),
+                                                    actual: format!("{ty}"),
+                                                },
+                                                Severity::Warning,
+                                                span,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             ExprKind::ArrayAccess(aa) => {
                 // Collect the full index chain from outermost to innermost.
                 // For `$arr[$a][$b] = $val`, this gives [type($b), type($a)].

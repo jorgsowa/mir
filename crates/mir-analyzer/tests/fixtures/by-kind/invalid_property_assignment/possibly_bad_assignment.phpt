@@ -1,7 +1,5 @@
 ===description===
 Possibly bad assignment
-===ignore===
-TODO
 ===file===
 <?php
 class A {

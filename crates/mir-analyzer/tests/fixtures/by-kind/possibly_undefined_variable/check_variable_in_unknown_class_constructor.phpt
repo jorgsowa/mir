@@ -1,7 +1,5 @@
 ===description===
 Check variable in unknown class constructor
-===ignore===
-TODO
 ===file===
 <?php
 /** @suppress UndefinedClass */

@@ -1,7 +1,5 @@
 ===description===
 Bad array property
-===ignore===
-TODO
 ===file===
 <?php
 class A {}
