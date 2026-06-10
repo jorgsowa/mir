@@ -10,7 +10,7 @@ enum Enumm
 #[Attribute]
 final class Attr
 {
-    public function __construct(public Enumm $e) {}
+    public function __construct(Enumm $e) {}
 }
 
 final class SomeClass
