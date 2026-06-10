@@ -194,6 +194,12 @@ pub enum IssueKind {
     /// Emitted when a divisor operand could be null (potential division by zero).
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     PossiblyNullOperand { op: String, ty: String },
+    /// Emitted when `yield from` is used with a non-iterable object (no Traversable).
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
+    RawObjectIteration { ty: String },
+    /// Emitted when `yield from` might be used with a non-iterable object.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
+    PossiblyRawObjectIteration { ty: String },
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/` (planned).
     MismatchingDocblockReturnType { declared: String, inferred: String },
     /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_param_type/` (planned).
@@ -599,7 +605,10 @@ impl IssueKind {
             | IssueKind::PossiblyNullArrayAccess
             | IssueKind::PossiblyInvalidClone { .. }
             | IssueKind::PossiblyInvalidOperand { .. }
-            | IssueKind::PossiblyNullOperand { .. } => Severity::Info,
+            | IssueKind::PossiblyNullOperand { .. }
+            | IssueKind::PossiblyRawObjectIteration { .. } => Severity::Info,
+
+            IssueKind::RawObjectIteration { .. } => Severity::Warning,
 
             // Info
             IssueKind::RedundantCondition { .. }
@@ -718,6 +727,8 @@ impl IssueKind {
             IssueKind::InvalidOperand { .. } => "MIR0208",
             IssueKind::PossiblyInvalidOperand { .. } => "MIR0213",
             IssueKind::PossiblyNullOperand { .. } => "MIR0214",
+            IssueKind::RawObjectIteration { .. } => "MIR0222",
+            IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
             IssueKind::InvalidStringClass { .. } => "MIR0211",
@@ -869,6 +880,8 @@ impl IssueKind {
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
             IssueKind::PossiblyInvalidOperand { .. } => "PossiblyInvalidOperand",
             IssueKind::PossiblyNullOperand { .. } => "PossiblyNullOperand",
+            IssueKind::RawObjectIteration { .. } => "RawObjectIteration",
+            IssueKind::PossiblyRawObjectIteration { .. } => "PossiblyRawObjectIteration",
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
@@ -1093,6 +1106,12 @@ impl IssueKind {
             }
             IssueKind::PossiblyNullOperand { op, ty } => {
                 format!("Operator '{op}' operand '{ty}' might be null")
+            }
+            IssueKind::RawObjectIteration { ty } => {
+                format!("Cannot iterate over non-iterable object '{ty}'")
+            }
+            IssueKind::PossiblyRawObjectIteration { ty } => {
+                format!("Cannot iterate over possibly non-iterable object '{ty}'")
             }
             IssueKind::MismatchingDocblockReturnType { declared, inferred } => {
                 format!("Docblock return type '{declared}' does not match inferred '{inferred}'")
@@ -1627,6 +1646,8 @@ mod code_tests {
                 right: s(),
             },
             IssueKind::PossiblyNullOperand { op: s(), ty: s() },
+            IssueKind::RawObjectIteration { ty: s() },
+            IssueKind::PossiblyRawObjectIteration { ty: s() },
             IssueKind::MismatchingDocblockReturnType {
                 declared: s(),
                 inferred: s(),
@@ -1900,6 +1921,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 114);
+        assert_eq!(one_of_each().len(), 116);
     }
 }

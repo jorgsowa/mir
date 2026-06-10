@@ -12,3 +12,4 @@ if (isValidString($myString)) {
     echo "Ma chaine " . $myString;
 }
 ===expect===
+PossiblyNullOperand@9:25-9:34: Operator '.' operand '"abacus"|null' might be null

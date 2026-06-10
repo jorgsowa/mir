@@ -1,4 +1,4 @@
-use super::binary::operand_is_non_bitwise;
+use super::binary::{operand_contains_null, operand_is_non_bitwise};
 use super::helpers::extract_simple_var;
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -16,6 +16,16 @@ fn operand_is_definitely_bool(ty: &Type) -> bool {
             .types
             .iter()
             .all(|a| matches!(a, Atomic::TTrue | Atomic::TBool))
+}
+
+/// Returns true when `ty` is a non-empty literal string (PHP's string++ is deprecated/invalid).
+fn operand_is_non_empty_literal_string(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && !ty.is_mixed()
+        && ty.types.iter().all(|a| match a {
+            Atomic::TLiteralString(s) => !s.is_empty(),
+            _ => false,
+        })
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -44,6 +54,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                             right: String::new(),
                         },
                         Severity::Warning,
+                        u.operand.span,
+                    );
+                } else if operand_contains_null(&operand_ty) {
+                    self.emit(
+                        IssueKind::PossiblyNullOperand {
+                            op: "~".to_string(),
+                            ty: operand_ty.to_string(),
+                        },
+                        Severity::Info,
                         u.operand.span,
                     );
                 }
@@ -79,19 +98,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPostfixOp::PostIncrement | UnaryPostfixOp::PostDecrement => {
-                // Flag increment/decrement on a definitely-bool operand.
-                // PHP silently no-ops on bool but this is almost always a bug.
-                // Only fires when ALL union members are TTrue/TBool (never on
-                // int|bool). TFalse is reserved for the future FalseOperand kind.
-                if operand_is_definitely_bool(&operand_ty) {
-                    let op = if u.op == UnaryPostfixOp::PostIncrement {
-                        "++"
-                    } else {
-                        "--"
-                    };
+                let op_str = if u.op == UnaryPostfixOp::PostIncrement {
+                    "++"
+                } else {
+                    "--"
+                };
+                // Flag increment/decrement on a definitely-bool operand (PHP
+                // silently no-ops; TFalse reserved for future FalseOperand kind)
+                // or on a non-empty literal string (deprecated in PHP 8.3+).
+                if operand_is_definitely_bool(&operand_ty)
+                    || operand_is_non_empty_literal_string(&operand_ty)
+                {
                     self.emit(
                         IssueKind::InvalidOperand {
-                            op: op.to_string(),
+                            op: op_str.to_string(),
                             left: operand_ty.to_string(),
                             right: String::new(),
                         },

@@ -12,26 +12,25 @@ pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
     if ty.types.is_empty() || ty.is_mixed() {
         return false;
     }
-    ty.types.iter().all(|a| {
-        matches!(
-            a,
-            Atomic::TArray { .. }
-                | Atomic::TList { .. }
-                | Atomic::TNonEmptyArray { .. }
-                | Atomic::TNonEmptyList { .. }
-                | Atomic::TKeyedArray { .. }
-                | Atomic::TObject
-                | Atomic::TNamedObject { .. }
-                | Atomic::TStaticObject { .. }
-                | Atomic::TSelf { .. }
-                | Atomic::TParent { .. }
-                | Atomic::TIntersection { .. }
-                | Atomic::TClosure { .. }
-                | Atomic::TLiteralEnumCase { .. }
-                | Atomic::TBool
-                | Atomic::TTrue
-                | Atomic::TFalse
-        )
+    ty.types.iter().all(|a| match a {
+        Atomic::TLiteralString(s) => !is_numeric_string(s),
+        Atomic::TArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TObject
+        | Atomic::TNamedObject { .. }
+        | Atomic::TStaticObject { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TParent { .. }
+        | Atomic::TIntersection { .. }
+        | Atomic::TClosure { .. }
+        | Atomic::TLiteralEnumCase { .. }
+        | Atomic::TBool
+        | Atomic::TTrue
+        | Atomic::TFalse => true,
+        _ => false,
     })
 }
 
@@ -188,6 +187,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Severity::Info,
                         span,
                     );
+                } else if operand_contains_null(&left_ty) {
+                    self.emit(
+                        IssueKind::PossiblyNullOperand {
+                            op: ".".to_string(),
+                            ty: left_ty.to_string(),
+                        },
+                        Severity::Info,
+                        b.left.span,
+                    );
+                } else if operand_contains_null(&right_ty) {
+                    self.emit(
+                        IssueKind::PossiblyNullOperand {
+                            op: ".".to_string(),
+                            ty: right_ty.to_string(),
+                        },
+                        Severity::Info,
+                        b.right.span,
+                    );
                 }
                 Type::single(Atomic::TString)
             }
@@ -342,7 +359,7 @@ fn operand_has_any_non_numeric_member(ty: &Type) -> bool {
 }
 
 /// Whether `ty` contains `null` (potential division-by-zero when used as divisor).
-fn operand_contains_null(ty: &Type) -> bool {
+pub(super) fn operand_contains_null(ty: &Type) -> bool {
     ty.types.iter().any(|a| matches!(a, Atomic::TNull))
 }
 
