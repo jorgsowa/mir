@@ -2100,6 +2100,12 @@ fn seed_param_locations(
         let (line_end, col_end) =
             crate::diagnostics::offset_to_line_col(source, p.span.end, source_map);
         ctx.record_var_location(name, line, col_start, line_end, col_end);
+        // Promoted properties (`public/protected/private $param`) are implicitly
+        // assigned to `$this->prop` by PHP — mark them read so that constructors
+        // with an empty body don't trigger UnusedParam.
+        if p.visibility.is_some() {
+            ctx.read_vars.insert(Name::from(name));
+        }
     }
 }
 

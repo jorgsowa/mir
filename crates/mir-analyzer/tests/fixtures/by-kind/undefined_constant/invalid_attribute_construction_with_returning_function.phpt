@@ -23,4 +23,3 @@ final class SomeClass
 }
                 
 ===expect===
-UnusedParam@10:33-10:48: Parameter $e is never used

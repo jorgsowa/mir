@@ -93,6 +93,23 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let mut else_ctx = ctx.branch();
+        // For `if ($x = expr())`, in the false branch the assignment was evaluated
+        // and found falsy — the write is consumed by the truthiness check. Remove
+        // the pending-write entry so that using $x only in the true branch does not
+        // trigger UnusedVariable.
+        {
+            let cond = match &if_stmt.condition.kind {
+                ExprKind::Parenthesized(inner) => inner.as_ref(),
+                _ => &if_stmt.condition,
+            };
+            if let ExprKind::Assign(a) = &cond.kind {
+                if let Some(var_name) = extract_simple_var(&a.target) {
+                    else_ctx
+                        .last_write_locs
+                        .remove(&Name::from(var_name.as_str()));
+                }
+            }
+        }
         narrow_from_condition(
             &if_stmt.condition,
             &mut else_ctx,
