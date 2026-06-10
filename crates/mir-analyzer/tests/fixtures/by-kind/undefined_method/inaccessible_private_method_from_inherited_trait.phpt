@@ -1,7 +1,5 @@
 ===description===
 Inaccessible private method from inherited trait
-===ignore===
-TODO
 ===file===
 <?php
 trait T {

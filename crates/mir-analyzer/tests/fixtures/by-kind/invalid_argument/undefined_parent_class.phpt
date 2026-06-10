@@ -1,7 +1,5 @@
 ===description===
 Undefined parent class
-===ignore===
-TODO
 ===file===
 <?php
 /**

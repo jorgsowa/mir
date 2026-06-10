@@ -1,7 +1,5 @@
 ===description===
 Possibly unused param
-===ignore===
-TODO
 ===file===
 <?php
 class A {

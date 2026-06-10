@@ -1,7 +1,5 @@
 ===description===
 Inherit param types
-===ignore===
-TODO
 ===file===
 <?php
 class A {

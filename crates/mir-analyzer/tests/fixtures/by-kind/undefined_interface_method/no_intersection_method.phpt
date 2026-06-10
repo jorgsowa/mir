@@ -1,7 +1,5 @@
 ===description===
 No intersection method
-===ignore===
-TODO
 ===file===
 <?php
 interface A {}

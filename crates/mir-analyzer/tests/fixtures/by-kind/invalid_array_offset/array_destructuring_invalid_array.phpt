@@ -1,7 +1,5 @@
 ===description===
 Array destructuring invalid array
-===ignore===
-TODO
 ===file===
 <?php
 $a = 42;

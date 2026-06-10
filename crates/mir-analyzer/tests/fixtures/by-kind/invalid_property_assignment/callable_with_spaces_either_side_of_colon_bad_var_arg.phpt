@@ -1,7 +1,5 @@
 ===description===
 Callable with spaces either side of colon bad var arg
-===ignore===
-TODO
 ===file===
 <?php
 class C {

@@ -1,7 +1,5 @@
 ===description===
 Too few arguments to attribute constructor
-===ignore===
-TODO
 ===file===
 <?php
 namespace Foo;

@@ -1,7 +1,5 @@
 ===description===
 Check callable type string
-===ignore===
-TODO
 ===file===
 <?php
 /**

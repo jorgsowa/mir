@@ -1,7 +1,5 @@
 ===description===
 Public unused method
-===ignore===
-TODO
 ===file===
 <?php
 final class A {

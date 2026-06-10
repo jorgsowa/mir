@@ -1,7 +1,5 @@
 ===description===
 Variadic argument is not list
-===ignore===
-TODO
 ===file===
 <?php
 /** @return list<int> */

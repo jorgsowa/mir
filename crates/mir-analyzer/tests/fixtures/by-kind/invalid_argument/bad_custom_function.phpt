@@ -1,7 +1,5 @@
 ===description===
 Bad custom function
-===ignore===
-TODO
 ===file===
 <?php
 /**

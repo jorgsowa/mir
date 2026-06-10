@@ -1,7 +1,5 @@
 ===description===
 Automatic inherit doc
-===ignore===
-TODO
 ===file===
 <?php
 class Y {

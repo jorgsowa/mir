@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use mir_codebase::storage::{Assertion, AssertionKind, FnParam, TemplateParam};
 use mir_issues::{IssueKind, Severity};
+use mir_types::atomic::FnParam as TypeFnParam;
 use mir_types::{Atomic, Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
@@ -66,12 +67,49 @@ impl CallAnalyzer {
             ExprKind::Identifier(name) => name.as_ref().to_string(),
             _ => {
                 let callee_ty = ea.analyze(&call.name, ctx);
-                for arg in call.args.iter() {
-                    ea.analyze(&arg.value, ctx);
-                }
 
-                // Validate callable arity
-                if let Some(params) = extract_callable_params(&callee_ty, ea) {
+                // Collect arg types, spans, names and byref flags for type checking.
+                let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
+                for arg in call.args.iter() {
+                    let ty = ea.analyze(&arg.value, ctx);
+                    inner_arg_types.push(if arg.unpack {
+                        spread_element_type(&ty)
+                    } else {
+                        ty
+                    });
+                }
+                let inner_arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+                let inner_arg_names: Vec<Option<String>> = call
+                    .args
+                    .iter()
+                    .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
+                    .collect();
+                let inner_arg_byref: Vec<bool> = call
+                    .args
+                    .iter()
+                    .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+                    .collect();
+                let has_spread = call.args.iter().any(|a| a.unpack);
+
+                if let Some((callee_fn_name, params)) = typed_params_from_callee(&callee_ty, ea) {
+                    // Full type + arity checking via check_args.
+                    check_args(
+                        ea,
+                        CheckArgsParams {
+                            fn_name: &callee_fn_name,
+                            params: &params,
+                            arg_types: &inner_arg_types,
+                            arg_spans: &inner_arg_spans,
+                            arg_names: &inner_arg_names,
+                            arg_can_be_byref: &inner_arg_byref,
+                            call_span: span,
+                            has_spread,
+                            template_params: &[],
+                            no_named_arguments: false,
+                        },
+                    );
+                } else if let Some(params) = extract_callable_params(&callee_ty, ea) {
+                    // Arity-only fallback when full param types are unavailable.
                     let required_count = params
                         .iter()
                         .filter(|p| !p.is_optional && !p.is_variadic)
@@ -550,6 +588,61 @@ fn extract_docblock_case_insensitive<'a>(src: &'a str, pattern: &str) -> Option<
     } else {
         None
     }
+}
+
+/// Convert `mir_types::atomic::FnParam` (from TClosure) to `mir_codebase::storage::FnParam`
+/// so they can be passed to `check_args`.
+fn type_param_to_storage_param(p: &TypeFnParam) -> FnParam {
+    FnParam {
+        name: p.name,
+        ty: p.ty.as_ref().map(|t| Arc::new(t.to_union())),
+        has_default: p.default.is_some(),
+        is_variadic: p.is_variadic,
+        is_byref: p.is_byref,
+        is_optional: p.is_optional,
+    }
+}
+
+/// Try to extract a callable name and full typed params from a callee type union.
+/// Returns `Some((name, params))` for:
+/// - `TClosure` — name is `"{closure}"`, params from the closure's param list
+/// - `TNamedObject` with `__invoke` method — name is `"Fqcn::__invoke"`, params from DB
+///
+/// Returns `None` if the union contains a bare `TCallable { params: None }` (unknown arity),
+/// same guard as `extract_callable_params`.
+fn typed_params_from_callee(
+    union: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+) -> Option<(String, Vec<FnParam>)> {
+    // Bare callable with unknown arity — we cannot determine params statically.
+    if union
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TCallable { params: None, .. }))
+    {
+        return None;
+    }
+
+    for atomic in &union.types {
+        match atomic {
+            Atomic::TClosure { params, .. } => {
+                let storage_params = params.iter().map(type_param_to_storage_param).collect();
+                return Some(("{closure}".to_string(), storage_params));
+            }
+            Atomic::TNamedObject { fqcn, .. } => {
+                if let Some((_, storage)) = crate::db::find_method_respecting_precedence(
+                    ea.db,
+                    crate::db::Fqcn::from_str(ea.db, fqcn.as_ref()),
+                    "__invoke",
+                ) {
+                    let fn_name = format!("{}::__invoke", fqcn);
+                    return Some((fn_name, storage.params.to_vec()));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Extract docblock before a given byte position in the source.

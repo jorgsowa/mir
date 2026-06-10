@@ -1,7 +1,5 @@
 ===description===
 Returns typed closure with subclass return
-===ignore===
-TODO
 ===file===
 <?php
 class A {}

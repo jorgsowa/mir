@@ -1,7 +1,5 @@
 ===description===
 Returns typed closure from callable
-===ignore===
-TODO
 ===file===
 <?php
 class A {}

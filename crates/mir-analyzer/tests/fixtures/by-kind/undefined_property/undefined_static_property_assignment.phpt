@@ -1,7 +1,5 @@
 ===description===
 Undefined static property assignment
-===ignore===
-TODO
 ===file===
 <?php
 class A {

@@ -19,4 +19,5 @@ function foo(Closure $f, Closure $g) : Closure {
     };
 }
 ===expect===
+InvalidArgument@15:22-15:24: Argument $arg0 of {closure}() expects 'C', got 'int'
 InvalidReturnType@15:9-15:27: Return type 'A' is not compatible with declared 'int'

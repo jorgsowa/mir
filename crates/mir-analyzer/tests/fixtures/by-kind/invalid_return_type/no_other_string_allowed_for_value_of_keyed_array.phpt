@@ -1,7 +1,5 @@
 ===description===
 No other string allowed for value of keyed array
-===ignore===
-TODO
 ===file===
 <?php
 /**

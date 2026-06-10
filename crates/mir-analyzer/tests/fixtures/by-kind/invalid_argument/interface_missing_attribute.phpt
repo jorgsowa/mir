@@ -1,7 +1,5 @@
 ===description===
 Interface missing attribute
-===ignore===
-TODO
 ===file===
 <?php
 interface I {

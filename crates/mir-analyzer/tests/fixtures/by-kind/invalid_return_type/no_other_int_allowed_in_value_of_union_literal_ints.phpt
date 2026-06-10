@@ -1,7 +1,5 @@
 ===description===
 No other int allowed in value of union literal ints
-===ignore===
-TODO
 ===file===
 <?php
 /**

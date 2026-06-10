@@ -1,7 +1,5 @@
 ===description===
 Valid annotation with invalid variadic call
-===ignore===
-TODO
 ===file===
 <?php
 class ParentClass {

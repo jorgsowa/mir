@@ -1,7 +1,5 @@
 ===description===
 Detect implicit void return
-===ignore===
-TODO
 ===file===
 <?php
 /**

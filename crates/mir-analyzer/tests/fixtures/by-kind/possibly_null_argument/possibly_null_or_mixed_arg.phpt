@@ -1,7 +1,5 @@
 ===description===
 Possibly null or mixed arg
-===ignore===
-TODO
 ===file===
 <?php
 class A {

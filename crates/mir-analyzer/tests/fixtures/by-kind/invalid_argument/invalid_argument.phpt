@@ -1,7 +1,5 @@
 ===description===
 Invalid argument
-===ignore===
-TODO
 ===file===
 <?php
 #[Attribute]

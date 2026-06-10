@@ -1,7 +1,5 @@
 ===description===
 Callable instance array method out of class context static non public
-===ignore===
-TODO
 ===file===
 <?php
 /**

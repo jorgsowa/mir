@@ -1,7 +1,5 @@
 ===description===
 Callable instance array method class context php native unsupported non static non public
-===ignore===
-TODO
 ===file===
 <?php
 class Foo {

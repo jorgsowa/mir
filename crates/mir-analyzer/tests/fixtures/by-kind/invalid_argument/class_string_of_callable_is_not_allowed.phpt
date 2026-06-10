@@ -1,7 +1,5 @@
 ===description===
 Class string of callable is not allowed
-===ignore===
-TODO
 ===file===
 <?php
 /**

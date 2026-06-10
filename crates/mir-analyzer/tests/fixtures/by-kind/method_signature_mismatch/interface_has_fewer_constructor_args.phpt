@@ -1,7 +1,5 @@
 ===description===
 Interface has fewer constructor args
-===ignore===
-TODO
 ===file===
 <?php
 interface Foo {

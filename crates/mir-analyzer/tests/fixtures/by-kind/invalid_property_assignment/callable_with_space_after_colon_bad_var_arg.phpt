@@ -1,7 +1,5 @@
 ===description===
 Callable with space after colon bad var arg
-===ignore===
-TODO
 ===file===
 <?php
 class C {

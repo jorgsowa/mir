@@ -1,7 +1,5 @@
 ===description===
 Possibly unused property
-===ignore===
-TODO
 ===file===
 <?php
 final class A {
