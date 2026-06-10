@@ -536,9 +536,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let mut result = if non_diverging_catches.is_empty() {
-            let mut r = try_ctx;
-            r.diverges = false;
-            r
+            try_ctx
         } else {
             let mut r = try_ctx;
             for catch_ctx in non_diverging_catches {
@@ -550,6 +548,8 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(finally_stmts) = &tc.finally {
             let mut finally_ctx = result.clone();
             finally_ctx.inside_finally = true;
+            // finally always executes regardless of whether try/catch diverged
+            finally_ctx.diverges = false;
             self.analyze_stmts(&finally_stmts.stmts, &mut finally_ctx);
             if finally_ctx.diverges {
                 result.diverges = true;
