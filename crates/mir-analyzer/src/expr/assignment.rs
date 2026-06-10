@@ -166,7 +166,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if prop_name_opt.is_none() {
                     self.analyze(&pa.property, ctx);
                 }
-                if let Some(prop_name) = prop_name_opt {
+                if obj_ty.is_mixed() {
+                    if let Some(ref prop_name) = prop_name_opt {
+                        self.emit(
+                            IssueKind::MixedPropertyAssignment {
+                                property: prop_name.clone(),
+                            },
+                            Severity::Info,
+                            span,
+                        );
+                    }
+                } else if let Some(prop_name) = prop_name_opt {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
                             let db = self.db;

@@ -609,6 +609,10 @@ pub fn run_fixture(path: &str) {
             "MissingPropertyType",
             "MixedArgument",
             "MixedAssignment",
+            "MixedPropertyFetch",
+            "MixedPropertyAssignment",
+            "MixedArrayAccess",
+            "MixedArrayOffset",
             "ForbiddenCode",
             "Trace",
         ];

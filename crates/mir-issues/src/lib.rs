@@ -441,8 +441,18 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_method_call/`.
     MixedMethodCall { method: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/` (planned).
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/`.
     MixedPropertyFetch { property: String },
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_property_assignment/`.
+    MixedPropertyAssignment { property: String },
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_array_access/`.
+    MixedArrayAccess,
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_array_offset/`.
+    MixedArrayOffset,
     /// Emitted by `mir-analyzer/src/expr/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
     MixedClone,
@@ -621,6 +631,9 @@ impl IssueKind {
             | IssueKind::MixedAssignment { .. }
             | IssueKind::MixedMethodCall { .. }
             | IssueKind::MixedPropertyFetch { .. }
+            | IssueKind::MixedPropertyAssignment { .. }
+            | IssueKind::MixedArrayAccess
+            | IssueKind::MixedArrayOffset
             | IssueKind::MixedClone
             | IssueKind::ShadowedTemplateParam { .. }
             | IssueKind::MissingThrowsDocblock { .. }
@@ -786,6 +799,9 @@ impl IssueKind {
             IssueKind::MixedAssignment { .. } => "MIR1201",
             IssueKind::MixedMethodCall { .. } => "MIR1202",
             IssueKind::MixedPropertyFetch { .. } => "MIR1203",
+            IssueKind::MixedPropertyAssignment { .. } => "MIR1208",
+            IssueKind::MixedArrayAccess => "MIR1209",
+            IssueKind::MixedArrayOffset => "MIR1210",
             IssueKind::MixedClone => "MIR1204",
             IssueKind::InvalidClone { .. } => "MIR1205",
             IssueKind::PossiblyInvalidClone { .. } => "MIR1206",
@@ -914,6 +930,9 @@ impl IssueKind {
             IssueKind::MixedAssignment { .. } => "MixedAssignment",
             IssueKind::MixedMethodCall { .. } => "MixedMethodCall",
             IssueKind::MixedPropertyFetch { .. } => "MixedPropertyFetch",
+            IssueKind::MixedPropertyAssignment { .. } => "MixedPropertyAssignment",
+            IssueKind::MixedArrayAccess => "MixedArrayAccess",
+            IssueKind::MixedArrayOffset => "MixedArrayOffset",
             IssueKind::MixedClone => "MixedClone",
             IssueKind::InvalidClone { .. } => "InvalidClone",
             IssueKind::PossiblyInvalidClone { .. } => "PossiblyInvalidClone",
@@ -1311,6 +1330,11 @@ impl IssueKind {
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${property} fetched on mixed type")
             }
+            IssueKind::MixedPropertyAssignment { property } => {
+                format!("Property ${property} assigned on mixed type")
+            }
+            IssueKind::MixedArrayAccess => "Array access on mixed type".to_string(),
+            IssueKind::MixedArrayOffset => "Mixed type used as array offset".to_string(),
             IssueKind::MixedClone => "cannot clone mixed".to_string(),
             IssueKind::InvalidClone { ty } => format!("cannot clone non-object {ty}"),
             IssueKind::PossiblyInvalidClone { ty } => {
@@ -1766,6 +1790,9 @@ mod code_tests {
             IssueKind::MixedAssignment { var: s() },
             IssueKind::MixedMethodCall { method: s() },
             IssueKind::MixedPropertyFetch { property: s() },
+            IssueKind::MixedPropertyAssignment { property: s() },
+            IssueKind::MixedArrayAccess,
+            IssueKind::MixedArrayOffset,
             IssueKind::MixedClone,
             IssueKind::InvalidClone { ty: s() },
             IssueKind::PossiblyInvalidClone { ty: s() },
@@ -1873,6 +1900,6 @@ mod code_tests {
         // 106 = current variant count. If this assertion fires after you added
         // a new variant, also add it to `one_of_each()` so the uniqueness
         // and shape tests cover it.
-        assert_eq!(one_of_each().len(), 111);
+        assert_eq!(one_of_each().len(), 114);
     }
 }

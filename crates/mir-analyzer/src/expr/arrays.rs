@@ -138,7 +138,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     Severity::Warning,
                     idx.span,
                 );
+            } else if idx_ty.is_mixed() {
+                self.emit(IssueKind::MixedArrayOffset, Severity::Info, idx.span);
             }
+        }
+
+        if arr_ty.is_mixed() {
+            self.emit(IssueKind::MixedArrayAccess, Severity::Info, expr.span);
+            return Type::mixed();
         }
 
         // InvalidArrayAccess: definitely non-subscriptable type (not array, not string, not object)

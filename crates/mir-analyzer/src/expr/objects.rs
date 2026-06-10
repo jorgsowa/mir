@@ -357,6 +357,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
 
+        if obj_ty.is_mixed() {
+            self.emit(
+                IssueKind::MixedPropertyFetch {
+                    property: prop_name.clone(),
+                },
+                Severity::Info,
+                expr_span,
+            );
+            return Type::mixed();
+        }
+
         // InvalidPropertyFetch: all types are scalar/non-object
         if !obj_ty.is_mixed()
             && !obj_ty.types.is_empty()

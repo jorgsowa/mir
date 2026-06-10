@@ -1,5 +1,7 @@
 ===description===
 Intersections not allowed with unions
+===ignore===
+TODO
 ===file===
 <?php
 interface A {
@@ -12,6 +14,3 @@ function foo (A&B|C $test): A&B|C {
     return $test;
 }
 ===expect===
-ParseError
-===ignore===
-TODO

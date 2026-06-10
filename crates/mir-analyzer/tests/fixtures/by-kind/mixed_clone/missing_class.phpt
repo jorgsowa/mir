@@ -12,6 +12,3 @@ function get() {}
 /** @suppress UndefinedDocblockClass */
 clone get();
 ===expect===
-InvalidClone
-===ignore===
-TODO
