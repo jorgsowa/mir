@@ -1232,3 +1232,28 @@ function test(Post|Comment $subject): void {
             .collect::<Vec<_>>()
     );
 }
+
+// ---------------------------------------------------------------------------
+// symbol_at — instanceof class name resolves to ClassReference
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_instanceof_class_name_resolves_to_class_reference() {
+    // `$v instanceof Widget` — symbol_at on "Widget" must return
+    // ClassReference("Widget"), enabling hover and find-references on it.
+    let src =
+        "<?php\nclass Widget {}\nfunction check(mixed $v): bool { return $v instanceof Widget; }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("instanceof Widget").unwrap() as u32 + "instanceof ".len() as u32;
+
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find ClassReference on instanceof class name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Widget"),
+        "expected ClassReference(Widget), got {:?}",
+        sym.kind
+    );
+}
