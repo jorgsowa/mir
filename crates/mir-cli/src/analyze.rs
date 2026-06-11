@@ -318,7 +318,10 @@ fn build_session(
 }
 
 fn build_batch_opts(find_dead_code: bool) -> BatchOptions {
-    let mut opts = BatchOptions::new();
+    // The CLI only reports diagnostics; per-expression symbols (hover /
+    // go-to-definition data for LSP consumers) would be collected and never
+    // read — a Laravel-scale run retains ~600k of them.
+    let mut opts = BatchOptions::new().without_symbols();
     if !find_dead_code {
         opts.suppressed_issue_kinds
             .extend(dead_code_issue_kinds().iter().map(|s| (*s).to_string()));

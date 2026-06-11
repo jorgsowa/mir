@@ -56,6 +56,13 @@ pub struct BatchOptions {
     /// Override the session's configured PHP version for this run. `None`
     /// uses the session's version.
     pub php_version_override: Option<PhpVersion>,
+    /// Skip collecting per-expression [`crate::symbol::ResolvedSymbol`]s
+    /// into the [`AnalysisResult`]. Defaults to `false` (symbols collected)
+    /// so existing consumers — LSP servers using
+    /// [`AnalysisResult::symbol_at`] for hover/go-to-definition — are
+    /// unaffected. Diagnostics-only consumers (the CLI) opt out: a
+    /// Laravel-scale batch retains ~600k symbols nothing reads.
+    pub skip_symbols: bool,
 }
 
 impl BatchOptions {
@@ -79,6 +86,14 @@ impl BatchOptions {
 
     pub fn with_php_version(mut self, version: PhpVersion) -> Self {
         self.php_version_override = Some(version);
+        self
+    }
+
+    /// Don't collect per-expression symbols into the result (see
+    /// [`Self::skip_symbols`]). For diagnostics-only consumers;
+    /// [`AnalysisResult::symbol_at`] will find nothing on the batch result.
+    pub fn without_symbols(mut self) -> Self {
+        self.skip_symbols = true;
         self
     }
 
@@ -492,6 +507,11 @@ impl AnalysisSession {
                     if let Some(cb) = &opts.on_file_done {
                         cb();
                     }
+                    let symbols = if opts.skip_symbols {
+                        Vec::new()
+                    } else {
+                        symbols
+                    };
                     return (parsed.file.clone(), issues, symbols, pending);
                 } else {
                     driver.analyze_bodies(
@@ -505,6 +525,13 @@ impl AnalysisSession {
                 if let Some(cb) = &opts.on_file_done {
                     cb();
                 }
+                // Drop the per-file symbol vec inside the worker when the
+                // consumer opted out — the orchestrator never accumulates.
+                let symbols = if opts.skip_symbols {
+                    Vec::new()
+                } else {
+                    symbols
+                };
                 (parsed.file.clone(), issues, symbols, pending)
             })
             .collect();
@@ -533,6 +560,7 @@ impl AnalysisSession {
                 &files_with_parse_errors,
                 &mut all_issues,
                 &mut all_symbols,
+                opts.skip_symbols,
             );
         }
 
@@ -703,6 +731,7 @@ impl AnalysisSession {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn lazy_load_from_body_issues(
         &self,
         psr4: Arc<crate::composer::Psr4Map>,
@@ -711,6 +740,7 @@ impl AnalysisSession {
         files_with_parse_errors: &HashSet<Arc<str>>,
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<crate::symbol::ResolvedSymbol>,
+        skip_symbols: bool,
     ) {
         use mir_issues::IssueKind;
 
@@ -796,7 +826,9 @@ impl AnalysisSession {
             let mut reanalysis_ref_locs: Vec<RefLoc> = Vec::new();
             for (issues, symbols, ref_locs) in reanalysis {
                 all_issues.extend(issues);
-                all_symbols.extend(symbols);
+                if !skip_symbols {
+                    all_symbols.extend(symbols);
+                }
                 reanalysis_ref_locs.extend(ref_locs);
             }
             {
