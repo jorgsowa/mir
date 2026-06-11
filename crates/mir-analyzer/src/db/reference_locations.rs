@@ -2,9 +2,6 @@ use std::sync::Arc;
 
 use mir_issues::Issue;
 
-use crate::body_analysis::BodyAnalyzer;
-use crate::PhpVersion;
-
 use super::*;
 
 // `analyze_file` tracked query: the single value-returning analysis driver.
@@ -82,11 +79,17 @@ unsafe impl salsa::Update for AnalyzeOutput {
     }
 }
 
-/// Analyze one file: parse-error issues plus full body analysis.
+/// Analyze one file: parse-error issues plus full body analysis, assembled
+/// from per-scope memos (see [`super::scopes::infer_scope`]).
 ///
 /// Reads the PHP version from the [`AnalyzeFileInput`] singleton (a tracked
 /// field read), so the memo key is just `file` and version changes
 /// invalidate all memos at once.
+///
+/// The per-scope merge means this whole-file memo is cheap to recompute:
+/// when a dependency change invalidates it, only the scopes actually
+/// reached by the change re-execute — the rest return their memoized
+/// results during the merge.
 #[salsa::tracked]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
     let path = file.path(db);
@@ -112,24 +115,14 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
     let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
     let mut ref_locs: Vec<RefLoc> = Vec::new();
     if !has_hard_parse_errors {
-        use std::str::FromStr as _;
-        let php_version_str = db.analyze_config().php_version(db);
-        let php_version =
-            PhpVersion::from_str(php_version_str.as_ref()).unwrap_or(PhpVersion::LATEST);
-        let driver = BodyAnalyzer::new(db, php_version);
-        let (body_issues, _symbols) = driver.analyze_bodies(
-            &parsed.program,
-            path.clone(),
-            text.as_ref(),
-            &parsed.source_map,
-        );
-        issues.extend(body_issues);
+        let (scope_issues, scope_refs) = super::scopes::analyze_file_per_scope(db, file);
+        issues.extend(scope_issues);
 
-        // Drain reference locations that body analysis staged in this db's
-        // pending buffer. The shared reference index is intentionally NOT
-        // mutated from inside the tracked query — consumers decide when to
-        // commit the returned locations.
-        ref_locs = db.take_pending_ref_locs();
+        // The shared reference index is intentionally NOT mutated from
+        // inside the tracked query — consumers decide when to commit the
+        // returned locations. Sorted + deduped so the memo value is
+        // deterministic (required for backdating).
+        ref_locs = scope_refs;
         ref_locs.sort_unstable();
         ref_locs.dedup();
     }
