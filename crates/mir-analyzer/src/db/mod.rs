@@ -68,6 +68,17 @@ pub trait MirDatabase: salsa::Database {
     /// underlying `MirDbStorage` doesn't need to be named.
     fn take_pending_ref_locs(&self) -> Vec<RefLoc>;
 
+    /// Push a fresh reference-location staging frame. Pure per-scope
+    /// analysis entry points bracket their walk with push/pop so refs
+    /// recorded by a nested tracked query on the same db handle don't leak
+    /// into the caller's staged refs.
+    fn push_ref_loc_frame(&self);
+
+    /// Pop the top staging frame, returning the refs recorded since the
+    /// matching [`Self::push_ref_loc_frame`]. An unbalanced pop drains the
+    /// base frame instead of removing it.
+    fn pop_ref_loc_frame(&self) -> Vec<RefLoc>;
+
     /// Extract reference locations for one file in cache-storage shape.
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)>;
 

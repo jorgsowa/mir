@@ -20,15 +20,27 @@ use super::*;
 /// **not** supported because `salsa::Database: Send` (not `Sync`).
 /// Per-clone staging buffer for reference locations recorded during a parallel
 /// body analysis worker.  `record_reference_location` pushes here instead of directly
-/// into the shared `Arc<Mutex<...>>` maps, eliminating cross-thread contention.
+/// into the shared reference index, eliminating cross-thread contention.
 /// After the parallel phase the owner calls `take_pending_ref_locs` and commits
-/// the batch serially via `commit_reference_locations_batch`.
+/// the batch serially.
+///
+/// Internally a *stack of frames* (the base frame is always present): pure
+/// per-scope analysis entry points push a fresh frame on entry and pop it on
+/// exit, so refs recorded by a nested tracked query running on the same db
+/// handle land in the nested frame instead of leaking into the caller's
+/// staged refs. The flat-buffer behavior (record → base frame, take → drain
+/// base frame) is the degenerate one-frame case.
 ///
 /// The custom `Clone` impl returns a *new empty buffer* so that each `MirDbStorage`
 /// worker clone starts fresh — we do NOT propagate one clone's pending entries
 /// to another worker.
-#[derive(Default)]
-struct PendingRefLocs(Mutex<Vec<super::reference_locations::RefLoc>>);
+struct PendingRefLocs(Mutex<Vec<Vec<super::reference_locations::RefLoc>>>);
+
+impl Default for PendingRefLocs {
+    fn default() -> Self {
+        Self(Mutex::new(vec![Vec::new()]))
+    }
+}
 
 impl Clone for PendingRefLocs {
     fn clone(&self) -> Self {
@@ -368,11 +380,39 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
-        self.pending_ref_locs.0.lock().push(loc);
+        let mut frames = self.pending_ref_locs.0.lock();
+        frames
+            .last_mut()
+            .expect("PendingRefLocs base frame always present")
+            .push(loc);
     }
 
     fn take_pending_ref_locs(&self) -> Vec<RefLoc> {
-        std::mem::take(&mut *self.pending_ref_locs.0.lock())
+        let mut frames = self.pending_ref_locs.0.lock();
+        std::mem::take(
+            frames
+                .last_mut()
+                .expect("PendingRefLocs base frame always present"),
+        )
+    }
+
+    fn push_ref_loc_frame(&self) {
+        self.pending_ref_locs.0.lock().push(Vec::new());
+    }
+
+    fn pop_ref_loc_frame(&self) -> Vec<RefLoc> {
+        let mut frames = self.pending_ref_locs.0.lock();
+        if frames.len() > 1 {
+            frames.pop().expect("len checked above")
+        } else {
+            // Unbalanced pop: drain the base frame instead of removing it,
+            // preserving the invariant that the base frame always exists.
+            std::mem::take(
+                frames
+                    .last_mut()
+                    .expect("PendingRefLocs base frame always present"),
+            )
+        }
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {

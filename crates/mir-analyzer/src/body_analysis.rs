@@ -351,6 +351,26 @@ fn check_duplicate_declarations(
     }
 }
 
+/// Container-kind parameters for one method-body analysis. Captures the
+/// divergences between the class / trait / enum and plain / typed paths so
+/// the shared [`BodyAnalyzer::analyze_method_scope`] core reproduces each
+/// call site's behavior exactly:
+///
+/// - traits and enums have no parent class context (`parent_fqcn: None`);
+/// - enums never treat `__construct` specially;
+/// - missing-return and `__toString` checks run only on the untyped class
+///   path (Full mode);
+/// - docblock template params bind only on the untyped class path;
+/// - parameter default-value expressions are analyzed only on class paths.
+pub(crate) struct MethodScopeCx {
+    pub fqcn: Arc<str>,
+    pub parent_fqcn: Option<Arc<str>>,
+    pub detect_ctor: bool,
+    pub with_templates: bool,
+    pub check_returns: bool,
+    pub analyze_param_defaults: bool,
+}
+
 pub(crate) struct BodyAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
@@ -859,11 +879,10 @@ impl<'a> BodyAnalyzer<'a> {
     /// `ResolvedSymbol`s observed during the walk are intentionally dropped —
     /// symbols are re-walked on demand to keep the cache small.
     ///
-    /// **Constraint:** this method drains `db.take_pending_ref_locs()` at entry
-    /// to isolate the refs produced by this call. Don't invoke from a context
-    /// where the same db handle has already-staged pending refs you care
-    /// about — they will be discarded. The intended caller is the
-    /// `infer_function` tracked query, which holds its own db handle per call.
+    /// Ref-loc isolation: the walk is bracketed by a push/pop of a staging
+    /// frame, so only refs produced by *this* call are returned — refs
+    /// already staged on the handle (or recorded by a nested tracked query)
+    /// are unaffected.
     pub(crate) fn analyze_fn_decl_pure(
         &self,
         decl: &php_ast::owned::FunctionDecl,
@@ -875,9 +894,8 @@ impl<'a> BodyAnalyzer<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
-        // Clear any previously-staged refs on this db handle so we capture
-        // only what this function's walk produces.
-        let _ = self.db.take_pending_ref_locs();
+        // Isolate this walk's refs in a fresh staging frame; popped at exit.
+        self.db.push_ref_loc_frame();
 
         let mut issues: Vec<Issue> = Vec::new();
         let mut discarded_symbols: Vec<ResolvedSymbol> = Vec::new();
@@ -974,7 +992,7 @@ impl<'a> BodyAnalyzer<'a> {
         emit_unused_variables(&ctx, file, &mut issues);
         issues.extend(buf.into_issues());
 
-        let ref_locs = self.db.take_pending_ref_locs();
+        let ref_locs = self.db.pop_ref_loc_frame();
 
         crate::db::FunctionInferenceResult {
             issues,
@@ -984,6 +1002,196 @@ impl<'a> BodyAnalyzer<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// Property-member checks shared by the class and trait paths: type-hint
+    /// class resolution when a hint is present, `MissingPropertyType`
+    /// otherwise (Full mode).
+    #[allow(clippy::too_many_arguments)]
+    fn check_property_member(
+        &self,
+        prop: &php_ast::owned::PropertyDecl,
+        member_span: &php_ast::Span,
+        fqcn: &str,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if let Some(hint) = &prop.type_hint {
+            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+        } else if self.mode == AnalysisMode::Full {
+            let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+            let (line, col_start) =
+                crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
+            let (line_end, col_end) =
+                crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
+            all_issues.push(mir_issues::Issue::new(
+                mir_issues::IssueKind::MissingPropertyType {
+                    class: fqcn.to_string(),
+                    property: prop_name,
+                },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: col_end.max(col_start + 1),
+                },
+            ));
+        }
+    }
+
+    /// Analyze one class-like member method: hint checks, optional parameter
+    /// default-value analysis, FlowState construction, body statement
+    /// analysis, unused-param/-var emission, optional return checks, and
+    /// inference recording.
+    ///
+    /// One shared core replaces the six previously copy-pasted blocks
+    /// (class / trait / enum × plain / typed). [`MethodScopeCx`] captures the
+    /// container-kind divergences so each call site's behavior — including
+    /// issue emission *order* — is reproduced exactly.
+    #[allow(clippy::too_many_arguments)]
+    fn analyze_method_scope(
+        &self,
+        method: &php_ast::owned::MethodDecl,
+        cx: &MethodScopeCx,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+        type_envs: Option<&mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>>,
+    ) {
+        use crate::flow_state::FlowState;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        let fqcn: &str = cx.fqcn.as_ref();
+
+        for param in method.params.iter() {
+            if let Some(hint) = &param.type_hint {
+                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            }
+        }
+        if let Some(hint) = &method.return_type {
+            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+        }
+
+        if cx.analyze_param_defaults && method.params.iter().any(|p| p.default.is_some()) {
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                self.db,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+                self.php_version,
+                self.mode,
+            );
+            let mut default_ctx = FlowState::new();
+            default_ctx.self_fqcn = Some(cx.fqcn.clone());
+            default_ctx.parent_fqcn = cx.parent_fqcn.clone();
+            default_ctx.static_fqcn = Some(cx.fqcn.clone());
+            for p in method.params.iter() {
+                if let Some(default) = &p.default {
+                    let mut ea = sa.expr_analyzer(&default_ctx);
+                    let _ = ea.analyze(default, &mut default_ctx);
+                }
+            }
+            drop(sa);
+            all_issues.extend(buf.into_issues());
+        }
+
+        let Some(body) = &method.body else { return };
+        let method_name = method.name.as_deref().unwrap_or("");
+
+        let (params, return_ty, template_params, declared_throws) =
+            method_chain_signature(self.db, fqcn, method_name);
+
+        let declared_return = return_ty.clone();
+        let is_ctor = cx.detect_ctor && method_name == "__construct";
+        let templates: Option<&[mir_codebase::storage::TemplateParam]> = if cx.with_templates {
+            Some(&template_params)
+        } else {
+            None
+        };
+        let mut ctx = FlowState::for_method_with_templates(
+            &params,
+            return_ty,
+            declared_throws,
+            Some(cx.fqcn.clone()),
+            cx.parent_fqcn.clone(),
+            Some(cx.fqcn.clone()),
+            false,
+            is_ctor,
+            method.is_static,
+            templates,
+        );
+        seed_param_locations(&mut ctx, &method.params, source, source_map);
+        record_param_symbols(all_symbols, file, source, &method.params, &ctx);
+
+        let mut buf = IssueBuffer::new();
+        let mut sa = StatementsAnalyzer::new(
+            self.db,
+            file.clone(),
+            source,
+            source_map,
+            &mut buf,
+            all_symbols,
+            self.php_version,
+            self.mode,
+        );
+        ctx.is_generator = body_has_yield(&body.stmts);
+        sa.analyze_stmts(&body.stmts, &mut ctx);
+        let inferred = merge_return_types(&sa.return_types);
+        let body_diverges = ctx.diverges;
+        drop(sa);
+
+        if let Some(type_envs) = type_envs {
+            type_envs.insert(
+                crate::type_env::ScopeId::Method {
+                    class: cx.fqcn.clone(),
+                    method: Arc::from(method_name),
+                },
+                crate::type_env::TypeEnv::new(ctx.vars.clone()),
+            );
+        }
+
+        emit_unused_params(&params, &ctx, method_name, file, all_issues);
+        emit_unused_variables(&ctx, file, all_issues);
+        all_issues.extend(buf.into_issues());
+
+        if cx.check_returns && self.mode == AnalysisMode::Full && !is_ctor && !ctx.is_generator {
+            crate::diagnostics::check_missing_return(
+                declared_return.as_ref(),
+                body_diverges,
+                &body.span,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+        }
+
+        if cx.check_returns
+            && self.mode == AnalysisMode::Full
+            && method_name.eq_ignore_ascii_case("__tostring")
+        {
+            crate::diagnostics::check_to_string_return(
+                fqcn,
+                declared_return.as_ref(),
+                &inferred,
+                &body.span,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+        }
+
+        self.record_method_inference(fqcn, method_name, &inferred);
+    }
+
     fn analyze_class_decl(
         &self,
         decl: &php_ast::owned::ClassDecl,
@@ -996,9 +1204,6 @@ impl<'a> BodyAnalyzer<'a> {
         crate::attributes::check_class_attributes(
             decl, self.db, file, source, source_map, all_issues,
         );
-        use crate::flow_state::FlowState;
-        use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
 
         let class_name_owned = decl
             .name
@@ -1045,148 +1250,40 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: parent_fqcn.clone(),
+            detect_ctor: true,
+            with_templates: true,
+            check_returns: true,
+            analyze_param_defaults: true,
+        };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
-                if let Some(hint) = &prop.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                } else if self.mode == AnalysisMode::Full {
-                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
-                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
-                        source,
-                        member.span.start,
-                        source_map,
-                    );
-                    let (line_end, col_end) =
-                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
-                    all_issues.push(mir_issues::Issue::new(
-                        mir_issues::IssueKind::MissingPropertyType {
-                            class: fqcn.to_string(),
-                            property: prop_name,
-                        },
-                        mir_issues::Location {
-                            file: file.clone(),
-                            line,
-                            line_end,
-                            col_start,
-                            col_end: col_end.max(col_start + 1),
-                        },
-                    ));
-                }
+                self.check_property_member(
+                    prop,
+                    &member.span,
+                    fqcn,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-
-            for param in method.params.iter() {
-                if let Some(hint) = &param.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                }
-            }
-            if let Some(hint) = &method.return_type {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
-            }
-
-            if method.params.iter().any(|p| p.default.is_some()) {
-                let mut buf = IssueBuffer::new();
-                let mut sa = StatementsAnalyzer::new(
-                    self.db,
-                    file.clone(),
-                    source,
-                    source_map,
-                    &mut buf,
-                    all_symbols,
-                    self.php_version,
-                    self.mode,
-                );
-                let mut default_ctx = FlowState::new();
-                default_ctx.self_fqcn = Some(Arc::from(fqcn));
-                default_ctx.parent_fqcn = parent_fqcn.clone();
-                default_ctx.static_fqcn = Some(Arc::from(fqcn));
-                for p in method.params.iter() {
-                    if let Some(default) = &p.default {
-                        let mut ea = sa.expr_analyzer(&default_ctx);
-                        let _ = ea.analyze(default, &mut default_ctx);
-                    }
-                }
-                drop(sa);
-                all_issues.extend(buf.into_issues());
-            }
-
-            let Some(body) = &method.body else { continue };
-            let method_name = method.name.as_deref().unwrap_or("");
-
-            let (params, return_ty, template_params, declared_throws) =
-                method_chain_signature(self.db, fqcn, method_name);
-
-            let declared_return = return_ty.clone();
-            let is_ctor = method_name == "__construct";
-            let mut ctx = FlowState::for_method_with_templates(
-                &params,
-                return_ty,
-                declared_throws,
-                Some(Arc::from(fqcn)),
-                parent_fqcn.clone(),
-                Some(Arc::from(fqcn)),
-                false,
-                is_ctor,
-                method.is_static,
-                Some(&template_params),
-            );
-            seed_param_locations(&mut ctx, &method.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
-
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
+            self.analyze_method_scope(
+                method,
+                &scope_cx,
+                file,
                 source,
                 source_map,
-                &mut buf,
+                all_issues,
                 all_symbols,
-                self.php_version,
-                self.mode,
+                None,
             );
-            ctx.is_generator = body_has_yield(&body.stmts);
-            sa.analyze_stmts(&body.stmts, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
-            let body_diverges = ctx.diverges;
-            drop(sa);
-
-            emit_unused_params(&params, &ctx, method_name, file, all_issues);
-            emit_unused_variables(&ctx, file, all_issues);
-            all_issues.extend(buf.into_issues());
-
-            if self.mode == AnalysisMode::Full && !is_ctor && !ctx.is_generator {
-                crate::diagnostics::check_missing_return(
-                    declared_return.as_ref(),
-                    body_diverges,
-                    &body.span,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                );
-            }
-
-            if self.mode == AnalysisMode::Full && method_name.eq_ignore_ascii_case("__tostring") {
-                crate::diagnostics::check_to_string_return(
-                    fqcn,
-                    declared_return.as_ref(),
-                    &inferred,
-                    &body.span,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                );
-            }
-
-            self.record_method_inference(fqcn, method_name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -1310,10 +1407,6 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::flow_state::FlowState;
-        use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         let class_name_owned = decl
             .name
             .as_ref()
@@ -1350,128 +1443,40 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: parent_fqcn.clone(),
+            detect_ctor: true,
+            with_templates: false,
+            check_returns: false,
+            analyze_param_defaults: true,
+        };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
-                if let Some(hint) = &prop.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                } else if self.mode == AnalysisMode::Full {
-                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
-                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
-                        source,
-                        member.span.start,
-                        source_map,
-                    );
-                    let (line_end, col_end) =
-                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
-                    all_issues.push(mir_issues::Issue::new(
-                        mir_issues::IssueKind::MissingPropertyType {
-                            class: fqcn.to_string(),
-                            property: prop_name,
-                        },
-                        mir_issues::Location {
-                            file: file.clone(),
-                            line,
-                            line_end,
-                            col_start,
-                            col_end: col_end.max(col_start + 1),
-                        },
-                    ));
-                }
+                self.check_property_member(
+                    prop,
+                    &member.span,
+                    fqcn,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-
-            for param in method.params.iter() {
-                if let Some(hint) = &param.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                }
-            }
-            if let Some(hint) = &method.return_type {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
-            }
-
-            if method.params.iter().any(|p| p.default.is_some()) {
-                let mut buf = IssueBuffer::new();
-                let mut sa = StatementsAnalyzer::new(
-                    self.db,
-                    file.clone(),
-                    source,
-                    source_map,
-                    &mut buf,
-                    all_symbols,
-                    self.php_version,
-                    self.mode,
-                );
-                let mut default_ctx = FlowState::new();
-                default_ctx.self_fqcn = Some(Arc::from(fqcn));
-                default_ctx.parent_fqcn = parent_fqcn.clone();
-                default_ctx.static_fqcn = Some(Arc::from(fqcn));
-                for p in method.params.iter() {
-                    if let Some(default) = &p.default {
-                        let mut ea = sa.expr_analyzer(&default_ctx);
-                        let _ = ea.analyze(default, &mut default_ctx);
-                    }
-                }
-                drop(sa);
-                all_issues.extend(buf.into_issues());
-            }
-
-            let Some(body) = &method.body else { continue };
-            let method_name = method.name.as_deref().unwrap_or("");
-
-            let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, method_name);
-
-            let is_ctor = method_name == "__construct";
-            let mut ctx = FlowState::for_method(
-                &params,
-                return_ty,
-                declared_throws,
-                Some(Arc::from(fqcn)),
-                parent_fqcn.clone(),
-                Some(Arc::from(fqcn)),
-                false,
-                is_ctor,
-                method.is_static,
-            );
-            seed_param_locations(&mut ctx, &method.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
-
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
+            self.analyze_method_scope(
+                method,
+                &scope_cx,
+                file,
                 source,
                 source_map,
-                &mut buf,
+                all_issues,
                 all_symbols,
-                self.php_version,
-                self.mode,
+                Some(&mut *type_envs),
             );
-            ctx.is_generator = body_has_yield(&body.stmts);
-            sa.analyze_stmts(&body.stmts, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
-            drop(sa);
-
-            type_envs.insert(
-                crate::type_env::ScopeId::Method {
-                    class: Arc::from(fqcn),
-                    method: Arc::from(method_name),
-                },
-                crate::type_env::TypeEnv::new(ctx.vars.clone()),
-            );
-
-            emit_unused_params(&params, &ctx, method_name, file, all_issues);
-            emit_unused_variables(&ctx, file, all_issues);
-            all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method_name, &inferred);
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
@@ -1604,101 +1609,43 @@ impl<'a> BodyAnalyzer<'a> {
             decl, self.db, file, source, source_map, all_issues,
         );
 
-        use crate::flow_state::FlowState;
-        use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: None,
+            detect_ctor: true,
+            with_templates: false,
+            check_returns: false,
+            analyze_param_defaults: false,
+        };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
-                if let Some(hint) = &prop.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                } else if self.mode == AnalysisMode::Full {
-                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
-                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
-                        source,
-                        member.span.start,
-                        source_map,
-                    );
-                    let (line_end, col_end) =
-                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
-                    all_issues.push(mir_issues::Issue::new(
-                        mir_issues::IssueKind::MissingPropertyType {
-                            class: fqcn.to_string(),
-                            property: prop_name,
-                        },
-                        mir_issues::Location {
-                            file: file.clone(),
-                            line,
-                            line_end,
-                            col_start,
-                            col_end: col_end.max(col_start + 1),
-                        },
-                    ));
-                }
+                self.check_property_member(
+                    prop,
+                    &member.span,
+                    fqcn,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-
-            for param in method.params.iter() {
-                if let Some(hint) = &param.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                }
-            }
-            if let Some(hint) = &method.return_type {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
-            }
-
-            let Some(body) = &method.body else { continue };
-            let method_name = method.name.as_deref().unwrap_or("");
-
-            let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, method_name);
-
-            let is_ctor = method_name == "__construct";
-            let mut ctx = FlowState::for_method(
-                &params,
-                return_ty,
-                declared_throws,
-                Some(Arc::from(fqcn)),
-                None,
-                Some(Arc::from(fqcn)),
-                false,
-                is_ctor,
-                method.is_static,
-            );
-            seed_param_locations(&mut ctx, &method.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
-
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
+            self.analyze_method_scope(
+                method,
+                &scope_cx,
+                file,
                 source,
                 source_map,
-                &mut buf,
+                all_issues,
                 all_symbols,
-                self.php_version,
-                self.mode,
+                None,
             );
-            ctx.is_generator = body_has_yield(&body.stmts);
-            sa.analyze_stmts(&body.stmts, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
-            drop(sa);
-
-            emit_unused_params(&params, &ctx, method_name, file, all_issues);
-            emit_unused_variables(&ctx, file, all_issues);
-            all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method_name, &inferred);
         }
     }
 
@@ -1713,109 +1660,43 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::flow_state::FlowState;
-        use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
 
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: None,
+            detect_ctor: true,
+            with_templates: false,
+            check_returns: false,
+            analyze_param_defaults: false,
+        };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
-                if let Some(hint) = &prop.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                } else if self.mode == AnalysisMode::Full {
-                    let prop_name = prop.name.as_deref().unwrap_or("").to_string();
-                    let (line, col_start) = crate::diagnostics::offset_to_line_col(
-                        source,
-                        member.span.start,
-                        source_map,
-                    );
-                    let (line_end, col_end) =
-                        crate::diagnostics::offset_to_line_col(source, member.span.end, source_map);
-                    all_issues.push(mir_issues::Issue::new(
-                        mir_issues::IssueKind::MissingPropertyType {
-                            class: fqcn.to_string(),
-                            property: prop_name,
-                        },
-                        mir_issues::Location {
-                            file: file.clone(),
-                            line,
-                            line_end,
-                            col_start,
-                            col_end: col_end.max(col_start + 1),
-                        },
-                    ));
-                }
+                self.check_property_member(
+                    prop,
+                    &member.span,
+                    fqcn,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                );
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-
-            for param in method.params.iter() {
-                if let Some(hint) = &param.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                }
-            }
-            if let Some(hint) = &method.return_type {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
-            }
-
-            let Some(body) = &method.body else { continue };
-            let method_name = method.name.as_deref().unwrap_or("");
-
-            let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, method_name);
-
-            let is_ctor = method_name == "__construct";
-            let mut ctx = FlowState::for_method(
-                &params,
-                return_ty,
-                declared_throws,
-                Some(Arc::from(fqcn)),
-                None,
-                Some(Arc::from(fqcn)),
-                false,
-                is_ctor,
-                method.is_static,
-            );
-            seed_param_locations(&mut ctx, &method.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
-
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
+            self.analyze_method_scope(
+                method,
+                &scope_cx,
+                file,
                 source,
                 source_map,
-                &mut buf,
+                all_issues,
                 all_symbols,
-                self.php_version,
-                self.mode,
+                Some(&mut *type_envs),
             );
-            ctx.is_generator = body_has_yield(&body.stmts);
-            sa.analyze_stmts(&body.stmts, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
-            drop(sa);
-
-            type_envs.insert(
-                crate::type_env::ScopeId::Method {
-                    class: Arc::from(fqcn),
-                    method: Arc::from(method_name),
-                },
-                crate::type_env::TypeEnv::new(ctx.vars.clone()),
-            );
-
-            emit_unused_params(&params, &ctx, method_name, file, all_issues);
-            emit_unused_variables(&ctx, file, all_issues);
-            all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method_name, &inferred);
         }
     }
 
@@ -1828,9 +1709,6 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::flow_state::FlowState;
-        use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
         use php_ast::owned::EnumMemberKind;
 
         for iface in decl.implements.iter() {
@@ -1849,64 +1727,28 @@ impl<'a> BodyAnalyzer<'a> {
         let resolved = resolve_name(self.db, file.as_ref(), enum_name);
         let fqcn: &str = &resolved;
 
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: None,
+            detect_ctor: false,
+            with_templates: false,
+            check_returns: false,
+            analyze_param_defaults: false,
+        };
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-            for param in method.params.iter() {
-                if let Some(hint) = &param.type_hint {
-                    self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
-                    );
-                }
-            }
-            if let Some(hint) = &method.return_type {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
-            }
-
-            let Some(body) = &method.body else {
-                continue;
-            };
-            let method_name = method.name.as_deref().unwrap_or("");
-
-            let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, method_name);
-
-            let mut ctx = FlowState::for_method(
-                &params,
-                return_ty,
-                declared_throws,
-                Some(Arc::from(fqcn)),
-                None,
-                Some(Arc::from(fqcn)),
-                false,
-                false,
-                method.is_static,
-            );
-            seed_param_locations(&mut ctx, &method.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
-
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
+            self.analyze_method_scope(
+                method,
+                &scope_cx,
+                file,
                 source,
                 source_map,
-                &mut buf,
+                all_issues,
                 all_symbols,
-                self.php_version,
-                self.mode,
+                None,
             );
-            ctx.is_generator = body_has_yield(&body.stmts);
-            sa.analyze_stmts(&body.stmts, &mut ctx);
-            let inferred = merge_return_types(&sa.return_types);
-            drop(sa);
-
-            emit_unused_params(&params, &ctx, method_name, file, all_issues);
-            emit_unused_variables(&ctx, file, all_issues);
-            all_issues.extend(buf.into_issues());
-
-            self.record_method_inference(fqcn, method_name, &inferred);
         }
     }
 
@@ -1921,68 +1763,50 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use crate::flow_state::FlowState;
-        use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
         use php_ast::owned::EnumMemberKind;
 
-        // Run the full enum body analysis (same as the untyped path).
-        self.analyze_enum_decl(decl, file, source, source_map, all_issues, all_symbols);
+        // Single pass: same analysis as the untyped path, additionally
+        // recording type environments for LSP hover/go-to-def. (Previously
+        // this ran the full body analysis twice and discarded the second
+        // run's issues — the shared core makes one run produce both.)
+        for iface in decl.implements.iter() {
+            check_name_class(
+                iface,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.php_version,
+            );
+        }
 
-        // Additionally record type environments for LSP hover/go-to-def.
         let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
         let resolved = resolve_name(self.db, file.as_ref(), enum_name);
         let fqcn: &str = &resolved;
 
+        let scope_cx = MethodScopeCx {
+            fqcn: Arc::from(fqcn),
+            parent_fqcn: None,
+            detect_ctor: false,
+            with_templates: false,
+            check_returns: false,
+            analyze_param_defaults: false,
+        };
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 continue;
             };
-            let Some(body) = &method.body else {
-                continue;
-            };
-            let method_name = method.name.as_deref().unwrap_or("");
-            let (params, return_ty, _, declared_throws) =
-                method_chain_signature(self.db, fqcn, method_name);
-
-            let mut ctx = FlowState::for_method(
-                &params,
-                return_ty,
-                declared_throws,
-                Some(Arc::from(fqcn)),
-                None,
-                Some(Arc::from(fqcn)),
-                false,
-                false,
-                method.is_static,
-            );
-            seed_param_locations(&mut ctx, &method.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &method.params, &ctx);
-
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
+            self.analyze_method_scope(
+                method,
+                &scope_cx,
+                file,
                 source,
                 source_map,
-                &mut buf,
+                all_issues,
                 all_symbols,
-                self.php_version,
-                self.mode,
+                Some(&mut *type_envs),
             );
-            ctx.is_generator = body_has_yield(&body.stmts);
-            sa.analyze_stmts(&body.stmts, &mut ctx);
-            drop(sa);
-
-            type_envs.insert(
-                crate::type_env::ScopeId::Method {
-                    class: Arc::from(fqcn),
-                    method: Arc::from(method_name),
-                },
-                crate::type_env::TypeEnv::new(ctx.vars.clone()),
-            );
-
-            drop(buf);
         }
     }
 
