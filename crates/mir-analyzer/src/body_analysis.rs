@@ -297,7 +297,7 @@ fn collect_decl_spans(
 /// Classes, interfaces, traits, and enums share one PHP symbol namespace
 /// (a `class Foo` and an `interface Foo` in the same file is a fatal error).
 /// Functions occupy their own namespace and are checked independently.
-fn check_duplicate_declarations(
+pub(crate) fn check_duplicate_declarations(
     stmts: &[php_ast::owned::Stmt],
     file: &Arc<str>,
     source: &str,
@@ -469,8 +469,6 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
     ) -> (Vec<Issue>, Vec<ResolvedSymbol>) {
-        use php_ast::owned::StmtKind;
-
         let mut all_issues = Vec::new();
         let mut all_symbols = Vec::new();
 
@@ -496,45 +494,69 @@ impl<'a> BodyAnalyzer<'a> {
         // Analyze top-level executable statements in global scope. The
         // inference-only sweep only primes function/method return types; top-
         // level diagnostics and references are produced by the main sweep.
-        if self.mode == AnalysisMode::Full {
-            use crate::flow_state::FlowState;
-            use crate::stmt::StatementsAnalyzer;
-            use mir_issues::IssueBuffer;
-
-            let mut ctx = FlowState::new();
-            let mut buf = IssueBuffer::new();
-            let mut sa = StatementsAnalyzer::new(
-                self.db,
-                file.clone(),
-                source,
-                source_map,
-                &mut buf,
-                &mut all_symbols,
-                self.php_version,
-                self.mode,
-            );
-            for stmt in program.stmts.iter() {
-                match &stmt.kind {
-                    StmtKind::Function(_)
-                    | StmtKind::Class(_)
-                    | StmtKind::Enum(_)
-                    | StmtKind::Interface(_)
-                    | StmtKind::Trait(_)
-                    | StmtKind::Namespace(_)
-                    | StmtKind::Use(_) => {}
-                    // Process Declare so that `declare(strict_types=1)` updates
-                    // ctx.strict_types before later executable stmts are analyzed.
-                    _ => {
-                        sa.analyze_stmt(stmt, &mut ctx);
-                    }
-                }
-            }
-            drop(sa);
-            crate::diagnostics::emit_unused_variables(&ctx, &file, &mut all_issues);
-            all_issues.extend(buf.into_issues());
-        }
+        self.analyze_global_exec(
+            program,
+            &file,
+            source,
+            source_map,
+            &mut all_issues,
+            &mut all_symbols,
+        );
 
         (all_issues, all_symbols)
+    }
+
+    /// Analyze top-level executable statements in global scope (Full mode
+    /// only). Extracted from [`Self::analyze_bodies`] so the per-scope
+    /// tracked query can run it as its own scope.
+    pub(crate) fn analyze_global_exec(
+        &self,
+        program: &php_ast::owned::Program,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use php_ast::owned::StmtKind;
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        use crate::flow_state::FlowState;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        let mut ctx = FlowState::new();
+        let mut buf = IssueBuffer::new();
+        let mut sa = StatementsAnalyzer::new(
+            self.db,
+            file.clone(),
+            source,
+            source_map,
+            &mut buf,
+            all_symbols,
+            self.php_version,
+            self.mode,
+        );
+        for stmt in program.stmts.iter() {
+            match &stmt.kind {
+                StmtKind::Function(_)
+                | StmtKind::Class(_)
+                | StmtKind::Enum(_)
+                | StmtKind::Interface(_)
+                | StmtKind::Trait(_)
+                | StmtKind::Namespace(_)
+                | StmtKind::Use(_) => {}
+                // Process Declare so that `declare(strict_types=1)` updates
+                // ctx.strict_types before later executable stmts are analyzed.
+                _ => {
+                    sa.analyze_stmt(stmt, &mut ctx);
+                }
+            }
+        }
+        drop(sa);
+        crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
+        all_issues.extend(buf.into_issues());
     }
 
     /// Like `analyze_bodies` but also populates `type_envs` with per-scope type environments.
@@ -743,7 +765,7 @@ impl<'a> BodyAnalyzer<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_fn_decl(
+    pub(crate) fn analyze_fn_decl(
         &self,
         decl: &php_ast::owned::FunctionDecl,
         file: &Arc<str>,
@@ -1192,7 +1214,7 @@ impl<'a> BodyAnalyzer<'a> {
         self.record_method_inference(fqcn, method_name, &inferred);
     }
 
-    fn analyze_class_decl(
+    pub(crate) fn analyze_class_decl(
         &self,
         decl: &php_ast::owned::ClassDecl,
         file: &Arc<str>,
@@ -1596,7 +1618,7 @@ impl<'a> BodyAnalyzer<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn analyze_trait_decl(
+    pub(crate) fn analyze_trait_decl(
         &self,
         decl: &php_ast::owned::TraitDecl,
         file: &Arc<str>,
@@ -1700,7 +1722,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
-    fn analyze_enum_decl(
+    pub(crate) fn analyze_enum_decl(
         &self,
         decl: &php_ast::owned::EnumDecl,
         file: &Arc<str>,
@@ -1810,7 +1832,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
-    fn analyze_interface_decl(
+    pub(crate) fn analyze_interface_decl(
         &self,
         decl: &php_ast::owned::InterfaceDecl,
         file: &Arc<str>,
@@ -1991,7 +2013,7 @@ fn record_param_symbols(
     }
 }
 
-fn check_use_decl_casing(
+pub(crate) fn check_use_decl_casing(
     use_decl: &php_ast::owned::UseDecl,
     db: &dyn crate::db::MirDatabase,
     file: &std::sync::Arc<str>,

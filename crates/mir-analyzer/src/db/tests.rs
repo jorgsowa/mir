@@ -166,6 +166,29 @@ mod tests {
     }
 
     #[test]
+    fn infer_scope_memoized_and_enumerates_decls() {
+        let db = MirDbStorage::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/scopes.php"),
+            Arc::from(
+                "<?php function foo(): string { return \"x\"; }\nclass Bar { public function m(): int { return 1; } }",
+            ),
+        );
+        let scopes = file_scopes(&db, file);
+        assert_eq!(scopes.len(), 2, "expected fn + class scopes: {scopes:?}");
+        assert!(matches!(&scopes[0], ScopeKey::Function(f, 0) if f.as_ref() == "foo"));
+        assert!(matches!(&scopes[1], ScopeKey::ClassLike(c, 0) if c.as_ref() == "Bar"));
+
+        let r1 = infer_scope(&db, file, scopes[0].clone());
+        let r2 = infer_scope(&db, file, scopes[0].clone());
+        assert!(
+            Arc::ptr_eq(&r1, &r2),
+            "unchanged file + scope must reuse the memoized Arc<ScopeInferenceResult>"
+        );
+    }
+
+    #[test]
     fn infer_function_returns_some_for_existing_free_fn() {
         let db = MirDbStorage::default();
         let file = SourceFile::new(
