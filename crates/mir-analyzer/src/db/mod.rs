@@ -68,9 +68,6 @@ pub trait MirDatabase: salsa::Database {
     /// underlying `MirDbStorage` doesn't need to be named.
     fn take_pending_ref_locs(&self) -> Vec<RefLoc>;
 
-    /// Replay reference locations for one file from cache.
-    fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]);
-
     /// Extract reference locations for one file in cache-storage shape.
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)>;
 

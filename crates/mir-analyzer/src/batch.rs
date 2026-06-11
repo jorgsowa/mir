@@ -448,64 +448,80 @@ impl AnalysisSession {
         db_main.freeze_workspace_index();
 
         // ---- Body analysis: function/method bodies in parallel --------------
-        let body_results: Vec<(Vec<Issue>, Vec<crate::symbol::ResolvedSymbol>, Vec<RefLoc>)> =
-            parsed_files
-                .par_iter()
-                .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
-                .map_with(db_main, |db, parsed| {
-                    let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
-                    let (issues, symbols) = if let Some(cache) = &self.cache {
-                        let h = hash_content(parsed.source());
-                        if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
-                            db.replay_reference_locations(parsed.file.clone(), &ref_locs);
-                            (cached_issues, Vec::new())
-                        } else {
-                            let (issues, symbols) = driver.analyze_bodies(
-                                parsed.owned(),
-                                parsed.file.clone(),
-                                parsed.source(),
-                                parsed.source_map(),
-                            );
-                            let pending = db.take_pending_ref_locs();
-                            let cache_locs = pending
-                                .iter()
-                                .map(|r| (r.symbol_key.to_string(), r.line, r.col_start, r.col_end))
-                                .collect();
-                            cache.put(&parsed.file, h, issues.clone(), cache_locs);
-                            if let Some(cb) = &opts.on_file_done {
-                                cb();
-                            }
-                            return (issues, symbols, pending);
-                        }
-                    } else {
-                        driver.analyze_bodies(
-                            parsed.owned(),
-                            parsed.file.clone(),
-                            parsed.source(),
-                            parsed.source_map(),
-                        )
-                    };
+        type BodyResult = (
+            Arc<str>,
+            Vec<Issue>,
+            Vec<crate::symbol::ResolvedSymbol>,
+            Vec<RefLoc>,
+        );
+        let body_results: Vec<BodyResult> = parsed_files
+            .par_iter()
+            .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
+            .map_with(db_main, |db, parsed| {
+                let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
+                let (issues, symbols) = if let Some(cache) = &self.cache {
+                    let h = hash_content(parsed.source());
+                    if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
+                        // Cache replay: rebuild the file's complete reference
+                        // set straight from the cached tuples — no pending-
+                        // buffer detour.
+                        let locs: Vec<RefLoc> = ref_locs
+                            .iter()
+                            .map(|(symbol, line, col_start, col_end)| RefLoc {
+                                symbol_key: Arc::from(symbol.as_str()),
+                                file: parsed.file.clone(),
+                                line: *line,
+                                col_start: *col_start,
+                                col_end: *col_end,
+                            })
+                            .collect();
+                        return (parsed.file.clone(), cached_issues, Vec::new(), locs);
+                    }
+                    let (issues, symbols) = driver.analyze_bodies(
+                        parsed.owned(),
+                        parsed.file.clone(),
+                        parsed.source(),
+                        parsed.source_map(),
+                    );
                     let pending = db.take_pending_ref_locs();
+                    let cache_locs = pending
+                        .iter()
+                        .map(|r| (r.symbol_key.to_string(), r.line, r.col_start, r.col_end))
+                        .collect();
+                    cache.put(&parsed.file, h, issues.clone(), cache_locs);
                     if let Some(cb) = &opts.on_file_done {
                         cb();
                     }
-                    (issues, symbols, pending)
-                })
-                .collect();
+                    return (parsed.file.clone(), issues, symbols, pending);
+                } else {
+                    driver.analyze_bodies(
+                        parsed.owned(),
+                        parsed.file.clone(),
+                        parsed.source(),
+                        parsed.source_map(),
+                    )
+                };
+                let pending = db.take_pending_ref_locs();
+                if let Some(cb) = &opts.on_file_done {
+                    cb();
+                }
+                (parsed.file.clone(), issues, symbols, pending)
+            })
+            .collect();
 
         let _t_body_analysis = _t0.elapsed();
 
-        // Serial commit: one lock acquisition per map for all files combined.
-        let mut all_ref_locs: Vec<RefLoc> = Vec::new();
+        // Serial commit with replace semantics: each file's output (or cache
+        // replay) is its complete reference set, so stale entries from a
+        // prior run cannot survive an append.
         let mut all_symbols = Vec::new();
-        for (issues, symbols, ref_locs) in body_results {
-            all_issues.extend(issues);
-            all_symbols.extend(symbols);
-            all_ref_locs.extend(ref_locs);
-        }
         {
             let guard = self.db.salsa.read();
-            guard.commit_reference_locations_batch(all_ref_locs);
+            for (file, issues, symbols, ref_locs) in body_results {
+                all_issues.extend(issues);
+                all_symbols.extend(symbols);
+                guard.set_file_reference_locations(file.as_ref(), ref_locs);
+            }
         }
 
         // ---- Post-analysis lazy loading: FQCNs used without `use` imports ------
@@ -808,13 +824,21 @@ impl AnalysisSession {
             let h = hash_content(new_content);
             if let Some((mut issues, ref_locs)) = cache.get(file_path, &h) {
                 let file: Arc<str> = Arc::from(file_path);
-                let guard = self.db.salsa.read();
-                guard.replay_reference_locations(file, &ref_locs);
-                let pending = guard.take_pending_ref_locs();
                 // Replace semantics: the cached set is the file's complete
                 // reference set, so stale entries from a prior version are
                 // cleared rather than appended over.
-                guard.set_file_reference_locations(file_path, pending);
+                let locs: Vec<RefLoc> = ref_locs
+                    .iter()
+                    .map(|(symbol, line, col_start, col_end)| RefLoc {
+                        symbol_key: Arc::from(symbol.as_str()),
+                        file: file.clone(),
+                        line: *line,
+                        col_start: *col_start,
+                        col_end: *col_end,
+                    })
+                    .collect();
+                let guard = self.db.salsa.read();
+                guard.set_file_reference_locations(file_path, locs);
                 drop(guard);
                 opts.apply(&mut issues);
                 self.apply_inline_suppressions(&mut issues);

@@ -375,18 +375,6 @@ impl MirDatabase for MirDbStorage {
         std::mem::take(&mut *self.pending_ref_locs.0.lock())
     }
 
-    fn replay_reference_locations(&self, file: Arc<str>, locs: &[(String, u32, u16, u16)]) {
-        for (symbol, line, col_start, col_end) in locs {
-            self.record_reference_location(RefLoc {
-                symbol_key: Arc::from(symbol.as_str()),
-                file: file.clone(),
-                line: *line,
-                col_start: *col_start,
-                col_end: *col_end,
-            });
-        }
-    }
-
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
         self.ref_index.lock().file_locations(file)
     }
