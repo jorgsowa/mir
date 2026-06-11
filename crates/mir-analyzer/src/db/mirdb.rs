@@ -18,15 +18,6 @@ use super::*;
 /// own clone (each clone gets a fresh `ZalsaLocal`, sharing the
 /// underlying memoization storage).  Sharing `&MirDbStorage` across threads is
 /// **not** supported because `salsa::Database: Send` (not `Sync`).
-type ReferenceLocations = Arc<Mutex<FxHashMap<Arc<str>, Vec<(Arc<str>, u32, u16, u16)>>>>;
-/// Forward index: file path → set of symbol keys that file references.
-/// Kept in sync with `reference_locations` for O(degree) lookups.
-type FileReferences = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
-/// Reverse reference index: symbol key → set of files that reference it.
-/// Transpose of `FileReferences`; maintained in lockstep so deletions can
-/// find referencing files in O(1).
-type SymbolReferencers = Arc<Mutex<FxHashMap<Arc<str>, HashSet<Arc<str>>>>>;
-
 /// Per-clone staging buffer for reference locations recorded during a parallel
 /// body analysis worker.  `record_reference_location` pushes here instead of directly
 /// into the shared `Arc<Mutex<...>>` maps, eliminating cross-thread contention.
@@ -125,14 +116,10 @@ fn subtract_decls(
 #[derive(Clone)]
 pub struct MirDbStorage {
     storage: salsa::Storage<Self>,
-    /// Public symbol key → reference locations.
-    reference_locations: ReferenceLocations,
-    /// Forward index: file → set of symbol keys it references. Kept in sync
-    /// with `reference_locations` to provide O(degree) dep-graph lookups.
-    file_references: FileReferences,
-    /// Reverse reference index: symbol key → set of files that reference it.
-    /// Maintained in lockstep with `file_references`.
-    symbol_referencers: SymbolReferencers,
+    /// Unified reference index: symbol→locations, file→symbols and
+    /// symbol→files views behind one lock with a single writer path, so the
+    /// views cannot drift apart. See [`crate::db::ref_index::RefIndex`].
+    ref_index: Arc<Mutex<crate::db::ref_index::RefIndex>>,
     /// Per-clone staging area for reference locations.  Workers push here
     /// during parallel analysis; the orchestrator drains and commits serially.
     pending_ref_locs: PendingRefLocs,
@@ -249,9 +236,7 @@ impl Default for MirDbStorage {
     fn default() -> Self {
         let mut db = Self {
             storage: salsa::Storage::default(),
-            reference_locations: ReferenceLocations::default(),
-            file_references: FileReferences::default(),
-            symbol_referencers: SymbolReferencers::default(),
+            ref_index: Arc::default(),
             pending_ref_locs: PendingRefLocs::default(),
             source_files: Arc::default(),
             deleted_files: Arc::default(),
@@ -379,11 +364,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
-        self.symbol_referencers
-            .lock()
-            .get(symbol_key)
-            .map(|s| s.iter().cloned().collect())
-            .unwrap_or_default()
+        self.ref_index.lock().referencers_of(symbol_key)
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
@@ -407,70 +388,27 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let refs = self.reference_locations.lock();
-        let mut out = Vec::new();
-        for (symbol, locs) in refs.iter() {
-            for (loc_file, line, col_start, col_end) in locs {
-                if loc_file.as_ref() == file {
-                    out.push((symbol.clone(), *line, *col_start, *col_end));
-                }
-            }
-        }
-        out
+        self.ref_index.lock().file_locations(file)
     }
 
     fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let refs = self.reference_locations.lock();
-        refs.get(symbol).cloned().unwrap_or_default()
+        self.ref_index.lock().locations_of(symbol)
     }
 
     fn has_reference(&self, symbol: &str) -> bool {
-        let refs = self.reference_locations.lock();
-        refs.get(symbol).is_some_and(|locs| !locs.is_empty())
+        self.ref_index.lock().has_reference(symbol)
     }
 
     fn clear_file_references(&self, file: &str) {
-        // Drain the forward index first to learn which symbols this file referenced,
-        // then remove only those entries — O(degree) instead of O(S×R).
-        let symbol_keys = {
-            let mut file_refs = self.file_references.lock();
-            file_refs.remove(file).unwrap_or_default()
-        };
-        let mut refs = self.reference_locations.lock();
-        let mut sym_refs = self.symbol_referencers.lock();
-        for key in &symbol_keys {
-            if let Some(locs) = refs.get_mut(key) {
-                locs.retain(|(loc_file, _, _, _)| loc_file.as_ref() != file);
-            }
-            let empty = if let Some(referencers) = sym_refs.get_mut(key) {
-                referencers.remove(file);
-                referencers.is_empty()
-            } else {
-                false
-            };
-            if empty {
-                sym_refs.remove(key);
-            }
-        }
+        self.ref_index.lock().clear_file(file);
     }
 
     fn all_reference_location_pairs(&self) -> Vec<(Arc<str>, Arc<str>)> {
-        let refs = self.reference_locations.lock();
-        let mut pairs = Vec::new();
-        for (symbol, locs) in refs.iter() {
-            for (file, _, _, _) in locs {
-                pairs.push((file.clone(), symbol.clone()));
-            }
-        }
-        pairs
+        self.ref_index.lock().all_pairs()
     }
 
     fn file_referenced_symbols(&self, file: &str) -> Vec<Arc<str>> {
-        let file_refs = self.file_references.lock();
-        file_refs
-            .get(file)
-            .map(|s| s.iter().cloned().collect())
-            .unwrap_or_default()
+        self.ref_index.lock().symbols_referenced_by(file)
     }
 
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
@@ -1010,31 +948,14 @@ impl MirDbStorage {
         }
     }
 
-    /// Commit a batch of reference locations into the shared maps in one lock
-    /// acquisition per map.  Must be called serially after all parallel workers
+    /// Commit a batch of reference locations into the shared index in one
+    /// lock acquisition.  Must be called serially after all parallel workers
     /// have dropped their db clones and returned their pending buffers.
     pub fn commit_reference_locations_batch(&self, locs: Vec<RefLoc>) {
         if locs.is_empty() {
             return;
         }
-        let mut refs = self.reference_locations.lock();
-        let mut file_refs = self.file_references.lock();
-        let mut sym_refs = self.symbol_referencers.lock();
-        for loc in locs {
-            file_refs
-                .entry(loc.file.clone())
-                .or_default()
-                .insert(loc.symbol_key.clone());
-            sym_refs
-                .entry(loc.symbol_key.clone())
-                .or_default()
-                .insert(loc.file.clone());
-            let entry = refs.entry(loc.symbol_key).or_default();
-            let tuple = (loc.file, loc.line, loc.col_start, loc.col_end);
-            if !entry.iter().any(|e| e == &tuple) {
-                entry.push(tuple);
-            }
-        }
+        self.ref_index.lock().append_batch(locs);
     }
 
     /// Drain this db's pending buffer and commit it directly to the shared maps.

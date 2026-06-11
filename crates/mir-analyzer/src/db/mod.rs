@@ -192,6 +192,7 @@ pub use self::queries::{
     inherited_template_bindings, is_unchecked_exception, member_location, parse_file, resolve_name,
     ClassKind, InferredFileTypes, TrackedParseResult,
 };
+pub use self::ref_index::RefIndex;
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 pub use self::workspace::{
@@ -208,6 +209,7 @@ mod mirdb;
 mod nodes;
 mod per_function;
 mod queries;
+pub(crate) mod ref_index;
 mod reference_locations;
 mod resolver;
 mod workspace;
