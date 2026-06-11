@@ -829,3 +829,56 @@ fn static_method_call_records_class_reference() {
         "Widget::make() should record a class reference to Widget"
     );
 }
+
+#[test]
+fn closure_param_type_hint_records_class_reference() {
+    // Type hints in closure parameters (`function(Foo $x)`) should record a
+    // ClassReference so that find-references on Foo includes closure usages.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "closure_hint.php",
+        "<?php\nclass Logger {}\n$fn = function(Logger $l): void {};\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("Logger")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "closure param type hint Logger should record a reference to Logger"
+    );
+}
+
+#[test]
+fn arrow_function_param_type_hint_records_class_reference() {
+    // Same requirement for arrow functions (`fn(Foo $x) => $x`).
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "arrow_hint.php",
+        "<?php\nclass Formatter {}\n$fn = fn(Formatter $f) => $f;\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("Formatter")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "arrow function param type hint Formatter should record a reference to Formatter"
+    );
+}

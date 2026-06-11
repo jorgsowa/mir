@@ -446,6 +446,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Severity::Error,
                         hint.span,
                     );
+                } else {
+                    let fqcn: Arc<str> = Arc::from(resolved.as_str());
+                    self.record_ref(fqcn.clone(), hint.span);
+                    self.record_symbol(
+                        hint.span,
+                        ReferenceKind::ClassReference(fqcn),
+                        mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+                    );
                 }
             }
             TypeHintKind::Nullable(inner) => self.check_type_hint(inner),
