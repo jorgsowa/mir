@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-06-11
+
+### Added
+
+- Per-scope tracked inference queries (`file_scopes`, `infer_scope`) for granular type inference memoization at function/class declaration and file-frame scope levels.
+- Batch-mode symbol collection opt-out via `BatchOptions::skip_symbols` for performance optimization in batch analysis runs.
+
+### Changed
+
+- `analyze_file` now assembles results from per-scope memos instead of a single whole-file analysis walk, improving incremental re-analysis efficiency.
+- Reference locations architecture refactored: `RefIndex` consolidates three independent reference maps (`reference_locations`, `file_references`, `symbol_referencers`) into a single tracked structure.
+- Dependent re-analysis now drives through the `analyze_file` query for salsa-validated memoization, replacing per-file re-parsing and full re-analysis on every edit.
+- Reverse dependencies now derived from a tracked query (`file_structural_deps`) instead of an in-memory map, improving incremental consistency.
+
+### Fixed
+
+- Reference-location synchronization drift eliminated by consolidating three independent maps into `RefIndex`.
+
 ## [0.36.0] - 2026-06-11
 
 ### Added
