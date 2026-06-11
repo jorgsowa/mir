@@ -863,6 +863,42 @@ impl IssueKind {
         }
     }
 
+    /// Returns the default [`Severity`] for a stable issue code (e.g. `"MIR0005"`).
+    ///
+    /// Useful when a caller holds a bare code string — from config, suppression
+    /// annotations, or serialised diagnostics — and needs to recover the severity
+    /// without constructing a full [`IssueKind`]. Returns `None` for unknown codes.
+    pub fn default_severity_for_code(code: &str) -> Option<Severity> {
+        match code {
+            // Errors
+            "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
+            | "MIR0010" | "MIR0011" | "MIR0200" | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204"
+            | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
+            | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
+            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803"
+            | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503"
+            | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+
+            // Warnings
+            "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
+            | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
+            | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0500" | "MIR0506"
+            | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" => Some(Severity::Warning),
+
+            // Info
+            "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
+            | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400" | "MIR0401"
+            | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504" | "MIR0505"
+            | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003" | "MIR1004" | "MIR1005"
+            | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011" | "MIR1100"
+            | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200" | "MIR1201" | "MIR1202"
+            | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1600"
+            | "MIR1601" => Some(Severity::Info),
+
+            _ => None,
+        }
+    }
+
     /// Identifier name used in config and `@psalm-suppress` / `@suppress` annotations.
     pub fn name(&self) -> &'static str {
         match self {
@@ -1962,6 +1998,26 @@ mod code_tests {
             stripped.contains("error[MIR0005] UndefinedClass:"),
             "Display output missing code/name segment: {stripped:?}",
         );
+    }
+
+    #[test]
+    fn default_severity_for_code_round_trips() {
+        for kind in one_of_each() {
+            let code = kind.code();
+            assert_eq!(
+                IssueKind::default_severity_for_code(code),
+                Some(kind.default_severity()),
+                "severity mismatch for {code} (variant {})",
+                kind.name(),
+            );
+        }
+    }
+
+    #[test]
+    fn default_severity_for_code_unknown_returns_none() {
+        assert_eq!(IssueKind::default_severity_for_code("MIR9999"), None);
+        assert_eq!(IssueKind::default_severity_for_code(""), None);
+        assert_eq!(IssueKind::default_severity_for_code("mir0001"), None);
     }
 
     /// Guards against forgetting to add a new variant to `one_of_each()`.
