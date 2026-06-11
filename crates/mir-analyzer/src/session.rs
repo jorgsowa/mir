@@ -16,8 +16,6 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use mir_codebase::{FileId, FileIdMap};
-
 use crate::analyzer_db::AnalyzerDb;
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
@@ -48,13 +46,6 @@ pub struct AnalysisSession {
     pub(crate) php_version: PhpVersion,
     pub(crate) user_stub_files: Vec<PathBuf>,
     pub(crate) user_stub_dirs: Vec<PathBuf>,
-    /// Path ↔ FileId mapping shared with `reverse_dep_map`.
-    file_id_map: Arc<RwLock<FileIdMap>>,
-    /// In-memory reverse dependency map: target_file → set of files that
-    /// depend on it. Always maintained (not gated on disk cache presence),
-    /// enabling `reanalyze_dependents` and `dependency_graph()` without a
-    /// disk cache. Updated in `ingest_file` and `invalidate_file`.
-    reverse_dep_map: Arc<RwLock<HashMap<FileId, HashSet<FileId>>>>,
     /// Tracks symbols that were previously defined in a file but have since
     /// been removed (deleted or renamed). When `ingest_file` detects that
     /// a symbol disappears, it records it here so `dependency_graph()` can
@@ -104,8 +95,6 @@ impl AnalysisSession {
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
-            file_id_map: Arc::new(RwLock::new(FileIdMap::new())),
-            reverse_dep_map: Arc::new(RwLock::new(HashMap::default())),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
@@ -794,8 +783,9 @@ impl AnalysisSession {
             guard.remove_file_definitions(file);
             guard.remove_source_file(file);
         }
-        // Remove this file's outgoing deps from the in-memory reverse dep map.
-        self.update_in_memory_reverse_deps(file, &HashSet::default());
+        // Outgoing structural edges disappear from the derived graph
+        // automatically: the file is no longer in `source_file_paths()`, so
+        // `dependency_graph()` stops iterating it.
         // Clear stale symbol tracking for this file — it's fully gone.
         self.stale_defined_symbols.write().remove(file);
         if let Some(cache) = &self.cache {
@@ -1535,82 +1525,17 @@ impl AnalysisSession {
             .collect()
     }
 
-    /// Compute `file`'s outgoing dependency edges and update both the in-memory
-    /// reverse-dep map (always) and the disk cache's reverse-dep graph (if configured).
+    /// Compute `file`'s outgoing dependency edges and persist them to the
+    /// disk cache's reverse-dep graph (if configured). The in-memory graph
+    /// is no longer maintained imperatively: `dependency_graph()` derives
+    /// structural edges from the memoized [`crate::db::file_structural_deps`]
+    /// tracked query, so there is no second copy to drift out of sync.
     fn update_reverse_deps_for(&self, file: &str) {
-        let db = self.snapshot_db();
-        let targets = file_outgoing_dependencies(&db, file);
-
-        // Always update the in-memory map.
-        self.update_in_memory_reverse_deps(file, &targets);
-
-        // Also persist to disk cache if configured.
         if let Some(cache) = self.cache.as_deref() {
+            let db = self.snapshot_db();
+            let targets = file_outgoing_dependencies(&db, file);
             cache.update_reverse_deps_for_file(file, &targets);
         }
-    }
-
-    /// Update the in-memory reverse dependency map for `file` with `new_targets`.
-    /// Removes `file` from all existing entries, then adds it as a dependent of
-    /// each target in `new_targets` (excluding self-edges).
-    fn update_in_memory_reverse_deps(&self, file: &str, new_targets: &HashSet<String>) {
-        let file_id = self.file_id_map.write().assign_or_get(file);
-        let target_ids: Vec<FileId> = {
-            let mut id_map = self.file_id_map.write();
-            new_targets
-                .iter()
-                .map(|t| id_map.assign_or_get(t))
-                .collect()
-        };
-
-        let mut map = self.reverse_dep_map.write();
-        for dependents in map.values_mut() {
-            dependents.remove(&file_id);
-        }
-        map.retain(|_, dependents| !dependents.is_empty());
-        for target_id in target_ids {
-            if target_id != file_id {
-                map.entry(target_id).or_default().insert(file_id);
-            }
-        }
-    }
-
-    /// BFS transitive dependents of `file` using the in-memory reverse dep map.
-    ///
-    /// O(D) where D is the number of transitive dependents — faster than
-    /// [`Self::dependency_graph().transitive_dependents()`] which rebuilds the
-    /// full graph on every call. Only covers structural dependencies from definition collection
-    /// (imports, class hierarchy, type hints); does not include bare FQN body
-    /// references recorded during body analysis. For full fidelity, use
-    /// `dependency_graph().transitive_dependents()` after body analysis is complete.
-    pub fn structural_dependents(&self, file: &str) -> Vec<String> {
-        let Some(start_id) = self.file_id_map.read().get(file) else {
-            return Vec::new();
-        };
-        let map = self.reverse_dep_map.read();
-        let mut visited: HashSet<FileId> = HashSet::default();
-        let mut queue = vec![start_id];
-        let mut result_ids = Vec::new();
-        while let Some(current_id) = queue.pop() {
-            if !visited.insert(current_id) {
-                continue;
-            }
-            if let Some(deps) = map.get(&current_id) {
-                for &dep_id in deps {
-                    if !visited.contains(&dep_id) {
-                        queue.push(dep_id);
-                        result_ids.push(dep_id);
-                    }
-                }
-            }
-        }
-        drop(map);
-        let id_map = self.file_id_map.read();
-        result_ids
-            .iter()
-            .filter_map(|&id| id_map.path(id))
-            .map(|s| s.to_string())
-            .collect()
     }
 
     /// File dependency graph: which files depend on which other files.
@@ -1663,34 +1588,26 @@ impl AnalysisSession {
             }
         }
 
-        // Merge structural deps from definition collection from the incremental reverse_dep_map.
-        // dependency_graph() above only captures bare-FQN references recorded during body analysis;
-        // the reverse_dep_map covers imports, class hierarchy (extends/implements/use),
-        // and type-hint-only references that never appear in file_referenced_symbols.
-        // Together they give a complete picture without requiring body analysis on every file.
-        {
-            let id_map = self.file_id_map.read();
-            let rev = self.reverse_dep_map.read();
-            for (&target_id, dep_set) in rev.iter() {
-                let Some(target) = id_map.path(target_id) else {
-                    continue;
-                };
-                let target = target.to_string();
-                for &dep_id in dep_set {
-                    let Some(dep) = id_map.path(dep_id) else {
-                        continue;
-                    };
-                    let dep = dep.to_string();
-                    if dep != target {
-                        dependents
-                            .entry(target.clone())
-                            .or_default()
-                            .push(dep.clone());
-                        dependencies
-                            .entry(dep.clone())
-                            .or_default()
-                            .push(target.clone());
-                    }
+        // Merge structural deps derived from definition collection. The
+        // forward pass above only captures bare-FQN references recorded
+        // during body analysis; `file_structural_deps` covers imports, class
+        // hierarchy (extends/implements/use), and type-hint-only references
+        // that never appear in file_referenced_symbols. The query is salsa-
+        // memoized, so the warm rebuild costs one map lookup per file rather
+        // than a definition walk — and there is no imperatively-maintained
+        // reverse map to drift out of sync with the definitions.
+        for file in &all_files {
+            let Some(sf) = db.lookup_source_file(file) else {
+                continue;
+            };
+            for target in crate::db::file_structural_deps(&db, sf).iter() {
+                let target = target.as_ref().to_string();
+                if &target != file {
+                    dependents
+                        .entry(target.clone())
+                        .or_default()
+                        .push(file.clone());
+                    dependencies.entry(file.clone()).or_default().push(target);
                 }
             }
         }
@@ -1748,121 +1665,32 @@ impl AnalysisSession {
     }
 }
 
-/// Compute the set of files `file` depends on: defining files of its imports,
-/// plus parent / interfaces / traits' defining files for any classes declared
-/// in `file`. Self-edges are excluded.
+/// Compute the full set of files `file` depends on: structural edges from
+/// the memoized [`crate::db::file_structural_deps`] tracked query, plus
+/// bare-FQN references recorded during body analysis (which live in the
+/// reference index and are not visible to salsa). Self-edges are excluded.
+/// Used to persist the disk cache's reverse-dep graph.
 fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<String> {
     let mut targets: HashSet<String> = HashSet::default();
 
-    let mut add_target = |symbol: &str| {
-        if let Some(defining_file) = db.symbol_defining_file(symbol) {
-            let def = defining_file.as_ref().to_string();
-            if def != file {
-                targets.insert(def);
-            }
-        }
-    };
-
-    let extract_named_objects = |union: &mir_types::Type| {
-        union
-            .types
-            .iter()
-            .filter_map(|atomic| match atomic {
-                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-    };
-
-    let imports = db.file_imports(file);
-    for fqcn in imports.values() {
-        add_target(fqcn.as_str());
-    }
-
-    // Walk every class/interface/trait/enum/function defined in this file
-    // via the pull-path slice. Push-path lookup_*_node have been retired.
     if let Some(sf) = db.lookup_source_file(file) {
-        let defs = crate::db::collect_file_definitions(db, sf);
-        for c in defs.slice.classes.iter() {
-            if let Some(p) = &c.parent {
-                add_target(p);
-            }
-            for iface in c.interfaces.iter() {
-                add_target(iface);
-            }
-            for tr in c.traits.iter() {
-                add_target(tr);
-            }
-            for prop in c.own_properties.values() {
-                if let Some(ty) = &prop.ty {
-                    for named in extract_named_objects(ty) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-            for method in c.own_methods.values() {
-                for param in method.params.iter() {
-                    if let Some(ty) = &param.ty {
-                        for named in extract_named_objects(ty.as_ref()) {
-                            add_target(named.as_ref());
-                        }
-                    }
-                }
-                if let Some(rt) = method.return_type.as_deref() {
-                    for named in extract_named_objects(rt) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-        }
-        for i in defs.slice.interfaces.iter() {
-            for ext in i.extends.iter() {
-                add_target(ext);
-            }
-            for method in i.own_methods.values() {
-                for param in method.params.iter() {
-                    if let Some(ty) = &param.ty {
-                        for named in extract_named_objects(ty.as_ref()) {
-                            add_target(named.as_ref());
-                        }
-                    }
-                }
-                if let Some(rt) = method.return_type.as_deref() {
-                    for named in extract_named_objects(rt) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-        }
-        for t in defs.slice.traits.iter() {
-            for tr in t.traits.iter() {
-                add_target(tr);
-            }
-        }
-        for f in defs.slice.functions.iter() {
-            for param in f.params.iter() {
-                if let Some(ty) = &param.ty {
-                    for named in extract_named_objects(ty.as_ref()) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-            if let Some(rt) = f.return_type.as_deref() {
-                for named in extract_named_objects(rt) {
-                    add_target(named.as_ref());
-                }
-            }
+        for target in crate::db::file_structural_deps(db, sf).iter() {
+            targets.insert(target.as_ref().to_string());
         }
     }
 
-    // Also track bare-FQN references recorded during body analysis (new \Foo(), \Foo::method(),
-    // \foo()) that do not appear in use-import statements.
+    // Bare-FQN references recorded during body analysis (new \Foo(),
+    // \Foo::method(), \foo()) that do not appear in use-import statements.
     for symbol_key in db.file_referenced_symbols(file) {
         let lookup: &str = match symbol_key.split_once("::") {
             Some((class, _)) => class,
             None => &symbol_key,
         };
-        add_target(lookup);
+        if let Some(defining_file) = db.symbol_defining_file(lookup) {
+            if defining_file.as_ref() != file {
+                targets.insert(defining_file.as_ref().to_string());
+            }
+        }
     }
 
     targets

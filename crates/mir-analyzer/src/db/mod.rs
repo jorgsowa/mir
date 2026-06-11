@@ -170,6 +170,7 @@ pub trait MirDatabase: salsa::Database {
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
 pub use self::ancestors::*;
+pub use self::deps::file_structural_deps;
 pub use self::find_queries::{
     analyzed_class_defs, analyzed_enum_defs, analyzed_interface_defs, class_ancestors_by_fqcn,
     class_in_file, enum_in_file, find_class_constant_in_chain, find_class_constant_in_class,
@@ -203,6 +204,7 @@ pub use self::workspace::{
 
 // Sub-modules
 mod ancestors;
+mod deps;
 mod find_queries;
 mod inferred_types;
 mod mirdb;
