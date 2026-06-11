@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-06-11
+
+### Added
+
+- `MissingReturnType` (MIR1201) and `MissingParamType` (MIR1200) — emitted for interface methods that lack `@return` or `@param` docblock annotations when not otherwise typed.
+- `MixedArgument` (MIR0221) and `MixedAssignment` (MIR0222) — emitted when a `mixed`-typed value is passed to a parameter expecting a concrete type, or assigned to a typed property.
+- `MixedArrayAccess` (MIR0223), `MixedArrayOffset` (MIR0224), `MixedPropertyFetch` (MIR0225), and `MixedPropertyAssignment` (MIR0226) — emitted when `mixed` is used in array/property access contexts.
+- `MissingPropertyType` (MIR1202) — emitted for untyped class and trait properties when `find_dead_code` is enabled.
+- `ForbiddenCode` (MIR1301) — detects code marked with `#[Forbidden]` attribute; use `#[Forbidden("reason")]` on methods/functions to flag uses as errors.
+- `@trace` docblock annotation — mark variables and expressions with `/** @trace $var */` to emit an `@trace` informational diagnostic, aiding debugging without leaving analyzer artifacts in code. Useful for development and CI integration.
+- `PossiblyInvalidArgument` (MIR0205) — enhanced to flag partial type-union overlaps, not just complete mismatches. Emitted when a union contains only some valid argument types.
+- Type-checking for `TClosure` and `__invoke` method calls: generic template parameters are now resolved at call sites, enabling precise type narrowing on closure return values.
+- `@no-named-arguments` enforcement: methods/functions marked with this attribute now emit `InvalidArgument` when invoked with named arguments.
+- Duplicate declaration detection: `DuplicateClass`, `DuplicateInterface`, `DuplicateTrait`, `DuplicateFunction`, and `DuplicateConstant` now detect and report redeclarations across the entire codebase.
+- Psalm compatibility: all 1843 fixture tests now pass, including un-ignoring 120+ Psalm-specific test cases covering edge-case behaviors.
+
+### Fixed
+
+- Constructor-promoted property handling: `UnusedParam` and `UnusedVariable` false positives eliminated for promoted properties accessed through property-assignment or constructor side effects.
+- `if`-condition variable assignment detection: variables assigned in `if` condition expressions (e.g., `if ($x = foo())`) are no longer incorrectly flagged as unused.
+- Negated `instanceof` guard narrowing: type refinement now correctly applies at receiver position (`$obj instanceof X` and `!$other instanceof $this`).
+- User-defined stub registration now uses Salsa `Durability::HIGH`, improving incremental re-analysis performance when stubs are unchanged.
+- Readonly promoted properties and compound-assignment edge cases in destructuring contexts.
+- Operand and iteration gaps now match Psalm parity across type-checking and narrowing behaviors.
+- `TLiteralString` subtype narrowing: numeric literal strings now correctly match `TNumericString` bounds.
+- Globally-qualified type hints (`\Closure`, `\Generator`, etc.) in namespaced files now resolve correctly without prepending the current namespace.
+- Generator `bare return;` statements no longer emit false `InvalidReturnType` diagnostics.
+- `try`-body divergence is now preserved when all `catch` blocks also diverge, preventing unreachable-code false positives.
+- `ImplicitToStringCast` suppression for classes implementing `\Stringable` and when argument union contains non-string arms.
+- `@param` docblock generic type hints now take precedence over plain array hints for promoted properties.
+
+### Changed
+
+- All 1843 fixture tests now pass without ignores, improving test coverage visibility and closing known gaps in Psalm parity.
+
 ## [0.35.1] - 2026-06-10
 
 ### Fixed
