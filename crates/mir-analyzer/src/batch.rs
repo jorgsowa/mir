@@ -810,7 +810,11 @@ impl AnalysisSession {
                 let file: Arc<str> = Arc::from(file_path);
                 let guard = self.db.salsa.read();
                 guard.replay_reference_locations(file, &ref_locs);
-                guard.commit_pending_to_maps();
+                let pending = guard.take_pending_ref_locs();
+                // Replace semantics: the cached set is the file's complete
+                // reference set, so stale entries from a prior version are
+                // cleared rather than appended over.
+                guard.set_file_reference_locations(file_path, pending);
                 drop(guard);
                 opts.apply(&mut issues);
                 self.apply_inline_suppressions(&mut issues);
@@ -860,7 +864,8 @@ impl AnalysisSession {
                     &parsed.source_map,
                 );
                 all_issues.extend(body_issues);
-                guard.commit_pending_to_maps();
+                let pending = guard.take_pending_ref_locs();
+                guard.set_file_reference_locations(file.as_ref(), pending);
                 symbols
             } else {
                 Vec::new()

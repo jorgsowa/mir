@@ -1373,43 +1373,69 @@ impl AnalysisSession {
             return Vec::new();
         }
 
-        // Phase 1: compute dependents + gather their sources outside the
-        // analysis loop so each worker has everything it needs.
+        // Phase 1: compute dependents outside the analysis loop.
         let dependents = self.dependency_graph().transitive_dependents(file);
         if dependents.is_empty() {
             return Vec::new();
         }
-        let with_source: Vec<(Arc<str>, Arc<str>)> = dependents
+        let dependents: Vec<Arc<str>> = dependents
             .into_iter()
-            .filter_map(|path| {
-                let arc_path: Arc<str> = Arc::from(path.as_str());
-                let src = self.source_of(&path)?;
-                Some((arc_path, src))
-            })
+            .map(|path| Arc::from(path.as_str()))
             .collect();
-        if with_source.is_empty() {
-            return Vec::new();
-        }
 
-        // Phase 2: parallel parse + analyze. Each rayon worker gets its own
-        // database snapshot via FileAnalyzer; writes are isolated to the
-        // session's canonical db (none happen here since we only run body analysis).
+        // Phase 2: drive each dependent through the `analyze_file` tracked
+        // query in parallel. Salsa's memo validation does the real work
+        // here: after a body-only edit, a dependent whose tracked inputs are
+        // structurally unchanged (`FileDefinitions` backdating) returns its
+        // cached output without re-running body analysis — re-analysis cost
+        // scales with what actually changed, not with dependent count.
+        //
+        // Dependents' `FileAnalysis::symbols` are empty on this path:
+        // per-expression symbols are intentionally not memoized (a typical
+        // file resolves thousands; caching them balloons memory), and
+        // diagnostics consumers don't read them. Hover / go-to-definition
+        // flows analyze the open file directly via [`crate::FileAnalyzer`].
+        //
         // Each worker short-circuits when cancellation has been requested.
-        with_source
+        let db_main = self.snapshot_db();
+        let results: Vec<(Arc<str>, std::sync::Arc<crate::db::AnalyzeOutput>)> = dependents
             .into_par_iter()
-            .filter_map(|(file, source)| {
+            .map_with(db_main, |db, file| {
                 if cancel.is_cancelled() {
                     return None;
                 }
-                let parsed = php_rs_parser::parse(source.as_ref());
-                let analyzer = crate::FileAnalyzer::new(self);
-                let analysis = analyzer.analyze(
-                    file.clone(),
-                    source.as_ref(),
-                    &parsed.program,
-                    &parsed.source_map,
-                );
-                Some((file, analysis))
+                let sf = db.lookup_source_file(file.as_ref())?;
+                // Fault in this dependent's direct class references if the
+                // background indexer hasn't reached them yet (mirrors the
+                // FileAnalyzer warm-up behavior, avoiding transient false
+                // UndefinedClass during index warm-up).
+                let parsed = crate::db::parse_file(&*db as &dyn crate::db::MirDatabase, sf);
+                self.prepare_ast_for_analysis(&parsed.0.program, file.as_ref());
+                let out = crate::db::analyze_file(&*db as &dyn crate::db::MirDatabase, sf);
+                Some((file, out))
+            })
+            .flatten()
+            .collect();
+
+        // Serial commit: each dependent's output is its complete reference
+        // set, so replace rather than append.
+        {
+            let guard = self.db.salsa.read();
+            for (file, out) in &results {
+                guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+            }
+        }
+
+        results
+            .into_iter()
+            .map(|(file, out)| {
+                (
+                    file,
+                    crate::FileAnalysis {
+                        issues: out.issues.to_vec(),
+                        symbols: Vec::new(),
+                    },
+                )
             })
             .collect()
     }

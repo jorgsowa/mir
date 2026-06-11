@@ -958,14 +958,14 @@ impl MirDbStorage {
         self.ref_index.lock().append_batch(locs);
     }
 
-    /// Drain this db's pending buffer and commit it directly to the shared maps.
-    ///
-    /// Use on serial paths (e.g. `re_analyze_file`) where the db is not a
-    /// worker clone: pending locations accumulate in the shared db itself and
-    /// must be flushed before callers read the reference maps.
-    pub fn commit_pending_to_maps(&self) {
-        let locs = std::mem::take(&mut *self.pending_ref_locs.0.lock());
-        self.commit_reference_locations_batch(locs);
+    /// Replace `file`'s reference locations wholesale (clear + append) in
+    /// one lock acquisition. Use when `locs` is known to be the file's
+    /// *complete* reference set — fresh `analyze_file` output or a
+    /// disk-cache replay. Entries in `locs` belonging to other files (e.g.
+    /// recorded by nested on-demand inference) are appended without
+    /// clearing those files.
+    pub fn set_file_reference_locations(&self, file: &str, locs: Vec<RefLoc>) {
+        self.ref_index.lock().set_file_refs(file, locs);
     }
 
     /// Install or replace the active class resolver.
