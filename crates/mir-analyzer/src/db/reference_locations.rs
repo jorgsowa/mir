@@ -7,32 +7,22 @@ use crate::PhpVersion;
 
 use super::*;
 
-// S4 Step 1: analyze_file accumulators + tracked-query skeleton
+// `analyze_file` tracked query: the single value-returning analysis driver.
 //
-// First step toward S4 (issues + reference locations as Salsa accumulators,
-// `analyze_file` as a tracked query).  This step is purely additive:
+// Issues and reference locations are *returned* from the query rather than
+// pushed through salsa accumulators. Accumulators were measured to be the
+// wrong vehicle here:
 //
-//   1. Defines `IssueAccumulator` and `RefLocAccumulator` salsa accumulator
-//      types — push targets for analyzer-emitted issues and reference-index
-//      entries during tracked-query evaluation.
-//   2. Defines `analyze_file` as a tracked-query stub keyed on a
-//      `(SourceFile, AnalyzeFileInput)` pair.  The stub does NOT perform
-//      analysis — it accumulates only the parse errors (a strict subset of
-//      what `collect_file_definitions` already produces, so semantics are
-//      unchanged).  The full analyzer wiring follows in subsequent S4 PRs.
+//   1. `accumulated_by` performs an untracked read, so any tracked query
+//      consuming accumulator output is permanently invalidated and re-runs
+//      every revision — derived aggregates can never be built on top.
+//   2. Every `accumulated()` call performs a fresh DFS over the query's
+//      entire dependency subtree (hundreds of edges per file), which is
+//      O(total_edges) per read at workspace scale.
 //
-// Nothing in this module is wired into the batch (`analyze`) or LSP
-// (`re_analyze_file`) paths yet.  Behavior change: zero.
-
-/// Salsa accumulator carrying analyzer-emitted issues.  In the eventual
-/// S4 design, every site that today calls `IssueBuffer::add` / `Vec::push`
-/// from inside a tracked query will instead call
-/// `IssueAccumulator(issue).accumulate(db)`, and `re_analyze_file` will read
-/// the accumulated issues for the file with
-/// `analyze_file::accumulated::<IssueAccumulator>(db, file, ...)`.
-#[salsa::accumulator]
-#[derive(Clone, Debug)]
-pub struct IssueAccumulator(pub Issue);
+// Returning an `Arc<AnalyzeOutput>` makes the memo a plain value: cheap to
+// fetch, shareable with downstream aggregates, and validated by salsa's
+// regular red-green algorithm.
 
 /// Reference-index entry as produced during analysis.  Mirrors the tuple
 /// shape that `Codebase::record_ref` accepts:
@@ -42,7 +32,7 @@ pub struct IssueAccumulator(pub Issue);
 ///   `Codebase::mark_*_referenced_at` use).
 /// - `file`: the file in which the reference appears.
 /// - `(line, col_start, col_end)`: span within the file.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RefLoc {
     pub symbol_key: Arc<str>,
     pub file: Arc<str>,
@@ -51,21 +41,11 @@ pub struct RefLoc {
     pub col_end: u16,
 }
 
-/// Salsa accumulator carrying reference-index entries.  In the eventual
-/// S4 design this replaces the `Codebase::mark_*_referenced_at` side
-/// effects: instead of mutating the codebase's reference index inside a
-/// tracked query (which Salsa cannot observe), the analyzer pushes
-/// `RefLocAccumulator(loc)` and the consumer (LSP / dead-code) reads via
-/// `analyze_file::accumulated::<RefLocAccumulator>(db, …)`.
-#[salsa::accumulator]
-#[derive(Clone, Debug)]
-#[allow(dead_code)]
-pub struct RefLocAccumulator(pub RefLoc);
-
-/// Salsa tracked-query input for `analyze_file`.  Carries the analysis
-/// parameters that aren't already captured by `SourceFile` itself.  Kept
-/// minimal in this PR; subsequent PRs in the S4 chain will extend it as
-/// the query body grows to call the full analyzer pipeline.
+/// Singleton salsa input carrying the analysis parameters that aren't
+/// already captured by `SourceFile` itself. Lazily created once per
+/// database (see `MirDatabase::analyze_config`) so tracked queries that
+/// read it get a stable memo key; `MirDbStorage::set_php_version` writes
+/// through to it, invalidating dependents on version change.
 #[salsa::input]
 pub struct AnalyzeFileInput {
     /// Resolved PHP version (`"8.1"`, `"8.2"`, …) used by the analyzer.
@@ -73,102 +53,89 @@ pub struct AnalyzeFileInput {
     pub php_version: Arc<str>,
 }
 
-// S4 Step 3: Lazy inferred-type queries
-//
-// These tracked queries compute inferred return types on-demand during body analysis.
-// When `BodyAnalyzer` encounters a function/method call, it reads the inferred
-// type via these queries instead of from a pre-computed buffer.
-//
-// This enables two key optimizations:
-// 1. Single-pass execution: inferred types are computed as needed, not upfront
-// 2. Incremental caching: if a dependent file doesn't call a function, its
-//    inferred type is never computed (Salsa skips the query)
-
-// Helper: collect analysis results via tracked query accumulators
-
-/// Collects all accumulated issues from a set of files analyzed via the
-/// `analyze_file` tracked query. Used during batch analysis to read issues
-/// that were emitted during tracked-query evaluation.
-#[allow(dead_code)]
-pub(crate) fn collect_accumulated_issues(
-    db: &dyn MirDatabase,
-    files: &[(Arc<str>, SourceFile)],
-    php_version: &str,
-) -> Vec<Issue> {
-    let mut all_issues = Vec::new();
-    let input = AnalyzeFileInput::new(db, Arc::from(php_version));
-
-    for (_path, file) in files {
-        // Call the tracked query to trigger analysis + accumulation
-        analyze_file(db, *file, input);
-
-        // Read back the accumulated issues for this file
-        let accumulated: Vec<&IssueAccumulator> = analyze_file::accumulated(db, *file, input);
-        for acc in accumulated {
-            all_issues.push(acc.0.clone());
-        }
-    }
-
-    all_issues
+/// Everything `analyze_file` produces for one file: diagnostics plus the
+/// reference-index entries recorded while analyzing its bodies.
+///
+/// `ref_locs` is sorted + deduplicated so the memo value is deterministic
+/// regardless of analysis traversal order — required for salsa backdating
+/// (unchanged output ⇒ dependents stay green).
+///
+/// Per-expression resolved symbols are intentionally NOT part of the memo:
+/// a typical file resolves thousands of expressions and retaining them in
+/// the salsa cache balloons memory (~50 KiB/file measured on Laravel).
+/// Consumers that need symbols call `BodyAnalyzer` directly via
+/// `FileAnalyzer`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AnalyzeOutput {
+    pub issues: Arc<[Issue]>,
+    pub ref_locs: Arc<[RefLoc]>,
 }
 
-/// Tracked-query skeleton for `analyze_file`.
+unsafe impl salsa::Update for AnalyzeOutput {
+    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
+        let old = unsafe { &mut *old_ptr };
+        if *old == new_val {
+            return false;
+        }
+        *old = new_val;
+        true
+    }
+}
+
+/// Analyze one file: parse-error issues plus full body analysis.
 ///
-/// **Current behavior (S4 step 2):** parses the file, emits parse-error issues,
-/// and calls body analysis to analyze function/method bodies. Issues and reference
-/// locations are emitted via `IssueAccumulator` and `RefLocAccumulator`.
-///
-/// Inferred return types are resolved on demand via `inferred_function_return_type_demand`
-/// and `inferred_method_return_type_demand` — no pre-sweep needed.
+/// Reads the PHP version from the [`AnalyzeFileInput`] singleton (a tracked
+/// field read), so the memo key is just `file` and version changes
+/// invalidate all memos at once.
 #[salsa::tracked]
-pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile, input: AnalyzeFileInput) {
-    use salsa::Accumulator as _;
+pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
     let path = file.path(db);
     let text = file.text(db);
+
+    let mut issues: Vec<Issue> = Vec::new();
 
     let parsed_file = super::queries::parse_file(db, file);
     let parsed = &*parsed_file.0;
 
     for err in &parsed.errors {
-        let issue = crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map);
-        IssueAccumulator(issue).accumulate(db);
+        issues.push(crate::parser::parse_error_to_issue(
+            err,
+            &path,
+            &text,
+            &parsed.source_map,
+        ));
     }
 
     // Run full analysis unless there are hard parse errors. ForbiddenWarning
     // diagnostics are non-fatal and leave the AST complete, so analysis can
     // still proceed.
     let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
+    let mut ref_locs: Vec<RefLoc> = Vec::new();
     if !has_hard_parse_errors {
         use std::str::FromStr as _;
+        let php_version_str = db.analyze_config().php_version(db);
         let php_version =
-            PhpVersion::from_str(input.php_version(db).as_ref()).unwrap_or(PhpVersion::LATEST);
+            PhpVersion::from_str(php_version_str.as_ref()).unwrap_or(PhpVersion::LATEST);
         let driver = BodyAnalyzer::new(db, php_version);
-        let (issues, _symbols) = driver.analyze_bodies(
+        let (body_issues, _symbols) = driver.analyze_bodies(
             &parsed.program,
             path.clone(),
             text.as_ref(),
             &parsed.source_map,
         );
+        issues.extend(body_issues);
 
-        // Emit issues via accumulator
-        for issue in issues {
-            IssueAccumulator(issue).accumulate(db);
-        }
-
-        // Drain reference locations that body analysis staged in this db's pending
-        // buffer and emit each via the accumulator. The shared
-        // reference_locations map is intentionally NOT mutated from inside
-        // the tracked query — consumers (`collect_accumulated_issues`,
-        // future S5-B FileAnalyzer migration) decide when to commit after
-        // reading accumulator output.
-        //
-        // Per-expression resolved symbols are NOT routed through an
-        // accumulator: a typical file resolves thousands of expressions and
-        // retaining them in the salsa cache balloons memory (~50 KiB/file
-        // measured on Laravel). Consumers that need symbols call
-        // `BodyAnalyzer` directly via `FileAnalyzer`.
-        for loc in db.take_pending_ref_locs() {
-            RefLocAccumulator(loc).accumulate(db);
-        }
+        // Drain reference locations that body analysis staged in this db's
+        // pending buffer. The shared reference index is intentionally NOT
+        // mutated from inside the tracked query — consumers decide when to
+        // commit the returned locations.
+        ref_locs = db.take_pending_ref_locs();
+        ref_locs.sort_unstable();
+        ref_locs.dedup();
     }
+
+    Arc::new(AnalyzeOutput {
+        issues: issues.into(),
+        ref_locs: ref_locs.into(),
+    })
 }

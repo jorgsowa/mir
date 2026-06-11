@@ -12,9 +12,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use mir_analyzer::db::{
-    collect_file_definitions, infer_function, parse_file, AnalyzeFileInput, MirDatabase,
-};
+use mir_analyzer::db::{collect_file_definitions, infer_function, parse_file, MirDatabase};
 use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 /// 40 short free functions — enough to amortize fixed setup, small enough that
@@ -61,19 +59,18 @@ fn measure_infer_function_timings() {
     let file = db.lookup_source_file(path_str.as_ref()).unwrap();
     let _ = parse_file(&db, file);
     let _ = collect_file_definitions(&db, file);
-    let input = AnalyzeFileInput::new(&db, Arc::from("8.4"));
 
     // ---- Cold: each fn queried for the first time on this db ----
     let t_cold = Instant::now();
     for name in &names {
-        let _ = infer_function(&db, file, name.clone(), input);
+        let _ = infer_function(&db, file, name.clone());
     }
     let elapsed_cold = t_cold.elapsed();
 
     // ---- Warm: repeat the same calls; should be memoized ----
     let t_warm = Instant::now();
     for name in &names {
-        let _ = infer_function(&db, file, name.clone(), input);
+        let _ = infer_function(&db, file, name.clone());
     }
     let elapsed_warm = t_warm.elapsed();
 

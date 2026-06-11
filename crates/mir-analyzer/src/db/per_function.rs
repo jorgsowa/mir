@@ -4,7 +4,8 @@
 //! one function's diagnostics + inferred return type at function granularity.
 //! Editing file A's `bar()` does not invalidate cached results for `foo()`.
 //!
-//! Today the query is keyed by `(SourceFile, fn_fqn, AnalyzeFileInput)`. Edits
+//! Today the query is keyed by `(SourceFile, fn_fqn)`; the PHP version is
+//! read from the [`AnalyzeFileInput`] singleton (a tracked field read). Edits
 //! to the file's source text invalidate the entire file's set of function
 //! caches via salsa's dependency on `parse_file(db, file)`; finer per-function
 //! invalidation would require giving function bodies their own salsa input
@@ -97,13 +98,13 @@ pub fn infer_function(
     db: &dyn MirDatabase,
     file: SourceFile,
     fn_fqn: Arc<str>,
-    input: crate::db::AnalyzeFileInput,
 ) -> Option<Arc<FunctionInferenceResult>> {
     use std::str::FromStr as _;
 
     let path = file.path(db);
     let text = file.text(db);
-    let php_version = crate::php_version::PhpVersion::from_str(input.php_version(db).as_ref())
+    let php_version_str = db.analyze_config().php_version(db);
+    let php_version = crate::php_version::PhpVersion::from_str(php_version_str.as_ref())
         .unwrap_or(crate::php_version::PhpVersion::LATEST);
 
     let parsed_file = crate::db::parse_file(db, file);

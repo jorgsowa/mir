@@ -162,6 +162,11 @@ pub struct MirDbStorage {
     /// Set once before any analysis begins; read by `collect_file_definitions`
     /// to filter `@since`/`@removed` stub symbols.
     php_version: Arc<parking_lot::RwLock<Arc<str>>>,
+    /// Lazily-created [`crate::db::AnalyzeFileInput`] singleton input (see
+    /// [`MirDatabase::analyze_config`]). Holds the PHP version as a tracked
+    /// field so `analyze_file` / `infer_function` memos invalidate on
+    /// version change while keeping a stable memo key.
+    analyze_config_input: Arc<parking_lot::RwLock<Option<crate::db::AnalyzeFileInput>>>,
     /// Optional disk-backed definition cache. Shared with `AnalyzerDb::stub_cache`
     /// so `collect_file_definitions` can consult it directly without going
     /// through `collect_and_ingest_file`.
@@ -254,6 +259,7 @@ impl Default for MirDbStorage {
             workspace_revision_input: Arc::default(),
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
+            analyze_config_input: Arc::default(),
             stub_cache: Arc::default(),
             parse_cache: Arc::default(),
             workspace_symbol_index_input: Arc::default(),
@@ -469,6 +475,20 @@ impl MirDatabase for MirDbStorage {
 
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
         self.source_files.get(path).copied()
+    }
+
+    fn analyze_config(&self) -> crate::db::AnalyzeFileInput {
+        if let Some(cfg) = *self.analyze_config_input.read() {
+            return cfg;
+        }
+        let mut slot = self.analyze_config_input.write();
+        // Double-checked: another clone may have created it between locks.
+        if let Some(cfg) = *slot {
+            return cfg;
+        }
+        let cfg = crate::db::AnalyzeFileInput::new(self, self.php_version.read().clone());
+        *slot = Some(cfg);
+        cfg
     }
 
     fn resolver_config(&self) -> Option<ResolverConfig> {
@@ -1049,7 +1069,15 @@ impl MirDbStorage {
     /// `collect_file_definitions`. Must be called before any stub files are
     /// registered so the salsa cache sees consistent results.
     pub fn set_php_version(&mut self, version: Arc<str>) {
-        *self.php_version.write() = version;
+        *self.php_version.write() = version.clone();
+        // Write through to the AnalyzeFileInput singleton (if it has been
+        // created) so tracked queries reading `cfg.php_version(db)` are
+        // invalidated. Never hold the lock across the salsa setter.
+        let existing = *self.analyze_config_input.read();
+        if let Some(cfg) = existing {
+            use salsa::Setter as _;
+            cfg.set_php_version(self).to(version);
+        }
     }
 
     /// `None` clears the resolver. The `ResolverConfig` input is *not*

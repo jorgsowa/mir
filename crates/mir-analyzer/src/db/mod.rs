@@ -95,6 +95,13 @@ pub trait MirDatabase: salsa::Database {
     /// Return the Salsa SourceFile handle registered for `path`, if any.
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile>;
 
+    /// Return the singleton [`AnalyzeFileInput`] input handle, lazily
+    /// creating it (seeded from `php_version_str()`) on first use. Tracked
+    /// queries read `cfg.php_version(db)` so a version change invalidates
+    /// their memos; the handle itself is stable for the session, giving
+    /// queries like `analyze_file` a repeatable memo key.
+    fn analyze_config(&self) -> AnalyzeFileInput;
+
     /// Return the singleton [`ResolverConfig`] input handle, if a resolver
     /// has ever been attached via `MirDbStorage::set_resolver`. Tracked queries
     /// read `cfg.revision(db)` to anchor on the resolver's version so

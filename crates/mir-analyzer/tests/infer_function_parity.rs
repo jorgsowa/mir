@@ -7,9 +7,7 @@ use std::sync::Arc;
 
 use std::hash::{Hash, Hasher};
 
-use mir_analyzer::db::{
-    collect_file_definitions, infer_function, parse_file, AnalyzeFileInput, MirDatabase,
-};
+use mir_analyzer::db::{collect_file_definitions, infer_function, parse_file, MirDatabase};
 use mir_analyzer::PhpVersion;
 
 /// Sources crafted to exercise: a clean fn, an undefined-variable fn, a
@@ -102,8 +100,9 @@ fn new_path_issues_for(fn_name: &str, source: &str) -> Vec<mir_issues::Issue> {
     let _ = parse_file(&db_snap, file);
     let _ = collect_file_definitions(&db_snap, file);
 
-    let input = AnalyzeFileInput::new(&db_snap, Arc::from("8.4"));
-    let result = infer_function(&db_snap, file, Arc::from(fn_name), input);
+    // PHP version comes from the AnalyzeFileInput singleton, seeded from the
+    // session's configured version (PhpVersion::LATEST here).
+    let result = infer_function(&db_snap, file, Arc::from(fn_name));
     result.map(|r| r.issues.clone()).unwrap_or_default()
 }
 
