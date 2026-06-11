@@ -423,6 +423,90 @@ fn method_references_inherited_method_end_to_end() {
 }
 
 #[test]
+fn property_references_inherited_property_end_to_end() {
+    // When Foo inherits $count from Base, record_ref and record_symbol must both
+    // use the declaring class (Base), not the receiver (Foo), so that
+    // references_to(Base::count) finds the access site.
+    use mir_analyzer::symbol::ReferenceKind;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("inherit_prop.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Base { public int $count = 0; }\n\
+         final class Foo extends Base {}\n\
+         (new Foo())->count;\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let prop_offset = source.find("->count").unwrap() as u32 + 2;
+    let sym = analysis
+        .symbol_at(prop_offset)
+        .expect("should resolve symbol at ->count");
+
+    let declaring_class = match &sym.kind {
+        ReferenceKind::PropertyAccess { class, .. } => class.as_ref().to_string(),
+        other => panic!("unexpected kind: {other:?}"),
+    };
+
+    assert_eq!(
+        declaring_class, "Base",
+        "symbol_at must report the DECLARING class (Base), not the receiver (Foo)"
+    );
+
+    let name = sym.to_symbol().expect("PropertyAccess maps to Name");
+    let refs = session.references_to(&name);
+
+    assert!(
+        !refs.is_empty(),
+        "references_to(Base::count) must find the (new Foo())->count access; \
+         got none (declaring_class was '{declaring_class}', refs: {refs:?})"
+    );
+}
+
+#[test]
+fn property_references_direct_property_end_to_end() {
+    // Non-inherited property: references_to(Foo::value) finds the access site.
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("direct_prop.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Foo { public string $value = ''; }\n\
+         (new Foo())->value;\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let _ = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let refs = session.references_to(&Name::property("Foo", "value"));
+    assert!(
+        !refs.is_empty(),
+        "references_to(Foo::value) must find the ->value access; got none"
+    );
+}
+
+#[test]
 fn load_class_with_custom_resolver() {
     use mir_analyzer::{ClassResolver, LoadOutcome};
     use std::path::PathBuf;

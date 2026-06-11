@@ -441,10 +441,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         let resolved = self.resolve_property_type(&obj_ty, &prop_name, pa.property.span);
         for atomic in &obj_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                let declaring_class = crate::db::find_property_in_chain(
+                    self.db,
+                    crate::db::Fqcn::new(self.db, *fqcn),
+                    &prop_name,
+                )
+                .map(|(dc, _)| dc)
+                .unwrap_or_else(|| Arc::from(fqcn.as_ref()));
                 self.record_symbol(
                     pa.property.span,
                     ReferenceKind::PropertyAccess {
-                        class: Arc::from(fqcn.as_ref()),
+                        class: declaring_class,
                         property: Arc::from(prop_name.as_str()),
                     },
                     resolved.clone(),
@@ -472,10 +479,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         prop_ty.add_type(Atomic::TNull);
         for atomic in &non_null_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                let declaring_class = crate::db::find_property_in_chain(
+                    self.db,
+                    crate::db::Fqcn::new(self.db, *fqcn),
+                    &prop_name,
+                )
+                .map(|(dc, _)| dc)
+                .unwrap_or_else(|| Arc::from(fqcn.as_ref()));
                 self.record_symbol(
                     pa.property.span,
                     ReferenceKind::PropertyAccess {
-                        class: Arc::from(fqcn.as_ref()),
+                        class: declaring_class,
                         property: Arc::from(prop_name.as_str()),
                     },
                     prop_ty.clone(),
@@ -813,7 +827,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         crate::db::Fqcn::new(self.db, *fqcn),
                         prop_name,
                     );
-                    if let Some((_, ref p)) = prop_result {
+                    if let Some((declaring_class, p)) = prop_result {
                         if let Some(msg) = &p.deprecated {
                             self.emit(
                                 IssueKind::DeprecatedProperty {
@@ -825,11 +839,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 span,
                             );
                         }
-                    }
-                    let prop_found: Option<Type> = prop_result
-                        .map(|(_, p)| p.ty.as_deref().cloned().unwrap_or_else(Type::mixed));
-                    if let Some(ty) = prop_found {
-                        self.record_ref(Arc::from(format!("{}::{}", fqcn, prop_name)), span);
+                        let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        self.record_ref(
+                            Arc::from(format!("{}::{}", declaring_class, prop_name)),
+                            span,
+                        );
                         return ty;
                     }
                     let get_method = crate::db::find_method_in_chain(
