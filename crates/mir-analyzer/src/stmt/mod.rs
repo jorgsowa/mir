@@ -38,6 +38,23 @@ struct VarAnnotation {
     ty: mir_types::Type,
 }
 
+/// The `$name` (without `$`) of a simple `$x = expr;` statement LHS, if any.
+fn simple_assignment_lhs(stmt: &php_ast::owned::Stmt) -> Option<&str> {
+    let php_ast::owned::StmtKind::Expression(e) = &stmt.kind else {
+        return None;
+    };
+    let php_ast::owned::ExprKind::Assign(a) = &e.kind else {
+        return None;
+    };
+    if !matches!(&a.op, php_ast::ast::AssignOp::Assign) {
+        return None;
+    }
+    let php_ast::owned::ExprKind::Variable(lhs_name) = &a.target.kind else {
+        return None;
+    };
+    Some(lhs_name.trim_start_matches('$'))
+}
+
 /// Apply post-narrow: after `$x = expr()`, override the inferred type with the annotated one.
 /// Named `@var Type $x` applies only when the LHS matches. Bare `@var Type` applies to any
 /// simple assignment LHS (it annotates the statement, not a specific variable).
@@ -349,6 +366,40 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Post-narrow: after `$x = expr()`, override the inferred type if annotated.
         if let Some(ref ann) = var_annotation {
+            // An annotation that exactly matches the inferred (widened) type
+            // of a simple assignment adds nothing — UnnecessaryVarAnnotation.
+            // Narrowing or widening annotations stay silent.
+            if self.mode == AnalysisMode::Full {
+                if let Some(lhs) = simple_assignment_lhs(stmt) {
+                    let applies = ann.name.as_deref().is_none_or(|n| n == lhs);
+                    if applies {
+                        let ann_ty = crate::expr::helpers::resolve_named_objects_in_union(
+                            ann.ty.clone(),
+                            self.db,
+                            self.file.as_ref(),
+                        );
+                        // Exact comparison, NO literal widening: `@var string`
+                        // on `$s = 'hello'` deliberately widens the literal
+                        // (it changes conditional-return resolution), so it is
+                        // not unnecessary.
+                        let inferred = ctx.get_var(lhs);
+                        if !inferred.is_mixed() && inferred.to_string() == ann_ty.to_string() {
+                            self.issues.add(Issue::new(
+                                IssueKind::UnnecessaryVarAnnotation {
+                                    var: lhs.to_string(),
+                                },
+                                Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    line_end,
+                                    col_start,
+                                    col_end: col_end.max(col_start + 1),
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
             apply_post_narrow(stmt, ann, ctx);
         }
 
