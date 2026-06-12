@@ -1373,12 +1373,51 @@ impl AnalysisSession {
             .map(|path| Arc::from(path.as_str()))
             .collect();
 
-        // Phase 2: drive each dependent through the `analyze_file` tracked
+        // Phase 2a: fault in each dependent's direct class references if the
+        // background indexer hasn't reached them yet (mirrors the FileAnalyzer
+        // warm-up behavior, avoiding transient false `UndefinedClass` during
+        // index warm-up).
+        //
+        // This runs SERIALLY and *before* the parallel analyze loop below:
+        // `prepare_ast_for_analysis` resolves and loads classes, and loading
+        // mutates the shared session salsa storage (`load_class` →
+        // `ingest_file` sets salsa inputs). Salsa input mutation cancels and
+        // blocks until every other database handle is released, so it must run
+        // with NO live snapshot in scope:
+        //
+        //  - in parallel (the v0.37.0 regression), sibling rayon workers held
+        //    live snapshot clones mid-`analyze_file`, so the first warm-up
+        //    write blocked on them forever — under high dependent fan-out this
+        //    deadlocked the whole runtime; and
+        //  - even serially, a snapshot held across the loop (e.g. one taken to
+        //    parse the dependents) blocks the very first write.
+        //
+        // So each iteration takes a *scoped* snapshot to fetch the parsed AST,
+        // drops it (the `Arc<ParseResult>` is owned), and only then warms up.
+        for file in &dependents {
+            if cancel.is_cancelled() {
+                return Vec::new();
+            }
+            let parsed = {
+                let db = self.snapshot_db();
+                let Some(sf) = db.lookup_source_file(file.as_ref()) else {
+                    continue;
+                };
+                crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf).0
+            };
+            self.prepare_ast_for_analysis(&parsed.program, file.as_ref());
+        }
+
+        // Phase 2b: drive each dependent through the `analyze_file` tracked
         // query in parallel. Salsa's memo validation does the real work
         // here: after a body-only edit, a dependent whose tracked inputs are
         // structurally unchanged (`FileDefinitions` backdating) returns its
         // cached output without re-running body analysis — re-analysis cost
         // scales with what actually changed, not with dependent count.
+        //
+        // The snapshot is taken AFTER the warm-up above so each worker observes
+        // the freshly-loaded classes. This loop is read-only on salsa: no
+        // worker mutates inputs, so the snapshots never contend on a write.
         //
         // Dependents' `FileAnalysis::symbols` are empty on this path:
         // per-expression symbols are intentionally not memoized (a typical
@@ -1395,12 +1434,6 @@ impl AnalysisSession {
                     return None;
                 }
                 let sf = db.lookup_source_file(file.as_ref())?;
-                // Fault in this dependent's direct class references if the
-                // background indexer hasn't reached them yet (mirrors the
-                // FileAnalyzer warm-up behavior, avoiding transient false
-                // UndefinedClass during index warm-up).
-                let parsed = crate::db::parse_file(&*db as &dyn crate::db::MirDatabase, sf);
-                self.prepare_ast_for_analysis(&parsed.0.program, file.as_ref());
                 let out = crate::db::analyze_file(&*db as &dyn crate::db::MirDatabase, sf);
                 Some((file, out))
             })

@@ -1018,3 +1018,114 @@ fn reanalyze_dependents_transitive_after_delete() {
         after
     );
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Regression: reanalyze_dependents must not deadlock when many dependents each
+// trigger a lazy class-load during warm-up.
+//
+// `reanalyze_dependents` warms up each dependent via `prepare_ast_for_analysis`,
+// which resolves the dependent's direct class references and loads any that
+// aren't indexed yet. Loading mutates the shared session salsa storage
+// (`load_class` → `ingest_file` takes the salsa write lock and sets inputs).
+//
+// v0.37.0 moved that warm-up *inside* the parallel rayon worker. With many
+// dependents each referencing a not-yet-loaded class, multiple workers entered
+// `ingest_file` concurrently while sibling workers held live snapshot clones
+// mid-`analyze_file` — quiescing the salsa runtime and deadlocking. On a
+// high-fan-out workspace (the symfony LSP feature tests) the call hung
+// indefinitely. The fix hoists the input-mutating warm-up out of the parallel
+// loop. This test reproduces the condition and asserts the call completes.
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// In-memory `ClassResolver`: maps an FQCN to a virtual path. Leading
+/// backslash on fully-qualified names is normalized away.
+struct MapResolver(std::collections::HashMap<String, std::path::PathBuf>);
+impl mir_analyzer::ClassResolver for MapResolver {
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+        self.0.get(fqcn.trim_start_matches('\\')).cloned()
+    }
+}
+
+/// In-memory `SourceProvider`: serves virtual-path source text.
+struct MapProvider(std::collections::HashMap<String, Arc<str>>);
+impl mir_analyzer::SourceProvider for MapProvider {
+    fn read(&self, path: &str) -> Option<Arc<str>> {
+        self.0.get(path).cloned()
+    }
+}
+
+#[test]
+fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    // Enough dependents to guarantee concurrent rayon workers contend on the
+    // shared salsa write lock during warm-up.
+    const N: usize = 64;
+
+    // Build resolver + provider for the lazily-loaded classes (Lazy0..LazyN).
+    // These are NOT ingested up front — the warm-up inside reanalyze_dependents
+    // is what faults them in, which is exactly what mutates shared salsa state.
+    let mut resolver_map: HashMap<String, PathBuf> = HashMap::new();
+    let mut provider_map: HashMap<String, Arc<str>> = HashMap::new();
+    for i in 0..N {
+        let path = format!("lazy_{i}.php");
+        resolver_map.insert(format!("Lazy{i}"), PathBuf::from(&path));
+        provider_map.insert(
+            path,
+            Arc::from(format!("<?php\nclass Lazy{i} {{}}\n").as_str()),
+        );
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST)
+        .with_class_resolver(Arc::new(MapResolver(resolver_map)))
+        .with_source_provider(Arc::new(MapProvider(provider_map)));
+    session.ensure_all_stubs();
+
+    // Base class every dependent extends — gives each dep a structural edge to
+    // base.php (recorded at ingest time), so all deps are transitive dependents.
+    session.ingest_file(Arc::from("base.php"), Arc::from("<?php\nclass Base {}\n"));
+
+    // Each dependent `extends \Base` (the dependency edge) and constructs a
+    // distinct `\Lazy{i}` in a method body. The Lazy reference is collected by
+    // the warm-up and triggers a lazy ingest, since it isn't loaded yet. Only
+    // ingest_file is called here (no FileAnalyzer), so Lazy{i} stays unloaded
+    // until reanalyze_dependents runs.
+    for i in 0..N {
+        let path: Arc<str> = Arc::from(format!("dep_{i}.php").as_str());
+        let src = format!(
+            "<?php\nclass Dep{i} extends \\Base {{ public function go(): void {{ $x = new \\Lazy{i}(); }} }}\n"
+        );
+        session.ingest_file(path, Arc::from(src.as_str()));
+    }
+
+    // Run on a worker thread guarded by a timeout: a regression deadlocks here
+    // rather than returning, so recv_timeout is what turns the hang into a
+    // failed assertion instead of a hung test binary.
+    let session = Arc::new(session);
+    let (tx, rx) = mpsc::channel();
+    let worker_session = Arc::clone(&session);
+    let handle = std::thread::spawn(move || {
+        let result = worker_session.reanalyze_dependents("base.php");
+        let _ = tx.send(result.len());
+    });
+
+    match rx.recv_timeout(Duration::from_secs(60)) {
+        Ok(count) => {
+            handle.join().expect("worker thread panicked");
+            assert_eq!(
+                count, N,
+                "every Dep{{i}} extends \\Base, so all {N} should be returned as dependents"
+            );
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            panic!(
+                "reanalyze_dependents did not complete within 60s — likely the \
+                 in-parallel-worker lazy-load deadlock regressed (v0.37.0 bug)"
+            );
+        }
+        Err(e) => panic!("worker channel error: {e:?}"),
+    }
+}

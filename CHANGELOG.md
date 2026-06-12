@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `reanalyze_dependents` no longer deadlocks on workspaces with high dependent fan-out. The per-dependent warm-up (`prepare_ast_for_analysis`, introduced in 0.37.0) loads classes by mutating shared salsa inputs, and salsa input mutation blocks until every other database handle is released. Running the warm-up inside the parallel rayon worker meant a worker mutated the storage while sibling workers held live snapshots mid-`analyze_file`, so the write blocked on them forever — hanging indefinitely on high-fan-out workspaces. Warm-up now runs before the parallel read-only analyze loop, with each iteration holding only a scoped snapshot that is dropped before any input write, restoring the "no input writes while a snapshot is live" invariant. Covered by a regression test (`reanalyze_dependents_lazy_load_warmup_does_not_deadlock`).
+
 ## [0.38.0] - 2026-06-12
 
 ### Added
