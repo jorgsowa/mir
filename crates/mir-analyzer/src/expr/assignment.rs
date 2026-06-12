@@ -156,6 +156,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::PropertyAccess(pa) => {
+                // Purity check: assigning to a parameter's property in a @pure function.
+                if ctx.is_in_pure_fn {
+                    if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                        let recv_stripped = recv_name.trim_start_matches('$');
+                        if ctx
+                            .param_names
+                            .contains(&mir_types::Name::from(recv_stripped))
+                        {
+                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                                self.emit(
+                                    IssueKind::ImpurePropertyAssignment {
+                                        property: prop_name,
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
+                        }
+                    }
+                }
                 let obj_ty = self.analyze(&pa.object, ctx);
                 let prop_name_opt = extract_string_from_expr(&pa.property);
                 if prop_name_opt.is_none() {

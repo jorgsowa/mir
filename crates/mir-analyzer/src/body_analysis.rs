@@ -865,6 +865,7 @@ impl<'a> BodyAnalyzer<'a> {
             true,
             Some(&template_params),
         );
+        ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
         let mut buf = IssueBuffer::new();
@@ -1345,6 +1346,15 @@ impl<'a> BodyAnalyzer<'a> {
             method.is_static,
             templates,
         );
+        // Set is_in_pure_fn if the method is annotated @pure.
+        if let Some((_, method_storage)) = crate::db::find_method_in_chain(
+            self.db,
+            crate::db::Fqcn::from_str(self.db, fqcn),
+            &method_name.to_ascii_lowercase(),
+        ) {
+            ctx.is_in_pure_fn = method_storage.is_pure;
+        }
+
         seed_param_locations(&mut ctx, &method.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
@@ -1588,6 +1598,7 @@ impl<'a> BodyAnalyzer<'a> {
             false,
             true,
         );
+        ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
         let mut buf = IssueBuffer::new();

@@ -79,6 +79,9 @@ pub struct FlowState {
     /// Whether we are inside a constructor.
     pub inside_constructor: bool,
 
+    /// Whether we are inside a @pure function/method body.
+    pub is_in_pure_fn: bool,
+
     /// Whether we are inside a static method body.
     pub inside_static_method: bool,
 
@@ -201,6 +204,7 @@ impl FlowState {
             inside_finally: false,
             is_generator: false,
             inside_constructor: false,
+            is_in_pure_fn: false,
             inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashSet::default(),

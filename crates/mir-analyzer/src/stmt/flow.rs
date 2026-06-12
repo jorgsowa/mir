@@ -420,6 +420,23 @@ impl<'a> StatementsAnalyzer<'a> {
             let ty = Type::mixed(); // static vars are indeterminate on entry
             let name_str = sv.name.as_deref().unwrap_or("").to_string();
             let name = name_str.trim_start_matches('$');
+            // Purity check: using a static variable in a @pure function.
+            if ctx.is_in_pure_fn {
+                let (line, col_start) = self.offset_to_line_col(sv.span.start);
+                let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
+                self.issues.add(mir_issues::Issue::new(
+                    IssueKind::ImpureStaticVariable {
+                        variable: name.to_string(),
+                    },
+                    Location {
+                        file: self.file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
+                    },
+                ));
+            }
             ctx.set_var(name, ty);
             let (line, col_start) = self.offset_to_line_col(sv.span.start);
             let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
@@ -439,6 +456,23 @@ impl<'a> StatementsAnalyzer<'a> {
         for var in vars.iter() {
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
                 let var_name = name.trim_start_matches('$');
+                // Purity check: using a global variable in a @pure function.
+                if ctx.is_in_pure_fn {
+                    let (line, col_start) = self.offset_to_line_col(var.span.start);
+                    let (line_end, col_end) = self.offset_to_line_col(var.span.end);
+                    self.issues.add(mir_issues::Issue::new(
+                        IssueKind::ImpureGlobalVariable {
+                            variable: var_name.to_string(),
+                        },
+                        Location {
+                            file: self.file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
+                }
                 let ty = self
                     .db
                     .global_var_type(var_name)

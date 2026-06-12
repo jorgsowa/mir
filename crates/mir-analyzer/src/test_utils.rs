@@ -615,6 +615,10 @@ pub fn run_fixture(path: &str) {
             "MixedArrayOffset",
             "ForbiddenCode",
             "Trace",
+            "ImpurePropertyAssignment",
+            "ImpureMethodCall",
+            "ImpureGlobalVariable",
+            "ImpureStaticVariable",
         ];
         if fixture.config.suppressed_issue_kinds.is_none() {
             // No explicit suppress= — build default set from dead-code group and

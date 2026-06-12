@@ -11,3 +11,4 @@ function addCumulative(int $left) : int {
     return $left;
 }
 ===expect===
+ImpureGlobalVariable@5:12-5:14: Using global variable $i in a @pure function

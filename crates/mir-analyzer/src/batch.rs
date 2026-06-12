@@ -36,7 +36,12 @@ use crate::stub_cache::{hash_source, prepare_for_ingest};
 /// every kind listed here is suppressed, the dead-code pass is skipped
 /// entirely.
 pub fn dead_code_issue_kinds() -> &'static [&'static str] {
-    &["UnusedMethod", "UnusedProperty", "UnusedFunction"]
+    &[
+        "UnusedMethod",
+        "UnusedProperty",
+        "UnusedFunction",
+        "UnusedClass",
+    ]
 }
 
 /// Per-batch options for [`AnalysisSession::analyze_paths`] and friends.

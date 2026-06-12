@@ -272,6 +272,19 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/diagnostics.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unused_foreach_value/`.
     UnusedForeachValue { name: String },
+    /// Emitted by `mir-analyzer/src/dead_code.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unused_class/`.
+    UnusedClass { class: String },
+
+    // --- Purity -------------------------------------------------------------
+    /// Emitted when a @pure function assigns to a parameter's property.
+    ImpurePropertyAssignment { property: String },
+    /// Emitted when a @pure function calls an impure method on a parameter.
+    ImpureMethodCall { method: String },
+    /// Emitted when a @pure function uses a global variable.
+    ImpureGlobalVariable { variable: String },
+    /// Emitted when a @pure function uses a static variable.
+    ImpureStaticVariable { variable: String },
 
     // --- Readonly -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
@@ -605,6 +618,10 @@ impl IssueKind {
             | IssueKind::ImplicitFloatToIntCast { .. }
             | IssueKind::UnusedVariable { .. }
             | IssueKind::UnusedForeachValue { .. }
+            | IssueKind::ImpurePropertyAssignment { .. }
+            | IssueKind::ImpureMethodCall { .. }
+            | IssueKind::ImpureGlobalVariable { .. }
+            | IssueKind::ImpureStaticVariable { .. }
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::UnhandledMatchCondition { .. }
             | IssueKind::InvalidStringClass { .. }
@@ -636,6 +653,7 @@ impl IssueKind {
             | IssueKind::UnusedMethod { .. }
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
+            | IssueKind::UnusedClass { .. }
             | IssueKind::DeprecatedCall { .. }
             | IssueKind::DeprecatedProperty { .. }
             | IssueKind::DeprecatedConstant { .. }
@@ -777,6 +795,13 @@ impl IssueKind {
             IssueKind::UnusedProperty { .. } => "MIR0504",
             IssueKind::UnusedFunction { .. } => "MIR0505",
             IssueKind::UnusedForeachValue { .. } => "MIR0506",
+            IssueKind::UnusedClass { .. } => "MIR0507",
+
+            // Purity (1700-1799)
+            IssueKind::ImpurePropertyAssignment { .. } => "MIR1700",
+            IssueKind::ImpureMethodCall { .. } => "MIR1701",
+            IssueKind::ImpureGlobalVariable { .. } => "MIR1702",
+            IssueKind::ImpureStaticVariable { .. } => "MIR1703",
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
@@ -883,17 +908,18 @@ impl IssueKind {
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0500" | "MIR0506"
-            | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" => Some(Severity::Warning),
+            | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700" | "MIR1701"
+            | "MIR1702" | "MIR1703" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
             | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400" | "MIR0401"
             | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504" | "MIR0505"
-            | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003" | "MIR1004" | "MIR1005"
-            | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011" | "MIR1100"
-            | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200" | "MIR1201" | "MIR1202"
-            | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210" | "MIR1600"
-            | "MIR1601" => Some(Severity::Info),
+            | "MIR0507" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003" | "MIR1004"
+            | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011"
+            | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200" | "MIR1201"
+            | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210"
+            | "MIR1600" | "MIR1601" => Some(Severity::Info),
 
             _ => None,
         }
@@ -964,6 +990,11 @@ impl IssueKind {
             IssueKind::UnusedProperty { .. } => "UnusedProperty",
             IssueKind::UnusedFunction { .. } => "UnusedFunction",
             IssueKind::UnusedForeachValue { .. } => "UnusedForeachValue",
+            IssueKind::UnusedClass { .. } => "UnusedClass",
+            IssueKind::ImpurePropertyAssignment { .. } => "ImpurePropertyAssignment",
+            IssueKind::ImpureMethodCall { .. } => "ImpureMethodCall",
+            IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
+            IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
@@ -1251,6 +1282,21 @@ impl IssueKind {
             }
             IssueKind::UnusedForeachValue { name } => {
                 format!("Foreach value ${name} is never read")
+            }
+            IssueKind::UnusedClass { class } => {
+                format!("Class {class} is never referenced")
+            }
+            IssueKind::ImpurePropertyAssignment { property } => {
+                format!("Assigning to property {property} of a parameter in a @pure function")
+            }
+            IssueKind::ImpureMethodCall { method } => {
+                format!("Calling impure method {method}() in a @pure function")
+            }
+            IssueKind::ImpureGlobalVariable { variable } => {
+                format!("Using global variable ${variable} in a @pure function")
+            }
+            IssueKind::ImpureStaticVariable { variable } => {
+                format!("Using static variable ${variable} in a @pure function")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
@@ -1778,6 +1824,11 @@ mod code_tests {
             },
             IssueKind::UnusedFunction { name: s() },
             IssueKind::UnusedForeachValue { name: s() },
+            IssueKind::UnusedClass { class: s() },
+            IssueKind::ImpurePropertyAssignment { property: s() },
+            IssueKind::ImpureMethodCall { method: s() },
+            IssueKind::ImpureGlobalVariable { variable: s() },
+            IssueKind::ImpureStaticVariable { variable: s() },
             IssueKind::ReadonlyPropertyAssignment {
                 class: s(),
                 property: s(),
@@ -2026,6 +2077,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 121);
+        assert_eq!(one_of_each().len(), 126);
     }
 }

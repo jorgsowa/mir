@@ -184,6 +184,25 @@ impl CallAnalyzer {
             return Type::mixed();
         }
 
+        // Purity check: calling a method on a parameter in a @pure function.
+        if ctx.is_in_pure_fn {
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                let recv_stripped = recv_name.trim_start_matches('$');
+                if ctx
+                    .param_names
+                    .contains(&mir_types::Name::from(recv_stripped))
+                {
+                    ea.emit(
+                        IssueKind::ImpureMethodCall {
+                            method: method_name.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+            }
+        }
+
         let receiver = obj_ty.remove_null();
         let mut result = Type::empty();
         // Declaring class of the resolved method, threaded out of

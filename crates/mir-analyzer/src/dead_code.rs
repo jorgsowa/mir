@@ -122,8 +122,46 @@ impl<'a> DeadCodeAnalyzer<'a> {
             }
         }
 
-        // --- Non-referenced free functions ---
+        // --- Non-referenced classes ---
         let stub_vfs = StubVfs::new();
+        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
+            let fqcn_str = fqcn.as_ref();
+
+            // Skip abstract and non-final classes — they may be used via inheritance or type hints
+            // in ways the reference tracker doesn't capture. Only flag final classes, which are
+            // true leaf types that can only be used by being directly instantiated/referenced.
+            if class.is_abstract() || !class.is_final() {
+                continue;
+            }
+
+            // Skip vendor/stub files.
+            let location = match &class {
+                crate::db::ClassLike::Class(c) => c.location.clone(),
+                _ => continue,
+            };
+            if let Some(loc) = &location {
+                if stub_vfs.is_stub_file(loc.file.as_ref()) {
+                    continue;
+                }
+                if !self.analyzed_files.is_empty()
+                    && !self.analyzed_files.contains(loc.file.as_ref())
+                {
+                    continue;
+                }
+            }
+
+            if !self.db.has_reference(fqcn_str) {
+                let loc = crate::diagnostics::storage_loc_to_location(location.as_ref());
+                issues.push(Issue::new(
+                    IssueKind::UnusedClass {
+                        class: fqcn_str.to_string(),
+                    },
+                    loc,
+                ));
+            }
+        }
+
+        // --- Non-referenced free functions ---
         let fqns: Vec<Arc<str>> = crate::db::workspace_functions(self.db)
             .iter()
             .cloned()

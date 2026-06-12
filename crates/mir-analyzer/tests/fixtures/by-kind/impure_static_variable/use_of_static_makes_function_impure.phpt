@@ -10,3 +10,4 @@ function addCumulative(int $left) : int {
     return $left;
 }
 ===expect===
+ImpureStaticVariable@5:12-5:18: Using static variable $i in a @pure function
