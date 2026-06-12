@@ -994,7 +994,7 @@ impl<'a> BodyAnalyzer<'a> {
                 );
                 if !hint_ty.is_mixed()
                     && !doc_ty.is_mixed()
-                    && !crate::subtype::is_subtype(self.db, doc_ty, &hint_ty)
+                    && docblock_conflicts_with_hint(self.db, doc_ty, &hint_ty)
                 {
                     let span = fn_header_name_span(source, decl);
                     let (line, col_start) =
@@ -1047,7 +1047,7 @@ impl<'a> BodyAnalyzer<'a> {
                 );
                 if hint_ty.is_mixed()
                     || doc_ty.is_mixed()
-                    || crate::subtype::is_subtype(self.db, &doc_ty, &hint_ty)
+                    || !docblock_conflicts_with_hint(self.db, &doc_ty, &hint_ty)
                 {
                     continue;
                 }
@@ -2168,6 +2168,161 @@ fn seed_param_locations(
             ctx.read_vars.insert(Name::from(name));
         }
     }
+}
+
+mod docblock_hint_compat {
+    //! Coarse compatibility between a docblock type and a native hint.
+    //!
+    //! `is_subtype` is too strict for docblock refinement types
+    //! (`literal-string`, `pure-callable`, `non-empty-list<...>` …), so the
+    //! mismatch check uses PHP type FAMILIES: a docblock atom conflicts with
+    //! the hint only when its family has no overlap with any hint family.
+    //! Object-vs-object comparisons additionally use `is_subtype`, but only
+    //! when every named class is known (unknown names are usually templates).
+    use mir_types::{Atomic, Type};
+
+    pub const NULL: u32 = 1;
+    pub const BOOL: u32 = 1 << 1;
+    pub const INT: u32 = 1 << 2;
+    pub const FLOAT: u32 = 1 << 3;
+    pub const STRING: u32 = 1 << 4;
+    pub const ARRAY: u32 = 1 << 5;
+    pub const OBJECT: u32 = 1 << 6;
+    pub const CALLABLE: u32 = 1 << 7;
+    pub const ALL: u32 = u32::MAX;
+
+    /// Family bits for one atom. `0` means "matches anything" (unknown /
+    /// placeholder kinds stay silent).
+    pub fn fam(a: &Atomic) -> u32 {
+        match a {
+            Atomic::TNull => NULL,
+            Atomic::TBool | Atomic::TTrue | Atomic::TFalse => BOOL,
+            Atomic::TInt
+            | Atomic::TLiteralInt(_)
+            | Atomic::TIntRange { .. }
+            | Atomic::TPositiveInt
+            | Atomic::TNegativeInt
+            | Atomic::TNonNegativeInt => INT,
+            Atomic::TFloat | Atomic::TLiteralFloat(..) => FLOAT,
+            Atomic::TString
+            | Atomic::TLiteralString(_)
+            | Atomic::TNonEmptyString
+            | Atomic::TNumericString
+            | Atomic::TInterfaceString
+            | Atomic::TEnumString
+            | Atomic::TTraitString
+            | Atomic::TClassString(_) => STRING,
+            Atomic::TCallableString => STRING | CALLABLE,
+            Atomic::TArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TNonEmptyArray { .. }
+            | Atomic::TNonEmptyList { .. }
+            | Atomic::TKeyedArray { .. } => ARRAY,
+            Atomic::TObject
+            | Atomic::TNamedObject { .. }
+            | Atomic::TSelf { .. }
+            | Atomic::TStaticObject { .. }
+            | Atomic::TParent { .. }
+            | Atomic::TIntersection { .. } => OBJECT,
+            Atomic::TClosure { .. } => OBJECT | CALLABLE,
+            Atomic::TCallable { .. } => CALLABLE | STRING | ARRAY | OBJECT,
+            Atomic::TScalar => BOOL | INT | FLOAT | STRING,
+            Atomic::TNumeric => INT | FLOAT | STRING,
+            Atomic::TNever => 0, // never ⊆ everything
+            _ => 0,              // mixed / templates / conditional / unknown
+        }
+    }
+
+    /// What a HINT atom accepts — slightly wider than its own family
+    /// (PHP coerces int → float; a `callable` hint takes strings, arrays
+    /// and invokable objects).
+    fn hint_mask(a: &Atomic) -> u32 {
+        match a {
+            Atomic::TMixed => ALL,
+            Atomic::TFloat => FLOAT | INT,
+            Atomic::TCallable { .. } | Atomic::TCallableString => {
+                CALLABLE | STRING | ARRAY | OBJECT
+            }
+            // `object` hint takes any object incl. closures.
+            Atomic::TObject => OBJECT | CALLABLE,
+            other => {
+                let f = fam(other);
+                if f == 0 {
+                    ALL
+                } else {
+                    f
+                }
+            }
+        }
+    }
+
+    pub fn hint_accepts_mask(hint: &Type) -> u32 {
+        hint.types.iter().fold(0, |acc, a| acc | hint_mask(a))
+    }
+}
+
+/// Whether the docblock type CONTRADICTS the native hint (vs merely refining
+/// it). See [`docblock_hint_compat`] for the family model.
+fn docblock_conflicts_with_hint(
+    db: &dyn crate::db::MirDatabase,
+    doc_ty: &mir_types::Type,
+    hint_ty: &mir_types::Type,
+) -> bool {
+    use docblock_hint_compat as fc;
+    use mir_types::Atomic;
+
+    let mask = fc::hint_accepts_mask(hint_ty);
+    if doc_ty.types.iter().any(|a| {
+        let fa = fc::fam(a);
+        // Docblock refinement types the parser doesn't model become bare
+        // named objects ("literal-string", "non-falsy-string", `C::class`
+        // constant refs) — an OBJECT-family atom only counts when the class
+        // actually exists, otherwise it is an unknown refinement: stay silent.
+        if fa == fc::OBJECT {
+            if let Atomic::TNamedObject { fqcn, .. } = a {
+                if crate::db::find_class_like(db, crate::db::Fqcn::new(db, *fqcn)).is_none() {
+                    return false;
+                }
+            }
+        }
+        fa != 0 && fa & mask == 0
+    }) {
+        return true;
+    }
+
+    // Object-vs-object precision: both sides purely class types with every
+    // name known → inheritance-aware subtype check (catches `A&C` vs `A&B`).
+    // Unknown names are usually unresolved templates — stay silent.
+    fn collect_names(t: &mir_types::Type, out: &mut Vec<mir_types::Name>) -> bool {
+        for a in &t.types {
+            match a {
+                Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
+                    out.push(*fqcn)
+                }
+                Atomic::TIntersection { parts } => {
+                    for p in parts.iter() {
+                        if !collect_names(p, out) {
+                            return false;
+                        }
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+    let mut names = Vec::new();
+    if !doc_ty.types.is_empty()
+        && !hint_ty.types.is_empty()
+        && collect_names(doc_ty, &mut names)
+        && collect_names(hint_ty, &mut names)
+        && names
+            .iter()
+            .all(|n| crate::db::find_class_like(db, crate::db::Fqcn::new(db, *n)).is_some())
+    {
+        return !crate::subtype::is_subtype(db, doc_ty, hint_ty);
+    }
+    false
 }
 
 /// Whether a docblock type still contains placeholders that cannot be

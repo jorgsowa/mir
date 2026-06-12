@@ -17,3 +17,4 @@ function test(A&B $in): void {
 }
 
 ===expect===
+MismatchingDocblockParamType@12:19-12:22: Docblock type 'A&C' for $in does not match inferred 'A&B'
