@@ -183,6 +183,7 @@ impl CallAnalyzer {
             .iter()
             .map(|arg| {
                 let ty = ea.analyze(&arg.value, ctx);
+                super::consume_arg_assignment(&arg.value, ctx);
                 if arg.unpack {
                     spread_element_type(&ty)
                 } else {
@@ -442,6 +443,7 @@ impl CallAnalyzer {
     ) -> Type {
         for arg in call.args.iter() {
             ea.analyze(&arg.value, ctx);
+            super::consume_arg_assignment(&arg.value, ctx);
         }
         Type::mixed()
     }

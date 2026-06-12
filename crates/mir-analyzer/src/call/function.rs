@@ -72,6 +72,7 @@ impl CallAnalyzer {
                 let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
                 for arg in call.args.iter() {
                     let ty = ea.analyze(&arg.value, ctx);
+                    super::consume_arg_assignment(&arg.value, ctx);
                     inner_arg_types.push(if arg.unpack {
                         spread_element_type(&ty)
                     } else {
@@ -259,6 +260,7 @@ impl CallAnalyzer {
             } else {
                 ea.analyze(&arg.value, ctx)
             };
+            super::consume_arg_assignment(&arg.value, ctx);
             arg_types.push(if arg.unpack {
                 spread_element_type(&ty)
             } else {

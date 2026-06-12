@@ -143,6 +143,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         arg_types.clear();
         for a in n.args.iter() {
             let ty = self.analyze(&a.value, ctx);
+            crate::call::consume_arg_assignment(&a.value, ctx);
             arg_types.push(if a.unpack {
                 crate::call::spread_element_type(&ty)
             } else {
