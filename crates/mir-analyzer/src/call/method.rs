@@ -185,6 +185,12 @@ impl CallAnalyzer {
 
         let receiver = obj_ty.remove_null();
         let mut result = Type::empty();
+        // Declaring class of the resolved method, threaded out of
+        // `resolve_method_return` so the symbol-recording loop below does not
+        // have to walk the ancestor chain a second time. Only the
+        // `TNamedObject` branch feeds it — the recording loop matches
+        // top-level `TNamedObject` atomics only.
+        let mut declaring = None;
 
         for atomic in &receiver.types {
             match atomic {
@@ -204,7 +210,13 @@ impl CallAnalyzer {
                         &receiver_type_params[..],
                         &arg_types,
                         &arg_spans,
+                        &mut declaring,
                     ));
+                    // Fallback for unresolvable calls (__call, unknown methods):
+                    // key the symbol on the receiver type itself.
+                    if declaring.is_none() {
+                        declaring = Some(fqcn.clone());
+                    }
                 }
                 mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
@@ -221,6 +233,7 @@ impl CallAnalyzer {
                         &[],
                         &arg_types,
                         &arg_spans,
+                        &mut None,
                     ));
                 }
                 mir_types::Atomic::TIntersection { parts } => {
@@ -248,6 +261,7 @@ impl CallAnalyzer {
                                         &receiver_type_params[..],
                                         &arg_types,
                                         &arg_spans,
+                                        &mut None,
                                     ));
                                 }
                             }
@@ -307,6 +321,7 @@ impl CallAnalyzer {
                                 &[],
                                 &arg_types,
                                 &arg_spans,
+                                &mut None,
                             ));
                         }
                     }
@@ -335,20 +350,15 @@ impl CallAnalyzer {
         };
 
         for atomic in &obj_ty.types {
-            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                // Resolve to the declaring class (via the inheritance chain) so that
-                // symbol_at → to_symbol() → references_to uses the same key as
-                // record_ref, which also keys by owner_fqcn. Fall back to the receiver
-                // type for unresolvable calls (__call, unknown methods).
-                let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
-                let fqcn_arc = Arc::from(fqcn_resolved.as_str());
-                let declaring_class = crate::db::find_method_respecting_precedence(
-                    ea.db,
-                    crate::db::Fqcn::from_str(ea.db, &fqcn_arc),
-                    &method_name.to_ascii_lowercase(),
-                )
-                .map(|(owner, _)| owner)
-                .unwrap_or(fqcn_arc);
+            if let mir_types::Atomic::TNamedObject { .. } = atomic {
+                // The declaring class (via the inheritance chain) was threaded
+                // out of `resolve_method_return` above so that symbol_at →
+                // to_symbol() → references_to uses the same key as record_ref,
+                // which also keys by owner_fqcn — without walking the chain a
+                // second time.
+                let Some(declaring_class) = declaring.take() else {
+                    break;
+                };
                 ea.record_symbol_with_expr_span(
                     call.method.span,
                     span,
@@ -367,6 +377,10 @@ impl CallAnalyzer {
 
 /// Resolves method return type for a known receiver FQCN, shared between the
 /// `TNamedObject` and `TSelf`/`TStaticObject`/`TParent` branches.
+///
+/// `declaring_class` is set (first resolution wins) to the FQCN of the class
+/// that declares the method — reused by the caller for symbol recording so
+/// the ancestor chain is only walked once.
 #[allow(clippy::too_many_arguments)]
 fn resolve_method_return<'a>(
     ea: &mut ExpressionAnalyzer<'a>,
@@ -378,11 +392,15 @@ fn resolve_method_return<'a>(
     receiver_type_params: &[Type],
     arg_types: &[Type],
     arg_spans: &[Span],
+    declaring_class: &mut Option<Arc<str>>,
 ) -> Type {
     let method_name_lower = method_name.to_lowercase();
     let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower);
 
     if let Some(resolved) = resolved {
+        if declaring_class.is_none() {
+            *declaring_class = Some(resolved.owner_fqcn.clone());
+        }
         ea.record_ref(
             Arc::from(format!(
                 "{}::{}",
