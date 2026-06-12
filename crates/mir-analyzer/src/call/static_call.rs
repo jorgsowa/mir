@@ -400,12 +400,14 @@ impl CallAnalyzer {
         } else if crate::db::class_exists(ea.db, &fqcn)
             && !crate::db::has_unknown_ancestor(ea.db, &fqcn)
         {
-            let is_abstract = crate::db::class_kind(ea.db, &fqcn)
-                .map(|k| k.is_abstract)
-                .unwrap_or(false);
+            let (is_abstract, is_trait) = crate::db::class_kind(ea.db, &fqcn)
+                .map(|k| (k.is_abstract, k.is_trait))
+                .unwrap_or((false, false));
             // Check for __callStatic in the full inheritance chain (not just direct methods)
             let has_callstatic_magic = crate::db::has_method_in_chain(ea.db, &fqcn, "__callstatic");
-            if is_abstract || has_callstatic_magic {
+            // In a trait body, self::/static:: resolve to the consuming class,
+            // which may provide the method — not undefined.
+            if is_abstract || is_trait || has_callstatic_magic {
                 Type::mixed()
             } else {
                 ea.emit(

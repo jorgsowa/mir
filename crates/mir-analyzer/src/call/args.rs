@@ -114,52 +114,35 @@ pub(crate) fn check_method_visibility(
     ctx: &crate::flow_state::FlowState,
     span: Span,
 ) {
-    match visibility {
+    let disallowed = match visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
             let from_trait =
                 crate::db::class_kind(ea.db, owner_fqcn.as_ref()).is_some_and(|k| k.is_trait);
-            let allowed = caller_fqcn == owner_fqcn.as_ref()
+            !(caller_fqcn == owner_fqcn.as_ref()
                 || (from_trait
-                    && crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref()));
-            if !allowed {
-                ea.emit(
-                    IssueKind::UndefinedMethod {
-                        class: owner_fqcn.to_string(),
-                        method: method_name.to_string(),
-                    },
-                    Severity::Error,
-                    span,
-                );
-            }
+                    && crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref())))
         }
         Visibility::Protected => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
-            if caller_fqcn.is_empty() {
-                ea.emit(
-                    IssueKind::UndefinedMethod {
-                        class: owner_fqcn.to_string(),
-                        method: method_name.to_string(),
-                    },
-                    Severity::Error,
-                    span,
-                );
-            } else {
-                let allowed = caller_fqcn == owner_fqcn.as_ref()
-                    || crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref());
-                if !allowed {
-                    ea.emit(
-                        IssueKind::UndefinedMethod {
-                            class: owner_fqcn.to_string(),
-                            method: method_name.to_string(),
-                        },
-                        Severity::Error,
-                        span,
-                    );
-                }
-            }
+            caller_fqcn.is_empty()
+                || !(caller_fqcn == owner_fqcn.as_ref()
+                    || crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref()))
         }
-        Visibility::Public => {}
+        Visibility::Public => false,
+    };
+    // An inaccessible method call is dispatched to `__call` at runtime when
+    // the class (chain) defines one — e.g. Laravel's Router::prefix() is
+    // protected and external callers go through Macroable::__call.
+    if disallowed && !crate::db::has_method_in_chain(ea.db, owner_fqcn, "__call") {
+        ea.emit(
+            IssueKind::UndefinedMethod {
+                class: owner_fqcn.to_string(),
+                method: method_name.to_string(),
+            },
+            Severity::Error,
+            span,
+        );
     }
 }
 

@@ -601,12 +601,14 @@ fn resolve_method_return<'a>(
         })
     } else if crate::db::class_exists(ea.db, fqcn) && !crate::db::has_unknown_ancestor(ea.db, fqcn)
     {
-        let (is_interface, is_abstract) = crate::db::class_kind(ea.db, fqcn)
-            .map(|k| (k.is_interface, k.is_abstract))
-            .unwrap_or((false, false));
+        let (is_interface, is_abstract, is_trait) = crate::db::class_kind(ea.db, fqcn)
+            .map(|k| (k.is_interface, k.is_abstract, k.is_trait))
+            .unwrap_or((false, false, false));
         // Check for __call in the full inheritance chain (not just direct methods)
         let has_call_magic = crate::db::has_method_in_chain(ea.db, fqcn, "__call");
-        if is_interface || is_abstract || has_call_magic {
+        // A trait body's $this is the future consuming class — the method may
+        // be provided by the consumer, so an unresolved call is not undefined.
+        if is_interface || is_abstract || is_trait || has_call_magic {
             Type::mixed()
         } else {
             ea.emit(
