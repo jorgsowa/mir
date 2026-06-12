@@ -54,13 +54,47 @@ pub fn infer_arg_template_bindings(
         .map(|tp| Name::from(tp.name.as_ref()))
         .collect();
 
-    for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
+    for (idx, arg_ty) in arg_types.iter().enumerate() {
+        // A trailing variadic param collects every remaining argument: match
+        // each one against it instead of stopping at params.len().
+        let param = if idx < params.len() {
+            &params[idx]
+        } else {
+            match params.last() {
+                Some(p) if p.is_variadic => p,
+                _ => break,
+            }
+        };
         if let Some(param_ty) = &param.ty {
-            infer_from_pair(param_ty, arg_ty, &template_names, &mut bindings);
+            if param.is_variadic {
+                // Variadic docblock types are written aggregate-style
+                // (`@param array<X> $args`); each individual argument is an
+                // `X`, so unwrap one array layer before matching.
+                let elem = variadic_element_type(param_ty);
+                infer_from_pair(elem, arg_ty, &template_names, &mut bindings);
+            } else {
+                infer_from_pair(param_ty, arg_ty, &template_names, &mut bindings);
+            }
         }
     }
 
     bindings
+}
+
+/// For a variadic parameter declared aggregate-style (`@param array<X> $args`
+/// or `list<X>`), return the element type `X` that each individual argument
+/// must match. Types that aren't a single array/list atomic are returned
+/// unchanged (e.g. `@param string ...$args` stores the bare element type).
+fn variadic_element_type(ty: &Type) -> &Type {
+    if ty.types.len() == 1 {
+        match &ty.types[0] {
+            Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. } => value,
+            Atomic::TList { value } | Atomic::TNonEmptyList { value } => value,
+            _ => ty,
+        }
+    } else {
+        ty
+    }
 }
 
 /// Check that each binding satisfies the template's declared bound, using
@@ -123,26 +157,45 @@ fn compute_template_residual(
     template_names: &std::collections::HashSet<Name>,
 ) -> Option<Type> {
     let mut has_template = false;
+    let mut has_template_class_string = false;
     let mut concrete: Vec<&Atomic> = Vec::new();
     for a in &param_ty.types {
         if is_template_atomic(a, template_names) {
             has_template = true;
+        } else if matches!(a, Atomic::TClassString(Some(n)) if template_names.contains(n)) {
+            // `class-string<T>` alongside a bare `T` (Mockery's
+            // `class-string<TMock>|TMock` pattern): the class-string
+            // alternative binds class-string args itself, so the bare
+            // template must not also absorb them.
+            has_template_class_string = true;
         } else {
             concrete.push(a);
         }
     }
-    if !has_template || concrete.is_empty() {
+    if !has_template || (concrete.is_empty() && !has_template_class_string) {
         return None;
     }
     let mut residual = Type::empty();
     residual.from_docblock = arg_ty.from_docblock;
     residual.possibly_undefined = arg_ty.possibly_undefined;
+    let mut class_string_consumed = false;
     for a in &arg_ty.types {
+        if has_template_class_string && matches!(a, Atomic::TClassString(_)) {
+            class_string_consumed = true;
+            continue;
+        }
         if !concrete.iter().any(|c| atomics_match_for_filter(c, a)) {
             residual.add_type(a.clone());
         }
     }
-    if residual.types.is_empty() || residual.types.len() == arg_ty.types.len() {
+    if residual.types.is_empty() {
+        // An EMPTY residual is meaningful when a `class-string<T>` alternative
+        // consumed the args: the bare template binds nothing at all. Otherwise
+        // (all args matched concrete atomics) keep the legacy behavior of
+        // binding the full arg type.
+        return class_string_consumed.then_some(residual);
+    }
+    if residual.types.len() == arg_ty.types.len() && !class_string_consumed {
         return None;
     }
     Some(residual)
@@ -202,6 +255,12 @@ fn infer_from_pair(
             // Direct template placeholder: T → bind T = residual(arg_ty)
             Atomic::TTemplateParam { name, .. } => {
                 let bind = template_residual.as_ref().unwrap_or(arg_ty);
+                if bind.types.is_empty() {
+                    // Empty residual: every arg atomic was consumed by another
+                    // union alternative (e.g. `class-string<T>`); nothing left
+                    // for the bare template to bind.
+                    continue;
+                }
                 let entry = bindings.entry(*name).or_insert_with(Type::empty);
                 entry.merge_with(bind);
             }
@@ -287,6 +346,9 @@ fn infer_from_pair(
             } => {
                 if pp.is_empty() && !pfqcn.contains('\\') && template_names.contains(pfqcn) {
                     let bind = template_residual.as_ref().unwrap_or(arg_ty);
+                    if bind.types.is_empty() {
+                        continue; // see TTemplateParam arm above
+                    }
                     let entry = bindings.entry(*pfqcn).or_insert_with(Type::empty);
                     entry.merge_with(bind);
                     continue;
@@ -397,10 +459,17 @@ fn infer_from_pair(
                 }
             }
 
-            // A&B intersection — recurse each part against the full arg
+            // A&B intersection — recurse each part against the arg. Use the
+            // residual-filtered arg when the surrounding union computed one:
+            // atomics consumed by sibling alternatives (e.g. `class-string<T>`)
+            // must not leak into bare-template parts of the intersection.
             Atomic::TIntersection { parts } => {
+                let arg = template_residual.as_ref().unwrap_or(arg_ty);
+                if arg.types.is_empty() {
+                    continue;
+                }
                 for part in parts.iter() {
-                    infer_from_pair(part, arg_ty, template_names, bindings);
+                    infer_from_pair(part, arg, template_names, bindings);
                 }
             }
 

@@ -5,7 +5,7 @@ use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::Type;
+use mir_types::{Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -477,8 +477,16 @@ fn resolve_method_return<'a>(
         }
 
         // Substitute class bindings into param types so argument checking resolves T → int etc.
+        // A method-level `@template T` SHADOWS a same-named class template: its
+        // occurrences in param types must stay unbound here so `check_args` can
+        // infer them from the arguments instead (e.g. ReflectionClass<Foo> with
+        // `getAttributes(class-string<T>|null $name)` redeclaring T).
+        let mut param_bindings = bindings.clone();
+        for tp in resolved.template_params.iter() {
+            param_bindings.remove(&Name::from(tp.name.as_ref()));
+        }
         let substituted_params: Vec<FnParam>;
-        let effective_params: &[FnParam] = if bindings.is_empty() {
+        let effective_params: &[FnParam] = if param_bindings.is_empty() {
             &resolved.params
         } else {
             substituted_params = resolved
@@ -486,7 +494,8 @@ fn resolve_method_return<'a>(
                 .iter()
                 .map(|p| FnParam {
                     ty: mir_codebase::wrap_param_type(
-                        p.ty.as_ref().map(|t| t.substitute_templates(&bindings)),
+                        p.ty.as_ref()
+                            .map(|t| t.substitute_templates(&param_bindings)),
                     ),
                     ..p.clone()
                 })
@@ -515,15 +524,25 @@ fn resolve_method_return<'a>(
         if !resolved.template_params.is_empty() {
             let method_bindings =
                 infer_template_bindings(&resolved.template_params, &resolved.params, arg_types);
-            for key in method_bindings.keys() {
-                if bindings.contains_key(key) {
-                    ea.emit(
-                        IssueKind::ShadowedTemplateParam {
-                            name: key.to_string(),
-                        },
-                        Severity::Info,
-                        span,
-                    );
+            // Only warn about template shadowing when the declaring class lives
+            // in the file under analysis — a shadow inside a stub or vendor
+            // class is the library's concern, not this call site's.
+            let declared_here = crate::db::class_like_decl_file(
+                ea.db,
+                crate::db::Fqcn::from_str(ea.db, resolved.owner_fqcn.as_ref()),
+            )
+            .is_some_and(|f| f.as_ref() == ea.file.as_ref());
+            if declared_here {
+                for key in method_bindings.keys() {
+                    if bindings.contains_key(key) {
+                        ea.emit(
+                            IssueKind::ShadowedTemplateParam {
+                                name: key.to_string(),
+                            },
+                            Severity::Info,
+                            span,
+                        );
+                    }
                 }
             }
             bindings.extend(method_bindings);

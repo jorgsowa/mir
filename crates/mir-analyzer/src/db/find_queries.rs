@@ -549,6 +549,16 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     }
 }
 
+/// The file a class-like symbol is declared in, if known.
+pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<str>> {
+    let key = fqcn.name(db).ascii_lowercase();
+    let loc = match db.frozen_workspace_index() {
+        Some(frozen) => frozen.class_like.get(&key).copied(),
+        None => crate::db::workspace_index(db).class_like.get(&key).copied(),
+    }?;
+    Some(loc.file().path(db))
+}
+
 /// Composite: resolve `fqn` to its defining file, then locate the
 /// function within it.
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {

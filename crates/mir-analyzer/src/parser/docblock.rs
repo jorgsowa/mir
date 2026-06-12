@@ -956,6 +956,11 @@ fn find_matching_paren(s: &str) -> Option<usize> {
 fn parse_template_line(_tag_name: &str, body: Option<String>) -> Option<(String, Option<String>)> {
     let body = body?;
     let body = body.trim();
+    // The body may also carry FOLLOWING PROSE LINES (a description written
+    // after the tag) — only the first line holds the name and optional bound.
+    // Otherwise a description like "Returns an array of class attributes."
+    // is misparsed as a bound via its " of ".
+    let body = body.lines().next().unwrap_or(body).trim_end();
     // Stop at the next embedded tag so single-line docblocks don't swallow the
     // following `@param`/`@return` tokens into the template name/bound.
     let body = match body.find(" @") {
