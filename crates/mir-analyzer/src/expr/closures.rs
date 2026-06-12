@@ -30,7 +30,12 @@ fn param_name_span(source: &str, p: &Param) -> Span {
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
-    pub(super) fn analyze_closure(&mut self, c: &ClosureExpr, ctx: &mut FlowState) -> Type {
+    pub(super) fn analyze_closure(
+        &mut self,
+        c: &ClosureExpr,
+        expr_span: php_ast::Span,
+        ctx: &mut FlowState,
+    ) -> Type {
         for param in c.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_type_hint(hint);
@@ -50,7 +55,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             .return_type
             .as_ref()
             .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
-            .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
+            .map(|u| resolve_named_objects_in_union(u, self.db, &self.file))
+            .or_else(|| {
+                // Fall back to `@return` docblock preceding the `function` keyword.
+                crate::parser::find_preceding_docblock(self.source, expr_span.start)
+                    .and_then(|doc| crate::parser::DocblockParser::parse(&doc).return_type)
+                    .map(|ty| resolve_named_objects_in_union(ty, self.db, &self.file))
+            });
 
         let mut closure_ctx = crate::flow_state::FlowState::for_function(
             &params,

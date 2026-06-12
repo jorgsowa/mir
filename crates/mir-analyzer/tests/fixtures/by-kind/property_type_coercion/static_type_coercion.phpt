@@ -14,4 +14,4 @@ class A {
 
 class B extends A {}
 ===expect===
-InvalidPropertyAssignment@8:9-8:24: Property $foo expects 'B|null', cannot assign 'A'
+PropertyTypeCoercion@8:9-8:24: Property $foo expects 'B|null', cannot assign 'A' — coercion may fail at runtime

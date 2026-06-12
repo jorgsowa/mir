@@ -191,6 +191,17 @@ pub(crate) fn check_one(
                 Severity::Info,
                 arg_span,
             );
+        } else if is_named_object_coercion(arg_ty, param_ty, ea) {
+            ea.emit(
+                IssueKind::ArgumentTypeCoercion {
+                    param: param_name.to_string(),
+                    fn_name: fn_name.to_string(),
+                    expected: format!("{param_ty}"),
+                    actual: format!("{arg_ty}"),
+                },
+                Severity::Info,
+                arg_span,
+            );
         } else {
             ea.emit(
                 IssueKind::InvalidArgument {
@@ -203,6 +214,27 @@ pub(crate) fn check_one(
                 arg_span,
             );
         }
+    }
+
+    // When a supertype object is passed where a subtype is expected, emit ArgumentTypeCoercion.
+    // This happens when named_object_subtype returns true via the "reverse" check (param extends arg),
+    // which means the call might fail at runtime if the actual object isn't the expected subtype.
+    if !arg_ty.is_mixed()
+        && !param_ty.is_mixed()
+        && is_named_object_coercion(arg_ty, param_ty, ea)
+        && !scalar_arg_fits_param(arg_ty, param_ty)
+        && !array_list_compatible(arg_ty, param_ty, ea)
+    {
+        ea.emit(
+            IssueKind::ArgumentTypeCoercion {
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
+                expected: format!("{param_ty}"),
+                actual: format!("{arg_ty}"),
+            },
+            Severity::Info,
+            arg_span,
+        );
     }
 
     // When a Stringable object is implicitly coerced to string, emit ImplicitToStringCast.
@@ -600,6 +632,31 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
 
             false
         })
+    })
+}
+
+fn is_named_object_coercion(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    if !arg.is_single() {
+        return false;
+    }
+    let arg_fqcn: &Name = match arg.types.first() {
+        Some(Atomic::TNamedObject { fqcn, type_params }) if type_params.is_empty() => fqcn,
+        Some(
+            Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn },
+        ) => fqcn,
+        _ => return false,
+    };
+    let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
+    param.types.iter().any(|p_atomic| {
+        let param_fqcn: &Name = match p_atomic {
+            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => fqcn,
+            _ => return false,
+        };
+        let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
+        // param is a subtype of arg = arg is the ancestor = coercion
+        crate::db::extends_or_implements(ea.db, param_fqcn.as_ref(), &resolved_arg)
+            || crate::db::extends_or_implements(ea.db, param_fqcn.as_ref(), arg_fqcn.as_ref())
+            || crate::db::extends_or_implements(ea.db, &resolved_param, &resolved_arg)
     })
 }
 

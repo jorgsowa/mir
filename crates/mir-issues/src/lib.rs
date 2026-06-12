@@ -276,6 +276,23 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/unused_class/`.
     UnusedClass { class: String },
 
+    /// Emitted by `mir-analyzer/src/call/args/types.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/argument_type_coercion/`.
+    ArgumentTypeCoercion {
+        param: String,
+        fn_name: String,
+        expected: String,
+        actual: String,
+    },
+
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/property_type_coercion/`.
+    PropertyTypeCoercion {
+        property: String,
+        expected: String,
+        actual: String,
+    },
+
     // --- Purity -------------------------------------------------------------
     /// Emitted when a @pure function assigns to a parameter's property.
     ImpurePropertyAssignment { property: String },
@@ -654,6 +671,8 @@ impl IssueKind {
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
             | IssueKind::UnusedClass { .. }
+            | IssueKind::ArgumentTypeCoercion { .. }
+            | IssueKind::PropertyTypeCoercion { .. }
             | IssueKind::DeprecatedCall { .. }
             | IssueKind::DeprecatedProperty { .. }
             | IssueKind::DeprecatedConstant { .. }
@@ -773,6 +792,8 @@ impl IssueKind {
             IssueKind::InvalidStringClass { .. } => "MIR0211",
             IssueKind::TypeCheckMismatch { .. } => "MIR0212",
             IssueKind::Trace { .. } => "MIR0221",
+            IssueKind::ArgumentTypeCoercion { .. } => "MIR0225",
+            IssueKind::PropertyTypeCoercion { .. } => "MIR0226",
 
             // Array / offset (0300-0399)
             IssueKind::InvalidArrayOffset { .. } => "MIR0300",
@@ -919,7 +940,7 @@ impl IssueKind {
             | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011"
             | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200" | "MIR1201"
             | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210"
-            | "MIR1600" | "MIR1601" => Some(Severity::Info),
+            | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" => Some(Severity::Info),
 
             _ => None,
         }
@@ -991,6 +1012,8 @@ impl IssueKind {
             IssueKind::UnusedFunction { .. } => "UnusedFunction",
             IssueKind::UnusedForeachValue { .. } => "UnusedForeachValue",
             IssueKind::UnusedClass { .. } => "UnusedClass",
+            IssueKind::ArgumentTypeCoercion { .. } => "ArgumentTypeCoercion",
+            IssueKind::PropertyTypeCoercion { .. } => "PropertyTypeCoercion",
             IssueKind::ImpurePropertyAssignment { .. } => "ImpurePropertyAssignment",
             IssueKind::ImpureMethodCall { .. } => "ImpureMethodCall",
             IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
@@ -1285,6 +1308,21 @@ impl IssueKind {
             }
             IssueKind::UnusedClass { class } => {
                 format!("Class {class} is never referenced")
+            }
+            IssueKind::ArgumentTypeCoercion {
+                param,
+                fn_name,
+                expected,
+                actual,
+            } => {
+                format!("Argument ${param} of {fn_name}() expects '{expected}', got '{actual}' — coercion may fail at runtime")
+            }
+            IssueKind::PropertyTypeCoercion {
+                property,
+                expected,
+                actual,
+            } => {
+                format!("Property ${property} expects '{expected}', cannot assign '{actual}' — coercion may fail at runtime")
             }
             IssueKind::ImpurePropertyAssignment { property } => {
                 format!("Assigning to property {property} of a parameter in a @pure function")
@@ -1825,6 +1863,17 @@ mod code_tests {
             IssueKind::UnusedFunction { name: s() },
             IssueKind::UnusedForeachValue { name: s() },
             IssueKind::UnusedClass { class: s() },
+            IssueKind::ArgumentTypeCoercion {
+                param: s(),
+                fn_name: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::PropertyTypeCoercion {
+                property: s(),
+                expected: s(),
+                actual: s(),
+            },
             IssueKind::ImpurePropertyAssignment { property: s() },
             IssueKind::ImpureMethodCall { method: s() },
             IssueKind::ImpureGlobalVariable { variable: s() },
@@ -2077,6 +2126,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 126);
+        assert_eq!(one_of_each().len(), 128);
     }
 }

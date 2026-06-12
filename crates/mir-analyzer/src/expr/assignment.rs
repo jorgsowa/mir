@@ -1,6 +1,7 @@
 use super::helpers::{
-    extract_simple_var, extract_string_from_expr, infer_arithmetic, property_assign_compatible,
-    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key,
+    extract_simple_var, extract_string_from_expr, infer_arithmetic, is_property_type_coercion,
+    property_assign_compatible, type_refs_any_template, widen_array_as_list,
+    widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -260,15 +261,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         if !skip
                                             && !property_assign_compatible(&ty, prop_ty, self.db)
                                         {
-                                            self.emit(
-                                                IssueKind::InvalidPropertyAssignment {
-                                                    property: prop_name.clone(),
-                                                    expected: format!("{prop_ty}"),
-                                                    actual: format!("{ty}"),
-                                                },
-                                                Severity::Warning,
-                                                span,
-                                            );
+                                            if is_property_type_coercion(&ty, prop_ty, self.db) {
+                                                self.emit(
+                                                    IssueKind::PropertyTypeCoercion {
+                                                        property: prop_name.clone(),
+                                                        expected: format!("{prop_ty}"),
+                                                        actual: format!("{ty}"),
+                                                    },
+                                                    Severity::Info,
+                                                    span,
+                                                );
+                                            } else {
+                                                self.emit(
+                                                    IssueKind::InvalidPropertyAssignment {
+                                                        property: prop_name.clone(),
+                                                        expected: format!("{prop_ty}"),
+                                                        actual: format!("{ty}"),
+                                                    },
+                                                    Severity::Warning,
+                                                    span,
+                                                );
+                                            }
                                         }
                                     }
                                 }
@@ -323,15 +336,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         if !skip
                                             && !property_assign_compatible(&ty, prop_ty, self.db)
                                         {
-                                            self.emit(
-                                                IssueKind::InvalidPropertyAssignment {
-                                                    property: prop_name.clone(),
-                                                    expected: format!("{prop_ty}"),
-                                                    actual: format!("{ty}"),
-                                                },
-                                                Severity::Warning,
-                                                span,
-                                            );
+                                            if is_property_type_coercion(&ty, prop_ty, self.db) {
+                                                self.emit(
+                                                    IssueKind::PropertyTypeCoercion {
+                                                        property: prop_name.clone(),
+                                                        expected: format!("{prop_ty}"),
+                                                        actual: format!("{ty}"),
+                                                    },
+                                                    Severity::Info,
+                                                    span,
+                                                );
+                                            } else {
+                                                self.emit(
+                                                    IssueKind::InvalidPropertyAssignment {
+                                                        property: prop_name.clone(),
+                                                        expected: format!("{prop_ty}"),
+                                                        actual: format!("{ty}"),
+                                                    },
+                                                    Severity::Warning,
+                                                    span,
+                                                );
+                                            }
                                         }
                                     }
                                 }

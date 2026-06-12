@@ -349,3 +349,28 @@ pub(crate) fn property_assign_compatible(
         _ => false,
     })
 }
+
+pub(crate) fn is_property_type_coercion(
+    value_ty: &Type,
+    prop_ty: &Type,
+    db: &dyn crate::db::MirDatabase,
+) -> bool {
+    if value_ty.is_mixed() || prop_ty.is_mixed() {
+        return false;
+    }
+    let value_core = value_ty.core_type();
+    if value_core.types.is_empty() || !value_core.is_single() {
+        return false;
+    }
+    let val_fqcn = match value_core.types.first().unwrap() {
+        Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => *fqcn,
+        _ => return false,
+    };
+    prop_ty.types.iter().any(|p| {
+        let prop_fqcn = match p {
+            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => fqcn,
+            _ => return false,
+        };
+        crate::db::extends_or_implements(db, prop_fqcn.as_ref(), val_fqcn.as_ref())
+    })
+}
