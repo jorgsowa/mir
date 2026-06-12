@@ -11,3 +11,4 @@ function foo() : string {
     };
 }
 ===expect===
+TypeDoesNotContainType@7:9-7:12: Type '"a"|"b"' can never contain type '"c"'

@@ -111,6 +111,24 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let Some(var) = &subject_var {
                 if !arm_ty.is_empty() && !arm_ty.is_mixed() {
                     let narrowed = subject_ty.intersect_with(&arm_ty);
+                    if !subject_ty.is_mixed()
+                        && narrowed.is_never()
+                        && is_scalar_union(&subject_ty)
+                        && is_scalar_union(&arm_ty)
+                    {
+                        if let Some(conditions) = &arm.conditions {
+                            for cond in conditions {
+                                self.emit(
+                                    IssueKind::TypeDoesNotContainType {
+                                        left: format!("{subject_ty}"),
+                                        right: format!("{arm_ty}"),
+                                    },
+                                    Severity::Info,
+                                    cond.span,
+                                );
+                            }
+                        }
+                    }
                     if !narrowed.is_empty() {
                         arm_ctx.set_var(var, narrowed);
                     }
@@ -291,4 +309,25 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         None
     }
+}
+
+/// Returns true when every atomic in `ty` is a scalar or literal type (string, int, float,
+/// bool, null, or their literal variants). Named object types are excluded because class
+/// hierarchies make the "can never contain" check unreliable without full inheritance data.
+fn is_scalar_union(ty: &Type) -> bool {
+    ty.types.iter().all(|a| {
+        matches!(
+            a,
+            Atomic::TString
+                | Atomic::TLiteralString(_)
+                | Atomic::TInt
+                | Atomic::TLiteralInt(_)
+                | Atomic::TFloat
+                | Atomic::TLiteralFloat(..)
+                | Atomic::TBool
+                | Atomic::TTrue
+                | Atomic::TFalse
+                | Atomic::TNull
+        )
+    })
 }

@@ -279,6 +279,23 @@ impl<'a> StatementsAnalyzer<'a> {
             entry.record_write(vname.as_str(), line, col_start, line_end, col_end);
             // Emit ResolvedSymbol for value variable at binding position
             self.record_symbol_for_var(fe.value.span, vname, value_ty.clone());
+            if value_ty.is_mixed() {
+                self.issues.add(
+                    Issue::new(
+                        IssueKind::MixedAssignment { var: vname.clone() },
+                        Location {
+                            file: self.file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    )
+                    .with_snippet(
+                        parser::span_text(self.source, fe.value.span).unwrap_or_default(),
+                    ),
+                );
+            }
         } else {
             for vname in &value_destructure_vars {
                 entry.set_var(vname, Type::mixed());
@@ -336,7 +353,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
     pub(super) fn analyze_switch_stmt(&mut self, sw: &SwitchStmt, ctx: &mut FlowState) {
         self.check_duplicate_case_values(sw);
-        let _subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
+        let subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
         let subject_var: Option<String> = match &sw.expr.kind {
             ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
             _ => None,
@@ -368,8 +385,31 @@ impl<'a> StatementsAnalyzer<'a> {
                         ExprKind::Null => Some(Type::single(Atomic::TNull)),
                         _ => None,
                     };
-                    if let Some(narrowed) = narrow_ty {
-                        case_ctx.set_var(var_name, narrowed);
+                    if let Some(ref narrowed) = narrow_ty {
+                        if !subject_ty.is_mixed() && narrowed.intersect_with(&subject_ty).is_never()
+                        {
+                            let (line, line_end, col_start, col_end) =
+                                self.span_to_location(val.span);
+                            self.issues.add(
+                                Issue::new(
+                                    IssueKind::TypeDoesNotContainType {
+                                        left: format!("{subject_ty}"),
+                                        right: format!("{narrowed}"),
+                                    },
+                                    Location {
+                                        file: self.file.clone(),
+                                        line,
+                                        line_end,
+                                        col_start,
+                                        col_end: col_end.max(col_start + 1),
+                                    },
+                                )
+                                .with_snippet(
+                                    parser::span_text(self.source, val.span).unwrap_or_default(),
+                                ),
+                            );
+                        }
+                        case_ctx.set_var(var_name, narrowed.clone());
                     }
                 }
                 self.expr_analyzer(&case_ctx).analyze(val, &mut case_ctx);
