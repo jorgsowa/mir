@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-06-12
+
+### Added
+
+- `UnnecessaryVarAnnotation` (Info) — a `@var` annotation on a simple assignment whose declared type exactly matches the inferred type is flagged as redundant. The comparison is exact, with no literal widening: `@var string` on `$s = 'hello'` changes the type (literal → base) and is therefore not reported. Narrowing annotations, mixed-typed right-hand sides, and non-assignment statements stay silent.
+- `MismatchingDocblockReturnType` / `MismatchingDocblockParamType` (Info) — a `@return`/`@param` docblock that contradicts the native type hint on a top-level function is now reported. Refinements never fire: the comparison uses PHP type families (with `int → float` coercion and `callable`'s string/array/object forms modeled), so e.g. `literal-string`/`non-empty-list<…>` against their base hints stay silent. Object-vs-object falls back to an inheritance-aware subtype check when every named class is known; unresolved names (templates, `::class` refs, unmodeled refinement syntax) stay silent.
+- `MissingReturnType` / `MissingParamType` (Info) — top-level functions with neither a native hint nor a docblock type are now reported (previously only interface methods were checked), on all three analysis paths (per-scope salsa, batch typed, pure per-function).
+
 ### Fixed
 
 - `reanalyze_dependents` no longer deadlocks on workspaces with high dependent fan-out. The per-dependent warm-up (`prepare_ast_for_analysis`, introduced in 0.37.0) loads classes by mutating shared salsa inputs, and salsa input mutation blocks until every other database handle is released. Running the warm-up inside the parallel rayon worker meant a worker mutated the storage while sibling workers held live snapshots mid-`analyze_file`, so the write blocked on them forever — hanging indefinitely on high-fan-out workspaces. Warm-up now runs before the parallel read-only analyze loop, with each iteration holding only a scoped snapshot that is dropped before any input write, restoring the "no input writes while a snapshot is live" invariant. Covered by a regression test (`reanalyze_dependents_lazy_load_warmup_does_not_deadlock`).
+- Large false-positive reduction on the Laravel reference corpus across several diagnostic kinds (each fix ships with regression fixtures, including the negative cases):
+  - **Template binding**: trailing variadic params now bind every remaining argument (unwrapping `array<X>` docblock types to their element type per argument); a `class-string<T>` union alternative consumes class-string arguments so a sibling bare `T` no longer absorbs them; method-level `@template` shadows a same-named class template during argument checking; and a docblock description following a `@template` line is no longer misparsed as a bound. Removes ~1350 FPs (6148 → 4781), dominated by Mockery intersection mocks.
+  - **`InvalidStringClass`**: `new $x` where `$x` is `mixed` or a template param no longer fires — `mixed` is a `Mixed*` concern, and a template bound may be a class-string. Removes 501 FPs (4781 → 4280).
+  - **`UndefinedMethod`**: `$this->m()` / `static::m()` inside a trait body is suppressed (the consuming class may provide the method, so traits join interfaces/abstract classes), and inaccessible protected/private calls dispatched through `__call` (e.g. `Macroable`, Mockery partial mocks) no longer error. 756 → 168.
+  - **`UnusedVariable` / `UnusedForeachValue`**: path-accurate liveness — closure `use()` captures and closure/arrow-body reads consume the outer write; branch merges no longer resurrect a write consumed on one path; multiple pending write locations per variable are tracked (pre-loop and loop-body writes); and `switch` with a `default` arm no longer merges the impossible no-match path. 938 → 376 and 106 → 54.
+  - **`UnusedVariable`**: an assignment in argument position (`f($x = expr)`, `->andReturn($mock = m::mock(...))`) now counts as a use across all call shapes (function, dynamic-callee, method, static, `new`). 376 → 243.
+  - **`UndefinedFunction` / `InvalidTemplateParam`**: a string passed to a union param with non-callable alternatives is no longer validated as a function name (157 → 3); template bounds are not checked against bindings that still contain unresolved placeholders (`self`/`static`/`parent`, template params) (103 → 42); and `class-string<T>` binding coerces class-name-shaped string literals such as `m::mock('Foo\Bar')` without `::class`.
+  - **`InvalidArgument`**: an array passed to a `callable|array|null` param matches the array alternative instead of being forced into the `[object, "method"]` callable shape. Removes 169 FPs (618 → 449).
 
 ## [0.38.0] - 2026-06-12
 
