@@ -929,6 +929,26 @@ fn validate_callable_type(
         return;
     }
 
+    // A union like `callable|array|null` (Http\Client\Factory::fake) accepts
+    // any array through its non-callable alternatives — don't force the
+    // [object, "method"] callable shape onto it.
+    let has_array_accepting_alternative = param_ty.types.iter().any(|t| match t {
+        Atomic::TArray { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TMixed
+        | Atomic::TTemplateParam { .. } => true,
+        Atomic::TNamedObject { fqcn, type_params } => {
+            type_params.is_empty() && !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
+        }
+        _ => false,
+    });
+    if has_array_accepting_alternative {
+        return;
+    }
+
     // Check if argument is a keyed array (should be [obj/class, "method"] format)
     for atomic in &arg_ty.types {
         if let Atomic::TKeyedArray { properties, .. } = atomic {
