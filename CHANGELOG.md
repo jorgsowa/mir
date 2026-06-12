@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-06-12
+
+### Added
+
+- `IssueKind::default_severity_for_code` — reverse lookup from a stable error code (e.g. `"MIR0005"`) to its default severity, for callers holding a bare code string (config files, suppression annotations, serialised diagnostics).
+
+### Changed
+
+- Property-access and method-call symbol recording now reuses the declaring class from type resolution instead of re-walking the inheritance chain, removing a redundant ancestor-chain walk per property access and per method call.
+
+### Fixed
+
+- Closure and arrow-function parameter/return type hints (`function (Foo $x) {}`, `fn (Foo $x) => ...`) now contribute reference-index entries and `ClassReference` symbols, so find-references and hover cover closure usages.
+- `$x instanceof Foo` now records a `ClassReference` symbol at the class-name span, unblocking hover and the `symbol_at` → `references_to` round-trip for instanceof sites.
+- Property references and symbols now key on the declaring class (as `find_property_in_chain` returns it) instead of the receiver type, fixing find-references and `symbol_at` for inherited properties accessed through a subtype.
+
 ## [0.37.0] - 2026-06-11
 
 ### Added
