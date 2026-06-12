@@ -822,6 +822,30 @@ fn validate_callable_argument(
         return;
     }
 
+    // A union like `(callable(TValue): bool)|TValue|string` (Collection::max,
+    // ::contains, ...) accepts a plain string through its non-callable
+    // alternatives — the string is not necessarily a callable, so don't
+    // validate it as a function name.
+    let has_string_accepting_alternative = param_ty.types.iter().any(|t| match t {
+        Atomic::TString
+        | Atomic::TLiteralString(_)
+        | Atomic::TNonEmptyString
+        | Atomic::TNumericString
+        | Atomic::TClassString(_)
+        | Atomic::TMixed
+        | Atomic::TScalar
+        | Atomic::TTemplateParam { .. } => true,
+        // A bare unresolvable name is almost certainly an unsubstituted
+        // template param (e.g. `TValue`), which could be a string.
+        Atomic::TNamedObject { fqcn, type_params } => {
+            type_params.is_empty() && !fqcn.contains('\\') && !type_exists(ea, fqcn.as_ref())
+        }
+        _ => false,
+    });
+    if has_string_accepting_alternative {
+        return;
+    }
+
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
         // Check for "ClassName::methodName" format
         if let Some((class_name, method_name)) = s.split_once("::") {

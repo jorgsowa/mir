@@ -106,6 +106,29 @@ pub fn check_template_bounds_with_inheritance<'a>(
     bindings: &'a FxHashMap<Name, Type>,
     template_params: &'a [TemplateParam],
 ) -> Vec<(&'a Name, &'a Type, &'a Type)> {
+    // An inferred type that still contains unresolved template placeholders or
+    // self/static cannot be meaningfully checked against the bound here — it
+    // resolves only at a concrete call site (e.g. Eloquent's TRelatedModel
+    // bound by `self`/`static` inside the defining class).
+    let is_unresolved = |ty: &Type| {
+        ty.types.iter().any(|a| match a {
+            Atomic::TTemplateParam { .. }
+            | Atomic::TSelf { .. }
+            | Atomic::TStaticObject { .. }
+            | Atomic::TParent { .. } => true,
+            Atomic::TNamedObject { fqcn, type_params } => {
+                (type_params.is_empty() && !fqcn.contains('\\') && {
+                    let name = fqcn.as_str();
+                    name.eq_ignore_ascii_case("self")
+                        || name.eq_ignore_ascii_case("static")
+                        || name.eq_ignore_ascii_case("parent")
+                        || template_params.iter().any(|tp| tp.name.as_ref() == name)
+                }) || type_params.iter().any(is_unresolved_shallow)
+            }
+            _ => false,
+        })
+    };
+
     let mut violations = Vec::new();
     for tp in template_params {
         if let Some(bound) = &tp.bound {
@@ -116,6 +139,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
                 let resolved_bound = bound.substitute_templates(bindings);
                 if !resolved_bound.is_mixed()
                     && !inferred.is_mixed()
+                    && !is_unresolved(inferred)
                     && !is_subtype(db, inferred, &resolved_bound)
                 {
                     violations.push((&tp.name, inferred, bound.as_ref()));
@@ -124,6 +148,24 @@ pub fn check_template_bounds_with_inheritance<'a>(
         }
     }
     violations
+}
+
+/// Shallow variant of the unresolved-placeholder check for nested type params
+/// (one level is enough: `Collection<TKey, ...>` with a bare `TKey` inside).
+fn is_unresolved_shallow(ty: &Type) -> bool {
+    ty.types.iter().any(|a| match a {
+        Atomic::TTemplateParam { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TStaticObject { .. }
+        | Atomic::TParent { .. } => true,
+        Atomic::TNamedObject { fqcn, type_params } => {
+            type_params.is_empty()
+                && !fqcn.contains('\\')
+                && fqcn.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+                && fqcn.as_str() != "Closure"
+        }
+        _ => false,
+    })
 }
 
 /// Build template bindings from a receiver's concrete type params.
@@ -180,7 +222,10 @@ fn compute_template_residual(
     residual.possibly_undefined = arg_ty.possibly_undefined;
     let mut class_string_consumed = false;
     for a in &arg_ty.types {
-        if has_template_class_string && matches!(a, Atomic::TClassString(_)) {
+        let consumed_by_class_string = has_template_class_string
+            && matches!(a, Atomic::TClassString(_))
+            || matches!(a, Atomic::TLiteralString(s) if has_template_class_string && literal_is_class_like(s));
+        if consumed_by_class_string {
             class_string_consumed = true;
             continue;
         }
@@ -199,6 +244,25 @@ fn compute_template_residual(
         return None;
     }
     Some(residual)
+}
+
+/// Whether a string literal is shaped like a class reference: backslash-
+/// separated identifier segments, with at least one backslash or an
+/// uppercase first letter. Filters out Mockery's `'alias:Foo'` /
+/// `'overload:Foo'` prefixes and plain lowercase words.
+fn literal_is_class_like(s: &str) -> bool {
+    let t = s.trim_start_matches('\\');
+    if t.is_empty() {
+        return false;
+    }
+    let shape_ok = t.split('\\').all(|seg| {
+        !seg.is_empty()
+            && seg
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || !c.is_ascii())
+            && !seg.chars().next().is_some_and(|c| c.is_ascii_digit())
+    });
+    shape_ok && (s.contains('\\') || t.chars().next().is_some_and(|c| c.is_ascii_uppercase()))
 }
 
 fn is_template_atomic(a: &Atomic, template_names: &std::collections::HashSet<Name>) -> bool {
@@ -484,6 +548,14 @@ fn infer_from_pair(
                             }))
                         }
                         Atomic::TClassString(None) => Some(Type::single(Atomic::TObject)),
+                        // A class-name-shaped string literal coerces to
+                        // class-string (Psalm-style): `m::mock('Foo\Bar')`.
+                        Atomic::TLiteralString(s) if literal_is_class_like(s) => {
+                            Some(Type::single(Atomic::TNamedObject {
+                                fqcn: Name::new(s.trim_start_matches('\\')),
+                                type_params: empty_type_params(),
+                            }))
+                        }
                         _ => None,
                     };
                     if let Some(cls_ty) = cls_ty {
