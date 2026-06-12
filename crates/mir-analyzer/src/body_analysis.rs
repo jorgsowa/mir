@@ -841,6 +841,17 @@ impl<'a> BodyAnalyzer<'a> {
             ),
         };
 
+        if self.mode == AnalysisMode::Full {
+            self.emit_missing_fn_types(
+                decl,
+                resolved.as_ref().map(|(_, s)| s),
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+        }
+
         let declared_return = return_ty.clone();
         let mut ctx = FlowState::for_method_with_templates(
             &params,
@@ -891,6 +902,181 @@ impl<'a> BodyAnalyzer<'a> {
 
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);
+        }
+    }
+
+    /// Missing type declarations (Psalm parity): a top-level function with
+    /// neither a native hint nor a docblock type. `stored` carries the
+    /// docblock-resolved types, so absent there + absent in the AST = missing.
+    fn emit_missing_fn_types(
+        &self,
+        decl: &php_ast::owned::FunctionDecl,
+        stored: Option<&Arc<mir_codebase::storage::FunctionDef>>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        issues: &mut Vec<Issue>,
+    ) {
+        let fn_name = decl.name.as_deref().unwrap_or("");
+        let stored_params_match = stored.is_some_and(|s| s.params.len() == decl.params.len());
+        if decl.return_type.is_none()
+            && stored.is_none_or(|s| s.return_type.is_none())
+            && !fn_name.is_empty()
+        {
+            let span = fn_header_name_span(source, decl);
+            let (line, col_start) =
+                crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+            let (line_end, col_end) =
+                crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+            issues.push(mir_issues::Issue::new(
+                mir_issues::IssueKind::MissingReturnType {
+                    fn_name: fn_name.to_string(),
+                },
+                mir_issues::Location {
+                    file: file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: col_end.max(col_start + 1),
+                },
+            ));
+        }
+        for (i, ast_param) in decl.params.iter().enumerate() {
+            let stored_ty_present = stored_params_match
+                && stored.is_some_and(|s| s.params.get(i).is_some_and(|p| p.ty.is_some()));
+            if ast_param.type_hint.is_none() && !stored_ty_present {
+                let param_name = ast_param
+                    .name
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim_start_matches('$')
+                    .to_string();
+                let span = param_name_span(source, ast_param);
+                let (line, col_start) =
+                    crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                let (line_end, col_end) =
+                    crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+                issues.push(mir_issues::Issue::new(
+                    mir_issues::IssueKind::MissingParamType {
+                        fn_name: fn_name.to_string(),
+                        param: param_name,
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
+                    },
+                ));
+            }
+        }
+
+        // Docblock signature mismatches (Psalm parity): a docblock type that
+        // contradicts the native hint. The stored type is the docblock-resolved
+        // one (collector prefers docblock and marks `from_docblock`); the hint
+        // is converted and namespace-resolved here for the comparison.
+        let Some(stored) = stored else { return };
+        let template_names: Vec<&str> = stored
+            .template_params
+            .iter()
+            .map(|tp| tp.name.as_ref())
+            .collect();
+        if let (Some(hint), Some(doc_ty)) = (&decl.return_type, stored.return_type.as_deref()) {
+            if doc_ty.from_docblock
+                && !docblock_type_unresolvable(doc_ty, &template_names)
+                && !fn_name.is_empty()
+            {
+                let hint_ty = crate::expr::helpers::resolve_named_objects_in_union(
+                    crate::parser::type_from_hint_owned(hint, None),
+                    self.db,
+                    file.as_ref(),
+                );
+                if !hint_ty.is_mixed()
+                    && !doc_ty.is_mixed()
+                    && !crate::subtype::is_subtype(self.db, doc_ty, &hint_ty)
+                {
+                    let span = fn_header_name_span(source, decl);
+                    let (line, col_start) =
+                        crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                    let (line_end, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+                    issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::MismatchingDocblockReturnType {
+                            declared: doc_ty.to_string(),
+                            inferred: hint_ty.to_string(),
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: col_end.max(col_start + 1),
+                        },
+                    ));
+                }
+            }
+        }
+        // Param docblock types are not flagged `from_docblock` in storage, so
+        // re-parse the doc comment to know which params have a docblock type.
+        let doc = decl
+            .doc_comment
+            .as_ref()
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
+            .unwrap_or_default();
+        {
+            for ast_param in decl.params.iter() {
+                let raw_name = ast_param.name.as_deref().unwrap_or_default();
+                let (Some(hint), Some(doc_raw)) =
+                    (&ast_param.type_hint, doc.get_param_type(raw_name))
+                else {
+                    continue;
+                };
+                let doc_ty = crate::expr::helpers::resolve_named_objects_in_union(
+                    doc_raw.clone(),
+                    self.db,
+                    file.as_ref(),
+                );
+                if docblock_type_unresolvable(&doc_ty, &template_names) {
+                    continue;
+                }
+                let hint_ty = crate::expr::helpers::resolve_named_objects_in_union(
+                    crate::parser::type_from_hint_owned(hint, None),
+                    self.db,
+                    file.as_ref(),
+                );
+                if hint_ty.is_mixed()
+                    || doc_ty.is_mixed()
+                    || crate::subtype::is_subtype(self.db, &doc_ty, &hint_ty)
+                {
+                    continue;
+                }
+                let param_name = ast_param
+                    .name
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim_start_matches('$')
+                    .to_string();
+                let span = param_name_span(source, ast_param);
+                let (line, col_start) =
+                    crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                let (line_end, col_end) =
+                    crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+                issues.push(mir_issues::Issue::new(
+                    mir_issues::IssueKind::MismatchingDocblockParamType {
+                        param: param_name,
+                        declared: doc_ty.to_string(),
+                        inferred: hint_ty.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: col_end.max(col_start + 1),
+                    },
+                ));
+            }
         }
     }
 
@@ -950,6 +1136,16 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        if self.mode == AnalysisMode::Full {
+            self.emit_missing_fn_types(
+                decl,
+                resolved.as_ref().map(|(_, s)| s),
+                file,
+                source,
+                source_map,
+                &mut issues,
+            );
+        }
         #[allow(clippy::type_complexity)]
         let (params, return_ty, template_params, declared_throws): (
             Arc<[mir_codebase::FnParam]>,
@@ -1338,6 +1534,16 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        if self.mode == AnalysisMode::Full {
+            self.emit_missing_fn_types(
+                decl,
+                resolved.as_ref().map(|(_, s)| s),
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+        }
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         let (params, return_ty, declared_throws): (
             Arc<[mir_codebase::FnParam]>,
@@ -1961,6 +2167,61 @@ fn seed_param_locations(
         if p.visibility.is_some() {
             ctx.read_vars.insert(Name::from(name));
         }
+    }
+}
+
+/// Whether a docblock type still contains placeholders that cannot be
+/// compared against a native hint here: template params, self/static/parent,
+/// conditional types, or bare names matching a declared template.
+fn docblock_type_unresolvable(ty: &mir_types::Type, template_names: &[&str]) -> bool {
+    ty.types.iter().any(|a| match a {
+        mir_types::Atomic::TTemplateParam { .. }
+        | mir_types::Atomic::TSelf { .. }
+        | mir_types::Atomic::TStaticObject { .. }
+        | mir_types::Atomic::TParent { .. }
+        | mir_types::Atomic::TConditional { .. } => true,
+        mir_types::Atomic::TNamedObject { fqcn, type_params } => {
+            (type_params.is_empty()
+                && !fqcn.contains('\\')
+                && (template_names.contains(&fqcn.as_str())
+                    || fqcn.as_str().eq_ignore_ascii_case("static")
+                    || fqcn.as_str().eq_ignore_ascii_case("self")))
+                || !type_params.is_empty()
+        }
+        _ => false,
+    })
+}
+
+/// Tight span for the function name in a `function name(...)` header. The
+/// owned `Ident` carries no span, so search backward from the first param /
+/// body for the last `name` occurrence; fall back to the body span.
+fn fn_header_name_span(source: &str, decl: &php_ast::owned::FunctionDecl) -> php_ast::Span {
+    let anchor = decl
+        .params
+        .first()
+        .map(|p| p.span.start)
+        .unwrap_or(decl.body.span.start) as usize;
+    let anchor = anchor.min(source.len());
+    let fallback = php_ast::Span {
+        start: decl.body.span.start,
+        end: decl.body.span.start + 1,
+    };
+    let Some(name) = decl.name.as_deref() else {
+        return fallback;
+    };
+    if name.is_empty() {
+        return fallback;
+    }
+    let search_start = anchor.saturating_sub(name.len() + 256);
+    match source[search_start..anchor].rfind(name) {
+        Some(rel) => {
+            let start = (search_start + rel) as u32;
+            php_ast::Span {
+                start,
+                end: start + name.len() as u32,
+            }
+        }
+        None => fallback,
     }
 }
 
