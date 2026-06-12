@@ -1,4 +1,6 @@
 ===description===
+(divergence from Psalm: $user = null is READ by the later
+`$user !== null` check on the not-reassigned path, so it is not reported)
 Detect unused variable reassigned in if followed by try inside foreach loop
 ===file===
 <?php
@@ -20,7 +22,6 @@ if ($user !== null && $user !== 0) {
 }
 ===expect===
 UnusedVariable@2:1-2:9: Variable $user_id is never read
-UnusedVariable@3:1-3:6: Variable $user is never read
 UnusedVariable@13:9-13:11: Variable $a is never read
 UnusedVariable@14:22-14:39: Variable $e is never read
 PossiblyUndefinedVariable@16:10-16:12: Variable $i might not be defined

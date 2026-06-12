@@ -642,8 +642,14 @@ pub(crate) fn emit_unused_variables(
 
     // Dead writes: values overwritten without being read (detected at overwrite time).
     // These are emitted at the location of the overwritten (dead) write.
+    // A write consumed by a read on ANY path (e.g. the loop-never-ran path
+    // after `foreach { $x = ...; }`) is not dead.
     for (name, line, col_start, line_end, col_end) in &ctx.dead_writes {
-        if skip(name) {
+        if skip(name)
+            || ctx
+                .consumed_write_locs
+                .contains(&(*name, (*line, *col_start, *line_end, *col_end)))
+        {
             continue;
         }
         push(*name, *line, *col_start, *line_end, *col_end, issues);
@@ -651,11 +657,19 @@ pub(crate) fn emit_unused_variables(
 
     // Remaining pending writes: variables with a write that was never consumed.
     // This covers both "variable never read at all" and compound-op results not read.
-    for (name, (line, col_start, line_end, col_end)) in &ctx.last_write_locs {
+    for (name, locs) in &ctx.last_write_locs {
         if skip(name) {
             continue;
         }
-        push(*name, *line, *col_start, *line_end, *col_end, issues);
+        for (line, col_start, line_end, col_end) in locs {
+            if ctx
+                .consumed_write_locs
+                .contains(&(*name, (*line, *col_start, *line_end, *col_end)))
+            {
+                continue;
+            }
+            push(*name, *line, *col_start, *line_end, *col_end, issues);
+        }
     }
 
     // Fallback for variables in assigned_vars that lack last_write_locs entries

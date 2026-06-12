@@ -388,37 +388,38 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
 
-        let mut all_cases_diverge = true;
         let mut fallthrough_ctxs: Vec<FlowState> = Vec::new();
         for (i, case_ctx) in case_results.into_iter().enumerate() {
             if !effective_diverges[i] {
-                all_cases_diverge = false;
                 fallthrough_ctxs.push(case_ctx);
             }
         }
 
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
 
-        let mut merged = if has_default
-            && all_cases_diverge
-            && break_ctxs.is_empty()
-            && fallthrough_ctxs.is_empty()
-        {
+        // With a default arm, some arm ALWAYS runs — the "fell past every case"
+        // path doesn't exist, so don't seed the merge with pre_ctx (it would
+        // keep pre-switch pending writes alive that every arm overwrote).
+        let mut merged: Option<FlowState> = if has_default {
+            None
+        } else {
+            Some(pre_ctx.clone())
+        };
+
+        for bctx in break_ctxs.into_iter().chain(fallthrough_ctxs) {
+            merged = Some(match merged {
+                Some(m) => FlowState::merge_branches(&pre_ctx, bctx, Some(m)),
+                None => bctx,
+            });
+        }
+
+        *ctx = merged.unwrap_or_else(|| {
+            // has_default and every arm diverges: code after the switch is
+            // unreachable.
             let mut m = pre_ctx.clone();
             m.diverges = true;
             m
-        } else {
-            pre_ctx.clone()
-        };
-
-        for bctx in break_ctxs {
-            merged = FlowState::merge_branches(&pre_ctx, bctx, Some(merged));
-        }
-        for fctx in fallthrough_ctxs {
-            merged = FlowState::merge_branches(&pre_ctx, fctx, Some(merged));
-        }
-
-        *ctx = merged;
+        });
     }
 
     pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut FlowState) {

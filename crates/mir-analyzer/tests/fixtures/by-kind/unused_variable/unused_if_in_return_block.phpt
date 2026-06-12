@@ -1,4 +1,7 @@
 ===description===
+(divergence from Psalm: Psalm proves the foreach always returns on the
+first iteration via const-array evaluation; mir keeps the no-return path,
+on which `if ($i)` reads the line-2 write)
 Unused if in return block
 ===file===
 <?php
@@ -13,4 +16,3 @@ foreach ([1, 2, 3] as $a) {
 
 if ($i) {}
 ===expect===
-UnusedVariable@2:1-2:3: Variable $i is never read

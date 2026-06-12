@@ -31,9 +31,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
                 let else_ty = self.analyze(&t.else_expr, &mut else_ctx);
 
-                for name in then_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
-                    ctx.read_vars.insert(*name);
-                }
+                ctx.absorb_branch_reads(&then_ctx);
+                ctx.absorb_branch_reads(&else_ctx);
                 let mut merged = then_ty;
                 merged.merge_with(&else_ty);
                 merged
@@ -131,9 +130,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             let arm_body_ty = self.analyze(&arm.body, &mut arm_ctx);
             result.merge_with(&arm_body_ty);
-            for name in &arm_ctx.read_vars {
-                ctx.read_vars.insert(*name);
-            }
+            ctx.absorb_branch_reads(&arm_ctx);
         }
 
         // Exhaustiveness check: emit UnhandledMatchCondition if the match does not

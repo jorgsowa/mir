@@ -99,8 +99,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             if ctx.is_tainted(name) {
                 closure_ctx.taint_var(name);
             }
-            // Mark the captured variable as read in the parent context
+            // Mark the captured variable as read in the parent context, and
+            // consume its pending write so it isn't reported as a dead write.
             ctx.read_vars.insert(mir_types::Name::from(name));
+            ctx.mark_consumed(name);
         }
 
         let mut sa = crate::stmt::StatementsAnalyzer::new(
@@ -121,6 +123,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         for name in &closure_ctx.read_vars {
             if ctx.var_is_defined(name) || ctx.var_possibly_defined(name) {
                 ctx.read_vars.insert(*name);
+                ctx.mark_consumed(name.as_str());
             }
         }
 
@@ -246,8 +249,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         let inferred_return = self.analyze(&af.body, &mut arrow_ctx);
+        // Arrow functions capture the whole outer scope by value: any variable
+        // the body reads is a read (and consumed write) in the outer context.
         for name in &arrow_ctx.read_vars {
             ctx.read_vars.insert(*name);
+            ctx.mark_consumed(name.as_str());
         }
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);

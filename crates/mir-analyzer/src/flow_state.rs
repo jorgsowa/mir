@@ -113,15 +113,27 @@ pub struct FlowState {
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
 
-    /// Tracks the most-recent unread write location per variable.
-    /// When a variable is written, its entry is updated. When the variable
-    /// is read as an r-value, its entry is removed (the write was consumed).
+    /// Tracks unread write locations per variable.
+    /// When a variable is written, its entry is replaced. When the variable
+    /// is read as an r-value, its entry is removed (the writes were consumed).
     /// Entries remaining at end-of-scope are dead (last write never read).
-    pub last_write_locs: FxHashMap<Name, (u32, u16, u32, u16)>,
+    /// Multiple locations arise from branch merges where different paths left
+    /// different writes pending (e.g. a pre-loop write and a loop-body write):
+    /// a later read consumes ALL of them, since any could be the live value.
+    pub last_write_locs: FxHashMap<Name, Vec<(u32, u16, u32, u16)>>,
 
     /// Dead writes collected during analysis: writes that were overwritten
     /// without being read first. Accumulated via union across branches.
     pub dead_writes: Vec<(Name, u32, u16, u32, u16)>,
+
+    /// Write locations that were consumed by a read on SOME path. A write is
+    /// only dead if NO path reads it, so consumption is permanent: merges
+    /// union this set and filter pending/dead writes against it, and the
+    /// end-of-scope report skips consumed locations. Fixes false positives
+    /// like `$x = new stdClass; foreach (...) { $x = $v; } return $x === ...`
+    /// where the pre-loop write is overwritten in the body but read on the
+    /// loop-never-ran path.
+    pub consumed_write_locs: FxHashSet<(Name, (u32, u16, u32, u16))>,
 
     /// Variables that are foreach iteration values in this scope.
     /// Used to emit UnusedForeachValue instead of UnusedVariable for these names.
@@ -199,6 +211,7 @@ impl FlowState {
             var_locations: FxHashMap::default(),
             last_write_locs: FxHashMap::default(),
             dead_writes: Vec::new(),
+            consumed_write_locs: FxHashSet::default(),
             foreach_value_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
@@ -453,13 +466,21 @@ impl FlowState {
         col_end: u16,
     ) {
         let sym = Name::from(name.trim_start_matches('$'));
-        if let Some(old_loc) = self.last_write_locs.get(&sym).copied() {
-            // Previous write was overwritten without being read → dead write.
-            self.dead_writes
-                .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
+        if let Some(old_locs) = self.last_write_locs.get(&sym) {
+            // Previous write(s) overwritten without being read → dead writes.
+            for old_loc in old_locs.clone() {
+                self.dead_writes
+                    .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
+            }
         }
+        // Re-arm the location: a fresh write here is a new pending instance.
+        // A consumption recorded for a PREVIOUS dynamic execution of the same
+        // statement (loop iterations: `foreach (...) { $i = $i; }`) must not
+        // pre-cancel this one.
+        self.consumed_write_locs
+            .remove(&(sym, (line, col_start, line_end, col_end)));
         self.last_write_locs
-            .insert(sym, (line, col_start, line_end, col_end));
+            .insert(sym, vec![(line, col_start, line_end, col_end)]);
     }
 
     /// Mark a variable as consumed by an r-value read.
@@ -468,7 +489,30 @@ impl FlowState {
     /// dead. Call this whenever a variable is used as an expression value.
     pub fn mark_consumed(&mut self, name: &str) {
         let sym = Name::from(name.trim_start_matches('$'));
-        self.last_write_locs.remove(&sym);
+        if let Some(locs) = self.last_write_locs.remove(&sym) {
+            // Consumption is permanent across branch merges: see
+            // `consumed_write_locs`.
+            for loc in locs {
+                self.consumed_write_locs.insert((sym, loc));
+            }
+        }
+    }
+
+    /// Propagate reads observed in a branch-scoped context (ternary arm,
+    /// match arm, closure body) back into this context: variables read there
+    /// count as read here, and write locations they consumed stay consumed.
+    pub fn absorb_branch_reads(&mut self, branch: &FlowState) {
+        for name in branch.read_vars.iter() {
+            self.read_vars.insert(*name);
+        }
+        for key in branch.consumed_write_locs.iter() {
+            self.consumed_write_locs.insert(*key);
+        }
+        let consumed = &self.consumed_write_locs;
+        self.last_write_locs.retain(|name, locs| {
+            locs.retain(|loc| !consumed.contains(&(*name, *loc)));
+            !locs.is_empty()
+        });
     }
 
     /// Remove a variable from the context (after `unset`).
@@ -513,6 +557,9 @@ impl FlowState {
                 result.read_vars.insert(*name);
                 result.last_write_locs.remove(name);
             }
+            result
+                .consumed_write_locs
+                .extend(if_ctx.consumed_write_locs.iter().copied());
             // Dead writes from the diverging branch are still dead.
             extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
             for name in if_ctx.foreach_value_var_names.iter() {
@@ -530,6 +577,9 @@ impl FlowState {
                 result.read_vars.insert(*name);
                 result.last_write_locs.remove(name);
             }
+            result
+                .consumed_write_locs
+                .extend(else_ctx.consumed_write_locs.iter().copied());
             extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
             for name in else_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
@@ -544,6 +594,12 @@ impl FlowState {
             for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
                 result.read_vars.insert(*name);
             }
+            result
+                .consumed_write_locs
+                .extend(if_ctx.consumed_write_locs.iter().copied());
+            result
+                .consumed_write_locs
+                .extend(else_ctx.consumed_write_locs.iter().copied());
             // `result` is `pre.clone()`; both branches already contain pre's
             // dead writes, so rebuild deduped rather than concatenating.
             result.dead_writes.clear();
@@ -708,24 +764,45 @@ impl FlowState {
         extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
         extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
 
+        // Consumed write locations: union — a write read on ANY path is used.
+        result.consumed_write_locs = if_ctx.consumed_write_locs;
+        result
+            .consumed_write_locs
+            .extend(else_ctx.consumed_write_locs.iter().copied());
+
         // Last write locs: union from both branches, plus pre_ctx variables that
         // are still pending in BOTH branches (meaning neither branch nor the
         // condition consumed them). Variables present in pre_ctx but absent from
         // both branches were consumed on all paths (e.g. read in condition) and
-        // must not be re-added.
+        // must not be re-added. Entries whose location was consumed on either
+        // path are filtered — that write is used.
         result.last_write_locs = FxHashMap::default();
-        for (name, loc) in if_ctx.last_write_locs.iter() {
-            result.last_write_locs.entry(*name).or_insert(*loc);
-        }
-        for (name, loc) in else_ctx.last_write_locs.iter() {
-            result.last_write_locs.entry(*name).or_insert(*loc);
-        }
-        // Re-add pre_ctx variables that survived into BOTH branches unchanged.
-        for (name, loc) in pre.last_write_locs.iter() {
-            if if_ctx.last_write_locs.contains_key(name)
-                && else_ctx.last_write_locs.contains_key(name)
+        {
+            let consumed = &result.consumed_write_locs;
+            let add = |map: &mut FxHashMap<Name, Vec<(u32, u16, u32, u16)>>,
+                       name: &Name,
+                       loc: &(u32, u16, u32, u16)| {
+                if !consumed.contains(&(*name, *loc)) {
+                    let entry = map.entry(*name).or_default();
+                    if !entry.contains(loc) {
+                        entry.push(*loc);
+                    }
+                }
+            };
+            // Branch contexts inherit pre's pending entries, so unioning the two
+            // branch maps already covers pre-existing writes: a pre write still
+            // pending in either branch survives; one overwritten in BOTH
+            // branches (dead on every path) is gone from both maps and stays
+            // out. No separate pre re-add is needed — re-adding by name would
+            // resurrect pre locations that both branches overwrote.
+            for (name, locs) in if_ctx
+                .last_write_locs
+                .iter()
+                .chain(else_ctx.last_write_locs.iter())
             {
-                result.last_write_locs.entry(*name).or_insert(*loc);
+                for loc in locs.iter() {
+                    add(&mut result.last_write_locs, name, loc);
+                }
             }
         }
 

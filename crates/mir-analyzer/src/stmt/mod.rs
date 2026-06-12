@@ -527,9 +527,12 @@ impl<'a> StatementsAnalyzer<'a> {
             // the loop body read the old value but did NOT write a new one.
             // If the loop body wrote a new value (different location), keep it.
             for name in iter.read_vars.iter() {
-                if let Some(&pre_loc) = pre.last_write_locs.get(name) {
-                    if next.last_write_locs.get(name) == Some(&pre_loc) {
-                        next.last_write_locs.remove(name);
+                if let Some(pre_locs) = pre.last_write_locs.get(name) {
+                    if let Some(locs) = next.last_write_locs.get_mut(name) {
+                        locs.retain(|l| !pre_locs.contains(l));
+                        if locs.is_empty() {
+                            next.last_write_locs.remove(name);
+                        }
                     }
                 }
             }
