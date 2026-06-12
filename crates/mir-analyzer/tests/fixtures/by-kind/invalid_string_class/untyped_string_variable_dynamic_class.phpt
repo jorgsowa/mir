@@ -1,5 +1,6 @@
 ===description===
-Untyped string variable dynamic class
+Untyped string variable dynamic class — an untyped (mixed) param is not
+InvalidStringClass; mixed is already imprecise (a Mixed* concern)
 ===file===
 <?php
 class ValidClass {
@@ -18,4 +19,3 @@ $name = "ValidClass";
 $obj = createInstance($name);
 $obj->method();
 ===expect===
-InvalidStringClass@11:16-11:32: Dynamic class instantiation requires string or class-string type, got 'mixed'

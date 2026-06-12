@@ -1,9 +1,9 @@
 ===description===
-new with mixed variable should error - requires string or class-string type
+new with mixed variable is not InvalidStringClass — mixed is already imprecise
+(a Mixed* concern), matching the static-call path
 ===file===
 <?php
 function test(mixed $value) {
     new $value();
 }
 ===expect===
-InvalidStringClass@3:9-3:15: Dynamic class instantiation requires string or class-string type, got 'mixed'

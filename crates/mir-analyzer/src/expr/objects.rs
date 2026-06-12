@@ -31,12 +31,18 @@ fn widen_type_param(ty: &Type) -> Type {
 }
 
 fn is_valid_class_name_type(ty: &Type) -> bool {
-    // Class names must be strings or class-string types only.
-    // Mixed is not allowed - must be explicit string or class-string.
+    // Class names must be strings or class-string types. Mixed is allowed
+    // since it's already imprecise (matches the static-call path — a `mixed`
+    // receiver is a Mixed* concern, not InvalidStringClass). Template params
+    // are allowed because their bound may be a class-string.
     ty.contains(|t| {
         matches!(
             t,
-            Atomic::TString | Atomic::TClassString(_) | Atomic::TLiteralString(_)
+            Atomic::TString
+                | Atomic::TClassString(_)
+                | Atomic::TLiteralString(_)
+                | Atomic::TMixed
+                | Atomic::TTemplateParam { .. }
         )
     })
 }
