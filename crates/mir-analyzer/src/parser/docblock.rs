@@ -366,6 +366,21 @@ impl DocblockParser {
                         }
                     }
                 }
+                "taint-sink" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        // Format: `kind $param` or `kind $param1 $param2`
+                        let mut tokens = body_str.split_whitespace();
+                        if let Some(kind) = tokens.next() {
+                            let kind = kind.to_string();
+                            for param_token in tokens {
+                                let param = param_token.trim_start_matches('$').to_string();
+                                if !param.is_empty() {
+                                    result.taint_sinks.push((param, kind.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -495,6 +510,8 @@ pub struct ParsedDocblock {
     pub mir_checks: Vec<(String, String)>,
     /// `@trace $var1, $var2` or `@trace $var1 $var2` — variable names to trace
     pub trace_vars: Vec<String>,
+    /// `@taint-sink <kind> $param` — (param_name_without_dollar, sink_kind_string)
+    pub taint_sinks: Vec<(String, String)>,
 }
 
 impl ParsedDocblock {

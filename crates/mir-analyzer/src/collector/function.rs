@@ -323,6 +323,11 @@ impl DefinitionCollector<'_> {
             no_named_arguments: doc.no_named_arguments,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             docstring,
+            taint_sink_params: doc
+                .taint_sinks
+                .iter()
+                .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
+                .collect(),
         };
 
         self.slice.functions.push(std::sync::Arc::new(storage));

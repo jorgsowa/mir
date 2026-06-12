@@ -275,6 +275,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/dead_code.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unused_class/`.
     UnusedClass { class: String },
+    /// Emitted by `mir-analyzer/src/batch.rs` when a `@psalm-suppress` /
+    /// `@mir-suppress` annotation does not match any actual issue.
+    /// Fixtures: `tests/fixtures/by-kind/unused_psalm_suppress/`.
+    UnusedPsalmSuppress { kind: String },
 
     /// Emitted by `mir-analyzer/src/call/args/types.rs`.
     /// Fixtures: `tests/fixtures/by-kind/argument_type_coercion/`.
@@ -376,6 +380,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/function.rs`.
     /// Fixtures: `tests/fixtures/by-kind/tainted_shell/`.
     TaintedShell,
+    /// Emitted by `mir-analyzer/src/call/method.rs` when a tainted value reaches a
+    /// `@taint-sink llm_prompt` annotated parameter.
+    /// Fixtures: `tests/fixtures/by-kind/tainted_llm_prompt/`.
+    TaintedLlmPrompt,
 
     // --- Generics -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
@@ -605,6 +613,7 @@ impl IssueKind {
             | IssueKind::TaintedHtml
             | IssueKind::TaintedSql
             | IssueKind::TaintedShell
+            | IssueKind::TaintedLlmPrompt
             | IssueKind::CircularInheritance { .. }
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
@@ -671,6 +680,7 @@ impl IssueKind {
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
             | IssueKind::UnusedClass { .. }
+            | IssueKind::UnusedPsalmSuppress { .. }
             | IssueKind::ArgumentTypeCoercion { .. }
             | IssueKind::PropertyTypeCoercion { .. }
             | IssueKind::DeprecatedCall { .. }
@@ -817,6 +827,7 @@ impl IssueKind {
             IssueKind::UnusedFunction { .. } => "MIR0505",
             IssueKind::UnusedForeachValue { .. } => "MIR0506",
             IssueKind::UnusedClass { .. } => "MIR0507",
+            IssueKind::UnusedPsalmSuppress { .. } => "MIR0508",
 
             // Purity (1700-1799)
             IssueKind::ImpurePropertyAssignment { .. } => "MIR1700",
@@ -846,6 +857,7 @@ impl IssueKind {
             IssueKind::TaintedHtml => "MIR0801",
             IssueKind::TaintedSql => "MIR0802",
             IssueKind::TaintedShell => "MIR0803",
+            IssueKind::TaintedLlmPrompt => "MIR0804",
 
             // Generics (0900-0999)
             IssueKind::InvalidTemplateParam { .. } => "MIR0900",
@@ -922,8 +934,10 @@ impl IssueKind {
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
             | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803"
-            | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503"
-            | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500"
+            | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
+                Some(Severity::Error)
+            }
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -936,11 +950,11 @@ impl IssueKind {
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
             | "MIR0210" | "MIR0213" | "MIR0214" | "MIR0221" | "MIR0223" | "MIR0400" | "MIR0401"
             | "MIR0402" | "MIR0403" | "MIR0501" | "MIR0502" | "MIR0503" | "MIR0504" | "MIR0505"
-            | "MIR0507" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003" | "MIR1004"
-            | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010" | "MIR1011"
-            | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200" | "MIR1201"
-            | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209" | "MIR1210"
-            | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" => Some(Severity::Info),
+            | "MIR0507" | "MIR0508" | "MIR0901" | "MIR1000" | "MIR1001" | "MIR1002" | "MIR1003"
+            | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010"
+            | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200"
+            | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209"
+            | "MIR1210" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1012,6 +1026,7 @@ impl IssueKind {
             IssueKind::UnusedFunction { .. } => "UnusedFunction",
             IssueKind::UnusedForeachValue { .. } => "UnusedForeachValue",
             IssueKind::UnusedClass { .. } => "UnusedClass",
+            IssueKind::UnusedPsalmSuppress { .. } => "UnusedPsalmSuppress",
             IssueKind::ArgumentTypeCoercion { .. } => "ArgumentTypeCoercion",
             IssueKind::PropertyTypeCoercion { .. } => "PropertyTypeCoercion",
             IssueKind::ImpurePropertyAssignment { .. } => "ImpurePropertyAssignment",
@@ -1036,6 +1051,7 @@ impl IssueKind {
             IssueKind::TaintedHtml => "TaintedHtml",
             IssueKind::TaintedSql => "TaintedSql",
             IssueKind::TaintedShell => "TaintedShell",
+            IssueKind::TaintedLlmPrompt => "TaintedLlmPrompt",
             IssueKind::DeprecatedCall { .. } => "DeprecatedCall",
             IssueKind::DeprecatedProperty { .. } => "DeprecatedProperty",
             IssueKind::DeprecatedConstant { .. } => "DeprecatedConstant",
@@ -1309,6 +1325,9 @@ impl IssueKind {
             IssueKind::UnusedClass { class } => {
                 format!("Class {class} is never referenced")
             }
+            IssueKind::UnusedPsalmSuppress { kind } => {
+                format!("Suppress annotation for '{kind}' is never used")
+            }
             IssueKind::ArgumentTypeCoercion {
                 param,
                 fn_name,
@@ -1411,6 +1430,9 @@ impl IssueKind {
             IssueKind::TaintedSql => "Tainted SQL query — possible SQL injection".to_string(),
             IssueKind::TaintedShell => {
                 "Tainted shell command — possible command injection".to_string()
+            }
+            IssueKind::TaintedLlmPrompt => {
+                "Tainted LLM prompt — possible prompt injection".to_string()
             }
 
             IssueKind::DeprecatedCall { name, message } => {
@@ -1655,6 +1677,22 @@ impl IssueBuffer {
             .collect()
     }
 
+    /// Like `into_issues` but keeps suppressed issues (with `suppressed = true`)
+    /// so callers that need to detect unused suppressions can see which issues
+    /// were silenced. File-level suppressions are also marked `suppressed = true`
+    /// rather than dropped.
+    pub fn into_all_issues(self) -> Vec<Issue> {
+        self.issues
+            .into_iter()
+            .map(|mut i| {
+                if self.file_suppressions.contains(&i.kind.name().to_string()) {
+                    i.suppressed = true;
+                }
+                i
+            })
+            .collect()
+    }
+
     /// Mark all issues added since index `from` as suppressed if their issue
     /// name appears in `suppressions`. Used for `@psalm-suppress` / `@suppress` on statements.
     pub fn suppress_range(&mut self, from: usize, suppressions: &[String]) {
@@ -1863,6 +1901,7 @@ mod code_tests {
             IssueKind::UnusedFunction { name: s() },
             IssueKind::UnusedForeachValue { name: s() },
             IssueKind::UnusedClass { class: s() },
+            IssueKind::UnusedPsalmSuppress { kind: s() },
             IssueKind::ArgumentTypeCoercion {
                 param: s(),
                 fn_name: s(),
@@ -1929,6 +1968,7 @@ mod code_tests {
             IssueKind::TaintedHtml,
             IssueKind::TaintedSql,
             IssueKind::TaintedShell,
+            IssueKind::TaintedLlmPrompt,
             IssueKind::InvalidTemplateParam {
                 name: s(),
                 expected_bound: s(),
@@ -2126,6 +2166,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 128);
+        assert_eq!(one_of_each().len(), 130);
     }
 }

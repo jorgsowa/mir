@@ -416,6 +416,10 @@ pub struct MethodDef {
     /// methods must not be required as concrete interface implementations.
     #[serde(default)]
     pub is_virtual: bool,
+    /// Parameters declared as taint sinks via `@taint-sink <kind> $param`.
+    /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
+    #[serde(default)]
+    pub taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
 }
 
 impl MethodDef {
@@ -659,6 +663,10 @@ pub struct FunctionDef {
     /// Used for hover info.
     #[serde(default)]
     pub docstring: Option<Arc<str>>,
+    /// Parameters declared as taint sinks via `@taint-sink <kind> $param`.
+    /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
+    #[serde(default)]
+    pub taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
 }
 
 impl FunctionDef {

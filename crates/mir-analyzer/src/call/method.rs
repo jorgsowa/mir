@@ -3,6 +3,7 @@ use std::sync::Arc;
 use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
+use crate::taint::is_expr_tainted;
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Name, Type};
@@ -41,6 +42,7 @@ pub(super) struct ResolvedMethod {
     pub(super) return_ty_raw: Type,
     pub(super) throws: Arc<[Arc<str>]>,
     pub(super) no_named_arguments: bool,
+    pub(super) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -83,6 +85,7 @@ pub(super) fn resolve_method_from_db(
             return_ty_raw,
             throws: storage.throws.clone().into(),
             no_named_arguments: storage.no_named_arguments,
+            taint_sink_params: storage.taint_sink_params.clone(),
         });
     }
 
@@ -538,6 +541,40 @@ fn resolve_method_return<'a>(
                 no_named_arguments: resolved.no_named_arguments,
             },
         );
+
+        // Taint sink check: emit TaintedLlmPrompt when a tainted value reaches a
+        // @taint-sink annotated parameter.
+        if !resolved.taint_sink_params.is_empty() {
+            'sink: for (param_name, sink_kind) in &resolved.taint_sink_params {
+                // Find positional index of this param in the method's param list.
+                let param_idx = resolved
+                    .params
+                    .iter()
+                    .position(|p| p.name.as_ref() == param_name.as_ref());
+                let arg = if let Some(idx) = param_idx {
+                    call.args.get(idx)
+                } else {
+                    None
+                };
+                // Also check named args.
+                let named_arg = call.args.iter().find(|a| {
+                    a.name
+                        .as_ref()
+                        .map(|n| crate::parser::name_to_string_owned(n) == param_name.as_ref())
+                        .unwrap_or(false)
+                });
+                let arg = arg.or(named_arg);
+                if let Some(arg) = arg {
+                    if is_expr_tainted(&arg.value, ctx) {
+                        let issue = match sink_kind.as_ref() {
+                            "llm_prompt" => IssueKind::TaintedLlmPrompt,
+                            _ => continue 'sink,
+                        };
+                        ea.emit(issue, Severity::Error, span);
+                    }
+                }
+            }
+        }
 
         let ret_raw = substitute_static_in_return(resolved.return_ty_raw, fqcn);
 
