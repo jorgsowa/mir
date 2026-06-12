@@ -14,3 +14,4 @@ function foo(): callable {
     };
 }
 ===expect===
+UnusedPsalmSuppress@8:0-8:0: Suppress annotation for 'ImpureFunctionCall' is never used

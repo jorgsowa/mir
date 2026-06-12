@@ -19,3 +19,4 @@ function takesA(?A $a) : void {
     takesString($a->foo);
 }
 ===expect===
+UnusedPsalmSuppress@16:0-16:0: Suppress annotation for 'MixedArgument' is never used

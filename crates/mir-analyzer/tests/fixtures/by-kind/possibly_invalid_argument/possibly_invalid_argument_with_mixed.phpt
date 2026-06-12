@@ -14,3 +14,5 @@ function foo($a) : void {
     echo strlen($a);
 }
 ===expect===
+UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'MissingParamType' is never used
+UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'MixedArgument' is never used

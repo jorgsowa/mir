@@ -19,4 +19,5 @@ function notagenerator() : Generator {
     return generator2();
 }
 ===expect===
+UnusedPsalmSuppress@12:0-12:0: Suppress annotation for 'InvalidNullableReturnType' is never used
 InvalidReturnType@14:9-14:16: Return type 'void' is not compatible with declared 'Generator'

@@ -556,7 +556,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
         drop(sa);
         crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_issues());
+        all_issues.extend(buf.into_all_issues());
     }
 
     /// Like `analyze_bodies` but also populates `type_envs` with per-scope type environments.
@@ -615,7 +615,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             drop(sa);
             crate::diagnostics::emit_unused_variables(&ctx, &file, &mut all_issues);
-            all_issues.extend(buf.into_issues());
+            all_issues.extend(buf.into_all_issues());
         }
 
         all_issues
@@ -887,7 +887,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         emit_unused_params(&params, &ctx, "", file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_issues());
+        all_issues.extend(buf.into_all_issues());
 
         if self.mode == AnalysisMode::Full && !ctx.is_generator {
             crate::diagnostics::check_missing_return(
@@ -1209,7 +1209,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         emit_unused_params(&params, &ctx, "", file, &mut issues);
         emit_unused_variables(&ctx, file, &mut issues);
-        issues.extend(buf.into_issues());
+        issues.extend(buf.into_all_issues());
 
         let ref_locs = self.db.pop_ref_loc_frame();
 
@@ -1318,7 +1318,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
             drop(sa);
-            all_issues.extend(buf.into_issues());
+            all_issues.extend(buf.into_all_issues());
         }
 
         let Some(body) = &method.body else { return };
@@ -1387,7 +1387,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         emit_unused_params(&params, &ctx, method_name, file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_issues());
+        all_issues.extend(buf.into_all_issues());
 
         if cx.check_returns && self.mode == AnalysisMode::Full && !is_ctor && !ctx.is_generator {
             crate::diagnostics::check_missing_return(
@@ -1628,7 +1628,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         emit_unused_params(&params, &ctx, "", file, all_issues);
         emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_issues());
+        all_issues.extend(buf.into_all_issues());
 
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);

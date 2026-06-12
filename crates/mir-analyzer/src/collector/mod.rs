@@ -254,7 +254,7 @@ impl<'a> DefinitionCollector<'a> {
     pub fn collect_slice(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
         let _ = self.visit_program(program);
         self.finalize_slice();
-        (self.slice, self.issues.into_issues())
+        (self.slice, self.issues.into_all_issues())
     }
 
     // -----------------------------------------------------------------------
@@ -673,6 +673,7 @@ impl<'a> DefinitionCollector<'a> {
                     location: location.clone(),
                     docstring: None,
                     is_virtual: true,
+                    taint_sink_params: vec![],
                 }),
             );
         }
@@ -1122,6 +1123,11 @@ impl<'a> DefinitionCollector<'a> {
             } else {
                 Some(Arc::from(doc.description.as_str()))
             },
+            taint_sink_params: doc
+                .taint_sinks
+                .iter()
+                .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
+                .collect(),
         })
     }
 }

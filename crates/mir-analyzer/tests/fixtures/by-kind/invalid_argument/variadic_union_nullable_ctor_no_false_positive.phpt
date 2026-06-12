@@ -30,3 +30,4 @@ function app(): void {
     $c->setValue(new Other());
 }
 ===expect===
+Coll.php: UnusedPsalmSuppress@15:0-15:0: Suppress annotation for 'UnusedParam' is never used

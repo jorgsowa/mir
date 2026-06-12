@@ -22,3 +22,4 @@ $foo =
         return $bar;
     };
 ===expect===
+UnusedPsalmSuppress@13:0-13:0: Suppress annotation for 'MixedFunctionCall' is never used

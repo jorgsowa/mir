@@ -10,3 +10,4 @@ class A {
 }
 ===expect===
 InvalidToString@3:27-6:28: Method A::__toString() must return a string
+UnusedPsalmSuppress@5:0-5:0: Suppress annotation for 'InvalidReturnStatement' is never used

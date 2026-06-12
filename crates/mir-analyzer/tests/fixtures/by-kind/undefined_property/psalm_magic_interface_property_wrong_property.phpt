@@ -18,3 +18,4 @@ function getBar(GetterSetter $o) : string {
     return $o->bar;
 }
 ===expect===
+UnusedPsalmSuppress@14:0-14:0: Suppress annotation for 'NoInterfaceProperties' is never used

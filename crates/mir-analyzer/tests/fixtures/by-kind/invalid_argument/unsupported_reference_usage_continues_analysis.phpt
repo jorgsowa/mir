@@ -14,3 +14,4 @@ $bar = &$arr[$foo[0]];
 /** @trace $bar */;
 
 ===expect===
+UnusedPsalmSuppress@9:0-9:0: Suppress annotation for 'UnsupportedReferenceUsage' is never used

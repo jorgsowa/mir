@@ -179,14 +179,19 @@ impl AnalysisSession {
     /// Issues are *marked* rather than dropped, mirroring that per-statement
     /// path and the kind-level `mir.xml` suppress handler; every consumer (CLI,
     /// WASM, the test harness) already skips [`Issue::suppressed`].
-    fn apply_inline_suppressions(&self, issues: &mut [Issue]) {
+    /// Apply inline suppressions and then emit `UnusedPsalmSuppress` issues for
+    /// any named `@suppress`/`@psalm-suppress` annotations that matched nothing.
+    ///
+    /// `analyzed_files` must list every file that was analyzed in this batch so
+    /// that files with *zero* existing issues still have their suppression maps
+    /// inspected for unused annotations.
+    fn apply_suppressions_and_emit_unused(
+        &self,
+        issues: &mut Vec<Issue>,
+        analyzed_files: &[Arc<str>],
+    ) {
         use crate::suppression::SuppressionMap;
-        if issues.iter().all(|i| i.suppressed) {
-            return;
-        }
         let db = self.snapshot_db();
-        // One map per distinct file, built lazily; `None` once we know a file
-        // has no source registered or no suppression comments.
         let mut cache: HashMap<Arc<str>, Option<SuppressionMap>> = HashMap::default();
         for issue in issues.iter_mut() {
             if issue.suppressed {
@@ -195,7 +200,6 @@ impl AnalysisSession {
             let map = cache.entry(issue.location.file.clone()).or_insert_with(|| {
                 db.lookup_source_file(&issue.location.file)
                     .map(|sf| SuppressionMap::from_source(&sf.text(&db)))
-                    .filter(|m| !m.is_empty())
             });
             if let Some(map) = map.as_ref() {
                 if map.is_suppressed(issue.location.line, issue.kind.name(), issue.kind.code()) {
@@ -203,6 +207,54 @@ impl AnalysisSession {
                 }
             }
         }
+        // Ensure suppression maps are built for every analyzed file, not just
+        // those that already have at least one issue (files with no issues would
+        // otherwise be skipped and their unused suppressions never detected).
+        for file in analyzed_files {
+            cache.entry(file.clone()).or_insert_with(|| {
+                db.lookup_source_file(file)
+                    .map(|sf| SuppressionMap::from_source(&sf.text(&db)))
+            });
+        }
+        // Now emit UnusedPsalmSuppress for each file that has named suppressions.
+        let files: Vec<Arc<str>> = cache
+            .iter()
+            .filter_map(|(f, m)| m.as_ref().map(|_| f.clone()))
+            .collect();
+        let mut new_issues: Vec<Issue> = Vec::new();
+        for file in files {
+            if let Some(Some(map)) = cache.get(&file) {
+                if map.named_suppressions.is_empty() {
+                    continue;
+                }
+                let file_issues: Vec<Issue> = issues
+                    .iter()
+                    .filter(|i| i.location.file == file)
+                    .cloned()
+                    .collect();
+                // Pre-suppressed issues arrived with suppressed=true from the
+                // IssueBuffer mechanism (collector / body analysis). They may be
+                // at a different line than the SuppressionMap target and need
+                // special handling in unused_named.
+                let pre_suppressed: Vec<&Issue> =
+                    file_issues.iter().filter(|i| i.suppressed).collect();
+                // Issues newly suppressed by the SuppressionMap in this pass
+                // arrived with suppressed=false; after the marking loop they
+                // also have suppressed=true. Pass all file issues for exact-line
+                // matching; pre_suppressed enables the docblock-range fallback.
+                let unused = map.unused_named(&file_issues, &pre_suppressed);
+                for (line, kind) in unused {
+                    let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
+                    let mut issue =
+                        Issue::new(mir_issues::IssueKind::UnusedPsalmSuppress { kind }, loc);
+                    if map.is_suppressed(line, issue.kind.name(), issue.kind.code()) {
+                        issue.suppressed = true;
+                    }
+                    new_issues.push(issue);
+                }
+            }
+        }
+        issues.extend(new_issues);
     }
 
     fn type_exists(&self, fqcn: &str) -> bool {
@@ -625,7 +677,8 @@ impl AnalysisSession {
         }
 
         opts.apply(&mut all_issues);
-        self.apply_inline_suppressions(&mut all_issues);
+        let analyzed_files_vec: Vec<Arc<str>> = analyzed_file_set.iter().cloned().collect();
+        self.apply_suppressions_and_emit_unused(&mut all_issues, &analyzed_files_vec);
         if let Some(dump) = crate::metrics::dump() {
             eprintln!("{dump}");
         }
@@ -878,7 +931,7 @@ impl AnalysisSession {
                 guard.set_file_reference_locations(file_path, locs);
                 drop(guard);
                 opts.apply(&mut issues);
-                self.apply_inline_suppressions(&mut issues);
+                self.apply_suppressions_and_emit_unused(&mut issues, std::slice::from_ref(&file));
                 return AnalysisResult::build(issues, HashMap::default(), Vec::new());
             }
         }
@@ -1094,6 +1147,7 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
         &mut all_symbols,
     ));
     mark_suppressed(&mut all_issues, &suppressions);
+    emit_unused_suppressions(&mut all_issues, &suppressions, &file);
     AnalysisResult::build(all_issues, type_envs, all_symbols)
 }
 
@@ -1110,6 +1164,31 @@ fn mark_suppressed(issues: &mut [Issue], suppressions: &crate::suppression::Supp
         {
             issue.suppressed = true;
         }
+    }
+}
+
+/// Append `UnusedPsalmSuppress` issues for any named `@suppress`/`@psalm-suppress`
+/// annotations that did not match any issue in `all_issues`. The new issues are
+/// themselves subject to suppression (so `@suppress UnusedPsalmSuppress` works).
+fn emit_unused_suppressions(
+    all_issues: &mut Vec<Issue>,
+    suppressions: &crate::suppression::SuppressionMap,
+    file: &std::sync::Arc<str>,
+) {
+    let pre_suppressed_cloned: Vec<Issue> = all_issues
+        .iter()
+        .filter(|i| i.suppressed)
+        .cloned()
+        .collect();
+    let pre_suppressed: Vec<&Issue> = pre_suppressed_cloned.iter().collect();
+    let unused = suppressions.unused_named(all_issues, &pre_suppressed);
+    for (line, kind) in unused {
+        let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
+        let mut issue = Issue::new(mir_issues::IssueKind::UnusedPsalmSuppress { kind }, loc);
+        if suppressions.is_suppressed(line, issue.kind.name(), issue.kind.code()) {
+            issue.suppressed = true;
+        }
+        all_issues.push(issue);
     }
 }
 

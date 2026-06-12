@@ -7,4 +7,5 @@ suppress=UnusedParam,UnusedFunction
 /** @suppress MissingParamType */
 function foo($s = Foo::BAR) : void {}
 ===expect===
+UnusedPsalmSuppress@3:0-3:0: Suppress annotation for 'MissingParamType' is never used
 UndefinedClass@3:19-3:22: Class Foo does not exist

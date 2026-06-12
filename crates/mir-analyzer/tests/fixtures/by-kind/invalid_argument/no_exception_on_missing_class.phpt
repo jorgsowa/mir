@@ -15,3 +15,4 @@ class A
     }
 }
 ===expect===
+UnusedPsalmSuppress@3:0-3:0: Suppress annotation for 'UndefinedClass' is never used

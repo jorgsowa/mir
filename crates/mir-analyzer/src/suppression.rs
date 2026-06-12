@@ -95,6 +95,11 @@ pub struct SuppressionMap {
     lines: FxHashMap<u32, KindSet>,
     /// Whole-file suppression, if any directive requested it.
     file: Option<KindSet>,
+    /// Named (non-All) suppressions with their target lines, for
+    /// `UnusedPsalmSuppress` detection. Each entry is `(target_line, kind_name)`.
+    /// Only `@psalm-suppress X` / `@suppress X` / `@mir-suppress X` forms populate
+    /// this — blanket `@phpstan-ignore*` suppressions are intentionally excluded.
+    pub named_suppressions: Vec<(u32, String)>,
 }
 
 impl SuppressionMap {
@@ -119,7 +124,7 @@ impl SuppressionMap {
         let mut map = SuppressionMap::default();
 
         for (idx, raw) in raw_lines.iter().enumerate() {
-            let Some(directive) = parse_directive(raw) else {
+            let Some((directive, track_named)) = parse_directive_with_tracking(raw) else {
                 continue;
             };
             match directive.scope {
@@ -129,16 +134,88 @@ impl SuppressionMap {
                 },
                 Scope::SameLine => {
                     let line_no = idx as u32 + 1;
+                    if track_named {
+                        if let KindSet::Named(ref names) = directive.kinds {
+                            for name in names {
+                                map.named_suppressions.push((line_no, name.clone()));
+                            }
+                        }
+                    }
                     insert_line(&mut map.lines, line_no, directive.kinds);
                 }
                 Scope::NextLine => {
                     let target = next_code_line(&raw_lines, idx, directive.skip_comments);
+                    if track_named {
+                        if let KindSet::Named(ref names) = directive.kinds {
+                            for name in names {
+                                map.named_suppressions.push((target, name.clone()));
+                            }
+                        }
+                    }
                     insert_line(&mut map.lines, target, directive.kinds);
                 }
             }
         }
 
         map
+    }
+
+    /// Returns unused named suppressions: those that did not match any issue
+    /// in `all_issues`. The returned vec contains `(target_line, kind_name)`.
+    ///
+    /// `pre_suppressed` is the subset of `all_issues` that arrived already
+    /// suppressed (via the `IssueBuffer` mechanism in collector/body analysis).
+    /// These may be emitted at a different line than the suppression target
+    /// (e.g. `InvalidDocblock` at a docblock-start line vs. the following
+    /// declaration line), so they are matched within a 30-line window before
+    /// the target.
+    pub fn unused_named(
+        &self,
+        all_issues: &[mir_issues::Issue],
+        pre_suppressed: &[&mir_issues::Issue],
+    ) -> Vec<(u32, String)> {
+        self.named_suppressions
+            .iter()
+            .filter(|(target_line, kind)| {
+                let kind_matches = |issue: &&mir_issues::Issue| {
+                    issue.kind.name() == kind.as_str() || issue.kind.code() == kind.as_str()
+                };
+                // Normal case: SuppressionMap-suppressed issue at the exact target line.
+                let at_target = all_issues
+                    .iter()
+                    .any(|issue| issue.location.line == *target_line && kind_matches(&issue));
+                if at_target {
+                    return false; // suppression IS used
+                }
+                // Docblock case: collector-emitted issues (like `InvalidDocblock`)
+                // land at the docblock-start line, which precedes the declaration
+                // that the suppression targets. Allow a 30-line look-back so a
+                // `@psalm-suppress InvalidDocblock` in a multi-line docblock is
+                // recognised as used even though its issue line != target_line.
+                let min_line = target_line.saturating_sub(30);
+                let covered_by_pre_suppressed = pre_suppressed.iter().any(|issue| {
+                    issue.location.line >= min_line
+                        && issue.location.line < *target_line
+                        && kind_matches(issue)
+                });
+                !covered_by_pre_suppressed
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Like `unused_named` but takes a slice of `Issue` references.
+    pub fn unused_named_ref(&self, issues: &[&mir_issues::Issue]) -> Vec<(u32, String)> {
+        self.named_suppressions
+            .iter()
+            .filter(|(line, kind)| {
+                !issues.iter().any(|issue| {
+                    issue.location.line == *line
+                        && (issue.kind.name() == kind || issue.kind.code() == kind)
+                })
+            })
+            .cloned()
+            .collect()
     }
 }
 
@@ -214,7 +291,12 @@ const BARE_KEYWORDS: &[&str] = &[
     "@phpstan-ignore",
 ];
 
-fn parse_directive(raw: &str) -> Option<Directive> {
+/// Like `parse_directive` (which is parse_directive_with_tracking discarding the tracking flag),
+/// but also returns whether named suppression tracking
+/// should be applied (true for `@psalm-suppress`, `@mir-suppress`, `@suppress`
+/// and `@mir-ignore` forms; false for `@phpstan-*` which are blanket suppressors
+/// not tied to specific issue kinds).
+fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
     let comment = extract_comment(raw)?;
 
     for &(keyword, scope, force_all) in KEYWORDS {
@@ -254,11 +336,18 @@ fn parse_directive(raw: &str) -> Option<Directive> {
             parse_kinds(after)
         };
 
-        return Some(Directive {
-            scope,
-            kinds,
-            skip_comments,
-        });
+        // Track named suppressions only for non-phpstan forms (phpstan forms
+        // always suppress all kinds, so they can never be "unused for a specific kind").
+        let track_named = !keyword.starts_with("@phpstan");
+
+        return Some((
+            Directive {
+                scope,
+                kinds,
+                skip_comments,
+            },
+            track_named,
+        ));
     }
 
     None

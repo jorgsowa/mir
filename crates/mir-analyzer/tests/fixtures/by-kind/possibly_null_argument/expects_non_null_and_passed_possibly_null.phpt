@@ -12,3 +12,4 @@ function foo($mixed, $mixed_or_null): void {
     new Exception($mixed_or_null);
 }
 ===expect===
+UnusedPsalmSuppress@9:0-9:0: Suppress annotation for 'MixedArgument' is never used

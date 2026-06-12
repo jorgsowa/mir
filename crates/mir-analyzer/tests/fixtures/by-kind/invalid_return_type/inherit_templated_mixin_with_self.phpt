@@ -53,3 +53,4 @@ function test() : FooGrandChild {
     return (new FooGrandChild)->type();
 }
 ===expect===
+UnusedPsalmSuppress@47:0-47:0: Suppress annotation for 'MissingConstructor' is never used

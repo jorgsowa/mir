@@ -23,3 +23,4 @@ function app(): void {
     echo $result;
 }
 ===expect===
+holder.php: UnusedPsalmSuppress@12:0-12:0: Suppress annotation for 'UnusedParam' is never used
