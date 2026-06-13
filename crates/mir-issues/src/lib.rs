@@ -230,8 +230,8 @@ pub enum IssueKind {
     Trace { variable: String, type_info: String },
 
     // --- Array issues -------------------------------------------------------
-    /// Not yet emitted. Would fire when an invalid type (e.g. object) is used as an array key.
-    /// Fixtures: `tests/fixtures/by-kind/invalid_array_offset/` (partial — see NonExistentArrayOffset).
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_array_offset/`.
     InvalidArrayOffset { expected: String, actual: String },
     /// Emitted by `mir-analyzer/src/expr/arrays.rs` when a TKeyedArray is accessed with
     /// a literal key that does not exist in the shape.
