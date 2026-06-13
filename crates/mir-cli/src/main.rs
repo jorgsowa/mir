@@ -119,8 +119,13 @@ enum OutputFormat {
 fn main() {
     let cli = Cli::parse();
 
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
     if cli.clear_cache {
-        clear_cache(&cli);
+        // Resolve the composer root first so we clear the *project-local*
+        // `.mir/cache` the analyze path actually uses — not just the platform
+        // default. Done before config loading: clearing the cache needs neither.
+        clear_cache(&cli, resolve_composer_root(&cli, &cwd).as_deref());
     }
 
     let (mut config, config_base) = load_config(&cli);
@@ -139,7 +144,6 @@ fn main() {
             .ok();
     }
 
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let composer_root = resolve_composer_root(&cli, &cwd);
 
     let baseline = report::load_baseline(&cli, &config);
@@ -157,13 +161,25 @@ fn main() {
 // Bootstrap helpers
 // ---------------------------------------------------------------------------
 
-fn clear_cache(cli: &Cli) -> ! {
-    let cache_dir = cli.cache_dir.clone().or_else(analyze::default_cache_dir);
+fn clear_cache(cli: &Cli, composer_root: Option<&std::path::Path>) -> ! {
+    // Mirror the cache-dir resolution in `analyze::run_composer_flow`: an
+    // explicit `--cache-dir`, else the project-local `{composer_root}/.mir/cache`,
+    // else the platform default. The previous version only ever looked at the
+    // platform default and removed a `cache.json` that no longer exists (the
+    // format is `cache.bin`), so `--clear-cache` silently did nothing for a
+    // normal project run.
+    let cache_dir = cli
+        .cache_dir
+        .clone()
+        .or_else(|| composer_root.map(|r| r.join(".mir/cache")))
+        .or_else(analyze::default_cache_dir);
     if let Some(cache_dir) = cache_dir {
-        let cache_file = cache_dir.join("cache.json");
-        if cache_file.exists() {
-            if let Err(e) = std::fs::remove_file(&cache_file) {
-                eprintln!("mir: failed to remove cache file: {}", e);
+        if cache_dir.exists() {
+            // Remove the whole cache directory: it holds the result cache
+            // (`cache.bin`), any legacy `cache.json`, and the stub-definition
+            // cache under `stubs/`. A partial delete leaves a half-stale cache.
+            if let Err(e) = std::fs::remove_dir_all(&cache_dir) {
+                eprintln!("mir: failed to clear cache: {}", e);
                 process::exit(1);
             }
         }
@@ -171,7 +187,9 @@ fn clear_cache(cli: &Cli) -> ! {
             eprintln!("mir: cache cleared ({})", cache_dir.display());
         }
     } else {
-        eprintln!("mir: --clear-cache requires --cache-dir (no platform cache dir found)");
+        eprintln!(
+            "mir: --clear-cache requires --cache-dir (no project or platform cache dir found)"
+        );
         process::exit(2);
     }
     process::exit(0);
