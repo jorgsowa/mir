@@ -306,6 +306,10 @@ pub enum IssueKind {
     ImpureGlobalVariable { variable: String },
     /// Emitted when a @pure function uses a static variable.
     ImpureStaticVariable { variable: String },
+    /// Emitted by `mir-analyzer/src/call/function.rs` when a `@pure` function calls a
+    /// non-pure named function.
+    /// Fixtures: `tests/fixtures/by-kind/impure_function_call/`.
+    ImpureFunctionCall { fn_name: String },
 
     // --- Readonly -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
@@ -665,6 +669,7 @@ impl IssueKind {
             | IssueKind::ImpureMethodCall { .. }
             | IssueKind::ImpureGlobalVariable { .. }
             | IssueKind::ImpureStaticVariable { .. }
+            | IssueKind::ImpureFunctionCall { .. }
             | IssueKind::UnsupportedReferenceUsage
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::UnhandledMatchCondition { .. }
@@ -856,6 +861,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "MIR1701",
             IssueKind::ImpureGlobalVariable { .. } => "MIR1702",
             IssueKind::ImpureStaticVariable { .. } => "MIR1703",
+            IssueKind::ImpureFunctionCall { .. } => "MIR1704",
             IssueKind::UnsupportedReferenceUsage => "MIR1506",
             IssueKind::NoInterfaceProperties { .. } => "MIR1504",
             IssueKind::UndefinedDocblockClass { .. } => "MIR1505",
@@ -971,7 +977,7 @@ impl IssueKind {
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0500" | "MIR0506"
             | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700" | "MIR1701"
-            | "MIR1702" | "MIR1703" | "MIR1506" => Some(Severity::Warning),
+            | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1506" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1061,6 +1067,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "ImpureMethodCall",
             IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
             IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
+            IssueKind::ImpureFunctionCall { .. } => "ImpureFunctionCall",
             IssueKind::UnsupportedReferenceUsage => "UnsupportedReferenceUsage",
             IssueKind::NoInterfaceProperties { .. } => "NoInterfaceProperties",
             IssueKind::UndefinedDocblockClass { .. } => "UndefinedDocblockClass",
@@ -1387,6 +1394,9 @@ impl IssueKind {
             }
             IssueKind::ImpureStaticVariable { variable } => {
                 format!("Using static variable ${variable} in a @pure function")
+            }
+            IssueKind::ImpureFunctionCall { fn_name } => {
+                format!("Calling impure function {fn_name}() in a @pure function")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
@@ -1963,6 +1973,7 @@ mod code_tests {
             IssueKind::ImpureMethodCall { method: s() },
             IssueKind::ImpureGlobalVariable { variable: s() },
             IssueKind::ImpureStaticVariable { variable: s() },
+            IssueKind::ImpureFunctionCall { fn_name: s() },
             IssueKind::ReadonlyPropertyAssignment {
                 class: s(),
                 property: s(),

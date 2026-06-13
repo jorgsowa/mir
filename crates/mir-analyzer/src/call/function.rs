@@ -29,6 +29,7 @@ struct ResolvedFn {
     return_ty_raw: Type,
     throws: Arc<[Arc<str>]>,
     no_named_arguments: bool,
+    is_pure: bool,
 }
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
@@ -51,6 +52,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             return_ty_raw,
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
             no_named_arguments: f.no_named_arguments,
+            is_pure: f.is_pure,
         });
     }
     None
@@ -320,6 +322,17 @@ impl CallAnalyzer {
             let template_params = resolved.template_params;
             let return_ty_raw = resolved.return_ty_raw;
             let no_named_arguments = resolved.no_named_arguments;
+            let is_pure = resolved.is_pure;
+
+            if ctx.is_in_pure_fn && !is_pure {
+                ea.emit(
+                    IssueKind::ImpureFunctionCall {
+                        fn_name: fn_name.rsplit('\\').next().unwrap_or(&fn_name).to_string(),
+                    },
+                    Severity::Warning,
+                    span,
+                );
+            }
 
             if let Some(msg) = deprecated {
                 ea.emit(
