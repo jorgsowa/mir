@@ -1,5 +1,7 @@
 ===description===
 Invalid catch class
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class A {}

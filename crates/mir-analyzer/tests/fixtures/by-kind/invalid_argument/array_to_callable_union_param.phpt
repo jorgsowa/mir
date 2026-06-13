@@ -2,6 +2,8 @@
 An array passed to a `callable|array|null` union param (Http Factory::fake
 pattern) matches the array alternative — it must not be validated as an
 [object, "method"] callable shape. A pure callable param still validates.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Factory {

@@ -1,5 +1,7 @@
 ===description===
 variable from superglobal
+===config===
+suppress=MixedArrayAccess,MixedAssignment
 ===file===
 <?php
 function test(): void {

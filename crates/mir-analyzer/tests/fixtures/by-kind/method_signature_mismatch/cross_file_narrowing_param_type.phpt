@@ -1,5 +1,7 @@
 ===description===
 cross file narrowing param type
+===config===
+suppress=ForbiddenCode
 ===file:Animal.php===
 <?php
 class Animal {

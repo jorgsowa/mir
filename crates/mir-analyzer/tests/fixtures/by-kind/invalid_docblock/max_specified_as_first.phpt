@@ -1,5 +1,7 @@
 ===description===
 Max specified as first
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

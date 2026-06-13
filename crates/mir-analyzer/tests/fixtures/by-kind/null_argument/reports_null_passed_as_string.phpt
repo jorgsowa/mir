@@ -1,5 +1,7 @@
 ===description===
 reports null passed as string
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function f(string $x): void { var_dump($x); }

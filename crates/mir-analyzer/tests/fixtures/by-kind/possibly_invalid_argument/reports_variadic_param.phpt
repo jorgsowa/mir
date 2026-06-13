@@ -1,5 +1,7 @@
 ===description===
 reports variadic param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInts(int ...$ns): void { var_dump($ns); }

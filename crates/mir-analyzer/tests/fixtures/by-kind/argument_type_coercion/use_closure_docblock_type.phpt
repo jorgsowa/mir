@@ -1,5 +1,7 @@
 ===description===
 Use closure docblock type
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

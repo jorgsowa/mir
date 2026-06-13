@@ -1,5 +1,7 @@
 ===description===
 Array filter use method on inferable int
+===config===
+suppress=MissingClosureReturnType,UnusedVariable
 ===file===
 <?php
 $a = array_filter([1, 2, 3, 4], function ($i) { return $i->foo(); });

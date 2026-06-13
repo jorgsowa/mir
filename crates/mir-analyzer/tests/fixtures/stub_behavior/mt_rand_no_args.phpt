@@ -1,5 +1,7 @@
 ===description===
 mt_rand can be called with zero arguments
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 // mt_rand with no arguments is allowed (returns random int in full range)

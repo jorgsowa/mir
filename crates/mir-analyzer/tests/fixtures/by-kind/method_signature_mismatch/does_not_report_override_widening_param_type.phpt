@@ -1,5 +1,7 @@
 ===description===
 does not report override widening param type
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

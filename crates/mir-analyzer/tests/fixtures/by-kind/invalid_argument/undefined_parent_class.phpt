@@ -1,5 +1,7 @@
 ===description===
 Undefined parent class
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /**

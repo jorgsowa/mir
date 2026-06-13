@@ -1,5 +1,7 @@
 ===description===
 Sort of replacement for assert
+===config===
+suppress=MissingThrowsDocblock
 ===file===
 <?php
 namespace Bar;

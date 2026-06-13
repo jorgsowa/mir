@@ -1,5 +1,7 @@
 ===description===
 DeprecatedInterface fires when a class implements a deprecated interface.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /** @deprecated use NewLogger instead */

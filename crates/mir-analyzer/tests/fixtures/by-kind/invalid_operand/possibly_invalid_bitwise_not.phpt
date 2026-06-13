@@ -1,5 +1,7 @@
 ===description===
 Possibly invalid bitwise not
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = ~(rand(0, 1) ? 2 : null);

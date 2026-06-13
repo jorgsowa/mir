@@ -1,5 +1,7 @@
 ===description===
 UnsupportedReferenceUsage fires when taking a reference to an object property.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo {

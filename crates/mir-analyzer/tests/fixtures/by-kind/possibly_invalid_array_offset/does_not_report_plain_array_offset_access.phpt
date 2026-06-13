@@ -1,5 +1,7 @@
 ===description===
 does not report plain array offset access
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function test(): void {

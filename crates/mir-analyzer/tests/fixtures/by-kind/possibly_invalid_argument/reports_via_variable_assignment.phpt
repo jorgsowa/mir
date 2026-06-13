@@ -1,5 +1,7 @@
 ===description===
 reports via variable assignment
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

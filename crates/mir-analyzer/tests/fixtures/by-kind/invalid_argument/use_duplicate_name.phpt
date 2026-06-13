@@ -1,5 +1,7 @@
 ===description===
 Use duplicate name
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $foo = "bar";

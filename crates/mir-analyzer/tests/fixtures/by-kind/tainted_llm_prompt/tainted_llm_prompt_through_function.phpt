@@ -1,5 +1,7 @@
 ===description===
 Tainted llm prompt through function
+===config===
+suppress=MixedArrayAccess,UnusedParam
 ===file===
 <?php
 class LlmAgent {

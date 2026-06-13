@@ -1,5 +1,7 @@
 ===description===
 Invalid iterable arg
+===config===
+suppress=UnusedForeachValue
 ===file===
 <?php
 /**

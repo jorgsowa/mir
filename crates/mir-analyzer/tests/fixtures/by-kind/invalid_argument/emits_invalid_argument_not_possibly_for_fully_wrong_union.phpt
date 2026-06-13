@@ -1,5 +1,7 @@
 ===description===
 emits invalid argument not possibly for fully wrong union
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

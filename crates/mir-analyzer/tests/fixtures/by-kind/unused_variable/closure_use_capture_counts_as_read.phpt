@@ -2,6 +2,8 @@
 Capturing a variable in a closure use() clause (by value or by reference)
 consumes the pending write — not UnusedVariable. Arrow function body reads
 count too.
+===config===
+suppress=ForbiddenCode,MissingClosureReturnType
 ===file===
 <?php
 function takes(callable $cb): void { $cb(); }

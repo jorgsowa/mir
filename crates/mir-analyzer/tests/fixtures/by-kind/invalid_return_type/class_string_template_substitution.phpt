@@ -1,5 +1,7 @@
 ===description===
 class-string<T> in return type is substituted with the inferred class
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo {}

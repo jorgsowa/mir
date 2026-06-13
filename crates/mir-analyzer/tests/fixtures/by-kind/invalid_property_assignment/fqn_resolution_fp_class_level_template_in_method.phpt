@@ -1,5 +1,7 @@
 ===description===
 FP guard: class-level template params referenced in method return types must not be namespace-qualified
+===config===
+suppress=UnusedVariable
 ===file:Lib/Collection.php===
 <?php
 namespace Lib;

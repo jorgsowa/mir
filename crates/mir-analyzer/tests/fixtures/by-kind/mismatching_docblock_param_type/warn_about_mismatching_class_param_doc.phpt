@@ -1,5 +1,7 @@
 ===description===
 Warn about mismatching class param doc
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

@@ -1,5 +1,7 @@
 ===description===
 Deprecated class as param
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

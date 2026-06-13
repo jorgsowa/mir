@@ -1,5 +1,7 @@
 ===description===
 new global scope via use alias no error
+===config===
+suppress=UnusedVariable
 ===file:Entity.php===
 <?php
 namespace App\Model;

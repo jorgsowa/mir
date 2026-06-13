@@ -1,5 +1,7 @@
 ===description===
 does not report subclass as parent
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {}

@@ -1,5 +1,7 @@
 ===description===
 Mixed assignment
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var mixed */

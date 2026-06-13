@@ -1,5 +1,7 @@
 ===description===
 cross file implements stdlib interface
+===config===
+suppress=MixedAssignment
 ===file:Collection.php===
 <?php
 class NumberList implements \Iterator {

@@ -1,5 +1,7 @@
 ===description===
 Incorrect callable param default
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

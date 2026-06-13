@@ -1,5 +1,7 @@
 ===description===
 Magic interface property wrong property
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 /**

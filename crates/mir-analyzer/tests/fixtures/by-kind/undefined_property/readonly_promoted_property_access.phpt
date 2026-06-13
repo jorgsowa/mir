@@ -1,5 +1,7 @@
 ===description===
 Readonly promoted property access
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class A {

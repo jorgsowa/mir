@@ -1,5 +1,7 @@
 ===description===
 Use of static makes function impure
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 /** @pure */

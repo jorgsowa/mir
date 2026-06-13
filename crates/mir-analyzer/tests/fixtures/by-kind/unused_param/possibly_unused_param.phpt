@@ -1,5 +1,7 @@
 ===description===
 Possibly unused param
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

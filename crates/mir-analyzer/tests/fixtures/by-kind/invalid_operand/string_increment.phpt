@@ -1,5 +1,7 @@
 ===description===
 String increment
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = "hello";

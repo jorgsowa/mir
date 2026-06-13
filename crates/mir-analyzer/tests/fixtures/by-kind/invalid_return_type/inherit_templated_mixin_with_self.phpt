@@ -1,5 +1,7 @@
 ===description===
 Inherit templated mixin with self
+===config===
+suppress=MissingPropertyType,MixedReturnStatement
 ===file===
 <?php
 /**

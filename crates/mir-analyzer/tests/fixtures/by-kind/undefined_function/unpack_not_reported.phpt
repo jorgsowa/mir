@@ -1,5 +1,7 @@
 ===description===
 unpack not reported
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function test(): void {

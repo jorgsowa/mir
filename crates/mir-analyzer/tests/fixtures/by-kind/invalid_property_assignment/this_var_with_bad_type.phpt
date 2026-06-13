@@ -1,5 +1,7 @@
 ===description===
 This var with bad type
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

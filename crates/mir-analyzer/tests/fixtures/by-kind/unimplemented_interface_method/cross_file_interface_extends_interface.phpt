@@ -1,5 +1,7 @@
 ===description===
 cross file interface extends interface
+===config===
+suppress=ForbiddenCode
 ===file:Readable.php===
 <?php
 interface Readable {

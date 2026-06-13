@@ -1,7 +1,7 @@
 ===description===
 conditional return type resolves to if-true branch when null is passed
 ===config===
-suppress=UnusedParam
+suppress=UnusedParam,UnusedVariable
 ===file===
 <?php
 

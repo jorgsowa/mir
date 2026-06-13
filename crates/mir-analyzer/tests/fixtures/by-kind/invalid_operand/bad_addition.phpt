@@ -1,5 +1,7 @@
 ===description===
 Bad addition
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = "b" + 5;

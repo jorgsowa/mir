@@ -1,5 +1,7 @@
 ===description===
 Basic
+===config===
+suppress=MixedArgument,MixedArrayAccess
 ===file===
 <?php
 function run_query(mysqli $db): void {

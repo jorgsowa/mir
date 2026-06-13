@@ -1,5 +1,7 @@
 ===description===
 invariant rejects subtype arg
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template T */

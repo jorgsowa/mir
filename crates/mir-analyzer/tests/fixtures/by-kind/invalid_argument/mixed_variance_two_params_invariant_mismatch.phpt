@@ -1,5 +1,7 @@
 ===description===
 mixed variance two params invariant mismatch
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /**

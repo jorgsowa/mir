@@ -1,6 +1,8 @@
 ===description===
 UndefinedDocblockClass fires when a @param docblock names a class that does
 not exist, even without a native type hint.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

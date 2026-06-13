@@ -1,5 +1,7 @@
 ===description===
 cross file subclass accepted
+===config===
+suppress=ForbiddenCode
 ===file:Base.php===
 <?php
 class Base {}

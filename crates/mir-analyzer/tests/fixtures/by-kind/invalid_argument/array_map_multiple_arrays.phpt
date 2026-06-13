@@ -1,5 +1,7 @@
 ===description===
 array_map with multiple array arguments
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 

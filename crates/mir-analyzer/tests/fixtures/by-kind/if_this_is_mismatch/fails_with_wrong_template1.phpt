@@ -1,5 +1,7 @@
 ===description===
 Fails with wrong template1
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 

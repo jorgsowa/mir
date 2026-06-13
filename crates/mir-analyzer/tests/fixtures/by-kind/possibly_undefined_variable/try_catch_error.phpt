@@ -1,5 +1,7 @@
 ===description===
 try catch error
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 function foo(): string {

@@ -1,5 +1,7 @@
 ===description===
 Prevent trait property type
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 trait T {}

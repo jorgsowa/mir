@@ -1,5 +1,7 @@
 ===description===
 interface_exists guard suppresses UndefinedClass in true branch
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 function test(): void {

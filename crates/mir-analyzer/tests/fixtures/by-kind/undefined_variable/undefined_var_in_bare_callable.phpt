@@ -1,5 +1,7 @@
 ===description===
 Undefined var in bare callable
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $fn = function(int $a): void{};

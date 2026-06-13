@@ -1,6 +1,8 @@
 ===description===
 variable used only in variable-variable operand
 
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test() {

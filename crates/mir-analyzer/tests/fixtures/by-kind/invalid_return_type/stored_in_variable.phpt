@@ -1,5 +1,7 @@
 ===description===
 stored in variable
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

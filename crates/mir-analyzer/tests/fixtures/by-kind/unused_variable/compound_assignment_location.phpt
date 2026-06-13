@@ -1,5 +1,7 @@
 ===description===
 Verify location tracking for compound assignment operators.
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test() {

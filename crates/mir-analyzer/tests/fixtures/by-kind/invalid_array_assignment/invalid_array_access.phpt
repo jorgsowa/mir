@@ -1,5 +1,7 @@
 ===description===
 Invalid array access
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = 5;

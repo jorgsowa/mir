@@ -1,5 +1,7 @@
 ===description===
 Float as a boundary
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

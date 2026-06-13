@@ -1,5 +1,7 @@
 ===description===
 reports strpos result passed to int param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

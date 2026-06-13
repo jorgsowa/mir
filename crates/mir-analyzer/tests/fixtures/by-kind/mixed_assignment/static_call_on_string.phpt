@@ -1,5 +1,7 @@
 ===description===
 Static call on string
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class A {

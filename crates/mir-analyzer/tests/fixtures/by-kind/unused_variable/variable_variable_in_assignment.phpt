@@ -1,6 +1,8 @@
 ===description===
 variable-variable operand in assignment target
 
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test() {

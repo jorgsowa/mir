@@ -1,5 +1,7 @@
 ===description===
 Magic method defined with wrong casing is reported.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Foo {

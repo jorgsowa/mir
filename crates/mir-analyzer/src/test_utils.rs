@@ -93,12 +93,15 @@
 //!   `suppress`, `stub_file`, `stub_dir`); unknown keys fail the test.
 //! - `php_version` is parsed via [`PhpVersion::from_str`] (same parser as the
 //!   real CLI config); invalid values fail the test.
-//! - `suppress` accepts a comma-separated list of [`IssueKind`] names and
-//!   **replaces** the analyzer's default suppression set. When the key is
-//!   omitted the runner auto-fills the dead-code group unless the
-//!   fixture's `===expect===` references one of those kinds, so dead-code
-//!   fixtures need no boilerplate and ordinary fixtures don't get unsolicited
-//!   `UnusedFunction` noise from their bare top-level functions.
+//! - `suppress` accepts a comma-separated list of [`IssueKind`] names to drop
+//!   from the analyzer's output. Every other kind is asserted strictly: a
+//!   fixture must either expect each issue its example code produces or list
+//!   the kind here. The dead-code group (`UnusedFunction`/`UnusedMethod`/
+//!   `UnusedProperty`) is the one exception — it is suppressed by default
+//!   (merged on top of any explicit `suppress=`) so a fixture's bare top-level
+//!   functions don't emit unsolicited noise. That default is held back only
+//!   when the fixture's `===expect===` references one of those kinds, which is
+//!   how a fixture opts in to dead-code reporting.
 //! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
 //! - `===description===` must appear **at most once** and before any file section.
 //! - `===ignore===` must appear **at most once** and before any file section.
@@ -130,11 +133,10 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 #[derive(Default)]
 struct FixtureConfig {
     php_version: Option<PhpVersion>,
-    /// Explicit replacement for the analyzer's default suppression set.
-    /// Set from the `suppress=Foo,Bar` config key. When unset, the
-    /// analyzer's default suppressions (currently the dead-code group)
-    /// apply unchanged. `suppress=` with an empty value clears the set
-    /// entirely — that's how a fixture opts in to dead-code reporting.
+    /// Issue kinds to drop from the analyzer's output, set from the
+    /// `suppress=Foo,Bar` config key. The runner additionally merges in the
+    /// dead-code group by default (see `run_fixture`) unless the fixture
+    /// expects a dead-code diagnostic.
     suppressed_issue_kinds: Option<rustc_hash::FxHashSet<String>>,
     /// Paths (relative to temp dir) to pass as `analyzer.stub_files`.
     stub_files: Vec<String>,
@@ -580,79 +582,39 @@ pub fn run_fixture(path: &str) {
         .unwrap_or_else(|e| panic!("failed to read fixture {path}: {e}"));
 
     let mut fixture = parse_phpt(&content, path);
-    // Auto-suppression: fixtures that don't expect any dead-code diagnostic
-    // get the dead-code group silently suppressed, so authors don't have to
-    // sprinkle boilerplate `suppress=` lines on every fixture whose example
-    // code happens to declare an uncalled global function. Fixtures that
-    // explicitly set `suppress=...` keep their replacement semantics; this
-    // only fills in the default.
+    // Auto-suppression: the dead-code group (UnusedMethod/Property/Function) is
+    // suppressed by default so authors don't have to sprinkle boilerplate
+    // `suppress=` lines on every fixture whose example code happens to declare
+    // an uncalled global function. This default is applied *additively* — it
+    // merges with any explicit `suppress=Foo,Bar` rather than being skipped when
+    // one is present — and is held back in two cases, so the `dead_code_enabled`
+    // path filter below keeps its semantics:
+    //   1. the fixture expects a dead-code diagnostic, or
+    //   2. the fixture sets an explicit *empty* `suppress=`, which is the marker
+    //      for "report everything, including dead code" (used by the negative
+    //      dead-code fixtures that assert a *used* symbol is not flagged).
     //
-    // The dead-code group (UnusedMethod/Property/Function) is suppressed
-    // all-or-nothing so the `dead_code_enabled` path filter below keeps its
-    // current semantics. A second group of *incidental* diagnostics
-    // (UnusedParam, UnusedVariable, MissingThrowsDocblock) is suppressed
-    // per-kind: each is dropped unless the fixture's `===expect===` references
-    // it. These kinds fire on almost any realistic snippet (an unused closure
-    // parameter, a throw without a docblock), so a fixture that's focused on,
-    // say, InvalidArgument shouldn't have to also assert every incidental
-    // UnusedParam its example code happens to produce.
+    // Every other diagnostic — including the noisy kinds like UnusedParam,
+    // MixedArgument, or MissingParamType — is asserted strictly: a fixture must
+    // either expect each issue its example code produces or list the kind in an
+    // explicit `suppress=` config line.
     {
-        const INCIDENTAL: &[&str] = &[
-            "UnusedParam",
-            "UnusedVariable",
-            "UnusedForeachValue",
-            "InvalidCast",
-            "ImplicitToStringCast",
-            "MissingThrowsDocblock",
-            "MissingReturnType",
-            "MissingClosureReturnType",
-            "MixedReturnStatement",
-            "MissingParamType",
-            "MissingPropertyType",
-            "MixedArgument",
-            "MixedAssignment",
-            "MixedPropertyFetch",
-            "MixedPropertyAssignment",
-            "MixedArrayAccess",
-            "MixedArrayOffset",
-            "ForbiddenCode",
-            "Trace",
-            "ImpurePropertyAssignment",
-            "ImpureMethodCall",
-            "ImpureGlobalVariable",
-            "ImpureStaticVariable",
-        ];
-        if fixture.config.suppressed_issue_kinds.is_none() {
-            // No explicit suppress= — build default set from dead-code group and
-            // incidental kinds that the fixture doesn't explicitly expect.
-            let dead = crate::batch::dead_code_issue_kinds();
-            let expects_dead_code = fixture
-                .expected
-                .iter()
-                .any(|e| dead.contains(&e.kind_name.as_str()));
-            let mut suppress: rustc_hash::FxHashSet<String> = if expects_dead_code {
-                Default::default()
-            } else {
-                dead.iter().map(|s| (*s).to_string()).collect()
-            };
-            for kind in INCIDENTAL {
-                let expected = fixture.expected.iter().any(|e| e.kind_name == *kind);
-                if !expected {
-                    suppress.insert((*kind).to_string());
-                }
-            }
-            if !suppress.is_empty() {
-                fixture.config.suppressed_issue_kinds = Some(suppress);
-            }
-        } else if let Some(set) = fixture.config.suppressed_issue_kinds.as_mut() {
-            // Explicit suppress= was provided — still add any INCIDENTAL kinds that
-            // the fixture doesn't explicitly expect, so noisy diagnostics don't
-            // surprise fixtures focused on a different issue kind.
-            for kind in INCIDENTAL {
-                let expected = fixture.expected.iter().any(|e| e.kind_name == *kind);
-                if !expected {
-                    set.insert((*kind).to_string());
-                }
+        let dead = crate::batch::dead_code_issue_kinds();
+        let expects_dead_code = fixture
+            .expected
+            .iter()
+            .any(|e| dead.contains(&e.kind_name.as_str()));
+        let opts_into_dead_code = matches!(
+            &fixture.config.suppressed_issue_kinds,
+            Some(set) if set.is_empty()
+        );
+        if !expects_dead_code && !opts_into_dead_code {
+            let set = fixture
+                .config
+                .suppressed_issue_kinds
+                .get_or_insert_with(Default::default);
+            for kind in dead {
+                set.insert((*kind).to_string());
             }
         }
     }

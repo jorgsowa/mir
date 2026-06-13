@@ -1,5 +1,7 @@
 ===description===
 cross-file unannotated generic return with explicit @var property resolves correctly
+===config===
+suppress=MissingPropertyType
 ===file:holder.php===
 <?php
 /**

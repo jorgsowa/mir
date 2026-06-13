@@ -1,5 +1,7 @@
 ===description===
 Correct case class name in instanceof is not reported.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class MyException extends \Exception {}

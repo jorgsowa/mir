@@ -1,5 +1,7 @@
 ===description===
 Wrong case magic method name in explicit call is reported.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Stringable2 {

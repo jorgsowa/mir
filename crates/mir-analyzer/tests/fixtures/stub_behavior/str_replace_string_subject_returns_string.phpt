@@ -1,5 +1,7 @@
 ===description===
 str_replace and str_ireplace with string subject return string, not string|array
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $parts = ['rgb(100,200,150)', '200', '150'];

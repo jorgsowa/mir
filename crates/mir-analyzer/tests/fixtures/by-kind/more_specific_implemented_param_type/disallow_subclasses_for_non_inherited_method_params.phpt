@@ -1,5 +1,7 @@
 ===description===
 Disallow subclasses for non inherited method params
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

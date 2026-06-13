@@ -1,5 +1,7 @@
 ===description===
 does not report correct abstract implementation
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 abstract class Base {

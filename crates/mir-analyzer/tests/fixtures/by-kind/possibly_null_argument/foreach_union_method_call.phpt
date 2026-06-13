@@ -1,5 +1,7 @@
 ===description===
 Foreach union method call
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Item {

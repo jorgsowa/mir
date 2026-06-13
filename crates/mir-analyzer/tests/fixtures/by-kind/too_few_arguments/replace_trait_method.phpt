@@ -1,5 +1,7 @@
 ===description===
 Replace trait method
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 trait T {

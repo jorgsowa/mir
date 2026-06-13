@@ -1,5 +1,7 @@
 ===description===
 reports both elements of multi var destructure
+===config===
+suppress=ForbiddenCode,MixedAssignment
 ===file===
 <?php
 /** @return array|false */

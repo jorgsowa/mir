@@ -1,5 +1,7 @@
 ===description===
 covariant raw type no error
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template-covariant T */

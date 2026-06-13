@@ -1,5 +1,7 @@
 ===description===
 arg is itself an intersection type satisfying the concrete part — no false positive
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 interface Taggable {}

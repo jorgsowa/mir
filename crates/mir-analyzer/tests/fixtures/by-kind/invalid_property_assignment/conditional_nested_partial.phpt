@@ -1,5 +1,7 @@
 ===description===
 partially nested conditionals (inner simplifies, outer branches differ)
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class PartialFactory {

@@ -1,5 +1,7 @@
 ===description===
 reports string or false to string param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesString(string $s): void { var_dump($s); }

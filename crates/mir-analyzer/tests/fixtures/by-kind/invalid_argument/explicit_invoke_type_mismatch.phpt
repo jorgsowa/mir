@@ -1,5 +1,7 @@
 ===description===
 Explicit invoke type mismatch
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

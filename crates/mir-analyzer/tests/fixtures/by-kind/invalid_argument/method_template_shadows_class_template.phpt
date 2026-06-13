@@ -4,6 +4,8 @@ checking: the param must bind from the argument, not from the receiver's
 class binding (ReflectionClass<Foo>::getAttributes(Attr::class) pattern).
 The trailing description containing " of " must not be misparsed as the
 template's bound.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /** @template T of object */

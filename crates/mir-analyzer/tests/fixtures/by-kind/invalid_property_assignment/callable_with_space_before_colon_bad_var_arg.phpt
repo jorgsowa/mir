@@ -1,5 +1,7 @@
 ===description===
 Callable with space before colon bad var arg
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class C {

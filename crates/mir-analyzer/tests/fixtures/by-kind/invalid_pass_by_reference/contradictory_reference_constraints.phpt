@@ -1,5 +1,7 @@
 ===description===
 Contradictory reference constraints
+===config===
+suppress=MissingPropertyType,UnusedVariable
 ===file===
 <?php
 class A {

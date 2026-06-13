@@ -1,5 +1,7 @@
 ===description===
 Fails with wrong template2
+===config===
+suppress=MissingPropertyType,UnusedParam
 ===file===
 <?php
 class Frozen {}

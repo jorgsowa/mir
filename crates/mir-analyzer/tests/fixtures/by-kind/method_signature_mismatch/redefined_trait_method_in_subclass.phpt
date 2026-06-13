@@ -1,5 +1,7 @@
 ===description===
 Redefined trait method in subclass
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 trait T {

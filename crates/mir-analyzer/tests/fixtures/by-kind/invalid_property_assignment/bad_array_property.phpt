@@ -1,5 +1,7 @@
 ===description===
 Bad array property
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {}

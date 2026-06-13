@@ -1,5 +1,7 @@
 ===description===
 covariant allows subclass with template extends
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template-covariant T */

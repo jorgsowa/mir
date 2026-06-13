@@ -1,5 +1,7 @@
 ===description===
 Namespaced function with wrong-case short name is reported.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 namespace App\Utils;

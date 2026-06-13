@@ -1,5 +1,7 @@
 ===description===
 Variant templated properties
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 /**

@@ -2,6 +2,7 @@
 stub dir function no error
 ===config===
 stub_dir=stubs
+suppress=MixedAssignment,UnusedVariable
 ===file:stubs/auth.php===
 <?php
 function auth_check(string $token): bool { return strlen($token) > 0; }

@@ -1,5 +1,7 @@
 ===description===
 Mismatching interface method signature in trait
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 interface A {

@@ -1,5 +1,7 @@
 ===description===
 static call with int variable should error
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test(int $value) {

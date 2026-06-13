@@ -1,5 +1,7 @@
 ===description===
 Callable missing optional multiple params
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

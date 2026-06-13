@@ -1,6 +1,8 @@
 ===description===
 $this-> and static:: calls inside a trait body may be provided by the
 consuming class — not UndefinedMethod when unresolved in the trait itself
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 trait AssertsThings {

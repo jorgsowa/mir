@@ -1,5 +1,7 @@
 ===description===
 Sensitive parameter on method
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 

@@ -1,5 +1,7 @@
 ===description===
 Prevent string docblock type
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

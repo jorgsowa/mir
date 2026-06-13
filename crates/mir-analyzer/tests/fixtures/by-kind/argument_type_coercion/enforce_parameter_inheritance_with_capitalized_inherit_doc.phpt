@@ -1,5 +1,7 @@
 ===description===
 Enforce parameter inheritance with capitalized inherit doc
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

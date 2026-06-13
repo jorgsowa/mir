@@ -1,5 +1,7 @@
 ===description===
 Callable missing optional variable instance array
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 three level inheritance
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

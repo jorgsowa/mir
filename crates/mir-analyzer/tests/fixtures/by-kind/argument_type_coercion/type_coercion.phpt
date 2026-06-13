@@ -1,5 +1,7 @@
 ===description===
 Type coercion
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

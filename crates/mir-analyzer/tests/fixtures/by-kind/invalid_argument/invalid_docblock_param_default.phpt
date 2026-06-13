@@ -1,5 +1,7 @@
 ===description===
 Invalid docblock param default
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

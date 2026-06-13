@@ -1,5 +1,7 @@
 ===description===
 cross file compatible override
+===config===
+suppress=ForbiddenCode
 ===file:Base.php===
 <?php
 class Base {

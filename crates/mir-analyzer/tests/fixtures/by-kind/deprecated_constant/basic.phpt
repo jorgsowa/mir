@@ -1,5 +1,7 @@
 ===description===
 DeprecatedConstant fires when accessing a deprecated class constant.
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 class Config {

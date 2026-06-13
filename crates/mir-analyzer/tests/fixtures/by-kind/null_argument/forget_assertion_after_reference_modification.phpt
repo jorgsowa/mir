@@ -1,5 +1,7 @@
 ===description===
 Forget assertion after reference modification
+===config===
+suppress=UnusedParam,UnusedVariable
 ===file===
 <?php
 class Foo

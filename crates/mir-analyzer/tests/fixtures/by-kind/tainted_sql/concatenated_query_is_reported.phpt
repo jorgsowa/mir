@@ -1,5 +1,7 @@
 ===description===
 concatenated query is reported
+===config===
+suppress=MixedArrayAccess
 ===file===
 <?php
 function run_query(mysqli $db): void {

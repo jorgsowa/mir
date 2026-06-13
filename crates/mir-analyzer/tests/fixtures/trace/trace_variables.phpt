@@ -1,5 +1,7 @@
 ===description===
 Trace variables
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @trace $a $b */

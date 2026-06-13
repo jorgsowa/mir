@@ -1,5 +1,7 @@
 ===description===
 Invalid union assertion
+===config===
+suppress=MissingParamType,MissingReturnType
 ===file===
 <?php
 interface I {

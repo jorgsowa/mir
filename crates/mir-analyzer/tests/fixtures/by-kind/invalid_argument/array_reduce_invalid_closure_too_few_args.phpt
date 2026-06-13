@@ -1,5 +1,7 @@
 ===description===
 Array reduce invalid closure too few args
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 $arr = [2, 3, 4, 5];

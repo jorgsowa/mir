@@ -1,5 +1,7 @@
 ===description===
 No ImplicitToStringCast when class implements Stringable interface
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 // Stringable is a built-in PHP interface since PHP 8.0

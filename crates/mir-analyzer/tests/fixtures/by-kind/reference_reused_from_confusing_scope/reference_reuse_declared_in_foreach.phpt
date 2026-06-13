@@ -1,5 +1,7 @@
 ===description===
 Reference reuse declared in foreach
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var array<int> */

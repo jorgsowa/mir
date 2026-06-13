@@ -1,5 +1,7 @@
 ===description===
 Abstract class instantiation
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 abstract class AbstractService {

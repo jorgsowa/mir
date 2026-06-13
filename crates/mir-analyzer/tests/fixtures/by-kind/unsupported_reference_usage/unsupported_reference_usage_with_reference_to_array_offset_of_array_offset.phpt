@@ -1,5 +1,7 @@
 ===description===
 Unsupported reference usage with reference to array offset of array offset
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var array<string, string> */

@@ -1,5 +1,7 @@
 ===description===
 reports override adds required param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

@@ -1,5 +1,7 @@
 ===description===
 chained calls
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

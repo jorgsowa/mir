@@ -1,5 +1,7 @@
 ===description===
 One param
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 interface I {

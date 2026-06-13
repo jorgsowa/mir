@@ -1,5 +1,7 @@
 ===description===
 Undefined method on parent call with method exists on self
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 class A {}

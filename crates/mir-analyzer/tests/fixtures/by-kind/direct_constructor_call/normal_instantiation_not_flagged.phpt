@@ -1,5 +1,7 @@
 ===description===
 DirectConstructorCall does NOT fire for normal object instantiation.
+===config===
+suppress=UnusedParam,UnusedVariable
 ===file===
 <?php
 class Foo {

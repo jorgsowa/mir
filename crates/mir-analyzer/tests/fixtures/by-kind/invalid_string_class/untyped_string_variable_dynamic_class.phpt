@@ -1,6 +1,8 @@
 ===description===
 Untyped string variable dynamic class — an untyped (mixed) param is not
 InvalidStringClass; mixed is already imprecise (a Mixed* concern)
+===config===
+suppress=MissingParamType,MissingReturnType
 ===file===
 <?php
 class ValidClass {

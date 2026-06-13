@@ -1,5 +1,7 @@
 ===description===
 does not report when param accepts false
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesIntOrFalse(int|false $n): void { var_dump($n); }

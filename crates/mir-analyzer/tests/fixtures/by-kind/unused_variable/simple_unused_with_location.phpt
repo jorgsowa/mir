@@ -1,5 +1,7 @@
 ===description===
 Verify UnusedVariable is reported at the correct line and column.
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function example() {

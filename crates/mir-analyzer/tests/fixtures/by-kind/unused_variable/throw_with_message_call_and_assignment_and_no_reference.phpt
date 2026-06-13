@@ -1,5 +1,7 @@
 ===description===
 Throw with message call and assignment and no reference
+===config===
+suppress=MissingThrowsDocblock
 ===file===
 <?php
 function dangerous(): string {

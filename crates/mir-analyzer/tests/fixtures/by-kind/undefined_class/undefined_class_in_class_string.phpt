@@ -1,5 +1,7 @@
 ===description===
 Undefined class in class string
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

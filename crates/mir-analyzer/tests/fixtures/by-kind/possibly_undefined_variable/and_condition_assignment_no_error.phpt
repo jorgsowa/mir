@@ -1,5 +1,7 @@
 ===description===
 no PossiblyUndefinedVariable when var is assigned inside && condition and used in if body
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 class Foo {

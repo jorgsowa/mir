@@ -1,5 +1,7 @@
 ===description===
 does not report override with optional extra param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

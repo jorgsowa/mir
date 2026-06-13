@@ -1,5 +1,7 @@
 ===description===
 Class string parameter with type hint
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 class Service {

@@ -1,5 +1,7 @@
 ===description===
 Mixed argument
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function fooFoo(int $a): void {}

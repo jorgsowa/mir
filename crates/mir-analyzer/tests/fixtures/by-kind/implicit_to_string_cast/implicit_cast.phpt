@@ -1,5 +1,7 @@
 ===description===
 Implicit cast
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

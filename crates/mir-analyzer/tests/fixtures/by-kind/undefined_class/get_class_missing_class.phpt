@@ -1,5 +1,7 @@
 ===description===
 Get class missing class
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class A {}

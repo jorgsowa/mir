@@ -1,5 +1,7 @@
 ===description===
 Automatic inherit doc
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Y {

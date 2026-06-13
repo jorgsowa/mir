@@ -1,5 +1,7 @@
 ===description===
 reports incompatible union arg
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function g(): int|string { return 1; }

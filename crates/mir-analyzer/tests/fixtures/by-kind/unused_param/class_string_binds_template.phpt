@@ -1,5 +1,7 @@
 ===description===
 class-string<T> argument binds T to the named class, not the bound
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @template T */

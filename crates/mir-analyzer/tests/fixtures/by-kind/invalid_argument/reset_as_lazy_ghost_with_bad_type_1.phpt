@@ -1,5 +1,7 @@
 ===description===
 resetAsLazyGhostWithBadType_1
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 class Foo {}

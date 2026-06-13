@@ -1,5 +1,7 @@
 ===description===
 reports unpack result when stub present
+===config===
+suppress=ForbiddenCode,MixedAssignment
 ===file===
 <?php
 function test(): void {

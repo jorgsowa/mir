@@ -1,5 +1,7 @@
 ===description===
 Too many arguments to instance
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

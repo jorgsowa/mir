@@ -1,5 +1,7 @@
 ===description===
 does not report destructure of plain array
+===config===
+suppress=ForbiddenCode,MixedAssignment
 ===file===
 <?php
 /** @return array */

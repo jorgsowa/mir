@@ -1,5 +1,7 @@
 ===description===
 preg match populates matches
+===config===
+suppress=MixedArgument
 ===file===
 <?php
 function extract(string $s): string {

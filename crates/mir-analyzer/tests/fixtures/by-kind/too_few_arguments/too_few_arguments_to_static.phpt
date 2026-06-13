@@ -1,5 +1,7 @@
 ===description===
 Too few arguments to static
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

@@ -1,5 +1,7 @@
 ===description===
 foreach body error
+===config===
+suppress=MixedAssignment,MixedReturnStatement
 ===file===
 <?php
 function foo(array $items): string {

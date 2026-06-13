@@ -1,6 +1,8 @@
 ===description===
 Redundant cast from array to array
 
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $x = [];

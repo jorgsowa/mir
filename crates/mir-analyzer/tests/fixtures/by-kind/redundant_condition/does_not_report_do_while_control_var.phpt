@@ -1,5 +1,7 @@
 ===description===
 does not report do while control var
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 function foo(): void {

@@ -1,5 +1,7 @@
 ===description===
 Switch bad method call in case
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function f(string $p): void { }

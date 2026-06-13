@@ -1,5 +1,7 @@
 ===description===
 Interface has fewer constructor args
+===config===
+suppress=MissingReturnType,UnusedParam
 ===file===
 <?php
 interface Foo {

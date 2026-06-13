@@ -1,5 +1,7 @@
 ===description===
 reports both null and false independently
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

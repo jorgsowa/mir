@@ -1,5 +1,7 @@
 ===description===
 no false positive without type arg
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 /** @template T */

@@ -1,5 +1,7 @@
 ===description===
 closure use capture not reported
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 function foo(): array {

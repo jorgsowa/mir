@@ -1,5 +1,7 @@
 ===description===
 New lazy ghost with bad type
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 class Foo {}

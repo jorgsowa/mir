@@ -1,5 +1,7 @@
 ===description===
 No named args function
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /** @no-named-arguments */

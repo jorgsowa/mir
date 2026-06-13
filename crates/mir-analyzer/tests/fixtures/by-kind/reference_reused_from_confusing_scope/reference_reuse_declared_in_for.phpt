@@ -1,5 +1,7 @@
 ===description===
 Reference reuse declared in for
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var list<int> */

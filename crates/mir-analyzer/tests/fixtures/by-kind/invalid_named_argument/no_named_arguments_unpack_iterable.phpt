@@ -13,4 +13,3 @@ $test = ["arg1" => 1, "arg2" => 2];
 foo(...$test);
 
 ===expect===
-UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'UnusedParam' is never used

@@ -1,5 +1,7 @@
 ===description===
 cross file unpack return type
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file:Protocol.php===
 <?php
 /**

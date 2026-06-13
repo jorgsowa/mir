@@ -1,5 +1,7 @@
 ===description===
 Possibly invalid argument
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $foo = [

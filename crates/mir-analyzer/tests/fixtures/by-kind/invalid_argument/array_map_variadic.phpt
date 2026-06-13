@@ -1,5 +1,7 @@
 ===description===
 array_map with variadic callback
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 

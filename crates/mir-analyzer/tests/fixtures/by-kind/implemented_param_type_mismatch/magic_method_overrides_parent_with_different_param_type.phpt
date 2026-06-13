@@ -1,5 +1,7 @@
 ===description===
 Magic method overrides parent with different param type
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class C {}

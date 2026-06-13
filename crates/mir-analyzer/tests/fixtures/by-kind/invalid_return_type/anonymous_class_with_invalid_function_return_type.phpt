@@ -1,5 +1,7 @@
 ===description===
 Anonymous class with invalid function return type
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $foo = new class {

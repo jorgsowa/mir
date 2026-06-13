@@ -1,5 +1,7 @@
 ===description===
 Forget assertion after relevant non mutation free call on reference
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Foo

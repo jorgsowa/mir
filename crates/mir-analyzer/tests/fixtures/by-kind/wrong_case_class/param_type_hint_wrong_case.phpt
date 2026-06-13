@@ -1,5 +1,7 @@
 ===description===
 Wrong case class name in parameter type hint is reported.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Request {}

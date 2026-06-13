@@ -1,5 +1,7 @@
 ===description===
 nullable static
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

@@ -1,5 +1,7 @@
 ===description===
 Regression: static return type should resolve to the calling class at the call site
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Model {

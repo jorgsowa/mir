@@ -1,5 +1,7 @@
 ===description===
 cross file inheritance
+===config===
+suppress=ForbiddenCode
 ===file:A.php===
 <?php
 class A {

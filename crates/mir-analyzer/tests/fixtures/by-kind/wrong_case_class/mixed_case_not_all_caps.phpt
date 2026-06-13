@@ -1,5 +1,7 @@
 ===description===
 Mixed case variants (not all-caps) are also detected.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class HttpClient {}

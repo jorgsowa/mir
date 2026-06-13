@@ -1,5 +1,7 @@
 ===description===
 Literal string as int array key
+===config===
+suppress=MixedArgument,MixedArrayAccess,MixedAssignment
 ===file===
 <?php
 class a {

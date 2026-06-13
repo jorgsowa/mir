@@ -1,5 +1,7 @@
 ===description===
 Enum wrong float
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 namespace Ns;

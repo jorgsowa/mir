@@ -1,5 +1,7 @@
 ===description===
 instanceof narrowing combined with type guards
+===config===
+suppress=MissingParamType,MissingReturnType,MixedArgument
 ===file===
 <?php
 class Foo {

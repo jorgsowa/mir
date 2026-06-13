@@ -1,5 +1,7 @@
 ===description===
 array map null callback zip mode
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 // null callback (zip mode) is valid PHP 8 — callable|null signature

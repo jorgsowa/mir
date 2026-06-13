@@ -1,5 +1,7 @@
 ===description===
 Misplaced required param
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function foo(string $bar = null, int $bat): void {}

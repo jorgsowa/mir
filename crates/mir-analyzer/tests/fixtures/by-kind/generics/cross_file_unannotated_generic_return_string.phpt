@@ -1,5 +1,7 @@
 ===description===
 cross-file unannotated generic return resolves to string type parameter
+===config===
+suppress=MissingPropertyType,MixedAssignment
 ===file:box.php===
 <?php
 /**

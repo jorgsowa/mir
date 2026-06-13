@@ -1,5 +1,7 @@
 ===description===
 Arbitrary string no resolution
+===config===
+suppress=MissingParamType,MissingReturnType,MixedArgument,UnusedVariable
 ===file===
 <?php
 // A plain string literal that happens to match a function name

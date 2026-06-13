@@ -1,5 +1,7 @@
 ===description===
 Possibly invalid argument with overlap
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

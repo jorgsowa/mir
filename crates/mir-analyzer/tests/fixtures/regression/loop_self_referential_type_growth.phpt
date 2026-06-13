@@ -12,6 +12,8 @@ Fixed by deduplicating dead writes when merging branches. This fixture guards
 the fix: with the bug it OOMs; fixed, it completes in milliseconds. Diagnostics
 are identical either way (the blow-up is transient), so the guard is that it
 analyzes at all.
+===config===
+suppress=MissingPropertyType,MixedArgument,MixedArrayAccess,MixedArrayOffset,MixedAssignment,MixedPropertyFetch
 ===file===
 <?php
 class NotificationSender

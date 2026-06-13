@@ -1,5 +1,7 @@
 ===description===
 Static interface call
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 interface Foo {

@@ -1,5 +1,7 @@
 ===description===
 Self class const bad value
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

@@ -1,5 +1,7 @@
 ===description===
 Bad custom function
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

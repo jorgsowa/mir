@@ -1,5 +1,7 @@
 ===description===
 does not report compatible override
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

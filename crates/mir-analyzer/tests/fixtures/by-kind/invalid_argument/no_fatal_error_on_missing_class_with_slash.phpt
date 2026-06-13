@@ -1,5 +1,7 @@
 ===description===
 No fatal error on missing class with slash
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Func {

@@ -1,6 +1,8 @@
 ===description===
 Redundant cast from bool to bool
 
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $x = true;

@@ -1,5 +1,7 @@
 ===description===
 Class string properly resolves
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 class ConfigRegistry {

@@ -1,5 +1,7 @@
 ===description===
 Foreach unknown array size
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 function getItems(): array {

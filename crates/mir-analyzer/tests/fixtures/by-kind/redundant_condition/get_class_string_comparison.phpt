@@ -1,5 +1,7 @@
 ===description===
 get_class() string comparison narrowing
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 class Foo {

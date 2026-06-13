@@ -1,5 +1,7 @@
 ===description===
 Deprecated property set
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A{

@@ -1,5 +1,7 @@
 ===description===
 variadic union nullable ctor args do not panic or cause false positive
+===config===
+suppress=MissingPropertyType
 ===file:Coll.php===
 <?php
 class Base {}

@@ -1,5 +1,7 @@
 ===description===
 Variable assigned in if-condition and used only in the true branch is not reported
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function getToken(): ?string { return null; }

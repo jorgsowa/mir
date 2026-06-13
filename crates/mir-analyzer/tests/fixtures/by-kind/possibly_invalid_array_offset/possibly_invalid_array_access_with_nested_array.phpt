@@ -1,5 +1,7 @@
 ===description===
 Possibly invalid array access with nested array
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /**

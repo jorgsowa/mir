@@ -1,5 +1,7 @@
 ===description===
 Get attributes on parameter with non parameter attribute
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 #[Attribute(Attribute::TARGET_PROPERTY)]

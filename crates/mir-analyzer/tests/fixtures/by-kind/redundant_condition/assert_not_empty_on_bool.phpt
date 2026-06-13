@@ -1,5 +1,7 @@
 ===description===
 Assert not empty on bool
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

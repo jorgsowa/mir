@@ -1,5 +1,7 @@
 ===description===
 closure return type resolved
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 /**

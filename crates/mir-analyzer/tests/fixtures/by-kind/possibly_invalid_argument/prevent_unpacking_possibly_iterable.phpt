@@ -1,5 +1,7 @@
 ===description===
 Prevent unpacking possibly iterable
+===config===
+suppress=MixedArgument,UnusedParam
 ===file===
 <?php
 function foo(int $arg1, int $arg2): void {}

@@ -1,7 +1,7 @@
 ===description===
 calling a function defined only in a stub file without stub_file config emits UndefinedFunction
 ===config===
-suppress=UnusedVariable,UnusedFunction
+suppress=MixedAssignment,UnusedFunction,UnusedVariable
 ===file:App.php===
 <?php
 function test(): void {

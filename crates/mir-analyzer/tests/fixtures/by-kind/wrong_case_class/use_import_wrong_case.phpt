@@ -1,5 +1,7 @@
 ===description===
 A use import with wrong class name casing is reported.
+===config===
+suppress=UnusedVariable
 ===file:Lib.php===
 <?php
 

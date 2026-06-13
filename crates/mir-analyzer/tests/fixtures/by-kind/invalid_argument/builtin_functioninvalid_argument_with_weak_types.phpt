@@ -1,5 +1,7 @@
 ===description===
 Builtin functioninvalid argument with weak types
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $s = substr(5, 4);

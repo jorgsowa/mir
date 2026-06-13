@@ -1,5 +1,7 @@
 ===description===
 keyed array foreach string key no error
+===config===
+suppress=ForbiddenCode,UnusedForeachValue
 ===file===
 <?php
 // Bug: foreach over a keyed array (array shape) always produced TMixed for the key

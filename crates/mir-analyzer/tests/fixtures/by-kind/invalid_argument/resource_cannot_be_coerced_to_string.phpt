@@ -1,5 +1,7 @@
 ===description===
 Resource cannot be coerced to string
+===config===
+suppress=MixedArgument,MixedAssignment,UnusedParam
 ===file===
 <?php
 /** @mutation-free */

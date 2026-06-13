@@ -1,5 +1,7 @@
 ===description===
 Attribute invalid target parameter
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function foo(#[Attribute] string $_bar): void {}

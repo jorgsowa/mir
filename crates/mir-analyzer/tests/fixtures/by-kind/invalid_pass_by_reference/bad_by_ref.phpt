@@ -1,5 +1,7 @@
 ===description===
 Bad by ref
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function fooFoo(string &$v): void {}

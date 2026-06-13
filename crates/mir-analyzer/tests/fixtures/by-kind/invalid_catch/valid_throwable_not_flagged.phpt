@@ -1,5 +1,7 @@
 ===description===
 InvalidCatch does NOT fire for classes that do implement Throwable.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class AppException extends RuntimeException {}

@@ -1,5 +1,7 @@
 ===description===
 Wrong case method name via null-safe call is reported.
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 class Connection {

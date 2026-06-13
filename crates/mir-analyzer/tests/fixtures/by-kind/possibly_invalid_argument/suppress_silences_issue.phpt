@@ -1,5 +1,7 @@
 ===description===
 suppress silences issue
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

@@ -1,5 +1,7 @@
 ===description===
 UndefinedDocblockClass does NOT fire when the referenced class exists.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class MyExistingClass {}

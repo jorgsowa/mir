@@ -1,5 +1,7 @@
 ===description===
 Class method parameter violation in post assignment
+===config===
+suppress=MissingPropertyType,UnusedVariable
 ===file===
 <?php
 class A {

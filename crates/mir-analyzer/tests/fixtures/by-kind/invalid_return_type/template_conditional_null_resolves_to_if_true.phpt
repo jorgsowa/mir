@@ -1,7 +1,7 @@
 ===description===
 template-conditional return (TKey is null ? X : Y) resolves to if-true when null is passed
 ===config===
-suppress=UnusedParam
+suppress=UnusedParam,UnusedVariable
 ===file===
 <?php
 

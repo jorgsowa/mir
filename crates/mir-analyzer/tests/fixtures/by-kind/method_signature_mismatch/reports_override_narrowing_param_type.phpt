@@ -1,5 +1,7 @@
 ===description===
 reports override narrowing param type
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

@@ -1,5 +1,7 @@
 ===description===
 method call
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Foo {

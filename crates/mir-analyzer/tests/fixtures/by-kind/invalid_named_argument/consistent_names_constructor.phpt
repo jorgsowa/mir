@@ -1,5 +1,7 @@
 ===description===
 Consistent names constructor
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

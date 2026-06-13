@@ -1,5 +1,7 @@
 ===description===
 Foreach iteration variable type recorded at binding position
+===config===
+suppress=UnusedForeachValue
 ===file===
 <?php
 class User {

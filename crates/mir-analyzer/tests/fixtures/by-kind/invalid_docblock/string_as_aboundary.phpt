@@ -1,5 +1,7 @@
 ===description===
 String as a boundary
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 bare Closure type satisfies Closure(): T parameter — no InvalidArgument
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 class PDO {}

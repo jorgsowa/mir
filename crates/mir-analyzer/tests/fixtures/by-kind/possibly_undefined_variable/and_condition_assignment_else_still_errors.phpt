@@ -1,5 +1,7 @@
 ===description===
 PossiblyUndefinedVariable still fires when var assigned in && condition is used in the else branch
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 function foo(bool $a, object $obj): void {

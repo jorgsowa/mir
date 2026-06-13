@@ -1,5 +1,7 @@
 ===description===
 Prevent possibly undefined var in try
+===config===
+suppress=MissingThrowsDocblock,UnusedVariable
 ===file===
 <?php
 class Foo {

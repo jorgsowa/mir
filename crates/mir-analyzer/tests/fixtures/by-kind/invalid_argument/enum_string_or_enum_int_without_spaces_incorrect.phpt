@@ -1,5 +1,7 @@
 ===description===
 Enum string or enum int without spaces incorrect
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 namespace Ns;

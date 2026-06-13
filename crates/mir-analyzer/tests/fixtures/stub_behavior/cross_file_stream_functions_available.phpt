@@ -1,5 +1,7 @@
 ===description===
 cross file stream functions available
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file:StreamHelper.php===
 <?php
 function isTerminalStream(mixed $stream): bool {

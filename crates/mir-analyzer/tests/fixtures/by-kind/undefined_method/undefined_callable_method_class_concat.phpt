@@ -1,5 +1,7 @@
 ===description===
 Undefined callable method class concat
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

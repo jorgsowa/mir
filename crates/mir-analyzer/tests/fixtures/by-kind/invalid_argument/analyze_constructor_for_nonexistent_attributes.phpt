@@ -1,5 +1,7 @@
 ===description===
 Analyze constructor for nonexistent attributes
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class Foo

@@ -1,5 +1,7 @@
 ===description===
 Variable assigned before try and read only in finally block is not reported as unused
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 function withoutTablePrefix(callable $callback): mixed {

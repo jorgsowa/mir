@@ -1,5 +1,7 @@
 ===description===
 partial type parameter inference leaves unbound template as mixed, not fabricated to bound
+===config===
+suppress=MissingPropertyType
 ===file:Map.php===
 <?php
 class Base {}

@@ -1,5 +1,7 @@
 ===description===
 Get class arg wrong class
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 class A {}

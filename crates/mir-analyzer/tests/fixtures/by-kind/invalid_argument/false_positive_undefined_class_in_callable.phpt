@@ -1,5 +1,7 @@
 ===description===
 False positive undefined class in callable
+===config===
+suppress=MissingReturnType,MixedArgument
 ===file===
 <?php
 // This demonstrates the FALSE POSITIVE issue:

@@ -1,5 +1,7 @@
 ===description===
 Negated type guards narrow correctly
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function testNotNull(string|null $x) {

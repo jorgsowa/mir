@@ -1,5 +1,7 @@
 ===description===
 is_float, is_double, is_real all narrow to float type
+===config===
+suppress=MissingParamType,MissingReturnType,MixedArgument
 ===file===
 <?php
 function testIsFloat($x) {

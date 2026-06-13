@@ -1,5 +1,7 @@
 ===description===
 contravariant allows supertype arg
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template-contravariant T */

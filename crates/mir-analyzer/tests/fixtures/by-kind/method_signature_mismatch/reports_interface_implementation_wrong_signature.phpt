@@ -1,5 +1,7 @@
 ===description===
 reports interface implementation wrong signature
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 interface I {

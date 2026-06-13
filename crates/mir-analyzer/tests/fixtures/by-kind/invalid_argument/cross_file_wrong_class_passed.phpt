@@ -1,5 +1,7 @@
 ===description===
 cross file wrong class passed
+===config===
+suppress=ForbiddenCode
 ===file:User.php===
 <?php
 class User {}

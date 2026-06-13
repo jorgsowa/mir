@@ -1,5 +1,7 @@
 ===description===
 Clear isset context
+===config===
+suppress=MixedArgument
 ===file===
 <?php
 function greet(bool $arg): ?string

@@ -1,5 +1,7 @@
 ===description===
 No crash on get class method call
+===config===
+suppress=MixedArgument
 ===file===
 <?php
 class User {

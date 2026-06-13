@@ -1,5 +1,7 @@
 ===description===
 Invalid argument
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 #[Attribute]

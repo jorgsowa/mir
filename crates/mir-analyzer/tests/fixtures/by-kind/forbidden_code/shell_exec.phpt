@@ -1,5 +1,7 @@
 ===description===
 ForbiddenCode fires for backtick shell_exec.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function run(string $cmd): string {

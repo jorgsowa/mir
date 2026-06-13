@@ -1,5 +1,7 @@
 ===description===
 Abstract trait method with different param type
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

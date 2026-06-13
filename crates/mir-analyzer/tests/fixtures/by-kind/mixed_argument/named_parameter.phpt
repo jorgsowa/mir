@@ -1,5 +1,7 @@
 ===description===
 MixedArgument fires for named arguments too when the value is mixed.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function foo(int $a, string $b): void {}

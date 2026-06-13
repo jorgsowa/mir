@@ -1,5 +1,7 @@
 ===description===
 Invalid boolean bitwise not
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = ~true;

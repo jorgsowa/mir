@@ -1,5 +1,7 @@
 ===description===
 Wrong case class name in catch clause is reported.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class AppException extends \RuntimeException {}

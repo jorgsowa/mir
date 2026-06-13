@@ -1,5 +1,7 @@
 ===description===
 issue 147 exact example
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

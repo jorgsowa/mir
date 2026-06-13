@@ -1,5 +1,7 @@
 ===description===
 Docblock callable string
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 Assert one of strings
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

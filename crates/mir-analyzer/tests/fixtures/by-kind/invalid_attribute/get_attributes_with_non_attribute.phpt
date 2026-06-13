@@ -1,5 +1,7 @@
 ===description===
 Get attributes with non attribute
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class NonAttr {}

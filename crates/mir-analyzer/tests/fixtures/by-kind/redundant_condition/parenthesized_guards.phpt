@@ -1,5 +1,7 @@
 ===description===
 Parenthesized guards are handled correctly
+===config===
+suppress=MissingParamType,MissingReturnType,MixedArgument
 ===file===
 <?php
 function testParenthesized($x) {

@@ -1,5 +1,7 @@
 ===description===
 Deprecated clone method with call
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo {

@@ -1,5 +1,7 @@
 ===description===
 Undefined function in docblock
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

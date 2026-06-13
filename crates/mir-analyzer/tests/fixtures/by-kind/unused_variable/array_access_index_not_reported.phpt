@@ -1,5 +1,7 @@
 ===description===
 array access index not reported
+===config===
+suppress=MixedArrayOffset
 ===file===
 <?php
 function test(array $arr): mixed {

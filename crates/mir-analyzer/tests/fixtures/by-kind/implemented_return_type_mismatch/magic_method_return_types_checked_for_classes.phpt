@@ -1,5 +1,7 @@
 ===description===
 MagicMethodReturnTypesCheckedForClasses
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A

@@ -1,5 +1,7 @@
 ===description===
 Explicit variable key
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /** @param list<int> $a */

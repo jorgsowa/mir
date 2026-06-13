@@ -1,5 +1,7 @@
 ===description===
 reports on constructor call
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Query {

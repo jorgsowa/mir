@@ -1,5 +1,7 @@
 ===description===
 Getter automagic overridden with assertion
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

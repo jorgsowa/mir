@@ -1,5 +1,7 @@
 ===description===
 InvalidPropertyFetch does NOT fire after a null guard narrows the type.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo {

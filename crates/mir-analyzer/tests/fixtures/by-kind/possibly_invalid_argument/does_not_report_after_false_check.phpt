@@ -1,5 +1,7 @@
 ===description===
 does not report after false check
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

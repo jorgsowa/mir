@@ -1,5 +1,7 @@
 ===description===
 reports object passed as int
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Foo {}

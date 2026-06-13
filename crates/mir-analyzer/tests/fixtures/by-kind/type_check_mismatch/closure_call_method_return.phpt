@@ -1,5 +1,7 @@
 ===description===
 Closure->call() returns closure return type (not nullable)
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class C {

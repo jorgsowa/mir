@@ -19,4 +19,3 @@ function app(): void {
     echo get_class($b);
 }
 ===expect===
-bag.php: UnusedPsalmSuppress@10:0-10:0: Suppress annotation for 'UnusedParam' is never used

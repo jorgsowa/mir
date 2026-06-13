@@ -1,5 +1,7 @@
 ===description===
 Bad array by ref
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function fooFoo(array &$a): void {}

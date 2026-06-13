@@ -1,5 +1,7 @@
 ===description===
 Assert scalar and empty
+===config===
+suppress=MixedArgument,UnusedParam
 ===file===
 <?php
 /**

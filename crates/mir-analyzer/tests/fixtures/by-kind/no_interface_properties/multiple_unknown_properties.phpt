@@ -1,6 +1,8 @@
 ===description===
 NoInterfaceProperties fires once per distinct unknown property access on the
 same sealed interface.
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 /**

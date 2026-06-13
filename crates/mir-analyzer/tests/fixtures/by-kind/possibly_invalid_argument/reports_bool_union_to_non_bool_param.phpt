@@ -1,5 +1,7 @@
 ===description===
 reports bool union to non bool param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesInt(int $n): void { var_dump($n); }

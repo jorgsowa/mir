@@ -3,6 +3,8 @@ Template bounds are not checked against still-unresolved placeholders:
 a binding that is itself a template param, self, or static resolves only at
 a concrete call site (Eloquent relation pattern). A genuinely wrong concrete
 binding still violates.
+===config===
+suppress=MissingPropertyType,UnusedParam
 ===file===
 <?php
 class Model {}

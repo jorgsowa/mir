@@ -1,5 +1,7 @@
 ===description===
 cross file psr4 uses stdlib
+===config===
+suppress=UnusedVariable
 ===file:composer.json===
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 ===file:src/Formatter.php===

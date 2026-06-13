@@ -1,5 +1,7 @@
 ===description===
 Type narrowing through if/elseif/else branches
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function testBranches(int|string|bool $value) {

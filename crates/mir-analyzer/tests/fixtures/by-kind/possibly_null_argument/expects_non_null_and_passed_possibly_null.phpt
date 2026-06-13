@@ -12,4 +12,5 @@ function foo($mixed, $mixed_or_null): void {
     new Exception($mixed_or_null);
 }
 ===expect===
-UnusedPsalmSuppress@9:0-9:0: Suppress annotation for 'MixedArgument' is never used
+MissingParamType@5:14-5:20: Parameter $mixed of foo() has no type annotation
+UnusedParam@5:14-5:20: Parameter $mixed is never used

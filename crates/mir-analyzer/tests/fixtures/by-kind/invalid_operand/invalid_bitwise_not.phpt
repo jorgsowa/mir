@@ -1,5 +1,7 @@
 ===description===
 Invalid bitwise not
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = ~new stdClass;

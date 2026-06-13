@@ -1,5 +1,7 @@
 ===description===
 UnsupportedReferenceUsage fires for a simple reference assignment ($b = &$a).
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = "hello";

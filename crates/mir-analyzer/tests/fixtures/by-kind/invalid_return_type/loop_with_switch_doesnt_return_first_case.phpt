@@ -1,5 +1,7 @@
 ===description===
 Loop with switch doesnt return first case
+===config===
+suppress=MissingThrowsDocblock
 ===file===
 <?php
 function b(): int {

@@ -1,5 +1,7 @@
 ===description===
 via trait
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 trait RetStaticTrait {

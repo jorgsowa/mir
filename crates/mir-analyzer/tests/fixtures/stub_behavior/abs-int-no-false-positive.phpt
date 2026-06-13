@@ -1,6 +1,8 @@
 ===description===
 abs(int) should not produce TypeMismatch when passed to takesInt()
 
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 

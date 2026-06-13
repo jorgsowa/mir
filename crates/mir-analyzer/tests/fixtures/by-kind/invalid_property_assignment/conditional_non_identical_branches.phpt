@@ -1,5 +1,7 @@
 ===description===
 conditional types with different branches are not simplified
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class TestFactory {

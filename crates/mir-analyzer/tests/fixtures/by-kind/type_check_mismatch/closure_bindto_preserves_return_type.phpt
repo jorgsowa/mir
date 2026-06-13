@@ -1,5 +1,7 @@
 ===description===
 Closure->bindTo preserves return type from original closure
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class A {}

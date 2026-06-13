@@ -1,5 +1,7 @@
 ===description===
 Undefined callable method array without class
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

@@ -1,5 +1,7 @@
 ===description===
 Void returning array map
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 $arr = array_map(

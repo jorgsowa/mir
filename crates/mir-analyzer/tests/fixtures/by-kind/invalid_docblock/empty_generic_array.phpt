@@ -1,5 +1,7 @@
 ===description===
 empty generic array parameter
+===config===
+suppress=MissingParamType
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 InterfaceInstantiation does NOT fire when instantiating a concrete class.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class FileLogger implements \Countable {

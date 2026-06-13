@@ -1,6 +1,8 @@
 ===description===
 Redundant cast from int variable to int
 
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $x = 3;

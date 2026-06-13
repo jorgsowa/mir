@@ -1,5 +1,7 @@
 ===description===
 Reference reuse deeply nested
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var list<list<list<int>>> */

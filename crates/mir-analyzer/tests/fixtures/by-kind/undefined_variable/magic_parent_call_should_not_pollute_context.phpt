@@ -1,5 +1,7 @@
 ===description===
 Magic parent call should not pollute context
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 /**

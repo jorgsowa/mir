@@ -1,5 +1,7 @@
 ===description===
 References ignore var annotation
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = 1;

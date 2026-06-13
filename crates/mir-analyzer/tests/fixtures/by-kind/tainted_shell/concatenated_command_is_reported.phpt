@@ -1,5 +1,7 @@
 ===description===
 concatenated command is reported
+===config===
+suppress=ForbiddenCode,MixedArrayAccess
 ===file===
 <?php
 function run(): void {

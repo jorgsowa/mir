@@ -1,5 +1,7 @@
 ===description===
 Closure::bind chained with invoke returns correct type (key regression)
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class A {

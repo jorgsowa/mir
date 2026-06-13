@@ -1,5 +1,7 @@
 ===description===
 array_merge arrays are variadic
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 // array_merge with one array

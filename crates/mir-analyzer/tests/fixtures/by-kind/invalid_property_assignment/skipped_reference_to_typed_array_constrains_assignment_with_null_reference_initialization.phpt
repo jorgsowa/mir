@@ -1,5 +1,7 @@
 ===description===
 SKIPPED-referenceToTypedArrayConstrainsAssignmentWithNullReferenceInitialization
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo

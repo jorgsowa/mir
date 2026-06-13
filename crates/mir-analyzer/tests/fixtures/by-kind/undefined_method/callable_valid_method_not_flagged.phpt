@@ -1,5 +1,7 @@
 ===description===
 callable valid method not flagged
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 /**

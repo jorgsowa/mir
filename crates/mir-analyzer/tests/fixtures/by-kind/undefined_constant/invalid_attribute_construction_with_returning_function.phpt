@@ -1,5 +1,7 @@
 ===description===
 Invalid attribute construction with returning function
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 enum Enumm

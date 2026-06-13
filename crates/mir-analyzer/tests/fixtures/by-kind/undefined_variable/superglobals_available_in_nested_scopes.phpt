@@ -1,6 +1,8 @@
 ===description===
 PHP superglobals ($_GET, $_POST, $_SERVER, ...) are implicitly available in
 all scopes including nested closures and arrow functions — no UndefinedVariable.
+===config===
+suppress=MixedArrayAccess
 ===file===
 <?php
 function outer(): void {

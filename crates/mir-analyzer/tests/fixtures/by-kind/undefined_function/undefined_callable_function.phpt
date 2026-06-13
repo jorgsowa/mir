@@ -1,5 +1,7 @@
 ===description===
 Undefined callable function
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function foo(callable $c): void {}

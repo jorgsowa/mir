@@ -1,5 +1,7 @@
 ===description===
 Built-in function with mixed wrong casing is detected.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $x = Array_Map(fn($v) => $v * 2, [1, 2, 3]);

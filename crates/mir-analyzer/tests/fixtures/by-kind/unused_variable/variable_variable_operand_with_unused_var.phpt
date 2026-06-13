@@ -1,6 +1,8 @@
 ===description===
 variable-variable should mark operand as read, but other vars should still be reported as unused
 
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test() {

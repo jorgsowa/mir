@@ -1,5 +1,7 @@
 ===description===
 docblock return static
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

@@ -1,5 +1,7 @@
 ===description===
 Trace emits the inferred type of a variable via @trace in a docblock.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $x = 42;

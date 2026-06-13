@@ -1,5 +1,7 @@
 ===description===
 Invalid callable type
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

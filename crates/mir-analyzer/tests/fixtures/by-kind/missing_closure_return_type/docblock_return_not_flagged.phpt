@@ -1,6 +1,8 @@
 ===description===
 MissingClosureReturnType does NOT fire when the closure has a @return docblock
 immediately before the function keyword.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a =

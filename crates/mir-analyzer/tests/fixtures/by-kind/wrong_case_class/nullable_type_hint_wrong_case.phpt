@@ -1,5 +1,7 @@
 ===description===
 Wrong case class name in nullable type hint is reported.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class User {}

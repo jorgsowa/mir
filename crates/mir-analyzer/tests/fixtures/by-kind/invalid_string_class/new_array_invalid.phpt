@@ -1,5 +1,7 @@
 ===description===
 new with array variable should error
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test(array $config) {

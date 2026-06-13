@@ -1,5 +1,7 @@
 ===description===
 Possibly null return in try
+===config===
+suppress=MissingThrowsDocblock,UnusedVariable
 ===file===
 <?php
 function foo() : string {

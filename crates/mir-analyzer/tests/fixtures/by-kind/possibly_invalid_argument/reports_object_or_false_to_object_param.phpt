@@ -1,5 +1,7 @@
 ===description===
 reports object or false to object param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Connection {}

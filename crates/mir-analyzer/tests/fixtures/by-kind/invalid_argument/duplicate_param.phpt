@@ -1,5 +1,7 @@
 ===description===
 Duplicate param
+===config===
+suppress=MissingParamType,UnusedParam
 ===file===
 <?php
 /**

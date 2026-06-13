@@ -1,5 +1,7 @@
 ===description===
 new with union type containing non-string should error
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test(int|bool $value) {

@@ -1,5 +1,7 @@
 ===description===
 Add array to number
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = [1] + 1;

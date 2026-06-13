@@ -1,5 +1,7 @@
 ===description===
 No ImplicitToStringCast when parent class has __toString
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class ParentClass {

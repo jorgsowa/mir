@@ -1,5 +1,7 @@
 ===description===
 Min specified as second
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 Closure from callable invokable named class wrong args
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 namespace NS;

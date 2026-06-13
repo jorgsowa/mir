@@ -1,5 +1,7 @@
 ===description===
 Bad assignment
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

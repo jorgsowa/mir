@@ -1,5 +1,7 @@
 ===description===
 for(;;) body assigned before break is not possibly-undefined after loop
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 function foo(callable $cb): mixed {

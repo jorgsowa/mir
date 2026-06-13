@@ -1,5 +1,7 @@
 ===description===
 FP guard: (T is null ? list<array> : array<array>) — template conditional without $ is parsed correctly and neither T nor array is namespace-qualified (regression: both were being qualified to Namespace\T and Namespace\array)
+===config===
+suppress=UnusedVariable
 ===file:Lib/Db.php===
 <?php
 namespace Lib;

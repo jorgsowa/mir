@@ -1,5 +1,7 @@
 ===description===
 new with object variable should error
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 class Foo {}

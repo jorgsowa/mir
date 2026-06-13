@@ -1,5 +1,7 @@
 ===description===
 Reference reuse declared in if
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var array<int> */

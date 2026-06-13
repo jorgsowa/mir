@@ -1,5 +1,7 @@
 ===description===
 array keys filter is optional
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $arr = ['a' => 1, 'b' => 2];

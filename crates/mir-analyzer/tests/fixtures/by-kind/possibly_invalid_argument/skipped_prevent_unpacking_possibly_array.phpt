@@ -1,5 +1,7 @@
 ===description===
 SKIPPED-preventUnpackingPossiblyArray
+===config===
+suppress=MixedArgument,UnusedParam
 ===file===
 <?php
 function foo(int $arg1, int $arg2): void {}

@@ -2,6 +2,7 @@
 cross file substr count version params 5 3
 ===config===
 php_version=5.3
+suppress=UnusedVariable
 ===file:StringHelper.php===
 <?php
 function countWord(string $output): int {

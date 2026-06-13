@@ -1,5 +1,7 @@
 ===description===
 Encapsed concat with string creates string
+===config===
+suppress=ImplicitToStringCast
 ===file===
 <?php
 /**

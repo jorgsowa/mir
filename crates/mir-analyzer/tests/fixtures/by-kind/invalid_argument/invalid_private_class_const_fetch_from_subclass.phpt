@@ -1,5 +1,7 @@
 ===description===
 Invalid private class const fetch from subclass
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 class A

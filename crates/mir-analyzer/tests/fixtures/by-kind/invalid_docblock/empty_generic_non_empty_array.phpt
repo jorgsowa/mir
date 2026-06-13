@@ -1,5 +1,7 @@
 ===description===
 empty generic non-empty-array in class property
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class Container {

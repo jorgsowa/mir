@@ -1,5 +1,7 @@
 ===description===
 Detect redundancy after loop with continue
+===config===
+suppress=MissingThrowsDocblock
 ===file===
 <?php
 $gap = null;

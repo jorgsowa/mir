@@ -1,5 +1,7 @@
 ===description===
 Function with var
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test() {

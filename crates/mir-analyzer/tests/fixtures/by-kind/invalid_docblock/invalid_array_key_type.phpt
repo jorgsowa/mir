@@ -1,5 +1,7 @@
 ===description===
 Invalid array key type
+===config===
+suppress=MissingParamType,UnusedParam
 ===file===
 <?php
 /**

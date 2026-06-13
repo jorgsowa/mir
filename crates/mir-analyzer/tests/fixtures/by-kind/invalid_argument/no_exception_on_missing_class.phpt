@@ -1,5 +1,7 @@
 ===description===
 No exception on missing class
+===config===
+suppress=MissingPropertyType,UnusedParam
 ===file===
 <?php
 /** @suppress UndefinedClass */

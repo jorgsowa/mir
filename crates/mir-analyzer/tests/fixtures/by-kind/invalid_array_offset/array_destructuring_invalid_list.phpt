@@ -1,5 +1,7 @@
 ===description===
 Array destructuring invalid list
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 $a = 42;

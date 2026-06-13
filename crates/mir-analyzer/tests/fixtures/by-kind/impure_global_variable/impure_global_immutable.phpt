@@ -1,5 +1,7 @@
 ===description===
 Impure global immutable
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 Match true impossible
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $foo = new stdClass();

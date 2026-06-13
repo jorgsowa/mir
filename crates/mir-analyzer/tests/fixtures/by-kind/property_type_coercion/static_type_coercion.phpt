@@ -1,5 +1,7 @@
 ===description===
 Static type coercion
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

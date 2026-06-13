@@ -1,5 +1,7 @@
 ===description===
 cross file grandchild narrowing
+===config===
+suppress=ForbiddenCode
 ===file:GrandParent.php===
 <?php
 class GrandParent {

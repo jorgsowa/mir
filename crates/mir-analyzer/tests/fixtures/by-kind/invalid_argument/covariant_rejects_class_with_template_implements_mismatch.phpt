@@ -1,5 +1,7 @@
 ===description===
 covariant rejects class with template implements mismatch
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template-covariant T */

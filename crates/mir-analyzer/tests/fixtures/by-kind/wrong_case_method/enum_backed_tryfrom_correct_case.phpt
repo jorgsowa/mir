@@ -1,5 +1,7 @@
 ===description===
 Correct-case calls to synthesized backed-enum methods (tryFrom/from/cases) produce no WrongCaseMethod.
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 enum Color: string {

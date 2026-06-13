@@ -1,5 +1,7 @@
 ===description===
 invariant allows exact type arg
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template T */

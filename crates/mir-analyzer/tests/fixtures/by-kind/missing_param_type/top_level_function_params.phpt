@@ -1,6 +1,8 @@
 ===description===
 MissingParamType fires per untyped top-level function parameter; native hints
 and docblock @param types both satisfy it.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

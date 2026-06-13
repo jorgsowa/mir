@@ -1,5 +1,7 @@
 ===description===
 Array-destructuring targets used in conditional branch not reported as unused
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 /** @return array{string, string, string} */

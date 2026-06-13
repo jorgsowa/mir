@@ -1,5 +1,7 @@
 ===description===
 Empty array unions fold into generic arrays (Bug 7 secondary)
+===config===
+suppress=MixedAssignment,UnusedForeachValue
 ===file===
 <?php
 

@@ -1,5 +1,7 @@
 ===description===
 does not report destructure of only false
+===config===
+suppress=ForbiddenCode,MixedAssignment
 ===file===
 <?php
 function test(): void {

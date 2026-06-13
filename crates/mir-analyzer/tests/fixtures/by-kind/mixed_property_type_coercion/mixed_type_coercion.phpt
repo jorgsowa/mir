@@ -1,5 +1,7 @@
 ===description===
 Mixed type coercion
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

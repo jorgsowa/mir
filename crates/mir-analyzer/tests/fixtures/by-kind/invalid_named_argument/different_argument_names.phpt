@@ -1,5 +1,7 @@
 ===description===
 Different argument names
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

@@ -5,6 +5,7 @@ version-filtering bug where collect_file_definitions always used the db default
 (8.2) instead of the configured target version.
 ===config===
 php_version=7.4
+suppress=MixedReturnStatement
 ===file:App.php===
 <?php
 function check(string $s): bool {

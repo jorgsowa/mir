@@ -2,6 +2,8 @@
 A class-name-shaped string literal coerces to class-string when binding a
 class-string<T> template (m::mock('Foo\Bar') with a plain string instead of
 ::class). Non-class-shaped strings ('alias:Foo') don't bind.
+===config===
+suppress=MissingThrowsDocblock,UnusedParam,UnusedVariable
 ===file===
 <?php
 namespace Acme {

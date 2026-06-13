@@ -1,5 +1,7 @@
 ===description===
 Class constant invalid value
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 namespace NS {

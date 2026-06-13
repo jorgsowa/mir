@@ -1,5 +1,7 @@
 ===description===
 MixedArrayOffset does NOT fire when the offset has a concrete int or string type.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @var array<string, int> $arr */

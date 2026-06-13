@@ -1,5 +1,7 @@
 ===description===
 Throw with return in one catch and no reference
+===config===
+suppress=MissingThrowsDocblock
 ===file===
 <?php
 class E1 extends Exception {}

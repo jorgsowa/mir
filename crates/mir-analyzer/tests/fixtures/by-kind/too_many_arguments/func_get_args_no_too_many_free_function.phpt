@@ -1,5 +1,7 @@
 ===description===
 Free function using func_get_args() accepts extra positional args without TooManyArguments
+===config===
+suppress=MissingReturnType,MixedArgument
 ===file===
 <?php
 function joinAll(string $separator) {

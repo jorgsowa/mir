@@ -1,5 +1,7 @@
 ===description===
 Impure callable return
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 /**

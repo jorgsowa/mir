@@ -1,5 +1,7 @@
 ===description===
 interpolated superglobal is reported
+===config===
+suppress=MixedArrayAccess
 ===file===
 <?php
 function render(): void {

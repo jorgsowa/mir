@@ -1,5 +1,7 @@
 ===description===
 Accessing a non-existent int key in a list array
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 $x = ["a"];

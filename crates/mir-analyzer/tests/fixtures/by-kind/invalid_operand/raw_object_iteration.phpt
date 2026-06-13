@@ -1,5 +1,7 @@
 ===description===
 Raw object iteration
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

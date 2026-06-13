@@ -1,5 +1,7 @@
 ===description===
 Missing closure return type
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = function() {

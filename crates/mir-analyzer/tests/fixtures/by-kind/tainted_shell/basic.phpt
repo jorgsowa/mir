@@ -1,5 +1,7 @@
 ===description===
 Basic
+===config===
+suppress=MixedArgument,MixedArrayAccess,MixedAssignment
 ===file===
 <?php
 function test(): void {

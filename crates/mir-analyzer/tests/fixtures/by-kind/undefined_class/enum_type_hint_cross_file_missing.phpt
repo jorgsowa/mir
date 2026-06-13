@@ -1,5 +1,7 @@
 ===description===
 enum type hint cross file missing
+===config===
+suppress=MixedReturnStatement
 ===file:Service.php===
 <?php
 use App\MissingEnum;

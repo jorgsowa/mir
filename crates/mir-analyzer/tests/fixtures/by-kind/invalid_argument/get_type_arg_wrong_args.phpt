@@ -1,5 +1,7 @@
 ===description===
 Get type arg wrong args
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function testInt(int $var): void {

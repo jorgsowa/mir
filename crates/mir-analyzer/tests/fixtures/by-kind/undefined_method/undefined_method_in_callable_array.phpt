@@ -1,5 +1,7 @@
 ===description===
 Undefined method in callable array
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 class Handler {

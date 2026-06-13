@@ -1,5 +1,7 @@
 ===description===
 Wrong arg
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $bar = ["foo", "bar"];

@@ -1,5 +1,7 @@
 ===description===
 mir-check inside anonymous callable body emits error
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $fn = fn(int $x): int => (/** @mir-check $x is string */ $x * 2);

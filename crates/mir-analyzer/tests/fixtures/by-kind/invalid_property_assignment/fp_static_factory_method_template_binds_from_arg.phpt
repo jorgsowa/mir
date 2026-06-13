@@ -3,6 +3,8 @@ FP: static factory method with method-level @template T should bind T to the arg
 (e.g. mixed from array access). Before the fix, T was left as the literal template name,
 producing Option<T>|Option<never> instead of Option<mixed>|Option<never>, which
 then failed the InvalidPropertyAssignment check against Option<string|null>.
+===config===
+suppress=MixedArgument
 ===file===
 <?php
 

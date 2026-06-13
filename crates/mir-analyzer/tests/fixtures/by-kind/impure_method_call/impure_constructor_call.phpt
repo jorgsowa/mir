@@ -1,5 +1,7 @@
 ===description===
 Impure constructor call
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 namespace Bar;

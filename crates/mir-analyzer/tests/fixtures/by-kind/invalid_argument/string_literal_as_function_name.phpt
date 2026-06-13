@@ -1,5 +1,7 @@
 ===description===
 String literal as function name
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 // The issue: a TLiteralString("trim") should NOT be resolved via Fqcn::from_str

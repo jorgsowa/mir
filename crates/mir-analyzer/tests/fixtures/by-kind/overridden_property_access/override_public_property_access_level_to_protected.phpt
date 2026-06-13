@@ -1,5 +1,7 @@
 ===description===
 Override public property access level to protected
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

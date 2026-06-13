@@ -1,5 +1,7 @@
 ===description===
 basic inherited method call
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class A {

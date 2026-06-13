@@ -1,5 +1,7 @@
 ===description===
 Invalid arg after callable
+===config===
+suppress=MissingReturnType,UnusedParam
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 Wrong case method name defined in interface is reported.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 interface Logger {

@@ -1,5 +1,7 @@
 ===description===
 Plain string not false positive undefined class
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 // This test demonstrates the fix for issue #5:

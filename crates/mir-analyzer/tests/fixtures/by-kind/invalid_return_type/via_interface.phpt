@@ -1,5 +1,7 @@
 ===description===
 via interface
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 interface Fluent {

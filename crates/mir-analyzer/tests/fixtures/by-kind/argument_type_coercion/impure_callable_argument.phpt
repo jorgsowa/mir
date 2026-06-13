@@ -1,5 +1,7 @@
 ===description===
 Impure callable argument
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 /**

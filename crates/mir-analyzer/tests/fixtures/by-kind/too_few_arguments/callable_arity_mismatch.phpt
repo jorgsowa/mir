@@ -1,5 +1,7 @@
 ===description===
 Callable arity mismatch
+===config===
+suppress=MissingParamType,MissingReturnType,MixedArgument
 ===file===
 <?php
 // Function with wrong arity

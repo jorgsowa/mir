@@ -1,5 +1,7 @@
 ===description===
 Unsupported reference usage continues analysis
+===config===
+suppress=Trace,UnusedVariable
 ===file===
 <?php
 /** @var array<string, string> */

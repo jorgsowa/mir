@@ -1,5 +1,7 @@
 ===description===
 Wrong type variadic arguments
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 function takesArguments(int ...$args) : void {}

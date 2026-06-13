@@ -1,5 +1,7 @@
 ===description===
 array<T> single type param accepts string-keyed arrays (no FP)
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /**

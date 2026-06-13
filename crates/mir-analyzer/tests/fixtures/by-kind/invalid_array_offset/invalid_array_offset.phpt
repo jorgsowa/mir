@@ -1,5 +1,7 @@
 ===description===
 Invalid array offset
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 $x = ["a"];

@@ -1,5 +1,7 @@
 ===description===
 Closure(T): R parameter binds T and R from a typed closure argument
+===config===
+suppress=MixedArgument,UnusedVariable
 ===file===
 <?php
 /**

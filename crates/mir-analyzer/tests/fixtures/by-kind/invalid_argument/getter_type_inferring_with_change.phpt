@@ -1,5 +1,7 @@
 ===description===
 Getter type inferring with change
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class A {

@@ -1,5 +1,7 @@
 ===description===
 Strict null comparisons narrow types correctly
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function testTripleEqNull(int|null $x) {

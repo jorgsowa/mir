@@ -1,5 +1,7 @@
 ===description===
 Unknown constant
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

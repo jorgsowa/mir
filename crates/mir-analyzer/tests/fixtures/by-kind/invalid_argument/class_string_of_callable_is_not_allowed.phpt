@@ -1,5 +1,7 @@
 ===description===
 Class string of callable is not allowed
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 /**

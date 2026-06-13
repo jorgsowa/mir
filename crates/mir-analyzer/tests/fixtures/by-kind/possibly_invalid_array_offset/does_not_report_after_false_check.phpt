@@ -1,5 +1,7 @@
 ===description===
 does not report after false check
+===config===
+suppress=ForbiddenCode,MixedAssignment
 ===file===
 <?php
 /** @return array|false */

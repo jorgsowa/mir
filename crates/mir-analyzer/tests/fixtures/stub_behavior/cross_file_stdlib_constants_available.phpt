@@ -1,5 +1,7 @@
 ===description===
 cross file stdlib constants available
+===config===
+suppress=MixedReturnStatement,UnusedVariable
 ===file:Limits.php===
 <?php
 function getMaxId(): int {

@@ -1,5 +1,7 @@
 ===description===
 InterfaceInstantiation fires when trying to instantiate an interface.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 interface Countable {

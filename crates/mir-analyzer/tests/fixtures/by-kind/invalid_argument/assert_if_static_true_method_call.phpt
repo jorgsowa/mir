@@ -1,5 +1,7 @@
 ===description===
 Assert if static true method call
+===config===
+suppress=MixedArgument
 ===file===
 <?php
 class C {

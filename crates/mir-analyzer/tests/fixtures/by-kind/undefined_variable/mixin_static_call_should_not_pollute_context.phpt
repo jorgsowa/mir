@@ -1,5 +1,7 @@
 ===description===
 Mixin static call should not pollute context
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 /**

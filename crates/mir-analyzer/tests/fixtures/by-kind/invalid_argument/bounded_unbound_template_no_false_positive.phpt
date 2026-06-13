@@ -1,5 +1,7 @@
 ===description===
 bounded unbound template parameter does not fabricate receiver type parameter
+===config===
+suppress=MissingPropertyType
 ===file:Repo.php===
 <?php
 class Base {}

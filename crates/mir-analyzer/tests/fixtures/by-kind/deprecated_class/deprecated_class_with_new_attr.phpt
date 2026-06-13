@@ -1,5 +1,7 @@
 ===description===
 Deprecated class with new attr
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 #[\Deprecated]

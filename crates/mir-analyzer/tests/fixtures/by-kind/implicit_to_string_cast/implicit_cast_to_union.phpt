@@ -1,5 +1,7 @@
 ===description===
 Implicit cast to union
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {

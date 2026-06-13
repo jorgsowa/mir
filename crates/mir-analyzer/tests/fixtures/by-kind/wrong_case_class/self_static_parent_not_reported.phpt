@@ -1,5 +1,7 @@
 ===description===
 self, static, and parent references are never reported as wrong case.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Base {

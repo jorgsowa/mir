@@ -1,5 +1,7 @@
 ===description===
 Possibly nullable property fetch
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class Foo {

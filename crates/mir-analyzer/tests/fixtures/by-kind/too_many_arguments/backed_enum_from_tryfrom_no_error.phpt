@@ -1,5 +1,7 @@
 ===description===
 backed enum ::from() and ::tryFrom() accept one argument without TooManyArguments
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 enum Color: string {

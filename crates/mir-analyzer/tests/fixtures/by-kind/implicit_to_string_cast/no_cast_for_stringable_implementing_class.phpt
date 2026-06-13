@@ -1,5 +1,7 @@
 ===description===
 No ImplicitToStringCast when arg implements \Stringable — that interface signals intentional string use
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class FluentString implements \Stringable {

@@ -1,5 +1,7 @@
 ===description===
 Multiple instance of conditions not met in one arm
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 interface Foo {}

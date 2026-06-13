@@ -1,5 +1,7 @@
 ===description===
 Is always defined in finally
+===config===
+suppress=MissingThrowsDocblock,UnusedVariable
 ===file===
 <?php
 function maybeThrows() : void {

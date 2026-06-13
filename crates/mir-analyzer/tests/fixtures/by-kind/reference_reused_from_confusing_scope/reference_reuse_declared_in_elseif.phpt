@@ -1,5 +1,7 @@
 ===description===
 Reference reuse declared in elseif
+===config===
+suppress=MissingThrowsDocblock,UnusedVariable
 ===file===
 <?php
 /** @var array<int> */

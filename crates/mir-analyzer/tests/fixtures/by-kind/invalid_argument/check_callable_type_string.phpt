@@ -1,5 +1,7 @@
 ===description===
 Check callable type string
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

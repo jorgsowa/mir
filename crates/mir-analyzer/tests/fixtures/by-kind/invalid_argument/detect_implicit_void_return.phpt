@@ -1,5 +1,7 @@
 ===description===
 Detect implicit void return
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 /**

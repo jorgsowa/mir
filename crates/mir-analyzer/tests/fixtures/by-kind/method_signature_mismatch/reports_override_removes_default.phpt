@@ -1,5 +1,7 @@
 ===description===
 reports override removes default
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

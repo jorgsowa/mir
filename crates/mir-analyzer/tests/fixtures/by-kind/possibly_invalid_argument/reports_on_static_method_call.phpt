@@ -1,5 +1,7 @@
 ===description===
 reports on static method call
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Converter {

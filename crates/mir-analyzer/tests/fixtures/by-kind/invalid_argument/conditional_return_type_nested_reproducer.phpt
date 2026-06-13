@@ -1,5 +1,7 @@
 ===description===
 nested conditional return type passed to typed param should not report InvalidArgument
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /**

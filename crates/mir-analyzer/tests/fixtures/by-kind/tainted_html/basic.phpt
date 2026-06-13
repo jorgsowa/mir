@@ -1,5 +1,7 @@
 ===description===
 Basic
+===config===
+suppress=MixedArrayAccess
 ===file===
 <?php
 function test(): void {

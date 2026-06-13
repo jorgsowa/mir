@@ -1,5 +1,7 @@
 ===description===
 No ImplicitToStringCast when arg type directly satisfies a non-string arm of the union
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 /**

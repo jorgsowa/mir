@@ -1,5 +1,7 @@
 ===description===
 reports named argument wrong type
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function f(int $x): void { var_dump($x); }

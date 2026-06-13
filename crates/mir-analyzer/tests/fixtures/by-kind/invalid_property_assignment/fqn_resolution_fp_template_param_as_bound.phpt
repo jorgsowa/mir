@@ -1,6 +1,8 @@
 ===description===
 Template params used as bounds for other template params must not be FQN-qualified.
 Tests method-level (W of K), class-level (V of K), and function-level (B of A) cases.
+===config===
+suppress=UnusedVariable
 ===file:Util/Binder.php===
 <?php
 namespace Util;

@@ -1,5 +1,7 @@
 ===description===
 No crash with empty match
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function foo(int $i) {

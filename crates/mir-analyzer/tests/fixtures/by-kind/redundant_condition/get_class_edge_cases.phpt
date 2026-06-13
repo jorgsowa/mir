@@ -1,5 +1,7 @@
 ===description===
 get_class() narrowing edge cases with strict equality
+===config===
+suppress=MissingReturnType,MixedArgument
 ===file===
 <?php
 namespace App;

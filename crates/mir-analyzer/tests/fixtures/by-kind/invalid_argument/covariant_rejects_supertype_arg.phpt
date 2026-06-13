@@ -1,5 +1,7 @@
 ===description===
 covariant rejects supertype arg
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /** @template-covariant T */

@@ -1,5 +1,7 @@
 ===description===
 ImplicitToStringCast in string interpolation
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo {}

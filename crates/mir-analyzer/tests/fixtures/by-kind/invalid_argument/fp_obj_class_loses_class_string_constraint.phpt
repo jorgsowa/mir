@@ -1,5 +1,7 @@
 ===description===
 $obj::class should produce class-string<T> not bare class-string (FP G)
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /**

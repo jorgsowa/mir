@@ -1,5 +1,7 @@
 ===description===
 sscanf output vars are defined
+===config===
+suppress=MixedReturnStatement
 ===file===
 <?php
 function parse(string $s): int {

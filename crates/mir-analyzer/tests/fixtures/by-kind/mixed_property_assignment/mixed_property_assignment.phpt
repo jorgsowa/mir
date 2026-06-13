@@ -1,5 +1,7 @@
 ===description===
 Mixed property assignment
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class Foo {

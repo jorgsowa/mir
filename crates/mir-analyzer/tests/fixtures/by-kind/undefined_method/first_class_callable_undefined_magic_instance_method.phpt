@@ -1,5 +1,7 @@
 ===description===
 FirstClassCallable:UndefinedMagicInstanceMethod
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 class Test {

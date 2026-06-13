@@ -1,5 +1,7 @@
 ===description===
 Variant docblock properties
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class ParentClass

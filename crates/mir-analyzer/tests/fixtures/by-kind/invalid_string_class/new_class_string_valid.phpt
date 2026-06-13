@@ -1,5 +1,7 @@
 ===description===
 new with class-string variable should not error
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 class Foo {}

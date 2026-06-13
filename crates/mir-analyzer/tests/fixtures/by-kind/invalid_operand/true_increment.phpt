@@ -1,5 +1,7 @@
 ===description===
 True increment
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = true;

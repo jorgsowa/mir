@@ -1,5 +1,7 @@
 ===description===
 No fatal for unknown assert class
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 interface Foo {}

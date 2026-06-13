@@ -1,5 +1,7 @@
 ===description===
 Wrong case class in type hint is now reported as WrongCaseClass.
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 class A {}

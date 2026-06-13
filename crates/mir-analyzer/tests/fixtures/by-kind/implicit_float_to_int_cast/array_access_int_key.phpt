@@ -1,6 +1,8 @@
 ===description===
 Using int value as array offset - should not emit ImplicitFloatToIntCast
 
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 $arr = [];

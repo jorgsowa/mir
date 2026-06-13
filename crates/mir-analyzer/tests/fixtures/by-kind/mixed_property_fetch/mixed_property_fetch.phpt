@@ -1,5 +1,7 @@
 ===description===
 Mixed property fetch
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class Foo {

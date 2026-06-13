@@ -1,5 +1,7 @@
 ===description===
 Addition with class in weak mode
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = "hi" + (new stdClass);

@@ -1,5 +1,7 @@
 ===description===
 Fail with invalid template constraint
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 /** @template T */

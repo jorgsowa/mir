@@ -1,5 +1,7 @@
 ===description===
 Unset only prevents reference confusion after call
+===config===
+suppress=UnusedForeachValue
 ===file===
 <?php
 $arr = [1, 2, 3];

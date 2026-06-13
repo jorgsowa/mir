@@ -1,5 +1,7 @@
 ===description===
 does not report when param is mixed
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takesMixed(mixed $v): void { var_dump($v); }

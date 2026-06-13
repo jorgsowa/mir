@@ -1,5 +1,7 @@
 ===description===
 first-class callable syntax (strlen(...)) produces a typed TClosure so T binds correctly
+===config===
+suppress=MixedArgument
 ===file===
 <?php
 /**

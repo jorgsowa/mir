@@ -1,5 +1,7 @@
 ===description===
 does not report mixed return
+===config===
+suppress=MixedAssignment,MixedReturnStatement
 ===file===
 <?php
 function f(): int {

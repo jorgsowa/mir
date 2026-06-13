@@ -1,6 +1,8 @@
 ===description===
 Explicit int cast on int variable - should not emit ImplicitFloatToIntCast
 
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $x = 3;

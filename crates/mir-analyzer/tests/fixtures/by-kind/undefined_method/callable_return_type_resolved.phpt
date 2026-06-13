@@ -1,5 +1,7 @@
 ===description===
 callable return type resolved
+===config===
+suppress=MissingClosureReturnType
 ===file===
 <?php
 /**

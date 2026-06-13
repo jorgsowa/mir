@@ -1,5 +1,7 @@
 ===description===
 Basic
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takes_string(string $s): void { var_dump($s); }

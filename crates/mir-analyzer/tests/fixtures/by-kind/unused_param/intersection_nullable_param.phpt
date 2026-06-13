@@ -1,5 +1,7 @@
 ===description===
 nullable intersection param (Box<T>&Taggable)|null — no false positive when arg satisfies both parts
+===config===
+suppress=MixedAssignment
 ===file===
 <?php
 interface Taggable {}

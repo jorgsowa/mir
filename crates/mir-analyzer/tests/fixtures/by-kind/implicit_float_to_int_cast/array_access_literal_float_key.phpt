@@ -1,6 +1,8 @@
 ===description===
 Using literal float value as array offset - silently truncated to int
 
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 $arr = [];

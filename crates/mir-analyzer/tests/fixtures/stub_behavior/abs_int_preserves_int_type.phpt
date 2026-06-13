@@ -1,6 +1,8 @@
 ===description===
 abs(int) template preserves int type, abs(float) preserves float type
 
+===config===
+suppress=UnusedParam,UnusedVariable
 ===file===
 <?php
 

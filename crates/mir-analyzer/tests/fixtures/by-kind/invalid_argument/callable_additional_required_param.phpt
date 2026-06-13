@@ -1,5 +1,7 @@
 ===description===
 Callable additional required param
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 /**

@@ -1,5 +1,7 @@
 ===description===
 does not report override no type hint on parent
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 class Base {

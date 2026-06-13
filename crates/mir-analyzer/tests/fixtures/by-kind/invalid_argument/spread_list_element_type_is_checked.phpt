@@ -1,5 +1,7 @@
 ===description===
 spread list element type is checked
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takes_ints(int ...$xs): void { var_dump($xs); }

@@ -1,5 +1,7 @@
 ===description===
 Union annotation invalid arg
+===config===
+suppress=MixedAssignment,UnusedVariable
 ===file===
 <?php
 class ParentClass {

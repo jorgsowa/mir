@@ -1,5 +1,7 @@
 ===description===
 Possibly nullable property assignment
+===config===
+suppress=MissingPropertyType
 ===file===
 <?php
 class Foo {

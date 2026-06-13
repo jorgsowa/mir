@@ -1,5 +1,7 @@
 ===description===
 No return
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $bar = ["foo", "bar"];

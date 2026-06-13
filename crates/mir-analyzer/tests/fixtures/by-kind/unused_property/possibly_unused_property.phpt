@@ -1,5 +1,7 @@
 ===description===
 Possibly unused property
+===config===
+suppress=MissingPropertyType,UnusedVariable
 ===file===
 <?php
 final class A {

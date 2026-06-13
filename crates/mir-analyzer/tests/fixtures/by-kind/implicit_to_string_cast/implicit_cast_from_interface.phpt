@@ -1,5 +1,7 @@
 ===description===
 Implicit cast from interface
+===config===
+suppress=MissingReturnType,UnusedParam
 ===file===
 <?php
 interface I {

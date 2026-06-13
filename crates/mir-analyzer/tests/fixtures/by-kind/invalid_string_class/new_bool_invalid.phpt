@@ -1,5 +1,7 @@
 ===description===
 new with bool variable should error
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function test(bool $flag) {

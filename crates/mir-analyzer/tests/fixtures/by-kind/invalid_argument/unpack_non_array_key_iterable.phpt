@@ -10,4 +10,4 @@ $test = null;
 foo(...$test);
 
 ===expect===
-UnusedPsalmSuppress@3:0-3:0: Suppress annotation for 'UnusedParam' is never used
+MixedArgument@7:5-7:13: Argument $args of foo() is mixed

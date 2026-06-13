@@ -1,5 +1,7 @@
 ===description===
 No parent in attribute on class without parent
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 #[Attribute]

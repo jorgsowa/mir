@@ -1,5 +1,7 @@
 ===description===
 Min greater than max
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 /**

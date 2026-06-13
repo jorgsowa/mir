@@ -1,5 +1,7 @@
 ===description===
 array shape offset value type is checked
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 function takes_string(string $s): void { var_dump($s); }

@@ -1,5 +1,7 @@
 ===description===
 Echo class
+===config===
+suppress=ImplicitToStringCast
 ===file===
 <?php
 class A {}

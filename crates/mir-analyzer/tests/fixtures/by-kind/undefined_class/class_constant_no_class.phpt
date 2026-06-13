@@ -1,5 +1,7 @@
 ===description===
 Class constant no class
+===config===
+suppress=UnusedParam
 ===file===
 <?php
 namespace Ns;

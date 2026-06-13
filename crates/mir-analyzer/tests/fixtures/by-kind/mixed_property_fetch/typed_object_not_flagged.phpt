@@ -1,5 +1,7 @@
 ===description===
 MixedPropertyFetch does NOT fire when the object has a concrete type.
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 class Foo {

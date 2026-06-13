@@ -1,5 +1,7 @@
 ===description===
 Possibly null function call
+===config===
+suppress=MixedReturnStatement,UnusedVariable
 ===file===
 <?php
 /**

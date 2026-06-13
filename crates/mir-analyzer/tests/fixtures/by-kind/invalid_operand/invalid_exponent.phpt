@@ -1,5 +1,7 @@
 ===description===
 Invalid exponent
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $a = "x" ^ 1;

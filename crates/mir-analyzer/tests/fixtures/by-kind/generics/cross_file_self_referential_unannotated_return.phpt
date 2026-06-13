@@ -1,5 +1,7 @@
 ===description===
 cross-file self-referential unannotated return falls back without hanging
+===config===
+suppress=MissingPropertyType
 ===file:rec.php===
 <?php
 /**

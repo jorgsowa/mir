@@ -1,5 +1,7 @@
 ===description===
 Unused param
+===config===
+suppress=MissingReturnType
 ===file===
 <?php
 function foo(int $i) {}

@@ -1,5 +1,7 @@
 ===description===
 Catch with no return and no finally
+===config===
+suppress=MissingThrowsDocblock
 ===file===
 <?php
 function foo() : bool {

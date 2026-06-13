@@ -1,5 +1,7 @@
 ===description===
 String function call
+===config===
+suppress=UnusedVariable
 ===file===
 <?php
 $bad_one = "hello";

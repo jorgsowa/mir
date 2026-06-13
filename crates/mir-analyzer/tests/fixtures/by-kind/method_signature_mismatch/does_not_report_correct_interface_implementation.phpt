@@ -1,5 +1,7 @@
 ===description===
 does not report correct interface implementation
+===config===
+suppress=ForbiddenCode
 ===file===
 <?php
 interface I {
