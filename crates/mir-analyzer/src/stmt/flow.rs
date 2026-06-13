@@ -109,7 +109,31 @@ impl<'a> StatementsAnalyzer<'a> {
                 let has_invalid = !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                     && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
                         || return_type_is_invalid(&check_ty, declared, self.db, &self.file));
-                if has_invalid {
+                let is_mixed_return = !has_invalid
+                    && !declared.is_void()
+                    && !declared.is_mixed()
+                    && check_ty.is_mixed()
+                    && !declared.contains(|t| matches!(t, Atomic::TConditional { .. }));
+                if is_mixed_return {
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
+                    self.issues.add(
+                        mir_issues::Issue::new(
+                            IssueKind::MixedReturnStatement {
+                                declared: format!("{declared}"),
+                            },
+                            Location {
+                                file: self.file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        )
+                        .with_snippet(
+                            crate::parser::span_text(self.source, stmt_span).unwrap_or_default(),
+                        ),
+                    );
+                } else if has_invalid {
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(
                         mir_issues::Issue::new(

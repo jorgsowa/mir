@@ -527,6 +527,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/function.rs` when a dynamic call target is mixed.
     /// Fixtures: `tests/fixtures/by-kind/mixed_function_call/`.
     MixedFunctionCall,
+    /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_return_statement/`.
+    MixedReturnStatement { declared: String },
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/`.
     MixedPropertyFetch { property: String },
@@ -749,6 +752,7 @@ impl IssueKind {
             | IssueKind::UndefinedDocblockClass { .. }
             | IssueKind::MissingConstructor { .. }
             | IssueKind::MixedFunctionCall
+            | IssueKind::MixedReturnStatement { .. }
             | IssueKind::MixedPropertyFetch { .. }
             | IssueKind::MixedPropertyAssignment { .. }
             | IssueKind::MixedArrayAccess
@@ -888,6 +892,7 @@ impl IssueKind {
             IssueKind::UndefinedDocblockClass { .. } => "MIR1505",
             IssueKind::MissingConstructor { .. } => "MIR1507",
             IssueKind::MixedFunctionCall => "MIR1211",
+            IssueKind::MixedReturnStatement { .. } => "MIR1212",
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
@@ -1009,8 +1014,8 @@ impl IssueKind {
             | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010"
             | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105"
             | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208"
-            | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1600"
-            | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" => Some(Severity::Info),
+            | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507"
+            | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1096,6 +1101,7 @@ impl IssueKind {
             IssueKind::UndefinedDocblockClass { .. } => "UndefinedDocblockClass",
             IssueKind::MissingConstructor { .. } => "MissingConstructor",
             IssueKind::MixedFunctionCall => "MixedFunctionCall",
+            IssueKind::MixedReturnStatement { .. } => "MixedReturnStatement",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
@@ -1607,6 +1613,9 @@ impl IssueKind {
                 format!("Class {class} has uninitialized properties but no constructor")
             }
             IssueKind::MixedFunctionCall => "Cannot call mixed type as a function".to_string(),
+            IssueKind::MixedReturnStatement { declared } => {
+                format!("Cannot return a mixed type from function with declared return type '{declared}'")
+            }
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${property} fetched on mixed type")
             }
@@ -2126,6 +2135,7 @@ mod code_tests {
             IssueKind::UndefinedDocblockClass { name: s() },
             IssueKind::MissingConstructor { class: s() },
             IssueKind::MixedFunctionCall,
+            IssueKind::MixedReturnStatement { declared: s() },
             IssueKind::MixedPropertyFetch { property: s() },
             IssueKind::MixedPropertyAssignment { property: s() },
             IssueKind::MixedArrayAccess,
@@ -2260,6 +2270,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 138);
+        assert_eq!(one_of_each().len(), 139);
     }
 }
