@@ -136,6 +136,19 @@ impl CallAnalyzer {
 
         if matches!(&call.class.kind, ExprKind::Identifier(_)) {
             ea.record_ref(Arc::from(fqcn.as_str()), call.class.span);
+            // Record a symbol on the class token itself so hover / go-to-definition
+            // works when the cursor sits on the class name — including the
+            // `self`/`parent`/`static` keywords, which `resolve_static_class`
+            // has already mapped to a concrete FQCN.  Mirrors `new Foo` and
+            // `instanceof Foo`.  Skip the literal keywords that failed to
+            // resolve (e.g. `parent::` with no parent), which carry no class.
+            if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                ea.record_symbol(
+                    call.class.span,
+                    ReferenceKind::ClassReference(Arc::from(fqcn.as_str())),
+                    Type::single(Atomic::TClassString(None)),
+                );
+            }
             // Check if the class is deprecated (skip self/static/parent)
             if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
                 let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_str());

@@ -1257,3 +1257,72 @@ fn symbol_at_instanceof_class_name_resolves_to_class_reference() {
         sym.kind
     );
 }
+
+// ---------------------------------------------------------------------------
+// symbol_at — class token in a static call resolves to ClassReference
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_static_call_class_name_resolves_to_class_reference() {
+    // `Math::square(3)` — symbol_at on "Math" must return ClassReference("Math"),
+    // mirroring `new Math` / `$v instanceof Math`.
+    let src = "<?php\nclass Math { public static function square(int $n): int { return $n; } }\nfunction caller(): void { Math::square(3); }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("Math::square").unwrap() as u32;
+
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find ClassReference on the static-call class name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Math"),
+        "expected ClassReference(Math), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_parent_keyword_in_static_call_resolves_to_parent_class() {
+    // `parent::greet()` — symbol_at on the `parent` keyword must return a
+    // ClassReference to the *actual* parent class (Base), not the child.
+    let dir = create_temp_dir("symbol_at_parent_keyword");
+    let src = "<?php\nclass Base { public static function greet(): void {} }\nclass Child extends Base { public static function go(): void { parent::greet(); } }\n";
+    let file = write_file(&dir, "parent_kw.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("parent::greet").unwrap() as u32;
+
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at must find a ClassReference on the `parent` keyword");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Base"),
+        "expected ClassReference(Base) for `parent`, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_self_keyword_in_static_call_resolves_to_self_class() {
+    // `self::make()` — symbol_at on the `self` keyword must resolve to the
+    // enclosing class (Factory).
+    let src = "<?php\nclass Factory { public static function make(): void {} public static function build(): void { self::make(); } }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("self::make").unwrap() as u32;
+
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find a ClassReference on the `self` keyword");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Factory"),
+        "expected ClassReference(Factory) for `self`, got {:?}",
+        sym.kind
+    );
+}
