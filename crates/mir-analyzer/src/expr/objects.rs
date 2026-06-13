@@ -523,7 +523,24 @@ impl<'a> ExpressionAnalyzer<'a> {
         if let ExprKind::Identifier(id) = &spa.class.kind {
             let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
             if matches!(resolved.as_str(), "self" | "static" | "parent") {
-                // Cannot resolve without FlowState; skip reference recording.
+                // Resolve the relative keyword through the FlowState and record
+                // the property read so a `self::$prop` access counts as a use
+                // (otherwise a private static property is wrongly reported
+                // UnusedProperty).
+                let fqcn_opt = match resolved.as_str() {
+                    "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
+                    "parent" => ctx.parent_fqcn.clone(),
+                    _ => None,
+                };
+                if let Some(fqcn) = fqcn_opt {
+                    if let Some(prop_name) = expr_name_str(&spa.member) {
+                        let prop_name = prop_name.trim_start_matches('$');
+                        self.record_ref(
+                            Arc::from(format!("{}::{}", fqcn, prop_name)),
+                            spa.member.span,
+                        );
+                    }
+                }
             } else if !crate::db::class_exists(self.db, &resolved)
                 && !ctx.class_exists_guards.contains(resolved.as_str())
             {

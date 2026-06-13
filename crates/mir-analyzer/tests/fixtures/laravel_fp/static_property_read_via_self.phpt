@@ -1,11 +1,10 @@
 ===description===
-Laravel FP (laravel/framework): a private static property read via `self::$prop`
-is not counted as a use, so mir's dead-code check reports UnusedProperty
-(MimeType::$mime). Ignored pending fix — see ROADMAP §1.4 (liveness read-miss for
-static-property access).
-===ignore===
+Regression (laravel/framework): a private static property read via `self::$prop`
+counts as a use. The static-property-access path now resolves self/static/parent
+through the FlowState and records the reference, so mir no longer reports
+UnusedProperty (MimeType::$mime).
 ===config===
-suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,MixedReturnStatement,MixedAssignment
+suppress=MissingClosureReturnType,MissingPropertyType,UnusedParam,UnusedVariable,MixedReturnStatement,MixedAssignment
 ===file===
 <?php
 class MimeTypes {}
@@ -20,3 +19,5 @@ class MimeType {
         return self::$mime;
     }
 }
+===expect===
+
