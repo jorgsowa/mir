@@ -163,7 +163,7 @@ impl DefinitionCollector<'_> {
             .unwrap_or(stmt_span.start);
         self.emit_docblock_issues(&doc, doc_span);
 
-        if !self.version_allows(&doc) {
+        if !self.version_allows(&doc) || !self.version_attr_available(&decl.attributes) {
             return;
         }
 
@@ -195,19 +195,29 @@ impl DefinitionCollector<'_> {
         let mut local_complex = 0usize;
         let mut local_defaults = 0usize;
         for p in decl.params.iter() {
+            // phpstorm-stubs `#[PhpStormStubsElementAvailable]`: a param that
+            // does not exist at the target version is omitted entirely (keeping
+            // it would corrupt arity checks).
+            if !self.version_attr_available(&p.attributes) {
+                continue;
+            }
             let param_name = p.name.as_deref().unwrap_or_default();
-            let ty = doc
-                .get_param_type(param_name)
-                .cloned()
-                .map(|u| {
-                    // If the type is a simple named object that matches a template param,
-                    // convert it to a TTemplateParam
-                    self.resolve_union_doc_with_templates(
-                        u,
-                        &template_names,
-                        &fqn,
-                        &template_params,
-                    )
+            let ty = self
+                // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
+                // type override wins over the (usually absent) hint/docblock type.
+                .version_attr_type_string(&p.attributes)
+                .map(|s| crate::parser::docblock::parse_type_string(&s))
+                .or_else(|| {
+                    doc.get_param_type(param_name).cloned().map(|u| {
+                        // If the type is a simple named object that matches a template param,
+                        // convert it to a TTemplateParam
+                        self.resolve_union_doc_with_templates(
+                            u,
+                            &template_names,
+                            &fqn,
+                            &template_params,
+                        )
+                    })
                 })
                 .or_else(|| {
                     self.resolve_union_opt(
@@ -263,18 +273,26 @@ impl DefinitionCollector<'_> {
             });
         }
 
-        let return_type = match (doc.return_type.clone(), decl.return_type.as_ref()) {
-            (Some(mut ty), _) => {
-                ty.from_docblock = true;
-                Some(self.resolve_union_doc_with_templates(
-                    ty,
-                    &template_names,
-                    &fqn,
-                    &template_params,
-                ))
+        // phpstorm-stubs `#[LanguageLevelTypeAware]` return type wins over the
+        // declared/docblock return type, routed through the same resolution.
+        let return_type = if let Some(s) = self.version_attr_type_string(&decl.attributes) {
+            let mut ty = crate::parser::docblock::parse_type_string(&s);
+            ty.from_docblock = true;
+            Some(self.resolve_union_doc_with_templates(ty, &template_names, &fqn, &template_params))
+        } else {
+            match (doc.return_type.clone(), decl.return_type.as_ref()) {
+                (Some(mut ty), _) => {
+                    ty.from_docblock = true;
+                    Some(self.resolve_union_doc_with_templates(
+                        ty,
+                        &template_names,
+                        &fqn,
+                        &template_params,
+                    ))
+                }
+                (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint_owned(h, None))),
+                (None, None) => None,
             }
-            (None, Some(h)) => self.resolve_union_opt(Some(type_from_hint_owned(h, None))),
-            (None, None) => None,
         };
 
         let throws = doc

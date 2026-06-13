@@ -69,6 +69,31 @@ impl PhpVersion {
         }
         true
     }
+
+    /// Whether `self` falls within the **inclusive** `[from, to]` range used by
+    /// phpstorm-stubs' `#[PhpStormStubsElementAvailable($from, $to)]`. Both
+    /// bounds are inclusive (verified empirically: `Error::__clone` is declared
+    /// `from:"7.0", to:"8.0"` then `'8.1'`, and the only gap-free partition is
+    /// inclusive `to`). A `None` bound is open on that side.
+    ///
+    /// Unlike [`includes_symbol`](Self::includes_symbol) this is *not* the
+    /// `@since`/`@removed` semantics — `removed` there is exclusive. Version
+    /// strings that fail to parse are ignored (treated as absent), defensively;
+    /// `PhpVersion: FromStr` already truncates any `x.y.z` patch component.
+    pub fn in_range(self, from: Option<&str>, to_inclusive: Option<&str>) -> bool {
+        let parse = |s: &str| s.parse::<PhpVersion>().ok();
+        if let Some(f) = from.and_then(parse) {
+            if self < f {
+                return false;
+            }
+        }
+        if let Some(t) = to_inclusive.and_then(parse) {
+            if self > t {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 impl Default for PhpVersion {
@@ -176,5 +201,50 @@ mod tests {
     fn includes_symbol_ignores_garbage() {
         assert!(PhpVersion::new(8, 5).includes_symbol(Some("PECL"), None));
         assert!(PhpVersion::new(8, 5).includes_symbol(Some(""), None));
+    }
+
+    #[test]
+    fn in_range_inclusive_both_bounds() {
+        let v = PhpVersion::new;
+        // [7.0, 8.0] inclusive on both ends.
+        assert!(v(7, 0).in_range(Some("7.0"), Some("8.0")));
+        assert!(v(8, 0).in_range(Some("7.0"), Some("8.0"))); // upper bound is inclusive
+        assert!(v(7, 4).in_range(Some("7.0"), Some("8.0")));
+        assert!(!v(8, 1).in_range(Some("7.0"), Some("8.0")));
+        assert!(!v(6, 4).in_range(Some("7.0"), Some("8.0")));
+    }
+
+    #[test]
+    fn in_range_open_bounds() {
+        let v = PhpVersion::new;
+        // from-only: available at and after 8.0.
+        assert!(!v(7, 4).in_range(Some("8.0"), None));
+        assert!(v(8, 0).in_range(Some("8.0"), None));
+        assert!(v(8, 5).in_range(Some("8.0"), None));
+        // to-only: available at and before 8.0.
+        assert!(v(7, 4).in_range(None, Some("8.0")));
+        assert!(v(8, 0).in_range(None, Some("8.0")));
+        assert!(!v(8, 1).in_range(None, Some("8.0")));
+        // no bounds: always available.
+        assert!(v(7, 4).in_range(None, None));
+    }
+
+    #[test]
+    fn in_range_across_the_7_4_to_8_0_jump() {
+        let v = PhpVersion::new;
+        // The 7.4 → 8.0 boundary: the gap-free partition for Error::__clone.
+        assert!(v(7, 4).in_range(Some("7.0"), Some("8.0")));
+        assert!(!v(7, 4).in_range(Some("8.1"), None));
+        assert!(!v(8, 1).in_range(Some("7.0"), Some("8.0")));
+        assert!(v(8, 1).in_range(Some("8.1"), None));
+    }
+
+    #[test]
+    fn in_range_ignores_unparseable_bounds() {
+        let v = PhpVersion::new(8, 2);
+        assert!(v.in_range(Some("garbage"), None));
+        assert!(v.in_range(None, Some("")));
+        // patch components are truncated by FromStr.
+        assert!(v.in_range(Some("8.0.1"), Some("8.3.9")));
     }
 }

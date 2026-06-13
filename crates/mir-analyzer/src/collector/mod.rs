@@ -29,6 +29,7 @@ mod function;
 mod interface;
 mod resolution;
 mod r#trait;
+mod version_attrs;
 
 // ---------------------------------------------------------------------------
 // Profiling counters for scalar type frequency
@@ -219,6 +220,26 @@ impl<'a> DefinitionCollector<'a> {
             Some(v) => v.includes_symbol(doc.since.as_deref(), doc.removed.as_deref()),
             None => true,
         }
+    }
+
+    /// Whether a stub element (function/method/param) carrying
+    /// `#[PhpStormStubsElementAvailable]` is available at the configured target
+    /// version. Always `true` for user code (`php_version == None`) or when the
+    /// attribute is absent. See [`version_attrs`].
+    fn version_attr_available(&self, attrs: &[php_ast::owned::Attribute]) -> bool {
+        match self.php_version {
+            Some(v) => version_attrs::is_available(attrs, &self.use_aliases, v),
+            None => true,
+        }
+    }
+
+    /// The `#[LanguageLevelTypeAware]` type-string override for the target
+    /// version, if any. `None` for user code, an absent attribute, or an empty
+    /// (`default: ''`) resolution. Callers parse the string via
+    /// [`parse_type_string`](crate::parser::docblock::parse_type_string).
+    fn version_attr_type_string(&self, attrs: &[php_ast::owned::Attribute]) -> Option<String> {
+        let v = self.php_version?;
+        version_attrs::type_aware(attrs, &self.use_aliases, v)
     }
 
     fn parse_docblock_from_node(
@@ -911,7 +932,7 @@ impl<'a> DefinitionCollector<'a> {
             self.emit_docblock_issues(&doc, c.span.start);
         }
 
-        if !self.version_allows(&doc) {
+        if !self.version_allows(&doc) || !self.version_attr_available(&m.attributes) {
             return None;
         }
 
@@ -920,14 +941,22 @@ impl<'a> DefinitionCollector<'a> {
         let mut local_complex = 0usize;
         let mut local_defaults = 0usize;
         for p in m.params.iter() {
+            // phpstorm-stubs `#[PhpStormStubsElementAvailable]`: omit a param
+            // that does not exist at the target version (preserves arity).
+            if !self.version_attr_available(&p.attributes) {
+                continue;
+            }
             let param_name = p.name.as_deref().unwrap_or_default();
-            let ty = doc
-                .get_param_type(param_name)
-                .cloned()
-                .map(|u| {
-                    aliases
-                        .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
-                        .unwrap_or_else(|| self.resolve_union_doc(u))
+            let ty = self
+                // phpstorm-stubs `#[LanguageLevelTypeAware]` type override wins.
+                .version_attr_type_string(&p.attributes)
+                .map(|s| crate::parser::docblock::parse_type_string(&s))
+                .or_else(|| {
+                    doc.get_param_type(param_name).cloned().map(|u| {
+                        aliases
+                            .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
+                            .unwrap_or_else(|| self.resolve_union_doc(u))
+                    })
                 })
                 .or_else(|| {
                     self.resolve_union_opt(
@@ -1043,7 +1072,17 @@ impl<'a> DefinitionCollector<'a> {
             &combined_template_params
         };
 
-        let return_type = match (doc.return_type.clone(), m.return_type.as_ref()) {
+        // phpstorm-stubs `#[LanguageLevelTypeAware]` return type wins, routed
+        // through the same resolution + self/static/parent filling.
+        let attr_return = self.version_attr_type_string(&m.attributes).map(|s| {
+            let mut ty = crate::parser::docblock::parse_type_string(&s);
+            ty.from_docblock = true;
+            ty
+        });
+        let return_type = match (
+            attr_return.or_else(|| doc.return_type.clone()),
+            m.return_type.as_ref(),
+        ) {
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
                 let resolved = if !template_names.is_empty() {

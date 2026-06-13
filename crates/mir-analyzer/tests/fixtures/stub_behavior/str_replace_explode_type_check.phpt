@@ -19,5 +19,3 @@ function directAccess(string $colorString): float {
     return (float) $replaced;
 }
 ===expect===
-PossiblyInvalidArrayAccess@4:13-4:22: Possibly invalid array access: 'array<int, string>|false' might not support []
-PossiblyInvalidArrayAccess@12:13-12:42: Possibly invalid array access: 'array<int, string>|false' might not support []

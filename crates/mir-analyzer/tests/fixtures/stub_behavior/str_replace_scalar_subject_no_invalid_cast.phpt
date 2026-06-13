@@ -19,5 +19,3 @@ function replaceInExplodeI(string $s): int {
     return (int) str_ireplace('rgb(', '', explode(',', $s)[0]);
 }
 ===expect===
-PossiblyInvalidArrayAccess@11:41-11:60: Possibly invalid array access: 'array<int, string>|false' might not support []
-PossiblyInvalidArrayAccess@16:43-16:62: Possibly invalid array access: 'array<int, string>|false' might not support []

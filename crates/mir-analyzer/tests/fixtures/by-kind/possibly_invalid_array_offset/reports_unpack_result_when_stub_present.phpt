@@ -10,4 +10,3 @@ function test(): void {
 }
 ===expect===
 PossiblyInvalidArrayOffset@3:5-3:37: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'
-PossiblyInvalidArgument@3:24-3:36: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided

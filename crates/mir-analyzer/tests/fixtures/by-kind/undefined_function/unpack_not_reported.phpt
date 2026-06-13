@@ -9,4 +9,3 @@ function test(): void {
     var_dump($r);
 }
 ===expect===
-PossiblyInvalidArgument@3:23-3:36: Argument $string of unpack() expects 'string', possibly different type 'string|false' provided
