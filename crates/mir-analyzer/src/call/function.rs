@@ -586,7 +586,15 @@ impl CallAnalyzer {
         }
         // Don't emit UndefinedFunction if call_user_func/call_user_func_array with string arg
         // - string args are runtime callable names that may not exist at compile time
-        if !call_user_func_string_arg {
+        // Also skip when guarded by `function_exists('fn')` (PHP function names
+        // are case-insensitive). The short name is matched too, since a bare
+        // call in a namespace falls back to the global function the guard names.
+        let short_fn = fn_name.rsplit('\\').next().unwrap_or(&fn_name);
+        let guarded = ctx
+            .function_exists_guards
+            .iter()
+            .any(|g| g.eq_ignore_ascii_case(&fn_name) || g.eq_ignore_ascii_case(short_fn));
+        if !call_user_func_string_arg && !guarded {
             ea.emit(
                 IssueKind::UndefinedFunction { name: fn_name },
                 Severity::Error,

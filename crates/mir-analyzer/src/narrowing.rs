@@ -245,6 +245,37 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
+                } else if bare.eq_ignore_ascii_case("defined") {
+                    // `if (defined('NAME')) { ... NAME ... }` — record NAME as
+                    // proven-defined in the true branch to suppress
+                    // UndefinedConstant within the guarded block.
+                    if is_true {
+                        if let Some(arg) = call.args.first() {
+                            if let ExprKind::String(name) = &arg.value.kind {
+                                let name = name.as_ref().trim_start_matches('\\');
+                                if !name.is_empty() {
+                                    ctx.defined_guards.insert(std::sync::Arc::from(name));
+                                }
+                            }
+                        }
+                    }
+                } else if bare.eq_ignore_ascii_case("function_exists") {
+                    // `if (function_exists('fn')) { ... fn() ... }` — record fn
+                    // as proven-to-exist in the true branch to suppress
+                    // UndefinedFunction within the guarded block. Combined with
+                    // negation + divergence (`if (!function_exists('fn')) throw;`)
+                    // this also covers the early-exit pattern.
+                    if is_true {
+                        if let Some(arg) = call.args.first() {
+                            if let ExprKind::String(name) = &arg.value.kind {
+                                let name = name.as_ref().trim_start_matches('\\');
+                                if !name.is_empty() {
+                                    ctx.function_exists_guards
+                                        .insert(std::sync::Arc::from(name));
+                                }
+                            }
+                        }
+                    }
                 } else if fn_name.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {

@@ -77,7 +77,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         name: &str,
         expr: &Expr,
-        _ctx: &mut FlowState,
+        ctx: &mut FlowState,
     ) -> Type {
         let name_str: &str = name;
         let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
@@ -98,6 +98,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         if let Some(ty) = ty {
             ty
+        } else if ctx.defined_guards.contains(name_str)
+            || ns_qualified
+                .as_deref()
+                .is_some_and(|q| ctx.defined_guards.contains(q))
+        {
+            // Guarded by `defined('NAME')` — the constant is defined at runtime.
+            Type::mixed()
         } else {
             self.emit(
                 IssueKind::UndefinedConstant {

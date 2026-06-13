@@ -151,6 +151,15 @@ pub struct FlowState {
     /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
     /// `UndefinedClass` diagnostics inside guarded branches.
     pub class_exists_guards: ClassExistsGuards,
+
+    /// Constant names proven to exist in this branch via a `defined('NAME')`
+    /// guard. Used to suppress `UndefinedConstant` inside guarded branches.
+    pub defined_guards: ClassExistsGuards,
+
+    /// Function names proven to exist in this branch via a
+    /// `function_exists('fn')` guard. Used to suppress `UndefinedFunction`
+    /// inside guarded branches.
+    pub function_exists_guards: ClassExistsGuards,
 }
 
 /// Pre-built superglobal initial state, shared across all FlowState instances.
@@ -219,6 +228,8 @@ impl FlowState {
             foreach_value_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
+            defined_guards: FxHashSet::default(),
+            function_exists_guards: FxHashSet::default(),
         }
     }
 
@@ -723,6 +734,16 @@ impl FlowState {
         result.class_exists_guards = if_ctx
             .class_exists_guards
             .intersection(&else_ctx.class_exists_guards)
+            .cloned()
+            .collect();
+        result.defined_guards = if_ctx
+            .defined_guards
+            .intersection(&else_ctx.defined_guards)
+            .cloned()
+            .collect();
+        result.function_exists_guards = if_ctx
+            .function_exists_guards
+            .intersection(&else_ctx.function_exists_guards)
             .cloned()
             .collect();
 
