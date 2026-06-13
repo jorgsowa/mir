@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-06-13
+
+### Added
+
+- `TypeDoesNotContainType` — impossible `switch` case values (literal cannot intersect the switch subject type) and impossible `match` arm conditions (same scalar/literal intersection check) are now reported. `MixedAssignment` is now also emitted when a `foreach` value variable is bound from a mixed-typed iterable (previously this path bypassed the mixed check).
+- Purity enforcement: `ImpurePropertyAssignment` (MIR1700), `ImpureMethodCall` (MIR1701), `ImpureGlobalVariable` (MIR1702), `ImpureStaticVariable` (MIR1703) — emitted when a `@pure`/`@psalm-mutation-free`-annotated function mutates a parameter's property, calls an impure method on a parameter, or accesses a global/static variable.
+- `ImpureFunctionCall` (MIR1704, Warning) — emitted when a `@pure`-annotated function calls a named function not itself marked `@pure`.
+- `UnusedClass` (MIR0507, Info) — `final` class declared but never directly referenced. Restricted to `final` classes to avoid false positives from subclassing or type-hint uses.
+- `ArgumentTypeCoercion` (MIR0225, Info) — emitted when an argument is a supertype (parent class) of the expected parameter type. Previously these calls were silently accepted.
+- `PropertyTypeCoercion` (MIR0226, Info) — emitted when a property assignment uses a supertype of the declared property type. Previously emitted as the higher-severity `InvalidPropertyAssignment`; correctly distinguished as a lower-severity coercion case.
+- `TaintedLlmPrompt` (MIR0804, Error) — emitted when a value derived from tainted user input reaches a parameter annotated with `@taint-sink llm_prompt`. Parser now recognises `@taint-sink kind $param` docblock tags; sink params are stored on `FunctionDef`/`MethodDef`.
+- `UnusedPsalmSuppress` (MIR0508, Info) — emitted when a `@psalm-suppress`, `@suppress`, or `@mir-suppress` annotation does not match any actual issue in the analysed file. Self-suppression (`@suppress UnusedPsalmSuppress`) silences its own warning.
+- `UnsupportedReferenceUsage` (MIR1506, Warning) — emitted when a PHP reference assignment (`$b = &$x`) is used.
+- `NoInterfaceProperties` (MIR1504, Info) — emitted when a property is read or written on an interface annotated with `@seal-properties`/`@psalm-seal-properties` but not declared via `@property`/`@property-read`/`@property-write`.
+- `MissingConstructor` (MIR1507, Info) — emitted when a concrete class has at least one non-nullable uninitialized property anywhere in its ancestor chain but defines no constructor.
+- `MixedFunctionCall` (MIR1211, Info) — emitted when a variable of mixed type is invoked as a function via a dynamic call expression.
+- `MissingClosureReturnType` (MIR1105, Info) — emitted when a closure has no native return type and no preceding `@return` docblock (Full mode only).
+- `InvalidArrayOffset` (MIR0300, Error) — emitted when an object, array, or closure is used as an array subscript key (types PHP cannot coerce to a valid array key).
+- `PossiblyInvalidArrayAccess` (MIR0227, Info) — emitted when a union type contains some members that support `[]` and some that do not.
+- `DeprecatedMethod` (MIR1002) — instance deprecated method calls now emit `DeprecatedMethod` instead of `DeprecatedMethodCall`, reserving `DeprecatedMethodCall` for static calls and `__clone` dispatch.
+- `MixedReturnStatement` (MIR1212, Info) — emitted when a function with a declared non-void, non-mixed return type returns a value that infers to mixed (e.g. `array_pop()` returned from a `string` function).
+- phpstorm-stubs `#[LanguageLevelTypeAware]` and `#[PhpStormStubsElementAvailable]` attributes are now resolved against the configured target PHP version. This correctly models ~2,400 previously-dropped declaration sites across the stub corpus and eliminates spurious `|false` returns for `explode()`/`pack()` on PHP 8.x (those functions throw rather than return false since 8.0).
+- Vendored Redis and Memcached phpstorm-stubs extension directories. These PECL extensions were previously excluded and had no fallback resolution path after the submodule loader was removed, causing false `UndefinedClass` for `Redis`/`Memcached` in Laravel codebases.
+
+### Fixed
+
+- Result cache now invalidates when the running binary, target PHP version, or user-configured stubs change. Previously the cache keyed validity on file content hash only, leaving unchanged files serving stale diagnostics after a version upgrade, `--php-version` change, or stub set update.
+- `--clear-cache` now correctly targets the project-local cache directory (`{composer_root}/.mir/cache`) instead of always looking at the platform default cache dir and attempting to remove a `cache.json` that no longer exists (the format is `cache.bin`), making it a functional operation for normal project runs.
+
 ## [0.39.0] - 2026-06-12
 
 ### Added
