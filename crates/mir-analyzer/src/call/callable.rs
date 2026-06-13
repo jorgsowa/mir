@@ -101,9 +101,10 @@ pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
                 return true;
             }
             Atomic::TKeyedArray { is_list, .. } => {
-                // TKeyedArray marked as is_list is a numeric list, not a callable
+                // A numeric-keyed list is only callable in the `[$obj, 'method']`
+                // / `['Class', 'method']` 2-element form.
                 if *is_list {
-                    return false;
+                    return is_callable_array_pair(union);
                 }
                 // Otherwise it could be [obj, 'method'] form, accept it
                 return true;
@@ -120,6 +121,49 @@ pub(crate) fn is_valid_callable_type(union: &Type) -> bool {
         }
     }
     true
+}
+
+/// True if `arg` is the array-callable pair form `[$obj, 'method']` /
+/// `['Class', 'method']` — a 2-element shape (keys 0 and 1) whose first element
+/// is an object / class-string / string and whose second element is a string.
+/// PHP accepts this anywhere a `callable` is expected, including the `is_list`
+/// shape produced by an `[$this, 'm']` literal.
+pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
+    arg.types.iter().any(|a| {
+        let Atomic::TKeyedArray { properties, .. } = a else {
+            return false;
+        };
+        if properties.len() != 2 {
+            return false;
+        }
+        let first = properties.get(&mir_types::atomic::ArrayKey::Int(0));
+        let second = properties.get(&mir_types::atomic::ArrayKey::Int(1));
+        let (Some(first), Some(second)) = (first, second) else {
+            return false;
+        };
+        // The first element must be an object (`[$this, 'm']`) or a
+        // class-string. A plain/literal string is NOT accepted here: a literal
+        // like `["one", "two"]` is only callable if "one" names a real class,
+        // which this db-less predicate can't verify — leave that to the regular
+        // checks so a non-class string pair is still rejected.
+        let first_ok = first.ty.contains(|t| {
+            matches!(
+                t,
+                Atomic::TNamedObject { .. }
+                    | Atomic::TObject
+                    | Atomic::TSelf { .. }
+                    | Atomic::TStaticObject { .. }
+                    | Atomic::TClassString(_)
+            )
+        });
+        let second_ok = second.ty.contains(|t| {
+            matches!(
+                t,
+                Atomic::TString | Atomic::TNonEmptyString | Atomic::TLiteralString(_)
+            )
+        });
+        first_ok && second_ok
+    })
 }
 
 /// Validate array_map callback: arity must match the number of arrays passed.

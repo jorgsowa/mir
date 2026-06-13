@@ -169,6 +169,10 @@ pub(crate) fn check_one(
         // PHP calls __toString() implicitly. Most PHP code (including Laravel)
         // does not declare strict_types, so this is the common case.
         && !stringable_coercion_ok(arg_ty, param_ty, ea)
+        // `[$obj, 'method']` / `['Class', 'method']` is a valid callable, even
+        // though it types as a 2-element list shape.
+        && !(param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TClosure { .. }))
+            && super::super::callable::is_callable_array_pair(arg_ty))
     {
         // For union arg types, check if any individual atomic fits the param.
         // If some atomics fit and some don't → PossiblyInvalidArgument; otherwise → InvalidArgument.

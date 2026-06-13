@@ -1,9 +1,7 @@
 ===description===
-Laravel FP (laravel/framework): the `[$this, 'method']` callable-array form is
-valid `callable`, but mir types it as array{0: X, 1: "method"} and rejects it
-against a callable parameter (array_walk), emitting InvalidArgument. Ignored
-pending fix — see ROADMAP §1.4.
-===ignore===
+Regression (laravel/framework): the `[$this, 'method']` callable-array form is
+valid `callable`. mir now accepts a 2-element `[object|string, string]` shape
+against a callable parameter (array_walk), so it no longer emits InvalidArgument.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,MixedArgument,MixedReturnStatement
 ===file===
