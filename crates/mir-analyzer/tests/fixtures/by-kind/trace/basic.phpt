@@ -1,0 +1,9 @@
+===description===
+Trace emits the inferred type of a variable via @trace in a docblock.
+===file===
+<?php
+$x = 42;
+/** @trace $x */
+$y = $x + 1;
+===expect===
+Trace@4:1-4:13: Type of $x is 42
