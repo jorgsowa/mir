@@ -195,7 +195,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 } else if type_exists {
                     let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
                     if let Some(class) = crate::db::find_class_like(self.db, here) {
-                        if class.is_class() && class.is_abstract() {
+                        // `new static()` is valid even in an abstract class:
+                        // late static binding resolves `static` to the concrete
+                        // subclass at runtime, never the abstract class itself.
+                        // `new self()` / `new AbstractName()` remain errors.
+                        if class.is_class() && class.is_abstract() && resolved.as_str() != "static"
+                        {
                             self.emit(
                                 IssueKind::AbstractInstantiation {
                                     class: fqcn.to_string(),

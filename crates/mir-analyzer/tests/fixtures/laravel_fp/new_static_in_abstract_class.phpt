@@ -1,9 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): `new static` inside an abstract class (Model,
+Regression (laravel/framework): `new static` inside an abstract class (Model,
 Factory) is valid late static binding — it constructs the concrete subclass at
-runtime, not the abstract class. mir emits AbstractInstantiation. Ignored pending
-fix — see ROADMAP §1.4.
-===ignore===
+runtime, not the abstract class. mir no longer emits AbstractInstantiation for
+`new static` (only for `new self` / `new AbstractName`).
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
 ===file===
