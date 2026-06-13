@@ -278,6 +278,123 @@ pub(crate) fn check_array_filter_callback(
     }
 }
 
+/// Extract the return type a callable union resolves to, if statically known:
+/// - `TClosure` / `TCallable` carry their return type directly.
+/// - `TLiteralString` is resolved as a function name and its declared return is used.
+/// - `TIntersection` is searched part by part.
+///
+/// Returns `None` when the callback's return type cannot be determined (bare
+/// `callable`, unknown string, `null`, …) so callers can fall back to the
+/// generic stub return type rather than inventing a wrong element type.
+fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Type> {
+    for atomic in &union.types {
+        match atomic {
+            Atomic::TClosure { return_type, .. } => return Some((**return_type).clone()),
+            Atomic::TCallable {
+                return_type: Some(rt),
+                ..
+            } => return Some((**rt).clone()),
+            Atomic::TLiteralString(fn_name) if !fn_name.is_empty() => {
+                let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
+                if let Some(f) = crate::db::find_function(ea.db, here) {
+                    if let Some(rt) = &f.return_type {
+                        return Some((**rt).clone());
+                    }
+                }
+            }
+            Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    if let Some(rt) = callable_return_type(part, ea) {
+                        return Some(rt);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The default PHP array-key type, `int|string`, used when a source array's
+/// key type cannot be determined more precisely.
+fn array_key_type() -> Type {
+    let mut k = Type::single(Atomic::TInt);
+    k.add_type(Atomic::TString);
+    k
+}
+
+/// Infer the result type of `array_map($callback, $array, ...)`.
+///
+/// PHP semantics: `array_map` applies `$callback` to each element and returns
+/// an array of the callback's return values. With a single source array the
+/// keys are preserved; with multiple arrays the result is re-indexed with
+/// integer keys. A `null` callback (zip mode) is not modeled — we return
+/// `None` so the generic stub `array` return is kept.
+///
+/// Returns `None` when the callback return type is unknown, so the caller falls
+/// back to the stub return type instead of fabricating `array<…, mixed>`.
+pub(crate) fn infer_array_map_return(
+    ea: &ExpressionAnalyzer<'_>,
+    arg_types: &[Type],
+) -> Option<Type> {
+    let callback = arg_types.first()?;
+    // `array_map(null, ...)` (zip mode) and other non-callable first args are
+    // out of scope; only proceed for a genuinely callable first argument.
+    if callback.types.iter().any(|a| matches!(a, Atomic::TNull)) {
+        return None;
+    }
+    let value = callable_return_type(callback, ea)?;
+    // A `void`/`never` callback is degenerate (the runtime fills `null`); don't
+    // fabricate an `array<…, void>` element type that would surface dubious
+    // downstream diagnostics — keep the generic stub `array`.
+    if value
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TVoid | Atomic::TNever))
+    {
+        return None;
+    }
+
+    // Key type: preserved from the single source array; integer-keyed when
+    // multiple arrays are zipped together.
+    let key = if arg_types.len() == 2 {
+        let (k, _) = crate::stmt::infer_foreach_types(&arg_types[1]);
+        if k.is_mixed() {
+            array_key_type()
+        } else {
+            k
+        }
+    } else {
+        Type::single(Atomic::TInt)
+    };
+
+    Some(Type::single(Atomic::TArray {
+        key: Box::new(key),
+        value: Box::new(value),
+    }))
+}
+
+/// Infer the result type of `array_filter($array, $callback?, ...)`.
+///
+/// Filtering never changes the element types — it only removes entries — so the
+/// result carries the source array's key and value types (made possibly-empty;
+/// list-ness is dropped because filtering can leave gaps). Returns `None` when
+/// the source element types are unknown so the generic stub `array` is kept.
+pub(crate) fn infer_array_filter_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (key, value) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() && value.is_mixed() {
+        return None;
+    }
+    Some(Type::single(Atomic::TArray {
+        key: Box::new(key),
+        value: Box::new(value),
+    }))
+}
+
 /// Returns `(callback_arg_index, min_required_arity)` for built-in functions that enforce a
 /// minimum callback arity via `check_min_arity_callback`. Functions with more complex rules
 /// (array_map, array_filter) use their own specialized handlers instead.

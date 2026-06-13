@@ -77,7 +77,7 @@ pub(super) fn widen_unstable(
 // foreach key/value type inference
 // ---------------------------------------------------------------------------
 
-pub(super) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
+pub(crate) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
     if arr_ty.is_mixed() {
         return (Type::mixed(), Type::mixed());
     }

@@ -484,6 +484,20 @@ impl CallAnalyzer {
                     .cloned()
             });
 
+            // Built-in array transformers whose stub return type is a generic
+            // `array`: refine the element type from the callback / source array
+            // so binding sites (e.g. `foreach` over the result) get a usable
+            // value type. Falls back to the stub return when inference is unsure.
+            let return_ty = match resolved_fn_name.as_str() {
+                "array_map" => {
+                    super::callable::infer_array_map_return(ea, &arg_types).unwrap_or(return_ty)
+                }
+                "array_filter" => {
+                    super::callable::infer_array_filter_return(&arg_types).unwrap_or(return_ty)
+                }
+                _ => return_ty,
+            };
+
             super::ARG_TYPES_BUF.with(|b| {
                 let mut g = b.borrow_mut();
                 if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {

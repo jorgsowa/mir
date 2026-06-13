@@ -7,6 +7,7 @@ mod flow;
 mod loops;
 mod return_type;
 
+pub(crate) use loops::infer_foreach_types;
 use loops::{vars_stabilized, widen_unstable};
 pub(crate) use return_type::named_object_return_compatible;
 use return_type::resolve_union_for_file;
