@@ -40,6 +40,16 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
     }
 
     sub.types.iter().all(|a| {
+        // A trait-typed value only arises as `$this` inside a trait body
+        // (analyzed standalone). Its concrete runtime type is the unknown using
+        // class, which may extend/implement anything — so treat it as a subtype
+        // of any target rather than rejecting it against the trait's own (empty)
+        // hierarchy.
+        if let Atomic::TNamedObject { fqcn: sub_fqcn, .. } = a {
+            if crate::db::class_kind(db, sub_fqcn.as_ref()).is_some_and(|k| k.is_trait) {
+                return true;
+            }
+        }
         sup.types.iter().any(|b| {
             // Per-pair structural check: handles scalars (string, int, etc.) when
             // sub is a union — is_subtype_structural above failed because another

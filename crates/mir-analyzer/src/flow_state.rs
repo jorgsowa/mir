@@ -823,3 +823,14 @@ impl Default for FlowState {
         Self::new()
     }
 }
+
+/// True when the method/closure currently being analyzed belongs to a trait
+/// (i.e. `self_fqcn` names a trait). Trait bodies are analyzed standalone, so
+/// `self`/`static`/`parent`/`$this` resolve against the trait rather than the
+/// (unknown) using class — callers use this to suppress class-resolution
+/// false positives that only hold for the trait in isolation.
+pub(crate) fn self_is_trait(db: &dyn crate::db::MirDatabase, ctx: &FlowState) -> bool {
+    ctx.self_fqcn
+        .as_deref()
+        .is_some_and(|f| crate::db::class_kind(db, f).is_some_and(|k| k.is_trait))
+}

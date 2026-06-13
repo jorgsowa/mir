@@ -1,8 +1,7 @@
 ===description===
-Laravel FP (laravel/framework): `parent::` inside a trait resolves against the
-using class at runtime, not the trait. mir emits ParentNotFound. Ignored pending
-fix — see ROADMAP §1.4 (trait-context resolution).
-===ignore===
+Regression (laravel/framework): `parent::` inside a trait resolves against the
+using class at runtime, not the trait. mir no longer emits ParentNotFound when
+the enclosing scope is a trait.
 ===config===
 suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedArgument,MixedAssignment,MixedMethodCall,MixedReturnStatement
 ===file===

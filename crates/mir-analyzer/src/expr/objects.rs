@@ -260,27 +260,38 @@ impl<'a> ExpressionAnalyzer<'a> {
                             s.no_named_arguments,
                         )
                     });
+                    // `new static`/`new self`/`new parent` inside a trait binds
+                    // to the using class's constructor (late static binding),
+                    // not the trait's — which has none. Skip constructor-arg
+                    // validation so passing args isn't flagged against the
+                    // trait's (absent) zero-arg implicit constructor.
+                    let trait_relative_new =
+                        matches!(resolved.as_str(), "self" | "static" | "parent")
+                            && crate::flow_state::self_is_trait(self.db, ctx);
                     if let Some((ctor_params, ctor_templates, ctor_no_named_args)) =
                         &ctor_params_and_templates
                     {
-                        crate::call::check_constructor_args(
-                            self,
-                            &fqcn,
-                            crate::call::CheckArgsParams {
-                                fn_name: "__construct",
-                                params: ctor_params,
-                                arg_types: &arg_types,
-                                arg_spans: &arg_spans,
-                                arg_names: &arg_names,
-                                arg_can_be_byref: &arg_can_be_byref,
-                                call_span,
-                                has_spread: n.args.iter().any(|a| a.unpack),
-                                template_params: ctor_templates,
-                                no_named_arguments: *ctor_no_named_args,
-                            },
-                        );
+                        if !trait_relative_new {
+                            crate::call::check_constructor_args(
+                                self,
+                                &fqcn,
+                                crate::call::CheckArgsParams {
+                                    fn_name: "__construct",
+                                    params: ctor_params,
+                                    arg_types: &arg_types,
+                                    arg_spans: &arg_spans,
+                                    arg_names: &arg_names,
+                                    arg_can_be_byref: &arg_can_be_byref,
+                                    call_span,
+                                    has_spread: n.args.iter().any(|a| a.unpack),
+                                    template_params: ctor_templates,
+                                    no_named_arguments: *ctor_no_named_args,
+                                },
+                            );
+                        }
                     } else if !arg_types.is_empty()
                         && !n.args.iter().any(|a| a.unpack)
+                        && !trait_relative_new
                         && crate::db::class_exists(self.db, fqcn.as_ref())
                     {
                         // Class has no constructor but arguments were passed —
@@ -639,7 +650,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self_fqcn,
                             &const_name,
                         );
-                        if !exists && !crate::db::has_unknown_ancestor(self.db, self_fqcn) {
+                        // Inside a trait, `self::`/`static::CONST` may be
+                        // defined on the using class via late static binding,
+                        // not the trait itself — skip the undefined check.
+                        if !exists
+                            && !crate::db::has_unknown_ancestor(self.db, self_fqcn)
+                            && !crate::flow_state::self_is_trait(self.db, ctx)
+                        {
                             self.emit(
                                 IssueKind::UndefinedConstant {
                                     name: format!("{self_fqcn}::{const_name}"),

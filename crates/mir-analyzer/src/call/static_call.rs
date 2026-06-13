@@ -7,7 +7,7 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
-use crate::flow_state::FlowState;
+use crate::flow_state::{self_is_trait, FlowState};
 use crate::symbol::ReferenceKind;
 
 use super::args::{
@@ -127,8 +127,14 @@ impl CallAnalyzer {
             }
         };
 
-        // Detect `parent::` used in a class that has no parent.
-        if fqcn.to_lowercase() == "parent" && ctx.parent_fqcn.is_none() && ctx.self_fqcn.is_some() {
+        // Detect `parent::` used in a class that has no parent. Skip inside a
+        // trait: `parent::` there resolves against the using class at runtime,
+        // not the trait (which never has a parent).
+        if fqcn.to_lowercase() == "parent"
+            && ctx.parent_fqcn.is_none()
+            && ctx.self_fqcn.is_some()
+            && !self_is_trait(ea.db, ctx)
+        {
             ea.emit(IssueKind::ParentNotFound, Severity::Error, call.class.span);
         }
 

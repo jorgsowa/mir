@@ -1,9 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): `new static($items)` inside a trait
+Regression (laravel/framework): `new static($items)` inside a trait
 (EnumeratesValues::make) resolves `static` to the using class's constructor, not
-the trait's (which has none). mir emits TooManyArguments. Ignored pending fix —
-see ROADMAP §1.4 (trait-context resolution).
-===ignore===
+the trait's (which has none). mir no longer validates constructor args for
+`new static`/`new self`/`new parent` inside a trait, so no TooManyArguments.
 ===config===
 suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedArgument,MixedReturnStatement
 ===file===

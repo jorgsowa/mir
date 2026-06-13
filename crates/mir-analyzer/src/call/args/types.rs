@@ -373,7 +373,15 @@ fn project_generic_ancestor_type(
 fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg.types.iter().all(|a_atomic| {
         let arg_fqcn: &Name = match a_atomic {
-            Atomic::TNamedObject { fqcn, .. } => fqcn,
+            Atomic::TNamedObject { fqcn, .. } => {
+                // `$this` inside a trait body is typed `TNamedObject{trait}`;
+                // its concrete runtime type is the unknown using class, which
+                // may extend/implement the param type — treat as compatible.
+                if crate::db::class_kind(ea.db, fqcn.as_ref()).is_some_and(|k| k.is_trait) {
+                    return true;
+                }
+                fqcn
+            }
             Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
                 let is_trait =
                     crate::db::class_kind(ea.db, fqcn.as_ref()).is_some_and(|k| k.is_trait);

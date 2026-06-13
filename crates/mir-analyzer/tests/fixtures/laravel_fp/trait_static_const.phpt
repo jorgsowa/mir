@@ -1,8 +1,7 @@
 ===description===
-Laravel FP (laravel/framework): `static::CONST` inside a trait (e.g.
+Regression (laravel/framework): `static::CONST` inside a trait (e.g.
 HasTimestamps::CREATED_AT) is defined on the using model via late static binding.
-mir emits UndefinedConstant. Ignored pending fix — see ROADMAP §1.4.
-===ignore===
+mir no longer emits UndefinedConstant for self/static const access inside a trait.
 ===config===
 suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedArgument,MixedReturnStatement
 ===file===
