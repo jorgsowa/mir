@@ -28,9 +28,30 @@ pub fn is_superglobal(name: &str) -> bool {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SinkKind {
-    Html,  // echo / print → XSS
-    Sql,   // DB query functions → SQL injection
-    Shell, // system / exec / shell_exec → command injection
+    Html,        // echo / print → XSS
+    Sql,         // DB query functions → SQL injection
+    Shell,       // system / exec / shell_exec → command injection
+    File,        // filesystem path args → path traversal / LFI / SSRF
+    Unserialize, // unserialize → PHP object injection
+}
+
+impl SinkKind {
+    /// The argument indices whose taint should be reported for this sink.
+    ///
+    /// `None` means "any argument" — used for output/query/command sinks where
+    /// the dangerous payload may be in any position (e.g. `mysqli_query($db,
+    /// $sql)` carries the query in arg 1). The path/payload sinks below name
+    /// the single relevant argument so that, e.g., writing tainted *data* to a
+    /// constant path is not flagged — only a tainted *path* is.
+    pub fn tainted_arg_indices(self) -> Option<&'static [usize]> {
+        match self {
+            SinkKind::Html | SinkKind::Sql | SinkKind::Shell => None,
+            // Path is the first argument for every File sink listed below.
+            SinkKind::File => Some(&[0]),
+            // unserialize($data) — the payload is the first argument.
+            SinkKind::Unserialize => Some(&[0]),
+        }
+    }
 }
 
 /// Return the sink kind for a built-in function name, if it is a taint sink.
@@ -49,6 +70,15 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
         "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "pcntl_exec" => {
             Some(SinkKind::Shell)
         }
+
+        // Filesystem path (path traversal / local-file-inclusion / SSRF). Each
+        // of these takes the path/URL as its first argument.
+        "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink" => {
+            Some(SinkKind::File)
+        }
+
+        // Object injection.
+        "unserialize" => Some(SinkKind::Unserialize),
 
         _ => None,
     }

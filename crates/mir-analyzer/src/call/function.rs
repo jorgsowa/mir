@@ -164,12 +164,25 @@ impl CallAnalyzer {
 
         // Taint sink check (M19): before evaluating args so we can inspect raw exprs
         if let Some(sink_kind) = classify_sink(&fn_name) {
-            for arg in call.args.iter() {
+            let relevant = sink_kind.tainted_arg_indices();
+            for (i, arg) in call.args.iter().enumerate() {
+                // Path/payload sinks only care about their specific argument
+                // (e.g. a tainted *path*, not tainted *data* written to a
+                // constant path); output/query/command sinks check any arg.
+                if relevant.is_some_and(|idxs| !idxs.contains(&i)) {
+                    continue;
+                }
                 if is_expr_tainted(&arg.value, ctx) {
                     let issue_kind = match sink_kind {
                         SinkKind::Html => IssueKind::TaintedHtml,
                         SinkKind::Sql => IssueKind::TaintedSql,
                         SinkKind::Shell => IssueKind::TaintedShell,
+                        SinkKind::File => IssueKind::TaintedInput {
+                            sink: "file".to_string(),
+                        },
+                        SinkKind::Unserialize => IssueKind::TaintedInput {
+                            sink: "unserialize".to_string(),
+                        },
                     };
                     ea.emit(issue_kind, Severity::Error, span);
                     break;
