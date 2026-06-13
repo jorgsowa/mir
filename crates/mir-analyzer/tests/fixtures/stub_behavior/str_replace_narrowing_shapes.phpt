@@ -25,3 +25,6 @@ function test5(string $colorString): float {
     return (float) str_ireplace('rgb(', '', explode(',', $colorString)[0]);
 }
 ===expect===
+PossiblyInvalidArrayAccess@5:41-5:60: Possibly invalid array access: 'array<int, string>|false' might not support []
+PossiblyInvalidArrayAccess@11:41-11:50: Possibly invalid array access: 'array<int, string>|false' might not support []
+PossiblyInvalidArrayAccess@22:45-22:74: Possibly invalid array access: 'array<int, string>|false' might not support []
