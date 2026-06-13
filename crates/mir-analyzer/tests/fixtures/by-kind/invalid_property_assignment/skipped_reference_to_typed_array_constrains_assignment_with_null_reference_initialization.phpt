@@ -14,3 +14,4 @@ class Foo
 }
 
 ===expect===
+UnsupportedReferenceUsage@9:9-9:30: Reference assignment is not supported

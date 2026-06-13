@@ -13,3 +13,4 @@ foreach ($arr as $val) {
 $var = "foo";
 
 ===expect===
+UnsupportedReferenceUsage@6:5-6:17: Reference assignment is not supported

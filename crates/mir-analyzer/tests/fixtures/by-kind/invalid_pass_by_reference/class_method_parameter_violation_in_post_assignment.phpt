@@ -15,3 +15,4 @@ $bar = 5;
 $a = new A($bar);
 $bar = null;
 ===expect===
+UnsupportedReferenceUsage@7:9-7:27: Reference assignment is not supported

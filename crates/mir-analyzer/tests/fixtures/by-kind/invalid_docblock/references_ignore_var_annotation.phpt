@@ -7,3 +7,4 @@ $a = 1;
 $b = &$a;
 
 ===expect===
+UnsupportedReferenceUsage@4:1-4:9: Reference assignment is not supported

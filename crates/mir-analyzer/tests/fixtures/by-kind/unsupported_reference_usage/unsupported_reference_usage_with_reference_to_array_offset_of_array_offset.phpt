@@ -11,3 +11,4 @@ $foo = ["foo"];
 $bar = &$arr[$foo[0]];
 
 ===expect===
+UnsupportedReferenceUsage@8:1-8:22: Reference assignment is not supported

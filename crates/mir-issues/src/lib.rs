@@ -488,6 +488,9 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_method_call/`.
     MixedMethodCall { method: String },
+    /// Emitted when a PHP reference assignment is used (e.g. `$b = &$arr[$x]`).
+    /// Fixtures: `tests/fixtures/by-kind/unsupported_reference_usage/`.
+    UnsupportedReferenceUsage,
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/`.
     MixedPropertyFetch { property: String },
@@ -648,6 +651,7 @@ impl IssueKind {
             | IssueKind::ImpureMethodCall { .. }
             | IssueKind::ImpureGlobalVariable { .. }
             | IssueKind::ImpureStaticVariable { .. }
+            | IssueKind::UnsupportedReferenceUsage
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::UnhandledMatchCondition { .. }
             | IssueKind::InvalidStringClass { .. }
@@ -834,6 +838,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "MIR1701",
             IssueKind::ImpureGlobalVariable { .. } => "MIR1702",
             IssueKind::ImpureStaticVariable { .. } => "MIR1703",
+            IssueKind::UnsupportedReferenceUsage => "MIR1506",
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
@@ -944,7 +949,7 @@ impl IssueKind {
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0500" | "MIR0506"
             | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700" | "MIR1701"
-            | "MIR1702" | "MIR1703" => Some(Severity::Warning),
+            | "MIR1702" | "MIR1703" | "MIR1506" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1033,6 +1038,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "ImpureMethodCall",
             IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
             IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
+            IssueKind::UnsupportedReferenceUsage => "UnsupportedReferenceUsage",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
@@ -1520,6 +1526,9 @@ impl IssueKind {
             }
             IssueKind::MixedMethodCall { method } => {
                 format!("Method {method}() called on mixed type")
+            }
+            IssueKind::UnsupportedReferenceUsage => {
+                "Reference assignment is not supported".to_string()
             }
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${property} fetched on mixed type")
@@ -2032,6 +2041,7 @@ mod code_tests {
             },
             IssueKind::MixedAssignment { var: s() },
             IssueKind::MixedMethodCall { method: s() },
+            IssueKind::UnsupportedReferenceUsage,
             IssueKind::MixedPropertyFetch { property: s() },
             IssueKind::MixedPropertyAssignment { property: s() },
             IssueKind::MixedArrayAccess,
