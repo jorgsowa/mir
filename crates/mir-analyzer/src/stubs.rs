@@ -320,6 +320,36 @@ pub(crate) fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
     }
 }
 
+/// Fingerprint the user-configured stub set (paths + contents) for the result
+/// cache epoch. User stubs are resolvable just like bundled ones, so editing,
+/// adding, or removing them changes analysis output for files that reference
+/// those symbols — and the per-file content hash can't see it. Returns 0 when
+/// no user stubs are configured (the common case), so the epoch is unaffected.
+pub(crate) fn user_stub_fingerprint(files: &[PathBuf], dirs: &[PathBuf]) -> u64 {
+    if files.is_empty() && dirs.is_empty() {
+        return 0;
+    }
+    let mut all_paths: Vec<PathBuf> = files.to_vec();
+    for dir in dirs {
+        collect_stub_dir_paths(dir, &mut all_paths);
+    }
+    // Sort for a path-order-independent fingerprint.
+    all_paths.sort_unstable();
+    let mut hasher = blake3::Hasher::new();
+    for path in &all_paths {
+        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update(&[0]);
+        // Content too, so an in-place edit of a stub flips the fingerprint.
+        // A read failure still contributes the path, so add/remove is caught.
+        if let Ok(src) = std::fs::read(path) {
+            hasher.update(&src);
+        }
+        hasher.update(&[0]);
+    }
+    let bytes = hasher.finalize();
+    u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
+}
+
 /// Parse user-provided stub files and directories into `codebase`.
 ///
 /// Called after built-in stubs are loaded so user definitions can override or

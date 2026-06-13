@@ -39,7 +39,11 @@ fn inline_suppression_survives_cache_hit_in_fresh_session() {
 
     // First session: cold cache → miss path analyzes, bakes the suppression
     // mark, and writes the cached entry. The issue must be present but silenced.
-    let cache1 = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let cache1 = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
     let session1 = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache1.clone());
     let result1 = session1.re_analyze_file("test.php", SOURCE, &BatchOptions::new());
     let (total1, visible1) = undefined_class_issues(&result1);
@@ -52,7 +56,11 @@ fn inline_suppression_survives_cache_hit_in_fresh_session() {
     // Second session: a fresh db (no SourceFile registered) reading the same
     // disk cache. Identical content → cache hit, which replays without
     // registering source. The baked mark must keep the issue suppressed.
-    let cache2 = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let cache2 = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache2.clone());
     let result2 = session2.re_analyze_file("test.php", SOURCE, &BatchOptions::new());
     let (total2, visible2) = undefined_class_issues(&result2);

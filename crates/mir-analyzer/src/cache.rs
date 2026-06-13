@@ -9,6 +9,7 @@
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
 use mir_codebase::{FileId, FileIdMap};
 use parking_lot::Mutex;
@@ -28,6 +29,82 @@ pub type CacheHit = (Vec<Issue>, Vec<(String, u32, u16, u16)>);
 /// Compute the BLAKE3 hex digest of `content`.
 pub fn hash_content(content: &str) -> String {
     blake3::hash(content.as_bytes()).to_hex().to_string()
+}
+
+/// Memoized identity of the running mir build. Computed once per process.
+///
+/// This is the hash of the running executable's own bytes. Any new mir build —
+/// a released version bump, a different commit, or a local rebuild that changed
+/// analysis logic — produces different bytes and therefore a different
+/// fingerprint, so an old build's cache is never reused (the embedded stub set
+/// is part of the binary too, so this subsumes stub-set changes). A bare
+/// `CARGO_PKG_VERSION` would only catch explicit version bumps, leaving every
+/// same-version rebuild serving stale results.
+///
+/// Falls back to `CARGO_PKG_VERSION` + the bundled stub catalogue if the
+/// executable can't be read (unusual sandboxes) — still correct for the inputs
+/// that change most often, just blind to pure-logic changes within a version.
+fn build_fingerprint() -> u64 {
+    static FP: OnceLock<u64> = OnceLock::new();
+    *FP.get_or_init(|| {
+        let exe_bytes = std::env::current_exe().and_then(std::fs::read).ok();
+        compute_build_fingerprint(exe_bytes.as_deref())
+    })
+}
+
+fn compute_build_fingerprint(exe_bytes: Option<&[u8]>) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
+    hasher.update(&[0]);
+    match exe_bytes {
+        // Primary: the build's own bytes uniquely identify it.
+        Some(bytes) => {
+            hasher.update(bytes);
+        }
+        // Fallback: the bundled stub set (paths + contents).
+        None => {
+            for (path, content) in crate::stubs::stub_files() {
+                hasher.update(path.as_bytes());
+                hasher.update(&[0]);
+                hasher.update(content.as_bytes());
+                hasher.update(&[0]);
+            }
+        }
+    }
+    let bytes = hasher.finalize();
+    u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
+}
+
+/// Epoch the on-disk cache is validated against. Folds together every input
+/// that affects a file's analysis result *besides the file's own content*:
+/// the build fingerprint (the running mir binary's identity, which includes
+/// the crate version + embedded stub set) and the target PHP version.
+///
+/// A per-file cache entry's validity is otherwise keyed only on the file's
+/// content hash, which silently assumes those global inputs are unchanged
+/// between runs. They aren't:
+///
+/// - Bundled stubs change (e.g. vendoring `redis`/`memcached`, or a
+///   phpstorm-stubs bump) → files referencing a now-resolvable built-in keep
+///   a stale `UndefinedClass`.
+/// - The target PHP version changes (`--php-version`, or an edited
+///   `composer.json` constraint) → version-gated symbols (`@since`/`@removed`,
+///   LanguageLevelTypeAware params) resolve differently, but the file's bytes
+///   are identical so the stale result is served.
+///
+/// - User-configured stubs change (`user_stub_fp`, computed by
+///   [`crate::stubs::user_stub_fingerprint`]) → same as bundled stubs, but for
+///   custom stub files/dirs the project supplies.
+///
+/// Mixing them all into a cache-wide epoch invalidates the whole on-disk cache
+/// on the next run when any of them change, instead of serving stale diagnostics.
+fn cache_epoch(php_version: u8, user_stub_fp: u64) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&build_fingerprint().to_le_bytes());
+    hasher.update(&[php_version]);
+    hasher.update(&user_stub_fp.to_le_bytes());
+    let bytes = hasher.finalize();
+    u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +129,14 @@ struct CacheEntry {
 /// Serialized form of the full cache file.
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct CacheFile {
+    /// Analyzer epoch the entries were written under (see [`cache_epoch`]).
+    /// `load` discards the whole file when this doesn't match the running
+    /// binary's epoch. Defaults to 0 for legacy files written before this
+    /// field existed — 0 never matches a real epoch, so they're discarded
+    /// (the safe choice). Kept first so a bincode read of a legacy layout
+    /// reinterprets its leading bytes here rather than mid-struct.
+    #[serde(default)]
+    version: u64,
     #[serde(default)]
     entries: HashMap<String, CacheEntry>,
     /// Reverse dependency graph: defining_file → [files that depend on it].
@@ -63,6 +148,7 @@ struct CacheFile {
 /// View for serializing cache data without cloning.
 #[derive(Serialize)]
 struct CacheFileView<'a> {
+    version: u64,
     entries: &'a HashMap<String, CacheEntry>,
     reverse_deps: &'a HashMap<String, HashSet<String>>,
 }
@@ -76,6 +162,9 @@ pub struct AnalysisCache {
     entries: Mutex<HashMap<FileId, CacheEntry>>,
     /// Reverse dependency graph loaded from disk (from the previous run).
     reverse_deps: Mutex<HashMap<FileId, HashSet<FileId>>>,
+    /// Epoch this cache validates against (build fingerprint + PHP version).
+    /// Written into the on-disk file and re-checked on the next `load`.
+    epoch: u64,
     dirty: AtomicBool,
 }
 
@@ -83,9 +172,12 @@ impl AnalysisCache {
     /// Open or create a cache stored under `cache_dir`.
     /// If the directory or cache file do not exist they are created lazily on
     /// the first `flush()` call.
-    pub fn open(cache_dir: &Path) -> Self {
+    /// `user_stub_fp` is [`crate::stubs::user_stub_fingerprint`] for the
+    /// session's user stubs (0 when none are configured).
+    pub fn open(cache_dir: &Path, php_version: u8, user_stub_fp: u64) -> Self {
         std::fs::create_dir_all(cache_dir).ok();
-        let disk = Self::load(cache_dir);
+        let epoch = cache_epoch(php_version, user_stub_fp);
+        let disk = Self::load(cache_dir, epoch);
 
         // Build a FileIdMap from the on-disk path strings, then convert both
         // maps to use FileId keys for O(1) u32-hash lookups at runtime.
@@ -110,13 +202,14 @@ impl AnalysisCache {
             file_id_map: Mutex::new(id_map),
             entries: Mutex::new(entries),
             reverse_deps: Mutex::new(reverse_deps),
+            epoch,
             dirty: AtomicBool::new(false),
         }
     }
 
     /// Open the default cache directory: `{project_root}/.mir-cache/`.
-    pub fn open_default(project_root: &Path) -> Self {
-        Self::open(&project_root.join(".mir-cache"))
+    pub fn open_default(project_root: &Path, php_version: u8, user_stub_fp: u64) -> Self {
+        Self::open(&project_root.join(".mir-cache"), php_version, user_stub_fp)
     }
 
     /// Directory the cache was opened from. Useful for callers that want to
@@ -209,6 +302,7 @@ impl AnalysisCache {
             .collect();
 
         let view = CacheFileView {
+            version: self.epoch,
             entries: &entries,
             reverse_deps: &reverse_deps,
         };
@@ -325,17 +419,28 @@ impl AnalysisCache {
 
     // -----------------------------------------------------------------------
 
-    fn load(cache_dir: &Path) -> CacheFile {
+    fn load(cache_dir: &Path, epoch: u64) -> CacheFile {
+        // A file whose epoch doesn't match the running analyzer/stub set/PHP
+        // version may hold stale results (content hashes still match, but the
+        // analysis that produced them changed). Discard it rather than serve
+        // stale entries.
+        let fresh = |file: CacheFile| {
+            if file.version == epoch {
+                file
+            } else {
+                CacheFile::default()
+            }
+        };
         // Primary: bincode format
         if let Ok(bytes) = std::fs::read(cache_dir.join("cache.bin")) {
             if let Ok(file) = bincode::deserialize::<CacheFile>(&bytes) {
-                return file;
+                return fresh(file);
             }
         }
         // Fallback: legacy JSON format (migrate on next flush)
         if let Ok(bytes) = std::fs::read(cache_dir.join("cache.json")) {
             if let Ok(file) = serde_json::from_slice::<CacheFile>(&bytes) {
-                return file;
+                return fresh(file);
             }
         }
         CacheFile::default()
@@ -351,8 +456,12 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// Fixed PHP version for cache tests — any value works as long as the
+    /// open/write/reopen calls within one test agree on it.
+    const TEST_PHP_V: u8 = 0;
+
     fn make_cache(dir: &TempDir) -> AnalysisCache {
-        AnalysisCache::open(dir.path())
+        AnalysisCache::open(dir.path(), TEST_PHP_V, 0)
     }
 
     fn seed(cache: &AnalysisCache, file: &str) {
@@ -450,29 +559,186 @@ mod tests {
     }
 
     #[test]
-    fn old_cache_without_reference_locations_deserializes_to_empty() {
-        // Cache entries written before the reference_locations field was added
-        // must still be readable. The #[serde(default)] attribute covers this,
+    fn cache_entry_without_reference_locations_deserializes_to_empty() {
+        // A cache entry that predates the reference_locations field must still
+        // be readable as long as its epoch matches (a same-epoch file simply
+        // missing the newer field). The #[serde(default)] attribute covers this,
         // but we verify it explicitly so a future refactor can't silently break it.
         let dir = TempDir::new().unwrap();
         let cache_file = dir.path().join("cache.json");
 
-        // Write a cache file in the old format (no reference_locations field).
-        std::fs::write(
-            &cache_file,
-            r#"{"entries":{"a.php":{"content_hash":"abc","issues":[]}},"reverse_deps":{}}"#,
-        )
-        .unwrap();
+        // Old entry shape (no reference_locations), but with the *current* epoch
+        // so the file isn't discarded as stale.
+        let json = format!(
+            r#"{{"version":{},"entries":{{"a.php":{{"content_hash":"abc","issues":[]}}}},"reverse_deps":{{}}}}"#,
+            cache_epoch(TEST_PHP_V, 0)
+        );
+        std::fs::write(&cache_file, json).unwrap();
 
-        let cache = AnalysisCache::open(dir.path());
+        let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
         let hit = cache
             .get("a.php", "abc")
-            .expect("old cache entry should deserialize successfully");
+            .expect("same-epoch cache entry should deserialize successfully");
 
         assert!(hit.0.is_empty(), "no issues");
         assert!(
             hit.1.is_empty(),
             "reference_locations should default to empty vec, not fail"
+        );
+    }
+
+    #[test]
+    fn entries_survive_reopen_with_matching_epoch() {
+        // Sanity: a flush + reopen within the same build (same epoch) keeps
+        // entries. Guards against the epoch check being over-eager.
+        let dir = TempDir::new().unwrap();
+        {
+            let cache = make_cache(&dir);
+            cache.put("a.php", "h1".to_string(), vec![], vec![]);
+            cache.flush();
+        }
+        let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
+        assert!(
+            cache.get("a.php", "h1").is_some(),
+            "entry written by the same build/stub set must survive a reopen"
+        );
+    }
+
+    #[test]
+    fn stale_epoch_discards_entire_cache() {
+        // A cache.bin written under a different analyzer/stub epoch (e.g. before
+        // an extension stub was vendored) must be discarded on load, even though
+        // the per-file content hash still matches. This is the regression guard
+        // for stale `UndefinedClass` diagnostics surviving a stub-set change.
+        let dir = TempDir::new().unwrap();
+
+        let mut entries: HashMap<String, CacheEntry> = HashMap::default();
+        entries.insert(
+            "a.php".to_string(),
+            CacheEntry {
+                content_hash: "h1".to_string(),
+                issues: vec![],
+                reference_locations: vec![],
+            },
+        );
+        let reverse_deps: HashMap<String, HashSet<String>> = HashMap::default();
+        let view = CacheFileView {
+            version: cache_epoch(TEST_PHP_V, 0).wrapping_add(1), // deliberately wrong epoch
+            entries: &entries,
+            reverse_deps: &reverse_deps,
+        };
+        std::fs::write(
+            dir.path().join("cache.bin"),
+            bincode::serialize(&view).unwrap(),
+        )
+        .unwrap();
+
+        let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
+        assert!(
+            cache.get("a.php", "h1").is_none(),
+            "entry from a mismatched epoch must not be served despite a matching content hash"
+        );
+    }
+
+    #[test]
+    fn switching_php_version_discards_cache() {
+        // Results written targeting one PHP version must not be served when the
+        // next run targets a different one: version-gated symbols resolve
+        // differently though the file's content is identical. Regression guard
+        // for the `--php-version` arm of the stale-cache family.
+        let dir = TempDir::new().unwrap();
+        {
+            let cache = AnalysisCache::open(dir.path(), 74, 0); // analyzed as PHP 7.4
+            cache.put("a.php", "h1".to_string(), vec![], vec![]);
+            cache.flush();
+        }
+        let same = AnalysisCache::open(dir.path(), 74, 0);
+        assert!(
+            same.get("a.php", "h1").is_some(),
+            "same PHP version must reuse the cache"
+        );
+        let other = AnalysisCache::open(dir.path(), 80, 0); // now PHP 8.0
+        assert!(
+            other.get("a.php", "h1").is_none(),
+            "a different PHP version must discard the cache, not serve stale results"
+        );
+    }
+
+    #[test]
+    fn changing_user_stub_fingerprint_discards_cache() {
+        // User stubs are resolvable like bundled ones, so editing/adding/removing
+        // them changes analysis output for dependent files. The user-stub
+        // fingerprint is folded into the epoch; a different one must discard.
+        let dir = TempDir::new().unwrap();
+        {
+            let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
+            cache.put("a.php", "h1".to_string(), vec![], vec![]);
+            cache.flush();
+        }
+        let same = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
+        assert!(
+            same.get("a.php", "h1").is_some(),
+            "identical user-stub fingerprint must reuse the cache"
+        );
+        let changed = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xBBBB);
+        assert!(
+            changed.get("a.php", "h1").is_none(),
+            "a changed user-stub fingerprint must discard the cache"
+        );
+    }
+
+    #[test]
+    fn legacy_versionless_cache_bin_is_discarded_not_paniced() {
+        // A cache.bin written by a pre-`version` binary has the old 2-field
+        // bincode layout (entries, reverse_deps). Reading it into the new
+        // struct must NOT panic or OOM on the misaligned bytes — it must fall
+        // through to an empty cache. We reproduce the old layout by serializing
+        // a (entries, reverse_deps) tuple, which bincode encodes identically to
+        // the old struct.
+        let dir = TempDir::new().unwrap();
+        let mut entries: HashMap<String, CacheEntry> = HashMap::default();
+        entries.insert(
+            "a.php".to_string(),
+            CacheEntry {
+                content_hash: "h1".to_string(),
+                issues: vec![],
+                reference_locations: vec![],
+            },
+        );
+        let reverse_deps: HashMap<String, HashSet<String>> = HashMap::default();
+        let legacy_bytes = bincode::serialize(&(&entries, &reverse_deps)).unwrap();
+        std::fs::write(dir.path().join("cache.bin"), legacy_bytes).unwrap();
+
+        // Must not panic.
+        let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
+        assert!(
+            cache.get("a.php", "h1").is_none(),
+            "legacy versionless entries must be discarded, not served"
+        );
+    }
+
+    #[test]
+    fn build_fingerprint_tracks_binary_identity() {
+        // A different mir build (different executable bytes) must yield a
+        // different fingerprint, so its cache epoch differs and an old build's
+        // cache is never reused. Two distinct byte images stand in for two
+        // builds; identical bytes must reproduce the same fingerprint.
+        let build_a = compute_build_fingerprint(Some(b"mir-binary-image-A"));
+        let build_a_again = compute_build_fingerprint(Some(b"mir-binary-image-A"));
+        let build_b = compute_build_fingerprint(Some(b"mir-binary-image-B"));
+        assert_eq!(
+            build_a, build_a_again,
+            "same binary bytes → same fingerprint"
+        );
+        assert_ne!(
+            build_a, build_b,
+            "a new mir build (different bytes) must change the fingerprint"
+        );
+        // The fallback path (executable unreadable) is also deterministic and
+        // distinct from a real binary hash.
+        assert_eq!(
+            compute_build_fingerprint(None),
+            compute_build_fingerprint(None)
         );
     }
 }

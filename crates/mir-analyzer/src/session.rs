@@ -152,7 +152,16 @@ impl AnalysisSession {
             .salsa
             .write()
             .set_php_version(Arc::from(self.php_version.to_string().as_str()));
-        self.cache = Some(Arc::new(AnalysisCache::open(cache_dir)));
+        // Fold the user-stub fingerprint into the cache epoch. `with_user_stubs`
+        // must run before this for it to be picked up (it does in `build_session`);
+        // sessions without user stubs get 0, which is correct.
+        let user_stub_fp =
+            crate::stubs::user_stub_fingerprint(&self.user_stub_files, &self.user_stub_dirs);
+        self.cache = Some(Arc::new(AnalysisCache::open(
+            cache_dir,
+            self.php_version.cache_byte(),
+            user_stub_fp,
+        )));
         self
     }
 

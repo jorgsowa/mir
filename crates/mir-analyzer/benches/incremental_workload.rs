@@ -125,7 +125,11 @@ fn warm_session(
     vendor_files: &[PathBuf],
     project_files: &[PathBuf],
 ) -> AnalysisSession {
-    let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let cache = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
     session.ensure_all_stubs();
     // Vendor files: HIGH durability (stable within session).

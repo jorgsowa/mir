@@ -308,11 +308,13 @@ fn build_session(
     stub_dirs: Vec<PathBuf>,
 ) -> AnalysisSession {
     let mut session = AnalysisSession::new(version);
-    if let Some(dir) = cache_dir {
-        session = session.with_cache_dir(&dir);
-    }
+    // User stubs must be configured BEFORE the cache is opened: the cache epoch
+    // folds in the user-stub fingerprint, so it has to see them at open time.
     if !stub_files.is_empty() || !stub_dirs.is_empty() {
         session = session.with_user_stubs(stub_files, stub_dirs);
+    }
+    if let Some(dir) = cache_dir {
+        session = session.with_cache_dir(&dir);
     }
     session
 }

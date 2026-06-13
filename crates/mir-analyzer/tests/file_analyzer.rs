@@ -324,7 +324,11 @@ fn version_filter_with_cache_preserves_version() {
     use mir_analyzer::cache::AnalysisCache;
 
     let cache_dir = create_temp_dir("ver_cache");
-    let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let cache = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
     let session = AnalysisSession::new(PhpVersion::new(7, 4)).with_cache(cache);
     session.ensure_all_stubs();
 
@@ -653,7 +657,11 @@ fn invalidate_file_releases_all_per_file_state() {
     use mir_analyzer::cache::AnalysisCache;
 
     let cache_dir = create_temp_dir("cache");
-    let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let cache = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
 
     let base: Arc<str> = Arc::from("/proj/Base.php");
@@ -755,7 +763,11 @@ fn ingest_file_maintains_reverse_dep_graph_for_session_callers() {
     use mir_analyzer::cache::AnalysisCache;
 
     let cache_dir = create_temp_dir("cache");
-    let cache = Arc::new(AnalysisCache::open(cache_dir.path()));
+    let cache = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
 
     let base_path: Arc<str> = Arc::from("/proj/Base.php");
