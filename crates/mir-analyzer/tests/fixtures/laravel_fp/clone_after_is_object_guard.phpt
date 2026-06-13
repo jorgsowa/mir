@@ -1,8 +1,7 @@
 ===description===
-Laravel FP (laravel/framework): `is_object($x) ? clone $x : $x` is guarded, but
-mir does not narrow on is_object() and flags MixedClone on the clone of a mixed
-value. Ignored pending fix — see ROADMAP §1.4 (is_object narrowing).
-===ignore===
+Regression (laravel/framework): `is_object($x) ? clone $x : $x` is guarded.
+is_object() now narrows a mixed value to `object`, so the clone in the guarded
+branch no longer flags MixedClone.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedAssignment
 ===file===

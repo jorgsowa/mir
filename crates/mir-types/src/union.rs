@@ -453,9 +453,24 @@ impl Type {
         self.filter(|t| t.is_array() || matches!(t, Atomic::TMixed))
     }
 
-    /// Narrow as if `is_object($x)` is true.
+    /// Narrow as if `is_object($x)` is true. A `mixed` becomes a concrete bare
+    /// `object` (rather than staying `mixed`) so downstream object-only
+    /// operations — `clone`, `instanceof`, method calls — see an object type
+    /// instead of reporting `Mixed*`.
     pub fn narrow_to_object(&self) -> Type {
-        self.filter(|t| t.is_object() || matches!(t, Atomic::TMixed))
+        let mut out = Type::empty();
+        for t in &self.types {
+            if matches!(t, Atomic::TMixed) {
+                out.add_type(Atomic::TObject);
+            } else if t.is_object() {
+                out.add_type(t.clone());
+            }
+        }
+        if out.types.is_empty() {
+            self.filter(|t| t.is_object())
+        } else {
+            out
+        }
     }
 
     /// Narrow as if `is_callable($x)` is true.
