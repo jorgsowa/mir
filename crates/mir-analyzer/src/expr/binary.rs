@@ -1,4 +1,4 @@
-use super::helpers::infer_arithmetic;
+use super::helpers::{infer_arithmetic, infer_int_range_arithmetic};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
@@ -174,7 +174,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 }
-                infer_arithmetic(&left_ty, &right_ty)
+                infer_int_range_arithmetic(&left_ty, &right_ty, b.op)
+                    .unwrap_or_else(|| infer_arithmetic(&left_ty, &right_ty))
             }
 
             BinaryOp::Concat => {

@@ -1,7 +1,7 @@
 use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_union};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
-use crate::stmt::widen_for_check;
+use crate::stmt::{mir_check_matches, widen_for_check};
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
@@ -252,13 +252,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             let checks = crate::parser::DocblockParser::parse(&doc).mir_checks;
             for (var_name, expected_str) in checks {
                 let expected = crate::parser::docblock::parse_type_string(&expected_str);
-                let actual = widen_for_check(arrow_ctx.get_var(&var_name));
-                if expected.to_string() != actual.to_string() {
+                let actual_raw = arrow_ctx.get_var(&var_name);
+                if !mir_check_matches(&expected, &actual_raw) {
                     self.emit(
                         IssueKind::TypeCheckMismatch {
                             var: var_name,
                             expected: expected.to_string(),
-                            actual: actual.to_string(),
+                            actual: widen_for_check(actual_raw).to_string(),
                         },
                         Severity::Error,
                         check_target.span,

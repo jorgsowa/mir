@@ -11,4 +11,4 @@ function test(string $s): void {
     takesInt($pos);
 }
 ===expect===
-PossiblyInvalidArgument@6:14-6:18: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
+PossiblyInvalidArgument@6:14-6:18: Argument $n of takesInt() expects 'int', possibly different type 'int<0, max>|false' provided

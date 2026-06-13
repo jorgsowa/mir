@@ -508,6 +508,12 @@ impl CallAnalyzer {
                 "array_filter" => {
                     super::callable::infer_array_filter_return(&arg_types).unwrap_or(return_ty)
                 }
+                // Faithful integer-range returns: counts and lengths are
+                // non-negative (and counts of non-empty collections are `>= 1`).
+                "count" | "sizeof" => {
+                    super::callable::count_return_type(&arg_types).unwrap_or(return_ty)
+                }
+                "strlen" | "mb_strlen" => super::callable::non_negative_int(),
                 _ => return_ty,
             };
 

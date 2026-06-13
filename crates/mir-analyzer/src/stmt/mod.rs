@@ -182,13 +182,13 @@ impl<'a> StatementsAnalyzer<'a> {
         let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
         for (var_name, expected_str) in mir_checks {
             let expected = parse_type_string(&expected_str);
-            let actual = widen_for_check(ctx.get_var(&var_name));
-            if expected.to_string() != actual.to_string() {
+            let actual_raw = ctx.get_var(&var_name);
+            if !mir_check_matches(&expected, &actual_raw) {
                 self.issues.add(Issue::new(
                     IssueKind::TypeCheckMismatch {
                         var: var_name,
                         expected: expected.to_string(),
-                        actual: actual.to_string(),
+                        actual: widen_for_check(actual_raw).to_string(),
                     },
                     Location {
                         file: self.file.clone(),
@@ -619,6 +619,21 @@ impl<'a> StatementsAnalyzer<'a> {
 
         current
     }
+}
+
+/// Whether an `@mir-check $x is T` directive is satisfied by the inferred type.
+///
+/// The directive matches if the inferred type equals the expected type either
+/// *exactly* or after [`widen_for_check`] widening. The exact arm lets fixtures
+/// assert precise types the analyzer produces — integer ranges (`int<0, max>`),
+/// literals — while the widened arm keeps the lenient default: writing
+/// `@mir-check $x is int` still passes when `$x` infers to `int<0, max>` or a
+/// literal. Widening is a one-directional relaxation, so this is strictly more
+/// permissive than an exact-only check and never breaks an existing fixture.
+pub(crate) fn mir_check_matches(expected: &Type, actual: &Type) -> bool {
+    let expected_str = expected.to_string();
+    expected_str == actual.to_string()
+        || expected_str == widen_for_check(actual.clone()).to_string()
 }
 
 /// Widen literal types to their base scalar type for `@mir-check` comparisons.

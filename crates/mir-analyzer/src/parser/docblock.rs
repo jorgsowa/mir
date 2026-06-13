@@ -787,11 +787,21 @@ fn parse_generic(name: &str, inner: &str) -> Type {
             normalize_fqcn(inner.trim()).into(),
         ))),
         "int" => {
-            // int<min, max>
-            Type::single(Atomic::TIntRange {
-                min: None,
-                max: None,
-            })
+            // int<min, max> — `min`/`max` keywords (or a missing/garbled bound)
+            // mean "unbounded on that side"; a numeric literal is an inclusive
+            // bound. e.g. `int<0, max>` → min 0, no upper bound.
+            let parse_bound = |s: &str| -> Option<i64> {
+                match s.trim() {
+                    "min" | "max" => None,
+                    n => n.parse::<i64>().ok(),
+                }
+            };
+            let bounds = split_generics(inner);
+            let (min, max) = match bounds.as_slice() {
+                [lo, hi] => (parse_bound(lo), parse_bound(hi)),
+                _ => (None, None),
+            };
+            Type::single(Atomic::TIntRange { min, max })
         }
         // Named class with type params
         _ => {

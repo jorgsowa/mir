@@ -1,4 +1,5 @@
 use mir_types::{Atomic, Name, Type};
+use php_ast::ast::BinaryOp;
 use php_ast::owned::{Expr, ExprKind};
 use rustc_hash::FxHashSet;
 
@@ -118,6 +119,79 @@ fn fold_into(acc: &mut Option<Type>, new: Type) {
         None => *acc = Some(new),
         Some(existing) => existing.merge_with(&new),
     }
+}
+
+/// The inclusive integer bounds of `ty` when it is an integer-only type, as
+/// `(min, max)` where `None` means unbounded on that side. Returns `None` when
+/// any member is not an integer (so the caller falls back to scalar inference).
+/// Literals are exact bounds; a general `int` is unbounded both ways.
+fn int_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
+    if ty.types.is_empty() {
+        return None;
+    }
+    let mut min: Option<i64> = Some(i64::MAX);
+    let mut max: Option<i64> = Some(i64::MIN);
+    for a in &ty.types {
+        let (lo, hi) = match a {
+            Atomic::TLiteralInt(n) => (Some(*n), Some(*n)),
+            Atomic::TIntRange { min, max } => (*min, *max),
+            Atomic::TInt
+            | Atomic::TPositiveInt
+            | Atomic::TNonNegativeInt
+            | Atomic::TNegativeInt => {
+                // A general integer is unbounded for the purpose of range math.
+                (None, None)
+            }
+            _ => return None,
+        };
+        // Widen the accumulated bounds to cover this member (union semantics).
+        min = match (min, lo) {
+            (Some(m), Some(l)) => Some(m.min(l)),
+            _ => None,
+        };
+        max = match (max, hi) {
+            (Some(m), Some(h)) => Some(m.max(h)),
+            _ => None,
+        };
+    }
+    Some((min, max))
+}
+
+/// Whether `ty` carries an explicit integer range atomic.
+fn contains_int_range(ty: &Type) -> bool {
+    ty.types
+        .iter()
+        .any(|a| matches!(a, Atomic::TIntRange { .. }))
+}
+
+/// Range-aware integer arithmetic for `+` and `-`: when at least one operand is
+/// an integer range (e.g. a `count()` result), propagate faithful bounds so
+/// `count($a) + 1` is `int<1, max>` and `count($a) - 1` is `int<-1, max>`.
+/// Returns `None` for anything else (including literal-only arithmetic, left to
+/// [`infer_arithmetic`] so it is not perturbed).
+pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Option<Type> {
+    // Only engage when a genuine range is in play; plain int/literal operands
+    // keep the existing scalar inference.
+    if !contains_int_range(left) && !contains_int_range(right) {
+        return None;
+    }
+    let (lmin, lmax) = int_bounds(left)?;
+    let (rmin, rmax) = int_bounds(right)?;
+    let add = |a: Option<i64>, b: Option<i64>| match (a, b) {
+        (Some(a), Some(b)) => a.checked_add(b),
+        _ => None,
+    };
+    let sub = |a: Option<i64>, b: Option<i64>| match (a, b) {
+        (Some(a), Some(b)) => a.checked_sub(b),
+        _ => None,
+    };
+    let (min, max) = match op {
+        BinaryOp::Add => (add(lmin, rmin), add(lmax, rmax)),
+        // [lmin,lmax] - [rmin,rmax] = [lmin - rmax, lmax - rmin]
+        BinaryOp::Sub => (sub(lmin, rmax), sub(lmax, rmin)),
+        _ => return None,
+    };
+    Some(Type::single(Atomic::TIntRange { min, max }))
 }
 
 pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
@@ -373,4 +447,79 @@ pub(crate) fn is_property_type_coercion(
         };
         crate::db::extends_or_implements(db, prop_fqcn.as_ref(), val_fqcn.as_ref())
     })
+}
+
+#[cfg(test)]
+mod range_arithmetic_tests {
+    use super::*;
+
+    fn range(min: Option<i64>, max: Option<i64>) -> Type {
+        Type::single(Atomic::TIntRange { min, max })
+    }
+
+    fn lit(n: i64) -> Type {
+        Type::single(Atomic::TLiteralInt(n))
+    }
+
+    #[test]
+    fn add_shifts_both_bounds() {
+        // int<0, 4> + 5  =>  int<5, 9>
+        let r =
+            infer_int_range_arithmetic(&range(Some(0), Some(4)), &lit(5), BinaryOp::Add).unwrap();
+        assert_eq!(r.to_string(), "int<5, 9>");
+    }
+
+    #[test]
+    fn add_keeps_unbounded_upper() {
+        // int<0, max> + 5  =>  int<5, max>
+        let r = infer_int_range_arithmetic(&range(Some(0), None), &lit(5), BinaryOp::Add).unwrap();
+        assert_eq!(r.to_string(), "int<5, max>");
+    }
+
+    #[test]
+    fn sub_lowers_min_to_negative() {
+        // int<0, max> - 1  =>  int<-1, max>   (lmin - rmax, lmax - rmin)
+        let r = infer_int_range_arithmetic(&range(Some(0), None), &lit(1), BinaryOp::Sub).unwrap();
+        assert_eq!(r.to_string(), "int<-1, max>");
+    }
+
+    #[test]
+    fn add_overflow_saturates_to_unbounded() {
+        // int<i64::MAX, i64::MAX> + 1  =>  both bounds overflow to unbounded,
+        // which renders as the bare `int`.
+        let r = infer_int_range_arithmetic(
+            &range(Some(i64::MAX), Some(i64::MAX)),
+            &lit(1),
+            BinaryOp::Add,
+        )
+        .unwrap();
+        assert_eq!(r.to_string(), "int");
+    }
+
+    #[test]
+    fn no_range_operand_returns_none() {
+        // plain int + literal: no explicit range, so range arithmetic abstains
+        assert!(
+            infer_int_range_arithmetic(&Type::single(Atomic::TInt), &lit(3), BinaryOp::Add)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn non_integer_operand_returns_none() {
+        // range + string: not integer-only, abstain
+        assert!(infer_int_range_arithmetic(
+            &range(Some(0), None),
+            &Type::single(Atomic::TString),
+            BinaryOp::Add
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn mul_is_not_handled() {
+        assert!(
+            infer_int_range_arithmetic(&range(Some(0), None), &lit(2), BinaryOp::Mul).is_none()
+        );
+    }
 }

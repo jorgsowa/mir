@@ -315,6 +315,43 @@ fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Typ
     None
 }
 
+/// Whether every member of `ty` is a statically non-empty collection, so a
+/// `count()` over it is guaranteed `>= 1`. Conservative: any member that could
+/// be empty (or a `Countable` object of unknown size) yields `false`.
+fn is_non_empty_collection(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| match a {
+            Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. } => true,
+            // A keyed array (shape) is non-empty iff it declares a required key.
+            Atomic::TKeyedArray { properties, .. } => properties.values().any(|p| !p.optional),
+            _ => false,
+        })
+}
+
+/// Result type of `count($value)` / `sizeof($value)`: the integer count is
+/// always `>= 0`, and `>= 1` when the argument is a statically non-empty
+/// collection. Modeling this as `int<0, max>` / `int<1, max>` is the faithful
+/// type and feeds range-aware arithmetic at use sites.
+pub(crate) fn count_return_type(arg_types: &[Type]) -> Option<Type> {
+    let min = match arg_types.first() {
+        Some(t) if is_non_empty_collection(t) => 1,
+        _ => 0,
+    };
+    Some(Type::single(Atomic::TIntRange {
+        min: Some(min),
+        max: None,
+    }))
+}
+
+/// Result type of `strlen($s)` / `mb_strlen($s)`: a byte/character length is
+/// always `>= 0`, i.e. `int<0, max>`.
+pub(crate) fn non_negative_int() -> Type {
+    Type::single(Atomic::TIntRange {
+        min: Some(0),
+        max: None,
+    })
+}
+
 /// The default PHP array-key type, `int|string`, used when a source array's
 /// key type cannot be determined more precisely.
 fn array_key_type() -> Type {
