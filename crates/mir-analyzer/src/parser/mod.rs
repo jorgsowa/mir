@@ -48,11 +48,37 @@ pub(crate) fn parse_error_to_issue(
     issue
 }
 
+/// php-rs-parser 0.17 over-broadly rejects `numeric` and `resource` as reserved
+/// class names, but PHP permits `class Numeric {}` / `class Resource {}` — only
+/// `int`/`float`/`bool`/`string`/`true`/`false`/`null`/`void`/`iterable`/
+/// `object`/`mixed`/`never` (plus `self`/`parent`/`static`) are truly reserved
+/// as type/class names. Recognize that single spurious diagnostic so it can be
+/// dropped from the issue stream and ignored when deciding whether to block
+/// analysis. Matches on the parser's Display message
+/// (`Cannot use "<name>" as a class name as it is reserved`).
+pub(crate) fn is_spurious_reserved_class_error(
+    err: &php_rs_parser::diagnostics::ParseError,
+) -> bool {
+    let msg = err.to_string();
+    let Some(rest) = msg.strip_prefix("Cannot use \"") else {
+        return false;
+    };
+    let Some(end) = rest.find('"') else {
+        return false;
+    };
+    let name = &rest[..end];
+    rest[end..].contains("as a class name as it is reserved")
+        && matches!(name.to_ascii_lowercase().as_str(), "numeric" | "resource")
+}
+
 /// Returns `true` for parser diagnostics that should block semantic analysis.
 /// `ForbiddenWarning` diagnostics are non-fatal (PHP only warns) and leave the
-/// AST complete, so they do not block analysis.
+/// AST complete, so they do not block analysis. The spurious
+/// reserved-class-name diagnostic (see [`is_spurious_reserved_class_error`]) is
+/// likewise treated as non-blocking — the declaration it flags is valid PHP.
 pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) -> bool {
     matches!(err.severity(), php_rs_parser::diagnostics::Severity::Error)
+        && !is_spurious_reserved_class_error(err)
 }
 
 // ---------------------------------------------------------------------------

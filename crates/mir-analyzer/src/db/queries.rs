@@ -374,6 +374,7 @@ pub fn collect_file_definitions_uncached(
     let mut all_issues: Vec<Issue> = parsed
         .errors
         .iter()
+        .filter(|err| !crate::parser::is_spurious_reserved_class_error(err))
         .map(|err| crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map))
         .collect();
 

@@ -1,9 +1,9 @@
 ===description===
-Laravel FP (laravel/framework): `Numeric` is a valid class name in PHP (only
+Regression (laravel/framework): `Numeric` is a valid class name in PHP (only
 bool/int/float/string/true/false/null/void/iterable/object/mixed/never are
-reserved). mir's reserved-word list wrongly includes `Numeric`, producing a
-ParseError on `class Numeric`. Ignored pending fix — see ROADMAP §1.4.
-===ignore===
+reserved). The underlying php-rs-parser over-broadly rejected `numeric` (and
+`resource`); mir now drops that spurious reserved-class ParseError so the
+declaration analyzes normally.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedClass
 ===file===

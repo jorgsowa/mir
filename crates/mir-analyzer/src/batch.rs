@@ -402,6 +402,7 @@ impl AnalysisSession {
                 let mut all_issues: Vec<Issue> = parsed
                     .errors()
                     .iter()
+                    .filter(|err| !crate::parser::is_spurious_reserved_class_error(err))
                     .map(|err| {
                         crate::parser::parse_error_to_issue(
                             err,

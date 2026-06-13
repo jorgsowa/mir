@@ -101,6 +101,9 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
     let parsed = &*parsed_file.0;
 
     for err in &parsed.errors {
+        if crate::parser::is_spurious_reserved_class_error(err) {
+            continue;
+        }
         issues.push(crate::parser::parse_error_to_issue(
             err,
             &path,
