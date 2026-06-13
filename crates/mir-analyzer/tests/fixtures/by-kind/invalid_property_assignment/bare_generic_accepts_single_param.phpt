@@ -19,3 +19,4 @@ class Container {
     }
 }
 ===expect===
+MissingConstructor@5:0-5:17: Class Container has uninitialized properties but no constructor

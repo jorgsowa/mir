@@ -12,3 +12,4 @@ final class Page {
     }
 }
 ===expect===
+MissingConstructor@5:6-5:18: Class Page has uninitialized properties but no constructor

@@ -36,3 +36,5 @@ function branchNarrowing(Document|Media $asset): void {
     }
 }
 ===expect===
+MissingConstructor@2:0-2:16: Class Document has uninitialized properties but no constructor
+MissingConstructor@6:0-6:13: Class Media has uninitialized properties but no constructor

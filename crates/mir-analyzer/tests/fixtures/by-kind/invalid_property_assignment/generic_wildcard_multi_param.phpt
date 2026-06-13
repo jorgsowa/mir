@@ -27,3 +27,4 @@ $pair = $factory->make();
 /** @mir-check $pair is Pair<mixed, mixed> */
 $c->bare = $pair;
 ===expect===
+MissingConstructor@17:0-17:14: Class Config has uninitialized properties but no constructor

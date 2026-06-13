@@ -39,4 +39,5 @@ class MyTest extends TestCase {
     }
 }
 ===expect===
+App.php: MissingConstructor@7:0-7:31: Class MyTest has uninitialized properties but no constructor
 TestCase.php: UnusedParam@12:32-12:56: Parameter $classOrInterface is never used

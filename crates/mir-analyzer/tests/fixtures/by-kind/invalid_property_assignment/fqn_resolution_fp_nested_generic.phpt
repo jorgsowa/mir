@@ -41,3 +41,4 @@ class Consumer {
 }
 ===expect===
 Types.php: UnusedParam@16:26-16:37: Parameter $cls is never used
+UseNested.php: MissingConstructor@9:0-9:16: Class App\Consumer has uninitialized properties but no constructor

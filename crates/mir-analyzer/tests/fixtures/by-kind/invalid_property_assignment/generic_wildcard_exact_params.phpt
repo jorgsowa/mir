@@ -28,3 +28,4 @@ $i = $factory->makeInt();
 $c->prop = $s;
 $c->prop = $i;
 ===expect===
+MissingConstructor@13:0-13:14: Class Config has uninitialized properties but no constructor

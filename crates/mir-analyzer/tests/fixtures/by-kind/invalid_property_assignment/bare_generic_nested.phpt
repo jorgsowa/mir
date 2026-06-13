@@ -15,3 +15,4 @@ class Wrapper {
     }
 }
 ===expect===
+MissingConstructor@5:0-5:15: Class Wrapper has uninitialized properties but no constructor

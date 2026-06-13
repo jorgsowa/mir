@@ -19,4 +19,5 @@ function takesA(?A $a) : void {
     takesString($a->foo);
 }
 ===expect===
+MissingConstructor@2:0-2:9: Class A has uninitialized properties but no constructor
 UnusedPsalmSuppress@16:0-16:0: Suppress annotation for 'MixedArgument' is never used

@@ -20,3 +20,4 @@ function nestedCheck(Base|Other $value): void {
     }
 }
 ===expect===
+MissingConstructor@3:0-3:29: Class Extended has uninitialized properties but no constructor

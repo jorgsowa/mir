@@ -296,6 +296,9 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- 5. Magic method casing ----------------------------------------
             self.check_magic_method_casing(fqcn, &mut issues);
+
+            // ---- 6. Missing constructor ----------------------------------------
+            self.check_missing_constructor(fqcn, location.as_ref(), &mut issues);
         }
 
         // ---- 5. Interface-level #[Override] check + extends casing --------
@@ -1353,6 +1356,47 @@ impl<'a> ClassAnalyzer<'a> {
     fn iface_in_analyzed_files(&self, fqcn: &Arc<str>) -> bool {
         // Same lookup path as `class_in_analyzed_files`.
         self.class_in_analyzed_files(fqcn)
+    }
+
+    fn check_missing_constructor(
+        &self,
+        fqcn: &Arc<str>,
+        location: Option<&Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        if crate::db::find_method_in_chain(self.db, here, "__construct").is_some() {
+            return;
+        }
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        let has_uninitialized = ancestors.iter().any(|ancestor| {
+            let anc_here = crate::db::Fqcn::from_str(self.db, ancestor.as_ref());
+            if let Some(class) = crate::db::find_class_like(self.db, anc_here) {
+                if let Some(props) = class.own_properties() {
+                    return props.values().any(|p| {
+                        p.default.is_none() && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable())
+                    });
+                }
+            }
+            false
+        });
+        if !has_uninitialized {
+            return;
+        }
+        let loc = issue_location(
+            location,
+            location.and_then(|l| self.sources.get(&l.file).copied()),
+        );
+        let mut issue = Issue::new(
+            IssueKind::MissingConstructor {
+                class: fqcn.to_string(),
+            },
+            loc,
+        );
+        if let Some(snippet) = extract_snippet(location, &self.sources) {
+            issue = issue.with_snippet(snippet);
+        }
+        issues.push(issue);
     }
 }
 

@@ -34,3 +34,4 @@ function handleValue(string|int|null $value): void {
     }
 }
 ===expect===
+MissingConstructor@2:0-2:15: Class DataSet has uninitialized properties but no constructor

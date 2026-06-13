@@ -23,4 +23,5 @@ class A {
 $a = new A();
 $a->foo = 5;
 ===expect===
+MissingConstructor@6:0-6:9: Class A has uninitialized properties but no constructor
 InvalidPropertyAssignment@21:1-21:12: Property $foo expects 'string', cannot assign '5'

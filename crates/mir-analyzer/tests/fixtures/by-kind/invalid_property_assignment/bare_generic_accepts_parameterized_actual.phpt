@@ -29,3 +29,4 @@ class MyTest extends TestCase {
 }
 ===expect===
 UnusedParam@11:32-11:43: Parameter $cls is never used
+MissingConstructor@18:0-18:31: Class MyTest has uninitialized properties but no constructor

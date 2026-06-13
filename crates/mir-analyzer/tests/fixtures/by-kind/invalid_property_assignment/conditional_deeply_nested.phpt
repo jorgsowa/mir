@@ -20,6 +20,7 @@ $result = $factory->makeDeep(null, 1, "x");
 /** @mir-check $result is Box<object> */
 $factory->box = $result;
 ===expect===
+MissingConstructor@5:0-5:19: Class DeepFactory has uninitialized properties but no constructor
 UnusedParam@10:30-10:32: Parameter $a is never used
 UnusedParam@10:34-10:36: Parameter $b is never used
 UnusedParam@10:38-10:40: Parameter $c is never used

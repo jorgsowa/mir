@@ -11,3 +11,4 @@ class Bar {
     public Dep $prop;
 }
 ===expect===
+Main.php: MissingConstructor@3:0-3:11: Class Bar has uninitialized properties but no constructor

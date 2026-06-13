@@ -19,4 +19,5 @@ $container = $factory->makeContainer(null);
 /** @mir-check $container is Container<object> */
 $factory->container = $container;
 ===expect===
+MissingConstructor@5:0-5:19: Class TestFactory has uninitialized properties but no constructor
 UnusedParam@9:35-9:37: Parameter $x is never used

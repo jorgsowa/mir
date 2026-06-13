@@ -17,3 +17,4 @@ class Holder {
     }
 }
 ===expect===
+MissingConstructor@7:0-7:14: Class Holder has uninitialized properties but no constructor

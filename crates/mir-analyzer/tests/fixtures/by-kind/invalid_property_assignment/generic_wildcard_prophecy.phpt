@@ -25,3 +25,4 @@ $wrapper = $factory->make(stdClass::class);
 $c->bare = $wrapper;
 ===expect===
 UnusedParam@11:26-11:37: Parameter $cls is never used
+MissingConstructor@14:0-14:17: Class Container has uninitialized properties but no constructor

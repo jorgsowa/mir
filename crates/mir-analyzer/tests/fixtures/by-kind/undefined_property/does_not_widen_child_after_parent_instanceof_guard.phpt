@@ -15,3 +15,4 @@ function test(object $value): void {
     echo $value->childOnly;
 }
 ===expect===
+MissingConstructor@3:0-3:26: Class Child has uninitialized properties but no constructor

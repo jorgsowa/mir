@@ -17,3 +17,4 @@ class Registry {
     }
 }
 ===expect===
+MissingConstructor@7:0-7:16: Class Registry has uninitialized properties but no constructor

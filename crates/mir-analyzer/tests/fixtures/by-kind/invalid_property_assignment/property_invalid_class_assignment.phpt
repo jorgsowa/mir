@@ -31,4 +31,5 @@ class A {
 $a = new A();
 $a->foo = new SomeOtherPropertyType();
 ===expect===
+MissingConstructor@10:0-10:9: Class Bar\A has uninitialized properties but no constructor
 InvalidPropertyAssignment@29:1-29:38: Property $foo expects 'PropertyType', cannot assign 'Bar\SomeOtherPropertyType'

@@ -11,4 +11,5 @@ class Bar {
     public Missing $prop;
 }
 ===expect===
+Main.php: MissingConstructor@3:0-3:11: Class Bar has uninitialized properties but no constructor
 Main.php: UndefinedClass@4:12-4:19: Class Vendor\Lib\Missing does not exist

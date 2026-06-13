@@ -31,3 +31,4 @@ function test(DynamicModel $model): void {
     strlen($model->title);
 }
 ===expect===
+MissingConstructor@18:0-18:21: Class DynamicModel has uninitialized properties but no constructor

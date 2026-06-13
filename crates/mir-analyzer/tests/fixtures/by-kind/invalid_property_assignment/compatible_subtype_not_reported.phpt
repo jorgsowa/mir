@@ -12,3 +12,4 @@ class Cage {
 $c = new Cage();
 $c->occupant = new Dog();
 ===expect===
+MissingConstructor@5:0-5:12: Class Cage has uninitialized properties but no constructor

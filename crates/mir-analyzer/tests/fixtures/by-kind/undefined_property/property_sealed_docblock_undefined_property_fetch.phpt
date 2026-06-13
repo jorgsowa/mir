@@ -23,3 +23,4 @@ class A {
 $a = new A();
 echo $a->bar;
 ===expect===
+MissingConstructor@6:0-6:9: Class A has uninitialized properties but no constructor

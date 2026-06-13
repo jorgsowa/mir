@@ -23,3 +23,4 @@ class Consumer {
     }
 }
 ===expect===
+Consumer.php: MissingConstructor@6:0-6:16: Class App\Consumer has uninitialized properties but no constructor

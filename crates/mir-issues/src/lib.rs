@@ -499,6 +499,9 @@ pub enum IssueKind {
     /// does not exist.
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/missing_class.phpt`.
     UndefinedDocblockClass { name: String },
+    /// Emitted when a class with non-nullable uninitialized properties has no constructor.
+    /// Fixtures: `tests/fixtures/by-kind/missing_constructor/`.
+    MissingConstructor { class: String },
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/`.
     MixedPropertyFetch { property: String },
@@ -716,6 +719,7 @@ impl IssueKind {
             | IssueKind::MixedMethodCall { .. }
             | IssueKind::NoInterfaceProperties { .. }
             | IssueKind::UndefinedDocblockClass { .. }
+            | IssueKind::MissingConstructor { .. }
             | IssueKind::MixedPropertyFetch { .. }
             | IssueKind::MixedPropertyAssignment { .. }
             | IssueKind::MixedArrayAccess
@@ -851,6 +855,7 @@ impl IssueKind {
             IssueKind::UnsupportedReferenceUsage => "MIR1506",
             IssueKind::NoInterfaceProperties { .. } => "MIR1504",
             IssueKind::UndefinedDocblockClass { .. } => "MIR1505",
+            IssueKind::MissingConstructor { .. } => "MIR1507",
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
@@ -971,9 +976,8 @@ impl IssueKind {
             | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010"
             | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200"
             | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209"
-            | "MIR1210" | "MIR1504" | "MIR1505" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" => {
-                Some(Severity::Info)
-            }
+            | "MIR1210" | "MIR1504" | "MIR1505" | "MIR1507" | "MIR1600" | "MIR1601" | "MIR0225"
+            | "MIR0226" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1055,6 +1059,7 @@ impl IssueKind {
             IssueKind::UnsupportedReferenceUsage => "UnsupportedReferenceUsage",
             IssueKind::NoInterfaceProperties { .. } => "NoInterfaceProperties",
             IssueKind::UndefinedDocblockClass { .. } => "UndefinedDocblockClass",
+            IssueKind::MissingConstructor { .. } => "MissingConstructor",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
@@ -1551,6 +1556,9 @@ impl IssueKind {
             }
             IssueKind::UndefinedDocblockClass { name } => {
                 format!("Docblock type '{name}' does not exist")
+            }
+            IssueKind::MissingConstructor { class } => {
+                format!("Class {class} has uninitialized properties but no constructor")
             }
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${property} fetched on mixed type")
@@ -2066,6 +2074,7 @@ mod code_tests {
             IssueKind::UnsupportedReferenceUsage,
             IssueKind::NoInterfaceProperties { property: s() },
             IssueKind::UndefinedDocblockClass { name: s() },
+            IssueKind::MissingConstructor { class: s() },
             IssueKind::MixedPropertyFetch { property: s() },
             IssueKind::MixedPropertyAssignment { property: s() },
             IssueKind::MixedArrayAccess,
