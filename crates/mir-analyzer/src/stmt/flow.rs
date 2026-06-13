@@ -434,6 +434,12 @@ impl<'a> StatementsAnalyzer<'a> {
         for var in vars.iter() {
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
                 ctx.unset_var(name.trim_start_matches('$'));
+            } else {
+                // `unset($arr[$key])` / `unset($obj->prop)`: analyze the target
+                // so the variables it reads (e.g. the array-access key) count as
+                // uses — otherwise a foreach value used only as an unset key is
+                // wrongly reported UnusedForeachValue.
+                self.expr_analyzer(ctx).analyze(var, ctx);
             }
         }
     }

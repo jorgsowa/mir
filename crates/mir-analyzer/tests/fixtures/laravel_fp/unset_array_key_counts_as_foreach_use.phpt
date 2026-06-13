@@ -1,9 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): a foreach value used as an array key in
-`unset($arr[$value])` is a use, but mir does not count an unset() dimension key as
-a read and emits UnusedForeachValue (e.g. Container::forgetScopedInstances).
-Ignored pending fix — see ROADMAP §1.4 (liveness read-miss).
-===ignore===
+Regression (laravel/framework): a foreach value used as an array key in
+`unset($arr[$value])` is a use. mir now analyzes non-variable unset targets, so
+the dimension key counts as a read and UnusedForeachValue is no longer emitted
+(e.g. Container::forgetScopedInstances).
 ===config===
 suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable
 ===file===
