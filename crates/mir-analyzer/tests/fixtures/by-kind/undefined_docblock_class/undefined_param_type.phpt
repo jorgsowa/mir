@@ -1,0 +1,12 @@
+===description===
+UndefinedDocblockClass fires when a @param docblock names a class that does
+not exist, even without a native type hint.
+===file===
+<?php
+/**
+ * @param NonExistentParamClass $x
+ */
+function process($x): void {}
+
+===expect===
+UndefinedDocblockClass@5:10-5:17: Docblock type 'NonExistentParamClass' does not exist

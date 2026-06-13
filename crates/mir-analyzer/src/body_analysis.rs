@@ -1107,6 +1107,61 @@ impl<'a> BodyAnalyzer<'a> {
                 ));
             }
         }
+        // UndefinedDocblockClass: @param docblock references a non-existent class.
+        // Runs separately from the MismatchingDocblockParamType loop because that
+        // loop requires both a native hint and a docblock type, while this check
+        // only needs a docblock type.
+        {
+            let fn_span = fn_header_name_span(source, decl);
+            let (fn_line, fn_col_start) =
+                crate::diagnostics::offset_to_line_col(source, fn_span.start, source_map);
+            let (fn_line_end, fn_col_end) =
+                crate::diagnostics::offset_to_line_col(source, fn_span.end, source_map);
+            for ast_param in decl.params.iter() {
+                let raw_name = ast_param.name.as_deref().unwrap_or_default();
+                let Some(doc_raw) = doc.get_param_type(raw_name) else {
+                    continue;
+                };
+                let doc_ty = crate::expr::helpers::resolve_named_objects_in_union(
+                    doc_raw.clone(),
+                    self.db,
+                    file.as_ref(),
+                );
+                for atomic in &doc_ty.types {
+                    if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+                        // Skip pseudo-types (non-falsy-string), callables (pure-callable(…)),
+                        // class-constants (Ns\C::A), float-literals (0.3), and namespace-resolved
+                        // template params (App\T where T is a declared template).
+                        let looks_like_class = !fqcn.contains('-')
+                            && !fqcn.contains('(')
+                            && !fqcn.contains("::")
+                            && !fqcn.contains('.')
+                            && !fqcn.starts_with(|c: char| c.is_ascii_digit());
+                        let last_segment = fqcn.rsplit('\\').next().unwrap_or(fqcn.as_ref());
+                        let is_template = template_names
+                            .iter()
+                            .any(|t| *t == fqcn.as_ref() || *t == last_segment);
+                        if looks_like_class
+                            && !is_template
+                            && !crate::db::class_exists(self.db, fqcn.as_ref())
+                        {
+                            issues.push(mir_issues::Issue::new(
+                                mir_issues::IssueKind::UndefinedDocblockClass {
+                                    name: fqcn.to_string(),
+                                },
+                                mir_issues::Location {
+                                    file: file.clone(),
+                                    line: fn_line,
+                                    line_end: fn_line_end,
+                                    col_start: fn_col_start,
+                                    col_end: fn_col_end.max(fn_col_start + 1),
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Pure entry point: run the same analysis as [`Self::analyze_fn_decl`] for

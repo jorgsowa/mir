@@ -119,7 +119,8 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/arrays.rs`.
     /// Fixtures: `tests/fixtures/by-kind/possibly_null_array_access/`.
     PossiblyNullArrayAccess,
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/nullable_return_statement/` (planned).
+    /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/nullable_return_statement/`.
     NullableReturnStatement { expected: String, actual: String },
 
     // --- Type mismatches ----------------------------------------------------
@@ -203,9 +204,11 @@ pub enum IssueKind {
     /// Emitted when `yield from` might be used with a non-iterable object.
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     PossiblyRawObjectIteration { ty: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/` (planned).
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/`.
     MismatchingDocblockReturnType { declared: String, inferred: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mismatching_docblock_param_type/` (planned).
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mismatching_docblock_param_type/`.
     MismatchingDocblockParamType {
         param: String,
         declared: String,
@@ -224,9 +227,12 @@ pub enum IssueKind {
     Trace { variable: String, type_info: String },
 
     // --- Array issues -------------------------------------------------------
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/invalid_array_offset/` (planned).
+    /// Not yet emitted. Would fire when an invalid type (e.g. object) is used as an array key.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_array_offset/` (partial — see NonExistentArrayOffset).
     InvalidArrayOffset { expected: String, actual: String },
-    /// Not yet emitted. No fixtures yet.
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs` when a TKeyedArray is accessed with
+    /// a literal key that does not exist in the shape.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_array_offset/`.
     NonExistentArrayOffset { key: String },
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_array_offset/`.
@@ -239,9 +245,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/redundant_cast/`.
     RedundantCast { from: String, to: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/unnecessary_var_annotation/` (planned).
+    /// Emitted by `mir-analyzer/src/stmt/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unnecessary_var_annotation/`.
     UnnecessaryVarAnnotation { var: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/type_does_not_contain_type/` (planned).
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` and `mir-analyzer/src/expr/conditional.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/type_does_not_contain_type/`.
     TypeDoesNotContainType { left: String, right: String },
     /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` and `mir-analyzer/src/expr/conditional.rs`.
     /// Fixtures: `tests/fixtures/by-kind/paradoxical_condition/`.
@@ -457,9 +465,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/internal_method/`.
     InternalMethod { class: String, method: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/missing_return_type/` (planned).
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/missing_return_type/`.
     MissingReturnType { fn_name: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/missing_param_type/` (planned).
+    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/missing_param_type/`.
     MissingParamType { fn_name: String, param: String },
     /// Emitted by `mir-analyzer/src/body_analysis.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_param_type/` (property variants).
@@ -485,9 +495,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_docblock/`.
     InvalidDocblock { message: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mixed_argument/` (planned).
+    /// Emitted by `mir-analyzer/src/call/args/types.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_argument/`.
     MixedArgument { param: String, fn_name: String },
-    /// Not yet emitted. Fixtures: `tests/fixtures/by-kind/mixed_assignment/` (planned).
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs` and `mir-analyzer/src/stmt/control_flow.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_assignment/`.
     MixedAssignment { var: String },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_method_call/`.
@@ -2228,6 +2240,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 130);
+        assert_eq!(one_of_each().len(), 136);
     }
 }
