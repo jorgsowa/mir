@@ -258,6 +258,7 @@ impl DocblockParser {
                 }
                 "internal" => result.is_internal = true,
                 "pure" => result.is_pure = true,
+                "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
                 "immutable" => result.is_immutable = true,
                 "readonly" => result.is_readonly = true,
@@ -512,6 +513,8 @@ pub struct ParsedDocblock {
     pub trace_vars: Vec<String>,
     /// `@taint-sink <kind> $param` — (param_name_without_dollar, sink_kind_string)
     pub taint_sinks: Vec<(String, String)>,
+    /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
+    pub seal_properties: bool,
 }
 
 impl ParsedDocblock {

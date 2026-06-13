@@ -569,6 +569,12 @@ pub struct InterfaceDef {
     /// `@deprecated` docblock annotation, if present.
     #[serde(default)]
     pub deprecated: Option<Arc<str>>,
+    /// Properties declared via `@property*` docblock annotations on the interface.
+    #[serde(default)]
+    pub own_properties: IndexMap<Arc<str>, PropertyDef>,
+    /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
+    #[serde(default)]
+    pub seal_properties: bool,
 }
 
 // ---------------------------------------------------------------------------

@@ -113,15 +113,16 @@ impl<'a> DefinitionCollector<'a> {
         }
 
         let type_aliases = self.build_type_aliases(&iface_doc);
-        let mut dummy_properties = indexmap::IndexMap::new();
+        let mut own_properties = indexmap::IndexMap::new();
         self.add_docblock_members(
             &iface_doc,
             &type_aliases,
             &fqcn,
             &mut own_methods,
-            &mut dummy_properties,
+            &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
         );
+        let seal_properties = iface_doc.seal_properties;
 
         self.slice
             .interfaces
@@ -134,6 +135,8 @@ impl<'a> DefinitionCollector<'a> {
                 template_params,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
                 deprecated: iface_doc.deprecated.as_deref().map(Arc::from),
+                own_properties,
+                seal_properties,
             }));
 
         ControlFlow::Continue(())

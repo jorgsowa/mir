@@ -870,6 +870,32 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .unwrap_or_else(Type::mixed);
                 }
                 Atomic::TNamedObject { fqcn, .. }
+                    if crate::db::class_kind(self.db, fqcn.as_ref())
+                        .is_some_and(|k| k.is_interface) =>
+                {
+                    if let Some(crate::db::ClassLike::Interface(iface)) = crate::db::find_class_like(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                    ) {
+                        if iface.seal_properties
+                            && !self.in_existence_check
+                            && !iface.own_properties.contains_key(prop_name)
+                        {
+                            self.emit(
+                                IssueKind::NoInterfaceProperties {
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
+                        if let Some(p) = iface.own_properties.get(prop_name) {
+                            return p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        }
+                    }
+                    return Type::mixed();
+                }
+                Atomic::TNamedObject { fqcn, .. }
                     if crate::db::class_kind(self.db, fqcn.as_ref()).is_some_and(|k| k.is_enum) =>
                 {
                     match prop_name {

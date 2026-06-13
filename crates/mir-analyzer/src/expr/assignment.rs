@@ -202,6 +202,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 } else if let Some(prop_name) = prop_name_opt {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                            // Check NoInterfaceProperties for sealed interfaces.
+                            if let Some(crate::db::ClassLike::Interface(iface)) =
+                                crate::db::find_class_like(
+                                    self.db,
+                                    crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                                )
+                            {
+                                if iface.seal_properties
+                                    && !iface.own_properties.contains_key(prop_name.as_str())
+                                {
+                                    self.emit(
+                                        IssueKind::NoInterfaceProperties {
+                                            property: prop_name.clone(),
+                                        },
+                                        Severity::Info,
+                                        span,
+                                    );
+                                }
+                                continue;
+                            }
                             let db = self.db;
                             let prop_def = crate::db::find_property_in_chain(
                                 db,
