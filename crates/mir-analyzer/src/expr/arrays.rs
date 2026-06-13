@@ -140,6 +140,29 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             } else if idx_ty.is_mixed() {
                 self.emit(IssueKind::MixedArrayOffset, Severity::Info, idx.span);
+            } else if !idx_ty.types.is_empty()
+                && idx_ty.types.iter().all(|a| {
+                    matches!(
+                        a,
+                        Atomic::TNamedObject { .. }
+                            | Atomic::TObject
+                            | Atomic::TArray { .. }
+                            | Atomic::TList { .. }
+                            | Atomic::TKeyedArray { .. }
+                            | Atomic::TNonEmptyArray { .. }
+                            | Atomic::TNonEmptyList { .. }
+                            | Atomic::TClosure { .. }
+                    )
+                })
+            {
+                self.emit(
+                    IssueKind::InvalidArrayOffset {
+                        expected: "array-key".to_string(),
+                        actual: idx_ty.to_string(),
+                    },
+                    Severity::Error,
+                    idx.span,
+                );
             }
         }
 
@@ -174,6 +197,35 @@ impl<'a> ExpressionAnalyzer<'a> {
                 expr.span,
             );
             return Type::mixed();
+        }
+
+        // PossiblyInvalidArrayAccess: union has some subscriptable members and some that aren't.
+        let is_invalid_for_access = |a: &Atomic| {
+            matches!(
+                a,
+                Atomic::TInt
+                    | Atomic::TLiteralInt(_)
+                    | Atomic::TIntRange { .. }
+                    | Atomic::TPositiveInt
+                    | Atomic::TFloat
+                    | Atomic::TLiteralFloat(_, _)
+                    | Atomic::TBool
+                    | Atomic::TTrue
+                    | Atomic::TFalse
+            )
+        };
+        if !arr_ty.is_mixed()
+            && !arr_ty.types.is_empty()
+            && arr_ty.types.iter().any(is_invalid_for_access)
+            && !arr_ty.types.iter().all(is_invalid_for_access)
+        {
+            self.emit(
+                IssueKind::PossiblyInvalidArrayAccess {
+                    ty: arr_ty.to_string(),
+                },
+                Severity::Info,
+                expr.span,
+            );
         }
 
         if arr_ty.contains(|t| matches!(t, Atomic::TNull)) && arr_ty.is_single() {

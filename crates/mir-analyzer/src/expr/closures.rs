@@ -63,6 +63,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .map(|ty| resolve_named_objects_in_union(ty, self.db, &self.file))
             });
 
+        if return_ty_hint.is_none() && self.mode == crate::expr::AnalysisMode::Full {
+            self.emit(
+                mir_issues::IssueKind::MissingClosureReturnType,
+                mir_issues::Severity::Info,
+                expr_span,
+            );
+        }
+
         let mut closure_ctx = crate::flow_state::FlowState::for_function(
             &params,
             return_ty_hint.clone(),
