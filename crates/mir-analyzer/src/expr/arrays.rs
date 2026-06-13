@@ -216,6 +216,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         };
         if !arr_ty.is_mixed()
             && !arr_ty.types.is_empty()
+            && !self.in_existence_check
             && arr_ty.types.iter().any(is_invalid_for_access)
             && !arr_ty.types.iter().all(is_invalid_for_access)
         {

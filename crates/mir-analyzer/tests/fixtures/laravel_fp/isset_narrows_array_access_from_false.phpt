@@ -1,9 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): `preg_split()` returns array|false; an access
-guarded by `isset($matches[1])` is safe, but mir does not narrow false/null out of
-an array-access target under isset() and emits PossiblyInvalidArrayAccess
-(Console\Parser). Ignored pending fix — see ROADMAP §1.4.
-===ignore===
+Regression (laravel/framework): `preg_split()` returns array|false; an access
+guarded by `isset($matches[1])` is safe. isset() on an array-access target now
+narrows false/null out of the base variable, so mir no longer emits
+PossiblyInvalidArrayAccess (Console\Parser).
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement,MixedAssignment
 ===file===

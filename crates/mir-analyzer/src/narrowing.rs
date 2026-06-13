@@ -302,6 +302,15 @@ pub fn narrow_from_condition(
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars)
                             .insert(mir_types::Name::from(var_name.as_str()));
                     }
+                } else if is_true {
+                    // `isset($base[$k])` implies `$base` is a non-null, indexable
+                    // value — remove null/false from the base variable so a
+                    // guarded access (`preg_split()` returns array|false) does
+                    // not report PossiblyInvalidArrayAccess.
+                    if let Some(base) = array_access_base_var(var_expr) {
+                        let current = ctx.get_var(&base);
+                        ctx.set_var(&base, current.remove_null().remove_false());
+                    }
                 }
             }
         }
@@ -960,6 +969,17 @@ fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
+        _ => None,
+    }
+}
+
+/// The base variable name of a (possibly nested) array-access expression:
+/// `$a[1][2]` → `a`. Returns `None` if the base is not a plain variable.
+fn array_access_base_var(expr: &php_ast::owned::Expr) -> Option<String> {
+    match &expr.kind {
+        ExprKind::ArrayAccess(aa) => array_access_base_var(&aa.array),
+        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::Parenthesized(inner) => array_access_base_var(inner),
         _ => None,
     }
 }
