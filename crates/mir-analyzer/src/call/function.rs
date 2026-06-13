@@ -68,6 +68,10 @@ impl CallAnalyzer {
             _ => {
                 let callee_ty = ea.analyze(&call.name, ctx);
 
+                if callee_ty.is_mixed() {
+                    ea.emit(IssueKind::MixedFunctionCall, Severity::Info, span);
+                }
+
                 // Collect arg types, spans, names and byref flags for type checking.
                 let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
                 for arg in call.args.iter() {
