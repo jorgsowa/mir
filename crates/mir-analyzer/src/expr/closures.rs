@@ -94,8 +94,27 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         for use_var in c.use_vars.iter() {
             let name = use_var.name.trim_start_matches('$');
-            // Check if variable is defined in parent context
-            if !ctx.var_is_defined(name) {
+            // A by-ref capture (`use (&$f)`) binds by reference and auto-creates
+            // the variable in the parent scope if it does not yet exist, so it is
+            // never "undefined" — this is what makes a self-referential closure
+            // `$f = function () use (&$f) {...}` valid. Define it in both scopes
+            // and skip the undefined check.
+            if use_var.by_ref {
+                if !ctx.var_is_defined(name) {
+                    // Type an auto-created by-ref capture as a callable of
+                    // unknown arity: the dominant case is the self-referential
+                    // closure `$f = function () use (&$f)`, where `$f` is the
+                    // closure being assigned. This avoids spurious
+                    // MixedFunctionCall / arity errors when the body calls it.
+                    ctx.set_var(
+                        name,
+                        Type::single(mir_types::Atomic::TCallable {
+                            params: None,
+                            return_type: None,
+                        }),
+                    );
+                }
+            } else if !ctx.var_is_defined(name) {
                 if ctx.var_possibly_defined(name) {
                     self.emit(
                         mir_issues::IssueKind::PossiblyUndefinedVariable {

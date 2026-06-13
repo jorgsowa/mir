@@ -1,8 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): a self-referential closure `$f = function () use (&$f)`
-is valid (the by-ref use binds the variable the assignment defines), but mir reports
-UndefinedVariable for $f in the use list. Ignored pending fix — see ROADMAP §1.4.
-===ignore===
+Regression (laravel/framework): a self-referential closure `$f = function () use (&$f)`
+is valid — the by-ref use auto-creates the variable the assignment defines. mir now
+treats a by-ref capture as defined (typed as a callable of unknown arity), so it no
+longer reports UndefinedVariable / MixedFunctionCall.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
 ===file===
