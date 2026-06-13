@@ -17,5 +17,4 @@ class A
     }
 }
 ===expect===
-MissingConstructor@3:0-3:7: Class A has uninitialized properties but no constructor
 UnusedPsalmSuppress@3:0-3:0: Suppress annotation for 'UndefinedClass' is never used

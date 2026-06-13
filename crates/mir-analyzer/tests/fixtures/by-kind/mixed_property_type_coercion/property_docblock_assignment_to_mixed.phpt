@@ -25,4 +25,3 @@ function foo($b) : void {
     $a->__set("foo", $b);
 }
 ===expect===
-MissingConstructor@5:0-5:9: Class A has uninitialized properties but no constructor

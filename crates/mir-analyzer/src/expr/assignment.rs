@@ -243,9 +243,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                             }
-                            let prop_info: Option<(bool, Option<Type>)> =
-                                prop_def.map(|p| (p.is_readonly, p.ty.as_deref().cloned()));
-                            if let Some((is_readonly, prop_ty)) = prop_info {
+                            let prop_info: Option<(bool, Option<Type>, bool)> = prop_def.map(|p| {
+                                (p.is_readonly, p.ty.as_deref().cloned(), p.has_native_type)
+                            });
+                            if let Some((is_readonly, prop_ty, prop_has_native_type)) = prop_info {
                                 if is_readonly && !ctx.inside_constructor {
                                     self.emit(
                                         IssueKind::ReadonlyPropertyAssignment {
@@ -285,8 +286,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 &ty,
                                                 &ctx.template_param_names,
                                             );
+                                        // A docblock-only (`@var`) property
+                                        // accepts null (implicit null default);
+                                        // widen for the compatibility decision
+                                        // only, keeping the declared type in the
+                                        // emitted message.
+                                        let compat_ty = if prop_has_native_type {
+                                            prop_ty.clone()
+                                        } else {
+                                            let mut t = prop_ty.clone();
+                                            t.add_type(Atomic::TNull);
+                                            t
+                                        };
                                         if !skip
-                                            && !property_assign_compatible(&ty, prop_ty, self.db)
+                                            && !property_assign_compatible(&ty, &compat_ty, self.db)
                                         {
                                             if is_property_type_coercion(&ty, prop_ty, self.db) {
                                                 self.emit(
@@ -339,6 +352,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             if let Some((_, prop_def)) =
                                 crate::db::find_property_in_chain(self.db, here, &prop_name)
                             {
+                                let prop_has_native_type = prop_def.has_native_type;
                                 if let Some(prop_ty) = prop_def.ty.as_deref() {
                                     if !prop_ty.is_mixed() && !ty.is_mixed() {
                                         let class_tp_names: FxHashSet<mir_types::Name> =
@@ -360,8 +374,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 &ty,
                                                 &ctx.template_param_names,
                                             );
+                                        // A docblock-only (`@var`) property
+                                        // accepts null (implicit null default);
+                                        // widen for the compatibility decision
+                                        // only, keeping the declared type in the
+                                        // emitted message.
+                                        let compat_ty = if prop_has_native_type {
+                                            prop_ty.clone()
+                                        } else {
+                                            let mut t = prop_ty.clone();
+                                            t.add_type(Atomic::TNull);
+                                            t
+                                        };
                                         if !skip
-                                            && !property_assign_compatible(&ty, prop_ty, self.db)
+                                            && !property_assign_compatible(&ty, &compat_ty, self.db)
                                         {
                                             if is_property_type_coercion(&ty, prop_ty, self.db) {
                                                 self.emit(

@@ -16,4 +16,3 @@ class C {
 $c = new C;
 $c->bb = [new A, new B];
 ===expect===
-MissingConstructor@6:0-6:9: Class C has uninitialized properties but no constructor

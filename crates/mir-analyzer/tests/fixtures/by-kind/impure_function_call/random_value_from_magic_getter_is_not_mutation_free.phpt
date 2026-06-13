@@ -40,4 +40,3 @@ if (assertBIsOne($a)) {
 function takesOne(int $_arg): void {}
 
 ===expect===
-MissingConstructor@5:0-5:9: Class A has uninitialized properties but no constructor

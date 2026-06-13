@@ -38,5 +38,4 @@ class NotAModel {}
 $r = new Relation();
 $r->add(new NotAModel());
 ===expect===
-MissingConstructor@17:0-17:15: Class Builder has uninitialized properties but no constructor
 InvalidArgument@31:9-31:24: Argument $model of add() expects 'Model', got 'NotAModel'

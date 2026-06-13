@@ -19,6 +19,5 @@ function takesA(?A $a) : void {
     takesString($a->foo);
 }
 ===expect===
-MissingConstructor@2:0-2:9: Class A has uninitialized properties but no constructor
 MissingPropertyType@6:5-6:16: Property A::$foo has no type annotation
 UnusedParam@9:22-9:31: Parameter $s is never used

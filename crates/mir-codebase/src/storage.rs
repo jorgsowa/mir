@@ -465,6 +465,13 @@ pub struct PropertyDef {
     /// `@deprecated` docblock annotation, if present.
     #[serde(default)]
     pub deprecated: Option<Arc<str>>,
+    /// True when the property declares a PHP native type hint (`public int $x`).
+    /// A property typed only via a `@var` docblock (or untyped entirely) is
+    /// `false`: PHP gives such a property an implicit `null` default, so it is
+    /// never "uninitialized" (no MissingConstructor) and accepts `null` on
+    /// assignment regardless of the advisory docblock type.
+    #[serde(default)]
+    pub has_native_type: bool,
 }
 
 // ---------------------------------------------------------------------------

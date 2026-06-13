@@ -20,4 +20,3 @@ class AChild extends A {
     public $foo = 0;
 }
 ===expect===
-MissingConstructor@13:0-13:24: Class AChild has uninitialized properties but no constructor

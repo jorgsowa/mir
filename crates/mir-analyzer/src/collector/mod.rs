@@ -627,6 +627,8 @@ impl<'a> DefinitionCollector<'a> {
                     default: None,
                     location: location.clone(),
                     deprecated: None,
+                    // Magic `@property` declarations carry no PHP native type.
+                    has_native_type: false,
                 },
             );
         }
