@@ -90,6 +90,13 @@ fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> Stri
         .map(|p| p.as_ref())
         .collect::<Vec<_>>()
         .join("\\");
+    // `attr.name.parts` drops the leading backslash, so a fully-qualified
+    // attribute like `#[\Override]` would otherwise be re-resolved against the
+    // file namespace (→ `App\Console\Override`). Restore the leading `\` so
+    // `resolve_name` treats it as the global name it is.
+    if matches!(attr.name.kind, php_ast::ast::NameKind::FullyQualified) {
+        return resolve_name(db, file, &format!("\\{raw}"));
+    }
     resolve_name(db, file, &raw)
 }
 

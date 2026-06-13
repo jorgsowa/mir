@@ -1,9 +1,9 @@
 ===description===
-Laravel FP (laravel/framework): the built-in PHP 8.3 attribute `#[\Override]` is
-missing from mir's global stubs, and inside a namespace its leading-\ name is
-re-resolved against the file namespace, yielding UndefinedAttributeClass. Ignored
-pending fix — see ROADMAP §1.4.
-===ignore===
+Regression (laravel/framework): the built-in PHP 8.3 attribute `#[\Override]`,
+applied inside a namespace, must keep its leading-\ (global) resolution. mir was
+dropping the leading backslash and re-resolving against the file namespace
+(→ App\Console\Override), yielding UndefinedAttributeClass; attribute-name
+resolution now honors the FullyQualified name kind.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,MixedReturnStatement
 ===file===
