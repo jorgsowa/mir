@@ -434,7 +434,7 @@ fn resolve_method_return<'a>(
         );
         if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(
-                IssueKind::DeprecatedMethodCall {
+                IssueKind::DeprecatedMethod {
                     class: fqcn.to_string(),
                     method: method_name.to_string(),
                     message: Some(msg).filter(|m| !m.is_empty()),
