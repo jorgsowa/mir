@@ -193,10 +193,17 @@ impl<'a> StatementsAnalyzer<'a> {
         } else {
             self.return_types.push(Type::single(Atomic::TVoid));
             // Bare `return;` from a non-void declared function is an error,
-            // except inside a generator where it terminates iteration.
+            // except inside a generator where it terminates iteration. A bare
+            // return yields null, so it is also valid when the declared type
+            // allows null (`?T`) or includes `void` in a union (`T|void`) — in
+            // both cases `is_void()` (single-atomic) misses it, so check
+            // `contains` for `TVoid`/`TNull`.
             if !ctx.is_generator {
                 if let Some(declared) = &ctx.fn_return_type.clone() {
-                    if !declared.is_void() && !declared.is_mixed() {
+                    if !declared.is_void()
+                        && !declared.is_mixed()
+                        && !declared.contains(|t| matches!(t, Atomic::TVoid | Atomic::TNull))
+                    {
                         let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                         self.issues.add(
                             mir_issues::Issue::new(

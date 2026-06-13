@@ -1,9 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): a bare `return;` yields null, which is assignable
-to a nullable declared return type (?User). mir synthesizes `void` and emits
-InvalidReturnType. Ignored pending fix — see ROADMAP §1.4 (stmt/flow.rs bare-return
-guard ignores nullable/void-union declared types).
-===ignore===
+Regression (laravel/framework): a bare `return;` yields null, which is assignable
+to a nullable declared return type (?User). The bare-return guard now also accepts
+a declared type that allows null or includes void in a union, so no
+InvalidReturnType.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
 ===file===
