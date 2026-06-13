@@ -8,3 +8,4 @@ suppressed via psalm suppress
  */
 function foo(): mixed { return []; }
 ===expect===
+UndefinedDocblockClass@6:10-6:13: Docblock type 'array<' does not exist

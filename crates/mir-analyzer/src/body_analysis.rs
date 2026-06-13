@@ -1018,6 +1018,34 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
         }
+        // UndefinedDocblockClass: docblock @return type references a non-existent class.
+        if let Some(doc_ty) = stored.return_type.as_deref().filter(|t| t.from_docblock) {
+            let span = fn_header_name_span(source, decl);
+            let (line, col_start) =
+                crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+            let (line_end, col_end) =
+                crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+            for atomic in &doc_ty.types {
+                if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+                    if !template_names.iter().any(|t| *t == fqcn.as_ref())
+                        && !crate::db::class_exists(self.db, fqcn.as_ref())
+                    {
+                        issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::UndefinedDocblockClass {
+                                name: fqcn.to_string(),
+                            },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        ));
+                    }
+                }
+            }
+        }
         // Param docblock types are not flagged `from_docblock` in storage, so
         // re-parse the doc comment to know which params have a docblock type.
         let doc = decl
@@ -2379,6 +2407,13 @@ fn fn_header_name_span(source: &str, decl: &php_ast::owned::FunctionDecl) -> php
         return fallback;
     }
     let search_start = anchor.saturating_sub(name.len() + 256);
+    // Align to UTF-8 char boundaries to avoid a panic on multi-byte characters.
+    let search_start = (search_start..=anchor.min(source.len()))
+        .find(|&i| source.is_char_boundary(i))
+        .unwrap_or(anchor);
+    let anchor = (anchor..=source.len())
+        .find(|&i| source.is_char_boundary(i))
+        .unwrap_or(source.len());
     match source[search_start..anchor].rfind(name) {
         Some(rel) => {
             let start = (search_start + rel) as u32;

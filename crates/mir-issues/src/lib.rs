@@ -495,6 +495,10 @@ pub enum IssueKind {
     /// but the property is not declared with `@property`/`@property-read`/`@property-write`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_property/magic_interface_*.phpt`.
     NoInterfaceProperties { property: String },
+    /// Emitted when a class referenced only in a docblock (`@return`, `@param`, etc.)
+    /// does not exist.
+    /// Fixtures: `tests/fixtures/by-kind/mixed_clone/missing_class.phpt`.
+    UndefinedDocblockClass { name: String },
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_property_fetch/`.
     MixedPropertyFetch { property: String },
@@ -711,6 +715,7 @@ impl IssueKind {
             | IssueKind::MixedAssignment { .. }
             | IssueKind::MixedMethodCall { .. }
             | IssueKind::NoInterfaceProperties { .. }
+            | IssueKind::UndefinedDocblockClass { .. }
             | IssueKind::MixedPropertyFetch { .. }
             | IssueKind::MixedPropertyAssignment { .. }
             | IssueKind::MixedArrayAccess
@@ -845,6 +850,7 @@ impl IssueKind {
             IssueKind::ImpureStaticVariable { .. } => "MIR1703",
             IssueKind::UnsupportedReferenceUsage => "MIR1506",
             IssueKind::NoInterfaceProperties { .. } => "MIR1504",
+            IssueKind::UndefinedDocblockClass { .. } => "MIR1505",
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
@@ -965,7 +971,7 @@ impl IssueKind {
             | "MIR1004" | "MIR1005" | "MIR1006" | "MIR1007" | "MIR1008" | "MIR1009" | "MIR1010"
             | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1200"
             | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208" | "MIR1209"
-            | "MIR1210" | "MIR1504" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" => {
+            | "MIR1210" | "MIR1504" | "MIR1505" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" => {
                 Some(Severity::Info)
             }
 
@@ -1048,6 +1054,7 @@ impl IssueKind {
             IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
             IssueKind::UnsupportedReferenceUsage => "UnsupportedReferenceUsage",
             IssueKind::NoInterfaceProperties { .. } => "NoInterfaceProperties",
+            IssueKind::UndefinedDocblockClass { .. } => "UndefinedDocblockClass",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
             IssueKind::UnimplementedInterfaceMethod { .. } => "UnimplementedInterfaceMethod",
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
@@ -1541,6 +1548,9 @@ impl IssueKind {
             }
             IssueKind::NoInterfaceProperties { property } => {
                 format!("Property ${property} is not defined on sealed interface")
+            }
+            IssueKind::UndefinedDocblockClass { name } => {
+                format!("Docblock type '{name}' does not exist")
             }
             IssueKind::MixedPropertyFetch { property } => {
                 format!("Property ${property} fetched on mixed type")
@@ -2055,6 +2065,7 @@ mod code_tests {
             IssueKind::MixedMethodCall { method: s() },
             IssueKind::UnsupportedReferenceUsage,
             IssueKind::NoInterfaceProperties { property: s() },
+            IssueKind::UndefinedDocblockClass { name: s() },
             IssueKind::MixedPropertyFetch { property: s() },
             IssueKind::MixedPropertyAssignment { property: s() },
             IssueKind::MixedArrayAccess,

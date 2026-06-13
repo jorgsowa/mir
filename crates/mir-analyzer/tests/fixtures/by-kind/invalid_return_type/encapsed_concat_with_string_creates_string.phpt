@@ -10,3 +10,4 @@ function foo(string $s1, string $s2): string {
     return "hello $s1 $s2";
 }
 ===expect===
+UndefinedDocblockClass@6:10-6:13: Docblock type 'literal-string' does not exist

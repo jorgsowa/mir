@@ -13,3 +13,4 @@ function getKey(bool $asInt) {
 }
 
 ===expect===
+UndefinedDocblockClass@5:10-5:16: Docblock type 'key-of' does not exist

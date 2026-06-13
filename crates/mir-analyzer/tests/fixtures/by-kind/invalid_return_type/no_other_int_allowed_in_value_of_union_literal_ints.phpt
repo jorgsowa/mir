@@ -10,3 +10,4 @@ function getValue() {
 }
 
 ===expect===
+UndefinedDocblockClass@5:10-5:18: Docblock type 'value-of' does not exist
