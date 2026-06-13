@@ -1,10 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): a `@return static<TValue, TKey>` annotation
-referencing the class's own @template params fails because mir does not register
-template params in the generic scope — it resolves TKey to a namespaced class
-(Illuminate\Support\TKey) and checks it against the bound, emitting
-InvalidTemplateParam (Collection::flip). Ignored pending fix — see ROADMAP §1.4.
-===ignore===
+Regression (laravel/framework): a `@return static<TValue, TKey>` annotation
+referencing the class's own @template params must treat TKey/TValue as template
+params, not resolve them to namespaced classes (Illuminate\Support\TKey). mir no
+longer emits InvalidTemplateParam (Collection::flip).
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedProperty,MixedArgument,MixedAssignment,MixedReturnStatement,MixedMethodCall
 ===file===
@@ -26,3 +24,5 @@ class Collection {
         return new static(array_flip($this->items));
     }
 }
+===expect===
+

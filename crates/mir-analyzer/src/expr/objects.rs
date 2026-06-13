@@ -292,6 +292,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     } else if !arg_types.is_empty()
                         && !n.args.iter().any(|a| a.unpack)
                         && !trait_relative_new
+                        // `new static(args)` may construct a subclass that
+                        // declares a constructor, even when the current class
+                        // has none — don't flag it against the implicit 0-arg
+                        // constructor (`new self` / a named class still are).
+                        && resolved.as_str() != "static"
                         && crate::db::class_exists(self.db, fqcn.as_ref())
                     {
                         // Class has no constructor but arguments were passed —

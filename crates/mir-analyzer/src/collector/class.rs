@@ -181,7 +181,20 @@ impl<'a> DefinitionCollector<'a> {
                     );
                     // @var docblock overrides the PHP type hint when present, allowing
                     // @var Box<string> to refine a bare Box declaration with type params.
-                    let ty = prop_doc.var_type.map(|t| self.resolve_union(t)).or(hint_ty);
+                    // Resolve with class template awareness so `@var array<TKey, TValue>`
+                    // keeps TKey/TValue as template params instead of resolving them to
+                    // namespaced classes (App\Support\TKey).
+                    let ty = prop_doc
+                        .var_type
+                        .map(|t| {
+                            self.resolve_union_doc_with_templates(
+                                t,
+                                &class_template_names,
+                                &fqcn,
+                                &class_template_params,
+                            )
+                        })
+                        .or(hint_ty);
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
                         ty: mir_codebase::storage::wrap_property_type(ty),
