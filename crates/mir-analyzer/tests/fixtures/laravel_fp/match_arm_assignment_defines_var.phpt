@@ -1,8 +1,8 @@
 ===description===
-Laravel FP (laravel/framework): an assignment in a `match` arm condition defines a
-variable usable in the arm body (ComponentTagCompiler), but mir does not register
-the assignment and emits UndefinedVariable. Ignored pending fix — see ROADMAP §1.4.
-===ignore===
+Regression (laravel/framework): an assignment in a `match` arm condition defines a
+variable usable in the arm body (ComponentTagCompiler). mir now analyzes arm
+conditions in the arm context, so the assignment is registered and no longer
+emits UndefinedVariable.
 ===config===
 suppress=MissingClosureReturnType,UnusedParam,UnusedVariable,UnusedFunction,MixedReturnStatement
 ===file===

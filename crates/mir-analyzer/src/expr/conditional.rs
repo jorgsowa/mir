@@ -99,11 +99,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut result = Type::empty();
         for arm in m.arms.iter() {
             let mut arm_ctx = ctx.branch();
-            // Always analyze conditions to check for undefined classes and get types
+            // Always analyze conditions to check for undefined classes and get
+            // types. Analyze against `arm_ctx` (not the parent) so an assignment
+            // in a condition — `match (true) { ($g = f()) !== '' => $g, ... }` —
+            // defines the variable for use in that arm's body.
             let mut arm_ty = Type::empty();
             if let Some(conditions) = &arm.conditions {
                 for cond in conditions.iter() {
-                    let cond_ty = self.analyze(cond, ctx);
+                    let cond_ty = self.analyze(cond, &mut arm_ctx);
                     arm_ty.merge_with(&cond_ty);
                 }
             }
