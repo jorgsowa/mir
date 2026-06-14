@@ -9,6 +9,7 @@ pub mod cache;
 pub(crate) mod call;
 pub(crate) mod class;
 pub(crate) mod collector;
+pub(crate) mod contradiction;
 #[doc(hidden)]
 pub mod db;
 pub(crate) mod dead_code;

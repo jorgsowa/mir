@@ -21,6 +21,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let pre_ctx = ctx.clone();
 
         let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
+        self.check_docblock_contradiction(&if_stmt.condition, ctx);
         let pre_diverges = ctx.diverges;
 
         let mut then_ctx = ctx.branch();
@@ -359,6 +360,49 @@ impl<'a> StatementsAnalyzer<'a> {
             _ => None,
         };
         let switch_on_true = matches!(&sw.expr.kind, ExprKind::Bool(true));
+
+        // `switch (gettype($x))`: a `case` whose string `gettype()` can never
+        // return is dead code (e.g. `case "int"` — gettype returns "integer").
+        if let Some(arg) = crate::contradiction::gettype_call_arg(&sw.expr) {
+            let arg_ty = self.expr_analyzer(ctx).analyze(arg, ctx);
+            let possible = crate::contradiction::gettype_possible_values(&arg_ty);
+            for case in sw.body.cases.iter() {
+                let Some(val) = &case.value else { continue };
+                let ExprKind::String(s) = &val.kind else {
+                    continue;
+                };
+                let s = s.as_ref();
+                let reason = if !crate::contradiction::gettype_is_valid(s) {
+                    let hint = crate::contradiction::gettype_suggestion(s)
+                        .map(|h| format!(" (did you mean \"{h}\"?)"))
+                        .unwrap_or_default();
+                    Some(format!("gettype() never returns \"{s}\"{hint}"))
+                } else if possible
+                    .as_ref()
+                    .is_some_and(|poss| poss.iter().all(|p| *p != s))
+                {
+                    Some(format!("gettype() of {arg_ty} never returns \"{s}\""))
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    let (line, line_end, col_start, col_end) = self.span_to_location(val.span);
+                    self.issues.add(
+                        Issue::new(
+                            IssueKind::UnevaluatedCode { reason },
+                            Location {
+                                file: self.file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        )
+                        .with_snippet(parser::span_text(self.source, val.span).unwrap_or_default()),
+                    );
+                }
+            }
+        }
 
         let pre_ctx = ctx.clone();
         self.break_ctx_stack.push(Vec::new());

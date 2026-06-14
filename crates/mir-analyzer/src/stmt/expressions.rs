@@ -10,14 +10,36 @@ impl<'a> StatementsAnalyzer<'a> {
         if expr_ty.is_never() {
             ctx.diverges = true;
         }
+        // A bare comparison statement (e.g. `$a === "aaa";`) whose result is
+        // statically fixed by a docblock-derived type.
+        self.check_docblock_contradiction(expr, ctx);
         if let ExprKind::FunctionCall(call) = &expr.kind {
             if let ExprKind::Identifier(fn_name) = &call.name.kind {
                 if fn_name.as_ref().eq_ignore_ascii_case("assert") {
                     if let Some(arg) = call.args.first() {
+                        // Check the asserted condition *before* narrowing, so the
+                        // original (docblock) type is still in scope.
+                        self.check_docblock_contradiction(&arg.value, ctx);
                         narrow_from_condition(&arg.value, ctx, true, self.db, &self.file);
                     }
                 }
             }
+        }
+    }
+
+    /// Emit `DocblockTypeContradiction` when `cond` is a comparison that a
+    /// docblock-derived type makes impossible.
+    pub(super) fn check_docblock_contradiction(&mut self, cond: &Expr, ctx: &mut FlowState) {
+        if let Some((expr_repr, declared)) = crate::contradiction::impossible_comparison(cond, ctx)
+        {
+            self.expr_analyzer(ctx).emit(
+                IssueKind::DocblockTypeContradiction {
+                    expr: expr_repr,
+                    declared,
+                },
+                mir_issues::Severity::Info,
+                cond.span,
+            );
         }
     }
 

@@ -91,6 +91,45 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         let subject_ty = self.analyze(&m.subject, ctx);
+
+        // `match (gettype($x)) { "int" => … }`: an arm whose string `gettype()`
+        // can never return is dead (gettype returns "integer", not "int").
+        if let Some(arg) = crate::contradiction::gettype_call_arg(&m.subject) {
+            let arg_ty = self.analyze(arg, ctx);
+            let possible = crate::contradiction::gettype_possible_values(&arg_ty);
+            for arm in m.arms.iter() {
+                let Some(conditions) = &arm.conditions else {
+                    continue;
+                };
+                for cond in conditions.iter() {
+                    let ExprKind::String(s) = &cond.kind else {
+                        continue;
+                    };
+                    let s = s.as_ref();
+                    let reason = if !crate::contradiction::gettype_is_valid(s) {
+                        let hint = crate::contradiction::gettype_suggestion(s)
+                            .map(|h| format!(" (did you mean \"{h}\"?)"))
+                            .unwrap_or_default();
+                        Some(format!("gettype() never returns \"{s}\"{hint}"))
+                    } else if possible
+                        .as_ref()
+                        .is_some_and(|poss| poss.iter().all(|p| *p != s))
+                    {
+                        Some(format!("gettype() of {arg_ty} never returns \"{s}\""))
+                    } else {
+                        None
+                    };
+                    if let Some(reason) = reason {
+                        self.emit(
+                            IssueKind::UnevaluatedCode { reason },
+                            Severity::Info,
+                            cond.span,
+                        );
+                    }
+                }
+            }
+        }
+
         let subject_var = match &m.subject.kind {
             ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
             _ => None,
