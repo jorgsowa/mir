@@ -516,6 +516,106 @@ impl<'a> DefinitionCollector<'a> {
         result
     }
 
+    /// Post-resolution template substitution for method params.
+    ///
+    /// `resolve_union_doc` / `resolve_union_doc_with_aliases` use `full_qualify=false`
+    /// so bare names like `Closure` or `Countable` stay bare (correct behavior for params).
+    /// But template param names (e.g. `TRelatedModel`) also stay bare — they need a second
+    /// pass to become `TTemplateParam`. This function does ONLY that conversion without
+    /// touching qualification, so it is safe to call after `resolve_union_doc`.
+    fn substitute_template_params(
+        &self,
+        ty: Type,
+        template_names: &std::collections::HashSet<String>,
+        template_params: &[TemplateParam],
+        defining_entity: &str,
+    ) -> Type {
+        let mut result = Type::empty();
+        result.possibly_undefined = ty.possibly_undefined;
+        result.from_docblock = ty.from_docblock;
+        for atomic in ty.types {
+            match &atomic {
+                mir_types::Atomic::TNamedObject { fqcn, type_params }
+                    if type_params.is_empty() && template_names.contains(fqcn.as_ref()) =>
+                {
+                    let bound = template_params
+                        .iter()
+                        .find(|tp| tp.name.as_ref() == fqcn.as_ref())
+                        .and_then(|tp| tp.bound.as_deref().cloned())
+                        .unwrap_or_else(Type::mixed);
+                    result.add_type(mir_types::Atomic::TTemplateParam {
+                        name: *fqcn,
+                        as_type: Box::new(bound),
+                        defining_entity: defining_entity.into(),
+                    });
+                }
+                mir_types::Atomic::TNamedObject { fqcn, type_params }
+                    if !type_params.is_empty() =>
+                {
+                    let new_params: Vec<Type> = type_params
+                        .iter()
+                        .map(|p| {
+                            self.substitute_template_params(
+                                p.clone(),
+                                template_names,
+                                template_params,
+                                defining_entity,
+                            )
+                        })
+                        .collect();
+                    result.add_type(mir_types::Atomic::TNamedObject {
+                        fqcn: *fqcn,
+                        type_params: mir_types::union::vec_to_type_params(new_params),
+                    });
+                }
+                mir_types::Atomic::TArray { key, value } => {
+                    result.add_type(mir_types::Atomic::TArray {
+                        key: Box::new(self.substitute_template_params(
+                            *key.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                        value: Box::new(self.substitute_template_params(
+                            *value.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TNonEmptyArray { key, value } => {
+                    result.add_type(mir_types::Atomic::TNonEmptyArray {
+                        key: Box::new(self.substitute_template_params(
+                            *key.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                        value: Box::new(self.substitute_template_params(
+                            *value.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TList { value } => {
+                    result.add_type(mir_types::Atomic::TList {
+                        value: Box::new(self.substitute_template_params(
+                            *value.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                    });
+                }
+                _ => result.add_type(atomic),
+            }
+        }
+        result
+    }
+
     fn build_assertions(&self, doc: &crate::parser::ParsedDocblock) -> Vec<Assertion> {
         annotation::build_assertions(doc, |u| self.resolve_union_doc(u))
     }
@@ -939,6 +1039,60 @@ impl<'a> DefinitionCollector<'a> {
             return None;
         }
 
+        // Build combined template name set before param resolution so docblock param types
+        // that reference class-level template params (e.g. `TRelatedModel`) are stored as
+        // TTemplateParam instead of being wrongly namespace-qualified.
+        // Includes both method-level and class-level template names.
+        let template_names: std::collections::HashSet<String> = doc
+            .templates
+            .iter()
+            .map(|(n, _, _)| n.to_string())
+            .chain(
+                class_template_params
+                    .iter()
+                    .map(|tp| tp.name.as_ref().to_string()),
+            )
+            .collect();
+
+        // Extract template params; bounds are resolved with template-awareness so a bound
+        // that is itself a template param (e.g. `@template T of A` where A is another
+        // template) is stored as TTemplateParam rather than being wrongly FQN-qualified.
+        let template_params: Vec<TemplateParam> = doc
+            .templates
+            .iter()
+            .map(|(name, bound, variance)| TemplateParam {
+                name: name.as_str().into(),
+                bound: wrap_template_bound(bound.clone().map(|b| {
+                    self.resolve_union_doc_with_templates(
+                        b,
+                        &template_names,
+                        class_fqcn,
+                        class_template_params,
+                    )
+                })),
+                defining_entity: class_fqcn.into(),
+                variance: *variance,
+            })
+            .collect();
+
+        // Combined param list for bound lookup: method-level first (they shadow class-level),
+        // then class-level. Used only for resolve_union_doc_with_templates, not stored in MethodDef.
+        let combined_template_params: Vec<TemplateParam>;
+        let template_params_for_resolve: &[TemplateParam] = if class_template_params.is_empty() {
+            &template_params
+        } else {
+            combined_template_params = template_params
+                .iter()
+                .chain(
+                    class_template_params
+                        .iter()
+                        .filter(|ctp| !template_params.iter().any(|tp| tp.name == ctp.name)),
+                )
+                .cloned()
+                .collect();
+            &combined_template_params
+        };
+
         let mut params = Vec::new();
         let mut local_scalar = 0usize;
         let mut local_complex = 0usize;
@@ -956,9 +1110,20 @@ impl<'a> DefinitionCollector<'a> {
                 .map(|s| crate::parser::docblock::parse_type_string(&s))
                 .or_else(|| {
                     doc.get_param_type(param_name).cloned().map(|u| {
-                        aliases
+                        // Use full_qualify=false resolution (same as before) so bare
+                        // names like `Closure` stay bare and don't get namespaced.
+                        // After that, run a template-only substitution pass to convert
+                        // bare names matching class/method template params (e.g. TRelatedModel)
+                        // into TTemplateParam without touching other names.
+                        let resolved = aliases
                             .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
-                            .unwrap_or_else(|| self.resolve_union_doc(u))
+                            .unwrap_or_else(|| self.resolve_union_doc(u));
+                        self.substitute_template_params(
+                            resolved,
+                            &template_names,
+                            template_params_for_resolve,
+                            class_fqcn,
+                        )
                     })
                 })
                 .or_else(|| {
@@ -1018,62 +1183,6 @@ impl<'a> DefinitionCollector<'a> {
                 });
             }
         }
-
-        // Build combined template name set first so bound resolution below can recognise
-        // template-param names and avoid namespace-qualifying them.
-        // Includes both method-level and class-level template names.
-        let template_names: std::collections::HashSet<String> = doc
-            .templates
-            .iter()
-            .map(|(n, _, _)| n.to_string())
-            .chain(
-                class_template_params
-                    .iter()
-                    .map(|tp| tp.name.as_ref().to_string()),
-            )
-            .collect();
-
-        // Extract template params before processing return type so generic return types
-        // like ObjectProphecy<T> can be resolved with template-awareness (FQN-qualifying
-        // the outer class while converting T to TTemplateParam).
-        // Bounds are resolved with template-awareness so a bound that is itself a template
-        // param (e.g. `@template T of A` where A is another template) is stored as
-        // TTemplateParam rather than being wrongly FQN-qualified.
-        let template_params: Vec<TemplateParam> = doc
-            .templates
-            .iter()
-            .map(|(name, bound, variance)| TemplateParam {
-                name: name.as_str().into(),
-                bound: wrap_template_bound(bound.clone().map(|b| {
-                    self.resolve_union_doc_with_templates(
-                        b,
-                        &template_names,
-                        class_fqcn,
-                        class_template_params,
-                    )
-                })),
-                defining_entity: class_fqcn.into(),
-                variance: *variance,
-            })
-            .collect();
-
-        // Combined param list for bound lookup: method-level first (they shadow class-level),
-        // then class-level. Used only for resolve_union_doc_with_templates, not stored in MethodDef.
-        let combined_template_params: Vec<TemplateParam>;
-        let template_params_for_resolve: &[TemplateParam] = if class_template_params.is_empty() {
-            &template_params
-        } else {
-            combined_template_params = template_params
-                .iter()
-                .chain(
-                    class_template_params
-                        .iter()
-                        .filter(|ctp| !template_params.iter().any(|tp| tp.name == ctp.name)),
-                )
-                .cloned()
-                .collect();
-            &combined_template_params
-        };
 
         // phpstorm-stubs `#[LanguageLevelTypeAware]` return type wins, routed
         // through the same resolution + self/static/parent filling.
