@@ -50,3 +50,4 @@ $g = $f->freeze();
 $g->set("asd", 20);  // Fails
 
 ===expect===
+IfThisIsMismatch@45:1-45:19: Cannot call Foo::set() — @if-this-is requires $this to be 'Foo<Unfrozen>', but it is 'Foo<Frozen>'

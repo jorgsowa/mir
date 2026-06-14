@@ -697,6 +697,7 @@ impl<'a> DefinitionCollector<'a> {
                     docstring: None,
                     is_virtual: true,
                     taint_sink_params: vec![],
+                    if_this_is: None,
                 }),
             );
         }
@@ -1118,6 +1119,23 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
+        // Resolve `@if-this-is` while the template-param borrow is still live
+        // (it must not outlive the `template_params` move into MethodDef below).
+        let if_this_is_resolved: Option<Arc<Type>> = doc.if_this_is.clone().map(|mut ty| {
+            ty.from_docblock = true;
+            let resolved = if template_names.is_empty() {
+                self.resolve_union_doc(ty)
+            } else {
+                self.resolve_union_doc_with_templates(
+                    ty,
+                    &template_names,
+                    class_fqcn,
+                    template_params_for_resolve,
+                )
+            };
+            Arc::new(Self::fill_self_static_parent(resolved, class_fqcn))
+        });
+
         let method_name = m.name.as_deref().unwrap_or_default();
         let is_override = m.attributes.iter().any(|a| {
             a.name
@@ -1169,6 +1187,7 @@ impl<'a> DefinitionCollector<'a> {
                 .iter()
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
+            if_this_is: if_this_is_resolved,
         })
     }
 }

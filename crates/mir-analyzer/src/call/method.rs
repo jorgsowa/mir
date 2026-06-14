@@ -43,6 +43,7 @@ pub(super) struct ResolvedMethod {
     pub(super) throws: Arc<[Arc<str>]>,
     pub(super) no_named_arguments: bool,
     pub(super) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    pub(super) if_this_is: Option<Arc<Type>>,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -86,6 +87,7 @@ pub(super) fn resolve_method_from_db(
             throws: storage.throws.clone().into(),
             no_named_arguments: storage.no_named_arguments,
             taint_sink_params: storage.taint_sink_params.clone(),
+            if_this_is: storage.if_this_is.clone(),
         });
     }
 
@@ -432,6 +434,44 @@ fn resolve_method_return<'a>(
             )),
             call.method.span,
         );
+        // `@if-this-is X<Y>`: the method may only be called when the receiver
+        // satisfies the constraint. We can only judge this when the receiver's
+        // type arguments are known — an unparameterized receiver (e.g.
+        // `new Foo()` with no `@var`) carries nothing to contradict.
+        if let Some(constraint) = resolved.if_this_is.clone() {
+            let constraint_has_params = constraint.types.iter().any(|a| {
+                matches!(a, mir_types::Atomic::TNamedObject { type_params, .. } if !type_params.is_empty())
+            });
+            // Receiver type args that are still unresolved template vars (e.g.
+            // a call on `$this` inside the generic class body) carry no concrete
+            // instantiation to judge against — skip rather than risk a false
+            // mismatch.
+            let receiver_has_unresolved_template = receiver_type_params.iter().any(|t| {
+                t.types
+                    .iter()
+                    .any(|a| matches!(a, mir_types::Atomic::TTemplateParam { .. }))
+            });
+            if !receiver_has_unresolved_template
+                && (!receiver_type_params.is_empty() || !constraint_has_params)
+            {
+                let receiver = Type::single(mir_types::Atomic::TNamedObject {
+                    fqcn: Name::new(fqcn.as_ref()),
+                    type_params: receiver_type_params.to_vec().into(),
+                });
+                if !crate::subtype::is_subtype(ea.db, &receiver, &constraint) {
+                    ea.emit(
+                        IssueKind::IfThisIsMismatch {
+                            class: fqcn.to_string(),
+                            method: method_name.to_string(),
+                            expected: format!("{constraint}"),
+                            actual: format!("{receiver}"),
+                        },
+                        Severity::Info,
+                        span,
+                    );
+                }
+            }
+        }
         if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(
                 IssueKind::DeprecatedMethod {

@@ -647,6 +647,7 @@ pub fn find_method_in_class<'db>(
                 location: None,
                 docstring: None,
                 taint_sink_params: vec![],
+                if_this_is: None,
             })
         };
         if lower == "cases" {
@@ -680,6 +681,7 @@ pub fn find_method_in_class<'db>(
                 location: None,
                 docstring: None,
                 taint_sink_params: vec![],
+                if_this_is: None,
             }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {

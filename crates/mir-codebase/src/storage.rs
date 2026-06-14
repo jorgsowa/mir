@@ -420,6 +420,10 @@ pub struct MethodDef {
     /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
     #[serde(default)]
     pub taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    /// `@if-this-is Type` — the resolved constraint a receiver's type must
+    /// satisfy for this method to be callable. `None` when absent.
+    #[serde(default)]
+    pub if_this_is: Option<Arc<Type>>,
 }
 
 impl MethodDef {

@@ -152,6 +152,14 @@ impl DocblockParser {
                         }
                     }
                 }
+                "if-this-is" | "psalm-if-this-is" | "phpstan-if-this-is" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let trimmed = body_str.trim();
+                        if !trimmed.is_empty() {
+                            result.if_this_is = Some(parse_type_string(trimmed));
+                        }
+                    }
+                }
                 "suppress" | "psalm-suppress" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         for rule in body_str.split([',', ' ']) {
@@ -515,6 +523,10 @@ pub struct ParsedDocblock {
     pub taint_sinks: Vec<(String, String)>,
     /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
     pub seal_properties: bool,
+    /// `@if-this-is Type` / `@psalm-if-this-is Type` — the method may only be
+    /// called when `$this` satisfies this type. Stored as the raw parsed type;
+    /// class names are resolved later by the collector.
+    pub if_this_is: Option<Type>,
 }
 
 impl ParsedDocblock {

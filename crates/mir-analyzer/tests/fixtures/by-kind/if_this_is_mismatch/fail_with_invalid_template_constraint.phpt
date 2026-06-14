@@ -27,3 +27,4 @@ final class ArrayList
 $list = new ArrayList();
 $numbers = $list->compact();
 ===expect===
+IfThisIsMismatch@23:12-23:28: Cannot call ArrayList::compact() — @if-this-is requires $this to be 'ArrayList<Option<A>>', but it is 'ArrayList<int>'
