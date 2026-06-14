@@ -84,10 +84,9 @@ impl<'a> ClassAnalyzer<'a> {
                 let parent_deprecated: Option<Arc<str>> =
                     parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
                 if let Some(canonical) = parent_pulled.as_ref() {
-                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
-                        parent_fqcn.as_ref(),
-                        canonical.fqcn().as_ref(),
-                    ) {
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(parent_fqcn.as_ref(), canonical.fqcn().as_ref())
+                    {
                         let loc = issue_location(
                             location.as_ref(),
                             location
@@ -206,10 +205,9 @@ impl<'a> ClassAnalyzer<'a> {
                     for trait_fqcn in cls.class_traits() {
                         let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
                         if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
-                            if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
-                                trait_fqcn.as_ref(),
-                                t.fqcn().as_ref(),
-                            ) {
+                            if let Some((used, canonical_str)) =
+                                crate::fqcn_case_mismatch(trait_fqcn.as_ref(), t.fqcn().as_ref())
+                            {
                                 let loc = issue_location(
                                     location.as_ref(),
                                     location
@@ -323,10 +321,9 @@ impl<'a> ClassAnalyzer<'a> {
             for iface_fqcn in enum_def.interfaces.iter() {
                 let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
                 if let Some(canonical) = crate::db::find_class_like(self.db, here) {
-                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
-                        iface_fqcn.as_ref(),
-                        canonical.fqcn().as_ref(),
-                    ) {
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(iface_fqcn.as_ref(), canonical.fqcn().as_ref())
+                    {
                         let loc = issue_location(
                             location.as_ref(),
                             location

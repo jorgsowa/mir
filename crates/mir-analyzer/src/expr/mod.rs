@@ -298,7 +298,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ArrowFunction(af) => self.analyze_arrow_function(af, ctx),
 
-            ExprKind::CallableCreate(cc) => self.callable_create_type(cc),
+            ExprKind::CallableCreate(cc) => self.callable_create_type(cc, expr.span),
 
             // --- Match expression ------------------------------------------
             ExprKind::Match(m) => self.analyze_match(m, expr.span, ctx),
@@ -353,14 +353,33 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     /// Convert an AST span to `(line, col_start, col_end)` for reference recording.
-    fn callable_create_type(&self, cc: &php_ast::owned::CallableCreateExpr) -> Type {
+    fn callable_create_type(
+        &mut self,
+        cc: &php_ast::owned::CallableCreateExpr,
+        outer_span: php_ast::Span,
+    ) -> Type {
         use php_ast::owned::CallableCreateKind;
         if let CallableCreateKind::Function(name_expr) = &cc.kind {
             if let ExprKind::Identifier(name) = &name_expr.kind {
-                let fqn = name.as_ref();
+                let resolved_fqn =
+                    crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
                 let db = self.db;
-                let here = crate::db::Fqcn::from_str(db, fqn);
+                let here = crate::db::Fqcn::from_str(db, &resolved_fqn);
                 if let Some(f) = crate::db::find_function(db, here) {
+                    if let Some((used, canonical)) =
+                        crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
+                    {
+                        let span = if name_expr.span.start < name_expr.span.end {
+                            name_expr.span
+                        } else {
+                            outer_span
+                        };
+                        self.emit(
+                            mir_issues::IssueKind::WrongCaseFunction { used, canonical },
+                            mir_issues::Severity::Info,
+                            span,
+                        );
+                    }
                     let return_ty = f
                         .return_type
                         .as_deref()

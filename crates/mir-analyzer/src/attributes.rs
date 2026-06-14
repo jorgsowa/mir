@@ -487,6 +487,16 @@ fn check_attribute_list(
                 ));
             }
             Some(cl) => {
+                // Check for case mismatch between the written attribute name and canonical.
+                if let Some((used, canonical)) =
+                    crate::fqcn_case_mismatch(&fqcn, cl.fqcn().as_ref())
+                {
+                    issues.push(Issue::new(
+                        IssueKind::WrongCaseClass { used, canonical },
+                        loc.clone(),
+                    ));
+                }
+
                 // Only plain `Class` entities can be attribute classes.
                 use crate::db::ClassLike;
                 let maybe_flags = match &cl {
