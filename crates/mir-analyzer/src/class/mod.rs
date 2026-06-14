@@ -84,18 +84,10 @@ impl<'a> ClassAnalyzer<'a> {
                 let parent_deprecated: Option<Arc<str>> =
                     parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
                 if let Some(canonical) = parent_pulled.as_ref() {
-                    let used_short = parent_fqcn
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(parent_fqcn.as_ref());
-                    let canonical_short = canonical
-                        .fqcn()
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(canonical.fqcn().as_ref());
-                    if used_short != canonical_short
-                        && used_short.eq_ignore_ascii_case(canonical_short)
-                    {
+                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                        parent_fqcn.as_ref(),
+                        canonical.fqcn().as_ref(),
+                    ) {
                         let loc = issue_location(
                             location.as_ref(),
                             location
@@ -104,8 +96,8 @@ impl<'a> ClassAnalyzer<'a> {
                         );
                         let mut issue = Issue::new(
                             IssueKind::WrongCaseClass {
-                                used: used_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             loc,
                         );
@@ -164,18 +156,10 @@ impl<'a> ClassAnalyzer<'a> {
                     for iface_fqcn in cls.interfaces() {
                         let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
                         if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
-                            let used_short = iface_fqcn
-                                .rsplit('\\')
-                                .next()
-                                .unwrap_or(iface_fqcn.as_ref());
-                            let canonical_short = iface
-                                .fqcn()
-                                .rsplit('\\')
-                                .next()
-                                .unwrap_or(iface.fqcn().as_ref());
-                            if used_short != canonical_short
-                                && used_short.eq_ignore_ascii_case(canonical_short)
-                            {
+                            if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                                iface_fqcn.as_ref(),
+                                iface.fqcn().as_ref(),
+                            ) {
                                 let loc = issue_location(
                                     location.as_ref(),
                                     location
@@ -184,8 +168,8 @@ impl<'a> ClassAnalyzer<'a> {
                                 );
                                 let mut issue = Issue::new(
                                     IssueKind::WrongCaseClass {
-                                        used: used_short.to_string(),
-                                        canonical: canonical_short.to_string(),
+                                        used,
+                                        canonical: canonical_str,
                                     },
                                     loc,
                                 );
@@ -222,15 +206,10 @@ impl<'a> ClassAnalyzer<'a> {
                     for trait_fqcn in cls.class_traits() {
                         let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
                         if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
-                            let used_short = trait_fqcn
-                                .rsplit('\\')
-                                .next()
-                                .unwrap_or(trait_fqcn.as_ref());
-                            let canonical_short =
-                                t.fqcn().rsplit('\\').next().unwrap_or(t.fqcn().as_ref());
-                            if used_short != canonical_short
-                                && used_short.eq_ignore_ascii_case(canonical_short)
-                            {
+                            if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                                trait_fqcn.as_ref(),
+                                t.fqcn().as_ref(),
+                            ) {
                                 let loc = issue_location(
                                     location.as_ref(),
                                     location
@@ -239,8 +218,8 @@ impl<'a> ClassAnalyzer<'a> {
                                 );
                                 let mut issue = Issue::new(
                                     IssueKind::WrongCaseClass {
-                                        used: used_short.to_string(),
-                                        canonical: canonical_short.to_string(),
+                                        used,
+                                        canonical: canonical_str,
                                     },
                                     loc,
                                 );
@@ -311,18 +290,10 @@ impl<'a> ClassAnalyzer<'a> {
             for parent_iface_fqcn in iface.extends.iter() {
                 let here = crate::db::Fqcn::from_str(self.db, parent_iface_fqcn.as_ref());
                 if let Some(canonical) = crate::db::find_class_like(self.db, here) {
-                    let used_short = parent_iface_fqcn
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(parent_iface_fqcn.as_ref());
-                    let canonical_short = canonical
-                        .fqcn()
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(canonical.fqcn().as_ref());
-                    if used_short != canonical_short
-                        && used_short.eq_ignore_ascii_case(canonical_short)
-                    {
+                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                        parent_iface_fqcn.as_ref(),
+                        canonical.fqcn().as_ref(),
+                    ) {
                         let loc = issue_location(
                             location.as_ref(),
                             location
@@ -331,8 +302,8 @@ impl<'a> ClassAnalyzer<'a> {
                         );
                         let mut issue = Issue::new(
                             IssueKind::WrongCaseClass {
-                                used: used_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             loc,
                         );
@@ -352,18 +323,10 @@ impl<'a> ClassAnalyzer<'a> {
             for iface_fqcn in enum_def.interfaces.iter() {
                 let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
                 if let Some(canonical) = crate::db::find_class_like(self.db, here) {
-                    let used_short = iface_fqcn
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(iface_fqcn.as_ref());
-                    let canonical_short = canonical
-                        .fqcn()
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(canonical.fqcn().as_ref());
-                    if used_short != canonical_short
-                        && used_short.eq_ignore_ascii_case(canonical_short)
-                    {
+                    if let Some((used, canonical_str)) = crate::fqcn_case_mismatch(
+                        iface_fqcn.as_ref(),
+                        canonical.fqcn().as_ref(),
+                    ) {
                         let loc = issue_location(
                             location.as_ref(),
                             location
@@ -372,8 +335,8 @@ impl<'a> ClassAnalyzer<'a> {
                         );
                         let mut issue = Issue::new(
                             IssueKind::WrongCaseClass {
-                                used: used_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             loc,
                         );

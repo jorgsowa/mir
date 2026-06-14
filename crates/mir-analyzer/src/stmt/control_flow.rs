@@ -542,20 +542,14 @@ impl<'a> StatementsAnalyzer<'a> {
                         if crate::db::class_exists(self.db, &resolved) {
                             let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
                             if let Some(class) = crate::db::find_class_like(self.db, here) {
-                                let written_short = raw.rsplit('\\').next().unwrap_or(raw.as_str());
-                                let canonical_short = class
-                                    .fqcn()
-                                    .rsplit('\\')
-                                    .next()
-                                    .unwrap_or(class.fqcn().as_ref());
-                                if written_short != canonical_short
-                                    && written_short.eq_ignore_ascii_case(canonical_short)
+                                if let Some((used, canonical_str)) =
+                                    crate::fqcn_case_mismatch(raw.as_str(), class.fqcn().as_ref())
                                 {
                                     let (line_end, col_end2) = self.offset_to_line_col(span.end);
                                     self.issues.add(Issue::new(
                                         IssueKind::WrongCaseClass {
-                                            used: written_short.to_string(),
-                                            canonical: canonical_short.to_string(),
+                                            used,
+                                            canonical: canonical_str,
                                         },
                                         Location {
                                             file: self.file.clone(),

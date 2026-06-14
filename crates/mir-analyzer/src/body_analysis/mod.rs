@@ -788,19 +788,13 @@ pub(crate) fn check_use_decl_casing(
             UseKind::Normal => {
                 let here = crate::db::Fqcn::from_str(db, &full_name);
                 if let Some(class) = crate::db::find_class_like(db, here) {
-                    let written_short = full_name.rsplit('\\').next().unwrap_or(full_name.as_str());
-                    let canonical_short = class
-                        .fqcn()
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(class.fqcn().as_ref());
-                    if written_short != canonical_short
-                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(&full_name, class.fqcn().as_ref())
                     {
                         all_issues.push(mir_issues::Issue::new(
                             mir_issues::IssueKind::WrongCaseClass {
-                                used: written_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             loc,
                         ));
@@ -810,15 +804,13 @@ pub(crate) fn check_use_decl_casing(
             UseKind::Function => {
                 let here = crate::db::Fqcn::from_str(db, &full_name);
                 if let Some(func) = crate::db::find_function(db, here) {
-                    let written_short = full_name.rsplit('\\').next().unwrap_or(full_name.as_str());
-                    let canonical_short = func.fqn.rsplit('\\').next().unwrap_or(func.fqn.as_ref());
-                    if written_short != canonical_short
-                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(&full_name, func.fqn.as_ref())
                     {
                         all_issues.push(mir_issues::Issue::new(
                             mir_issues::IssueKind::WrongCaseFunction {
-                                used: written_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             loc,
                         ));

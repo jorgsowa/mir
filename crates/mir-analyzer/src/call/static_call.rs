@@ -170,24 +170,13 @@ impl CallAnalyzer {
                         );
                     }
                     // Check for case mismatch between the written class name and canonical
-                    let written_short = if let ExprKind::Identifier(name) = &call.class.kind {
-                        name.rsplit('\\').next().unwrap_or(name.as_ref())
-                    } else {
-                        ""
-                    };
-                    let canonical_short = class
-                        .fqcn()
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(class.fqcn().as_ref());
-                    if !written_short.is_empty()
-                        && written_short != canonical_short
-                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(fqcn.as_str(), class.fqcn().as_ref())
                     {
                         ea.emit(
                             IssueKind::WrongCaseClass {
-                                used: written_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             Severity::Info,
                             call.class.span,

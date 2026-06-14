@@ -50,6 +50,27 @@ pub use parser::{DocblockParser, ParsedDocblock};
 pub use php_version::{ParsePhpVersionError, PhpVersion};
 pub use session::AnalysisSession;
 pub use source_provider::{FsSourceProvider, SourceProvider};
+
+/// Returns `Some((used, canonical))` when `written` and `canonical` FQCNs differ only in casing.
+/// Uses the short (last-segment) form when only the final segment is wrong and the namespace
+/// prefix is already correct; otherwise returns the full path so the mismatch is visible.
+pub(crate) fn fqcn_case_mismatch(written: &str, canonical: &str) -> Option<(String, String)> {
+    let w = written.trim_start_matches('\\');
+    let c = canonical.trim_start_matches('\\');
+    if w == c || !w.eq_ignore_ascii_case(c) {
+        return None;
+    }
+    let w_last = w.rsplit('\\').next().unwrap_or(w);
+    let c_last = c.rsplit('\\').next().unwrap_or(c);
+    if w_last != c_last {
+        let w_prefix = w.rsplit_once('\\').map_or("", |(p, _)| p);
+        let c_prefix = c.rsplit_once('\\').map_or("", |(p, _)| p);
+        if w_prefix == c_prefix {
+            return Some((w_last.to_string(), c_last.to_string()));
+        }
+    }
+    Some((w.to_string(), c.to_string()))
+}
 pub use stubs::{
     is_builtin_function, stub_files, stub_path_for_class, ChainedClassResolver, StubClassResolver,
     StubVfs,

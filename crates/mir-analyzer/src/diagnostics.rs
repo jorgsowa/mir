@@ -124,14 +124,8 @@ pub(crate) fn check_type_hint_classes(
                 // Class exists — check for wrong case and deprecation
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if let Some(class) = crate::db::find_class_like(db, here) {
-                    let written_short = name_str.rsplit('\\').next().unwrap_or(&name_str);
-                    let canonical_short = class
-                        .fqcn()
-                        .rsplit('\\')
-                        .next()
-                        .unwrap_or(class.fqcn().as_ref());
-                    if written_short != canonical_short
-                        && written_short.eq_ignore_ascii_case(canonical_short)
+                    if let Some((used, canonical_str)) =
+                        crate::fqcn_case_mismatch(&name_str, class.fqcn().as_ref())
                     {
                         let (line, col_start) =
                             offset_to_line_col(source, hint.span.start, source_map);
@@ -142,8 +136,8 @@ pub(crate) fn check_type_hint_classes(
                         };
                         issues.push(mir_issues::Issue::new(
                             mir_issues::IssueKind::WrongCaseClass {
-                                used: written_short.to_string(),
-                                canonical: canonical_short.to_string(),
+                                used,
+                                canonical: canonical_str,
                             },
                             mir_issues::Location {
                                 file: file.clone(),
