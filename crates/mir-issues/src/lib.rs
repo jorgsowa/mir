@@ -257,6 +257,18 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` and `mir-analyzer/src/expr/conditional.rs`.
     /// Fixtures: `tests/fixtures/by-kind/paradoxical_condition/`.
     ParadoxicalCondition { value: String },
+    /// A docblock-declared type makes a subsequent assertion or comparison
+    /// impossible (e.g. `assert($a < 4)` on a `@param int<5, max> $a`).
+    /// Emitted by `mir-analyzer/src/narrowing.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/docblock_type_contradiction/`.
+    DocblockTypeContradiction { expr: String, declared: String },
+    /// A `switch`/`match` arm that can never be reached given the subject's
+    /// inferred type — most often a `gettype()` arm tested against a string
+    /// that `gettype()` never returns (e.g. `case "int"` — it returns
+    /// `"integer"`).
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` and `mir-analyzer/src/expr/conditional.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/unevaluated_code/`.
+    UnevaluatedCode { reason: String },
 
     // --- Dead code ----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/diagnostics.rs`.
@@ -411,6 +423,16 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/shadowed_template_param/`.
     ShadowedTemplateParam { name: String },
+    /// A method annotated `@if-this-is X<Y>` was called on a receiver whose
+    /// type does not satisfy that constraint.
+    /// Emitted by `mir-analyzer/src/call/method.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/if_this_is_mismatch/`.
+    IfThisIsMismatch {
+        class: String,
+        method: String,
+        expected: String,
+        actual: String,
+    },
 
     // --- Other --------------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/function.rs`.
@@ -719,6 +741,9 @@ impl IssueKind {
             | IssueKind::RedundantCast { .. }
             | IssueKind::UnnecessaryVarAnnotation { .. }
             | IssueKind::TypeDoesNotContainType { .. }
+            | IssueKind::DocblockTypeContradiction { .. }
+            | IssueKind::UnevaluatedCode { .. }
+            | IssueKind::IfThisIsMismatch { .. }
             | IssueKind::UnusedParam { .. }
             | IssueKind::UnreachableCode
             | IssueKind::UnusedMethod { .. }
@@ -869,6 +894,8 @@ impl IssueKind {
             IssueKind::TypeDoesNotContainType { .. } => "MIR0403",
             IssueKind::ParadoxicalCondition { .. } => "MIR0404",
             IssueKind::UnhandledMatchCondition { .. } => "MIR0405",
+            IssueKind::DocblockTypeContradiction { .. } => "MIR0406",
+            IssueKind::UnevaluatedCode { .. } => "MIR0407",
 
             // Dead code (0500-0599)
             IssueKind::UnusedVariable { .. } => "MIR0500",
@@ -921,6 +948,7 @@ impl IssueKind {
             // Generics (0900-0999)
             IssueKind::InvalidTemplateParam { .. } => "MIR0900",
             IssueKind::ShadowedTemplateParam { .. } => "MIR0901",
+            IssueKind::IfThisIsMismatch { .. } => "MIR0902",
 
             // Deprecation / internal (1000-1099)
             IssueKind::DeprecatedCall { .. } => "MIR1000",
@@ -1015,7 +1043,8 @@ impl IssueKind {
             | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105"
             | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208"
             | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507"
-            | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" => Some(Severity::Info),
+            | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407"
+            | "MIR0902" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1070,6 +1099,9 @@ impl IssueKind {
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
+            IssueKind::DocblockTypeContradiction { .. } => "DocblockTypeContradiction",
+            IssueKind::UnevaluatedCode { .. } => "UnevaluatedCode",
+            IssueKind::IfThisIsMismatch { .. } => "IfThisIsMismatch",
             IssueKind::Trace { .. } => "Trace",
             IssueKind::InvalidArrayOffset { .. } => "InvalidArrayOffset",
             IssueKind::NonExistentArrayOffset { .. } => "NonExistentArrayOffset",
@@ -1378,6 +1410,22 @@ impl IssueKind {
             }
             IssueKind::UnhandledMatchCondition { detail } => {
                 format!("Unhandled match condition: {detail}")
+            }
+            IssueKind::DocblockTypeContradiction { expr, declared } => {
+                format!("Type '{declared}' makes '{expr}' impossible — this can never hold")
+            }
+            IssueKind::UnevaluatedCode { reason } => {
+                format!("Unevaluated code: {reason}")
+            }
+            IssueKind::IfThisIsMismatch {
+                class,
+                method,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Cannot call {class}::{method}() — @if-this-is requires $this to be '{expected}', but it is '{actual}'"
+                )
             }
 
             IssueKind::UnusedVariable { name } => format!("Variable ${name} is never read"),
