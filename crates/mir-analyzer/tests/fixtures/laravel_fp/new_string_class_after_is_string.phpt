@@ -1,14 +1,11 @@
 ===description===
 Laravel FP (laravel/framework): `new $this->job()` inside `if (is_string($this->job))`
-is a valid dynamic class instantiation. The MissingConstructor half of this FP is
-fixed (an untyped `@var` property is no longer treated as uninitialized). The
-InvalidStringClass half remains BLOCKED by an upstream php-rs-parser 0.17 bug:
-`parse_new_expr` consumes only `$this` as the class reference for `new $this->job()`,
-parsing it as `(new $this)->job()` instead of `new ($this->job)()`. mir then
-correctly reports `new $this` (an object) as InvalidStringClass. Fixing this needs
-a parser that handles member-access class references (`new $var->prop`); kept
-ignored until then.
-===ignore===
+is a valid dynamic class instantiation. The MissingConstructor half was fixed by
+untyped `@var` properties no longer being treated as uninitialized. The
+InvalidStringClass half was blocked by a php-rs-parser 0.17 bug where `new $this->job()`
+was parsed as `(new $this)->job()` instead of `new ($this->job)()`. Fixed in
+php-rs-parser 0.18.0 via `parse_new_variable_tail`, which correctly handles
+member-access class references.
 ===config===
 suppress=MissingPropertyType,MissingClosureReturnType,UnusedParam,UnusedVariable,MixedReturnStatement,MixedMethodCall
 ===file===
