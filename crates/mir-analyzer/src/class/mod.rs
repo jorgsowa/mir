@@ -1,0 +1,476 @@
+/// Class analyzer — validates class definitions after codebase finalization.
+///
+/// Checks performed (all codebase-level, no AST required):
+///   - Concrete class implements all abstract parent methods
+///   - Concrete class implements all interface methods
+///   - Overriding method does not reduce visibility
+///   - Overriding method return type is covariant with parent
+///   - Overriding method does not override a final method
+///   - Class does not extend a final class
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::sync::Arc;
+
+use mir_codebase::storage::Visibility;
+use mir_issues::{Issue, IssueKind, Location};
+
+use crate::db::{class_ancestors, MirDatabase};
+
+// ---------------------------------------------------------------------------
+// ClassAnalyzer
+// ---------------------------------------------------------------------------
+
+pub struct ClassAnalyzer<'a> {
+    db: &'a dyn MirDatabase,
+    /// Only report issues for classes defined in these files (empty = all files).
+    analyzed_files: HashSet<Arc<str>>,
+    /// Source text keyed by file path, used to extract snippets for class-level issues.
+    sources: HashMap<Arc<str>, &'a str>,
+}
+
+impl<'a> ClassAnalyzer<'a> {
+    #[allow(dead_code)]
+    pub fn new(db: &'a dyn MirDatabase) -> Self {
+        Self {
+            db,
+            analyzed_files: HashSet::default(),
+            sources: HashMap::default(),
+        }
+    }
+
+    pub fn with_files(
+        db: &'a dyn MirDatabase,
+        files: HashSet<Arc<str>>,
+        file_data: &'a [(Arc<str>, Arc<str>)],
+    ) -> Self {
+        let sources: HashMap<Arc<str>, &'a str> = file_data
+            .iter()
+            .map(|(f, s)| (f.clone(), s.as_ref()))
+            .collect();
+        Self {
+            db,
+            analyzed_files: files,
+            sources,
+        }
+    }
+
+    /// Ancestor chain for `fqcn` from the salsa db, or empty if the class
+    /// isn't registered.
+    fn ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
+        class_ancestors(self.db, crate::db::Fqcn::from_str(self.db, fqcn)).0
+    }
+
+    /// Run all class-level checks and return every discovered issue.
+    pub fn analyze_all(&self) -> Vec<Issue> {
+        let mut issues = Vec::new();
+
+        // Only plain classes defined in the analyzed file set, already sorted by
+        // FQCN. Decomposing per file via `collect_file_definitions` means vendor
+        // / stub classes are never materialized (they aren't in `analyzed_files`),
+        // which is the dominant cost on cold start over a large `vendor/`.
+        for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
+            let fqcn = &fqcn;
+            let location: Option<Location> = class.location().cloned();
+            let parent_fqcn: Option<Arc<str>> = class.parent().cloned();
+            let is_abstract = class.is_abstract();
+
+            // ---- 1. Final-class extension check / deprecated parent check ------
+            if let Some(parent_fqcn) = parent_fqcn.as_ref() {
+                let parent_here = crate::db::Fqcn::from_str(self.db, parent_fqcn.as_ref());
+                let parent_pulled = crate::db::find_class_like(self.db, parent_here);
+                let parent_is_final = parent_pulled
+                    .as_ref()
+                    .map(|c| c.is_final())
+                    .unwrap_or(false);
+                let parent_deprecated: Option<Arc<str>> =
+                    parent_pulled.as_ref().and_then(|c| c.deprecated().cloned());
+                if let Some(canonical) = parent_pulled.as_ref() {
+                    let used_short = parent_fqcn
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(parent_fqcn.as_ref());
+                    let canonical_short = canonical
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(canonical.fqcn().as_ref());
+                    if used_short != canonical_short
+                        && used_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::WrongCaseClass {
+                                used: used_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+                if parent_pulled.is_some() {
+                    if parent_is_final {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::InvalidExtendClass {
+                                parent: parent_fqcn.to_string(),
+                                child: fqcn.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                    if let Some(msg) = parent_deprecated {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::DeprecatedClass {
+                                name: parent_fqcn.to_string(),
+                                message: Some(msg).filter(|m| !m.is_empty()),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
+
+            // ---- 1b. Deprecated interface / trait checks -----------------------
+            {
+                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                if let Some(cls) = crate::db::find_class_like(self.db, here) {
+                    for iface_fqcn in cls.interfaces() {
+                        let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+                        if let Some(iface) = crate::db::find_class_like(self.db, iface_here) {
+                            let used_short = iface_fqcn
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(iface_fqcn.as_ref());
+                            let canonical_short = iface
+                                .fqcn()
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(iface.fqcn().as_ref());
+                            if used_short != canonical_short
+                                && used_short.eq_ignore_ascii_case(canonical_short)
+                            {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::WrongCaseClass {
+                                        used: used_short.to_string(),
+                                        canonical: canonical_short.to_string(),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
+                            if let Some(msg) = iface.deprecated() {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::DeprecatedInterface {
+                                        name: iface_fqcn.to_string(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
+                        }
+                    }
+                    for trait_fqcn in cls.class_traits() {
+                        let trait_here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                        if let Some(t) = crate::db::find_class_like(self.db, trait_here) {
+                            let used_short = trait_fqcn
+                                .rsplit('\\')
+                                .next()
+                                .unwrap_or(trait_fqcn.as_ref());
+                            let canonical_short =
+                                t.fqcn().rsplit('\\').next().unwrap_or(t.fqcn().as_ref());
+                            if used_short != canonical_short
+                                && used_short.eq_ignore_ascii_case(canonical_short)
+                            {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::WrongCaseClass {
+                                        used: used_short.to_string(),
+                                        canonical: canonical_short.to_string(),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
+                            if let Some(msg) = t.deprecated() {
+                                let loc = issue_location(
+                                    location.as_ref(),
+                                    location
+                                        .as_ref()
+                                        .and_then(|l| self.sources.get(&l.file).copied()),
+                                );
+                                let mut issue = Issue::new(
+                                    IssueKind::DeprecatedTrait {
+                                        name: trait_fqcn.to_string(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    loc,
+                                );
+                                if let Some(snippet) =
+                                    extract_snippet(location.as_ref(), &self.sources)
+                                {
+                                    issue = issue.with_snippet(snippet);
+                                }
+                                issues.push(issue);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Skip abstract classes for "must implement" checks
+            if is_abstract {
+                // Still check override compatibility for abstract classes
+                self.check_overrides(fqcn, location.as_ref(), &mut issues);
+                self.check_magic_method_casing(fqcn, &mut issues);
+                continue;
+            }
+
+            // ---- 2. Abstract parent methods must be implemented ----------------
+            self.check_abstract_methods_implemented(fqcn, location.as_ref(), &mut issues);
+
+            // ---- 3. Interface methods must be implemented ----------------------
+            self.check_interface_methods_implemented(fqcn, location.as_ref(), &mut issues);
+
+            // ---- 4. Method override compatibility ------------------------------
+            self.check_overrides(fqcn, location.as_ref(), &mut issues);
+
+            // ---- 5. Magic method casing ----------------------------------------
+            self.check_magic_method_casing(fqcn, &mut issues);
+
+            // ---- 6. Missing constructor ----------------------------------------
+            self.check_missing_constructor(fqcn, location.as_ref(), &mut issues);
+        }
+
+        // ---- 5. Interface-level #[Override] check + extends casing --------
+        // Interfaces are not included in the class loop above, so scan them
+        // separately for #[Override] on methods that have no parent interface method.
+        for (iface_fqcn, iface) in crate::db::analyzed_interface_defs(self.db, &self.analyzed_files)
+        {
+            self.check_overrides(&iface_fqcn, None, &mut issues);
+            let location = iface.location.clone();
+            for parent_iface_fqcn in iface.extends.iter() {
+                let here = crate::db::Fqcn::from_str(self.db, parent_iface_fqcn.as_ref());
+                if let Some(canonical) = crate::db::find_class_like(self.db, here) {
+                    let used_short = parent_iface_fqcn
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(parent_iface_fqcn.as_ref());
+                    let canonical_short = canonical
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(canonical.fqcn().as_ref());
+                    if used_short != canonical_short
+                        && used_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::WrongCaseClass {
+                                used: used_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
+            self.check_magic_method_casing(&iface_fqcn, &mut issues);
+        }
+
+        // ---- 5b. Enum-level implements casing + magic methods ---------------
+        for (enum_fqcn, enum_def) in crate::db::analyzed_enum_defs(self.db, &self.analyzed_files) {
+            let location = enum_def.location.clone();
+            for iface_fqcn in enum_def.interfaces.iter() {
+                let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+                if let Some(canonical) = crate::db::find_class_like(self.db, here) {
+                    let used_short = iface_fqcn
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(iface_fqcn.as_ref());
+                    let canonical_short = canonical
+                        .fqcn()
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(canonical.fqcn().as_ref());
+                    if used_short != canonical_short
+                        && used_short.eq_ignore_ascii_case(canonical_short)
+                    {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::WrongCaseClass {
+                                used: used_short.to_string(),
+                                canonical: canonical_short.to_string(),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
+            self.check_magic_method_casing(&enum_fqcn, &mut issues);
+        }
+
+        // ---- 6. Circular inheritance detection --------------------------------
+        self.check_circular_class_inheritance(&mut issues);
+        self.check_circular_interface_inheritance(&mut issues);
+
+        issues
+    }
+
+    // -----------------------------------------------------------------------
+    // Check: all abstract methods from ancestor chain are implemented
+    // -----------------------------------------------------------------------
+}
+
+mod cycles;
+mod members;
+mod overrides;
+
+/// Returns true if `child_vis` is strictly less visible than `parent_vis`.
+fn visibility_reduced(child_vis: Visibility, parent_vis: Visibility) -> bool {
+    // Public > Protected > Private (in terms of access)
+    // Reducing means going from more visible to less visible.
+    matches!(
+        (parent_vis, child_vis),
+        (Visibility::Public, Visibility::Protected)
+            | (Visibility::Public, Visibility::Private)
+            | (Visibility::Protected, Visibility::Private)
+    )
+}
+
+/// Build an issue location from the stored codebase Location.
+/// Clamps `line_end`/`col_end` to the declaration line so SARIF/WASM consumers
+/// see a tight range instead of the entire class body.
+/// Falls back to `storage_loc_to_location(None)` when no Location is stored.
+fn issue_location(storage_loc: Option<&mir_types::Location>, source: Option<&str>) -> Location {
+    let Some(loc) = storage_loc else {
+        return crate::diagnostics::storage_loc_to_location(None);
+    };
+    let (line_end, col_end) = source
+        .and_then(|src| src.lines().nth(loc.line.saturating_sub(1) as usize))
+        .map(|decl_line| {
+            let char_count = decl_line.chars().count() as u16;
+            (loc.line, char_count.max(loc.col_start + 1))
+        })
+        .unwrap_or((loc.line, loc.col_end));
+    Location {
+        file: loc.file.clone(),
+        line: loc.line,
+        line_end,
+        col_start: loc.col_start,
+        col_end,
+    }
+}
+
+fn canonical_magic_name(lower: &str) -> Option<&'static str> {
+    match lower {
+        "__construct" => Some("__construct"),
+        "__destruct" => Some("__destruct"),
+        "__call" => Some("__call"),
+        "__callstatic" => Some("__callStatic"),
+        "__get" => Some("__get"),
+        "__set" => Some("__set"),
+        "__isset" => Some("__isset"),
+        "__unset" => Some("__unset"),
+        "__sleep" => Some("__sleep"),
+        "__wakeup" => Some("__wakeup"),
+        "__serialize" => Some("__serialize"),
+        "__unserialize" => Some("__unserialize"),
+        "__tostring" => Some("__toString"),
+        "__invoke" => Some("__invoke"),
+        "__set_state" => Some("__set_state"),
+        "__clone" => Some("__clone"),
+        "__debuginfo" => Some("__debugInfo"),
+        _ => None,
+    }
+}
+
+/// Extract the first line of source text covered by `storage_loc` as a snippet.
+fn extract_snippet(
+    storage_loc: Option<&mir_types::Location>,
+    sources: &HashMap<Arc<str>, &str>,
+) -> Option<String> {
+    let loc = storage_loc?;
+    let src = *sources.get(&loc.file)?;
+    // Walk to the 1-based start line (loc.line is already 1-based).
+    let line_idx = loc.line.saturating_sub(1) as usize;
+    let line_text = src.lines().nth(line_idx)?;
+    Some(line_text.trim().to_string())
+}
