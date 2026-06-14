@@ -513,6 +513,10 @@ fn return_requires_value(t: &mir_types::Type) -> bool {
     if t.is_empty() || t.is_void() || t.is_never() || t.is_mixed() || t.is_nullable() {
         return false;
     }
+    // `static|void`, `T|void` — void in a union means implicit return is valid.
+    if t.contains(|a| matches!(a, Atomic::TVoid)) {
+        return false;
+    }
     // Conditional and template return types are resolved per-call/contextually;
     // an empty-bodied stub with such a return must not be flagged (mirrors the
     // exemption in `analyze_return_stmt`).

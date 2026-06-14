@@ -973,6 +973,17 @@ fn validate_class_string_argument(
         return;
     }
 
+    // When the parameter also accepts a plain `string` (e.g. `string|class-string<T>`),
+    // a literal string satisfies the `string` alternative — don't check class existence.
+    // This avoids false positives from IoC container keys like `Container::make('config')`.
+    let has_plain_string = param_ty
+        .types
+        .iter()
+        .any(|t| matches!(t, Atomic::TString | Atomic::TNonEmptyString));
+    if has_plain_string {
+        return;
+    }
+
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
         let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
         if !crate::db::class_exists(ea.db, &resolved) {
