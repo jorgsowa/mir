@@ -444,6 +444,13 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                         .iter()
                         .any(|part| named_object_subtype(part, param, ea));
             }
+            // Bare `object` satisfies any param that accepts `object` or `mixed`.
+            Atomic::TObject => {
+                return param
+                    .types
+                    .iter()
+                    .any(|p| matches!(p, Atomic::TObject | Atomic::TMixed));
+            }
             _ => return false,
         };
 
@@ -482,6 +489,8 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
             }
 
             let param_fqcn: &Name = match p_atomic {
+                // Any named-object arg satisfies bare `object` or `mixed`.
+                Atomic::TObject | Atomic::TMixed => return true,
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 Atomic::TSelf { fqcn } => fqcn,
                 Atomic::TStaticObject { fqcn } => fqcn,
