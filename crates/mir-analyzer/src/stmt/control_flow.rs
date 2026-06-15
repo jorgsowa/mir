@@ -653,7 +653,11 @@ impl<'a> StatementsAnalyzer<'a> {
             // is not falsely flagged as UnusedVariable.
             for name in finally_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
+                result.last_write_locs.remove(name);
             }
+            result
+                .consumed_write_locs
+                .extend(finally_ctx.consumed_write_locs.iter().copied());
         }
 
         *ctx = result;
