@@ -25,4 +25,4 @@ function still_unused(): void {
     $o = new Mock();
 }
 ===expect===
-UnusedVariable@18:5-18:7: Variable $o is never read
+UnusedVariable@18:4-18:6: Variable $o is never read

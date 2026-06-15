@@ -13,4 +13,4 @@ abstract class A
     }
 }
 ===expect===
-MixedMethodCall@8:9-8:24: Method greet() called on mixed type
+MixedMethodCall@8:8-8:23: Method greet() called on mixed type

@@ -13,6 +13,6 @@ function outerFn(string $x): void {
 
 outerFn('hello', 'world');
 ===expect===
-UnusedParam@2:18-2:27: Parameter $x is never used
-UnusedVariable@3:5-3:11: Variable $inner is never read
-TooManyArguments@9:18-9:25: Too many arguments for outerFn(): expected 1, got 2
+UnusedParam@2:17-2:26: Parameter $x is never used
+UnusedVariable@3:4-3:10: Variable $inner is never read
+TooManyArguments@9:17-9:24: Too many arguments for outerFn(): expected 1, got 2

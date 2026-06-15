@@ -24,4 +24,4 @@ function getAssetInfo(Document|Image $asset): void {
 ===expect===
 MissingConstructor@2:0-2:16: Class Document has uninitialized properties but no constructor
 MissingConstructor@6:0-6:13: Class Image has uninitialized properties but no constructor
-RedundantCondition@17:15-17:38: Condition is always true/false for type 'bool'
+RedundantCondition@17:14-17:37: Condition is always true/false for type 'bool'

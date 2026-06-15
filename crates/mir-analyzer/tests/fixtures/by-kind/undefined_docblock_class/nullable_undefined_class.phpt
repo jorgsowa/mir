@@ -9,4 +9,4 @@ function maybeGhost(): mixed {
 }
 
 ===expect===
-UndefinedDocblockClass@3:10-3:20: Docblock type 'GhostClass' does not exist
+UndefinedDocblockClass@3:9-3:19: Docblock type 'GhostClass' does not exist

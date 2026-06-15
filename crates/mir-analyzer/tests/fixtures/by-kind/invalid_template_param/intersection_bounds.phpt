@@ -30,6 +30,6 @@ function processStream($_stream): void {}
 $readable = new OnlyReadable();
 processStream($readable);
 ===expect===
-test.php: UnusedParam@14:27-14:40: Parameter $_data is never used
-test.php: UnusedParam@25:24-25:32: Parameter $_stream is never used
-test.php: InvalidTemplateParam@28:1-28:25: Template type 'T' inferred as 'OnlyReadable' does not satisfy bound 'Base&Readable&Writable'
+test.php: UnusedParam@14:26-14:39: Parameter $_data is never used
+test.php: UnusedParam@25:23-25:31: Parameter $_stream is never used
+test.php: InvalidTemplateParam@28:0-28:24: Template type 'T' inferred as 'OnlyReadable' does not satisfy bound 'Base&Readable&Writable'

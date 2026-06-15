@@ -8,4 +8,4 @@ trait MyTrait {
     }
 }
 ===expect===
-UndefinedFunction@4:9-4:27: Function missing_function() is not defined
+UndefinedFunction@4:8-4:26: Function missing_function() is not defined

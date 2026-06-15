@@ -5,4 +5,4 @@ DuplicateFunction fires when the same function is declared twice.
 function greet(): string { return "hello"; }
 function greet(): string { return "hi"; }
 ===expect===
-DuplicateFunction@3:1-3:42: Function greet() has already been defined
+DuplicateFunction@3:0-3:41: Function greet() has already been defined

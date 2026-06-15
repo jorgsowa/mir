@@ -15,4 +15,4 @@ foreach ([1, 2, 3] as $_) {
     throw new Exception($gap);
 }
 ===expect===
-UnusedVariable@2:1-2:5: Variable $gap is never read
+UnusedVariable@2:0-2:4: Variable $gap is never read

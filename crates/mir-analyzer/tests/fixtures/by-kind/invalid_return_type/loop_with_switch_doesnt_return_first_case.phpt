@@ -17,4 +17,4 @@ function b(): int {
     }
 }
 ===expect===
-InvalidReturnType@2:19-13:20: Return type 'void' is not compatible with declared 'int'
+InvalidReturnType@2:18-13:19: Return type 'void' is not compatible with declared 'int'

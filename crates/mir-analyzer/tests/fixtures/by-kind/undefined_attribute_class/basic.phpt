@@ -5,4 +5,4 @@ UndefinedAttributeClass fires when an attribute class does not exist.
 #[Route('/home')]
 class HomeController {}
 ===expect===
-UndefinedAttributeClass@2:3-2:17: Attribute class Route does not exist
+UndefinedAttributeClass@2:2-2:16: Attribute class Route does not exist

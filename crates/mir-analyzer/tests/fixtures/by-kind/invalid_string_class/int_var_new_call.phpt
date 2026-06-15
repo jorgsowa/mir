@@ -5,4 +5,4 @@ Int var new call
 $a = 5;
 new $a();
 ===expect===
-InvalidStringClass@3:5-3:7: Dynamic class instantiation requires string or class-string type, got '5'
+InvalidStringClass@3:4-3:6: Dynamic class instantiation requires string or class-string type, got '5'

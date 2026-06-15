@@ -8,5 +8,5 @@ function test(?string $value): void {
     greet($value);
 }
 ===expect===
-UnusedParam@2:16-2:28: Parameter $name is never used
-PossiblyNullArgument@5:11-5:17: Argument $name of greet() might be null
+UnusedParam@2:15-2:27: Parameter $name is never used
+PossiblyNullArgument@5:10-5:16: Argument $name of greet() might be null

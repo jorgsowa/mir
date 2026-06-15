@@ -25,4 +25,4 @@ function doTry() : void {
     }
 }
 ===expect===
-RedundantCondition@17:13-17:23: Condition is always true/false for type 'Exception'
+RedundantCondition@17:12-17:22: Condition is always true/false for type 'Exception'

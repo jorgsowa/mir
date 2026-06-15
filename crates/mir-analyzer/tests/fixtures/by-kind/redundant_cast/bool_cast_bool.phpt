@@ -9,4 +9,4 @@ $x = true;
 $y = (bool)$x;
 
 ===expect===
-RedundantCast@3:12-3:14: Casting 'true' to 'bool' is redundant
+RedundantCast@3:11-3:13: Casting 'true' to 'bool' is redundant

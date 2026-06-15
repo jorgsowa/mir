@@ -9,4 +9,4 @@ while (rand(0, 1)) {
     break;
 }
 ===expect===
-UnusedVariable@5:5-5:7: Variable $a is never read
+UnusedVariable@5:4-5:6: Variable $a is never read

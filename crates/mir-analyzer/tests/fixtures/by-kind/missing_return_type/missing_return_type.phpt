@@ -6,4 +6,4 @@ interface foo {
     public function withoutAnyReturnType();
 }
 ===expect===
-MissingReturnType@3:5-3:44: Function foo::withoutAnyReturnType() has no return type annotation
+MissingReturnType@3:4-3:43: Function foo::withoutAnyReturnType() has no return type annotation

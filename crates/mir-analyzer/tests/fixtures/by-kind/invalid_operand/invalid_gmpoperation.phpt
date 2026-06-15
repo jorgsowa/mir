@@ -7,4 +7,4 @@ suppress=MixedAssignment,UnusedVariable
 $a = gmp_init(2);
 $b = "a" + $a;
 ===expect===
-InvalidOperand@3:6-3:14: Operator '+' not supported between '"a"' and 'mixed'
+InvalidOperand@3:5-3:13: Operator '+' not supported between '"a"' and 'mixed'

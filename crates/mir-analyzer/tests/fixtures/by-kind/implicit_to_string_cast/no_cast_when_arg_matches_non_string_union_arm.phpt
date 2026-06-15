@@ -24,4 +24,4 @@ class HasToString {
 function takesStringOrInt($val): void {}
 takesStringOrInt(new HasToString());
 ===expect===
-ImplicitToStringCast@20:18-20:35: Class HasToString is implicitly cast to string
+ImplicitToStringCast@20:17-20:34: Class HasToString is implicitly cast to string

@@ -16,4 +16,4 @@ function foo(int $x): int {
     return $y;
 }
 ===expect===
-InvalidReturnType@11:5-11:15: Return type '"not an int"|0' is not compatible with declared 'int'
+InvalidReturnType@11:4-11:14: Return type '"not an int"|0' is not compatible with declared 'int'

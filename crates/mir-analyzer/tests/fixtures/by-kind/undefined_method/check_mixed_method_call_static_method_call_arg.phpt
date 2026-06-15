@@ -9,4 +9,4 @@ function foo($a) : void {
     $a->bar(B::bat());
 }
 ===expect===
-UndefinedMethod@6:13-6:21: Method B::bat() does not exist
+UndefinedMethod@6:12-6:20: Method B::bat() does not exist

@@ -8,4 +8,4 @@ function myPure(int $n): int {
 }
 
 ===expect===
-ImpureFunctionCall@4:12-4:26: Calling impure function mt_rand() in a @pure function
+ImpureFunctionCall@4:11-4:25: Calling impure function mt_rand() in a @pure function

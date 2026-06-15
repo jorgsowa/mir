@@ -4,4 +4,4 @@ Undefined constant
 <?php
 echo HELLO;
 ===expect===
-UndefinedConstant@2:6-2:11: Constant HELLO is not defined
+UndefinedConstant@2:5-2:10: Constant HELLO is not defined

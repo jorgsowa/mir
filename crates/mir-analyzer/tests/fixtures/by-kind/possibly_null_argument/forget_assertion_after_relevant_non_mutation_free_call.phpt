@@ -32,4 +32,4 @@ if (assertBarNotNull($foo)) {
 function requiresString(string $_str): void {}
 
 ===expect===
-PossiblyNullArgument@24:20-24:29: Argument $_str of requiresString() might be null
+PossiblyNullArgument@24:19-24:28: Argument $_str of requiresString() might be null

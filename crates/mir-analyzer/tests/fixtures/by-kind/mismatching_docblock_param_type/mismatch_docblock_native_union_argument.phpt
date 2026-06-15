@@ -10,4 +10,4 @@ function test(int|bool $in): bool {
 }
 
 ===expect===
-MismatchingDocblockParamType@5:24-5:27: Docblock type 'string|null' for $in does not match inferred 'int|bool'
+MismatchingDocblockParamType@5:23-5:26: Docblock type 'string|null' for $in does not match inferred 'int|bool'

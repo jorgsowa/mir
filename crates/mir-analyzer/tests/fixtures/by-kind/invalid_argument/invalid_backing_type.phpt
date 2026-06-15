@@ -5,4 +5,4 @@ Invalid backing type
 enum Status: array {}
 
 ===expect===
-ParseError@2:14-2:19: Parse error: Enum backing type must be int or string
+ParseError@2:13-2:18: Parse error: Enum backing type must be int or string

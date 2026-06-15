@@ -7,5 +7,5 @@ class Greeter {
 }
 (new Greeter())->say('Ada', 'Grace');
 ===expect===
-UnusedParam@3:25-3:37: Parameter $name is never used
-TooManyArguments@5:29-5:36: Too many arguments for say(): expected 1, got 2
+UnusedParam@3:24-3:36: Parameter $name is never used
+TooManyArguments@5:28-5:35: Too many arguments for say(): expected 1, got 2

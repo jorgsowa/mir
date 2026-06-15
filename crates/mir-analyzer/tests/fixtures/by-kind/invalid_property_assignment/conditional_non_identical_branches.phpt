@@ -24,4 +24,4 @@ $f->stringProp = $result;
 $f->intProp = $result;
 ===expect===
 MissingConstructor@2:0-2:19: Class TestFactory has uninitialized properties but no constructor
-InvalidPropertyAssignment@19:1-19:22: Property $intProp expects 'int', cannot assign 'string'
+InvalidPropertyAssignment@19:0-19:21: Property $intProp expects 'int', cannot assign 'string'

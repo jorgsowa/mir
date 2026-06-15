@@ -14,4 +14,4 @@ $direct_closure_result = array_reduce(
     1
 );
 ===expect===
-InvalidArgument@6:5-8:6: Argument $callback of array_reduce() expects 'callable accepting at least 2 arguments', got 'callable accepting 0 arguments'
+InvalidArgument@6:4-8:5: Argument $callback of array_reduce() expects 'callable accepting at least 2 arguments', got 'callable accepting 0 arguments'

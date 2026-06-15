@@ -5,4 +5,4 @@ Unused list var
 list($a, $b) = explode(" ", "hello world");
 echo $a;
 ===expect===
-UnusedVariable@2:10-2:12: Variable $b is never read
+UnusedVariable@2:9-2:11: Variable $b is never read

@@ -8,4 +8,4 @@ function foo() : C {
     return fn (int $i) => "";
 }
 ===expect===
-InvalidReturnType@5:5-5:30: Return type 'Closure(int): ""' is not compatible with declared 'C'
+InvalidReturnType@5:4-5:29: Return type 'Closure(int): ""' is not compatible with declared 'C'

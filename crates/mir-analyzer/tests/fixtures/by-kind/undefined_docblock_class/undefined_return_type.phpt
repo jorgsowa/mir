@@ -9,4 +9,4 @@ function missing(): mixed {
 }
 
 ===expect===
-UndefinedDocblockClass@3:10-3:17: Docblock type 'NonExistentReturnClass' does not exist
+UndefinedDocblockClass@3:9-3:16: Docblock type 'NonExistentReturnClass' does not exist

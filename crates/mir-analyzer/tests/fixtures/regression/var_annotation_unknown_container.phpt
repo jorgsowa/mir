@@ -14,4 +14,4 @@ function main(mixed $container): void {
     $repo->find(1);
 }
 ===expect===
-MixedMethodCall@7:13-7:51: Method get() called on mixed type
+MixedMethodCall@7:12-7:50: Method get() called on mixed type

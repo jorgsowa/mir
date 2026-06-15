@@ -16,4 +16,4 @@ function foo(string $a) : string {
   }
 }
 ===expect===
-InvalidReturnType@2:34-14:35: Return type 'void' is not compatible with declared 'string'
+InvalidReturnType@2:33-14:34: Return type 'void' is not compatible with declared 'string'

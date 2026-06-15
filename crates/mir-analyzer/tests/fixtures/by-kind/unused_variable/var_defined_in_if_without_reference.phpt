@@ -9,5 +9,5 @@ if (rand(0, 1)) {
     $b = "goodbye";
 }
 ===expect===
-UnusedVariable@2:1-2:3: Variable $a is never read
-UnusedVariable@4:5-4:7: Variable $b is never read
+UnusedVariable@2:0-2:2: Variable $a is never read
+UnusedVariable@4:4-4:6: Variable $b is never read

@@ -9,4 +9,4 @@ function test(): void {
     $data = file_get_contents($path);
 }
 ===expect===
-TaintedInput@4:13-4:37: Tainted input reaching sink 'file'
+TaintedInput@4:12-4:36: Tainted input reaching sink 'file'

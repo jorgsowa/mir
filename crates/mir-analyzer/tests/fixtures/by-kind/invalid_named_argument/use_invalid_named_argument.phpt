@@ -21,4 +21,4 @@ function foo(array $input) : CustomerData {
     );
 }
 ===expect===
-InvalidNamedArgument@15:9-15:28: CustomerData::__construct() has no parameter named $aage
+InvalidNamedArgument@15:8-15:27: CustomerData::__construct() has no parameter named $aage

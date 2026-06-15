@@ -44,4 +44,4 @@ function testElseAfterNarrowing(string|null $value) {
     }
 }
 ===expect===
-UnreachableCode@13:5-13:17: Unreachable code detected
+UnreachableCode@13:4-13:16: Unreachable code detected

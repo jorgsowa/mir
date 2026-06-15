@@ -10,4 +10,4 @@ class A {
 
 A::fooFoo(5, "dfd");
 ===expect===
-TooManyArguments@6:14-6:19: Too many arguments for fooFoo(): expected 1, got 2
+TooManyArguments@6:13-6:18: Too many arguments for fooFoo(): expected 1, got 2

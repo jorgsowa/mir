@@ -13,4 +13,4 @@ function test(): void {
     Converter::process(readInput());
 }
 ===expect===
-PossiblyInvalidArgument@8:24-8:35: Argument $s of process() expects 'string', possibly different type 'string|false' provided
+PossiblyInvalidArgument@8:23-8:34: Argument $s of process() expects 'string', possibly different type 'string|false' provided

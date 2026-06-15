@@ -8,4 +8,4 @@ class Foo {
     }
 }
 ===expect===
-ParentNotFound@4:9-4:15: Cannot use parent:: when current class has no parent
+ParentNotFound@4:8-4:14: Cannot use parent:: when current class has no parent

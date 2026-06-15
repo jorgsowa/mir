@@ -8,4 +8,4 @@ trait T {
 }
 
 ===expect===
-ParseError@4:5-4:32: Parse error: Cannot redeclare property $foo
+ParseError@4:4-4:31: Parse error: Cannot redeclare property $foo

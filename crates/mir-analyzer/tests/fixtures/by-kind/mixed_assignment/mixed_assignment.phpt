@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $a = 5;
 $b = $a;
 ===expect===
-MixedAssignment@4:1-4:8: Variable $b is assigned a mixed type
+MixedAssignment@4:0-4:7: Variable $b is assigned a mixed type

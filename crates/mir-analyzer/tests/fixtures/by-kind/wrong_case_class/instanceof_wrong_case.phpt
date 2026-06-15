@@ -8,4 +8,4 @@ class MyException extends \Exception {}
 $e = new MyException();
 $result = $e instanceof myexception;
 ===expect===
-WrongCaseClass@4:25-4:36: Class name 'myexception' has incorrect casing; use 'MyException'
+WrongCaseClass@4:24-4:35: Class name 'myexception' has incorrect casing; use 'MyException'

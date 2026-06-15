@@ -21,4 +21,4 @@ $w->secret();
 $n = new NoMagic();
 $n->prefix('foo');
 ===expect===
-UndefinedMethod@17:1-17:18: Method NoMagic::prefix() does not exist
+UndefinedMethod@17:0-17:17: Method NoMagic::prefix() does not exist

@@ -12,4 +12,4 @@ class Table {
 #[Table("videos")]
 function foo() : void {}
 ===expect===
-InvalidAttribute@9:3-9:18: Attribute Table cannot be used on this target
+InvalidAttribute@9:2-9:17: Attribute Table cannot be used on this target

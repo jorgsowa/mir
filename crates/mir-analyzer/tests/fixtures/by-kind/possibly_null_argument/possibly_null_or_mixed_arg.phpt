@@ -19,5 +19,5 @@ function takesA(?A $a) : void {
     takesString($a->foo);
 }
 ===expect===
-MissingPropertyType@6:5-6:16: Property A::$foo has no type annotation
-UnusedParam@9:22-9:31: Parameter $s is never used
+MissingPropertyType@6:4-6:15: Property A::$foo has no type annotation
+UnusedParam@9:21-9:30: Parameter $s is never used

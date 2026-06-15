@@ -11,4 +11,4 @@ function foo(array $items): string {
     return $last;
 }
 ===expect===
-PossiblyUndefinedVariable@6:12-6:17: Variable $last might not be defined
+PossiblyUndefinedVariable@6:11-6:16: Variable $last might not be defined

@@ -10,4 +10,4 @@ $a = new A;
 $a->f();
 
 ===expect===
-DirectConstructorCall@4:33-4:53: Cannot call constructor of A directly
+DirectConstructorCall@4:32-4:52: Cannot call constructor of A directly

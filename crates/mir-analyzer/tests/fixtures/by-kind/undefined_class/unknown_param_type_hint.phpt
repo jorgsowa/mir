@@ -6,4 +6,4 @@ suppress=UnusedParam,UnusedFunction
 <?php
 function f(UnknownClass $x): void {}
 ===expect===
-UndefinedClass@2:12-2:24: Class UnknownClass does not exist
+UndefinedClass@2:11-2:23: Class UnknownClass does not exist

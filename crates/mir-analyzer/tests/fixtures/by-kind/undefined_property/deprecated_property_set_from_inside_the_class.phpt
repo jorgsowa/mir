@@ -17,4 +17,4 @@ class A{
 }
 
 ===expect===
-DeprecatedProperty@10:9-10:24: Property A::$foo is deprecated
+DeprecatedProperty@10:8-10:23: Property A::$foo is deprecated

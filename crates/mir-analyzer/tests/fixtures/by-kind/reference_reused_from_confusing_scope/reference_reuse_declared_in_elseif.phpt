@@ -16,4 +16,4 @@ if (random_int(0, 1)) {
 $var = "foo";
 
 ===expect===
-UnsupportedReferenceUsage@7:5-7:20: Reference assignment is not supported
+UnsupportedReferenceUsage@7:4-7:19: Reference assignment is not supported

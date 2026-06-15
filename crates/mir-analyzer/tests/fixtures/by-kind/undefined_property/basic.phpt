@@ -10,4 +10,4 @@ function test(): void {
     echo $f->nonexistent;
 }
 ===expect===
-UndefinedProperty@7:14-7:25: Property Foo::$nonexistent does not exist
+UndefinedProperty@7:13-7:24: Property Foo::$nonexistent does not exist

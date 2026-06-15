@@ -64,9 +64,9 @@ class NotificationSender
     }
 }
 ===expect===
-MixedClone@9:21-9:40: cannot clone mixed
-MixedMethodCall@12:30-12:57: Method via() called on mixed type
-MixedClone@13:33-13:48: cannot clone mixed
-MixedMethodCall@38:17-44:18: Method dispatch() called on mixed type
-MixedMethodCall@39:21-41:42: Method onQueue() called on mixed type
-UndefinedClass@39:26-39:49: Class SendQueuedNotifications does not exist
+MixedClone@9:20-9:39: cannot clone mixed
+MixedMethodCall@12:29-12:56: Method via() called on mixed type
+MixedClone@13:32-13:47: cannot clone mixed
+MixedMethodCall@38:16-44:17: Method dispatch() called on mixed type
+MixedMethodCall@39:20-41:41: Method onQueue() called on mixed type
+UndefinedClass@39:25-39:48: Class SendQueuedNotifications does not exist

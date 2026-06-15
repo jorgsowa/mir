@@ -6,4 +6,4 @@ suppress=MissingClosureReturnType,UnusedVariable
 <?php
 $a = array_map(function ($i) { return $i->foo(); }, [1, 2, 3, 4]);
 ===expect===
-MixedMethodCall@2:39-2:48: Method foo() called on mixed type
+MixedMethodCall@2:38-2:47: Method foo() called on mixed type

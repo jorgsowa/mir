@@ -15,4 +15,4 @@ function bar($b) : void {}
 
 bar($foo);
 ===expect===
-PossiblyInvalidArgument@11:5-11:9: Argument $b of bar() expects 'B|C', possibly different type 'A|B' provided
+PossiblyInvalidArgument@11:4-11:8: Argument $b of bar() expects 'B|C', possibly different type 'A|B' provided

@@ -12,5 +12,5 @@ function foo(A $a) : void {
     }
 }
 ===expect===
-MixedMethodCall@8:9-8:23: Method foo() called on mixed type
-UndefinedVariable@8:9-8:16: Variable $object is not defined
+MixedMethodCall@8:8-8:22: Method foo() called on mixed type
+UndefinedVariable@8:8-8:15: Variable $object is not defined

@@ -30,4 +30,4 @@ $mapper = new Mapper();
 $result = $mapper->toArrays([1, 2, 3]);
 /** @mir-check $result is list<array> */
 ===expect===
-Mapper.php: UnusedParam@14:30-14:42: Parameter $items is never used
+Mapper.php: UnusedParam@14:29-14:41: Parameter $items is never used

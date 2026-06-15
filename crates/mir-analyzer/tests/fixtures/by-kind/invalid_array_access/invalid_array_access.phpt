@@ -5,4 +5,4 @@ Invalid array access
 $a = 5;
 echo $a[0];
 ===expect===
-InvalidArrayAccess@3:6-3:11: Cannot use [] operator on non-array type '5'
+InvalidArrayAccess@3:5-3:10: Cannot use [] operator on non-array type '5'

@@ -7,4 +7,4 @@ foreach ($a as &$b) {
     $b = $b + 1;
 }
 ===expect===
-UnusedForeachValue@4:5-4:7: Foreach value $b is never read
+UnusedForeachValue@4:4-4:6: Foreach value $b is never read

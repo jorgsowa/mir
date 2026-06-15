@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $fn = fn(int $x): int => (/** @mir-check $x is string */ $x * 2);
 ===expect===
-TypeCheckMismatch@2:58-2:64: Type of $x is expected to be string, got int
+TypeCheckMismatch@2:57-2:63: Type of $x is expected to be string, got int

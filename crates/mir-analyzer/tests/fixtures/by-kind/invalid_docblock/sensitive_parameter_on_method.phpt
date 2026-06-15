@@ -17,4 +17,4 @@ class HelloWorld {
 }
 
 ===expect===
-InvalidAttribute@8:7-8:25: Attribute SensitiveParameter cannot be used on this target
+InvalidAttribute@8:6-8:24: Attribute SensitiveParameter cannot be used on this target

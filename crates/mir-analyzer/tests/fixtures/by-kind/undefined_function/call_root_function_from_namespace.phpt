@@ -12,4 +12,4 @@ namespace A {
     Aoo();
 }
 ===expect===
-ParseError@9:7-9:9: Parse error: expected ';' after expression
+ParseError@9:6-9:8: Parse error: expected ';' after expression

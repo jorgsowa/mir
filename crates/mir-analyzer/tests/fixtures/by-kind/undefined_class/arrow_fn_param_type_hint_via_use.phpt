@@ -7,4 +7,4 @@ suppress=UnusedVariable
 use Vendor\Missing\Foo;
 $fn = fn(Foo $x) => $x;
 ===expect===
-UndefinedClass@3:10-3:13: Class Vendor\Missing\Foo does not exist
+UndefinedClass@3:9-3:12: Class Vendor\Missing\Foo does not exist

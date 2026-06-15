@@ -10,5 +10,5 @@ class Factory {
     }
 }
 ===expect===
-WrongCaseMethod@5:15-5:21: Method name 'Factory::CREATE' has incorrect casing; use 'create'
-WrongCaseMethod@6:17-6:23: Method name 'Factory::CREATE' has incorrect casing; use 'create'
+WrongCaseMethod@5:14-5:20: Method name 'Factory::CREATE' has incorrect casing; use 'create'
+WrongCaseMethod@6:16-6:22: Method name 'Factory::CREATE' has incorrect casing; use 'create'

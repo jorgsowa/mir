@@ -8,4 +8,4 @@ class Foo {}
 $f = new Foo();
 $s = "Value: {$f}";
 ===expect===
-ImplicitToStringCast@4:15-4:17: Class Foo is implicitly cast to string
+ImplicitToStringCast@4:14-4:16: Class Foo is implicitly cast to string

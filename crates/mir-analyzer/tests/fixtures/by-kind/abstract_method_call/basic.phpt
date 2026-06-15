@@ -8,5 +8,5 @@ abstract class Shape {
 
 Shape::area();
 ===expect===
-AbstractMethodCall@6:1-6:14: Cannot call abstract method Shape::area()
-InvalidStaticInvocation@6:1-6:14: Non-static method Shape::area() cannot be called statically
+AbstractMethodCall@6:0-6:13: Cannot call abstract method Shape::area()
+InvalidStaticInvocation@6:0-6:13: Non-static method Shape::area() cannot be called statically

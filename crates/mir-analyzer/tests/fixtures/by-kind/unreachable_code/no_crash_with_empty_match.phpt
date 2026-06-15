@@ -10,4 +10,4 @@ function foo(int $i) {
     };
 }
 ===expect===
-UnhandledMatchCondition@3:5-5:6: Unhandled match condition: no arms
+UnhandledMatchCondition@3:4-5:5: Unhandled match condition: no arms

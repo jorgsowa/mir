@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $x = (int)[];
 
 ===expect===
-InvalidCast@2:11-2:13: Cannot cast 'array{}' to 'int'
+InvalidCast@2:10-2:12: Cannot cast 'array{}' to 'int'

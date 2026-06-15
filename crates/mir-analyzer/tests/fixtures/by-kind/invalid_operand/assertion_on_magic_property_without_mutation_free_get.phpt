@@ -24,4 +24,4 @@ if (assertString($a)) {
 function requiresString(string $_str): void {}
 
 ===expect===
-PossiblyNullArgument@16:20-16:25: Argument $_str of requiresString() might be null
+PossiblyNullArgument@16:19-16:24: Argument $_str of requiresString() might be null

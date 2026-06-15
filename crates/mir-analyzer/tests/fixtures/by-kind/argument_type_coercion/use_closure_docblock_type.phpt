@@ -17,4 +17,4 @@ $getAButReallyB = /** @return A */ function() {
 takesA($getAButReallyB());
 takesB($getAButReallyB());
 ===expect===
-ArgumentTypeCoercion@13:8-13:25: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime
+ArgumentTypeCoercion@13:7-13:24: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime

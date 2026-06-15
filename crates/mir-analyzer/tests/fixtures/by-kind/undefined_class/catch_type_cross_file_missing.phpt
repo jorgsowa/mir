@@ -18,4 +18,4 @@ function handle(): void {
     }
 }
 ===expect===
-Handler.php: UndefinedClass@8:14-8:30: Class App\MissingException does not exist
+Handler.php: UndefinedClass@8:13-8:29: Class App\MissingException does not exist

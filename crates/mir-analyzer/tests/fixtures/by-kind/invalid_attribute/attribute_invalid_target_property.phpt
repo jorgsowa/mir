@@ -8,4 +8,4 @@ class Foo {
 }
 
 ===expect===
-InvalidAttribute@3:7-3:16: #[Attribute] can only be applied to classes, not properties
+InvalidAttribute@3:6-3:15: #[Attribute] can only be applied to classes, not properties

@@ -14,4 +14,4 @@ function bar(string $a, string $b, string $c): bool {}
 
 foo("bar");
 ===expect===
-InvalidReturnType@8:53-8:55: Return type 'void' is not compatible with declared 'bool'
+InvalidReturnType@8:52-8:54: Return type 'void' is not compatible with declared 'bool'

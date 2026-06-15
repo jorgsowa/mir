@@ -11,4 +11,4 @@ enum Suit {
 
 echo Suit::Hearts->value;
 ===expect===
-UndefinedProperty@9:20-9:25: Property Suit::$value does not exist
+UndefinedProperty@9:19-9:24: Property Suit::$value does not exist

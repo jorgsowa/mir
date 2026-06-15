@@ -8,4 +8,4 @@ function scale(int|Box $x): int {
     return $x * 3;
 }
 ===expect===
-PossiblyInvalidOperand@5:12-5:18: Operator '*' might not be supported between 'int|Box' and '3'
+PossiblyInvalidOperand@5:11-5:17: Operator '*' might not be supported between 'int|Box' and '3'

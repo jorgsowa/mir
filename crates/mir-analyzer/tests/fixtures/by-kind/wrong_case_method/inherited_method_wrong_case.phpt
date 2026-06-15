@@ -9,4 +9,4 @@ class Dog extends Animal {}
 $d = new Dog();
 $d->MAKESOUND();
 ===expect===
-WrongCaseMethod@7:5-7:14: Method name 'Dog::MAKESOUND' has incorrect casing; use 'makeSound'
+WrongCaseMethod@7:4-7:13: Method name 'Dog::MAKESOUND' has incorrect casing; use 'makeSound'

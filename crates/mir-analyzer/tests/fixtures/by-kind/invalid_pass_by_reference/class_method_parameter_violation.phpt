@@ -18,4 +18,4 @@ $bar = 5;
 $a = new A($bar); // $bar is constrained to an int
 $bar = null; // ReferenceConstraintViolation issue emitted
 ===expect===
-UnsupportedReferenceUsage@7:9-7:27: Reference assignment is not supported
+UnsupportedReferenceUsage@7:8-7:26: Reference assignment is not supported

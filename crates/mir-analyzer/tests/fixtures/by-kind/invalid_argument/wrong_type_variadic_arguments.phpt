@@ -8,4 +8,4 @@ function takesArguments(int ...$args) : void {}
 
 takesArguments(age: "abc");
 ===expect===
-InvalidArgument@4:16-4:26: Argument $args of takesArguments() expects 'int', got '"abc"'
+InvalidArgument@4:15-4:25: Argument $args of takesArguments() expects 'int', got '"abc"'

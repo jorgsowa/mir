@@ -9,4 +9,4 @@ function my_helper(string $s): string { return $s; }
 <?php
 function test(): void { my_helper(42); }
 ===expect===
-App.php: InvalidArgument@2:35-2:37: Argument $s of my_helper() expects 'string', got '42'
+App.php: InvalidArgument@2:34-2:36: Argument $s of my_helper() expects 'string', got '42'

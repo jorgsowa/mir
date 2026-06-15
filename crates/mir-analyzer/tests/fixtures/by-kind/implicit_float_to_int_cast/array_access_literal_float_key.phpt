@@ -9,4 +9,4 @@ $arr = [];
 $val = $arr[3.7];
 
 ===expect===
-ImplicitFloatToIntCast@3:13-3:16: Implicit cast from 3.7 to int truncates the fractional part
+ImplicitFloatToIntCast@3:12-3:15: Implicit cast from 3.7 to int truncates the fractional part

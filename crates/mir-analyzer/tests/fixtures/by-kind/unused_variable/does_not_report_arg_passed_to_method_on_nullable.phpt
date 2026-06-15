@@ -9,4 +9,4 @@ class Baz {
     }
 }
 ===expect===
-PossiblyNullMethodCall@5:9-5:32: Cannot call method doSomething() on possibly null value
+PossiblyNullMethodCall@5:8-5:31: Cannot call method doSomething() on possibly null value

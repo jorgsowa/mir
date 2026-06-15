@@ -11,5 +11,5 @@ class C {
 }
 
 ===expect===
-InvalidScope@5:34-5:39: $this cannot be used in a static method
-UnreachableCode@6:21-6:22: Unreachable code detected
+InvalidScope@5:33-5:38: $this cannot be used in a static method
+UnreachableCode@6:20-6:21: Unreachable code detected

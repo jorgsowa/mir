@@ -20,4 +20,4 @@ function test(): void {
     $resolver()->undefinedMethod();
 }
 ===expect===
-UndefinedMethod@15:5-15:35: Method Service::undefinedMethod() does not exist
+UndefinedMethod@15:4-15:34: Method Service::undefinedMethod() does not exist

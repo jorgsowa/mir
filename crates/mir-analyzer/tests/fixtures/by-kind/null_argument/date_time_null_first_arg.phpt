@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $date = new DateTime(null);
 ===expect===
-NullArgument@2:22-2:26: Argument $datetime of DateTime::__construct() cannot be null
+NullArgument@2:21-2:25: Argument $datetime of DateTime::__construct() cannot be null

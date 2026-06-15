@@ -6,4 +6,4 @@ interface A {
     public string $value;
 }
 ===expect===
-ParseError@3:5-3:25: Parse error: Interfaces may only include hooked properties
+ParseError@3:4-3:24: Parse error: Interfaces may only include hooked properties

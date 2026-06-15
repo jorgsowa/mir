@@ -5,4 +5,4 @@ Accessing a key that does not exist in a closed keyed array
 $params = ["key" => "value"];
 echo $params["fieldName"];
 ===expect===
-NonExistentArrayOffset@3:14-3:25: Array offset 'fieldName' does not exist
+NonExistentArrayOffset@3:13-3:24: Array offset 'fieldName' does not exist

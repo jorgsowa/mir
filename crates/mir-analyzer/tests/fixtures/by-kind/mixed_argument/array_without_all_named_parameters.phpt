@@ -17,4 +17,4 @@ function processUserDataInvalid(array $data) : User {
     return new User(...$data);
 }
 ===expect===
-PossiblyInvalidArgument@14:21-14:29: Argument $id of User::__construct() expects 'int', possibly different type 'int|string' provided
+PossiblyInvalidArgument@14:20-14:28: Argument $id of User::__construct() expects 'int', possibly different type 'int|string' provided

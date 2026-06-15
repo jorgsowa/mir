@@ -23,4 +23,4 @@ function test(array $arr): void {
     $_ = $keys;
 }
 ===expect===
-helpers.php: UnusedParam@8:25-8:37: Parameter $array is never used
+helpers.php: UnusedParam@8:24-8:36: Parameter $array is never used

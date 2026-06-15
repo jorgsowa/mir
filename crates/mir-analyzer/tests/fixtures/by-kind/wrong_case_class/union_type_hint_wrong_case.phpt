@@ -8,4 +8,4 @@ class Foo {}
 class Bar {}
 function process(FOO|Bar $x): void {}
 ===expect===
-WrongCaseClass@4:18-4:21: Class name 'FOO' has incorrect casing; use 'Foo'
+WrongCaseClass@4:17-4:20: Class name 'FOO' has incorrect casing; use 'Foo'

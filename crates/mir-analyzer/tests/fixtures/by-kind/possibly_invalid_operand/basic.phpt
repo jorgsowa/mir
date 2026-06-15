@@ -6,4 +6,4 @@ function double(int|array $a): int {
     return $a * 2;
 }
 ===expect===
-PossiblyInvalidOperand@3:12-3:18: Operator '*' might not be supported between 'int|array<mixed, mixed>' and '2'
+PossiblyInvalidOperand@3:11-3:17: Operator '*' might not be supported between 'int|array<mixed, mixed>' and '2'

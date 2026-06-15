@@ -12,4 +12,4 @@ Parse bad method annotation
                         }
                     }
 ===expect===
-UndefinedVariable@7:34-7:36: Variable $b is not defined
+UndefinedVariable@7:33-7:35: Variable $b is not defined

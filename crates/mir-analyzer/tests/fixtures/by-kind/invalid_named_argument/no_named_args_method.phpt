@@ -23,6 +23,6 @@ function foo(array $input) : CustomerData {
     );
 }
 ===expect===
-InvalidNamedArguments@17:9-17:27: CustomerData::__construct() does not accept named arguments
-InvalidNamedArguments@18:9-18:29: CustomerData::__construct() does not accept named arguments
-InvalidNamedArguments@19:9-19:31: CustomerData::__construct() does not accept named arguments
+InvalidNamedArguments@17:8-17:26: CustomerData::__construct() does not accept named arguments
+InvalidNamedArguments@18:8-18:28: CustomerData::__construct() does not accept named arguments
+InvalidNamedArguments@19:8-19:30: CustomerData::__construct() does not accept named arguments

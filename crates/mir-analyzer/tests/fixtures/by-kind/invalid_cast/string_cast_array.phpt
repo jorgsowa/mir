@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $x = (string)[];
 
 ===expect===
-InvalidCast@2:14-2:16: Cannot cast 'array{}' to 'string'
+InvalidCast@2:13-2:15: Cannot cast 'array{}' to 'string'

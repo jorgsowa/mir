@@ -12,8 +12,8 @@ class EloquentBuilder {
     }
 }
 ===expect===
-UnusedParam@3:29-3:40: Parameter $col is never used
-UnusedParam@3:42-3:53: Parameter $vals is never used
-UnusedParam@4:35-4:46: Parameter $col is never used
-UnusedParam@4:48-4:59: Parameter $vals is never used
-UnusedParam@6:49-6:60: Parameter $key is never used
+UnusedParam@3:28-3:39: Parameter $col is never used
+UnusedParam@3:41-3:52: Parameter $vals is never used
+UnusedParam@4:34-4:45: Parameter $col is never used
+UnusedParam@4:47-4:58: Parameter $vals is never used
+UnusedParam@6:48-6:59: Parameter $key is never used

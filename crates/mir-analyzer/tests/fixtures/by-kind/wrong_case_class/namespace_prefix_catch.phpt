@@ -12,4 +12,4 @@ try {
 } catch (\myapp\exceptions\ServiceException $e) {
 }
 ===expect===
-WrongCaseClass@7:10-7:44: Class name 'myapp\exceptions\ServiceException' has incorrect casing; use 'MyApp\Exceptions\ServiceException'
+WrongCaseClass@7:9-7:43: Class name 'myapp\exceptions\ServiceException' has incorrect casing; use 'MyApp\Exceptions\ServiceException'

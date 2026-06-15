@@ -16,4 +16,4 @@ function check(string $s): bool {
 require_once 'App.php';
 check('hello');
 ===expect===
-App.php: UndefinedFunction@3:12-3:33: Function str_contains() is not defined
+App.php: UndefinedFunction@3:11-3:32: Function str_contains() is not defined

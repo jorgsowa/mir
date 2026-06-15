@@ -10,4 +10,4 @@ class Foo {
 
 Foo::barBar();
 ===expect===
-DeprecatedMethodCall@8:1-8:14: Call to deprecated method Foo::barBar
+DeprecatedMethodCall@8:0-8:13: Call to deprecated method Foo::barBar

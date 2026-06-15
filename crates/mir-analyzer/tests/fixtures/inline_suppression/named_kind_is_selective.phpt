@@ -6,4 +6,4 @@ function test(): void {
     noSuchFunc(new NoSuchClass()); // @mir-ignore UndefinedClass
 }
 ===expect===
-UndefinedFunction@3:5-3:34: Function noSuchFunc() is not defined
+UndefinedFunction@3:4-3:33: Function noSuchFunc() is not defined

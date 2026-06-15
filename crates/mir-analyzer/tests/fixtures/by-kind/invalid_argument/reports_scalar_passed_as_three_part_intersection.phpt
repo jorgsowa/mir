@@ -12,4 +12,4 @@ function test(): void {
     f("hello");
 }
 ===expect===
-InvalidArgument@9:7-9:14: Argument $x of f() expects 'Iterator&Countable&Stringable', got '"hello"'
+InvalidArgument@9:6-9:13: Argument $x of f() expects 'Iterator&Countable&Stringable', got '"hello"'

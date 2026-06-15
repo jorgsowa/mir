@@ -10,4 +10,4 @@ class A {
 
 (new A)->fooFoo();
 ===expect===
-TooFewArguments@6:1-6:18: Too few arguments for fooFoo(): expected 1, got 0
+TooFewArguments@6:0-6:17: Too few arguments for fooFoo(): expected 1, got 0

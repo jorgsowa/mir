@@ -8,4 +8,4 @@ function foo(): string {
     return $result;
 }
 ===expect===
-UndefinedVariable@3:12-3:19: Variable $result is not defined
+UndefinedVariable@3:11-3:18: Variable $result is not defined

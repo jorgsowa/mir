@@ -9,5 +9,5 @@ function foo(int $a) : void {}
 array_map("foo", [1, 2, 3], [4, 5, 6]);
 
 ===expect===
-UnusedParam@3:14-3:20: Parameter $a is never used
-TooManyArguments@6:11-6:16: Too many arguments for foo(): expected 1, got 2
+UnusedParam@3:13-3:19: Parameter $a is never used
+TooManyArguments@6:10-6:15: Too many arguments for foo(): expected 1, got 2

@@ -9,4 +9,4 @@ class A
     }
 }
 ===expect===
-ParseError@4:36-4:40: Parse error: Method __construct() cannot declare a return type
+ParseError@4:35-4:39: Parse error: Method __construct() cannot declare a return type

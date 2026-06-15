@@ -15,4 +15,4 @@ function instantiateClass($className) {
 // SHOULD emit UndefinedClass because it's documented as class-string
 instantiateClass("NonExistentClass");
 ===expect===
-UndefinedClass@11:18-11:36: Class NonExistentClass does not exist
+UndefinedClass@11:17-11:35: Class NonExistentClass does not exist

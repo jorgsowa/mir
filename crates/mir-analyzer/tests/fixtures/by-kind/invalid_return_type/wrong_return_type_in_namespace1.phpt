@@ -8,4 +8,4 @@ function fooFoo(): string {
     return 5;
 }
 ===expect===
-InvalidReturnType@5:5-5:14: Return type '5' is not compatible with declared 'string'
+InvalidReturnType@5:4-5:13: Return type '5' is not compatible with declared 'string'

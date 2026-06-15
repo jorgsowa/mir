@@ -9,4 +9,4 @@ switch (rand(0, 2)) {
         $a = true;
 }
 ===expect===
-UnusedVariable@2:1-2:3: Variable $a is never read
+UnusedVariable@2:0-2:2: Variable $a is never read

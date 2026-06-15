@@ -30,4 +30,4 @@ $a = $box->pick(Attr::class);
 /** @mir-check $a is Attr|null */
 echo $a !== null ? 'y' : 'n';
 ===expect===
-ShadowedTemplateParam@20:6-20:29: Method template parameter 'T' shadows class-level template parameter with the same name
+ShadowedTemplateParam@20:5-20:28: Method template parameter 'T' shadows class-level template parameter with the same name

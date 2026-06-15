@@ -7,4 +7,4 @@ function f(): int {
     return $x;
 }
 ===expect===
-InvalidReturnType@4:5-4:15: Return type '1|"hello"' is not compatible with declared 'int'
+InvalidReturnType@4:4-4:14: Return type '1|"hello"' is not compatible with declared 'int'

@@ -23,6 +23,6 @@ function exactMatch(): string { return 'x'; }
  */
 function templated(mixed $x): mixed { return $x; }
 ===expect===
-MismatchingDocblockReturnType@3:10-3:23: Docblock return type 'string|null' does not match inferred 'string'
-MismatchingDocblockReturnType@6:10-6:26: Docblock return type 'int' does not match inferred 'string'
-InvalidReturnType@6:39-6:50: Return type '"x"' is not compatible with declared 'int'
+MismatchingDocblockReturnType@3:9-3:22: Docblock return type 'string|null' does not match inferred 'string'
+MismatchingDocblockReturnType@6:9-6:25: Docblock return type 'int' does not match inferred 'string'
+InvalidReturnType@6:38-6:49: Return type '"x"' is not compatible with declared 'int'

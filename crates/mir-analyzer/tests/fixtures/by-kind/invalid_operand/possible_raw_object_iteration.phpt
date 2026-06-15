@@ -25,4 +25,4 @@ function gen() : Generator {
     yield from $arr;
 }
 ===expect===
-PossiblyRawObjectIteration@20:16-20:20: Cannot iterate over possibly non-iterable object 'list<A>|B'
+PossiblyRawObjectIteration@20:15-20:19: Cannot iterate over possibly non-iterable object 'list<A>|B'

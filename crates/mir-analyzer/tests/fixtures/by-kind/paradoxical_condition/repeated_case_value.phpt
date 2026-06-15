@@ -11,4 +11,4 @@ switch ($a) {
         echo "I never get here";
 }
 ===expect===
-ParadoxicalCondition@7:10-7:11: Value 0 is duplicated; this branch can never be reached
+ParadoxicalCondition@7:9-7:10: Value 0 is duplicated; this branch can never be reached

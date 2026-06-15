@@ -10,4 +10,4 @@ class UserService {}
 namespace Client;
 function handle(\myapp\service\UserService $s): void {}
 ===expect===
-WrongCaseClass@6:17-6:43: Class name 'myapp\service\UserService' has incorrect casing; use 'MyApp\Service\UserService'
+WrongCaseClass@6:16-6:42: Class name 'myapp\service\UserService' has incorrect casing; use 'MyApp\Service\UserService'

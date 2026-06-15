@@ -12,4 +12,4 @@ class Bar {}
 class Baz {}
 
 ===expect===
-InvalidAttribute@8:8-8:11: Attribute Bar cannot be used on this target
+InvalidAttribute@8:7-8:10: Attribute Bar cannot be used on this target

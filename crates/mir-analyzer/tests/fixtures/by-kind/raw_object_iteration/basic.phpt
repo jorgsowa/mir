@@ -12,4 +12,4 @@ function items(): \Generator {
     yield from $c;
 }
 ===expect===
-RawObjectIteration@9:16-9:18: Cannot iterate over non-iterable object 'Config'
+RawObjectIteration@9:15-9:17: Cannot iterate over non-iterable object 'Config'

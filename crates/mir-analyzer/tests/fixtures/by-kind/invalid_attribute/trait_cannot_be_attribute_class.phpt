@@ -5,4 +5,4 @@ Trait cannot be attribute class
 #[Attribute]
 trait Foo {}
 ===expect===
-InvalidAttribute@2:3-2:12: Traits cannot be attribute classes
+InvalidAttribute@2:2-2:11: Traits cannot be attribute classes

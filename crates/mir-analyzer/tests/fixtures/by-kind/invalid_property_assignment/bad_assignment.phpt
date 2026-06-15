@@ -14,4 +14,4 @@ class A {
     }
 }
 ===expect===
-InvalidPropertyAssignment@8:9-8:23: Property $foo expects 'string', cannot assign '5'
+InvalidPropertyAssignment@8:8-8:22: Property $foo expects 'string', cannot assign '5'

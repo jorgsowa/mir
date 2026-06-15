@@ -16,4 +16,4 @@ class B extends A
     }
 }
 ===expect===
-InaccessibleClassConstant@10:19-10:29: Cannot access constant A::IS_PRIVATE
+InaccessibleClassConstant@10:18-10:28: Cannot access constant A::IS_PRIVATE

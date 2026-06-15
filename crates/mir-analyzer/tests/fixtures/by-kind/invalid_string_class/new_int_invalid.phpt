@@ -8,4 +8,4 @@ function test(int $value) {
     new $value();
 }
 ===expect===
-InvalidStringClass@3:9-3:15: Dynamic class instantiation requires string or class-string type, got 'int'
+InvalidStringClass@3:8-3:14: Dynamic class instantiation requires string or class-string type, got 'int'

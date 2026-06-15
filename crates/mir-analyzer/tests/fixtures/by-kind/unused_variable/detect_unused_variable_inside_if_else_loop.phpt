@@ -13,4 +13,4 @@ function foo() : void {
     }
 }
 ===expect===
-UnusedVariable@3:5-3:7: Variable $a is never read
+UnusedVariable@3:4-3:6: Variable $a is never read

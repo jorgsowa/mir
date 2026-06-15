@@ -15,4 +15,4 @@ class Box {
     }
 }
 ===expect===
-InvalidPropertyAssignment@10:9-10:26: Property $label expects 'string', cannot assign 'int'
+InvalidPropertyAssignment@10:8-10:25: Property $label expects 'string', cannot assign 'int'

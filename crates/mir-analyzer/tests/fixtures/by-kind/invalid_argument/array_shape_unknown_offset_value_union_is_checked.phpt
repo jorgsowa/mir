@@ -11,4 +11,4 @@ function test(string $key): void {
     takes_int($row[$key]);
 }
 ===expect===
-PossiblyInvalidArgument@6:15-6:25: Argument $value of takes_int() expects 'int', possibly different type '123|"Ada"' provided
+PossiblyInvalidArgument@6:14-6:24: Argument $value of takes_int() expects 'int', possibly different type '123|"Ada"' provided

@@ -11,4 +11,4 @@ function test(): void {
     takesBool(getResult());
 }
 ===expect===
-PossiblyInvalidArgument@6:15-6:26: Argument $b of takesBool() expects 'bool', possibly different type 'int|false' provided
+PossiblyInvalidArgument@6:14-6:25: Argument $b of takesBool() expects 'bool', possibly different type 'int|false' provided

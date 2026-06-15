@@ -7,4 +7,4 @@ suppress=UnusedParam
 function fooFoo(string &$v): void {}
 fooFoo("a");
 ===expect===
-InvalidPassByReference@3:8-3:11: Argument $v of fooFoo() must be passed by reference
+InvalidPassByReference@3:7-3:10: Argument $v of fooFoo() must be passed by reference

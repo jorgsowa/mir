@@ -39,4 +39,4 @@ function multiNullRemoval(int|float|string|null|bool|array $value) {
     }
 }
 ===expect===
-InvalidCast@33:32-33:38: Cannot cast 'int|float|string|bool|array<mixed, mixed>' to 'string'
+InvalidCast@33:31-33:37: Cannot cast 'int|float|string|bool|array<mixed, mixed>' to 'string'

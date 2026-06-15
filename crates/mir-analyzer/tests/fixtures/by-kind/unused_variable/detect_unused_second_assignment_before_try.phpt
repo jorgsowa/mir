@@ -12,5 +12,5 @@ try {
   // something else
 }
 ===expect===
-UnusedVariable@4:1-4:3: Variable $a is never read
-UnusedVariable@8:9-10:10: Variable $t is never read
+UnusedVariable@4:0-4:2: Variable $a is never read
+UnusedVariable@8:8-10:9: Variable $t is never read

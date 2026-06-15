@@ -9,4 +9,4 @@ function foo(): array {
     return compact('name');
 }
 ===expect===
-UnusedVariable@4:5-4:14: Variable $unlisted is never read
+UnusedVariable@4:4-4:13: Variable $unlisted is never read

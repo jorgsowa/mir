@@ -24,5 +24,5 @@ class D extends C {
     }
 }
 ===expect===
-UndefinedMethod@14:9-14:26: Method C::traitFoo() does not exist
-UndefinedMethod@20:9-20:26: Method D::traitFoo() does not exist
+UndefinedMethod@14:8-14:25: Method C::traitFoo() does not exist
+UndefinedMethod@20:8-20:25: Method D::traitFoo() does not exist

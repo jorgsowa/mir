@@ -8,4 +8,4 @@ $a = "hello";
 $b = &$a;
 
 ===expect===
-UnsupportedReferenceUsage@3:1-3:9: Reference assignment is not supported
+UnsupportedReferenceUsage@3:0-3:8: Reference assignment is not supported

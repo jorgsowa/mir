@@ -7,4 +7,4 @@ if (rand(0, 1) > 0) {
 }
 
 ===expect===
-UnusedForeachValue@3:27-3:31: Foreach value $val is never read
+UnusedForeachValue@3:26-3:30: Foreach value $val is never read

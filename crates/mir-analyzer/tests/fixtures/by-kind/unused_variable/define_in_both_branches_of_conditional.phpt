@@ -8,4 +8,4 @@ if (($i = rand(0, 5)) || ($i = rand(0, 3))) {
     echo $i;
 }
 ===expect===
-UnusedVariable@2:1-2:3: Variable $i is never read
+UnusedVariable@2:0-2:2: Variable $i is never read

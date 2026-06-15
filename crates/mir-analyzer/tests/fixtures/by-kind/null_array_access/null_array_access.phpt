@@ -5,4 +5,4 @@ Null array access
 $a = null;
 echo $a[0];
 ===expect===
-NullArrayAccess@3:6-3:11: Cannot access array on null
+NullArrayAccess@3:5-3:10: Cannot access array on null

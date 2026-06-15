@@ -15,4 +15,4 @@ if (isset($arr[0])) {
 $var = "foo";
 
 ===expect===
-UnsupportedReferenceUsage@6:5-6:20: Reference assignment is not supported
+UnsupportedReferenceUsage@6:4-6:19: Reference assignment is not supported

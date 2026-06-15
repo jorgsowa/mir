@@ -5,4 +5,4 @@ Abstract class cannot be attribute class
 #[Attribute]
 abstract class Baz {}
 ===expect===
-InvalidAttribute@2:3-2:12: Abstract classes cannot be attribute classes
+InvalidAttribute@2:2-2:11: Abstract classes cannot be attribute classes

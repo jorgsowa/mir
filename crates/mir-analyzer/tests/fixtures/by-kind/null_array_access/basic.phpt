@@ -7,4 +7,4 @@ function test(): void {
     echo $x[0];
 }
 ===expect===
-NullArrayAccess@4:10-4:15: Cannot access array on null
+NullArrayAccess@4:9-4:14: Cannot access array on null

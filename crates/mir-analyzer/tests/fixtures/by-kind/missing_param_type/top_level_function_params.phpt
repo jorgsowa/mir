@@ -10,4 +10,4 @@ suppress=UnusedParam
  */
 function f($a, $b, int $c): void {}
 ===expect===
-MissingParamType@5:12-5:14: Parameter $a of f() has no type annotation
+MissingParamType@5:11-5:13: Parameter $a of f() has no type annotation

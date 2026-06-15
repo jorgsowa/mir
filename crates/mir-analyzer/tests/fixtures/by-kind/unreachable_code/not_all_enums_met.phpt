@@ -11,4 +11,4 @@ function foo(string $foo): string {
     };
 }
 ===expect===
-UnhandledMatchCondition@6:12-8:13: Unhandled match condition: "bar"
+UnhandledMatchCondition@6:11-8:12: Unhandled match condition: "bar"

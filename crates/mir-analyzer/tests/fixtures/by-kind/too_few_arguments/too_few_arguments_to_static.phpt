@@ -10,4 +10,4 @@ class A {
 
 A::fooFoo();
 ===expect===
-TooFewArguments@6:1-6:12: Too few arguments for fooFoo(): expected 1, got 0
+TooFewArguments@6:0-6:11: Too few arguments for fooFoo(): expected 1, got 0

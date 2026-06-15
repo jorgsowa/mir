@@ -7,4 +7,4 @@ suppress=UnusedVariable
 <?php
 $x = strrchr("hello", "l", true);
 ===expect===
-TooManyArguments@2:28-2:32: Too many arguments for strrchr(): expected 2, got 3
+TooManyArguments@2:27-2:31: Too many arguments for strrchr(): expected 2, got 3

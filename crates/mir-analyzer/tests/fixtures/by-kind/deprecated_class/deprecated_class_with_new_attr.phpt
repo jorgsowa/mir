@@ -9,4 +9,4 @@ class Foo { }
 
 $a = new Foo();
 ===expect===
-DeprecatedClass@5:10-5:13: Class Foo is deprecated
+DeprecatedClass@5:9-5:12: Class Foo is deprecated

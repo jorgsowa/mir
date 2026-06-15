@@ -6,4 +6,4 @@ function debug(mixed $v): void {
     var_dump($v);
 }
 ===expect===
-ForbiddenCode@3:5-3:17: Use of var_dump is forbidden
+ForbiddenCode@3:4-3:16: Use of var_dump is forbidden

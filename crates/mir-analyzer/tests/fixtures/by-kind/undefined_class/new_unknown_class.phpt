@@ -6,4 +6,4 @@ function test(): void {
     new UnknownClass();
 }
 ===expect===
-UndefinedClass@3:9-3:21: Class UnknownClass does not exist
+UndefinedClass@3:8-3:20: Class UnknownClass does not exist

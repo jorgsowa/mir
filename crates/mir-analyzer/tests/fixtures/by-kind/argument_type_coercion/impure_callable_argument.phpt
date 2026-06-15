@@ -30,4 +30,4 @@ $c = max_by([1, 2, 3], function(int $a): int {
 
 echo $c;
 ===expect===
-RedundantCondition@13:13-13:56: Condition is always true/false for type 'bool'
+RedundantCondition@13:12-13:55: Condition is always true/false for type 'bool'

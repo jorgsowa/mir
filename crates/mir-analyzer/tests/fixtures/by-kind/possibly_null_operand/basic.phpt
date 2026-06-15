@@ -6,4 +6,4 @@ function ratio(int $a, ?int $b): float {
     return $a / $b;
 }
 ===expect===
-PossiblyNullOperand@3:12-3:19: Operator '/' operand 'int|null' might be null
+PossiblyNullOperand@3:11-3:18: Operator '/' operand 'int|null' might be null

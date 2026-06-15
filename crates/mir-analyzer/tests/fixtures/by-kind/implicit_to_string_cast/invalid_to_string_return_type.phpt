@@ -6,4 +6,4 @@ class A {
     function __toString(): void { }
 }
 ===expect===
-InvalidToString@3:33-3:36: Method A::__toString() must return a string
+InvalidToString@3:32-3:35: Method A::__toString() must return a string

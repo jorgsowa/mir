@@ -13,4 +13,4 @@ function run(): void {
     helper();
 }
 ===expect===
-Main.php: UndefinedFunction@4:5-4:13: Function helper() is not defined
+Main.php: UndefinedFunction@4:4-4:12: Function helper() is not defined

@@ -9,4 +9,4 @@ function fooFoo(int $a): void {}
 $a = "hello";
 fooFoo($a);
 ===expect===
-MixedArgument@5:8-5:10: Argument $a of fooFoo() is mixed
+MixedArgument@5:7-5:9: Argument $a of fooFoo() is mixed

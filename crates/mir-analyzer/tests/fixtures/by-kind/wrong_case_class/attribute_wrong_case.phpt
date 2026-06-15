@@ -8,5 +8,4 @@ class myAttr {}
 #[myattr]
 class Foo {}
 ===expect===
-WrongCaseClass@5:3-5:9: Class name 'myattr' has incorrect casing; use 'myAttr'
-
+WrongCaseClass@5:2-5:8: Class name 'myattr' has incorrect casing; use 'myAttr'

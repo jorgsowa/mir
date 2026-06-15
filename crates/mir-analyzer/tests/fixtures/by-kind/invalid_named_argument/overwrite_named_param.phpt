@@ -8,4 +8,4 @@ function test(int $param, int $param2): void {
 
 test(param: 1, param: 2);
 ===expect===
-InvalidNamedArgument@6:16-6:24: test() has no parameter named $param
+InvalidNamedArgument@6:15-6:23: test() has no parameter named $param

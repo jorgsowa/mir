@@ -9,4 +9,4 @@ class A
 
 echo A::IS_PROTECTED;
 ===expect===
-InaccessibleClassConstant@7:9-7:21: Cannot access constant A::IS_PROTECTED
+InaccessibleClassConstant@7:8-7:20: Cannot access constant A::IS_PROTECTED

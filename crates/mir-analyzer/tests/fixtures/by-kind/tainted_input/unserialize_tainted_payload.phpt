@@ -8,4 +8,4 @@ function test(): void {
     $obj = unserialize($_COOKIE['session']);
 }
 ===expect===
-TaintedInput@3:12-3:44: Tainted input reaching sink 'unserialize'
+TaintedInput@3:11-3:43: Tainted input reaching sink 'unserialize'

@@ -8,4 +8,4 @@ function foo() : void {
     }
 }
 ===expect===
-UnusedForeachValue@4:9-4:11: Foreach value $i is never read
+UnusedForeachValue@4:8-4:10: Foreach value $i is never read

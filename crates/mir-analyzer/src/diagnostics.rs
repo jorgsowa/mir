@@ -53,7 +53,7 @@ pub(crate) fn offset_to_line_col(
             .unwrap_or(0)
     };
 
-    let col = (source[line_start_byte..byte_offset].chars().count() + 1) as u16;
+    let col = source[line_start_byte..byte_offset].chars().count() as u16;
 
     (line, col)
 }

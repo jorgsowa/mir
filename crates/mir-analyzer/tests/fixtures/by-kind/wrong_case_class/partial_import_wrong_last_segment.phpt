@@ -11,4 +11,4 @@ namespace Client;
 use MyApp\Service;
 $x = new Service\userservice();
 ===expect===
-WrongCaseClass@7:10-7:29: Class name 'userservice' has incorrect casing; use 'UserService'
+WrongCaseClass@7:9-7:28: Class name 'userservice' has incorrect casing; use 'UserService'

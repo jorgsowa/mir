@@ -20,4 +20,3 @@ class MimeType {
     }
 }
 ===expect===
-

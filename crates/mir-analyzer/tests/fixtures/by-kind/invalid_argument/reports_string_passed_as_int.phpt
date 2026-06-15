@@ -7,4 +7,4 @@ suppress=ForbiddenCode
 function f(int $x): void { var_dump($x); }
 function test(): void { f('hello'); }
 ===expect===
-InvalidArgument@3:27-3:34: Argument $x of f() expects 'int', got '"hello"'
+InvalidArgument@3:26-3:33: Argument $x of f() expects 'int', got '"hello"'

@@ -8,4 +8,4 @@ function foo(callable $c): void {}
 
 foo("trime");
 ===expect===
-UndefinedFunction@4:5-4:12: Function trime() is not defined
+UndefinedFunction@4:4-4:11: Function trime() is not defined

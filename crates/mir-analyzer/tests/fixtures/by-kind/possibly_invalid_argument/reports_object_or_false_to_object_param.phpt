@@ -12,4 +12,4 @@ function test(): void {
     takesConnection(getConnection());
 }
 ===expect===
-PossiblyInvalidArgument@7:21-7:36: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided
+PossiblyInvalidArgument@7:20-7:35: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided

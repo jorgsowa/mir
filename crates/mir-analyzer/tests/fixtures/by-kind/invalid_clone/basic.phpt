@@ -7,4 +7,4 @@ suppress=UnusedVariable
 $x = 42;
 $y = clone $x;
 ===expect===
-InvalidClone@3:6-3:14: cannot clone non-object 42
+InvalidClone@3:5-3:13: cannot clone non-object 42

@@ -5,4 +5,4 @@ Enum redefinition
 enum Foo {}
 enum Foo {}
 ===expect===
-DuplicateEnum@3:1-3:12: Enum Foo has already been defined
+DuplicateEnum@3:0-3:11: Enum Foo has already been defined

@@ -9,4 +9,4 @@ class Foo {
 }
 new Foo(function() : void {});
 ===expect===
-UndefinedClass@3:33-3:47: Class UndefinedClass does not exist
+UndefinedClass@3:32-3:46: Class UndefinedClass does not exist

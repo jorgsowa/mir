@@ -21,5 +21,5 @@ if (is_string($a->getValue())) {
     echo strlen($a->getValue());
 }
 ===expect===
-PossiblyInvalidArgument@16:17-16:31: Argument $string of strlen() expects 'string', possibly different type 'int|string|null' provided
-PossiblyNullArgument@16:17-16:31: Argument $string of strlen() might be null
+PossiblyInvalidArgument@16:16-16:30: Argument $string of strlen() expects 'string', possibly different type 'int|string|null' provided
+PossiblyNullArgument@16:16-16:30: Argument $string of strlen() might be null

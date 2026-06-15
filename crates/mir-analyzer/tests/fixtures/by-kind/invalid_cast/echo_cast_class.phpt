@@ -5,4 +5,4 @@ Echo cast class
 class A {}
 echo (string)(new A);
 ===expect===
-InvalidCast@3:14-3:21: Cannot cast 'A' to 'string'
+InvalidCast@3:13-3:20: Cannot cast 'A' to 'string'

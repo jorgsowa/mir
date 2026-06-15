@@ -16,4 +16,4 @@ class Holder {
 }
 ===expect===
 MissingConstructor@5:0-5:14: Class Holder has uninitialized properties but no constructor
-InvalidPropertyAssignment@11:9-11:28: Property $item expects 'Box<string>', cannot assign 'Box'
+InvalidPropertyAssignment@11:8-11:27: Property $item expects 'Box<string>', cannot assign 'Box'

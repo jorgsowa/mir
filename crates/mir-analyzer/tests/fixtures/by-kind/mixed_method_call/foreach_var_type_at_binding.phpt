@@ -31,6 +31,6 @@ foreach ($data as $key => $val) {
 }
 ===expect===
 MissingConstructor@2:0-2:12: Class User has uninitialized properties but no constructor
-TypeCheckMismatch@9:1-11:2: Type of $user is expected to be User, got mixed
-TypeCheckMismatch@16:1-18:2: Type of $item is expected to be string, got mixed
-TypeCheckMismatch@24:1-26:2: Type of $val is expected to be 1|2, got mixed
+TypeCheckMismatch@9:0-11:1: Type of $user is expected to be User, got mixed
+TypeCheckMismatch@16:0-18:1: Type of $item is expected to be string, got mixed
+TypeCheckMismatch@24:0-26:1: Type of $val is expected to be 1|2, got mixed

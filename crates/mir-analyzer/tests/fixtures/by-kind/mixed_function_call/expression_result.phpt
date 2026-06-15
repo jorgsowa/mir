@@ -9,4 +9,4 @@ function getMixed(): mixed { return null; }
 getMixed()();
 
 ===expect===
-MixedFunctionCall@5:1-5:13: Cannot call mixed type as a function
+MixedFunctionCall@5:0-5:12: Cannot call mixed type as a function

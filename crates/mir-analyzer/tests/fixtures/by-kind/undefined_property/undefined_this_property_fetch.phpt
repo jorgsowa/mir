@@ -8,4 +8,4 @@ class A {
     }
 }
 ===expect===
-UndefinedProperty@4:21-4:24: Property A::$foo does not exist
+UndefinedProperty@4:20-4:23: Property A::$foo does not exist

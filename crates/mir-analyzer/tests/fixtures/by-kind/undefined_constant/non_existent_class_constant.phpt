@@ -11,4 +11,4 @@ function getVal()
     return 5;
 }
 ===expect===
-UndefinedDocblockClass@6:10-6:16: Docblock type 'Foo::HELLO' does not exist
+UndefinedDocblockClass@6:9-6:15: Docblock type 'Foo::HELLO' does not exist

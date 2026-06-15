@@ -19,4 +19,4 @@ function getFoo(GetterSetter $o) : void {
 }
 ===expect===
 UnusedPsalmSuppress@14:0-14:0: Suppress annotation for 'NoInterfaceProperties' is never used
-NoInterfaceProperties@15:5-15:22: Property $bar is not defined on sealed interface
+NoInterfaceProperties@15:4-15:21: Property $bar is not defined on sealed interface

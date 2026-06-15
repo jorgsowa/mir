@@ -8,4 +8,4 @@ class A {
 $a = new A();
 clone $a;
 ===expect===
-InvalidClone@6:1-6:9: cannot clone non-object A
+InvalidClone@6:0-6:8: cannot clone non-object A

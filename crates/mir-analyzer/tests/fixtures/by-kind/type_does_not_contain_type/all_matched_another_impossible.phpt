@@ -11,4 +11,4 @@ function foo() : string {
     };
 }
 ===expect===
-TypeDoesNotContainType@7:9-7:12: Type '"a"|"b"' can never contain type '"c"'
+TypeDoesNotContainType@7:8-7:11: Type '"a"|"b"' can never contain type '"c"'

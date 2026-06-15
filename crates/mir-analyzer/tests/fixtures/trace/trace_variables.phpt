@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $a = getmypid();
 $b = getmypid();
 ===expect===
-Trace@3:1-3:17: Type of $a is mixed
+Trace@3:0-3:16: Type of $a is mixed

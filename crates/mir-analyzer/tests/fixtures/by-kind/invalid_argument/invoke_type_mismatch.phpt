@@ -11,4 +11,4 @@ class A {
 $q = new A;
 $q(1);
 ===expect===
-InvalidArgument@7:4-7:5: Argument $p of A::__invoke() expects 'string', got '1'
+InvalidArgument@7:3-7:4: Argument $p of A::__invoke() expects 'string', got '1'

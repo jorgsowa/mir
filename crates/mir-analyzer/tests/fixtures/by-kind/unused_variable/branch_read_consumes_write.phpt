@@ -33,4 +33,4 @@ function still_dead(): int {
     return $x;
 }
 ===expect===
-UnusedVariable@24:5-24:7: Variable $x is never read
+UnusedVariable@24:4-24:6: Variable $x is never read

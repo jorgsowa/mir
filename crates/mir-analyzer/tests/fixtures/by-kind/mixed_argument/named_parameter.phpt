@@ -10,4 +10,4 @@ $x = null;
 foo(a: $x, b: "hello");
 
 ===expect===
-MixedArgument@5:5-5:10: Argument $a of foo() is mixed
+MixedArgument@5:4-5:9: Argument $a of foo() is mixed

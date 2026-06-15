@@ -20,4 +20,4 @@ $result = $f->make(null);
 $f->prop = $result;
 ===expect===
 MissingConstructor@5:0-5:15: Class Factory has uninitialized properties but no constructor
-UnusedParam@9:26-9:28: Parameter $x is never used
+UnusedParam@9:25-9:27: Parameter $x is never used

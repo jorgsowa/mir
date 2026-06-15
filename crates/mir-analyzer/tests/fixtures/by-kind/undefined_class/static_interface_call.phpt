@@ -10,4 +10,4 @@ interface Foo {
 
 Foo::doFoo();
 ===expect===
-UndefinedClass@6:1-6:4: Class Foo does not exist
+UndefinedClass@6:0-6:3: Class Foo does not exist

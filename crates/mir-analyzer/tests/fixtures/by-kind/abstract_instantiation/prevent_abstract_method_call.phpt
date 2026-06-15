@@ -12,4 +12,4 @@ abstract class Base {
 
 Base::bar();
 ===expect===
-AbstractMethodCall@10:1-10:12: Cannot call abstract method Base::bar()
+AbstractMethodCall@10:0-10:11: Cannot call abstract method Base::bar()

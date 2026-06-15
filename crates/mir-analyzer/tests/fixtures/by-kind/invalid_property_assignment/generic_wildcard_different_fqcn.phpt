@@ -19,4 +19,4 @@ $c->a = $a;
 $c->a = new GenericB();
 ===expect===
 MissingConstructor@8:0-8:14: Class Config has uninitialized properties but no constructor
-InvalidPropertyAssignment@16:1-16:23: Property $a expects 'GenericA', cannot assign 'GenericB'
+InvalidPropertyAssignment@16:0-16:22: Property $a expects 'GenericA', cannot assign 'GenericB'

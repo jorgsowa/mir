@@ -16,4 +16,4 @@ class C {
     use B;
 }
 ===expect===
-InvalidReturnType@4:9-4:18: Return type '5' is not compatible with declared 'string'
+InvalidReturnType@4:8-4:17: Return type '5' is not compatible with declared 'string'

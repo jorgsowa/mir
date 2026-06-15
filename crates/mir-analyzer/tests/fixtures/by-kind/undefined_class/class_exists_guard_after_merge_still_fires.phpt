@@ -9,4 +9,4 @@ function test(): void {
     new \Optional\Pkg();
 }
 ===expect===
-UndefinedClass@6:9-6:22: Class Optional\Pkg does not exist
+UndefinedClass@6:8-6:21: Class Optional\Pkg does not exist

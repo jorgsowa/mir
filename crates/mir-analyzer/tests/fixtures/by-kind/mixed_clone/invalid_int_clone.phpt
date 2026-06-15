@@ -5,4 +5,4 @@ Invalid int clone
 $a = 5;
 clone $a;
 ===expect===
-InvalidClone@3:1-3:9: cannot clone non-object 5
+InvalidClone@3:0-3:8: cannot clone non-object 5

@@ -35,5 +35,5 @@ function test(): void {
     processMapWithContainer($mapData);
 }
 ===expect===
-UnusedParam@12:24-12:40: Parameter $value is never used
-UnusedParam@19:34-19:42: Parameter $map is never used
+UnusedParam@12:23-12:39: Parameter $value is never used
+UnusedParam@19:33-19:41: Parameter $map is never used

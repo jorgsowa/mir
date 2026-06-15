@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $x = STRLEN("hello");
 ===expect===
-WrongCaseFunction@2:6-2:12: Function name 'STRLEN' has incorrect casing; use 'strlen'
+WrongCaseFunction@2:5-2:11: Function name 'STRLEN' has incorrect casing; use 'strlen'

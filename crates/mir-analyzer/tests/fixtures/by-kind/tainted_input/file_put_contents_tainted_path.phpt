@@ -9,4 +9,4 @@ function test(): void {
     file_put_contents($path, 'safe-constant');
 }
 ===expect===
-TaintedInput@4:5-4:46: Tainted input reaching sink 'file'
+TaintedInput@4:4-4:45: Tainted input reaching sink 'file'

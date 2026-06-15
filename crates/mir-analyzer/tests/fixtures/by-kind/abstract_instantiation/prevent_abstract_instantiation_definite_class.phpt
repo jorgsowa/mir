@@ -10,4 +10,4 @@ function foo(string $a_class) : void {
     }
 }
 ===expect===
-AbstractInstantiation@6:13-6:21: Cannot instantiate abstract class A
+AbstractInstantiation@6:12-6:20: Cannot instantiate abstract class A

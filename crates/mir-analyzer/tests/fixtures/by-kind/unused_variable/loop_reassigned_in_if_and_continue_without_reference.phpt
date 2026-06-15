@@ -15,4 +15,4 @@ while (rand(0, 1)) {
     $a = 3;
 }
 ===expect===
-UnusedVariable@12:5-12:7: Variable $a is never read
+UnusedVariable@12:4-12:6: Variable $a is never read

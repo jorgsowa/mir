@@ -35,4 +35,4 @@ class Container {
     }
 }
 ===expect===
-UnusedParam@14:15-14:27: Parameter $value is never used
+UnusedParam@14:14-14:26: Parameter $value is never used

@@ -28,4 +28,4 @@ $c->max('foo');
 $c->contains('id', 1);
 pure_callable('not_a_real_function');
 ===expect===
-UndefinedFunction@22:15-22:36: Function not_a_real_function() is not defined
+UndefinedFunction@22:14-22:35: Function not_a_real_function() is not defined

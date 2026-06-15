@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $a = [1] + 1;
 ===expect===
-InvalidOperand@2:6-2:13: Operator '+' not supported between 'array{0: 1}' and '1'
+InvalidOperand@2:5-2:12: Operator '+' not supported between 'array{0: 1}' and '1'

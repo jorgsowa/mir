@@ -8,4 +8,4 @@ namespace App;
 
 \helper();
 ===expect===
-ParseError@2:1-2:27: Parse error: Namespace declaration statement has to be the very first statement or after any declare call in the script
+ParseError@2:0-2:26: Parse error: Namespace declaration statement has to be the very first statement or after any declare call in the script

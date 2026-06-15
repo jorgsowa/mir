@@ -19,4 +19,4 @@ class A {
     }
 }
 ===expect===
-InvalidReturnType@13:9-13:25: Return type 'int' is not compatible with declared 'string'
+InvalidReturnType@13:8-13:24: Return type 'int' is not compatible with declared 'string'

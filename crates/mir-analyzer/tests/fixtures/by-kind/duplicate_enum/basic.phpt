@@ -10,4 +10,4 @@ enum Status {
     case Inactive;
 }
 ===expect===
-DuplicateEnum@6:1-8:2: Enum Status has already been defined
+DuplicateEnum@6:0-8:1: Enum Status has already been defined

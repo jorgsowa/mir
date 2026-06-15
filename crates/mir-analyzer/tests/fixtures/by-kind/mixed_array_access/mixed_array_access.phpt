@@ -6,4 +6,4 @@ Mixed array access
 $a = [];
 echo $a[0];
 ===expect===
-MixedArrayAccess@4:6-4:11: Array access on mixed type
+MixedArrayAccess@4:5-4:10: Array access on mixed type

@@ -44,4 +44,4 @@ class MyTest {
 }
 ===expect===
 MyTest.php: MissingConstructor@7:0-7:14: Class MyApp\MyTest has uninitialized properties but no constructor
-Prophet.php: UnusedParam@10:32-10:43: Parameter $cls is never used
+Prophet.php: UnusedParam@10:31-10:42: Parameter $cls is never used

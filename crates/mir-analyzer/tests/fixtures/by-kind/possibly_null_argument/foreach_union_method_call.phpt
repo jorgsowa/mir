@@ -19,4 +19,4 @@ foreach ($items as $item) {
 // This should error because null doesn't have strlen
 $len = strlen($result);
 ===expect===
-PossiblyNullArgument@15:15-15:22: Argument $string of strlen() might be null
+PossiblyNullArgument@15:14-15:21: Argument $string of strlen() might be null

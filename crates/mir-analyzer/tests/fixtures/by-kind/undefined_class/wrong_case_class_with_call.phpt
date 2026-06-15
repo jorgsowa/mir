@@ -8,5 +8,5 @@ class A {}
 needsA(new A);
 function needsA(a $x): void {}
 ===expect===
-InvalidArgument@3:8-3:13: Argument $x of needsA() expects 'a', got 'A'
-WrongCaseClass@4:17-4:18: Class name 'a' has incorrect casing; use 'A'
+InvalidArgument@3:7-3:12: Argument $x of needsA() expects 'a', got 'A'
+WrongCaseClass@4:16-4:17: Class name 'a' has incorrect casing; use 'A'

@@ -10,4 +10,4 @@ class Stringable2 {
 $s = new Stringable2();
 $x = $s->__TOSTRING();
 ===expect===
-WrongCaseMethod@6:10-6:20: Method name 'Stringable2::__TOSTRING' has incorrect casing; use '__toString'
+WrongCaseMethod@6:9-6:19: Method name 'Stringable2::__TOSTRING' has incorrect casing; use '__toString'

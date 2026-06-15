@@ -8,4 +8,4 @@ Undefined class one line in file after
 new B();
 new C();
 ===expect===
-UndefinedClass@6:5-6:6: Class C does not exist
+UndefinedClass@6:4-6:5: Class C does not exist

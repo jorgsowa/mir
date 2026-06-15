@@ -8,4 +8,4 @@ function run(string $cmd): string {
     return `$cmd`;
 }
 ===expect===
-ForbiddenCode@3:12-3:18: Use of shell_exec (backtick) is forbidden
+ForbiddenCode@3:11-3:17: Use of shell_exec (backtick) is forbidden

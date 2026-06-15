@@ -7,4 +7,4 @@ class A {}
 
 (new A)->foo;
 ===expect===
-UndefinedProperty@5:10-5:13: Property A::$foo does not exist
+UndefinedProperty@5:9-5:12: Property A::$foo does not exist

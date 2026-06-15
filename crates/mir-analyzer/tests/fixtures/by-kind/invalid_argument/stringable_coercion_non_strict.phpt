@@ -13,4 +13,4 @@ function render(string $html): void {}
 // Should NOT report InvalidArgument — PHP calls __toString() in coercive mode.
 render(new Tag());
 ===expect===
-UnusedParam@8:17-8:29: Parameter $html is never used
+UnusedParam@8:16-8:28: Parameter $html is never used

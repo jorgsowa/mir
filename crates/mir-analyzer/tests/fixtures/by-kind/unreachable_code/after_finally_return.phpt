@@ -12,4 +12,4 @@ function test(): void {
     echo 'unreachable';
 }
 ===expect===
-UnreachableCode@9:5-9:24: Unreachable code detected
+UnreachableCode@9:4-9:23: Unreachable code detected

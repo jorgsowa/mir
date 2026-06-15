@@ -35,5 +35,5 @@ $val2 = extract($tb);
 /** @mir-check $val2 is mixed */
 echo $val2;
 ===expect===
-UnusedParam@15:18-15:29: Parameter $item is never used
-InvalidArgument@21:16-21:18: Argument $item of extract() expects 'Box<T>&Taggable', got 'Box<string>'
+UnusedParam@15:17-15:28: Parameter $item is never used
+InvalidArgument@21:15-21:17: Argument $item of extract() expects 'Box<T>&Taggable', got 'Box<string>'

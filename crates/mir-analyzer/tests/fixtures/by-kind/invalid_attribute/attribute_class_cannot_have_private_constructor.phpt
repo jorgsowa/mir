@@ -7,4 +7,4 @@ class Baz {
     private function __construct() {}
 }
 ===expect===
-InvalidAttribute@4:5-4:38: Attribute class constructor must not be private
+InvalidAttribute@4:4-4:37: Attribute class constructor must not be private

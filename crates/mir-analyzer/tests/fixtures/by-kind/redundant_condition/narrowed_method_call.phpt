@@ -35,5 +35,5 @@ function errorCase(Article|Photo $content): void {
     $content->undefinedMethod();
 }
 ===expect===
-RedundantCondition@21:15-21:40: Condition is always true/false for type 'bool'
-UndefinedMethod@32:5-32:32: Method Article::undefinedMethod() does not exist
+RedundantCondition@21:14-21:39: Condition is always true/false for type 'bool'
+UndefinedMethod@32:4-32:31: Method Article::undefinedMethod() does not exist

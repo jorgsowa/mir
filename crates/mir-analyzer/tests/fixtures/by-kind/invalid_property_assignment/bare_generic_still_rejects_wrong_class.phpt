@@ -18,4 +18,4 @@ $b = new ProphecyB();
 $h->prop = $b;
 ===expect===
 MissingConstructor@8:0-8:14: Class Holder has uninitialized properties but no constructor
-InvalidPropertyAssignment@15:1-15:14: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'
+InvalidPropertyAssignment@15:0-15:13: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'

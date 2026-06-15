@@ -4,4 +4,4 @@ reports too few arguments to native function
 <?php
 str_repeat('x');
 ===expect===
-TooFewArguments@2:1-2:16: Too few arguments for str_repeat(): expected 2, got 1
+TooFewArguments@2:0-2:15: Too few arguments for str_repeat(): expected 2, got 1

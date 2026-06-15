@@ -9,4 +9,4 @@ $x = [];
 $y = (array)$x;
 
 ===expect===
-RedundantCast@3:13-3:15: Casting 'array{}' to 'array' is redundant
+RedundantCast@3:12-3:14: Casting 'array{}' to 'array' is redundant

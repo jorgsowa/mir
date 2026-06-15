@@ -7,4 +7,4 @@ suppress=UnusedParam
 function fooFoo(int $a): void {}
 fooFoo();
 ===expect===
-TooFewArguments@3:1-3:9: Too few arguments for fooFoo(): expected 1, got 0
+TooFewArguments@3:0-3:8: Too few arguments for fooFoo(): expected 1, got 0

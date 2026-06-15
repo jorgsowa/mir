@@ -9,4 +9,4 @@ Continue is not break
                             continue 2;
                     }
 ===expect===
-ParseError@6:29-6:37: Parse error: Cannot 'continue' 2 levels
+ParseError@6:28-6:36: Parse error: Cannot 'continue' 2 levels

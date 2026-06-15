@@ -12,4 +12,4 @@ function bar() : void {
     }
 }
 ===expect===
-UnusedForeachValue@8:9-8:11: Foreach value $i is never read
+UnusedForeachValue@8:8-8:10: Foreach value $i is never read

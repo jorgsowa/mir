@@ -18,4 +18,4 @@ foreach ($items as $item) {
 // because array size is unknown and loop might not execute
 echo $result;
 ===expect===
-MixedMethodCall@10:15-10:33: Method transform() called on mixed type
+MixedMethodCall@10:14-10:32: Method transform() called on mixed type

@@ -12,4 +12,4 @@ function getLastNum(array $a): int {
     return 4;
 }
 ===expect===
-UnusedVariable@7:9-7:14: Variable $last is never read
+UnusedVariable@7:8-7:13: Variable $last is never read

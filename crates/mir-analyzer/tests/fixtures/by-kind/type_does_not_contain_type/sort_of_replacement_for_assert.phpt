@@ -21,5 +21,5 @@ function bar(?string $s) : string {
     return $s;
 }
 ===expect===
-UndefinedClass@10:19-10:28: Class Bar\Exception does not exist
-InvalidReturnType@16:5-16:15: Return type 'true' is not compatible with declared 'string'
+UndefinedClass@10:18-10:27: Class Bar\Exception does not exist
+InvalidReturnType@16:4-16:14: Return type 'true' is not compatible with declared 'string'

@@ -9,4 +9,4 @@ function foo(int $i) : void {
     };
 };
 ===expect===
-ParadoxicalCondition@5:9-5:10: Value 1 is duplicated; this branch can never be reached
+ParadoxicalCondition@5:8-5:9: Value 1 is duplicated; this branch can never be reached

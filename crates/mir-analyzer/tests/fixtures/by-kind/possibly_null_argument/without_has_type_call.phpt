@@ -8,4 +8,4 @@ foreach ($parameters as $parameter) {
     $parameter->getType()->__toString();
 }
 ===expect===
-PossiblyNullMethodCall@5:5-5:40: Cannot call method __toString() on possibly null value
+PossiblyNullMethodCall@5:4-5:39: Cannot call method __toString() on possibly null value

@@ -9,4 +9,4 @@ class Foo {}
 
 echo Foo::class;
 ===expect===
-DeprecatedClass@7:6-7:9: Class Foo is deprecated
+DeprecatedClass@7:5-7:8: Class Foo is deprecated

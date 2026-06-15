@@ -10,5 +10,5 @@ function twiceImpure(): string {
 }
 
 ===expect===
-ImpureFunctionCall@4:10-4:24: Calling impure function mt_rand() in a @pure function
-ImpureFunctionCall@5:10-5:24: Calling impure function mt_rand() in a @pure function
+ImpureFunctionCall@4:9-4:23: Calling impure function mt_rand() in a @pure function
+ImpureFunctionCall@5:9-5:23: Calling impure function mt_rand() in a @pure function

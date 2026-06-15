@@ -10,4 +10,4 @@ try {
 } catch (appexception $e) {
 }
 ===expect===
-WrongCaseClass@5:10-5:22: Class name 'appexception' has incorrect casing; use 'AppException'
+WrongCaseClass@5:9-5:21: Class name 'appexception' has incorrect casing; use 'AppException'

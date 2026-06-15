@@ -21,4 +21,4 @@ function f(): void {
     echo $a, $b, $c;
 }
 ===expect===
-UnnecessaryVarAnnotation@8:5-8:16: @var annotation for $a is unnecessary
+UnnecessaryVarAnnotation@8:4-8:15: @var annotation for $a is unnecessary

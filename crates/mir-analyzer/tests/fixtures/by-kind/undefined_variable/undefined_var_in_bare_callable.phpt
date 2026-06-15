@@ -10,4 +10,4 @@ function a(callable $fn): void{
 }
 a($fn);
 ===expect===
-UndefinedVariable@4:9-4:11: Variable $a is not defined
+UndefinedVariable@4:8-4:10: Variable $a is not defined

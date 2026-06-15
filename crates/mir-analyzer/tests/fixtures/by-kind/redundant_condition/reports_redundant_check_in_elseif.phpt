@@ -14,4 +14,4 @@ function foo(string|null $x): void {
     }
 }
 ===expect===
-RedundantCondition@9:15-9:28: Condition is always true/false for type 'bool'
+RedundantCondition@9:14-9:27: Condition is always true/false for type 'bool'

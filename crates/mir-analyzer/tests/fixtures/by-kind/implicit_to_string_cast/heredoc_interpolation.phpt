@@ -10,4 +10,4 @@ $s = <<<EOT
 Value: {$f}
 EOT;
 ===expect===
-ImplicitToStringCast@5:9-5:11: Class Foo is implicitly cast to string
+ImplicitToStringCast@5:8-5:10: Class Foo is implicitly cast to string

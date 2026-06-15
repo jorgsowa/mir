@@ -7,4 +7,4 @@ class MyClass {
 }
 myclass::hello();
 ===expect===
-WrongCaseClass@5:1-5:8: Class name 'myclass' has incorrect casing; use 'MyClass'
+WrongCaseClass@5:0-5:7: Class name 'myclass' has incorrect casing; use 'MyClass'

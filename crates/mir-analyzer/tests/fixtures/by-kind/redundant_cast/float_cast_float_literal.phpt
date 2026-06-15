@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $x = (float)3.0;
 
 ===expect===
-RedundantCast@2:13-2:16: Casting '3' to 'float' is redundant
+RedundantCast@2:12-2:15: Casting '3' to 'float' is redundant

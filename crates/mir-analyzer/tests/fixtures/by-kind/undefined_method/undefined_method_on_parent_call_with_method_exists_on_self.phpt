@@ -11,4 +11,4 @@ class B extends A {
     }
 }
 ===expect===
-UndefinedMethod@5:16-5:29: Method A::foo() does not exist
+UndefinedMethod@5:15-5:28: Method A::foo() does not exist

@@ -11,4 +11,4 @@ function test(): void {
     takesInt(n: getResult());
 }
 ===expect===
-PossiblyInvalidArgument@6:14-6:28: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided
+PossiblyInvalidArgument@6:13-6:27: Argument $n of takesInt() expects 'int', possibly different type 'int|false' provided

@@ -12,4 +12,4 @@ $obj = new Foo();
 $ref = &$obj->bar;
 
 ===expect===
-UnsupportedReferenceUsage@7:1-7:18: Reference assignment is not supported
+UnsupportedReferenceUsage@7:0-7:17: Reference assignment is not supported

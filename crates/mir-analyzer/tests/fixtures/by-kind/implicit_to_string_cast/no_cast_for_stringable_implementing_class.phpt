@@ -21,4 +21,4 @@ class HasToString {
 }
 process(new HasToString());
 ===expect===
-ImplicitToStringCast@17:9-17:26: Class HasToString is implicitly cast to string
+ImplicitToStringCast@17:8-17:25: Class HasToString is implicitly cast to string

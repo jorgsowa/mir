@@ -16,4 +16,4 @@ function takesI(I $i): void
     takesString($i);
 }
 ===expect===
-ImplicitToStringCast@11:17-11:19: Class I is implicitly cast to string
+ImplicitToStringCast@11:16-11:18: Class I is implicitly cast to string

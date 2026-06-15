@@ -20,4 +20,4 @@ $container = $factory->makeContainer(null);
 $factory->container = $container;
 ===expect===
 MissingConstructor@5:0-5:19: Class TestFactory has uninitialized properties but no constructor
-UnusedParam@9:35-9:37: Parameter $x is never used
+UnusedParam@9:34-9:36: Parameter $x is never used

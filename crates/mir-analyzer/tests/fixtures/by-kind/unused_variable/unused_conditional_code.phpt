@@ -7,4 +7,4 @@ if (rand(0, 1)) {
   $a = $a + 5;
 }
 ===expect===
-UnusedVariable@4:3-4:5: Variable $a is never read
+UnusedVariable@4:2-4:4: Variable $a is never read

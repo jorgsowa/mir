@@ -8,4 +8,4 @@ function test(string|null $in): string|null {
 test(2);
 
 ===expect===
-InvalidArgument@5:6-5:7: Argument $in of test() expects 'string|null', got '2'
+InvalidArgument@5:5-5:6: Argument $in of test() expects 'string|null', got '2'

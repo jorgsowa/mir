@@ -6,4 +6,4 @@ interface SomeInterface {
     string $value { get; }
 }
 ===expect===
-ParseError@3:5-3:11: Parse error: expected modifier, found identifier
+ParseError@3:4-3:10: Parse error: expected modifier, found identifier

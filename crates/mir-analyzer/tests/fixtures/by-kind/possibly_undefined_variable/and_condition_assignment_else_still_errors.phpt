@@ -12,4 +12,4 @@ function foo(bool $a, object $obj): void {
     }
 }
 ===expect===
-PossiblyUndefinedVariable@6:14-6:16: Variable $y might not be defined
+PossiblyUndefinedVariable@6:13-6:15: Variable $y might not be defined

@@ -15,4 +15,4 @@ function bar(callable $c) : string {
 
 bar($add_one);
 ===expect===
-InvalidReturnType@10:5-10:18: Return type 'int' is not compatible with declared 'string'
+InvalidReturnType@10:4-10:17: Return type 'int' is not compatible with declared 'string'

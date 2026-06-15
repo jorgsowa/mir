@@ -11,4 +11,4 @@ class Foo {
     private function doSomething(array $a): void {}
 }
 ===expect===
-UnusedParam@8:34-8:42: Parameter $a is never used
+UnusedParam@8:33-8:41: Parameter $a is never used

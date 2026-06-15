@@ -6,4 +6,4 @@ function f(): UnknownClass {
     return null;
 }
 ===expect===
-UndefinedClass@2:15-2:27: Class UnknownClass does not exist
+UndefinedClass@2:14-2:26: Class UnknownClass does not exist

@@ -6,4 +6,4 @@ suppress=UnusedParam
 <?php
 function foo(#[Pure] string $str) : void {}
 ===expect===
-UndefinedAttributeClass@2:16-2:20: Attribute class Pure does not exist
+UndefinedAttributeClass@2:15-2:19: Attribute class Pure does not exist

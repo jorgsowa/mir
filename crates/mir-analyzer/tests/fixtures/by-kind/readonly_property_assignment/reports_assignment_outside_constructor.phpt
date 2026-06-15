@@ -14,4 +14,4 @@ function test(Foo $foo): void {
     $foo->name = 'bar';
 }
 ===expect===
-ReadonlyPropertyAssignment@11:5-11:23: Cannot assign to readonly property Foo::$name outside of constructor
+ReadonlyPropertyAssignment@11:4-11:22: Cannot assign to readonly property Foo::$name outside of constructor

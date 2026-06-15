@@ -7,4 +7,4 @@ suppress=ForbiddenCode
 <?php
 var_dump();
 ===expect===
-TooFewArguments@2:1-2:11: Too few arguments for var_dump(): expected 1, got 0
+TooFewArguments@2:0-2:10: Too few arguments for var_dump(): expected 1, got 0

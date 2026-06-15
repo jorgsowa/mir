@@ -13,4 +13,4 @@ if (rand(0, 1)) {
     }
 }
 ===expect===
-UnusedVariable@6:9-6:11: Variable $a is never read
+UnusedVariable@6:8-6:10: Variable $a is never read

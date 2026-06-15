@@ -10,4 +10,4 @@ interface Logger {
     public function write(string $msg): void;
 }
 ===expect===
-DuplicateInterface@6:1-8:2: Interface Logger has already been defined
+DuplicateInterface@6:0-8:1: Interface Logger has already been defined

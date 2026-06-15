@@ -21,5 +21,5 @@ $result = $factory->makeNested(null, 1);
 $factory->wrapper = $result;
 ===expect===
 MissingConstructor@5:0-5:21: Class NestedFactory has uninitialized properties but no constructor
-UnusedParam@10:32-10:34: Parameter $x is never used
-UnusedParam@10:36-10:38: Parameter $y is never used
+UnusedParam@10:31-10:33: Parameter $x is never used
+UnusedParam@10:35-10:37: Parameter $y is never used

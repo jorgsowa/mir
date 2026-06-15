@@ -25,4 +25,4 @@ class NullableBug {
 }
 ===expect===
 UnusedPsalmSuppress@20:0-20:0: Suppress annotation for 'ArgumentTypeCoercion' is never used
-InvalidArgument@20:27-20:42: Argument $className of mock() expects 'class-string|null', got '"NullableClass"'
+InvalidArgument@20:26-20:41: Argument $className of mock() expects 'class-string|null', got '"NullableClass"'

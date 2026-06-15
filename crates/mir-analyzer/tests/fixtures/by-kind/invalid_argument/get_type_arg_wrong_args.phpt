@@ -22,5 +22,5 @@ switch (gettype($a)) {
         testString($a);
 }
 ===expect===
-PossiblyInvalidArgument@14:17-14:19: Argument $var of testInt() expects 'int', possibly different type '1|"two"' provided
-PossiblyInvalidArgument@17:20-17:22: Argument $var of testString() expects 'string', possibly different type '1|"two"' provided
+PossiblyInvalidArgument@14:16-14:18: Argument $var of testInt() expects 'int', possibly different type '1|"two"' provided
+PossiblyInvalidArgument@17:19-17:21: Argument $var of testString() expects 'string', possibly different type '1|"two"' provided

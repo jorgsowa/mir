@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $a = "hi" + (new stdClass);
 ===expect===
-InvalidOperand@2:6-2:27: Operator '+' not supported between '"hi"' and 'stdClass'
+InvalidOperand@2:5-2:26: Operator '+' not supported between '"hi"' and 'stdClass'

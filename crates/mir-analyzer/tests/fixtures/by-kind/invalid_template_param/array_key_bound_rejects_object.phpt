@@ -18,4 +18,4 @@ function test(array $arr): void {
     array_key_list($arr);
 }
 ===expect===
-App.php: InvalidTemplateParam@4:5-4:25: Template type 'TKey' inferred as 'object' does not satisfy bound 'int|string'
+App.php: InvalidTemplateParam@4:4-4:24: Template type 'TKey' inferred as 'object' does not satisfy bound 'int|string'

@@ -39,5 +39,5 @@ class MyTest {
 }
 ===expect===
 MyTest.php: MissingConstructor@8:0-8:14: Class App\MyTest has uninitialized properties but no constructor
-MyTest.php: InvalidPropertyAssignment@14:9-14:30: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
-ObjectProphecy.php: UnusedParam@16:32-16:43: Parameter $cls is never used
+MyTest.php: InvalidPropertyAssignment@14:8-14:29: Property $prop expects 'Prophecy\SubjectProphecy', cannot assign 'Prophecy\ObjectProphecy<stdClass>'
+ObjectProphecy.php: UnusedParam@16:31-16:42: Parameter $cls is never used

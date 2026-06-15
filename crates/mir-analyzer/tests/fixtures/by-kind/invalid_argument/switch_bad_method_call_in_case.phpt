@@ -12,4 +12,4 @@ switch (true) {
         break;
 }
 ===expect===
-InvalidArgument@6:11-6:13: Argument $p of f() expects 'string', got 'bool'
+InvalidArgument@6:10-6:12: Argument $p of f() expects 'string', got 'bool'

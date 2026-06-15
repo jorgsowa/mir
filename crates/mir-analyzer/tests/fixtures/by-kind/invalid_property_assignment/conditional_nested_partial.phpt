@@ -24,4 +24,4 @@ $factory->stringProp = $result;
 $factory->intProp = $result;
 ===expect===
 MissingConstructor@2:0-2:22: Class PartialFactory has uninitialized properties but no constructor
-InvalidPropertyAssignment@19:1-19:28: Property $intProp expects 'int', cannot assign 'string'
+InvalidPropertyAssignment@19:0-19:27: Property $intProp expects 'int', cannot assign 'string'

@@ -11,4 +11,4 @@ function makeStringBox(): mixed {
     return $b;
 }
 ===expect===
-InvalidReturnType@8:5-8:15: Return type 'Box<int>' is not compatible with declared 'Box<string>'
+InvalidReturnType@8:4-8:14: Return type 'Box<int>' is not compatible with declared 'Box<string>'

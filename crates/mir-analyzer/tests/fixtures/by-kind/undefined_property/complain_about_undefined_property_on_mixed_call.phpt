@@ -10,4 +10,4 @@ class C {
     }
 }
 ===expect===
-UndefinedProperty@6:24-6:25: Property C::$d does not exist
+UndefinedProperty@6:23-6:24: Property C::$d does not exist

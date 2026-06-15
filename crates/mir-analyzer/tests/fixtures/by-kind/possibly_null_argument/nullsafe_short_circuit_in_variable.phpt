@@ -14,4 +14,4 @@ function fooOrNull(): ?Foo {
 $a = fooOrNull()?->getBar();
 $a->doBaz();
 ===expect===
-PossiblyNullMethodCall@12:1-12:12: Cannot call method doBaz() on possibly null value
+PossiblyNullMethodCall@12:0-12:11: Cannot call method doBaz() on possibly null value

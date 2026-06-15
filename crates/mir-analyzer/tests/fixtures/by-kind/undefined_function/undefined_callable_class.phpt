@@ -19,5 +19,5 @@ class A {
     }
 }
 ===expect===
-UndefinedClass@3:31-3:34: Class Foo does not exist
-UndefinedClass@5:20-5:23: Class Foo does not exist
+UndefinedClass@3:30-3:33: Class Foo does not exist
+UndefinedClass@5:19-5:22: Class Foo does not exist

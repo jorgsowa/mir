@@ -7,5 +7,5 @@ class User {
     public $age;
 }
 ===expect===
-MissingPropertyType@3:5-3:17: Property User::$name has no type annotation
-MissingPropertyType@4:5-4:16: Property User::$age has no type annotation
+MissingPropertyType@3:4-3:16: Property User::$name has no type annotation
+MissingPropertyType@4:4-4:15: Property User::$age has no type annotation

@@ -16,4 +16,4 @@ function f(array $arr): array {
 }
 
 ===expect===
-UnusedForeachValue@8:26-8:33: Foreach value $subelt is never read
+UnusedForeachValue@8:25-8:32: Foreach value $subelt is never read

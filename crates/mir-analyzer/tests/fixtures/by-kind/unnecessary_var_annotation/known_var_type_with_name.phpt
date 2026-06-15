@@ -11,4 +11,4 @@ $a = foo();
 
 echo $a;
 ===expect===
-UnnecessaryVarAnnotation@7:1-7:12: @var annotation for $a is unnecessary
+UnnecessaryVarAnnotation@7:0-7:11: @var annotation for $a is unnecessary

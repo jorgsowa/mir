@@ -12,4 +12,4 @@ class Foo {
 
 Foo::barBar();
 ===expect===
-DeprecatedClass@10:1-10:4: Class Foo is deprecated
+DeprecatedClass@10:0-10:3: Class Foo is deprecated

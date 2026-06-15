@@ -6,4 +6,4 @@ function test(): void {
     static $count;
 }
 ===expect===
-UnusedVariable@3:12-3:18: Variable $count is never read
+UnusedVariable@3:11-3:17: Variable $count is never read

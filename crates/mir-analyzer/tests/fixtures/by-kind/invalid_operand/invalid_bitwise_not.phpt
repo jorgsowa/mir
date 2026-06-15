@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $a = ~new stdClass;
 ===expect===
-InvalidOperand@2:7-2:19: Operator '~' not supported between 'stdClass' and ''
+InvalidOperand@2:6-2:18: Operator '~' not supported between 'stdClass' and ''

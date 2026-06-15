@@ -15,4 +15,4 @@ class A {
 function fooFoo(string $b): void {}
 fooFoo(new A());
 ===expect===
-ImplicitToStringCast@11:8-11:15: Class A is implicitly cast to string
+ImplicitToStringCast@11:7-11:14: Class A is implicitly cast to string

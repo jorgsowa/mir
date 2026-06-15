@@ -10,4 +10,4 @@ $foo = new class {
     }
 };
 ===expect===
-UndefinedClass@4:13-4:14: Class B does not exist
+UndefinedClass@4:12-4:13: Class B does not exist

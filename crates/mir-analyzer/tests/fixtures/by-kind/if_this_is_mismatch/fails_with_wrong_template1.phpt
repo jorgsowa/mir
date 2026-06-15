@@ -30,4 +30,4 @@ $i = new a("test");
 $i->test();
 
 ===expect===
-IfThisIsMismatch@25:1-25:11: Cannot call a::test() — @if-this-is requires $this to be 'a<int>', but it is 'a<string>'
+IfThisIsMismatch@25:0-25:10: Cannot call a::test() — @if-this-is requires $this to be 'a<int>', but it is 'a<string>'

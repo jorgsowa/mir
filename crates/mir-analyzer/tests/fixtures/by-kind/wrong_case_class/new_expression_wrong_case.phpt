@@ -7,4 +7,4 @@ suppress=UnusedVariable
 class Foo {}
 $x = new foo();
 ===expect===
-WrongCaseClass@3:10-3:13: Class name 'foo' has incorrect casing; use 'Foo'
+WrongCaseClass@3:9-3:12: Class name 'foo' has incorrect casing; use 'Foo'

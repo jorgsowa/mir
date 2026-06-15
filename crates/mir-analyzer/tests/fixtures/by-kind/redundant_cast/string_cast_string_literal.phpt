@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $x = (string)"hello";
 
 ===expect===
-RedundantCast@2:14-2:21: Casting '"hello"' to 'string' is redundant
+RedundantCast@2:13-2:20: Casting '"hello"' to 'string' is redundant

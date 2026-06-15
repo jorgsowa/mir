@@ -10,4 +10,4 @@ try {
 }
 catch (A $e) {}
 ===expect===
-InvalidCatch@6:8-6:9: Caught type 'A' does not extend Throwable
+InvalidCatch@6:7-6:8: Caught type 'A' does not extend Throwable

@@ -17,4 +17,4 @@ function foo(array $input) : CustomerData {
     return new CustomerData(...$input);
 }
 ===expect===
-PossiblyInvalidArgument@14:29-14:38: Argument $name of CustomerData::__construct() expects 'string', possibly different type 'int|string' provided
+PossiblyInvalidArgument@14:28-14:37: Argument $name of CustomerData::__construct() expects 'string', possibly different type 'int|string' provided

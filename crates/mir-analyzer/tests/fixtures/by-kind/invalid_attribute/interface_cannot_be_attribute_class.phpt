@@ -5,4 +5,4 @@ Interface cannot be attribute class
 #[Attribute]
 interface Foo {}
 ===expect===
-InvalidAttribute@2:3-2:12: Interfaces cannot be attribute classes
+InvalidAttribute@2:2-2:11: Interfaces cannot be attribute classes

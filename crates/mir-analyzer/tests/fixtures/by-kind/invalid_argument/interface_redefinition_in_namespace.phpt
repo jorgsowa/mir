@@ -7,4 +7,4 @@ namespace Aye {
     interface Foo {}
 }
 ===expect===
-DuplicateInterface@4:5-4:21: Interface Aye\Foo has already been defined
+DuplicateInterface@4:4-4:20: Interface Aye\Foo has already been defined

@@ -12,4 +12,4 @@ $x = match (gettype($a)) {
     default => 3,
 };
 ===expect===
-UnevaluatedCode@5:5-5:10: Unevaluated code: gettype() never returns "int" (did you mean "integer"?)
+UnevaluatedCode@5:4-5:9: Unevaluated code: gettype() never returns "int" (did you mean "integer"?)

@@ -38,6 +38,6 @@ class Consumer {
     }
 }
 ===expect===
-ClassA.php: UnusedParam@16:27-16:38: Parameter $cls is never used
+ClassA.php: UnusedParam@16:26-16:37: Parameter $cls is never used
 Consumer.php: MissingConstructor@8:0-8:16: Class App\Consumer has uninitialized properties but no constructor
-Consumer.php: InvalidPropertyAssignment@14:9-14:32: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'
+Consumer.php: InvalidPropertyAssignment@14:8-14:31: Property $holder expects 'Lib\ClassB', cannot assign 'Lib\ClassA<stdClass>'

@@ -9,4 +9,4 @@ class Baz
 }
 
 ===expect===
-UndefinedAttributeClass@4:7-4:11: Attribute class Pure does not exist
+UndefinedAttributeClass@4:6-4:10: Attribute class Pure does not exist

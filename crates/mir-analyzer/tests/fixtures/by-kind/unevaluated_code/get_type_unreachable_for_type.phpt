@@ -13,4 +13,4 @@ function scope(int $n): void {
     }
 }
 ===expect===
-UnevaluatedCode@6:14-6:22: Unevaluated code: gettype() of int never returns "string"
+UnevaluatedCode@6:13-6:21: Unevaluated code: gettype() of int never returns "string"

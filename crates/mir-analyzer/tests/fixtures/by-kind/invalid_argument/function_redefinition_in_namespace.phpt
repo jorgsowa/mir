@@ -7,4 +7,4 @@ namespace Aye {
     function foo(): void {}
 }
 ===expect===
-DuplicateFunction@4:5-4:28: Function Aye\foo() has already been defined
+DuplicateFunction@4:4-4:27: Function Aye\foo() has already been defined

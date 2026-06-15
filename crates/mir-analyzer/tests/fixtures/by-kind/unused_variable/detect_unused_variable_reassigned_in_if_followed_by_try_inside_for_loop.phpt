@@ -21,6 +21,6 @@ if ($user !== null && $user !== 0) {
     echo $i;
 }
 ===expect===
-UnusedVariable@2:1-2:9: Variable $user_id is never read
-UnusedVariable@13:9-13:11: Variable $a is never read
-UnusedVariable@14:22-14:39: Variable $e is never read
+UnusedVariable@2:0-2:8: Variable $user_id is never read
+UnusedVariable@13:8-13:10: Variable $a is never read
+UnusedVariable@14:21-14:38: Variable $e is never read

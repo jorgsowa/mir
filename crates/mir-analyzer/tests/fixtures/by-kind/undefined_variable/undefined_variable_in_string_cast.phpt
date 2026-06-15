@@ -5,4 +5,4 @@ Undefined variable in string cast
 fn(): string => (string) $a;
                 
 ===expect===
-UndefinedVariable@2:26-2:28: Variable $a is not defined
+UndefinedVariable@2:25-2:27: Variable $a is not defined

@@ -9,4 +9,4 @@ function run(): void {
     shell_exec($cmd);
 }
 ===expect===
-TaintedShell@4:5-4:21: Tainted shell command — possible command injection
+TaintedShell@4:4-4:20: Tainted shell command — possible command injection

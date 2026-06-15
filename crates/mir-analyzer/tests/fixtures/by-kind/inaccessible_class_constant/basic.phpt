@@ -8,4 +8,4 @@ class Config {
 
 echo Config::SECRET;
 ===expect===
-InaccessibleClassConstant@6:14-6:20: Cannot access constant Config::SECRET
+InaccessibleClassConstant@6:13-6:19: Cannot access constant Config::SECRET

@@ -8,4 +8,4 @@ function missing_return() : bool {
     }
 }
 ===expect===
-InvalidReturnType@2:34-6:35: Return type 'void' is not compatible with declared 'bool'
+InvalidReturnType@2:33-6:34: Return type 'void' is not compatible with declared 'bool'

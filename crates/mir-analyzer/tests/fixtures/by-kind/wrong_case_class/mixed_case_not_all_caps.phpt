@@ -8,5 +8,5 @@ class HttpClient {}
 $c = new httpclient();
 $d = new HttpCLIENT();
 ===expect===
-WrongCaseClass@3:10-3:20: Class name 'httpclient' has incorrect casing; use 'HttpClient'
-WrongCaseClass@4:10-4:20: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'
+WrongCaseClass@3:9-3:19: Class name 'httpclient' has incorrect casing; use 'HttpClient'
+WrongCaseClass@4:9-4:19: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'

@@ -10,4 +10,4 @@ class A {
 $a = new A("hello");
 $a->bar = "goodbye";
 ===expect===
-ReadonlyPropertyAssignment@8:1-8:20: Cannot assign to readonly property A::$bar outside of constructor
+ReadonlyPropertyAssignment@8:0-8:19: Cannot assign to readonly property A::$bar outside of constructor

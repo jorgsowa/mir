@@ -13,4 +13,4 @@ class Config {
 $c = new Config();
 echo $c->server;
 ===expect===
-DeprecatedProperty@11:10-11:16: Property Config::$server is deprecated: Use $host instead.
+DeprecatedProperty@11:9-11:15: Property Config::$server is deprecated: Use $host instead.

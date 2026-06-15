@@ -14,4 +14,4 @@ $a = (new Foo());
 
 echo $a->foo;
 ===expect===
-MixedPropertyFetch@10:6-10:13: Property $foo fetched on mixed type
+MixedPropertyFetch@10:5-10:12: Property $foo fetched on mixed type

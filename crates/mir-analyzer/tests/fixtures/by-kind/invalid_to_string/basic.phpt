@@ -10,4 +10,4 @@ class Counter {
     }
 }
 ===expect===
-InvalidToString@5:39-7:40: Method Counter::__toString() must return a string
+InvalidToString@5:38-7:39: Method Counter::__toString() must return a string

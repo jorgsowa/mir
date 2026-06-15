@@ -6,4 +6,4 @@ function test(mixed $value): void {
     $value->someMethod();
 }
 ===expect===
-MixedMethodCall@3:5-3:25: Method someMethod() called on mixed type
+MixedMethodCall@3:4-3:24: Method someMethod() called on mixed type

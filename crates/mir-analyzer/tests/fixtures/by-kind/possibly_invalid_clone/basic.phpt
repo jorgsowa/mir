@@ -8,4 +8,4 @@ function copy(Repo|int $source): Repo|int {
     return clone $source;
 }
 ===expect===
-PossiblyInvalidClone@5:12-5:25: cannot clone possibly non-object Repo|int
+PossiblyInvalidClone@5:11-5:24: cannot clone possibly non-object Repo|int

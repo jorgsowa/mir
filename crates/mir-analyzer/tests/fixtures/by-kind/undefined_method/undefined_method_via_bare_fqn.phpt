@@ -12,4 +12,4 @@ function consume(): void {
     $s->nonexistent();
 }
 ===expect===
-Consumer.php: UndefinedMethod@4:5-4:22: Method Service::nonexistent() does not exist
+Consumer.php: UndefinedMethod@4:4-4:21: Method Service::nonexistent() does not exist

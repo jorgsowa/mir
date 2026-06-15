@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $a = ~true;
 ===expect===
-InvalidOperand@2:7-2:11: Operator '~' not supported between 'true' and ''
+InvalidOperand@2:6-2:10: Operator '~' not supported between 'true' and ''

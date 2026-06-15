@@ -18,5 +18,5 @@ function docTyped() {
     return 'x';
 }
 ===expect===
-MissingReturnType@2:10-2:22: Function noReturnType() has no return type annotation
-MissingParamType@2:23-2:25: Parameter $x of noReturnType() has no type annotation
+MissingReturnType@2:9-2:21: Function noReturnType() has no return type annotation
+MissingParamType@2:22-2:24: Parameter $x of noReturnType() has no type annotation

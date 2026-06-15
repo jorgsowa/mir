@@ -7,4 +7,4 @@ suppress=MixedAssignment,UnusedVariable
 $x = ["a"];
 $y = $x["b"];
 ===expect===
-NonExistentArrayOffset@3:9-3:12: Array offset 'b' does not exist
+NonExistentArrayOffset@3:8-3:11: Array offset 'b' does not exist

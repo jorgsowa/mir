@@ -27,4 +27,4 @@ try {
     echo $a;
 }
 ===expect===
-PossiblyUndefinedVariable@22:10-22:12: Variable $a might not be defined
+PossiblyUndefinedVariable@22:9-22:11: Variable $a might not be defined

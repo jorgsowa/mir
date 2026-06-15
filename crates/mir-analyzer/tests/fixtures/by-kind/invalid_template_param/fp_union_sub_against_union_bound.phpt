@@ -16,4 +16,4 @@ $cond = true;
 $x = $cond ? 'hello' : new MyCountable();
 process($x); // T = string|MyCountable, should pass - each arm satisfies one arm of bound
 ===expect===
-UnusedParam@10:18-10:24: Parameter $value is never used
+UnusedParam@10:17-10:23: Parameter $value is never used

@@ -8,4 +8,4 @@ function f(object $o): object
 }
 
 ===expect===
-InvalidStringClass@4:16-4:18: Dynamic class instantiation requires string or class-string type, got 'object'
+InvalidStringClass@4:15-4:17: Dynamic class instantiation requires string or class-string type, got 'object'

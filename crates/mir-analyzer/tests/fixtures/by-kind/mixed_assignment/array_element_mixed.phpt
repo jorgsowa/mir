@@ -10,4 +10,4 @@ $data = [];
 $value = $data["key"];
 
 ===expect===
-MixedAssignment@4:1-4:22: Variable $value is assigned a mixed type
+MixedAssignment@4:0-4:21: Variable $value is assigned a mixed type

@@ -16,4 +16,4 @@ class B extends A {
     }
 }
 ===expect===
-NonStaticSelfCall@12:9-12:20: Non-static method B::foo() cannot be called statically
+NonStaticSelfCall@12:8-12:19: Non-static method B::foo() cannot be called statically

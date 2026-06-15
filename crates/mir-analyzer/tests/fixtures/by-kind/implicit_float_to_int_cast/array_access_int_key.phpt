@@ -9,4 +9,4 @@ $arr = [];
 $val = $arr[3];
 
 ===expect===
-NonExistentArrayOffset@3:13-3:14: Array offset '3' does not exist
+NonExistentArrayOffset@3:12-3:13: Array offset '3' does not exist

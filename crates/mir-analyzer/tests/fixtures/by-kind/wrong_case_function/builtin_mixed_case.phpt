@@ -6,4 +6,4 @@ suppress=UnusedVariable
 <?php
 $x = Array_Map(fn($v) => $v * 2, [1, 2, 3]);
 ===expect===
-WrongCaseFunction@2:6-2:15: Function name 'Array_Map' has incorrect casing; use 'array_map'
+WrongCaseFunction@2:5-2:14: Function name 'Array_Map' has incorrect casing; use 'array_map'

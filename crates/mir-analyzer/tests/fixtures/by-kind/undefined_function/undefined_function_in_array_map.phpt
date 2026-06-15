@@ -7,4 +7,4 @@ array_map(
     [1, 2, 3]
 );
 ===expect===
-UndefinedFunction@3:5-3:25: Function undefined_function() is not defined
+UndefinedFunction@3:4-3:24: Function undefined_function() is not defined

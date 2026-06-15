@@ -14,5 +14,5 @@ function example2() : Generator {
     return null;
 }
 ===expect===
-InvalidReturnType@4:5-4:17: Return type 'null' is not compatible with declared 'Generator'
-InvalidReturnType@11:5-11:17: Return type 'null' is not compatible with declared 'Generator'
+InvalidReturnType@4:4-4:16: Return type 'null' is not compatible with declared 'Generator'
+InvalidReturnType@11:4-11:16: Return type 'null' is not compatible with declared 'Generator'

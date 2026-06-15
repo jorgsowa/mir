@@ -7,4 +7,4 @@ class Logger {
 }
 Logger::LOGERROR();
 ===expect===
-WrongCaseMethod@5:9-5:17: Method name 'Logger::LOGERROR' has incorrect casing; use 'logError'
+WrongCaseMethod@5:8-5:16: Method name 'Logger::LOGERROR' has incorrect casing; use 'logError'

@@ -7,4 +7,4 @@ suppress=UnusedParam,UnusedFunction
 use ast\Node;
 function f(Node $x): void {}
 ===expect===
-UndefinedClass@3:12-3:16: Class ast\Node does not exist
+UndefinedClass@3:11-3:15: Class ast\Node does not exist

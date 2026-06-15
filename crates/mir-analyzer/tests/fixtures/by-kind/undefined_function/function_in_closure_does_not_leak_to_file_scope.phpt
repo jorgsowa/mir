@@ -10,4 +10,4 @@ $fn = function () {
 
 leaked_from_closure();
 ===expect===
-UndefinedFunction@6:1-6:22: Function leaked_from_closure() is not defined
+UndefinedFunction@6:0-6:21: Function leaked_from_closure() is not defined
