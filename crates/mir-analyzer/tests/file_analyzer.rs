@@ -7,9 +7,10 @@
 
 mod common;
 
+use std::fs;
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
+use mir_analyzer::{AnalysisSession, FileAnalyzer, IndexCancel, IndexParallelism, PhpVersion};
 
 use self::common::create_temp_dir;
 
@@ -891,4 +892,118 @@ fn file_analyzer_reports_undefined_class_unconditionally() {
             .map(|i| i.kind.name())
             .collect::<Vec<_>>()
     );
+}
+
+/// Verify that `index_vendor_eager_files` loads global functions defined in
+/// Composer `autoload.files` vendor entries, making them visible to analysis.
+///
+/// Composer's `autoload.files` lists files that define global functions and
+/// constants. These are not reachable via the PSR-4 class resolver — they
+/// require an explicit eager-index step. Without it, any call to those
+/// functions produces a false-positive `UndefinedFunction`.
+///
+/// This test creates a minimal vendor with one `autoload.files` entry, calls
+/// `index_vendor_eager_files`, and verifies the function is resolved cleanly
+/// (no `UndefinedFunction`). A parallel control asserts that skipping
+/// `index_vendor_eager_files` does produce the false positive — confirming the
+/// method actually makes the difference.
+#[test]
+fn index_vendor_eager_files_makes_autoload_files_functions_visible() {
+    let root = create_temp_dir("autoload_files_eager");
+
+    // Minimal vendor autoload_files.php pointing to one helpers file.
+    fs::create_dir_all(root.path().join("vendor/composer")).unwrap();
+    // Composer generates this format: $vendorDir / $baseDir variable references.
+    // mir's parser resolves $vendorDir → actual vendor dir path at read time.
+    fs::write(
+        root.path().join("vendor/composer/autoload_files.php"),
+        "<?php\n\
+         $vendorDir = dirname(__DIR__);\n\
+         $baseDir = dirname($vendorDir);\n\
+         return array(\n\
+             'abc123' => $vendorDir . '/helpers/functions.php',\n\
+         );\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("vendor/composer/autoload_psr4.php"),
+        "<?php\nreturn [];\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("vendor/composer/autoload_classmap.php"),
+        "<?php\nreturn [];\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("vendor/composer/autoload_namespaces.php"),
+        "<?php\nreturn [];\n",
+    )
+    .unwrap();
+    fs::create_dir_all(root.path().join("vendor/helpers")).unwrap();
+    fs::write(
+        root.path().join("vendor/helpers/functions.php"),
+        "<?php\nfunction helper_greet(string $name): string { return 'hi ' . $name; }\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+
+    let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
+
+    let open_src = "<?php\nhelper_greet('world');\n";
+    let open_path: Arc<str> = Arc::from("open.php");
+    let parsed = php_rs_parser::parse(open_src);
+
+    // Control: without eager-loading, the function is invisible → UndefinedFunction.
+    {
+        let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4.clone()));
+        session.ingest_file(open_path.clone(), Arc::from(open_src));
+        let result = FileAnalyzer::new(&session).analyze(
+            open_path.clone(),
+            open_src,
+            &parsed.program,
+            &parsed.source_map,
+        );
+        let undefined = result
+            .issues
+            .iter()
+            .filter(|i| i.kind.name() == "UndefinedFunction")
+            .count();
+        assert_eq!(
+            undefined, 1,
+            "without index_vendor_eager_files, helper_greet should be unknown; \
+             got issues: {:?}",
+            result.issues
+        );
+    }
+
+    // After index_vendor_eager_files: function is resolved, no false positive.
+    {
+        let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+        let cancel = IndexCancel::new();
+        session.index_vendor_eager_files(IndexParallelism::Sequential, &cancel);
+        session.finalize_index();
+        session.ingest_file(open_path.clone(), Arc::from(open_src));
+        let result = FileAnalyzer::new(&session).analyze(
+            open_path,
+            open_src,
+            &parsed.program,
+            &parsed.source_map,
+        );
+        let undefined = result
+            .issues
+            .iter()
+            .filter(|i| i.kind.name() == "UndefinedFunction")
+            .count();
+        assert_eq!(
+            undefined, 0,
+            "after index_vendor_eager_files, helper_greet should resolve cleanly; \
+             got issues: {:?}",
+            result.issues
+        );
+    }
 }

@@ -53,11 +53,6 @@ pub fn run_composer_flow(
     let eager_vendor = std::env::var("MIR_EAGER_VENDOR")
         .ok()
         .is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes"));
-    let vendor_files: Vec<PathBuf> = if eager_vendor {
-        map.vendor_files()
-    } else {
-        map.vendor_eager_files()
-    };
 
     let ignore_dirs = resolve_ignore_dirs(config, config_base);
 
@@ -94,22 +89,27 @@ pub fn run_composer_flow(
 
     session.ensure_all_stubs();
 
-    if !vendor_files.is_empty() {
-        if !cli.quiet {
-            if eager_vendor {
+    if eager_vendor {
+        let vendor_files = map.vendor_files();
+        if !vendor_files.is_empty() {
+            if !cli.quiet {
                 eprintln!(
                     "mir: scanning {} vendor files for types...",
                     vendor_files.len()
                 );
-            } else {
-                eprintln!(
-                    "mir: eager-loading {} files-autoload entries ({} classmap entries available lazily)",
-                    vendor_files.len(),
-                    map.classmap_len()
-                );
             }
+            index_vendor_chunked(&session, &vendor_files);
         }
-        index_vendor_chunked(&session, &vendor_files);
+    } else {
+        let cancel = IndexCancel::new();
+        let outcome = session.index_vendor_eager_files(IndexParallelism::Rayon, &cancel);
+        if outcome.registered > 0 && !cli.quiet {
+            eprintln!(
+                "mir: eager-loading {} files-autoload entries ({} classmap entries available lazily)",
+                outcome.registered,
+                map.classmap_len()
+            );
+        }
     }
 
     let show_progress = !cli.no_progress && !cli.quiet && matches!(cli.format, OutputFormat::Text);
