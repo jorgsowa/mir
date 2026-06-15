@@ -89,6 +89,9 @@ pub fn run_composer_flow(
 
     session.ensure_all_stubs();
 
+    // vendor autoload.files globals are lazy-loaded automatically on first
+    // FileAnalyzer call (via prepare_ast_for_analysis → ensure_vendor_eager_functions).
+    // In eager-vendor mode we still pre-index everything upfront.
     if eager_vendor {
         let vendor_files = map.vendor_files();
         if !vendor_files.is_empty() {
@@ -101,12 +104,11 @@ pub fn run_composer_flow(
             index_vendor_chunked(&session, &vendor_files);
         }
     } else {
-        let cancel = IndexCancel::new();
-        let outcome = session.index_vendor_eager_files(IndexParallelism::Rayon, &cancel);
-        if outcome.registered > 0 && !cli.quiet {
+        let eager_files = map.vendor_eager_files();
+        if !eager_files.is_empty() && !cli.quiet {
             eprintln!(
-                "mir: eager-loading {} files-autoload entries ({} classmap entries available lazily)",
-                outcome.registered,
+                "mir: {} files-autoload entries will be lazy-loaded ({} classmap entries available lazily)",
+                eager_files.len(),
                 map.classmap_len()
             );
         }

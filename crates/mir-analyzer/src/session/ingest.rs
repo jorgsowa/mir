@@ -359,43 +359,6 @@ impl AnalysisSession {
         }
     }
 
-    /// Index every `autoload.files` entry from the attached PSR-4 map.
-    ///
-    /// Composer's `autoload.files` lists files that define global functions and
-    /// constants (e.g. Laravel's `Arr::accessible` helpers). Unlike PSR-4
-    /// classes, these are not reachable via the class resolver — they must be
-    /// parsed and indexed up-front or calls to those functions will produce
-    /// false-positive `UndefinedFunction` diagnostics.
-    ///
-    /// Call this once after [`Self::with_psr4`] and before your project-file
-    /// [`Self::index_batch`] pass. Reads source from disk. No-op when no PSR-4
-    /// map is attached.
-    pub fn index_vendor_eager_files(
-        &self,
-        parallelism: crate::IndexParallelism,
-        cancel: &crate::IndexCancel,
-    ) -> crate::IndexBatchOutcome {
-        let Some(psr4) = &self.psr4 else {
-            return crate::IndexBatchOutcome {
-                registered: 0,
-                cancelled: false,
-                generation: self.index_generation(),
-            };
-        };
-        let files: Vec<(Arc<str>, Arc<str>)> = psr4
-            .vendor_eager_files()
-            .into_iter()
-            .filter_map(|p| {
-                let text = std::fs::read_to_string(&p).ok()?;
-                Some((
-                    Arc::from(p.to_string_lossy().as_ref()),
-                    Arc::from(text.as_str()),
-                ))
-            })
-            .collect();
-        self.index_batch(&files, parallelism, cancel)
-    }
-
     /// Authoritative full rebuild of the workspace symbol index. Call once
     /// after the consumer has pumped every [`Self::index_batch`] chunk (end of
     /// warm-up) to reconcile the incrementally-merged index against the full

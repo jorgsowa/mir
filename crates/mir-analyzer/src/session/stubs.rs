@@ -136,12 +136,50 @@ impl AnalysisSession {
         self.resolver.is_some()
     }
 
-    /// Run both pre-passes (builtin-stub loading and PSR-4 class preloading)
-    /// in one call.  Replaces the two separate `ensure_stubs_for_ast` /
+    /// Index vendor `autoload.files` entries the first time analysis runs.
+    ///
+    /// Composer's `autoload.files` lists files that define global functions and
+    /// constants (e.g. Laravel helpers). These are invisible to the PSR-4 class
+    /// resolver — there is no function-name → file-path mapping without
+    /// parsing them first.  Rather than per-function lazy resolution, this
+    /// loads all pending vendor eager files at once on the first
+    /// [`Self::prepare_ast_for_analysis`] call.
+    ///
+    /// The mutex is held for the duration of the load, so concurrent callers
+    /// block here until the files are indexed.  Subsequent calls see `None`
+    /// and return immediately (O(1)).  Files are read via the session's
+    /// [`crate::SourceProvider`], so LSP VFS overrides are respected.
+    pub(crate) fn ensure_vendor_eager_functions(&self) {
+        let mut guard = self.pending_eager_function_files.lock();
+        let files = match guard.take() {
+            None => return,
+            Some(f) if f.is_empty() => return,
+            Some(f) => f,
+        };
+        // Guard remains held (now `None`) — concurrent callers block here
+        // until `index_batch` returns and all functions are indexed.
+        let sources: Vec<(std::sync::Arc<str>, std::sync::Arc<str>)> = files
+            .iter()
+            .filter_map(|p| {
+                let text = self.source_provider.read(p.to_string_lossy().as_ref())?;
+                Some((std::sync::Arc::from(p.to_string_lossy().as_ref()), text))
+            })
+            .collect();
+        if !sources.is_empty() {
+            let cancel = crate::IndexCancel::new();
+            self.index_batch(&sources, crate::IndexParallelism::Sequential, &cancel);
+        }
+    }
+
+    /// Run all pre-passes (builtin-stub loading, vendor-eager-file loading,
+    /// and PSR-4 class preloading) before body analysis of a single file.
+    ///
+    /// Replaces the two separate `ensure_stubs_for_ast` /
     /// `preload_psr4_classes_for_ast` calls at every `FileAnalyzer::analyze`
     /// site.
     pub fn prepare_ast_for_analysis(&self, program: &php_ast::owned::Program, file: &str) {
         self.ensure_stubs_for_ast(program);
+        self.ensure_vendor_eager_functions();
         self.priority_index_for_ast(program, file);
     }
 

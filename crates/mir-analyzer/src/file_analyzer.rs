@@ -143,6 +143,9 @@ impl<'a> BatchFileAnalyzer<'a> {
     /// analysis proceeds without lock contention on the session.
     pub fn analyze_batch(&self, files: Vec<ParsedFile>) -> Vec<(Arc<str>, FileAnalysis)> {
         // First pass: collect all ASTs and auto-discover stubs.
+        // Also lazy-load vendor autoload.files globals once so they are in the
+        // workspace index before the parallel analysis snapshot is taken.
+        self.session.ensure_vendor_eager_functions();
         files.iter().for_each(|file| {
             self.session.ensure_stubs_for_ast(&file.program);
         });

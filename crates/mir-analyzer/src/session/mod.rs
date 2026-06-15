@@ -68,6 +68,15 @@ pub struct AnalysisSession {
     /// reads ([`crate::FsSourceProvider`]); LSPs swap in a VFS-backed
     /// implementation so unsaved buffers override on-disk content.
     source_provider: Arc<dyn crate::SourceProvider>,
+    /// Vendor `autoload.files` entries not yet indexed. `Some(paths)` means
+    /// pending; `None` means the load has already run (idempotent). Populated
+    /// by [`Self::with_psr4`]; drained by [`Self::ensure_vendor_eager_functions`],
+    /// which is called automatically from [`Self::prepare_ast_for_analysis`].
+    ///
+    /// The mutex is held for the full duration of the load so concurrent callers
+    /// block until indexing is complete rather than proceeding with a stale
+    /// workspace snapshot.
+    pub(crate) pending_eager_function_files: Arc<parking_lot::Mutex<Option<Vec<PathBuf>>>>,
 }
 
 /// FQCN → optional resolver-mapped path. See the field doc on
@@ -98,6 +107,7 @@ impl AnalysisSession {
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
+            pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
         }
     }
 
@@ -177,12 +187,16 @@ impl AnalysisSession {
             user_resolver,
             Arc::new(crate::StubClassResolver),
         ));
-        self.psr4 = Some(map);
+        self.psr4 = Some(map.clone());
         self.resolver = Some(resolver.clone());
         // Mirror into MirDbStorage so salsa-tracked resolver queries
         // (`db::resolve_fqcn_to_path`) see the same resolver and are
         // invalidated on swap.
         self.db.salsa.write().set_resolver(Some(resolver));
+        // Register vendor autoload.files for lazy loading. They define global
+        // functions and constants that the class resolver cannot discover.
+        // `ensure_vendor_eager_functions` will index them on first analysis call.
+        *self.pending_eager_function_files.lock() = Some(map.vendor_eager_files());
         self
     }
 
