@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-06-15
+
+### Added
+
+- `IfThisIsMismatch` (MIR0902) — emitted when a method's `@if-this-is` type constraint is violated at a call site. Template-aware constraint checking enables precise type narrowing for receiver type refinements.
+- `DocblockTypeContradiction` (MIR0406) — emitted when a comparison operator (`===`, `<`, `<=`, `>`, `>=`) is used with values that cannot satisfy the condition given their inferred types. Detects impossible assertions and dead code in conditionals.
+- `UnevaluatedCode` (MIR0407) — emitted when a `switch`/`match` statement on `gettype($x)` contains arms that `gettype()` never returns (e.g., `"int"` when the actual return is `"integer"`), or when the argument's inferred type cannot produce those values.
+- `MixedReturnStatement` (MIR1212) — emitted when a function with a declared non-void return type returns a `mixed` value (e.g., `array_pop()` in a `string`-returning function).
+- Integer range types now tracked for `count()`/`sizeof()` → `int<0, max>` (or `int<1, max>` for non-empty), `strlen()`/`mb_strlen()` → `int<0, max>`, and arithmetic operations preserve range bounds. Comparison-driven narrowing (e.g., `if ($i < count($a))`) now refines loop variables to their valid index ranges.
+- `array_map()` and `array_filter()` now infer precise result element types from their callbacks instead of returning bare `array`.
+- Vendored Redis and Memcached phpstorm-stubs extension directories, fixing ~1,400 `UndefinedClass` false positives on Laravel codebases that use these PECL extensions.
+- phpstorm-stubs `#[LanguageLevelTypeAware]` and `#[PhpStormStubsElementAvailable]` attributes are now resolved against the configured target PHP version. This honors ~2,400 previously-dropped declaration sites and eliminates spurious `|false` returns for version-specific function signatures (e.g., `explode()`/`pack()` on PHP 8.x).
+- Filesystem and unserialize taint sinks: `file_get_contents()`, `file_put_contents()`, `unserialize()` and related functions now propagate taint in `TaintedFilesystem` and `TaintedUnserialization` issue kinds.
+- Symbol reference recording for static-call class name tokens, enabling go-to-definition and find-references on `ClassName::method()` expressions.
+
+### Fixed
+
+- Class-level template parameters are now correctly resolved in method parameter types during generic method binding.
+- Named-object arguments now satisfy bare `object` parameter types via `named_object_subtype` checking.
+- `[object, "method"]` array literals are now recognized as valid callables, fixing false `InvalidArgument` diagnostics.
+- Docblock-only properties (declared via `@property` annotations) are now correctly typed as nullable and not flagged as uninitialized.
+- Property `@var` docblock annotations now resolve class-level template parameters, enabling precise typing for generic class properties.
+- Surplus arguments to closure calls no longer emit false `TooManyArguments` diagnostics when the closure arity is unknown.
+- Array-access narrowing: `isset($arr[$key])` and `??` operators now narrow both the array base and key existence.
+- `is_object()` type guards now correctly narrow `mixed` to `object` in conditional branches.
+- `unset($arr[$key])` now counts as a read of the variable, fixing false `UnusedVariable` diagnostics.
+- Static property reads (`self::$prop`) now correctly count as property uses.
+- Bare `return;` statements are now valid in functions with nullable or void-union return types.
+- `defined()` and `function_exists()` guards now narrow constant/function references in conditional branches.
+- By-reference closure captures (`use (&$var)`) now auto-create the captured variable if it doesn't exist.
+- Variable assignments inside `match` arm conditions now correctly define the variable for use in the arm body.
+- `self`, `static`, `parent`, and `$this` resolution in trait bodies now correctly targets the consuming class instead of the trait.
+- `new static` is now allowed in abstract classes, delegating to concrete subclasses at runtime.
+- `stdClass` now permits dynamic property access and assignment without emitting `UndefinedProperty` diagnostics.
+- Fully-qualified attribute names in `#[...]` are now honored in attribute resolution.
+- `Numeric` and `Resource` are no longer treated as reserved class names in the parser.
+- `--clear-cache` now correctly targets the project-local cache directory (`.mir/cache`) instead of always searching the platform default cache dir.
+- Result cache now invalidates when the running binary, target PHP version, or user-configured stubs change.
+- Wrong-case checks now extend to full FQCN namespace segments, catching case mismatches in any part of the class name.
+
+### Changed
+
+- `mir-analyzer` module structure refactored for maintainability: `batch.rs`, `class.rs`, `parser/docblock.rs`, `session.rs`, and `body_analysis.rs` split into dedicated submodules.
+- PHP parser suite (`php-rs-parser`, `php-ast`, `php-lexer`, `phpdoc-parser`) upgraded to 0.18.0 for improved parsing robustness.
+
+### Performance
+
+- Large false-positive reduction on the Laravel reference corpus: the vendored Redis/Memcached stubs and version attributes support reduce `UndefinedClass` from 617 to 114 (an 82% reduction on the reference benchmark).
+
 ## [0.40.0] - 2026-06-13
 
 ### Added
