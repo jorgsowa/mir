@@ -16,4 +16,3 @@ UnusedParam@3:28-3:39: Parameter $col is never used
 UnusedParam@3:41-3:52: Parameter $vals is never used
 UnusedParam@4:34-4:45: Parameter $col is never used
 UnusedParam@4:47-4:58: Parameter $vals is never used
-UnusedParam@6:48-6:59: Parameter $key is never used

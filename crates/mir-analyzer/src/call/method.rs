@@ -108,6 +108,10 @@ impl CallAnalyzer {
             ExprKind::Identifier(name) => name.as_ref(),
             _ => {
                 ea.analyze(&call.method, ctx);
+                // Analyze arguments so variables used in them are marked as consumed.
+                for arg in &call.args {
+                    ea.analyze(&arg.value, ctx);
+                }
                 return Type::mixed();
             }
         };
