@@ -169,9 +169,6 @@ pub(crate) fn check_one(
         // PHP calls __toString() implicitly. Most PHP code (including Laravel)
         // does not declare strict_types, so this is the common case.
         && !stringable_coercion_ok(arg_ty, param_ty, ea)
-        // In PHP's coercive typing mode, integer values are silently coerced to
-        // string when passed to a `string`-typed parameter (e.g. `(string)42`).
-        && !int_to_string_coercion_ok(arg_ty, param_ty, ea)
         // `[$obj, 'method']` / `['Class', 'method']` is a valid callable, even
         // though it types as a 2-element list shape.
         && !(param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TClosure { .. }))
@@ -186,7 +183,6 @@ pub(crate) fn check_one(
                     || named_object_subtype(&single, param_ty, ea)
                     || array_list_compatible(&single, param_ty, ea)
                     || stringable_coercion_ok(&single, param_ty, ea)
-                    || int_to_string_coercion_ok(&single, param_ty, ea)
             });
         if any_atomic_fits {
             ea.emit(
@@ -311,30 +307,6 @@ fn stringable_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>)
             || crate::db::extends_or_implements(ea.db, fqcn, "Stringable")
             || crate::db::has_method_in_chain(ea.db, &resolved, "__toString")
             || crate::db::has_method_in_chain(ea.db, fqcn, "__toString")
-    })
-}
-
-/// In PHP without `strict_types=1`, integer values are silently coerced to
-/// `string` when passed to a `string`-typed parameter (e.g. passing `42`
-/// where `string $s` is expected produces `"42"` at runtime). This is the
-/// standard coercive typing behaviour and should not be flagged as
-/// `InvalidArgument` in non-strict files.
-fn int_to_string_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
-    if ea.strict_types {
-        return false;
-    }
-    let param_wants_string = param
-        .types
-        .iter()
-        .any(|p| matches!(p, Atomic::TString | Atomic::TNonEmptyString));
-    if !param_wants_string {
-        return false;
-    }
-    arg.types.iter().any(|a| {
-        matches!(
-            a,
-            Atomic::TInt | Atomic::TLiteralInt(_) | Atomic::TIntRange { .. }
-        )
     })
 }
 
