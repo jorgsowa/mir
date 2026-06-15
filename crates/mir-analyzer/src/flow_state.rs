@@ -142,6 +142,12 @@ pub struct FlowState {
     /// Used to emit UnusedForeachValue instead of UnusedVariable for these names.
     pub foreach_value_var_names: FxHashSet<Name>,
 
+    /// Variables bound by a by-reference foreach (`foreach ($arr as &$val)`).
+    /// Writes to these variables always have a side effect (they mutate the
+    /// source array through the reference), so dead-write detection must not
+    /// flag them as UnusedVariable.
+    pub foreach_byref_var_names: FxHashSet<Name>,
+
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
     /// Arc-shared — set once at context construction, never mutated during analysis.
@@ -226,6 +232,7 @@ impl FlowState {
             dead_writes: Vec::new(),
             consumed_write_locs: FxHashSet::default(),
             foreach_value_var_names: FxHashSet::default(),
+            foreach_byref_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
@@ -580,6 +587,9 @@ impl FlowState {
             for name in if_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
+            for name in if_ctx.foreach_byref_var_names.iter() {
+                result.foreach_byref_var_names.insert(*name);
+            }
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -598,6 +608,9 @@ impl FlowState {
             extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
             for name in else_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
+            }
+            for name in else_ctx.foreach_byref_var_names.iter() {
+                result.foreach_byref_var_names.insert(*name);
             }
             return result;
         }
@@ -626,6 +639,13 @@ impl FlowState {
                 .chain(else_ctx.foreach_value_var_names.iter())
             {
                 result.foreach_value_var_names.insert(*name);
+            }
+            for name in if_ctx
+                .foreach_byref_var_names
+                .iter()
+                .chain(else_ctx.foreach_byref_var_names.iter())
+            {
+                result.foreach_byref_var_names.insert(*name);
             }
             return result;
         }
@@ -768,6 +788,15 @@ impl FlowState {
             .chain(else_ctx.foreach_value_var_names.iter())
         {
             result.foreach_value_var_names.insert(*name);
+        }
+
+        // Foreach by-ref var names: union — if either branch marks a var as by-ref, keep it
+        for name in if_ctx
+            .foreach_byref_var_names
+            .iter()
+            .chain(else_ctx.foreach_byref_var_names.iter())
+        {
+            result.foreach_byref_var_names.insert(*name);
         }
 
         // Var locations: keep the earliest known span for each variable

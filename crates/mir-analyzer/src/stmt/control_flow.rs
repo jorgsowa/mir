@@ -267,13 +267,28 @@ impl<'a> StatementsAnalyzer<'a> {
         }
         let value_var = extract_simple_var(&fe.value);
         let value_destructure_vars = extract_destructure_vars(&fe.value);
+        // The PHP parser silently discards the `&` in `foreach ($arr as &$val)`.
+        // Detect it by checking whether the source character immediately preceding
+        // the value span (skipping whitespace) is `&`. Reference iteration writes
+        // back through the reference, so dead-write checks don't apply.
+        let value_is_by_ref = value_var.is_some() && {
+            let start = fe.value.span.start as usize;
+            let pre = &self.source[..start.min(self.source.len())];
+            pre.chars().rev().find(|c| !c.is_whitespace()) == Some('&')
+        };
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
-            // Track this as a foreach value variable so emit_unused_variables can
-            // emit UnusedForeachValue instead of UnusedVariable for dead writes.
-            entry
-                .foreach_value_var_names
-                .insert(Name::from(vname.as_str()));
+            if value_is_by_ref {
+                // By-reference iteration: writes to this variable always mutate
+                // the source array through the reference, so they are never dead.
+                entry
+                    .foreach_byref_var_names
+                    .insert(Name::from(vname.as_str()));
+            } else {
+                entry
+                    .foreach_value_var_names
+                    .insert(Name::from(vname.as_str()));
+            }
             // Record the header assignment so it appears in last_write_locs and
             // triggers UnusedForeachValue when the value is never read in the body.
             let (line, line_end, col_start, col_end) = self.span_to_location(fe.value.span);

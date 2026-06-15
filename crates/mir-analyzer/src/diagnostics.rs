@@ -602,6 +602,7 @@ pub(crate) fn emit_unused_variables(
             || SUPERGLOBALS.contains(&name.as_str())
             || name == "this"
             || name.starts_with('_')
+            || ctx.foreach_byref_var_names.contains(name)
     };
 
     // Emit at most one UnusedVariable/UnusedForeachValue per variable name to avoid
