@@ -258,15 +258,16 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 
 /// AST visitor that collects class FQCN references for PSR-4 preloading.
 /// Captures identifiers from `new X`, static calls / property / constant
-/// access, type hints, and `instanceof`. Does *not* normalize via PSR-4 /
+/// access, type hints, `instanceof`, and `@param`/`@return`/`@var`/`@extends`/
+/// `@implements` docblock annotations. Does *not* normalize via PSR-4 /
 /// imports — callers run the raw string through `resolve_name`.
 fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String> {
     use php_ast::ast::BinaryOp;
     use php_ast::owned::visitor::{
-        walk_owned_catch_clause, walk_owned_expr, walk_owned_program, walk_owned_type_hint,
-        OwnedVisitor,
+        walk_owned_catch_clause, walk_owned_class_member, walk_owned_expr, walk_owned_program,
+        walk_owned_stmt, walk_owned_type_hint, OwnedVisitor,
     };
-    use php_ast::owned::{ExprKind, TypeHintKind};
+    use php_ast::owned::{ClassMemberKind, ExprKind, TypeHintKind};
     use std::ops::ControlFlow;
 
     fn owned_name_str(name: &php_ast::owned::Name) -> String {
@@ -283,10 +284,68 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
         }
     }
 
+    /// Recursively collect all `TNamedObject` FQCNs from a mir type, including
+    /// those nested inside generic type parameters (e.g. `Collection<Item>`).
+    fn collect_from_type(ty: &mir_types::Type, out: &mut std::collections::HashSet<String>) {
+        for atomic in ty.types.iter() {
+            if let mir_types::Atomic::TNamedObject { fqcn, type_params } = atomic {
+                out.insert(fqcn.as_ref().to_string());
+                for tp in type_params.iter() {
+                    collect_from_type(tp, out);
+                }
+            }
+        }
+    }
+
+    /// Parse a docblock and collect class names from `@param`, `@return`,
+    /// `@var`, `@extends`, and `@implements` annotations.
+    fn collect_from_docblock(text: &str, out: &mut std::collections::HashSet<String>) {
+        let parsed = crate::parser::DocblockParser::parse(text);
+        for (_, ty) in &parsed.params {
+            collect_from_type(ty, out);
+        }
+        if let Some(ret) = &parsed.return_type {
+            collect_from_type(ret, out);
+        }
+        if let Some(var) = &parsed.var_type {
+            collect_from_type(var, out);
+        }
+        if let Some(ext) = &parsed.extends {
+            collect_from_type(ext, out);
+        }
+        for impl_ty in &parsed.implements {
+            collect_from_type(impl_ty, out);
+        }
+    }
+
     struct V {
         names: std::collections::HashSet<String>,
     }
     impl OwnedVisitor for V {
+        fn visit_stmt(&mut self, stmt: &php_ast::owned::Stmt) -> ControlFlow<()> {
+            if let Some(doc) = stmt.leading_doc_comment() {
+                collect_from_docblock(&doc.text, &mut self.names);
+            }
+            walk_owned_stmt(self, stmt)
+        }
+
+        fn visit_class_member(&mut self, member: &php_ast::owned::ClassMember) -> ControlFlow<()> {
+            match &member.kind {
+                ClassMemberKind::Method(m) => {
+                    if let Some(doc) = &m.doc_comment {
+                        collect_from_docblock(&doc.text, &mut self.names);
+                    }
+                }
+                ClassMemberKind::Property(p) => {
+                    if let Some(doc) = &p.doc_comment {
+                        collect_from_docblock(&doc.text, &mut self.names);
+                    }
+                }
+                _ => {}
+            }
+            walk_owned_class_member(self, member)
+        }
+
         fn visit_expr(&mut self, expr: &php_ast::owned::Expr) -> ControlFlow<()> {
             match &expr.kind {
                 ExprKind::New(n) => {

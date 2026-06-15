@@ -21,6 +21,7 @@ use std::fs;
 use std::sync::Arc;
 
 use mir_analyzer::{AnalysisSession, FileAnalyzer, IndexCancel, IndexParallelism, PhpVersion};
+use php_rs_parser::parse as php_parse;
 
 use self::common::create_temp_dir;
 
@@ -174,5 +175,83 @@ fn open_file_does_not_flag_valid_inherited_member() {
         undefined_method_count(&analysis),
         0,
         "fromBase() is inherited from the lazily-loaded Base and must resolve cleanly"
+    );
+}
+
+/// Verify that `priority_index_for_ast` pre-loads classes referenced *only*
+/// inside `@param` / `@return` docblock annotations (no PHP type hint).
+///
+/// Before the docblock-scanning extension, `collect_class_refs_from_ast` only
+/// walked PHP type hints and expression sites (`new X`, `X::method()`, etc.).
+/// A class that appeared purely as a docblock `@param` type would be invisible
+/// to the pre-loader.  If the background indexer hadn't yet reached that class
+/// and it was only resolvable via the ClassResolver, the type would degrade to
+/// `mixed` and method checks on it would be silently skipped.
+///
+/// This test uses `FileAnalyzer` (the open-file / LSP path) with a PSR-4
+/// ClassResolver but WITHOUT eagerly indexing `Widget.php`.  The only way
+/// `Widget` can be discovered is through the `@param Widget $w` docblock scanned
+/// by the pre-loader — no PHP hint, no `new Widget`, no `Widget::`. Once loaded,
+/// `$w->nope()` must resolve to an `UndefinedMethod` diagnostic.
+#[test]
+fn priority_index_pre_loads_docblock_only_param_class() {
+    let root = common::create_temp_dir("docblock_preload");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+
+    fs::write(
+        root.path().join("src/Widget.php"),
+        "<?php\nnamespace App;\nclass Widget {\n    public function render(): void {}\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+
+    let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
+    // Widget.php is NOT eagerly indexed — only the ClassResolver can find it.
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+
+    let open_src = "<?php\n\
+        namespace App;\n\
+        class Service {\n\
+            /**\n\
+             * @param Widget $w\n\
+             */\n\
+            public function process($w): void {\n\
+                $w->nope();\n\
+            }\n\
+        }\n";
+
+    let open_path: Arc<str> = Arc::from(
+        root.path()
+            .join("src/Service.php")
+            .to_string_lossy()
+            .as_ref(),
+    );
+    session.ingest_file(open_path.clone(), Arc::from(open_src));
+
+    let parsed = php_parse(open_src);
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+
+    let analysis = FileAnalyzer::new(&session).analyze(
+        open_path,
+        open_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    assert_eq!(
+        undefined_method_count(&analysis),
+        1,
+        "Widget should be pre-loaded via @param docblock scanning so that \
+         $w->nope() is type-checked. A count of 0 means Widget was not loaded \
+         and the call silently degraded to mixed. Got issues: {:?}",
+        analysis.issues
     );
 }
