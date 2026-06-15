@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-06-15
+
+### Added
+
+- `AnalysisSession::class_imports(file)` → `Vec<(alias, fqcn)>` — returns the use-import alias map for a file as `(short_name, fully_qualified_name)` pairs. Completion handlers can use this to expand a short class name written before `::` into its FQN before looking up static members, mirroring the alias expansion already performed by `symbol_at` + `definition_of`.
+- Vendor `autoload.files` globals (e.g. Laravel helper functions) are now lazy-loaded automatically on first analysis. Previously callers had to invoke a manual eager-index step; any consumer that omitted it received false-positive `UndefinedFunction` diagnostics for every call to those globals.
+
+### Fixed
+
+- Diagnostic column numbers are now 0-based throughout, matching the LSP UTF-32 convention documented in `mir_types::Location`. Body-analysis diagnostics were previously emitting 1-indexed columns, inconsistent with collector-stored diagnostics (which were already 0-indexed).
+- Classes referenced only in docblock annotations (`@param`, `@return`, `@var`, `@extends`, `@implements`) are now pre-loaded during AST prioritization. Previously such classes were invisible to the pre-loader; method and property checks on the annotated variable would silently degrade to `mixed` when the class had not yet been eagerly indexed.
+
 ## [0.41.0] - 2026-06-15
 
 ### Added
