@@ -152,6 +152,26 @@ impl AnalysisSession {
     /// loaded in the session.
     ///
     /// Designed as the input to background prefetching: after the LSP server
+    /// Return the `use`-import alias map for a file: a list of `(alias, fqcn)`
+    /// pairs where `alias` is the local name (e.g. `"Str"`) and `fqcn` is the
+    /// fully-qualified name (e.g. `"Illuminate\\Support\\Str"`).
+    ///
+    /// Completion handlers can use this to expand a short class name written
+    /// before `::` into its FQN before looking up static members, mirroring the
+    /// same alias expansion that go-to-definition already performs via
+    /// `symbol_at` + `definition_of`.
+    ///
+    /// Returns an empty Vec if the file has not been ingested or has no use
+    /// imports.
+    pub fn class_imports(&self, file: &str) -> Vec<(Arc<str>, Arc<str>)> {
+        let db = self.snapshot_db();
+        let imports = db.file_imports(file);
+        imports
+            .iter()
+            .map(|(alias, fqcn)| (Arc::from(alias.as_str()), Arc::from(fqcn.as_str())))
+            .collect()
+    }
+
     /// ingests an open buffer, it can call this and lazy-load the returned
     /// FQCNs on a worker thread so the user's first Cmd+Click into vendor
     /// code doesn't pay the file-read+parse cost.
