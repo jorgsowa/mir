@@ -9,6 +9,10 @@ impl AnalysisSession {
 
         // ---- Load PHP built-in stubs (before definition collection so user code can override)
         self.load_batch_stubs(php_version);
+        // Index vendor autoload.files (global function/constant helpers such as
+        // Laravel's `confirm()`, `select()`, etc.) before body analysis so
+        // calls to these functions resolve rather than emitting UndefinedFunction.
+        self.ensure_vendor_eager_functions();
         let _t_stubs = _t0.elapsed();
 
         // ---- Read files in parallel ----------------------------------
