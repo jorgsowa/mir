@@ -3,6 +3,7 @@ use std::sync::Arc;
 use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
+use crate::narrowing::extract_expr_guard_key;
 use crate::taint::is_expr_tainted;
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
@@ -717,7 +718,14 @@ fn resolve_method_return<'a>(
         let has_call_magic = crate::db::has_method_in_chain(ea.db, fqcn, "__call");
         // A trait body's $this is the future consuming class — the method may
         // be provided by the consumer, so an unresolved call is not undefined.
-        if is_interface || is_abstract || is_trait || has_call_magic {
+        // Also suppress when caller guarded with `method_exists($obj, 'method')`.
+        let guarded_by_method_exists = extract_expr_guard_key(&call.object)
+            .map(|key| {
+                ctx.method_exists_guards
+                    .contains(&(key, Arc::from(method_name.to_lowercase().as_str())))
+            })
+            .unwrap_or(false);
+        if is_interface || is_abstract || is_trait || has_call_magic || guarded_by_method_exists {
             Type::mixed()
         } else {
             ea.emit(

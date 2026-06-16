@@ -281,6 +281,29 @@ pub fn narrow_from_condition(
                     if let Some(arg_expr) = call.args.first() {
                         narrow_from_condition(&arg_expr.value, ctx, is_true, db, file);
                     }
+                } else if fn_name.eq_ignore_ascii_case("method_exists")
+                    || fn_name.eq_ignore_ascii_case("property_exists")
+                {
+                    // Narrow the first arg to TObject for simple variables (existing behaviour).
+                    // Additionally record `(expr_key, method_name)` in method_exists_guards for
+                    // property-access first args where variable narrowing can't reach.
+                    if let Some(arg_expr) = call.args.first() {
+                        if let Some(var_name) = extract_var_name(&arg_expr.value) {
+                            narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
+                        }
+                        if is_true {
+                            if let Some(expr_key) = extract_expr_guard_key(&arg_expr.value) {
+                                if let Some(method_arg) = call.args.get(1) {
+                                    if let ExprKind::String(method_name) = &method_arg.value.kind {
+                                        let method_lc = std::sync::Arc::from(
+                                            method_name.to_lowercase().as_str(),
+                                        );
+                                        ctx.method_exists_guards.insert((expr_key, method_lc));
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
@@ -969,6 +992,27 @@ fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => extract_var_name(inner),
+        _ => None,
+    }
+}
+
+/// Extract a compact key for simple expressions used as the first arg of
+/// `method_exists`/`property_exists`. Supports `$var` → `"var"` and
+/// `$var->prop` → `"var->prop"` (depth-1 only). Returns `None` for anything
+/// more complex so we don't risk false-positive suppression.
+pub(crate) fn extract_expr_guard_key(expr: &php_ast::owned::Expr) -> Option<std::sync::Arc<str>> {
+    match &expr.kind {
+        ExprKind::Variable(name) => Some(std::sync::Arc::from(name.trim_start_matches('$'))),
+        ExprKind::Parenthesized(inner) => extract_expr_guard_key(inner),
+        ExprKind::PropertyAccess(pa) => {
+            let base = extract_var_name(&pa.object)?;
+            let prop = match &pa.property.kind {
+                ExprKind::Identifier(s) => s.as_ref(),
+                ExprKind::Variable(s) => s.trim_start_matches('$'),
+                _ => return None,
+            };
+            Some(std::sync::Arc::from(format!("{base}->{prop}").as_str()))
+        }
         _ => None,
     }
 }

@@ -171,6 +171,11 @@ pub struct FlowState {
     /// `function_exists('fn')` guard. Used to suppress `UndefinedFunction`
     /// inside guarded branches.
     pub function_exists_guards: ClassExistsGuards,
+
+    /// `(expr_key, method_name)` pairs proven to exist via a `method_exists($expr, 'method')`
+    /// guard. Used to suppress `UndefinedMethod` inside guarded branches.
+    /// `expr_key` is a compact string like `"this->notification"` or `"foo"`.
+    pub method_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
 }
 
 /// Pre-built superglobal initial state, shared across all FlowState instances.
@@ -243,6 +248,7 @@ impl FlowState {
             class_exists_guards: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
+            method_exists_guards: FxHashSet::default(),
         }
     }
 
@@ -794,6 +800,11 @@ impl FlowState {
         result.function_exists_guards = if_ctx
             .function_exists_guards
             .intersection(&else_ctx.function_exists_guards)
+            .cloned()
+            .collect();
+        result.method_exists_guards = if_ctx
+            .method_exists_guards
+            .intersection(&else_ctx.method_exists_guards)
             .cloned()
             .collect();
 
