@@ -313,6 +313,30 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
+                } else if bare.eq_ignore_ascii_case("array_key_exists") && is_true {
+                    // array_key_exists('k', $arr) in true-branch: prove the key
+                    // exists in the array's sealed shape so that $arr['k'] does
+                    // not trigger NonExistentArrayOffset afterwards.
+                    if let (Some(key_arg), Some(arr_arg)) = (call.args.first(), call.args.get(1)) {
+                        let literal_key = match &key_arg.value.kind {
+                            ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(
+                                std::sync::Arc::from(s.as_ref()),
+                            )),
+                            ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
+                            _ => None,
+                        };
+                        if let Some(key) = literal_key {
+                            if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                                let current = ctx.get_var(&var_name);
+                                let narrowed = add_key_to_sealed_shapes(&current, &key);
+                                if narrowed != current {
+                                    ctx.set_var(&var_name, narrowed);
+                                }
+                            } else if let Some((obj, prop)) = extract_prop_access(&arr_arg.value) {
+                                narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
+                            }
+                        }
+                    }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
@@ -843,6 +867,97 @@ fn narrow_prop_instanceof(
     if narrowed != current {
         ctx.set_prop_refined(obj_var, prop, narrowed);
     }
+}
+
+/// Narrow a property's type when `array_key_exists('k', $this->prop)` is proven true.
+fn narrow_prop_array_key_exists(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    key: &mir_types::atomic::ArrayKey,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let current = if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
+        refined.clone()
+    } else {
+        let obj_ty = ctx.get_var(obj_var);
+        let mut prop_ty = mir_types::Type::mixed();
+        'outer: for atomic in &obj_ty.types {
+            if let mir_types::Atomic::TNamedObject { fqcn, .. }
+            | mir_types::Atomic::TSelf { fqcn }
+            | mir_types::Atomic::TStaticObject { fqcn } = atomic
+            {
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        if prop_ty.is_mixed() && obj_var == "this" {
+            if let Some(fqcn) = ctx.self_fqcn.as_ref() {
+                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(db, &resolved);
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                    }
+                }
+            }
+        }
+        prop_ty
+    };
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = add_key_to_sealed_shapes(&current, key);
+    if narrowed != current {
+        ctx.set_prop_refined(obj_var, prop, narrowed);
+    }
+}
+
+/// For each `TKeyedArray` in `ty` that is sealed (`is_open == false`) and does not
+/// already contain `key`, return a version with `key` added as non-optional `mixed`.
+fn add_key_to_sealed_shapes(
+    ty: &mir_types::Type,
+    key: &mir_types::atomic::ArrayKey,
+) -> mir_types::Type {
+    use mir_types::atomic::KeyedProperty;
+    let new_types: Vec<Atomic> = ty
+        .types
+        .iter()
+        .map(|a| {
+            if let Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } = a
+            {
+                if !is_open && !properties.contains_key(key) {
+                    let mut new_props = properties.clone();
+                    new_props.insert(
+                        key.clone(),
+                        KeyedProperty {
+                            ty: mir_types::Type::mixed(),
+                            optional: false,
+                        },
+                    );
+                    return Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    };
+                }
+            }
+            a.clone()
+        })
+        .collect();
+    let mut result = mir_types::Type::from_vec(new_types);
+    result.from_docblock = ty.from_docblock;
+    result
 }
 
 fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
