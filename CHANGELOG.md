@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.44.0] - 2026-06-17
+
+### Fixed
+
+- `int-range` sub-ranges are now correctly recognized as subtypes of containing int-ranges. `positive-int` is now a subtype of `scalar`, `numeric`, and `int<min,max>` when the range contains all positive integers.
+- `list<T>` subtype check for `array<K,V>` now verifies `int <: K` (accepts `array-key`-keyed arrays). Keyed array shapes like `array{0:Child,1:Child}` now satisfy `list<Base>` when `Child extends Base`.
+- `do-while` bodies are now known to execute at least once: variables introduced in the body are stripped of `possibly_undefined` / `possibly_assigned` after the first pass, matching PHP's guaranteed-first-iteration semantics.
+- Property type narrowing via `!== null` / `=== null` guards and direct assignment: `$this->prop !== null` now refines the property type in the true-branch, and `$this->prop = $val` records the assigned type for subsequent accesses within the same scope.
+- `$this->prop instanceof ClassName` now narrows the property's type in the true-branch, preventing false `InvalidArgument` and `TypeMismatch` diagnostics on the narrowed access.
+- By-ref output parameters (e.g. `preg_match`'s `$matches`) are now promoted from possibly-assigned to definitely-assigned in the true-branch of `&&` conditions. Assignment expressions in `while` conditions (e.g. `while ($line = fgets($r))`) stay definitely-assigned after loop-body widening.
+- `@inheritDoc`-annotated methods with parameter widening (contravariant-legal in PHP) no longer emit `UnusedParam` for parameters that are unused in the overriding body.
+- PHP `ext-bz2` stubs added: `bzcompress`, `bzdecompress`, `bzopen`, `bzread`, `bzwrite`, `bzclose`, `bzflush`, `bzerrno`, `bzerror`, `bzerrstr` no longer emit `UndefinedFunction`.
+- Trait method aliases (`use Trait { method as alias; }`) are now resolved before insteadof precedence, fixing `UndefinedMethod` false positives on aliased method calls.
+- `iterable<K,V>` now expands to `array<K,V>|Traversable<K,V>`, forwarding the key type to both sides. Previously the key was dropped, causing false `InvalidArgument` diagnostics when a `Traversable` implementation was passed to an `iterable<K,V>` parameter.
+- `non-empty-list<T>` is now a subtype of `array<K,V>` and `non-empty-array<K,V>`.
+- String literals that cannot be class names (e.g. `'string[]'`) no longer trigger `UndefinedClass` or `InvalidArgument` when passed to `class-string` parameters. A complementary `TLiteralString → TClassString` subtype rule prevents the redundant `InvalidArgument` path.
+- `array_key_exists('k', $arr)` in a truthy guard now adds `'k'` as a non-optional entry in every sealed `TKeyedArray` shape of the variable's type, suppressing subsequent `NonExistentArrayOffset` diagnostics. Works for both plain variables and property accesses (`$this->prop`).
+- `Color::{$name}` (dynamic enum case / const access) no longer emits `UndefinedConstant`. The class sub-expression is only analyzed when it is a variable; plain identifiers are skipped, matching the existing `ClassConstAccess` guard.
+
 ## [0.43.0] - 2026-06-16
 
 ### Fixed
