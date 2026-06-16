@@ -5,6 +5,26 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::CastKind;
 use php_ast::owned::Expr;
 
+/// Returns true for atomic types that are safely castable to any scalar.
+/// Used to suppress InvalidCast on union types that include both "bad" atoms
+/// (arrays/objects) and "good" atoms (scalars) — e.g. `string|array|bool|null`
+/// from console option() return types.
+fn is_scalar_safe(t: &Atomic) -> bool {
+    t.is_string()
+        || t.is_int()
+        || matches!(
+            t,
+            Atomic::TFloat
+                | Atomic::TLiteralFloat(..)
+                | Atomic::TBool
+                | Atomic::TTrue
+                | Atomic::TFalse
+                | Atomic::TNull
+                | Atomic::TMixed
+                | Atomic::TScalar
+        )
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_cast(
         &mut self,
@@ -26,7 +46,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                // Check for InvalidCast from array/object
+                // Check for InvalidCast from array/object — only when the union has no
+                // scalar-safe atoms.  If the union also contains string/bool/null/int/float,
+                // the cast is valid for those branches and we suppress the warning to avoid
+                // FPs from over-broad return types (e.g. console option()).
                 else if inner_ty.contains(|t| {
                     matches!(
                         t,
@@ -38,7 +61,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TNamedObject { .. }
                             | Atomic::TObject
                     )
-                }) {
+                }) && !inner_ty.contains(is_scalar_safe)
+                {
                     self.emit(
                         IssueKind::InvalidCast {
                             from: inner_ty.to_string(),
@@ -65,7 +89,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                // Check for InvalidCast from array/object
+                // Check for InvalidCast from array/object — same "no scalars" guard as int.
                 else if inner_ty.contains(|t| {
                     matches!(
                         t,
@@ -77,7 +101,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TNamedObject { .. }
                             | Atomic::TObject
                     )
-                }) {
+                }) && !inner_ty.contains(is_scalar_safe)
+                {
                     self.emit(
                         IssueKind::InvalidCast {
                             from: inner_ty.to_string(),

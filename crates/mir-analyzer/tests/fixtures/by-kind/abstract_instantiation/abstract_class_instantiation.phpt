@@ -15,7 +15,7 @@ function createService($serviceName) {
     return new $serviceName();
 }
 
-// SHOULD emit AbstractInstantiation because AbstractService is abstract
+// `class-string<AbstractService>` means the caller passes a concrete subclass,
+// so `new $serviceName()` is valid — AbstractInstantiation is not emitted here.
 createService(AbstractService::class);
 ===expect===
-AbstractInstantiation@10:15-10:27: Cannot instantiate abstract class AbstractService
