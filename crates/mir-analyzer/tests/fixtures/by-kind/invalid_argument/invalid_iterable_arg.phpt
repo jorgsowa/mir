@@ -19,4 +19,4 @@ class A {
 
 iterator(new A());
 ===expect===
-InvalidArgument@15:9-15:16: Argument $iter of iterator() expects 'array<mixed, string>|Traversable', got 'A'
+InvalidArgument@15:9-15:16: Argument $iter of iterator() expects 'array<mixed, string>|Traversable<mixed, string>', got 'A'

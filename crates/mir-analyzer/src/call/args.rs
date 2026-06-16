@@ -77,6 +77,25 @@ pub fn spread_element_type(arr_ty: &Type) -> Type {
                     }
                 }
             }
+            // Traversable<K, V>, Iterator<K, V>, Generator<K, V, ...> — value is param[1].
+            // Only extract when the key type is int-compatible; float/other keys
+            // produce undefined positional semantics so we skip (let result stay empty).
+            Atomic::TNamedObject { type_params, .. } if type_params.len() >= 2 => {
+                let key_is_int_compat = type_params[0].types.iter().all(|k| {
+                    matches!(
+                        k,
+                        Atomic::TInt
+                            | Atomic::TPositiveInt
+                            | Atomic::TIntRange { .. }
+                            | Atomic::TMixed
+                    )
+                });
+                if key_is_int_compat {
+                    for t in type_params[1].types.iter() {
+                        result.add_type(t.clone());
+                    }
+                }
+            }
             _ => return Type::mixed(),
         }
     }

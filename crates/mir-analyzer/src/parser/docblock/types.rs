@@ -241,18 +241,24 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         }
         "iterable" => {
             let params = split_generics(inner);
-            let value = match params.len() {
-                n if n >= 2 => parse_type_string(params[1].trim()),
-                1 => parse_type_string(params[0].trim()),
-                _ => Type::mixed(),
+            let (key, value) = match params.len() {
+                n if n >= 2 => (
+                    parse_type_string(params[0].trim()),
+                    parse_type_string(params[1].trim()),
+                ),
+                1 => (
+                    Type::single(Atomic::TMixed),
+                    parse_type_string(params[0].trim()),
+                ),
+                _ => (Type::single(Atomic::TMixed), Type::mixed()),
             };
             let mut u = Type::single(Atomic::TArray {
-                key: Box::new(Type::single(Atomic::TMixed)),
-                value: Box::new(value),
+                key: Box::new(key.clone()),
+                value: Box::new(value.clone()),
             });
             u.add_type(Atomic::TNamedObject {
                 fqcn: mir_types::Name::from("Traversable"),
-                type_params: Default::default(),
+                type_params: mir_types::union::vec_to_type_params(vec![key, value]),
             });
             u
         }
