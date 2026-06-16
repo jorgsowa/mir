@@ -264,9 +264,21 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::NullsafePropertyAccess(pa) => self.analyze_nullsafe_property_access(pa, ctx),
 
-            ExprKind::StaticPropertyAccess(spa) => self.analyze_static_property_access(spa, ctx),
+            ExprKind::StaticPropertyAccess(spa) => {
+                if matches!(&spa.class.kind, ExprKind::Variable(_)) {
+                    let _ = self.analyze(&spa.class, ctx);
+                }
+                self.analyze_static_property_access(spa, ctx)
+            }
 
-            ExprKind::ClassConstAccess(cca) => self.analyze_class_const_access(cca, expr.span, ctx),
+            ExprKind::ClassConstAccess(cca) => {
+                // When the class part is a variable (e.g. `$obj::class`, `$obj::CONST`),
+                // analyze it so the variable read is tracked and the write is consumed.
+                if matches!(&cca.class.kind, ExprKind::Variable(_)) {
+                    let _ = self.analyze(&cca.class, ctx);
+                }
+                self.analyze_class_const_access(cca, expr.span, ctx)
+            }
 
             ExprKind::ClassConstAccessDynamic { class, member } => {
                 let _ = self.analyze(class, ctx);
@@ -326,6 +338,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Include/require --------------------------------------------
             ExprKind::Include(_, inner) => {
                 self.analyze(inner, ctx);
+                // A require/include can read any variable currently in scope, so
+                // mark all pending writes as consumed and mark the names as read.
+                // This covers both the last_write_locs path and the assigned_vars
+                // fallback in emit_unused_variables.
+                let names: Vec<mir_types::Name> = ctx.last_write_locs.keys().copied().collect();
+                for name in names {
+                    ctx.read_vars.insert(name);
+                }
+                for (name, locs) in ctx.last_write_locs.drain() {
+                    for loc in locs {
+                        ctx.consumed_write_locs.insert((name, loc));
+                    }
+                }
                 Type::mixed()
             }
 
