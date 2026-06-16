@@ -117,10 +117,17 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             return_type: None,
         }),
         "callable-string" => Type::single(Atomic::TCallableString),
-        "iterable" => Type::single(Atomic::TArray {
-            key: Box::new(Type::single(Atomic::TMixed)),
-            value: Box::new(Type::mixed()),
-        }),
+        "iterable" => {
+            let mut u = Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TMixed)),
+                value: Box::new(Type::mixed()),
+            });
+            u.add_type(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("Traversable"),
+                type_params: Default::default(),
+            });
+            u
+        }
         "scalar" => Type::single(Atomic::TScalar),
         "numeric" => Type::single(Atomic::TNumeric),
         "array-key" => {

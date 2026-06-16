@@ -61,10 +61,17 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
             params: None,
             return_type: None,
         }),
-        BuiltinType::Iterable => Type::single(Atomic::TArray {
-            key: Box::new(Type::single(Atomic::TMixed)),
-            value: Box::new(Type::mixed()),
-        }),
+        BuiltinType::Iterable => {
+            let mut u = Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TMixed)),
+                value: Box::new(Type::mixed()),
+            });
+            u.add_type(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("Traversable"),
+                type_params: Default::default(),
+            });
+            u
+        }
         BuiltinType::Null => Type::single(Atomic::TNull),
         BuiltinType::True => Type::single(Atomic::TTrue),
         BuiltinType::False => Type::single(Atomic::TFalse),

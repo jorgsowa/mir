@@ -28,4 +28,3 @@ function iterateValue(iterable $value): void {
     }
 }
 ===expect===
-RedundantCondition@21:8-21:24: Condition is always true/false for type 'bool'
