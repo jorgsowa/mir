@@ -488,8 +488,18 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let mut fallthrough_ctxs: Vec<FlowState> = Vec::new();
+        // Collect reads from diverging case bodies so pre-switch writes they
+        // consume are not falsely reported as dead (e.g. `$description` passed
+        // to `new InputArgument(...)` in an all-return switch(true)).
+        let mut diverging_reads: rustc_hash::FxHashSet<mir_types::Name> =
+            rustc_hash::FxHashSet::default();
+        let mut diverging_consumed: rustc_hash::FxHashSet<(mir_types::Name, (u32, u16, u32, u16))> =
+            rustc_hash::FxHashSet::default();
         for (i, case_ctx) in case_results.into_iter().enumerate() {
-            if !effective_diverges[i] {
+            if effective_diverges[i] {
+                diverging_reads.extend(case_ctx.read_vars.iter().copied());
+                diverging_consumed.extend(case_ctx.consumed_write_locs.iter().copied());
+            } else {
                 fallthrough_ctxs.push(case_ctx);
             }
         }
@@ -519,6 +529,17 @@ impl<'a> StatementsAnalyzer<'a> {
             m.diverges = true;
             m
         });
+        // Apply reads gathered from diverging case arms.
+        ctx.read_vars.extend(diverging_reads);
+        ctx.consumed_write_locs
+            .extend(diverging_consumed.iter().copied());
+        {
+            let consumed = &ctx.consumed_write_locs;
+            ctx.last_write_locs.retain(|name, locs| {
+                locs.retain(|loc| !consumed.contains(&(*name, *loc)));
+                !locs.is_empty()
+            });
+        }
     }
 
     pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut FlowState) {
@@ -653,11 +674,27 @@ impl<'a> StatementsAnalyzer<'a> {
             // is not falsely flagged as UnusedVariable.
             for name in finally_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
-                result.last_write_locs.remove(name);
             }
             result
                 .consumed_write_locs
                 .extend(finally_ctx.consumed_write_locs.iter().copied());
+            // Remove pending writes consumed in the finally block.
+            {
+                let consumed = result.consumed_write_locs.clone();
+                result.last_write_locs.retain(|name, locs| {
+                    locs.retain(|loc| !consumed.contains(&(*name, *loc)));
+                    !locs.is_empty()
+                });
+            }
+        }
+
+        // Catch variables are bound by the clause, not explicitly assigned. Suppress
+        // UnusedVariable for them by tracking their names in catch_var_names.
+        for catch in tc.catches.iter() {
+            if let Some(var) = &catch.var {
+                let sym = mir_types::Name::from(var.trim_start_matches('$'));
+                result.catch_var_names.insert(sym);
+            }
         }
 
         *ctx = result;

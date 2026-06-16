@@ -268,8 +268,16 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ClassConstAccess(cca) => self.analyze_class_const_access(cca, expr.span, ctx),
 
-            ExprKind::ClassConstAccessDynamic { .. } => Type::mixed(),
-            ExprKind::StaticPropertyAccessDynamic { .. } => Type::mixed(),
+            ExprKind::ClassConstAccessDynamic { class, member } => {
+                let _ = self.analyze(class, ctx);
+                let _ = self.analyze(member, ctx);
+                Type::mixed()
+            }
+            ExprKind::StaticPropertyAccessDynamic { class, member } => {
+                let _ = self.analyze(class, ctx);
+                let _ = self.analyze(member, ctx);
+                Type::mixed()
+            }
 
             // --- Method calls ----------------------------------------------
             ExprKind::MethodCall(mc) => {

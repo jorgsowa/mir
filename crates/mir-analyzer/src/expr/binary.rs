@@ -59,9 +59,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             if !right_ctx.diverges {
                 let _right_ty = self.analyze(&b.right, &mut right_ctx);
             }
-            for v in right_ctx.read_vars {
-                ctx.read_vars.insert(v);
-            }
+            // Propagate reads and consumed write locations from the short-circuit
+            // RHS back to the parent. Without this, a variable consumed only in
+            // the RHS (e.g. `A && $x['key']`) would not be marked as consumed in
+            // the parent, causing its pending write to survive into a catch block
+            // that resets last_write_locs to the pre-try state.
+            ctx.absorb_branch_reads(&right_ctx);
             for (name, ty) in right_ctx.vars.iter() {
                 if !ctx.vars.contains_key(name) {
                     std::sync::Arc::make_mut(&mut ctx.vars).insert(*name, ty.clone());
@@ -73,6 +76,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         if b.op == B::Instanceof {
             let _left_ty = self.analyze(&b.left, ctx);
+            // When the RHS is not a static class name but a variable or other
+            // expression (`$x instanceof $class`), analyze it so that the
+            // variable is marked as consumed — otherwise it is falsely reported
+            // as unused.
+            if !matches!(b.right.kind, ExprKind::Identifier(_)) {
+                let _ = self.analyze(&b.right, ctx);
+            }
             if let ExprKind::Identifier(name) = &b.right.kind {
                 let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());

@@ -148,6 +148,11 @@ pub struct FlowState {
     /// flag them as UnusedVariable.
     pub foreach_byref_var_names: FxHashSet<Name>,
 
+    /// Variables bound by a catch clause (`catch (Exception $e)`).
+    /// These are declared by the runtime, not by developer assignment, so an
+    /// unused catch variable must not produce an UnusedVariable diagnostic.
+    pub catch_var_names: FxHashSet<Name>,
+
     /// Names of template parameters in the current function/method.
     /// Used during type narrowing to correctly handle generic template variables.
     /// Arc-shared — set once at context construction, never mutated during analysis.
@@ -233,6 +238,7 @@ impl FlowState {
             consumed_write_locs: FxHashSet::default(),
             foreach_value_var_names: FxHashSet::default(),
             foreach_byref_var_names: FxHashSet::default(),
+            catch_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
@@ -495,12 +501,6 @@ impl FlowState {
                     .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
             }
         }
-        // Re-arm the location: a fresh write here is a new pending instance.
-        // A consumption recorded for a PREVIOUS dynamic execution of the same
-        // statement (loop iterations: `foreach (...) { $i = $i; }`) must not
-        // pre-cancel this one.
-        self.consumed_write_locs
-            .remove(&(sym, (line, col_start, line_end, col_end)));
         self.last_write_locs
             .insert(sym, vec![(line, col_start, line_end, col_end)]);
     }
@@ -577,11 +577,21 @@ impl FlowState {
             // Variables read in the diverging branch still count as used.
             for name in if_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
-                result.last_write_locs.remove(name);
             }
             result
                 .consumed_write_locs
                 .extend(if_ctx.consumed_write_locs.iter().copied());
+            // Remove pending writes that were consumed in the diverging branch.
+            // Use consumed_write_locs rather than read_vars to avoid incorrectly
+            // removing writes that appear in read_vars only due to loop-iteration
+            // accumulation (not because they were actually consumed this iteration).
+            {
+                let consumed = result.consumed_write_locs.clone();
+                result.last_write_locs.retain(|name, locs| {
+                    locs.retain(|loc| !consumed.contains(&(*name, *loc)));
+                    !locs.is_empty()
+                });
+            }
             // Dead writes from the diverging branch are still dead.
             extend_dead_writes_dedup(&mut result.dead_writes, if_ctx.dead_writes);
             for name in if_ctx.foreach_value_var_names.iter() {
@@ -589,6 +599,9 @@ impl FlowState {
             }
             for name in if_ctx.foreach_byref_var_names.iter() {
                 result.foreach_byref_var_names.insert(*name);
+            }
+            for name in if_ctx.catch_var_names.iter() {
+                result.catch_var_names.insert(*name);
             }
             return result;
         }
@@ -600,17 +613,27 @@ impl FlowState {
             // Variables read in the diverging branch still count as used.
             for name in else_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
-                result.last_write_locs.remove(name);
             }
             result
                 .consumed_write_locs
                 .extend(else_ctx.consumed_write_locs.iter().copied());
+            // Remove pending writes consumed in the diverging branch.
+            {
+                let consumed = result.consumed_write_locs.clone();
+                result.last_write_locs.retain(|name, locs| {
+                    locs.retain(|loc| !consumed.contains(&(*name, *loc)));
+                    !locs.is_empty()
+                });
+            }
             extend_dead_writes_dedup(&mut result.dead_writes, else_ctx.dead_writes);
             for name in else_ctx.foreach_value_var_names.iter() {
                 result.foreach_value_var_names.insert(*name);
             }
             for name in else_ctx.foreach_byref_var_names.iter() {
                 result.foreach_byref_var_names.insert(*name);
+            }
+            for name in else_ctx.catch_var_names.iter() {
+                result.catch_var_names.insert(*name);
             }
             return result;
         }
@@ -646,6 +669,13 @@ impl FlowState {
                 .chain(else_ctx.foreach_byref_var_names.iter())
             {
                 result.foreach_byref_var_names.insert(*name);
+            }
+            for name in if_ctx
+                .catch_var_names
+                .iter()
+                .chain(else_ctx.catch_var_names.iter())
+            {
+                result.catch_var_names.insert(*name);
             }
             return result;
         }
@@ -797,6 +827,15 @@ impl FlowState {
             .chain(else_ctx.foreach_byref_var_names.iter())
         {
             result.foreach_byref_var_names.insert(*name);
+        }
+
+        // Catch var names: union — catch variables from any branch must not be reported
+        for name in if_ctx
+            .catch_var_names
+            .iter()
+            .chain(else_ctx.catch_var_names.iter())
+        {
+            result.catch_var_names.insert(*name);
         }
 
         // Var locations: keep the earliest known span for each variable

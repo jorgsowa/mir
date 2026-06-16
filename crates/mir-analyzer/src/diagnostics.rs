@@ -603,6 +603,7 @@ pub(crate) fn emit_unused_variables(
             || name == "this"
             || name.starts_with('_')
             || ctx.foreach_byref_var_names.contains(name)
+            || ctx.catch_var_names.contains(name)
     };
 
     // Emit at most one UnusedVariable/UnusedForeachValue per variable name to avoid

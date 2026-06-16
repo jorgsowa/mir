@@ -20,6 +20,24 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let rhs_tainted = crate::taint::is_expr_tainted(&a.value, ctx);
+        // Snapshot which variables were already in consumed_write_locs before
+        // analyzing the RHS. When the LHS target variable is consumed DURING RHS
+        // analysis (e.g. `$x = f($x)`) the new write to `$x` must be re-armed so it
+        // can be independently detected as dead — this mirrors the pre-existing re-arm
+        // logic. But variables consumed BEFORE the RHS (carry-forward from a prior
+        // loop iteration) must NOT be re-armed, to prevent false "unused" reports on
+        // patterns like `foreach (...) { use($prev); $prev = $item; }`.
+        let target_var_name: Option<String> = match &a.target.kind {
+            ExprKind::Variable(v) => Some(v.trim_start_matches('$').to_string()),
+            _ => None,
+        };
+        let pre_rhs_consumed_count = target_var_name.as_deref().map(|name| {
+            let sym = mir_types::Name::from(name);
+            ctx.consumed_write_locs
+                .iter()
+                .filter(|(n, _)| *n == sym)
+                .count()
+        });
         let rhs_ty = self.analyze(&a.value, ctx);
         if rhs_ty.is_never() {
             return rhs_ty;
@@ -34,6 +52,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 }
                 self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
+                // If the target variable was consumed during RHS analysis (e.g. `$x = f($x)`),
+                // re-arm the new write location so it is treated as a fresh pending write.
+                // This allows subsequent iterations to detect it as dead if never read.
+                if let (Some(name), Some(pre_count)) = (&target_var_name, pre_rhs_consumed_count) {
+                    let sym = mir_types::Name::from(name.as_str());
+                    let post_count = ctx
+                        .consumed_write_locs
+                        .iter()
+                        .filter(|(n, _)| *n == sym)
+                        .count();
+                    if post_count > pre_count {
+                        // Target was freshly consumed during RHS — re-arm the new write.
+                        if let Some(locs) = ctx.last_write_locs.get(&sym).cloned() {
+                            for loc in locs {
+                                ctx.consumed_write_locs.remove(&(sym, loc));
+                            }
+                        }
+                    }
+                }
                 if rhs_tainted {
                     if let ExprKind::Variable(name) = &a.target.kind {
                         ctx.taint_var(name.as_ref());
@@ -43,6 +80,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             AssignOp::Concat => {
                 if let Some(var_name) = extract_simple_var(&a.target) {
+                    // `.=` reads the LHS before writing — mark the old write consumed.
+                    ctx.mark_consumed(&var_name);
                     ctx.set_var(&var_name, Type::single(Atomic::TString));
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
@@ -56,9 +95,34 @@ impl<'a> ExpressionAnalyzer<'a> {
             | AssignOp::Div
             | AssignOp::Mod
             | AssignOp::Pow => {
+                // Capture count before LHS analysis: `$a += $i` reads $a (consuming its prior
+                // write) then writes a fresh $a. Re-arm the new write so it is independently
+                // trackable as a dead write — same logic as AssignOp::Assign.
+                let pre_lhs_consumed_count = target_var_name.as_deref().map(|name| {
+                    let sym = mir_types::Name::from(name);
+                    ctx.consumed_write_locs
+                        .iter()
+                        .filter(|(n, _)| *n == sym)
+                        .count()
+                });
                 let lhs_ty = self.analyze(&a.target, ctx);
                 let result_ty = infer_arithmetic(&lhs_ty, &rhs_ty);
                 self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
+                if let (Some(name), Some(pre_count)) = (&target_var_name, pre_lhs_consumed_count) {
+                    let sym = mir_types::Name::from(name.as_str());
+                    let post_count = ctx
+                        .consumed_write_locs
+                        .iter()
+                        .filter(|(n, _)| *n == sym)
+                        .count();
+                    if post_count > pre_count {
+                        if let Some(locs) = ctx.last_write_locs.get(&sym).cloned() {
+                            for loc in locs {
+                                ctx.consumed_write_locs.remove(&(sym, loc));
+                            }
+                        }
+                    }
+                }
                 result_ty
             }
             AssignOp::Coalesce => {
@@ -74,6 +138,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             _ => {
                 if let Some(var_name) = extract_simple_var(&a.target) {
+                    // Compound assignment reads the LHS before writing — mark old write consumed.
+                    ctx.mark_consumed(&var_name);
                     ctx.set_var(&var_name, Type::mixed());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);

@@ -19,6 +19,6 @@ function test() {
 }
 ===expect===
 UnusedVariable@4:4-4:6: Variable $x is never read
-UnusedVariable@6:4-6:6: Variable $y is never read
+UnusedVariable@7:4-7:6: Variable $y is never read
 UnusedVariable@10:6-10:8: Variable $z is never read
 UnusedVariable@13:4-13:6: Variable $a is never read

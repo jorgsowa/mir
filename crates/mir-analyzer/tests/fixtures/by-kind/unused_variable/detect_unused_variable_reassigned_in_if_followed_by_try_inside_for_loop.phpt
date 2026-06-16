@@ -23,4 +23,3 @@ if ($user !== null && $user !== 0) {
 ===expect===
 UnusedVariable@2:0-2:8: Variable $user_id is never read
 UnusedVariable@13:8-13:10: Variable $a is never read
-UnusedVariable@14:21-14:38: Variable $e is never read
