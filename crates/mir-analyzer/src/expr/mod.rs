@@ -281,12 +281,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             ExprKind::ClassConstAccessDynamic { class, member } => {
-                let _ = self.analyze(class, ctx);
+                if matches!(&class.kind, ExprKind::Variable(_)) {
+                    let _ = self.analyze(class, ctx);
+                }
                 let _ = self.analyze(member, ctx);
                 Type::mixed()
             }
             ExprKind::StaticPropertyAccessDynamic { class, member } => {
-                let _ = self.analyze(class, ctx);
+                if matches!(&class.kind, ExprKind::Variable(_)) {
+                    let _ = self.analyze(class, ctx);
+                }
                 let _ = self.analyze(member, ctx);
                 Type::mixed()
             }
