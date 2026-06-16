@@ -544,6 +544,12 @@ pub struct ClassDef {
     /// E.g. `use A, B { B::hello insteadof A; }` stores `"hello" → ["A"]`.
     #[serde(default)]
     pub trait_insteadof: IndexMap<Arc<str>, Vec<Arc<str>>>,
+    /// Trait method aliases from `as` declarations in this class's `use` blocks.
+    /// Maps new_name_lowercase → (optional_trait_fqcn, original_method_name_lowercase).
+    /// E.g. `use Base { __construct as __constructBase; }` stores `"__constructbase" → (None, "__construct")`.
+    #[serde(default)]
+    #[allow(clippy::type_complexity)]
+    pub trait_aliases: FxHashMap<Arc<str>, (Option<Arc<str>>, Arc<str>)>,
 }
 
 impl ClassDef {

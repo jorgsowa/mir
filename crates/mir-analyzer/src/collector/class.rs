@@ -37,6 +37,11 @@ impl<'a> DefinitionCollector<'a> {
         let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
         let mut trait_insteadof: indexmap::IndexMap<Arc<str>, Vec<Arc<str>>> =
             indexmap::IndexMap::new();
+        #[allow(clippy::type_complexity)]
+        let mut trait_aliases: rustc_hash::FxHashMap<
+            Arc<str>,
+            (Option<Arc<str>>, Arc<str>),
+        > = rustc_hash::FxHashMap::default();
 
         let class_doc = self.parse_docblock_from_node(decl.doc_comment.as_ref());
 
@@ -268,21 +273,40 @@ impl<'a> DefinitionCollector<'a> {
                         trait_uses.push(fqcn);
                     }
                     for adaptation in tu.adaptations.iter() {
-                        if let php_ast::owned::TraitAdaptationKind::Precedence {
-                            method,
-                            insteadof,
-                            ..
-                        } = &adaptation.kind
-                        {
-                            let method_lower: Arc<str> =
-                                name_to_string_owned(method).to_ascii_lowercase().into();
-                            for excluded in insteadof.iter() {
-                                let excluded_fqcn: Arc<str> =
-                                    self.resolve_name(&name_to_string_owned(excluded)).into();
-                                trait_insteadof
-                                    .entry(method_lower.clone())
-                                    .or_default()
-                                    .push(excluded_fqcn);
+                        match &adaptation.kind {
+                            php_ast::owned::TraitAdaptationKind::Precedence {
+                                method,
+                                insteadof,
+                                ..
+                            } => {
+                                let method_lower: Arc<str> =
+                                    name_to_string_owned(method).to_ascii_lowercase().into();
+                                for excluded in insteadof.iter() {
+                                    let excluded_fqcn: Arc<str> =
+                                        self.resolve_name(&name_to_string_owned(excluded)).into();
+                                    trait_insteadof
+                                        .entry(method_lower.clone())
+                                        .or_default()
+                                        .push(excluded_fqcn);
+                                }
+                            }
+                            php_ast::owned::TraitAdaptationKind::Alias {
+                                trait_name,
+                                method,
+                                new_name,
+                                ..
+                            } => {
+                                if let Some(new_name) = new_name {
+                                    let new_lower: Arc<str> =
+                                        name_to_string_owned(new_name).to_ascii_lowercase().into();
+                                    let orig_lower: Arc<str> =
+                                        name_to_string_owned(method).to_ascii_lowercase().into();
+                                    let trait_fqcn: Option<Arc<str>> =
+                                        trait_name.as_ref().map(|t| {
+                                            self.resolve_name(&name_to_string_owned(t)).into()
+                                        });
+                                    trait_aliases.insert(new_lower, (trait_fqcn, orig_lower));
+                                }
                             }
                         }
                     }
@@ -392,6 +416,7 @@ impl<'a> DefinitionCollector<'a> {
                 })
                 .collect(),
             trait_insteadof,
+            trait_aliases,
         };
 
         self.slice.classes.push(std::sync::Arc::new(storage));
