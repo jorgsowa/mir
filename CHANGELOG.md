@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-06-16
+
+### Fixed
+
+- `int` values passed to `string` parameters in non-strict-mode files (without `declare(strict_types=1)`) are no longer flagged as `InvalidArgument`. PHP's coercive typing silently casts integers to strings in this context.
+- Batch analysis path (`analyze_paths`) now calls `ensure_vendor_eager_functions()`, ensuring Composer `autoload.files` globals (e.g. Laravel Prompts helpers: `confirm`, `select`, `suggest`) are indexed before body analysis. Previously, 61 spurious `UndefinedFunction` diagnostics were emitted on the Laravel corpus.
+- `foreach ($arr as &$val)` by-reference variables no longer emit `UnusedVariable` or dead-write diagnostics. Writes through a reference mutate the source array and are never dead.
+- Dynamic method call arguments (`$obj->{$method}($arg1, $arg2)`) are now analyzed so variables used only in those arguments are marked as consumed, fixing false `UnusedVariable` and `UnusedForeachValue` diagnostics.
+- Variables assigned before a `try` block and read only in the `finally` block are no longer reported as unused.
+- Union-typed arguments (e.g. `Arrayable|Stringable|array|string`) to matching parameters no longer emit false `ImplicitToStringCast` diagnostics.
+- `catch (Exception $e)` variables are never reported as unused, including when nested inside `if/else` or `try/catch` chains.
+- Concat-assign (`$x .= "…"`) marks the prior write consumed before recording the new write, preventing false dead-write reports on the initial assignment.
+- Carry-forward loop variables (`$prev = $item` inside `foreach`) no longer re-arm consumed writes spuriously, while `$a += $i` patterns retain dead-write detection when `$a` is never read after the loop.
+- `$var::class` and `$var::CONST` accesses now correctly mark the variable as consumed.
+- `require`/`include` marks all in-scope variables as consumed, since the included file can read any variable in the calling scope.
+- Variables assigned before a `try` block, overwritten inside the `try` body, and read in the `finally` block are no longer flagged as dead writes — the pre-try write is live on the exception path.
+- `UnusedVariable` and `UndefinedVariable` diagnostics are suppressed in Blade templates (`.blade.php`) and PHP files under `resources/views/`, where variables are injected by the template engine rather than assigned in PHP.
+- `method_exists($obj, 'method')` guards now suppress `UndefinedMethod` diagnostics inside the guarded `if` branch, including guards on property accesses.
+- `Closure` objects and keyed-array callables (e.g. `[object, "method"]`) are now valid callable subtypes, fixing false `InvalidReturnType` and `InvalidArgument` diagnostics.
+- `@internal` methods called on `$this` (own class or via traits) no longer emit `InternalMethod` false positives.
+- `new $classStringVar` where the variable holds `class-string<AbstractClass>` no longer emits `AbstractInstantiation` — the class-string constraint guarantees a concrete subclass at the call site.
+- `(int)` and `(float)` casts on unions that contain scalar-safe atoms (`string`, `bool`, `null`) no longer emit `InvalidCast`.
+- Assignment expressions inside `is_null()`/`is_string()`/etc. guards (`if (!is_null($model = $this->first(...)))`) now narrow the assigned variable in the then-branch, fixing `NullableReturnStatement` false positives in `firstOrFail`-style methods.
+- `iterable` pseudo-type now correctly expands to `array|Traversable` in both the docblock parser and the AST type-hint parser. Previously it was mapped to plain `array`, causing `InvalidArgument` and `InvalidReturnType` false positives wherever `Traversable` implementations were used.
+- Absolute FQCNs in docblocks (e.g. `\Carbon\CarbonImmutable`) are now preserved through alias resolution, preventing mis-resolution via `use` imports that share a prefix.
+- Types nested inside keyed array properties (e.g. `array{"class": class-string<T>}`) are now properly resolved through the file's namespace and import context.
+- `preg_replace`, `preg_replace_callback`, `preg_replace_callback_array`, and `preg_filter` now return `string|null` when `$subject` is a string and `array<int,string>|null` when it is an array.
+- `var_export($val, true)` now returns `string` instead of `string|null`.
+
 ## [0.42.0] - 2026-06-15
 
 ### Added
