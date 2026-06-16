@@ -1041,9 +1041,40 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TLiteralInt(n), Atomic::TNegativeInt) => *n < 0,
         (Atomic::TPositiveInt, Atomic::TInt) => true,
         (Atomic::TPositiveInt, Atomic::TNonNegativeInt) => true,
+        (Atomic::TPositiveInt, Atomic::TNumeric) => true,
+        (Atomic::TPositiveInt, Atomic::TScalar) => true,
         (Atomic::TNegativeInt, Atomic::TInt) => true,
         (Atomic::TNonNegativeInt, Atomic::TInt) => true,
         (Atomic::TIntRange { .. }, Atomic::TInt) => true,
+        (Atomic::TIntRange { .. }, Atomic::TNumeric) => true,
+        (Atomic::TIntRange { .. }, Atomic::TScalar) => true,
+        // positive-int is int<1, ∞>: subtype of int<sup_min, ∞> when sup_min <= 1
+        (Atomic::TPositiveInt, Atomic::TIntRange { min, max }) => {
+            max.is_none() && min.is_none_or(|m| m <= 1)
+        }
+        // int<sub_min, sub_max> <: int<sup_min, sup_max> when ranges nest
+        (
+            Atomic::TIntRange {
+                min: sub_min,
+                max: sub_max,
+            },
+            Atomic::TIntRange {
+                min: sup_min,
+                max: sup_max,
+            },
+        ) => {
+            let lower_ok = match (sub_min, sup_min) {
+                (_, None) => true,
+                (None, Some(_)) => false,
+                (Some(sl), Some(su)) => sl >= su,
+            };
+            let upper_ok = match (sub_max, sup_max) {
+                (None, None) | (Some(_), None) => true,
+                (None, Some(_)) => false,
+                (Some(sl), Some(su)) => sl <= su,
+            };
+            lower_ok && upper_ok
+        }
 
         (Atomic::TLiteralFloat(..), Atomic::TFloat) => true,
         (Atomic::TLiteralFloat(..), Atomic::TNumeric) => true,

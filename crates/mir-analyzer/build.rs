@@ -142,7 +142,7 @@ fn main() {
                 .unwrap()
                 .to_string_lossy()
                 .replace('-', "_");
-            let ignore = if content.contains("===ignore===") {
+            let ignore = if content.lines().any(|l| l.trim() == "===ignore===") {
                 format!("{indent}    #[ignore]\n")
             } else {
                 String::new()
