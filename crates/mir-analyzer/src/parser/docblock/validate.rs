@@ -1,8 +1,13 @@
 use super::*;
 
 pub(super) fn normalize_fqcn(s: &str) -> String {
-    // Strip leading backslash if present — we normalize all FQCNs without leading `\`
-    s.trim_start_matches('\\').to_string()
+    // Preserve a leading `\` — it signals an absolute FQCN and must survive into
+    // resolve_type_name so that use-alias resolution is NOT applied to it.
+    // Without the `\`, `\Carbon\CarbonImmutable` would be mis-resolved to
+    // `Illuminate\Support\Carbon\CarbonImmutable` when the file imports
+    // `use Illuminate\Support\Carbon`.  resolve_type_name strips the `\` after
+    // confirming the name is already absolute, so the final stored FQCN is clean.
+    s.to_string()
 }
 
 /// Returns an error message if `s` is a malformed PHPDoc type expression, otherwise `None`.

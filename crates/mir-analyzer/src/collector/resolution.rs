@@ -1,4 +1,4 @@
-use mir_types::{union::vec_to_type_params, Atomic, Name, Type};
+use mir_types::{atomic::KeyedProperty, union::vec_to_type_params, Atomic, Name, Type};
 use rustc_hash::FxHashMap;
 
 pub(super) fn resolve_name(
@@ -187,6 +187,28 @@ pub(super) fn resolve_atomic_inner(
                     .map(|p| resolve_union_inner(p.clone(), full_qualify, namespace, use_aliases))
                     .collect(),
             ),
+        },
+        Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } => Atomic::TKeyedArray {
+            properties: properties
+                .into_iter()
+                .map(|(key, prop)| {
+                    let resolved_ty =
+                        resolve_union_inner(prop.ty, full_qualify, namespace, use_aliases);
+                    (
+                        key,
+                        KeyedProperty {
+                            ty: resolved_ty,
+                            optional: prop.optional,
+                        },
+                    )
+                })
+                .collect(),
+            is_open,
+            is_list,
         },
         other => other,
     }
