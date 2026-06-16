@@ -294,7 +294,7 @@ function preg_match_all(string $pattern, string $subject, &$matches = null, int 
  * If specified, this variable will be filled with the number of
  * replacements done.
  * </p>
- * @return string|string[]|null <b>preg_replace</b> returns an array if the
+ * @return ($subject is array ? array<int, string>|null : string|null) <b>preg_replace</b> returns an array if the
  * <i>subject</i> parameter is an array, or a string
  * otherwise.
  * </p>
@@ -366,7 +366,7 @@ function preg_replace(array|string $pattern, array|string $replacement, array|st
  * replacements done.
  * </p>
  * @param int $flags [optional]
- * @return string|string[]|null <b>preg_replace_callback</b> returns an array if the
+ * @return ($subject is array ? array<int, string>|null : string|null) <b>preg_replace_callback</b> returns an array if the
  * <i>subject</i> parameter is an array, or a string
  * otherwise. On errors the return value is <b>NULL</b>
  * </p>
@@ -391,7 +391,7 @@ function preg_replace_callback(
  * @param int $limit [optional]
  * @param int &$count [optional]
  * @param int $flags [optional]
- * @return string|string[]|null  <p>preg_replace_callback_array() returns an array if the subject parameter is an array, or a string otherwise. On errors the return value is NULL</p>
+ * @return ($subject is array ? array<int, string>|null : string|null) <p>preg_replace_callback_array() returns an array if the subject parameter is an array, or a string otherwise. On errors the return value is NULL</p>
  * <p>If matches are found, the new subject will be returned, otherwise subject will be returned unchanged.</p>
  */
 function preg_replace_callback_array(
@@ -410,7 +410,7 @@ function preg_replace_callback_array(
  * @param string|string[] $subject
  * @param int $limit [optional]
  * @param int &$count [optional]
- * @return string|string[]|null an array if the <i>subject</i>
+ * @return ($subject is array ? array<int, string>|null : string|null) an array if the <i>subject</i>
  * parameter is an array, or a string otherwise.
  * </p>
  * <p>

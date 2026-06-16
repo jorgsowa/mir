@@ -209,7 +209,7 @@ function var_dump(...$vars): void {}
  * If used and set to true, var_export will return
  * the variable representation instead of outputting it.
  * </p>
- * @return string|null the variable representation when the return
+ * @return ($return is true ? string : null) the variable representation when the return
  * parameter is used and evaluates to true. Otherwise, this function will
  * return null.
  */
