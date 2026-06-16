@@ -195,7 +195,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let pre = ctx.clone();
         let entry = ctx.branch();
         // Do-while always executes at least once (body before condition check)
-        let post = self.analyze_loop_widened(
+        let mut post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
@@ -205,6 +205,35 @@ impl<'a> StatementsAnalyzer<'a> {
             true,
             false,
         );
+        // Since the body always executes at least once, variables introduced
+        // inside the body are definitely defined after the loop. Strip any
+        // possibly_undefined flag and promote possibly_assigned → assigned.
+        {
+            let new_names: Vec<mir_types::Name> = post
+                .vars
+                .keys()
+                .filter(|n| !pre.vars.contains_key(*n))
+                .copied()
+                .collect();
+            let post_vars = std::sync::Arc::make_mut(&mut post.vars);
+            for name in &new_names {
+                if let Some(ty) = post_vars.get_mut(name) {
+                    if ty.possibly_undefined {
+                        let mut stripped = (**ty).clone();
+                        stripped.possibly_undefined = false;
+                        *ty = mir_codebase::storage::wrap_var_type(stripped);
+                    }
+                }
+            }
+            let assigned = std::sync::Arc::make_mut(&mut post.assigned_vars);
+            let possibly = std::sync::Arc::make_mut(&mut post.possibly_assigned_vars);
+            for name in &new_names {
+                if possibly.contains(name) {
+                    possibly.remove(name);
+                    assigned.insert(*name);
+                }
+            }
+        }
         *ctx = post;
     }
 

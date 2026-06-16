@@ -395,6 +395,33 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                // Narrow the property type in prop_refined when the assignment is
+                // compatible with the declared type (so the refined type is a valid
+                // sub-type, e.g. assigning non-null to a nullable property).
+                // Skip refinement on invalid assignments to avoid masking later errors.
+                if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                        let obj_ty = ctx.get_var(obj_var.as_ref());
+                        let declared_opt: Option<std::sync::Arc<mir_types::Type>> =
+                            obj_ty.types.iter().find_map(|a| {
+                                if let Atomic::TNamedObject { fqcn, .. } = a {
+                                    let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                                    crate::db::find_property_in_chain(self.db, here, &prop_name)
+                                        .and_then(|(_, p)| p.ty.clone())
+                                } else {
+                                    None
+                                }
+                            });
+                        let should_refine = !ty.is_mixed()
+                            && declared_opt
+                                .as_deref()
+                                .map(|declared| crate::subtype::is_subtype(self.db, &ty, declared))
+                                .unwrap_or(true);
+                        if should_refine {
+                            ctx.set_prop_refined(obj_var.as_ref(), &prop_name, ty.clone());
+                        }
+                    }
+                }
             }
             ExprKind::StaticPropertyAccess(spa) => {
                 if let ExprKind::Identifier(id) = &spa.class.kind {

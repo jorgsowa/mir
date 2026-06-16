@@ -449,6 +449,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut declaring = None;
         let resolved =
             self.resolve_property_type(&obj_ty, &prop_name, pa.property.span, &mut declaring);
+
+        // If we have a narrowed type for this property access ($var->prop),
+        // return it instead of the declared type.
+        let resolved = if let ExprKind::Variable(obj_var) = &pa.object.kind {
+            ctx.get_prop_refined(obj_var.as_ref(), &prop_name)
+                .cloned()
+                .unwrap_or(resolved)
+        } else {
+            resolved
+        };
+
         for atomic in &obj_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let declaring_class = declaring.take().unwrap_or_else(|| Arc::from(fqcn.as_ref()));

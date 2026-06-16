@@ -91,10 +91,14 @@ pub fn narrow_from_condition(
             else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 }
             }
             // `$x === true` / `$x === false`
@@ -700,6 +704,75 @@ fn set_narrowed(
     }
 }
 
+/// Narrow a property access `$obj->prop` by a null check.
+/// Looks up the declared property type through the database and stores the
+/// narrowed result in `ctx.prop_refined`.
+fn narrow_prop_null(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_null: bool,
+) {
+    // Get the current type: use an existing refinement if present, else look up
+    // the declared type through the object variable's type.
+    let current = if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
+        refined.clone()
+    } else {
+        // Resolve through the object variable's type
+        let obj_ty = ctx.get_var(obj_var);
+        let mut prop_ty = mir_types::Type::mixed();
+        'outer: for atomic in &obj_ty.types {
+            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                // Try to find the property in the class chain
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                        break 'outer;
+                    }
+                }
+            } else if let mir_types::Atomic::TSelf { fqcn }
+            | mir_types::Atomic::TStaticObject { fqcn } = atomic
+            {
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        // Also try self_fqcn if obj_var is "this"
+        if prop_ty.is_mixed() && obj_var == "this" {
+            if let Some(fqcn) = ctx.self_fqcn.as_ref() {
+                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(db, &resolved);
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                    }
+                }
+            }
+        }
+        prop_ty
+    };
+
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_null {
+        current.narrow_to_null()
+    } else {
+        current.remove_null()
+    };
+    if narrowed != current {
+        ctx.set_prop_refined(obj_var, prop, narrowed);
+    }
+}
+
 fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_null {
@@ -984,6 +1057,22 @@ fn extract_class_fqcn_from_expr(
                 None
             }
         }
+        _ => None,
+    }
+}
+
+/// Extract `(obj_var, prop_name)` from a simple `$var->prop` expression.
+fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+    match &expr.kind {
+        ExprKind::PropertyAccess(pa) => {
+            let obj = extract_var_name(&pa.object)?;
+            let prop = match &pa.property.kind {
+                ExprKind::Identifier(s) => s.as_ref().to_string(),
+                _ => return None,
+            };
+            Some((obj, prop))
+        }
+        ExprKind::Parenthesized(inner) => extract_prop_access(inner),
         _ => None,
     }
 }

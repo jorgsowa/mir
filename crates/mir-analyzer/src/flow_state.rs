@@ -176,6 +176,12 @@ pub struct FlowState {
     /// guard. Used to suppress `UndefinedMethod` inside guarded branches.
     /// `expr_key` is a compact string like `"this->notification"` or `"foo"`.
     pub method_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
+
+    /// Narrowed/refined types for instance-property accesses tracked through
+    /// the current scope.  Key: `(object_var, prop_name)` e.g. `("this", "id")`.
+    /// Set by property assignments and null-guard narrowing; read by
+    /// `analyze_property_access` before falling back to the declared type.
+    pub prop_refined: Arc<FxHashMap<(Name, Name), Arc<Type>>>,
 }
 
 /// Pre-built superglobal initial state, shared across all FlowState instances.
@@ -249,6 +255,7 @@ impl FlowState {
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
             method_exists_guards: FxHashSet::default(),
+            prop_refined: Arc::new(FxHashMap::default()),
         }
     }
 
@@ -452,6 +459,35 @@ impl FlowState {
     pub fn var_possibly_defined(&self, name: &str) -> bool {
         let sym = Name::from(name.trim_start_matches('$'));
         self.assigned_vars.contains(&sym) || self.possibly_assigned_vars.contains(&sym)
+    }
+
+    /// Return the narrowed type for an instance-property access, if any.
+    /// `obj_var` is the receiver variable name (e.g. `"this"`).
+    pub fn get_prop_refined(&self, obj_var: &str, prop: &str) -> Option<&Type> {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        self.prop_refined.get(&key).map(|t| t.as_ref())
+    }
+
+    /// Record a narrowed/refined type for an instance property.
+    pub fn set_prop_refined(&mut self, obj_var: &str, prop: &str, ty: Type) {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        Arc::make_mut(&mut self.prop_refined).insert(key, mir_codebase::storage::wrap_var_type(ty));
+    }
+
+    /// Remove a refined type entry (e.g. after a write that invalidates it).
+    #[allow(dead_code)]
+    pub fn clear_prop_refined(&mut self, obj_var: &str, prop: &str) {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        Arc::make_mut(&mut self.prop_refined).remove(&key);
     }
 
     /// Mark a variable as carrying tainted (user-controlled) data.
@@ -807,6 +843,26 @@ impl FlowState {
             .intersection(&else_ctx.method_exists_guards)
             .cloned()
             .collect();
+
+        // Property refinements: keep only keys present in BOTH branches with the
+        // union of their types.  A refinement present in only one branch cannot
+        // be relied upon after the merge (the other path didn't narrow it).
+        {
+            let mut merged_props: FxHashMap<(Name, Name), Arc<Type>> = FxHashMap::default();
+            for (key, if_ty) in if_ctx.prop_refined.iter() {
+                if let Some(else_ty) = else_ctx.prop_refined.get(key) {
+                    let merged = if Arc::ptr_eq(if_ty, else_ty) {
+                        if_ty.clone()
+                    } else {
+                        let mut m = (**if_ty).clone();
+                        m.merge_with(else_ty);
+                        mir_codebase::storage::wrap_var_type(m)
+                    };
+                    merged_props.insert(*key, merged);
+                }
+            }
+            result.prop_refined = Arc::new(merged_props);
+        }
 
         // Taint: conservative union — if either branch taints a var, it stays tainted
         for name in if_ctx
