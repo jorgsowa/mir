@@ -178,10 +178,16 @@ impl<'a> StatementsAnalyzer<'a> {
         narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
 
         let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true));
+        let condition = w.condition.clone();
         let post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
+                // Re-apply condition narrowing at the start of each iteration so
+                // variables introduced by assignments in the condition (e.g.
+                // `while ($line = fgets($r))`) remain definitely-assigned in the body
+                // even after loop-widening merges demote them to possibly-assigned.
+                narrow_from_condition(&condition, iter, true, sa.db, &sa.file);
                 sa.analyze_stmt(&w.body, iter);
                 sa.expr_analyzer(iter).analyze(&w.condition, iter);
             },

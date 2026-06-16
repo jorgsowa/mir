@@ -41,8 +41,8 @@ pub fn narrow_from_condition(
                 narrow_from_condition(&b.right, ctx, true, db, file);
                 // When A && B is true, both sides were evaluated.
                 // Promote variables from possibly_assigned to assigned for side effects in each.
-                promote_assignment_effects(&b.left, ctx);
-                promote_assignment_effects(&b.right, ctx);
+                promote_assignment_effects(&b.left, ctx, db, file);
+                promote_assignment_effects(&b.right, ctx, db, file);
             }
         }
 
@@ -53,8 +53,8 @@ pub fn narrow_from_condition(
                 narrow_from_condition(&b.right, ctx, false, db, file);
                 // When A || B is false, both sides were evaluated.
                 // Promote variables from possibly_assigned to assigned for side effects in each.
-                promote_assignment_effects(&b.left, ctx);
-                promote_assignment_effects(&b.right, ctx);
+                promote_assignment_effects(&b.left, ctx, db, file);
+                promote_assignment_effects(&b.right, ctx, db, file);
             } else {
                 // For `$x instanceof A || $x instanceof B` in true-branch: narrow $x to A|B
                 narrow_or_instanceof_true(&b.left, &b.right, ctx, db, file);
@@ -370,11 +370,16 @@ pub fn narrow_from_condition(
         ExprKind::Assign(a) if matches!(a.op, AssignOp::Assign | AssignOp::Coalesce) => {
             if let Some(var_name) = extract_var_name(&a.target) {
                 let current = ctx.get_var(&var_name);
-                let narrowed = if is_true {
+                let mut narrowed = if is_true {
                     current.narrow_to_truthy()
                 } else {
                     current.narrow_to_falsy()
                 };
+                // In the true-branch the assignment definitely executed, so
+                // the variable is always defined here — clear possibly_undefined.
+                if is_true {
+                    narrowed.possibly_undefined = false;
+                }
                 if !narrowed.is_empty() {
                     ctx.set_var(&var_name, narrowed);
                 } else if !current.is_empty() && !current.is_mixed() {
@@ -1265,7 +1270,12 @@ fn extract_class_const_fqcn(
 /// Conservative for internal short-circuit operators: only recurses into the
 /// guaranteed-evaluated side (LHS) of nested `&&`/`||` sub-expressions, since
 /// we cannot know whether the RHS of those was reached.
-fn promote_assignment_effects(expr: &php_ast::owned::Expr, ctx: &mut FlowState) {
+fn promote_assignment_effects(
+    expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) {
     match &expr.kind {
         ExprKind::Assign(a) => {
             if let Some(var_name) = extract_var_name(&a.target) {
@@ -1276,42 +1286,66 @@ fn promote_assignment_effects(expr: &php_ast::owned::Expr, ctx: &mut FlowState) 
                     std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).remove(&sym);
                 }
             }
-            promote_assignment_effects(&a.value, ctx);
+            promote_assignment_effects(&a.value, ctx, db, file);
         }
         ExprKind::UnaryPrefix(u) => {
-            promote_assignment_effects(&u.operand, ctx);
+            promote_assignment_effects(&u.operand, ctx, db, file);
         }
         ExprKind::FunctionCall(call) => {
+            // Promote variables that were assigned via by-ref parameters
+            if let ExprKind::Identifier(fn_name) = &call.name.kind {
+                let resolved = crate::db::resolve_name(db, file, fn_name.as_ref());
+                let here = crate::db::Fqcn::from_str(db, &resolved);
+                if let Some(func) = crate::db::find_function(db, here) {
+                    for (i, param) in func.params.iter().enumerate() {
+                        if param.is_byref {
+                            let arg = call.args.get(i);
+                            if let Some(arg) = arg {
+                                if let ExprKind::Variable(name) = &arg.value.kind {
+                                    let var_name = name.as_ref().trim_start_matches('$');
+                                    let sym = mir_types::Name::from(var_name);
+                                    if ctx.possibly_assigned_vars.contains(&sym) {
+                                        let ty = ctx.get_var(var_name);
+                                        ctx.set_var(var_name, ty);
+                                        std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars)
+                                            .remove(&sym);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             for arg in call.args.iter() {
-                promote_assignment_effects(&arg.value, ctx);
+                promote_assignment_effects(&arg.value, ctx, db, file);
             }
         }
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
-            promote_assignment_effects(&mc.object, ctx);
+            promote_assignment_effects(&mc.object, ctx, db, file);
             for arg in mc.args.iter() {
-                promote_assignment_effects(&arg.value, ctx);
+                promote_assignment_effects(&arg.value, ctx, db, file);
             }
         }
         ExprKind::StaticMethodCall(smc) => {
             for arg in smc.args.iter() {
-                promote_assignment_effects(&arg.value, ctx);
+                promote_assignment_effects(&arg.value, ctx, db, file);
             }
         }
         // For nested &&: LHS is always evaluated; RHS might short-circuit — only recurse LHS.
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanAnd || b.op == BinaryOp::LogicalAnd => {
-            promote_assignment_effects(&b.left, ctx);
+            promote_assignment_effects(&b.left, ctx, db, file);
         }
         // For nested ||: LHS is always evaluated; RHS might short-circuit — only recurse LHS.
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
-            promote_assignment_effects(&b.left, ctx);
+            promote_assignment_effects(&b.left, ctx, db, file);
         }
         // For all other binary operators (===, !==, instanceof, +, etc.) both sides are evaluated.
         ExprKind::Binary(b) => {
-            promote_assignment_effects(&b.left, ctx);
-            promote_assignment_effects(&b.right, ctx);
+            promote_assignment_effects(&b.left, ctx, db, file);
+            promote_assignment_effects(&b.right, ctx, db, file);
         }
         ExprKind::Parenthesized(inner) => {
-            promote_assignment_effects(inner, ctx);
+            promote_assignment_effects(inner, ctx, db, file);
         }
         _ => {}
     }

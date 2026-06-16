@@ -2,8 +2,8 @@
 FALSE POSITIVE reproducer. Valid PHP: `preg_match($re,$s,$m)` defines `$m` by reference when it returns 1.
 mir 0.42.0 currently emits (the bug): PossiblyUndefinedVariable@5:13-5:15: $m
 Expected: no issue. Remove ===ignore=== to activate once fixed.
-===ignore===
 ===config===
+suppress=MixedArgument
 php_version=8.4
 ===file===
 <?php
