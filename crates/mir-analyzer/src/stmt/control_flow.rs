@@ -674,6 +674,15 @@ impl<'a> StatementsAnalyzer<'a> {
             // is not falsely flagged as UnusedVariable.
             for name in finally_ctx.read_vars.iter() {
                 result.read_vars.insert(*name);
+                // If the try body overwrote this variable (making its pre-try write appear
+                // dead), that pre-try write is NOT dead on the exception path (where the
+                // overwrite never happened). Mark any pre-try writes as consumed so they
+                // are not falsely reported.
+                if let Some(locs) = pre_ctx.last_write_locs.get(name) {
+                    for loc in locs {
+                        result.consumed_write_locs.insert((*name, *loc));
+                    }
+                }
             }
             result
                 .consumed_write_locs
