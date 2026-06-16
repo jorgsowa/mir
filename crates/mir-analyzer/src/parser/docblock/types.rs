@@ -246,10 +246,15 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 1 => parse_type_string(params[0].trim()),
                 _ => Type::mixed(),
             };
-            Type::single(Atomic::TArray {
+            let mut u = Type::single(Atomic::TArray {
                 key: Box::new(Type::single(Atomic::TMixed)),
                 value: Box::new(value),
-            })
+            });
+            u.add_type(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("Traversable"),
+                type_params: Default::default(),
+            });
+            u
         }
         "class-string" => Type::single(Atomic::TClassString(Some(
             normalize_fqcn(inner.trim()).into(),
