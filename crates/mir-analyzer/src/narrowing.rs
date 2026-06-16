@@ -204,7 +204,7 @@ pub fn narrow_from_condition(
             }
         }
 
-        // $x instanceof ClassName
+        // $x instanceof ClassName  /  $this->prop instanceof ClassName
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
             if let Some(var_name) = extract_var_name(&b.left) {
                 if let Some(raw_name) = extract_class_name(&b.right, ctx.self_fqcn.as_deref()) {
@@ -222,6 +222,11 @@ pub fn narrow_from_condition(
                         filter_out_instanceof_match(&current, &class_name, db)
                     };
                     set_narrowed(ctx, &var_name, &current, narrowed, true);
+                }
+            } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                if let Some(raw_name) = extract_class_name(&b.right, ctx.self_fqcn.as_deref()) {
+                    let class_name = crate::db::resolve_name(db, file, &raw_name);
+                    narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
                 }
             }
         }
@@ -767,6 +772,68 @@ fn narrow_prop_null(
         current.narrow_to_null()
     } else {
         current.remove_null()
+    };
+    if narrowed != current {
+        ctx.set_prop_refined(obj_var, prop, narrowed);
+    }
+}
+
+fn narrow_prop_instanceof(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    class_name: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_true: bool,
+) {
+    let current = if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
+        refined.clone()
+    } else {
+        let obj_ty = ctx.get_var(obj_var);
+        let mut prop_ty = mir_types::Type::mixed();
+        'outer: for atomic in &obj_ty.types {
+            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                        break 'outer;
+                    }
+                }
+            } else if let mir_types::Atomic::TSelf { fqcn }
+            | mir_types::Atomic::TStaticObject { fqcn } = atomic
+            {
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        if prop_ty.is_mixed() && obj_var == "this" {
+            if let Some(fqcn) = ctx.self_fqcn.as_ref() {
+                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(db, &resolved);
+                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                    if let Some(ty) = p_def.ty.as_deref() {
+                        prop_ty = ty.clone();
+                    }
+                }
+            }
+        }
+        prop_ty
+    };
+
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_true {
+        narrow_instanceof_preserving_subtypes(&current, class_name, db, &ctx.template_param_names)
+    } else {
+        filter_out_instanceof_match(&current, class_name, db)
     };
     if narrowed != current {
         ctx.set_prop_refined(obj_var, prop, narrowed);
