@@ -19,9 +19,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // View template files (blade templates and files under resources/views/) have
         // variables injected from the calling scope, so undefined-variable diagnostics
         // are false positives there.
-        let is_view_template = self.file.ends_with(".blade.php")
-            || self.file.contains("/resources/views/")
-            || self.file.contains("\\resources\\views\\");
+        let is_view_template = crate::diagnostics::is_view_template_path(&self.file);
         if !ctx.var_is_defined(name_str) && !self.in_existence_check && !is_view_template {
             if ctx.var_possibly_defined(name_str) {
                 self.emit(

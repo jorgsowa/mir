@@ -586,6 +586,16 @@ pub(crate) fn check_missing_return(
     ));
 }
 
+/// Returns true for Blade templates and files under `resources/views/`.
+/// Normalizes path separators before matching so Windows paths work correctly.
+pub(crate) fn is_view_template_path(file: &str) -> bool {
+    if file.ends_with(".blade.php") {
+        return true;
+    }
+    let normalized = file.replace('\\', "/");
+    normalized.contains("/resources/views/")
+}
+
 pub(crate) fn emit_unused_variables(
     ctx: &crate::flow_state::FlowState,
     file: &Arc<str>,
@@ -593,10 +603,7 @@ pub(crate) fn emit_unused_variables(
 ) {
     // View template files have variables injected from the calling scope; unused-variable
     // diagnostics are false positives there.
-    if file.ends_with(".blade.php")
-        || file.contains("/resources/views/")
-        || file.contains("\\resources\\views\\")
-    {
+    if is_view_template_path(file) {
         return;
     }
 
