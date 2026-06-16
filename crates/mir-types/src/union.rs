@@ -1180,6 +1180,12 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
             Type::single(Atomic::TInt).is_subtype_structural(key) && value.is_subtype_structural(av)
         }
+        (Atomic::TNonEmptyList { value }, Atomic::TArray { key, value: av }) => {
+            Type::single(Atomic::TInt).is_subtype_structural(key) && value.is_subtype_structural(av)
+        }
+        (Atomic::TNonEmptyList { value }, Atomic::TNonEmptyArray { key, value: av }) => {
+            Type::single(Atomic::TInt).is_subtype_structural(key) && value.is_subtype_structural(av)
+        }
         (Atomic::TNonEmptyList { value }, Atomic::TList { value: lv }) => {
             value.is_subtype_structural(lv)
         }
