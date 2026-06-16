@@ -591,6 +591,15 @@ pub(crate) fn emit_unused_variables(
     file: &Arc<str>,
     issues: &mut Vec<mir_issues::Issue>,
 ) {
+    // View template files have variables injected from the calling scope; unused-variable
+    // diagnostics are false positives there.
+    if file.ends_with(".blade.php")
+        || file.contains("/resources/views/")
+        || file.contains("\\resources\\views\\")
+    {
+        return;
+    }
+
     const SUPERGLOBALS: &[&str] = &[
         "_SERVER", "_GET", "_POST", "_REQUEST", "_SESSION", "_COOKIE", "_FILES", "_ENV", "GLOBALS",
         "argv", "argc",

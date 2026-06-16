@@ -16,7 +16,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let name_str = name.trim_start_matches('$');
-        if !ctx.var_is_defined(name_str) && !self.in_existence_check {
+        // View template files (blade templates and files under resources/views/) have
+        // variables injected from the calling scope, so undefined-variable diagnostics
+        // are false positives there.
+        let is_view_template = self.file.ends_with(".blade.php")
+            || self.file.contains("/resources/views/")
+            || self.file.contains("\\resources\\views\\");
+        if !ctx.var_is_defined(name_str) && !self.in_existence_check && !is_view_template {
             if ctx.var_possibly_defined(name_str) {
                 self.emit(
                     IssueKind::PossiblyUndefinedVariable {
