@@ -1010,6 +1010,11 @@ fn validate_class_string_argument(
     }
 
     if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+        // Skip strings that cannot be valid PHP class names (e.g. 'string[]', 'int|null').
+        // A class name only contains letters, digits, underscores, and namespace separators.
+        if !is_possible_class_name(s) {
+            return;
+        }
         let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
         if !crate::db::class_exists(ea.db, &resolved) {
             ea.emit(
@@ -1019,6 +1024,12 @@ fn validate_class_string_argument(
             );
         }
     }
+}
+
+fn is_possible_class_name(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '\\' || !c.is_ascii())
 }
 
 /// Validate callable type arguments: check that arrays are in valid [obj/class, "method"] format

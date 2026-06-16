@@ -1,10 +1,9 @@
 ===description===
 FALSE POSITIVE reproducer. Valid PHP: The string literal `'string[]'` is a runtime value, not a class name.
-mir 0.42.0 currently emits (the bug): UndefinedClass@6:23-6:33 (string[]) + InvalidArgument@6:23-6:33 (expected class-string)
-Expected: no issue. Remove ===ignore=== to activate once fixed.
-===ignore===
+Expected: no issue.
 ===config===
 php_version=8.4
+suppress=UnusedParam
 ===file===
 <?php
 /** @param class-string $type */
