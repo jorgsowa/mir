@@ -340,7 +340,15 @@ impl CallAnalyzer {
                 let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
                 let method_namespace =
                     extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());
-                if calling_namespace != method_namespace {
+                // self::/static::/parent:: calls are self-calls; also allow when calling
+                // on a class that is the current self (trait @internal methods included).
+                let is_self_call = is_self_parent_call
+                    || ctx
+                        .self_fqcn
+                        .as_deref()
+                        .map(|s| s.eq_ignore_ascii_case(fqcn.as_str()))
+                        .unwrap_or(false);
+                if calling_namespace != method_namespace && !is_self_call {
                     ea.emit(
                         IssueKind::InternalMethod {
                             class: fqcn.clone(),

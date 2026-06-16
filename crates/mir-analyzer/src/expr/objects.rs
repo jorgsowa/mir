@@ -354,24 +354,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         n.class.span,
                     );
                 }
-                // Check abstract for known TClassString
-                for atom in ty.types.iter() {
-                    if let Atomic::TClassString(Some(fqcn)) = atom {
-                        let here = crate::db::Fqcn::new(self.db, *fqcn);
-                        let is_abstract_class = crate::db::find_class_like(self.db, here)
-                            .map(|c| c.is_class() && c.is_abstract())
-                            .unwrap_or(false);
-                        if is_abstract_class {
-                            self.emit(
-                                IssueKind::AbstractInstantiation {
-                                    class: fqcn.to_string(),
-                                },
-                                Severity::Error,
-                                n.class.span,
-                            );
-                        }
-                    }
-                }
+                // Note: TClassString<AbstractClass> is valid for `new $var` because the
+                // class-string constraint means the held class-name IS-A AbstractClass, not
+                // that it IS AbstractClass itself. The concrete runtime class may be any
+                // non-abstract subclass, so no AbstractInstantiation check here.
                 Type::single(Atomic::TObject)
             }
         };

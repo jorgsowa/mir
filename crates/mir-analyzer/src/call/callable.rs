@@ -154,6 +154,7 @@ pub(crate) fn is_callable_array_pair(arg: &Type) -> bool {
                     | Atomic::TSelf { .. }
                     | Atomic::TStaticObject { .. }
                     | Atomic::TClassString(_)
+                    | Atomic::TMixed
             )
         });
         let second_ok = second.ty.contains(|t| {

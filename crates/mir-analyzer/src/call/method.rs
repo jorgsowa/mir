@@ -503,7 +503,15 @@ fn resolve_method_return<'a>(
         if resolved.is_internal {
             let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
             let method_namespace = extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());
-            if calling_namespace != method_namespace {
+            // Calling an @internal method on $this (self-call or inherited) is allowed —
+            // trait methods become part of the using class, and child classes may call
+            // parent/trait @internal methods that are part of their own API.
+            let is_self_call = ctx
+                .self_fqcn
+                .as_deref()
+                .map(|s| s.eq_ignore_ascii_case(fqcn.as_ref()))
+                .unwrap_or(false);
+            if calling_namespace != method_namespace && !is_self_call {
                 ea.emit(
                     IssueKind::InternalMethod {
                         class: fqcn.to_string(),

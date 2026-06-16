@@ -1121,6 +1121,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TLiteralString(_), Atomic::TCallable { .. }) => true,
         (Atomic::TArray { .. }, Atomic::TCallable { .. }) => true,
         (Atomic::TNonEmptyArray { .. }, Atomic::TCallable { .. }) => true,
+        (Atomic::TKeyedArray { .. }, Atomic::TCallable { .. }) => true,
 
         // Closure <: callable, typed Closure <: Closure
         (Atomic::TClosure { .. }, Atomic::TCallable { .. }) => true,
@@ -1137,6 +1138,10 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TClosure { .. }, Atomic::TObject) => true,
         // bare `Closure` (named object without signature) satisfies any typed Closure(): T
         (Atomic::TNamedObject { fqcn, .. }, Atomic::TClosure { .. }) => {
+            fqcn.as_ref().eq_ignore_ascii_case("closure")
+        }
+        // `Closure` named-object satisfies `callable`
+        (Atomic::TNamedObject { fqcn, .. }, Atomic::TCallable { .. }) => {
             fqcn.as_ref().eq_ignore_ascii_case("closure")
         }
 
