@@ -1176,11 +1176,9 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             fqcn.as_ref().eq_ignore_ascii_case("closure")
         }
 
-        // List <: array
+        // List <: array  (list key is always int; int must satisfy the array's key type)
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
-            // list key is always int
-            matches!(key.types.as_slice(), [Atomic::TInt | Atomic::TMixed])
-                && value.is_subtype_structural(av)
+            Type::single(Atomic::TInt).is_subtype_structural(key) && value.is_subtype_structural(av)
         }
         (Atomic::TNonEmptyList { value }, Atomic::TList { value: lv }) => {
             value.is_subtype_structural(lv)

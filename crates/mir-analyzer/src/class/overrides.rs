@@ -100,7 +100,11 @@ impl<'a> ClassAnalyzer<'a> {
 
             // ---- a0. Cannot re-declare a concrete method as abstract --------
             // PHP rejects making a concrete parent method abstract in a subclass.
-            if own.is_abstract && !parent.is_abstract {
+            // Interface methods are implicitly abstract, so re-declaring them
+            // abstract in an abstract class is always legal.
+            let parent_is_interface = crate::db::class_kind(self.db, parent_fqcn.as_ref())
+                .is_some_and(|k| k.is_interface);
+            if own.is_abstract && !parent.is_abstract && !parent_is_interface {
                 issues.push(
                     Issue::new(
                         IssueKind::MethodSignatureMismatch {

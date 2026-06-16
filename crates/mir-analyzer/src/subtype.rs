@@ -100,6 +100,17 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     let sup_single = Type::single(b.clone());
                     parts.iter().any(|part| is_subtype(db, part, &sup_single))
                 }
+                // A list-shaped keyed array (array{0:A,1:B}) satisfies list<T> when every
+                // element is a subtype of T — using the codebase-aware check so subclasses
+                // (CommandArgument extends Argument) are accepted.
+                (
+                    Atomic::TKeyedArray {
+                        properties,
+                        is_list,
+                        ..
+                    },
+                    Atomic::TList { value: lv },
+                ) => *is_list && properties.values().all(|p| is_subtype(db, &p.ty, lv)),
                 _ => false,
             }
         })
