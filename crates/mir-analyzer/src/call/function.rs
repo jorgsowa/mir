@@ -265,20 +265,8 @@ impl CallAnalyzer {
             .with(|b| b.borrow_mut().take())
             .unwrap_or_default();
         arg_types.clear();
-        // `ClassName::class` is a PHP compile-time constant — the class need not
-        // be loaded.  Suppress UndefinedClass while analysing arg 0 of the
-        // three PHP existence-probe functions so that the common guard pattern
-        // `class_exists(\Foo\Bar::class)` does not produce a false positive.
-        let is_existence_probe = matches!(
-            resolved_fn_name.as_str(),
-            "class_exists" | "interface_exists" | "trait_exists"
-        );
-        for (i, arg) in call.args.iter().enumerate() {
-            let ty = if is_existence_probe && i == 0 {
-                ea.with_class_exists_arg(|ea| ea.analyze(&arg.value, ctx))
-            } else {
-                ea.analyze(&arg.value, ctx)
-            };
+        for arg in call.args.iter() {
+            let ty = ea.analyze(&arg.value, ctx);
             super::consume_arg_assignment(&arg.value, ctx);
             arg_types.push(if arg.unpack {
                 spread_element_type(&ty)

@@ -589,18 +589,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.emit(IssueKind::ParentNotFound, Severity::Error, cca.class.span);
                 }
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                    if !crate::db::class_exists(self.db, &resolved)
-                        && !self.in_class_exists_arg
-                        && !ctx.class_exists_guards.contains(resolved.as_str())
-                    {
-                        self.emit(
-                            IssueKind::UndefinedClass {
-                                name: resolved.clone(),
-                            },
-                            Severity::Error,
-                            cca.class.span,
-                        );
-                    } else {
+                    // `Foo::class` is a PHP compile-time string constant — the class
+                    // need not be loaded or even defined.  Never emit UndefinedClass
+                    // for `::class` expressions.
+                    if crate::db::class_exists(self.db, &resolved) {
                         // Check if the class is deprecated
                         let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
                         if let Some(class) = crate::db::find_class_like(self.db, here) {
