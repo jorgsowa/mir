@@ -1025,7 +1025,12 @@ fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i
     };
     let current = ctx.get_var(name);
     let narrowed = narrow_type_to_int_range(&current, min, max);
-    set_narrowed(ctx, name, &current, narrowed, false);
+    // Mark the branch unreachable only when the current type is "closed precise"
+    // (a bounded int range, named int subtype, or literal union) — these only arise
+    // from docblocks/inference, so an empty intersection is a real contradiction.
+    // A plain `int` narrowed to an empty range is just conservative widening, not a bug.
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
 /// Apply integer bounds `[min, max]` to all integer components of a type.

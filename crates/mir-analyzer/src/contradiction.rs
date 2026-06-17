@@ -137,7 +137,7 @@ fn can_equal(ty: &Type, lit: &Lit) -> bool {
 /// loop-carried under-approximation — e.g. `$i = 0; while (…) { $r = $i++;
 /// if ($r > 3) … }` infers `$r` as `0` because loop-variable widening is not
 /// modelled, which would otherwise flag the live `$r > 3` as impossible.
-fn is_closed_precise(ty: &Type) -> bool {
+pub(crate) fn is_closed_precise(ty: &Type) -> bool {
     if ty.types.is_empty() {
         return false;
     }
