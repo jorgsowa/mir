@@ -60,7 +60,7 @@ fn return_type_is_invalid(
     if !actual.remove_null().is_empty() && actual.remove_null().is_subtype_structural(declared) {
         return false;
     }
-    if actual.remove_false().is_subtype_structural(declared) {
+    if !actual.remove_false().is_empty() && actual.remove_false().is_subtype_structural(declared) {
         return false;
     }
     // Suppress LessSpecificReturnStatement (level 4): actual is a supertype of declared
