@@ -101,7 +101,7 @@ impl CallAnalyzer {
                 let ty = ea.analyze(&call.class, ctx);
                 // $obj::method() / $this::method(): resolve against the object's class
                 if let Some(fqcn) = extract_object_fqcn(&ty) {
-                    if ty.is_nullable() {
+                    if ty.is_nullable() && !ty.is_mixed() {
                         ea.emit(
                             IssueKind::PossiblyNullMethodCall {
                                 method: method_name.to_string(),
