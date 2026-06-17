@@ -245,9 +245,9 @@ impl Atomic {
             | Atomic::TNonEmptyString  // "0" is both non-empty and falsy in PHP
             | Atomic::TNumericString   // "0" is a valid numeric-string and is falsy
             | Atomic::TArray { .. }
-            | Atomic::TList { .. }
-            | Atomic::TNonEmptyArray { .. }
-            | Atomic::TNonEmptyList { .. } => true,
+            | Atomic::TList { .. } => true,
+            // Non-empty collections always have at least one element — never falsy in PHP.
+            // TNonEmptyArray and TNonEmptyList are intentionally excluded here.
 
             Atomic::TLiteralString(s) => s.as_ref().is_empty() || s.as_ref() == "0",
 
