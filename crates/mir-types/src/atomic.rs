@@ -242,7 +242,8 @@ impl Atomic {
             | Atomic::TScalar
             | Atomic::TMixed
             | Atomic::TString
-            | Atomic::TNonEmptyString
+            | Atomic::TNonEmptyString  // "0" is both non-empty and falsy in PHP
+            | Atomic::TNumericString   // "0" is a valid numeric-string and is falsy
             | Atomic::TArray { .. }
             | Atomic::TList { .. }
             | Atomic::TNonEmptyArray { .. }
@@ -273,6 +274,11 @@ impl Atomic {
             | Atomic::TLiteralInt(0)
             | Atomic::TLiteralFloat(0, 0) => false,
             Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => false,
+            // int<0, 0> always equals zero — never truthy.
+            Atomic::TIntRange {
+                min: Some(0),
+                max: Some(0),
+            } => false,
             _ => true,
         }
     }
