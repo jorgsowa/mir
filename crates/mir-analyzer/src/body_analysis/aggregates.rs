@@ -25,6 +25,7 @@ impl<'a> BodyAnalyzer<'a> {
             with_templates: false,
             check_returns: false,
             analyze_param_defaults: false,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
@@ -76,6 +77,7 @@ impl<'a> BodyAnalyzer<'a> {
             with_templates: false,
             check_returns: false,
             analyze_param_defaults: false,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
@@ -140,6 +142,7 @@ impl<'a> BodyAnalyzer<'a> {
             with_templates: false,
             check_returns: false,
             analyze_param_defaults: false,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
@@ -198,6 +201,7 @@ impl<'a> BodyAnalyzer<'a> {
             with_templates: false,
             check_returns: false,
             analyze_param_defaults: false,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {

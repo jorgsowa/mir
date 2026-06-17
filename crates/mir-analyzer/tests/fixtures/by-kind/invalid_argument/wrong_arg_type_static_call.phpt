@@ -11,4 +11,4 @@ function run(): void {
     \Validator::check(42);
 }
 ===expect===
-App.php: InvalidArgument@3:22-3:24: Argument $value of check() expects 'string', got '42'
+App.php: ArgumentTypeCoercion@3:22-3:24: Argument $value of check() expects 'string', got '42' — coercion may fail at runtime

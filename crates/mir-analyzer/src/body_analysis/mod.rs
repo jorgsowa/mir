@@ -369,6 +369,15 @@ pub(crate) struct MethodScopeCx {
     pub with_templates: bool,
     pub check_returns: bool,
     pub analyze_param_defaults: bool,
+    pub strict_types: bool,
+}
+
+/// Returns `true` if `source` contains a top-level `declare(strict_types=1)`.
+/// PHP mandates the directive appear before any other code, so scanning the
+/// first 1 KiB is sufficient and reliable for well-formed files.
+pub(crate) fn is_strict_types_file(source: &str) -> bool {
+    let prefix = &source[..source.len().min(1024)];
+    prefix.contains("declare(strict_types=1)") || prefix.contains("declare(strict_types = 1)")
 }
 
 pub(crate) struct BodyAnalyzer<'a> {

@@ -122,7 +122,7 @@ impl<'a> BodyAnalyzer<'a> {
             Some(cx.fqcn.clone()),
             cx.parent_fqcn.clone(),
             Some(cx.fqcn.clone()),
-            false,
+            cx.strict_types,
             is_ctor,
             method.is_static,
             templates,
@@ -266,6 +266,7 @@ impl<'a> BodyAnalyzer<'a> {
             with_templates: true,
             check_returns: true,
             analyze_param_defaults: true,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {
@@ -352,6 +353,7 @@ impl<'a> BodyAnalyzer<'a> {
             with_templates: false,
             check_returns: false,
             analyze_param_defaults: true,
+            strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
             if let php_ast::owned::ClassMemberKind::Property(prop) = &member.kind {

@@ -9,4 +9,4 @@ class A {
 }
 (new A)->__invoke(1);
 ===expect===
-InvalidArgument@5:18-5:19: Argument $p of __invoke() expects 'string', got '1'
+ArgumentTypeCoercion@5:18-5:19: Argument $p of __invoke() expects 'string', got '1' — coercion may fail at runtime

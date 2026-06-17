@@ -11,4 +11,4 @@ function test(): void {
     takes_string($row['id']);
 }
 ===expect===
-InvalidArgument@6:17-6:27: Argument $s of takes_string() expects 'string', got '123'
+ArgumentTypeCoercion@6:17-6:27: Argument $s of takes_string() expects 'string', got '123' — coercion may fail at runtime

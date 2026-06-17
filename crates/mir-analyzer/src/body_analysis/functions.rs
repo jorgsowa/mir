@@ -97,7 +97,7 @@ impl<'a> BodyAnalyzer<'a> {
             None,
             None,
             None,
-            false,
+            crate::body_analysis::is_strict_types_file(source),
             false,
             true,
             Some(&template_params),
@@ -504,7 +504,7 @@ impl<'a> BodyAnalyzer<'a> {
             None,
             None,
             None,
-            false,
+            crate::body_analysis::is_strict_types_file(source),
             false,
             true,
             Some(&template_params),
@@ -618,7 +618,7 @@ impl<'a> BodyAnalyzer<'a> {
             None,
             None,
             None,
-            false,
+            crate::body_analysis::is_strict_types_file(source),
             true,
         );
         ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);

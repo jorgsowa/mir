@@ -15,4 +15,4 @@ function run(): void {
     $m->send(42);
 }
 ===expect===
-App.php: InvalidArgument@4:13-4:15: Argument $address of send() expects 'string', got '42'
+App.php: ArgumentTypeCoercion@4:13-4:15: Argument $address of send() expects 'string', got '42' — coercion may fail at runtime

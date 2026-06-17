@@ -195,7 +195,9 @@ pub(crate) fn check_one(
                 Severity::Info,
                 arg_span,
             );
-        } else if is_named_object_coercion(arg_ty, param_ty, ea) {
+        } else if is_named_object_coercion(arg_ty, param_ty, ea)
+            || scalar_coercion_ok(arg_ty, param_ty, ea)
+        {
             ea.emit(
                 IssueKind::ArgumentTypeCoercion {
                     param: param_name.to_string(),
@@ -324,6 +326,42 @@ fn stringable_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>)
             || crate::db::has_method_in_chain(ea.db, &resolved, "__toString")
             || crate::db::has_method_in_chain(ea.db, fqcn, "__toString")
     })
+}
+
+/// Returns `true` when passing `arg` where `param` is expected is a benign PHP
+/// scalar coercion in non-strict mode (e.g. `int → string`).
+///
+/// PHP without `strict_types=1` silently coerces int/float to string at call
+/// sites. These are not type errors; they should be `ArgumentTypeCoercion`
+/// (Info) rather than `InvalidArgument` (Error). Bool → string is excluded
+/// because passing `false` to a typed string param usually indicates a bug.
+fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    if ea.strict_types {
+        return false;
+    }
+    // int/float → string coercion
+    let param_accepts_string = param.types.iter().any(|p| {
+        matches!(
+            p,
+            Atomic::TString | Atomic::TNonEmptyString | Atomic::TNumericString
+        )
+    });
+    if param_accepts_string {
+        return arg.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TInt
+                    | Atomic::TLiteralInt(_)
+                    | Atomic::TIntRange { .. }
+                    | Atomic::TPositiveInt
+                    | Atomic::TNegativeInt
+                    | Atomic::TNonNegativeInt
+                    | Atomic::TFloat
+                    | Atomic::TLiteralFloat(..)
+            )
+        });
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------
