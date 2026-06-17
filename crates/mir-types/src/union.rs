@@ -348,8 +348,13 @@ impl Type {
     }
 
     /// Remove `false` from the union.
+    /// `TFalse` is dropped; `TBool` becomes `TTrue` since `bool - false = true`.
     pub fn remove_false(&self) -> Type {
-        self.filter(|t| !matches!(t, Atomic::TFalse | Atomic::TBool))
+        let mut result = self.filter(|t| !matches!(t, Atomic::TFalse | Atomic::TBool));
+        if self.types.iter().any(|t| matches!(t, Atomic::TBool)) {
+            result.add_type(Atomic::TTrue);
+        }
+        result
     }
 
     /// Remove both `null` and `false` from the union (core type without nullable/falsy variants).
