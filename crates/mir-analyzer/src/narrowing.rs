@@ -1039,33 +1039,24 @@ fn narrow_type_to_int_range(ty: &Type, min: Option<i64>, max: Option<i64>) -> Ty
     result.from_docblock = ty.from_docblock;
     for atomic in &ty.types {
         match atomic {
-            Atomic::TInt
-            | Atomic::TPositiveInt
-            | Atomic::TNonNegativeInt
-            | Atomic::TNegativeInt => {
+            Atomic::TInt => {
                 result.add_type(Atomic::TIntRange { min, max });
+            }
+            // Named int subtypes carry implicit bounds; intersect rather than replace.
+            Atomic::TPositiveInt => {
+                intersect_int_range_into(&mut result, Some(1), None, min, max);
+            }
+            Atomic::TNonNegativeInt => {
+                intersect_int_range_into(&mut result, Some(0), None, min, max);
+            }
+            Atomic::TNegativeInt => {
+                intersect_int_range_into(&mut result, None, Some(-1), min, max);
             }
             Atomic::TIntRange {
                 min: cur_min,
                 max: cur_max,
             } => {
-                let new_min = match (*cur_min, min) {
-                    (Some(a), Some(b)) => Some(a.max(b)),
-                    (None, v) | (v, None) => v,
-                };
-                let new_max = match (*cur_max, max) {
-                    (Some(a), Some(b)) => Some(a.min(b)),
-                    (None, v) | (v, None) => v,
-                };
-                if let (Some(lo), Some(hi)) = (new_min, new_max) {
-                    if lo > hi {
-                        continue; // Empty intersection — this arm is unreachable
-                    }
-                }
-                result.add_type(Atomic::TIntRange {
-                    min: new_min,
-                    max: new_max,
-                });
+                intersect_int_range_into(&mut result, *cur_min, *cur_max, min, max);
             }
             Atomic::TLiteralInt(v) => {
                 if in_bounds(*v) {
@@ -1078,6 +1069,34 @@ fn narrow_type_to_int_range(ty: &Type, min: Option<i64>, max: Option<i64>) -> Ty
         }
     }
     result
+}
+
+/// Intersect `(existing_min, existing_max)` with `(narrow_min, narrow_max)` and push
+/// the result into `out`, skipping the intersection if it is provably empty.
+fn intersect_int_range_into(
+    out: &mut Type,
+    existing_min: Option<i64>,
+    existing_max: Option<i64>,
+    narrow_min: Option<i64>,
+    narrow_max: Option<i64>,
+) {
+    let new_min = match (existing_min, narrow_min) {
+        (Some(a), Some(b)) => Some(a.max(b)),
+        (None, v) | (v, None) => v,
+    };
+    let new_max = match (existing_max, narrow_max) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (None, v) | (v, None) => v,
+    };
+    if let (Some(lo), Some(hi)) = (new_min, new_max) {
+        if lo > hi {
+            return; // Empty intersection — this arm is unreachable
+        }
+    }
+    out.add_type(Atomic::TIntRange {
+        min: new_min,
+        max: new_max,
+    });
 }
 
 fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
