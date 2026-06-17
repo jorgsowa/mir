@@ -362,3 +362,41 @@ pub(super) fn return_arrays_compatible(
         })
     })
 }
+
+// ---------------------------------------------------------------------------
+// Scalar return-type coercion (non-strict PHP)
+// ---------------------------------------------------------------------------
+
+/// Returns true if `actual` is a scalar type that PHP will silently coerce to
+/// `declared` in non-strict mode, so `InvalidReturnType` should not fire.
+///
+/// Narrower than the argument-side `scalar_coercion_ok`: for return types, mir
+/// deliberately keeps `int → string` and `float → string` as `InvalidReturnType`
+/// even in non-strict PHP (Psalm-parity and user expectation). Only the
+/// `int|false → bool` case is suppressed here, which covers the idiomatic
+/// `return preg_match(...)` pattern where the PHP function is explicitly typed
+/// as `int|false` but used in boolean context.
+pub(crate) fn scalar_return_coercion_ok(actual: &Type, declared: &Type) -> bool {
+    let declared_is_bool = declared
+        .types
+        .iter()
+        .any(|d| matches!(d, Atomic::TBool | Atomic::TTrue | Atomic::TFalse));
+
+    if !declared_is_bool {
+        return false;
+    }
+
+    actual.types.iter().all(|a| match a {
+        // int/false/bool → bool: PHP coerces 0 = false, non-zero = true
+        Atomic::TInt
+        | Atomic::TLiteralInt(_)
+        | Atomic::TIntRange { .. }
+        | Atomic::TPositiveInt
+        | Atomic::TNegativeInt
+        | Atomic::TNonNegativeInt
+        | Atomic::TFalse
+        | Atomic::TTrue
+        | Atomic::TBool => true,
+        _ => false,
+    })
+}

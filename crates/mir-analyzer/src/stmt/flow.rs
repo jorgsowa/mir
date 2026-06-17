@@ -1,5 +1,6 @@
 use super::return_type::{
     declared_return_has_template, named_object_return_compatible, return_arrays_compatible,
+    scalar_return_coercion_ok,
 };
 /// Flow-control statement handlers extracted from `analyze_stmt`.
 ///
@@ -12,6 +13,7 @@ use super::StatementsAnalyzer;
 fn return_type_is_invalid(
     actual: &Type,
     declared: &Type,
+    strict_types: bool,
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> bool {
@@ -37,6 +39,11 @@ fn return_type_is_invalid(
         return false;
     }
     if return_arrays_compatible(actual, declared, db, file) {
+        return false;
+    }
+    // Non-strict scalar return coercion: PHP silently coerces int/false → bool
+    // in non-strict files. Covers the idiomatic `return preg_match(...)` pattern.
+    if !strict_types && scalar_return_coercion_ok(actual, declared) {
         return false;
     }
     // Scalar coercion suppression: declared is a structural subtype of actual
@@ -108,7 +115,13 @@ impl<'a> StatementsAnalyzer<'a> {
                 // with TNull, so handle void separately to avoid false suppression).
                 let has_invalid = !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
                     && ((declared.is_void() && !check_ty.is_void() && !check_ty.is_mixed())
-                        || return_type_is_invalid(&check_ty, declared, self.db, &self.file));
+                        || return_type_is_invalid(
+                            &check_ty,
+                            declared,
+                            ctx.strict_types,
+                            self.db,
+                            &self.file,
+                        ));
                 let is_mixed_return = !has_invalid
                     && !declared.is_void()
                     && !declared.is_mixed()
@@ -162,6 +175,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     && !return_type_is_invalid(
                         &check_ty.remove_null(),
                         declared,
+                        ctx.strict_types,
                         self.db,
                         &self.file,
                     )
