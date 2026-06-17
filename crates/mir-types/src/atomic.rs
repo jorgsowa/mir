@@ -252,6 +252,13 @@ impl Atomic {
 
             Atomic::TKeyedArray { properties, .. } => properties.is_empty(),
 
+            // An int range can be falsy (== 0) when 0 is within the bounds.
+            Atomic::TIntRange { min, max } => {
+                min.is_none_or(|lo| lo <= 0) && max.is_none_or(|hi| hi >= 0)
+            }
+            // non-negative-int includes 0
+            Atomic::TNonNegativeInt => true,
+
             _ => false,
         }
     }
