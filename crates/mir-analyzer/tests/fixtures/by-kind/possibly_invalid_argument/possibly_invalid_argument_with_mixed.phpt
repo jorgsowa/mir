@@ -14,5 +14,5 @@ function foo($a) : void {
     echo strlen($a);
 }
 ===expect===
-UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'MixedArgument' is never used
+UnusedSuppress@6:0-6:0: Suppress annotation for 'MixedArgument' is never used
 MixedArgument@11:16-11:18: Argument $string of strlen() is mixed

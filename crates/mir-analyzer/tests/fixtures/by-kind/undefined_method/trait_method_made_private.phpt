@@ -1,6 +1,5 @@
 ===description===
-Trait method aliased as private. The alias is resolved so no UndefinedMethod is raised.
-Private-from-subclass visibility check (line 20) is not yet implemented.
+A trait method aliased as private is accessible within the declaring class but not from subclasses.
 ===file===
 <?php
 trait T {
@@ -21,7 +20,8 @@ class C {
 
 class D extends C {
     public function bar() : void {
-        $this->traitFoo(); // should eventually fail: private method of C
+        $this->traitFoo();
     }
 }
 ===expect===
+UndefinedMethod@20:8-20:25: Method C::traitFoo() does not exist

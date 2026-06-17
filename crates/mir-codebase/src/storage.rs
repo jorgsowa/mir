@@ -545,11 +545,17 @@ pub struct ClassDef {
     #[serde(default)]
     pub trait_insteadof: IndexMap<Arc<str>, Vec<Arc<str>>>,
     /// Trait method aliases from `as` declarations in this class's `use` blocks.
-    /// Maps new_name_lowercase → (optional_trait_fqcn, original_method_name_lowercase).
-    /// E.g. `use Base { __construct as __constructBase; }` stores `"__constructbase" → (None, "__construct")`.
+    /// Maps new_name_lowercase → (optional_trait_fqcn, original_method_name_lowercase, visibility_override, alias_cased).
+    /// `alias_cased` is the alias name preserving the original PHP casing (for error messages / case checks).
+    /// Visibility is `None` when the `as` clause only renames without changing visibility.
+    /// E.g. `use Base { __construct as __constructBase; }` stores
+    ///   `"__constructbase" → (None, "__construct", None, "__constructBase")`.
+    /// E.g. `use T { foo as private traitFoo; }` stores
+    ///   `"traitfoo" → (None, "foo", Some(Private), "traitFoo")`.
     #[serde(default)]
     #[allow(clippy::type_complexity)]
-    pub trait_aliases: FxHashMap<Arc<str>, (Option<Arc<str>>, Arc<str>)>,
+    pub trait_aliases:
+        FxHashMap<Arc<str>, (Option<Arc<str>>, Arc<str>, Option<Visibility>, Arc<str>)>,
 }
 
 impl ClassDef {

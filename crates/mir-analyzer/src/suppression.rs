@@ -96,7 +96,7 @@ pub struct SuppressionMap {
     /// Whole-file suppression, if any directive requested it.
     file: Option<KindSet>,
     /// Named (non-All) suppressions with their target lines, for
-    /// `UnusedPsalmSuppress` detection. Each entry is `(target_line, kind_name)`.
+    /// `UnusedSuppress` detection. Each entry is `(target_line, kind_name)`.
     /// Only `@psalm-suppress X` / `@suppress X` / `@mir-suppress X` forms populate
     /// this — blanket `@phpstan-ignore*` suppressions are intentionally excluded.
     pub named_suppressions: Vec<(u32, String)>,

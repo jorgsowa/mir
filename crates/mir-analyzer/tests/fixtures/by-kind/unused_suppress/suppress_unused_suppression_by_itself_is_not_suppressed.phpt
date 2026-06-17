@@ -4,7 +4,7 @@ Suppress unused suppression by itself is not suppressed
 <?php
 class Foo {
     /**
-     * @suppress UnusedPsalmSuppress
+     * @suppress UnusedSuppress
      */
     public string $bar = "baz";
 }

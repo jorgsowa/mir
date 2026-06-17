@@ -11,5 +11,5 @@ class A {
     }
 }
 ===expect===
-UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'MixedMethodCall' is never used
+UnusedSuppress@6:0-6:0: Suppress annotation for 'MixedMethodCall' is never used
 UndefinedProperty@7:31-7:34: Property A::$baz does not exist

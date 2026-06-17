@@ -299,9 +299,9 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/unused_class/`.
     UnusedClass { class: String },
     /// Emitted by `mir-analyzer/src/batch.rs` when a `@psalm-suppress` /
-    /// `@mir-suppress` annotation does not match any actual issue.
-    /// Fixtures: `tests/fixtures/by-kind/unused_psalm_suppress/`.
-    UnusedPsalmSuppress { kind: String },
+    /// `@mir-suppress` / `@suppress` annotation does not match any actual issue.
+    /// Fixtures: `tests/fixtures/by-kind/unused_suppress/`.
+    UnusedSuppress { kind: String },
 
     /// Emitted by `mir-analyzer/src/call/args/types.rs`.
     /// Fixtures: `tests/fixtures/by-kind/argument_type_coercion/`.
@@ -750,7 +750,7 @@ impl IssueKind {
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
             | IssueKind::UnusedClass { .. }
-            | IssueKind::UnusedPsalmSuppress { .. }
+            | IssueKind::UnusedSuppress { .. }
             | IssueKind::ArgumentTypeCoercion { .. }
             | IssueKind::PropertyTypeCoercion { .. }
             | IssueKind::DeprecatedCall { .. }
@@ -906,7 +906,7 @@ impl IssueKind {
             IssueKind::UnusedFunction { .. } => "MIR0505",
             IssueKind::UnusedForeachValue { .. } => "MIR0506",
             IssueKind::UnusedClass { .. } => "MIR0507",
-            IssueKind::UnusedPsalmSuppress { .. } => "MIR0508",
+            IssueKind::UnusedSuppress { .. } => "MIR0508",
 
             // Purity (1700-1799)
             IssueKind::ImpurePropertyAssignment { .. } => "MIR1700",
@@ -1120,7 +1120,7 @@ impl IssueKind {
             IssueKind::UnusedFunction { .. } => "UnusedFunction",
             IssueKind::UnusedForeachValue { .. } => "UnusedForeachValue",
             IssueKind::UnusedClass { .. } => "UnusedClass",
-            IssueKind::UnusedPsalmSuppress { .. } => "UnusedPsalmSuppress",
+            IssueKind::UnusedSuppress { .. } => "UnusedSuppress",
             IssueKind::ArgumentTypeCoercion { .. } => "ArgumentTypeCoercion",
             IssueKind::PropertyTypeCoercion { .. } => "PropertyTypeCoercion",
             IssueKind::ImpurePropertyAssignment { .. } => "ImpurePropertyAssignment",
@@ -1446,7 +1446,7 @@ impl IssueKind {
             IssueKind::UnusedClass { class } => {
                 format!("Class {class} is never referenced")
             }
-            IssueKind::UnusedPsalmSuppress { kind } => {
+            IssueKind::UnusedSuppress { kind } => {
                 format!("Suppress annotation for '{kind}' is never used")
             }
             IssueKind::ArgumentTypeCoercion {
@@ -2045,7 +2045,7 @@ mod code_tests {
             IssueKind::UnusedFunction { name: s() },
             IssueKind::UnusedForeachValue { name: s() },
             IssueKind::UnusedClass { class: s() },
-            IssueKind::UnusedPsalmSuppress { kind: s() },
+            IssueKind::UnusedSuppress { kind: s() },
             IssueKind::ArgumentTypeCoercion {
                 param: s(),
                 fn_name: s(),

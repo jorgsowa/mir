@@ -25,4 +25,4 @@ function app(): void {
     echo $r->loop();
 }
 ===expect===
-rec.php: UnusedPsalmSuppress@11:0-11:0: Suppress annotation for 'UnusedParam' is never used
+rec.php: UnusedSuppress@11:0-11:0: Suppress annotation for 'UnusedParam' is never used

@@ -40,7 +40,12 @@ impl<'a> DefinitionCollector<'a> {
         #[allow(clippy::type_complexity)]
         let mut trait_aliases: rustc_hash::FxHashMap<
             Arc<str>,
-            (Option<Arc<str>>, Arc<str>),
+            (
+                Option<Arc<str>>,
+                Arc<str>,
+                Option<mir_codebase::Visibility>,
+                Arc<str>,
+            ),
         > = rustc_hash::FxHashMap::default();
 
         let class_doc = self.parse_docblock_from_node(decl.doc_comment.as_ref());
@@ -293,19 +298,26 @@ impl<'a> DefinitionCollector<'a> {
                             php_ast::owned::TraitAdaptationKind::Alias {
                                 trait_name,
                                 method,
+                                new_modifier,
                                 new_name,
-                                ..
                             } => {
                                 if let Some(new_name) = new_name {
+                                    let alias_cased: Arc<str> =
+                                        name_to_string_owned(new_name).into();
                                     let new_lower: Arc<str> =
-                                        name_to_string_owned(new_name).to_ascii_lowercase().into();
+                                        alias_cased.to_ascii_lowercase().into();
                                     let orig_lower: Arc<str> =
                                         name_to_string_owned(method).to_ascii_lowercase().into();
                                     let trait_fqcn: Option<Arc<str>> =
                                         trait_name.as_ref().map(|t| {
                                             self.resolve_name(&name_to_string_owned(t)).into()
                                         });
-                                    trait_aliases.insert(new_lower, (trait_fqcn, orig_lower));
+                                    let vis_override =
+                                        new_modifier.map(|v| Self::convert_visibility(Some(v)));
+                                    trait_aliases.insert(
+                                        new_lower,
+                                        (trait_fqcn, orig_lower, vis_override, alias_cased),
+                                    );
                                 }
                             }
                         }

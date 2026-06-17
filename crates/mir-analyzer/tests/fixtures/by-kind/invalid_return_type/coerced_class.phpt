@@ -24,4 +24,4 @@ class NullableBug {
     }
 }
 ===expect===
-UnusedPsalmSuppress@20:0-20:0: Suppress annotation for 'ArgumentTypeCoercion' is never used
+UnusedSuppress@20:0-20:0: Suppress annotation for 'ArgumentTypeCoercion' is never used

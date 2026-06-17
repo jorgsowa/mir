@@ -10,4 +10,4 @@ class Foo {
 }
 
 ===expect===
-UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'UndefinedClass' is never used
+UnusedSuppress@6:0-6:0: Suppress annotation for 'UndefinedClass' is never used

@@ -858,7 +858,9 @@ fn walk_method_with_precedence<'db>(
     // For a plain class: respect its insteadof exclusions when walking its traits.
     if let ClassLike::Class(cls) = &class {
         // Check trait aliases: `use Trait { orig_method as alias_name; }`
-        if let Some((opt_trait_fqcn, orig_method)) = cls.trait_aliases.get(method_lower) {
+        if let Some((opt_trait_fqcn, orig_method, vis_override, alias_cased)) =
+            cls.trait_aliases.get(method_lower)
+        {
             let search_traits: Vec<Arc<str>> = if let Some(tfqcn) = opt_trait_fqcn {
                 vec![tfqcn.clone()]
             } else {
@@ -866,12 +868,20 @@ fn walk_method_with_precedence<'db>(
             };
             for trait_fqcn in &search_traits {
                 let here = Fqcn::new(db, Name::new(trait_fqcn.as_ref()));
-                if let Some((fqcn, m)) = walk_method_with_precedence(db, here, orig_method, visited)
+                if let Some((_trait_fqcn, m)) =
+                    walk_method_with_precedence(db, here, orig_method, visited)
                 {
-                    // Return method with the aliased name
                     let mut m_clone = (*m).clone();
-                    m_clone.name = class_name.clone();
-                    return Some((fqcn, Arc::new(m_clone)));
+                    // Use the alias name (original PHP casing) so WrongCaseMethod checks
+                    // and error messages use the alias, not the original trait method name.
+                    m_clone.name = alias_cased.clone();
+                    // Apply the visibility override declared in `foo as private alias`.
+                    if let Some(vis) = vis_override {
+                        m_clone.visibility = *vis;
+                    }
+                    // Return the declaring class as owner so visibility checks use
+                    // the class that declared the alias (not the trait).
+                    return Some((class_name, Arc::new(m_clone)));
                 }
             }
         }

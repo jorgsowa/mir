@@ -16,4 +16,4 @@ class User {
     }
 }
 ===expect===
-UnusedPsalmSuppress@6:0-6:0: Suppress annotation for 'MixedArgument' is never used
+UnusedSuppress@6:0-6:0: Suppress annotation for 'MixedArgument' is never used

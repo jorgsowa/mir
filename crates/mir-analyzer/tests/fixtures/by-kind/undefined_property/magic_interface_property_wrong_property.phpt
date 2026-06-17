@@ -20,5 +20,5 @@ function getBar(GetterSetter $o) : string {
     return $o->bar;
 }
 ===expect===
-UnusedPsalmSuppress@14:0-14:0: Suppress annotation for 'NoInterfaceProperties' is never used
+UnusedSuppress@14:0-14:0: Suppress annotation for 'NoInterfaceProperties' is never used
 NoInterfaceProperties@15:15-15:18: Property $bar is not defined on sealed interface

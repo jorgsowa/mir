@@ -179,7 +179,7 @@ impl AnalysisSession {
     /// Issues are *marked* rather than dropped, mirroring that per-statement
     /// path and the kind-level `mir.xml` suppress handler; every consumer (CLI,
     /// WASM, the test harness) already skips [`Issue::suppressed`].
-    /// Apply inline suppressions and then emit `UnusedPsalmSuppress` issues for
+    /// Apply inline suppressions and then emit `UnusedSuppress` issues for
     /// any named `@suppress`/`@psalm-suppress` annotations that matched nothing.
     ///
     /// `analyzed_files` must list every file that was analyzed in this batch so
@@ -216,7 +216,7 @@ impl AnalysisSession {
                     .map(|sf| SuppressionMap::from_source(&sf.text(&db)))
             });
         }
-        // Now emit UnusedPsalmSuppress for each file that has named suppressions.
+        // Now emit UnusedSuppress for each file that has named suppressions.
         let files: Vec<Arc<str>> = cache
             .iter()
             .filter_map(|(f, m)| m.as_ref().map(|_| f.clone()))
@@ -245,8 +245,7 @@ impl AnalysisSession {
                 let unused = map.unused_named(&file_issues, &pre_suppressed);
                 for (line, kind) in unused {
                     let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
-                    let mut issue =
-                        Issue::new(mir_issues::IssueKind::UnusedPsalmSuppress { kind }, loc);
+                    let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
                     if map.is_suppressed(line, issue.kind.name(), issue.kind.code()) {
                         issue.suppressed = true;
                     }
@@ -369,9 +368,9 @@ fn mark_suppressed(issues: &mut [Issue], suppressions: &crate::suppression::Supp
     }
 }
 
-/// Append `UnusedPsalmSuppress` issues for any named `@suppress`/`@psalm-suppress`
+/// Append `UnusedSuppress` issues for any named `@suppress`/`@psalm-suppress`
 /// annotations that did not match any issue in `all_issues`. The new issues are
-/// themselves subject to suppression (so `@suppress UnusedPsalmSuppress` works).
+/// themselves subject to suppression (so `@suppress UnusedSuppress` works).
 fn emit_unused_suppressions(
     all_issues: &mut Vec<Issue>,
     suppressions: &crate::suppression::SuppressionMap,
@@ -386,7 +385,7 @@ fn emit_unused_suppressions(
     let unused = suppressions.unused_named(all_issues, &pre_suppressed);
     for (line, kind) in unused {
         let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
-        let mut issue = Issue::new(mir_issues::IssueKind::UnusedPsalmSuppress { kind }, loc);
+        let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
         if suppressions.is_suppressed(line, issue.kind.name(), issue.kind.code()) {
             issue.suppressed = true;
         }
