@@ -477,6 +477,32 @@ pub(crate) fn infer_array_filter_return(arg_types: &[Type]) -> Option<Type> {
     }))
 }
 
+/// Infer the result type of `array_values($array)`.
+///
+/// Re-indexing produces a `list<TValue>` (or `non-empty-list<TValue>` when the
+/// source is provably non-empty). Returns `None` when element types are unknown
+/// so the generic stub `list<TValue>` binding falls back to `list<mixed>`.
+pub(crate) fn infer_array_values_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+    let atomic = if is_non_empty_collection(source) {
+        Atomic::TNonEmptyList {
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
 /// Returns `(callback_arg_index, min_required_arity)` for built-in functions that enforce a
 /// minimum callback arity via `check_min_arity_callback`. Functions with more complex rules
 /// (array_map, array_filter) use their own specialized handlers instead.

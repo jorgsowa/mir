@@ -489,6 +489,9 @@ impl CallAnalyzer {
                 "array_filter" => {
                     super::callable::infer_array_filter_return(&arg_types).unwrap_or(return_ty)
                 }
+                "array_values" => {
+                    super::callable::infer_array_values_return(&arg_types).unwrap_or(return_ty)
+                }
                 // Faithful integer-range returns: counts and lengths are
                 // non-negative (and counts of non-empty collections are `>= 1`).
                 "count" | "sizeof" => {

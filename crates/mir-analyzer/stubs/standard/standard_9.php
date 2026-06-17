@@ -83,11 +83,11 @@ function array_keys(array $array, mixed $filter_value = null, bool $strict = fal
 /**
  * Return all the values of an array
  * @link https://php.net/manual/en/function.array-values.php
- * @param array $array <p>
+ * @template TValue
+ * @param array<mixed, TValue> $array <p>
  * The array.
  * </p>
- * @return array an indexed array of values.
- * @meta
+ * @return list<TValue> an indexed array of values.
  * @pure
  */
 function array_values(array $array): array {}
