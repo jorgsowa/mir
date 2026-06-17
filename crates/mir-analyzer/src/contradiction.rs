@@ -11,7 +11,7 @@
 //! The analysis is deliberately conservative: an atomic is treated as "could
 //! still match the literal" unless it is *definitely* incompatible, so unknown
 //! or open atomics never produce a false contradiction.
-use php_ast::ast::BinaryOp;
+use php_ast::ast::{BinaryOp, UnaryPrefixOp};
 use php_ast::owned::{Expr, ExprKind};
 
 use mir_types::{Atomic, Type};
@@ -36,6 +36,14 @@ fn extract_lit(expr: &Expr) -> Option<Lit> {
         ExprKind::Int(n) => Some(Lit::Int(*n)),
         ExprKind::String(s) => Some(Lit::Str(s.to_string())),
         ExprKind::Parenthesized(inner) => extract_lit(inner),
+        // PHP parses `-1` as UnaryPrefix(Negate, Int(1)), not Int(-1).
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::Negate => {
+            if let ExprKind::Int(n) = &u.operand.kind {
+                n.checked_neg().map(Lit::Int)
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
