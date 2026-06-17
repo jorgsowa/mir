@@ -1053,7 +1053,11 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TPositiveInt, Atomic::TNumeric) => true,
         (Atomic::TPositiveInt, Atomic::TScalar) => true,
         (Atomic::TNegativeInt, Atomic::TInt) => true,
+        (Atomic::TNegativeInt, Atomic::TNumeric) => true,
+        (Atomic::TNegativeInt, Atomic::TScalar) => true,
         (Atomic::TNonNegativeInt, Atomic::TInt) => true,
+        (Atomic::TNonNegativeInt, Atomic::TNumeric) => true,
+        (Atomic::TNonNegativeInt, Atomic::TScalar) => true,
         (Atomic::TIntRange { .. }, Atomic::TInt) => true,
         (Atomic::TIntRange { .. }, Atomic::TNumeric) => true,
         (Atomic::TIntRange { .. }, Atomic::TScalar) => true,
@@ -1171,6 +1175,8 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // Literal int widens to float in PHP
         (Atomic::TLiteralInt(_), Atomic::TFloat) => true,
         (Atomic::TPositiveInt, Atomic::TFloat) => true,
+        (Atomic::TNegativeInt, Atomic::TFloat) => true,
+        (Atomic::TNonNegativeInt, Atomic::TFloat) => true,
         (Atomic::TInt, Atomic::TFloat) => true,
 
         // Literal int satisfies an int range only when the value is within bounds
