@@ -256,6 +256,15 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut crate::flow_state::FlowState,
     ) {
         let thrown_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
+        // If the thrown expression is a template-typed param variable, @throws is the
+        // caller's responsibility — suppress MissingThrowsDocblock for those.
+        let thrown_is_template_param = if let php_ast::owned::ExprKind::Variable(name) = &expr.kind
+        {
+            let var_name = mir_types::Name::from(name.trim_start_matches('$'));
+            ctx.template_typed_params.contains(&var_name)
+        } else {
+            false
+        };
         // Validate that the thrown type extends Throwable
         for atomic in &thrown_ty.types {
             match atomic {
@@ -299,7 +308,8 @@ impl<'a> StatementsAnalyzer<'a> {
                         } else {
                             fqcn.as_ref()
                         };
-                        if !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
+                        if !thrown_is_template_param
+                            && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
                             && !ctx.fn_declared_throws.iter().any(|declared| {
                                 declared.as_ref() == thrown_fqcn
                                     || crate::db::extends_or_implements(
@@ -363,7 +373,8 @@ impl<'a> StatementsAnalyzer<'a> {
                         } else {
                             fqcn.as_ref()
                         };
-                        if !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
+                        if !thrown_is_template_param
+                            && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
                             && !ctx.fn_declared_throws.iter().any(|declared| {
                                 declared.as_ref() == thrown_fqcn
                                     || crate::db::extends_or_implements(
@@ -391,6 +402,36 @@ impl<'a> StatementsAnalyzer<'a> {
                     }
                 }
                 mir_types::Atomic::TMixed | mir_types::Atomic::TObject => {}
+                // Template params with a throwable bound are valid to throw; the caller owns
+                // any @throws declaration — suppress both InvalidThrow and MissingThrowsDocblock.
+                mir_types::Atomic::TTemplateParam { as_type, .. } => {
+                    let bound_throwable = as_type.types.iter().any(|a| match a {
+                        mir_types::Atomic::TNamedObject { fqcn, .. } => {
+                            let r = crate::db::resolve_name(self.db, &self.file, fqcn);
+                            r == "Throwable"
+                                || r == "Exception"
+                                || r == "Error"
+                                || crate::db::extends_or_implements(self.db, &r, "Throwable")
+                        }
+                        mir_types::Atomic::TMixed | mir_types::Atomic::TObject => true,
+                        _ => false,
+                    });
+                    if !bound_throwable {
+                        let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
+                        self.issues.add(mir_issues::Issue::new(
+                            IssueKind::InvalidThrow {
+                                ty: format!("{thrown_ty}"),
+                            },
+                            Location {
+                                file: self.file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: col_end.max(col_start + 1),
+                            },
+                        ));
+                    }
+                }
                 _ => {
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt_span);
                     self.issues.add(mir_issues::Issue::new(

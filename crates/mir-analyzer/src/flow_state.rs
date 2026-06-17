@@ -158,6 +158,13 @@ pub struct FlowState {
     /// Arc-shared — set once at context construction, never mutated during analysis.
     pub template_param_names: Arc<FxHashSet<Name>>,
 
+    /// Names of function/method parameters whose declared types were expanded
+    /// from template param bounds (e.g. `@template T of Exception` + `@param T $e`).
+    /// Throw analysis uses this to suppress `MissingThrowsDocblock` when a
+    /// parameter of generic exception type is re-thrown — the caller owns the
+    /// `@throws` declaration, not the generic helper.
+    pub template_typed_params: Arc<FxHashSet<Name>>,
+
     /// FQCNs proven to exist in this branch via a `class_exists()` /
     /// `interface_exists()` / `trait_exists()` guard.  Used to suppress
     /// `UndefinedClass` diagnostics inside guarded branches.
@@ -251,6 +258,7 @@ impl FlowState {
             foreach_byref_var_names: FxHashSet::default(),
             catch_var_names: FxHashSet::default(),
             template_param_names: Arc::new(FxHashSet::default()),
+            template_typed_params: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
@@ -336,6 +344,7 @@ impl FlowState {
 
         // Build local sets — wrap in Arc at the end (set-once, never mutated during analysis).
         let mut template_param_names: FxHashSet<Name> = FxHashSet::default();
+        let mut template_typed_params: FxHashSet<Name> = FxHashSet::default();
         let mut param_names: FxHashSet<Name> = FxHashSet::default();
         let mut byref_param_names: FxHashSet<Name> = FxHashSet::default();
 
@@ -360,6 +369,7 @@ impl FlowState {
             // Resolve template references to their bounds
             // If the parameter type is a bare unqualified name matching a template parameter,
             // replace it with the template's bound
+            let mut is_template_typed = false;
             if elem_ty.types.len() == 1 {
                 match &elem_ty.types[0] {
                     mir_types::Atomic::TNamedObject { fqcn, type_params }
@@ -367,12 +377,14 @@ impl FlowState {
                     {
                         if let Some(bound) = template_bounds_map.get(fqcn) {
                             elem_ty = bound.clone();
+                            is_template_typed = true;
                         }
                     }
                     mir_types::Atomic::TTemplateParam { as_type, .. } if !as_type.is_mixed() => {
                         // If the template has a non-mixed bound, use it
                         // Otherwise keep the TTemplateParam to avoid MixedMethodCall errors
                         elem_ty = (**as_type).clone();
+                        is_template_typed = true;
                     }
                     _ => {}
                 }
@@ -404,6 +416,9 @@ impl FlowState {
             Arc::make_mut(&mut ctx.vars).insert(name, mir_codebase::storage::wrap_var_type(ty));
             Arc::make_mut(&mut ctx.assigned_vars).insert(name);
             param_names.insert(name);
+            if is_template_typed {
+                template_typed_params.insert(name);
+            }
             if p.is_byref {
                 byref_param_names.insert(name);
             }
@@ -429,6 +444,7 @@ impl FlowState {
         ctx.param_names = Arc::new(param_names);
         ctx.byref_param_names = Arc::new(byref_param_names);
         ctx.template_param_names = Arc::new(template_param_names);
+        ctx.template_typed_params = Arc::new(template_typed_params);
 
         ctx
     }
