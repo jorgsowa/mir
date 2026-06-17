@@ -108,6 +108,10 @@ impl Type {
 
     /// `T|null`
     pub fn nullable(atomic: Atomic) -> Self {
+        // `mixed|null` = `mixed` — null is already included in mixed.
+        if matches!(atomic, Atomic::TMixed) {
+            return Self::mixed();
+        }
         let mut types = SmallVec::new();
         types.push(atomic);
         types.push(Atomic::TNull);

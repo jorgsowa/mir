@@ -189,6 +189,31 @@ pub fn narrow_from_condition(
             }
         }
 
+        // $x < N, $x <= N, $x > N, $x >= N — comparison-driven integer range narrowing
+        ExprKind::Binary(b)
+            if matches!(
+                b.op,
+                BinaryOp::Less
+                    | BinaryOp::LessOrEqual
+                    | BinaryOp::Greater
+                    | BinaryOp::GreaterOrEqual
+            ) =>
+        {
+            // Normalize: variable on left, integer literal on right.
+            // If the literal is on the left (`5 > $x`), swap and flip the operator.
+            let (var_expr, cmp_op, lit_expr) = if extract_var_name(&b.left).is_some() {
+                (&b.left, b.op, &b.right)
+            } else {
+                (&b.right, flip_comparison_op(b.op), &b.left)
+            };
+
+            if let (Some(var_name), Some(n)) =
+                (extract_var_name(var_expr), extract_int_literal(lit_expr))
+            {
+                narrow_var_int_comparison(ctx, &var_name, cmp_op, n, is_true);
+            }
+        }
+
         // $x == null  (loose equality)
         ExprKind::Binary(b) if b.op == BinaryOp::Equal || b.op == BinaryOp::NotEqual => {
             let is_equal = b.op == BinaryOp::Equal;
@@ -957,6 +982,101 @@ fn add_key_to_sealed_shapes(
         .collect();
     let mut result = mir_types::Type::from_vec(new_types);
     result.from_docblock = ty.from_docblock;
+    result
+}
+
+/// Extract a signed integer literal from an expression, handling negation.
+fn extract_int_literal(expr: &php_ast::owned::Expr) -> Option<i64> {
+    let e = peel_parens(expr);
+    match &e.kind {
+        ExprKind::Int(n) => Some(*n),
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::Negate => {
+            if let ExprKind::Int(n) = &u.operand.kind {
+                n.checked_neg()
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Flip a comparison operator for when operands are swapped (`5 > $x` → `$x < 5`).
+fn flip_comparison_op(op: BinaryOp) -> BinaryOp {
+    match op {
+        BinaryOp::Less => BinaryOp::Greater,
+        BinaryOp::LessOrEqual => BinaryOp::GreaterOrEqual,
+        BinaryOp::Greater => BinaryOp::Less,
+        BinaryOp::GreaterOrEqual => BinaryOp::LessOrEqual,
+        other => other,
+    }
+}
+
+/// Narrow a variable by a comparison `$var op n` being `is_true`.
+fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i64, is_true: bool) {
+    // Determine the range constraint when the condition holds.
+    // Negation (`!is_true`) flips the constraint (e.g. NOT `< N` becomes `>= N`).
+    let (min, max): (Option<i64>, Option<i64>) = match (op, is_true) {
+        (BinaryOp::Less, true) | (BinaryOp::GreaterOrEqual, false) => (None, n.checked_sub(1)),
+        (BinaryOp::LessOrEqual, true) | (BinaryOp::Greater, false) => (None, Some(n)),
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => (n.checked_add(1), None),
+        (BinaryOp::GreaterOrEqual, true) | (BinaryOp::Less, false) => (Some(n), None),
+        _ => return,
+    };
+    let current = ctx.get_var(name);
+    let narrowed = narrow_type_to_int_range(&current, min, max);
+    set_narrowed(ctx, name, &current, narrowed, false);
+}
+
+/// Apply integer bounds `[min, max]` to all integer components of a type.
+///
+/// Integer atoms (`int`, `int<a,b>`, literal ints) that fall within the bounds
+/// are kept (possibly tightened); those that provably fall outside are removed.
+/// Non-integer atoms pass through unchanged so the narrowing is always safe.
+fn narrow_type_to_int_range(ty: &Type, min: Option<i64>, max: Option<i64>) -> Type {
+    let in_bounds = |v: i64| min.is_none_or(|lo| v >= lo) && max.is_none_or(|hi| v <= hi);
+    let mut result = Type::empty();
+    result.from_docblock = ty.from_docblock;
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TInt
+            | Atomic::TPositiveInt
+            | Atomic::TNonNegativeInt
+            | Atomic::TNegativeInt => {
+                result.add_type(Atomic::TIntRange { min, max });
+            }
+            Atomic::TIntRange {
+                min: cur_min,
+                max: cur_max,
+            } => {
+                let new_min = match (*cur_min, min) {
+                    (Some(a), Some(b)) => Some(a.max(b)),
+                    (None, v) | (v, None) => v,
+                };
+                let new_max = match (*cur_max, max) {
+                    (Some(a), Some(b)) => Some(a.min(b)),
+                    (None, v) | (v, None) => v,
+                };
+                if let (Some(lo), Some(hi)) = (new_min, new_max) {
+                    if lo > hi {
+                        continue; // Empty intersection — this arm is unreachable
+                    }
+                }
+                result.add_type(Atomic::TIntRange {
+                    min: new_min,
+                    max: new_max,
+                });
+            }
+            Atomic::TLiteralInt(v) => {
+                if in_bounds(*v) {
+                    result.add_type(atomic.clone());
+                }
+            }
+            _ => {
+                result.add_type(atomic.clone());
+            }
+        }
+    }
     result
 }
 
