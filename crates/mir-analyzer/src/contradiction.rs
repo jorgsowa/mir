@@ -144,15 +144,21 @@ fn is_closed_precise(ty: &Type) -> bool {
     let all_precise = ty.types.iter().all(|a| match a {
         Atomic::TLiteralInt(_) | Atomic::TLiteralString(_) | Atomic::TLiteralFloat(..) => true,
         Atomic::TIntRange { min, max } => min.is_some() || max.is_some(),
+        Atomic::TPositiveInt | Atomic::TNonNegativeInt | Atomic::TNegativeInt => true,
         _ => false,
     });
     if !all_precise {
         return false;
     }
-    let has_range = ty
-        .types
-        .iter()
-        .any(|a| matches!(a, Atomic::TIntRange { .. }));
+    let has_range = ty.types.iter().any(|a| {
+        matches!(
+            a,
+            Atomic::TIntRange { .. }
+                | Atomic::TPositiveInt
+                | Atomic::TNonNegativeInt
+                | Atomic::TNegativeInt
+        )
+    });
     has_range || ty.types.len() >= 2
 }
 
