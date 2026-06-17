@@ -1285,11 +1285,35 @@ fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_va
 fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_value {
-        current.filter(|t| match t {
-            Atomic::TLiteralInt(n) => *n == value,
-            Atomic::TInt | Atomic::TScalar | Atomic::TNumeric | Atomic::TMixed => true,
-            _ => false,
-        })
+        let int_contains = |min: Option<i64>, max: Option<i64>| {
+            min.is_none_or(|lo| value >= lo) && max.is_none_or(|hi| value <= hi)
+        };
+        let mut result = Type::empty();
+        result.from_docblock = current.from_docblock;
+        for t in &current.types {
+            match t {
+                Atomic::TLiteralInt(n) if *n == value => {
+                    result.add_type(t.clone());
+                }
+                Atomic::TInt | Atomic::TScalar | Atomic::TNumeric | Atomic::TMixed => {
+                    result.add_type(t.clone());
+                }
+                Atomic::TIntRange { min, max } if int_contains(*min, *max) => {
+                    result.add_type(Atomic::TLiteralInt(value));
+                }
+                Atomic::TPositiveInt if int_contains(Some(1), None) => {
+                    result.add_type(Atomic::TLiteralInt(value));
+                }
+                Atomic::TNonNegativeInt if int_contains(Some(0), None) => {
+                    result.add_type(Atomic::TLiteralInt(value));
+                }
+                Atomic::TNegativeInt if int_contains(None, Some(-1)) => {
+                    result.add_type(Atomic::TLiteralInt(value));
+                }
+                _ => {}
+            }
+        }
+        result
     } else {
         current.filter(|t| !matches!(t, Atomic::TLiteralInt(n) if *n == value))
     };
