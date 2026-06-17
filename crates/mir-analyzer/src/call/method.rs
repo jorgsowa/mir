@@ -153,7 +153,11 @@ impl CallAnalyzer {
 
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
-        if obj_ty.contains(|t| matches!(t, mir_types::Atomic::TNull)) {
+        // `mixed` already subsumes `null`, so a `mixed | null` receiver is just `mixed`.
+        // Such unions arise un-normalized from type inference (e.g. a @template TValue
+        // accessor declared @return TValue|null used unbound: TValue → mixed). Skip the
+        // nullability diagnostic and let the MixedMethodCall path below own it.
+        if obj_ty.contains(|t| matches!(t, mir_types::Atomic::TNull)) && !obj_ty.is_mixed() {
             if nullsafe {
                 // ?-> is fine, just returns null on null receiver
             } else if obj_ty.is_single() {
