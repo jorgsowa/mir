@@ -202,6 +202,8 @@ impl DefinitionCollector<'_> {
                 continue;
             }
             let param_name = p.name.as_deref().unwrap_or_default();
+            let native_ty =
+                self.resolve_union_opt(p.type_hint.as_ref().map(|h| type_from_hint_owned(h, None)));
             let ty = self
                 // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
                 // type override wins over the (usually absent) hint/docblock type.
@@ -211,19 +213,24 @@ impl DefinitionCollector<'_> {
                     doc.get_param_type(param_name).cloned().map(|u| {
                         // If the type is a simple named object that matches a template param,
                         // convert it to a TTemplateParam
-                        self.resolve_union_doc_with_templates(
+                        let doc_ty = self.resolve_union_doc_with_templates(
                             u,
                             &template_names,
                             &fqn,
                             &template_params,
-                        )
+                        );
+                        // When the native hint is a concrete scalar and the docblock has only
+                        // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
+                        // the PHP type hint is the runtime truth — prefer it over the docblock.
+                        if native_ty.as_ref().is_some_and(|n| {
+                            super::native_hint_wins_over_docblock_scalar(n, &doc_ty)
+                        }) {
+                            return native_ty.clone().unwrap();
+                        }
+                        doc_ty
                     })
                 })
-                .or_else(|| {
-                    self.resolve_union_opt(
-                        p.type_hint.as_ref().map(|h| type_from_hint_owned(h, None)),
-                    )
-                });
+                .or(native_ty);
             if let Some(ty_ref) = &ty {
                 if super::is_simple_scalar(ty_ref) {
                     local_scalar += 1;

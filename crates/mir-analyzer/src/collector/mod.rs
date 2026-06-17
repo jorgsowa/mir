@@ -58,6 +58,59 @@ fn is_simple_scalar(u: &Type) -> bool {
     )
 }
 
+/// Returns `true` when the native PHP hint is a single concrete scalar (bool/int/float/string)
+/// whose scalar family is completely absent from the docblock type.
+///
+/// Used at collection time (no DB needed) to detect `@param int $x` + `bool $x` style
+/// contradictions where the docblock has a *different* scalar family than the hint.
+/// In that case the PHP hint is the runtime truth and should take precedence.
+///
+/// Does NOT fire when the docblock is a refinement of the hint (e.g. `positive-int` + `int`
+/// hint, or `non-empty-string` + `string` hint): a refinement always contains atoms from the
+/// same family, so `docblock_contains_hint_family` would be true and this returns false.
+fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
+    use mir_types::atomic::Atomic;
+    if native.types.len() != 1 || doc.types.is_empty() {
+        return false;
+    }
+    let in_bool_family = |a: &Atomic| matches!(a, Atomic::TBool | Atomic::TTrue | Atomic::TFalse);
+    let in_int_family = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TInt
+                | Atomic::TLiteralInt(_)
+                | Atomic::TIntRange { .. }
+                | Atomic::TPositiveInt
+                | Atomic::TNegativeInt
+                | Atomic::TNonNegativeInt
+        )
+    };
+    let in_float_family = |a: &Atomic| matches!(a, Atomic::TFloat | Atomic::TLiteralFloat(_, _));
+    let in_string_family = |a: &Atomic| {
+        matches!(
+            a,
+            Atomic::TString
+                | Atomic::TLiteralString(_)
+                | Atomic::TClassString(_)
+                | Atomic::TNumericString
+        )
+    };
+    let family_check: fn(&Atomic) -> bool = match &native.types[0] {
+        a if in_bool_family(a) => in_bool_family,
+        a if in_int_family(a) => in_int_family,
+        a if in_float_family(a) => in_float_family,
+        a if in_string_family(a) => in_string_family,
+        _ => return false,
+    };
+    // Docblock must contain ONLY scalar atoms from other families (no mixed/null/object that
+    // could be a union refinement, and none from the hint's own family).
+    doc.types.iter().all(|a| {
+        let is_scalar =
+            in_bool_family(a) || in_int_family(a) || in_float_family(a) || in_string_family(a);
+        is_scalar && !family_check(a)
+    })
+}
+
 /// Returns true for PHP built-in type keywords and Psalm pseudo-types that must never be
 /// namespace-qualified, even when they appear as TNamedObject (e.g. inside generic params).
 fn is_php_builtin_type(name: &str) -> bool {
@@ -1104,6 +1157,11 @@ impl<'a> DefinitionCollector<'a> {
                 continue;
             }
             let param_name = p.name.as_deref().unwrap_or_default();
+            let native_ty = self.resolve_union_opt(
+                p.type_hint
+                    .as_ref()
+                    .map(|h| type_from_hint_owned(h, Some(class_fqcn))),
+            );
             let ty = self
                 // phpstorm-stubs `#[LanguageLevelTypeAware]` type override wins.
                 .version_attr_type_string(&p.attributes)
@@ -1118,21 +1176,25 @@ impl<'a> DefinitionCollector<'a> {
                         let resolved = aliases
                             .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
                             .unwrap_or_else(|| self.resolve_union_doc(u));
-                        self.substitute_template_params(
+                        let doc_ty = self.substitute_template_params(
                             resolved,
                             &template_names,
                             template_params_for_resolve,
                             class_fqcn,
-                        )
+                        );
+                        // When the native hint is a concrete scalar and the docblock has only
+                        // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
+                        // the PHP type hint is the runtime truth — prefer it over the docblock.
+                        if native_ty
+                            .as_ref()
+                            .is_some_and(|n| native_hint_wins_over_docblock_scalar(n, &doc_ty))
+                        {
+                            return native_ty.clone().unwrap();
+                        }
+                        doc_ty
                     })
                 })
-                .or_else(|| {
-                    self.resolve_union_opt(
-                        p.type_hint
-                            .as_ref()
-                            .map(|h| type_from_hint_owned(h, Some(class_fqcn))),
-                    )
-                });
+                .or(native_ty);
             if let Some(ty_ref) = &ty {
                 if is_simple_scalar(ty_ref) {
                     local_scalar += 1;
