@@ -15,6 +15,17 @@ pub(crate) fn check_one(
     arg_span: Span,
     template_params: &[TemplateParam],
 ) {
+    // `mixed` already subsumes `null`, so a `mixed | null` argument is just
+    // `mixed`. Such unions reach here un-normalized from type *inference* (e.g.
+    // a magic `__get` whose body returns `$attributes[$key]` or `null`), where
+    // the docblock parser's `mixed | null → mixed` collapse never ran. Emitting
+    // `PossiblyNullArgument`/`NullArgument` here is both redundant with the
+    // `MixedArgument` path and less precise than Psalm (which folds null into
+    // mixed), so defer entirely to that path.
+    if arg_ty.is_mixed() {
+        return;
+    }
+
     if !param_ty.is_nullable()
         && !param_ty.is_mixed()
         && !super::param_contains_template_or_unknown(param_ty, arg_ty, ea, template_params)
