@@ -1056,6 +1056,24 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TPositiveInt, Atomic::TIntRange { min, max }) => {
             max.is_none() && min.is_none_or(|m| m <= 1)
         }
+        // negative-int is int<-∞, -1>: subtype of int<-∞, sup_max> when sup_max >= -1
+        (Atomic::TNegativeInt, Atomic::TIntRange { min, max }) => {
+            min.is_none() && max.is_none_or(|m| m >= -1)
+        }
+        // non-negative-int is int<0, ∞>: subtype of int<sup_min, ∞> when sup_min <= 0
+        (Atomic::TNonNegativeInt, Atomic::TIntRange { min, max }) => {
+            max.is_none() && min.is_none_or(|m| m <= 0)
+        }
+        // A bounded int range is a subtype of a named int subtype when every value fits
+        (Atomic::TIntRange { min: sub_min, .. }, Atomic::TPositiveInt) => {
+            sub_min.is_some_and(|lo| lo >= 1)
+        }
+        (Atomic::TIntRange { min: sub_min, .. }, Atomic::TNonNegativeInt) => {
+            sub_min.is_some_and(|lo| lo >= 0)
+        }
+        (Atomic::TIntRange { max: sub_max, .. }, Atomic::TNegativeInt) => {
+            sub_max.is_some_and(|hi| hi <= -1)
+        }
         // int<sub_min, sub_max> <: int<sup_min, sup_max> when ranges nest
         (
             Atomic::TIntRange {
@@ -1150,8 +1168,10 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TPositiveInt, Atomic::TFloat) => true,
         (Atomic::TInt, Atomic::TFloat) => true,
 
-        // Literal int satisfies int ranges
-        (Atomic::TLiteralInt(_), Atomic::TIntRange { .. }) => true,
+        // Literal int satisfies an int range only when the value is within bounds
+        (Atomic::TLiteralInt(n), Atomic::TIntRange { min, max }) => {
+            min.is_none_or(|lo| *n >= lo) && max.is_none_or(|hi| *n <= hi)
+        }
 
         // PHP callables: string and array are valid callable values
         (Atomic::TString, Atomic::TCallable { .. }) => true,
