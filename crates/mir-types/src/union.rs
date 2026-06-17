@@ -1255,8 +1255,77 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             k1.is_subtype_structural(k2) && v1.is_subtype_structural(v2)
         }
 
-        // A keyed/shape array (array{...} or array{}) is a subtype of any generic array.
-        (Atomic::TKeyedArray { .. }, Atomic::TArray { .. }) => true,
+        // A keyed/shape array is a subtype of array<K, V> / non-empty-array<K, V>
+        // when all property KEYS are subtypes of K. Value compatibility is checked
+        // structurally only for scalar types; named-object values are deferred to
+        // class-hierarchy checks in return_arrays_compatible (mir-analyzer).
+        // Open shapes (is_open=true) may have extra unknown keys: keep permissive.
+        (
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            },
+            Atomic::TArray { key, value },
+        ) => {
+            if *is_open {
+                return true;
+            }
+            properties.iter().all(|(prop_key, prop)| {
+                let key_atomic = match prop_key {
+                    crate::atomic::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
+                    crate::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+                };
+                if !Type::single(key_atomic).is_subtype_structural(key) {
+                    return false; // key mismatch — definitively incompatible
+                }
+                // Named-object values require class-hierarchy checks not available here.
+                let has_named_obj = prop.ty.types.iter().any(|a| {
+                    matches!(
+                        a,
+                        Atomic::TNamedObject { .. }
+                            | Atomic::TSelf { .. }
+                            | Atomic::TStaticObject { .. }
+                            | Atomic::TClosure { .. }
+                            | Atomic::TTemplateParam { .. }
+                    )
+                });
+                has_named_obj || prop.ty.is_subtype_structural(value)
+            })
+        }
+        (
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            },
+            Atomic::TNonEmptyArray { key, value },
+        ) => {
+            if *is_open {
+                return !properties.is_empty();
+            }
+            properties.iter().any(|(_, p)| !p.optional)
+                && properties.iter().all(|(prop_key, prop)| {
+                    let key_atomic = match prop_key {
+                        crate::atomic::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
+                        crate::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+                    };
+                    if !Type::single(key_atomic).is_subtype_structural(key) {
+                        return false;
+                    }
+                    let has_named_obj = prop.ty.types.iter().any(|a| {
+                        matches!(
+                            a,
+                            Atomic::TNamedObject { .. }
+                                | Atomic::TSelf { .. }
+                                | Atomic::TStaticObject { .. }
+                                | Atomic::TClosure { .. }
+                                | Atomic::TTemplateParam { .. }
+                        )
+                    });
+                    has_named_obj || prop.ty.is_subtype_structural(value)
+                })
+        }
 
         // A list-shaped keyed array (is_list=true, all int keys) is a subtype of list<X>.
         (

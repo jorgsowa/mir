@@ -309,7 +309,38 @@ pub(super) fn return_arrays_compatible(
             | Atomic::TNonEmptyArray { value, .. }
             | Atomic::TList { value }
             | Atomic::TNonEmptyList { value } => value,
-            Atomic::TKeyedArray { .. } => return true,
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => {
+                // TKeyedArray compatibility:
+                // - TKeyedArray <: TKeyedArray: permissive (returning [] from a shaped
+                //   function is a common pattern not flagged at default error level).
+                // - TKeyedArray <: TArray / TNonEmptyArray: check keys + values with
+                //   class hierarchy awareness (structural check deferred named-object values).
+                return declared.types.iter().any(|d_atomic| match d_atomic {
+                    Atomic::TKeyedArray { .. } => true,
+                    Atomic::TArray { key: dk, value: dv }
+                    | Atomic::TNonEmptyArray { key: dk, value: dv } => {
+                        if *is_open {
+                            return true;
+                        }
+                        properties.iter().all(|(prop_key, prop)| {
+                            let key_atomic = match prop_key {
+                                mir_types::atomic::ArrayKey::String(s) => {
+                                    Atomic::TLiteralString(s.clone())
+                                }
+                                mir_types::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+                            };
+                            Type::single(key_atomic).is_subtype_structural(dk)
+                                && (prop.ty.is_subtype_structural(dv)
+                                    || named_object_return_compatible(&prop.ty, dv, db, file))
+                        })
+                    }
+                    _ => false,
+                });
+            }
             _ => return false,
         };
 
