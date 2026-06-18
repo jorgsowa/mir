@@ -605,6 +605,10 @@ impl CallAnalyzer {
                     super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
                 }
                 // date/time formatting functions always return non-empty strings.
+                // array_fill_keys uses the values of $keys as result keys and $value as each result value.
+                "array_fill_keys" => {
+                    super::callable::array_fill_keys_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 // preg_split with default flags always returns at least one part.
                 "preg_split" => {
                     super::callable::preg_split_return_type(&arg_types).unwrap_or(return_ty)

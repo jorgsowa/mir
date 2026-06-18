@@ -1503,6 +1503,35 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `array_fill_keys(array $keys, mixed $value)`.
+///
+/// The result has one entry per element in `$keys`. The key type comes from
+/// the *value* type of `$keys` (since those values become the result's keys),
+/// and the value type is the type of `$value`. Non-empty `$keys` → non-empty result.
+pub(crate) fn array_fill_keys_return_type(arg_types: &[Type]) -> Option<Type> {
+    let keys_arr = arg_types.first()?;
+    let value_ty = arg_types.get(1)?;
+    if keys_arr.is_mixed() || value_ty.is_mixed() {
+        return None;
+    }
+    let (_, key_of_result) = crate::stmt::infer_foreach_types(keys_arr);
+    if key_of_result.is_mixed() {
+        return None;
+    }
+    let atom = if is_non_empty_collection(keys_arr) {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key_of_result),
+            value: Box::new(value_ty.clone()),
+        }
+    } else {
+        Atomic::TArray {
+            key: Box::new(key_of_result),
+            value: Box::new(value_ty.clone()),
+        }
+    };
+    Some(Type::single(atom))
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {
