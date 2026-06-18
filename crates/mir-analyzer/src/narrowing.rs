@@ -415,6 +415,30 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
+                } else if bare.eq_ignore_ascii_case("in_array") {
+                    // in_array($needle, ['a', 'b', 'c']) true →
+                    // narrow $needle to 'a'|'b'|'c'.
+                    if let (Some(needle_arg), Some(haystack_arg)) =
+                        (call.args.first(), call.args.get(1))
+                    {
+                        if let Some(var_name) = extract_var_name(&needle_arg.value) {
+                            if let Some(haystack_ty) =
+                                extract_haystack_type(&haystack_arg.value, ctx)
+                            {
+                                let current = ctx.get_var(&var_name);
+                                if !current.is_mixed() && is_true {
+                                    // intersect: keep only types that could match a haystack value
+                                    let narrowed =
+                                        narrow_to_haystack_values(&current, &haystack_ty);
+                                    if !narrowed.is_empty() && narrowed != current {
+                                        ctx.set_var(&var_name, narrowed);
+                                    }
+                                    // false branch: removing exact literals from a broad type is
+                                    // rarely safe without full exhaustiveness knowledge — skip.
+                                }
+                            }
+                        }
+                    }
                 } else if bare.eq_ignore_ascii_case("is_a")
                     || bare.eq_ignore_ascii_case("is_subclass_of")
                 {
@@ -2004,4 +2028,78 @@ fn narrow_string_strlen_comparison(
     if narrowed != current {
         ctx.set_var(str_var, narrowed);
     }
+}
+
+/// Extract a union Type from an `in_array` haystack argument.
+/// Supports:
+/// - Literal arrays: `['a', 'b', 1]` → union of `TLiteralString` / `TLiteralInt`
+/// - Variables: look up from ctx and collect the TLiteralString/TLiteralInt values
+///   inside the TKeyedArray's properties.
+fn extract_haystack_type(expr: &php_ast::owned::Expr, ctx: &FlowState) -> Option<Type> {
+    match &expr.kind {
+        ExprKind::Array(elements) => {
+            let mut ty = Type::empty();
+            for item in elements.iter() {
+                match &item.value.kind {
+                    ExprKind::String(s) => {
+                        ty.add_type(Atomic::TLiteralString(std::sync::Arc::from(s.as_ref())))
+                    }
+                    ExprKind::Int(n) => ty.add_type(Atomic::TLiteralInt(*n)),
+                    _ => return None, // non-literal element — bail out
+                }
+            }
+            if ty.is_empty() {
+                None
+            } else {
+                Some(ty)
+            }
+        }
+        ExprKind::Variable(name) => {
+            let var_name = name.trim_start_matches('$');
+            let var_ty = ctx.get_var(var_name);
+            if var_ty.is_mixed() || var_ty.is_empty() {
+                return None;
+            }
+            let mut ty = Type::empty();
+            for atomic in &var_ty.types {
+                match atomic {
+                    Atomic::TKeyedArray { properties, .. } => {
+                        for prop in properties.values() {
+                            match &prop.ty.types[..] {
+                                [Atomic::TLiteralString(_)] | [Atomic::TLiteralInt(_)] => {
+                                    for a in &prop.ty.types {
+                                        ty.add_type(a.clone());
+                                    }
+                                }
+                                _ => return None, // non-literal value
+                            }
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            if ty.is_empty() {
+                None
+            } else {
+                Some(ty)
+            }
+        }
+        ExprKind::Parenthesized(inner) => extract_haystack_type(inner, ctx),
+        _ => None,
+    }
+}
+
+/// Narrow `current` to only the atomic types that overlap with `haystack` literals.
+/// For each literal atom in `haystack` (TLiteralString / TLiteralInt): keep it in
+/// the output if `current` could hold that value — i.e., the literal is a subtype
+/// of at least one atom in `current`.
+fn narrow_to_haystack_values(current: &Type, haystack: &Type) -> Type {
+    let mut out = Type::empty();
+    for hay_atom in &haystack.types {
+        let lit_ty = Type::single(hay_atom.clone());
+        if lit_ty.is_subtype_structural(current) {
+            out.add_type(hay_atom.clone());
+        }
+    }
+    out
 }
