@@ -265,7 +265,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                Type::single(Atomic::TInt)
+                infer_bitwise_range(b.op, &left_ty, &right_ty)
+                    .unwrap_or_else(|| Type::single(Atomic::TInt))
             }
 
             BinaryOp::Pipe => right_ty,
@@ -395,4 +396,64 @@ fn operand_has_any_array_member(ty: &Type) -> bool {
                 | Atomic::TKeyedArray { .. }
         )
     })
+}
+
+/// Infer a tighter return type for bitwise operations when possible:
+///
+/// - `$x & mask` / `mask & $x` where mask is a non-negative literal:
+///   result is always in `[0, mask]` regardless of `$x`.
+/// - `$x >> n` where n >= 0 and $x is non-negative:
+///   result is non-negative (right shift of a non-negative value stays non-negative).
+///
+/// Returns `None` to fall through to the `TInt` default.
+fn infer_bitwise_range(op: BinaryOp, left: &Type, right: &Type) -> Option<Type> {
+    match op {
+        BinaryOp::BitwiseAnd => {
+            // If either side is a known non-negative literal, the result is in [0, mask].
+            let mask = extract_non_negative_literal(right)
+                .or_else(|| extract_non_negative_literal(left))?;
+            let atom = if mask == 0 {
+                Atomic::TLiteralInt(0)
+            } else {
+                Atomic::TIntRange {
+                    min: Some(0),
+                    max: Some(mask),
+                }
+            };
+            Some(Type::single(atom))
+        }
+        BinaryOp::ShiftRight => {
+            // `$x >> n` where n >= 0 and $x is non-negative stays non-negative.
+            let _shift = extract_non_negative_literal(right)?;
+            if is_non_negative_int(left) {
+                Some(Type::single(Atomic::TNonNegativeInt))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// If `ty` is a single non-negative literal integer, return its value.
+fn extract_non_negative_literal(ty: &Type) -> Option<i64> {
+    if ty.types.len() == 1 {
+        if let Atomic::TLiteralInt(n) = ty.types[0] {
+            if n >= 0 {
+                return Some(n);
+            }
+        }
+    }
+    None
+}
+
+/// True when all atoms of `ty` are non-negative integer types.
+fn is_non_negative_int(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| match a {
+            Atomic::TNonNegativeInt | Atomic::TPositiveInt => true,
+            Atomic::TLiteralInt(n) => *n >= 0,
+            Atomic::TIntRange { min, .. } => min.is_some_and(|m| m >= 0),
+            _ => false,
+        })
 }
