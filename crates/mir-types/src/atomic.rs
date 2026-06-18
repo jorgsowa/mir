@@ -279,6 +279,12 @@ impl Atomic {
                 min: Some(0),
                 max: Some(0),
             } => false,
+            // array{} — a closed empty keyed array — is always falsy.
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } if !is_open && properties.is_empty() => false,
             _ => true,
         }
     }
