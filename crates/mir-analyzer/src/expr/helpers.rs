@@ -216,10 +216,21 @@ pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Op
         (Some(a), Some(b)) => a.checked_sub(b),
         _ => None,
     };
+    let mul_opt = |a: Option<i64>, b: Option<i64>| match (a, b) {
+        (Some(a), Some(b)) => a.checked_mul(b),
+        _ => None,
+    };
     let (min, max) = match op {
         BinaryOp::Add => (add(lmin, rmin), add(lmax, rmax)),
         // [lmin,lmax] - [rmin,rmax] = [lmin - rmax, lmax - rmin]
         BinaryOp::Sub => (sub(lmin, rmax), sub(lmax, rmin)),
+        // Multiplication: only handle the case where both operands are non-negative,
+        // which is the common case (`count * stride`, `width * height`, etc.).
+        // lmin/rmin must be Some(>=0) — None means unbounded below, i.e., can be negative.
+        // For mixed-sign operands the four-corner product is complex; defer to infer_arithmetic.
+        BinaryOp::Mul if lmin.is_some_and(|m| m >= 0) && rmin.is_some_and(|m| m >= 0) => {
+            (mul_opt(lmin, rmin), mul_opt(lmax, rmax))
+        }
         _ => return None,
     };
     Some(Type::single(Atomic::TIntRange { min, max }))
@@ -563,9 +574,23 @@ mod range_arithmetic_tests {
     }
 
     #[test]
-    fn mul_is_not_handled() {
+    fn mul_non_negative_ranges() {
+        // non-negative × literal positive → int<0, max> (unbounded above)
+        let r = infer_int_range_arithmetic(&range(Some(0), None), &lit(2), BinaryOp::Mul).unwrap();
+        assert_eq!(r, range(Some(0), None));
+
+        // bounded × bounded → bounded product
+        let r = infer_int_range_arithmetic(
+            &range(Some(2), Some(4)),
+            &range(Some(3), Some(6)),
+            BinaryOp::Mul,
+        )
+        .unwrap();
+        assert_eq!(r, range(Some(6), Some(24)));
+
+        // mixed-sign operand: defer to infer_arithmetic
         assert!(
-            infer_int_range_arithmetic(&range(Some(0), None), &lit(2), BinaryOp::Mul).is_none()
+            infer_int_range_arithmetic(&range(None, Some(-1)), &lit(2), BinaryOp::Mul).is_none()
         );
     }
 }
