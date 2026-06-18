@@ -520,9 +520,32 @@ impl CallAnalyzer {
                     ty.add_type(Atomic::TFalse);
                     ty
                 }
-                // Case-folding and similar string functions preserve non-emptiness.
-                "strtolower" | "strtoupper" | "mb_strtolower" | "mb_strtoupper" | "ucfirst"
-                | "lcfirst" | "ucwords" => {
+                // Case-folding, encoding, and similar string functions that preserve non-emptiness:
+                // a non-empty input always produces a non-empty output, and these functions
+                // always return string (not string|false).
+                "strtolower"
+                | "strtoupper"
+                | "mb_strtolower"
+                | "mb_strtoupper"
+                | "ucfirst"
+                | "lcfirst"
+                | "ucwords"
+                | "mb_convert_case"
+                | "mb_convert_kana"
+                | "htmlspecialchars"
+                | "htmlentities"
+                | "html_entity_decode"
+                | "htmlspecialchars_decode"
+                | "addslashes"
+                | "nl2br"
+                | "urlencode"
+                | "urldecode"
+                | "rawurlencode"
+                | "rawurldecode"
+                | "base64_encode"
+                | "quoted_printable_encode"
+                | "quoted_printable_decode"
+                | "str_rot13" => {
                     super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
                 }
                 // sprintf/vsprintf: non-empty when the format string guarantees it.
