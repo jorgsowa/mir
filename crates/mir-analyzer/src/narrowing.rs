@@ -1318,11 +1318,37 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
 fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_value {
-        current.filter(|t| match t {
-            Atomic::TLiteralString(s) => s.as_ref() == value,
-            Atomic::TString | Atomic::TScalar | Atomic::TMixed => true,
-            _ => false,
-        })
+        let lit: std::sync::Arc<str> = std::sync::Arc::from(value);
+        let mut result = Type::empty();
+        result.from_docblock = current.from_docblock;
+        for t in &current.types {
+            match t {
+                Atomic::TLiteralString(s) if s.as_ref() == value => {
+                    result.add_type(t.clone());
+                }
+                // Generic/wide string types: keep as-is (we can't narrow further without
+                // knowing the literal's place in a union)
+                Atomic::TString | Atomic::TScalar | Atomic::TMixed => {
+                    result.add_type(t.clone());
+                }
+                // String subtypes: the literal could satisfy them — narrow to the literal.
+                Atomic::TNonEmptyString if !value.is_empty() => {
+                    result.add_type(Atomic::TLiteralString(lit.clone()));
+                }
+                Atomic::TNumericString if is_numeric_string(value) => {
+                    result.add_type(Atomic::TLiteralString(lit.clone()));
+                }
+                Atomic::TCallableString
+                | Atomic::TClassString(_)
+                | Atomic::TInterfaceString
+                | Atomic::TEnumString
+                | Atomic::TTraitString => {
+                    result.add_type(Atomic::TLiteralString(lit.clone()));
+                }
+                _ => {} // non-string or non-matching literal — filtered out
+            }
+        }
+        result
     } else {
         current.filter(|t| !matches!(t, Atomic::TLiteralString(s) if s.as_ref() == value))
     };
