@@ -379,6 +379,14 @@ impl Type {
                 Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => {}
                 // bool contains both true (truthy) and false (falsy); truthy branch is true.
                 Atomic::TBool => result.add_type(Atomic::TTrue),
+                // array/list: empty ↔ falsy; truthy branch is non-empty-array/list.
+                Atomic::TArray { key, value } => result.add_type(Atomic::TNonEmptyArray {
+                    key: key.clone(),
+                    value: value.clone(),
+                }),
+                Atomic::TList { value } => result.add_type(Atomic::TNonEmptyList {
+                    value: value.clone(),
+                }),
                 // string: only "" and "0" are falsy; truthy branch is non-empty-string.
                 // non-empty-string still includes "0" (which is falsy) but that is the
                 // standard approximation used by Psalm and other analyzers.
