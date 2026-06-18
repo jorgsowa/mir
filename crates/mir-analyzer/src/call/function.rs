@@ -605,6 +605,11 @@ impl CallAnalyzer {
                     super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
                 }
                 // date/time formatting functions always return non-empty strings.
+                // array_search: narrow key type from haystack rather than returning string|int|false.
+                "array_search" => {
+                    super::callable::array_search_return_type(&arg_types).unwrap_or(return_ty)
+                }
+                // date/time formatting functions always return non-empty strings.
                 "date" | "gmdate" | "date_format" => Type::single(Atomic::TNonEmptyString),
                 _ => return_ty,
             };

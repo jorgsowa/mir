@@ -1459,6 +1459,25 @@ pub(crate) fn sort_byref_type(arr: &Type, reindex: bool) -> Type {
     Type::single(atom)
 }
 
+/// Infer the return type of `array_search($needle, $haystack)`.
+///
+/// The stub returns `string|int|false`. When the haystack has a known key type
+/// (e.g. `list` or `array<string, …>`), the success case is narrowed to that key
+/// type, reducing the union from `string|int|false` to `key_type|false`.
+pub(crate) fn array_search_return_type(arg_types: &[Type]) -> Option<Type> {
+    let haystack = arg_types.get(1)?;
+    if haystack.is_mixed() {
+        return None;
+    }
+    let (key, _) = crate::stmt::infer_foreach_types(haystack);
+    if key.is_mixed() {
+        return None;
+    }
+    let mut result = key;
+    result.add_type(Atomic::TFalse);
+    Some(result)
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {
