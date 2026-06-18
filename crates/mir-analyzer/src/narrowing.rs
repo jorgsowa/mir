@@ -390,6 +390,32 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
+                } else if bare.eq_ignore_ascii_case("is_a")
+                    || bare.eq_ignore_ascii_case("is_subclass_of")
+                {
+                    // is_a($obj, 'ClassName') / is_subclass_of($obj, 'ClassName') →
+                    // narrow $obj to ClassName in the true branch.
+                    if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
+                    {
+                        if let Some(var_name) = extract_var_name(&obj_arg.value) {
+                            if let Some(class_name) =
+                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
+                            {
+                                let current = ctx.get_var(&var_name);
+                                let narrowed = if is_true {
+                                    narrow_instanceof_preserving_subtypes(
+                                        &current,
+                                        &class_name,
+                                        db,
+                                        &ctx.template_param_names,
+                                    )
+                                } else {
+                                    filter_out_instanceof_match(&current, &class_name, db)
+                                };
+                                set_narrowed(ctx, &var_name, &current, narrowed, true);
+                            }
+                        }
+                    }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {

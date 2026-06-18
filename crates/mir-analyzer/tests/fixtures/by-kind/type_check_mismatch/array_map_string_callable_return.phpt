@@ -7,7 +7,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param list<string> $words */
 function test(array $words): void {
     $r = array_map('strtoupper', $words);
-    /** @mir-check $r is array<int, string> */
+    /** @mir-check $r is list<string> */
     $_ = $r;
 }
 ===expect===

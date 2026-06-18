@@ -974,41 +974,72 @@ pub(crate) fn infer_array_map_return(
         return None;
     }
 
-    // Key type: preserved from the single source array; integer-keyed when
-    // multiple arrays are zipped together.
-    let key = if arg_types.len() == 2 {
-        let (k, _) = crate::stmt::infer_foreach_types(&arg_types[1]);
-        if k.is_mixed() {
-            array_key_type()
-        } else {
-            k
-        }
-    } else {
-        Type::single(Atomic::TInt)
-    };
-
-    // Preserve the non-empty property: array_map on a non-empty input is also non-empty.
-    let src_is_non_empty = arg_types.get(1).is_some_and(|t| {
-        !t.types.is_empty()
-            && t.types.iter().all(|a| {
+    // Single-array mode: detect list-ness and non-emptiness from the source.
+    // Multi-array (zip) mode: always produces array<int, T>.
+    if arg_types.len() == 2 {
+        let source = &arg_types[1];
+        let src_is_list = !source.types.is_empty()
+            && source
+                .types
+                .iter()
+                .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }));
+        let src_is_non_empty = !source.types.is_empty()
+            && source.types.iter().all(|a| {
                 matches!(
                     a,
                     Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
                 )
-            })
-    });
-    let atom = if src_is_non_empty {
-        Atomic::TNonEmptyArray {
-            key: Box::new(key),
-            value: Box::new(value),
-        }
+            });
+        let atom = match (src_is_list, src_is_non_empty) {
+            (true, true) => Atomic::TNonEmptyList {
+                value: Box::new(value),
+            },
+            (true, false) => Atomic::TList {
+                value: Box::new(value),
+            },
+            (false, true) => {
+                let (k, _) = crate::stmt::infer_foreach_types(source);
+                let key = if k.is_mixed() { array_key_type() } else { k };
+                Atomic::TNonEmptyArray {
+                    key: Box::new(key),
+                    value: Box::new(value),
+                }
+            }
+            (false, false) => {
+                let (k, _) = crate::stmt::infer_foreach_types(source);
+                let key = if k.is_mixed() { array_key_type() } else { k };
+                Atomic::TArray {
+                    key: Box::new(key),
+                    value: Box::new(value),
+                }
+            }
+        };
+        Some(Type::single(atom))
     } else {
-        Atomic::TArray {
-            key: Box::new(key),
-            value: Box::new(value),
-        }
-    };
-    Some(Type::single(atom))
+        // Multi-array zip mode: integer-keyed, not a list (multi-array semantics).
+        let src_is_non_empty = arg_types.get(1).is_some_and(|t| {
+            !t.types.is_empty()
+                && t.types.iter().all(|a| {
+                    matches!(
+                        a,
+                        Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+                    )
+                })
+        });
+        let key = Type::single(Atomic::TInt);
+        let atom = if src_is_non_empty {
+            Atomic::TNonEmptyArray {
+                key: Box::new(key),
+                value: Box::new(value),
+            }
+        } else {
+            Atomic::TArray {
+                key: Box::new(key),
+                value: Box::new(value),
+            }
+        };
+        Some(Type::single(atom))
+    }
 }
 
 /// Infer the result type of `array_filter($array, $callback?, ...)`.

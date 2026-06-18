@@ -11,7 +11,7 @@ function test(array $items): void {
     $r = array_map(function (Foo $f) {
         return new Bar();
     }, $items);
-    /** @mir-check $r is array<int, Bar> */
+    /** @mir-check $r is list<Bar> */
     $_ = $r;
 }
 ===expect===

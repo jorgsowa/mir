@@ -556,6 +556,7 @@ impl CallAnalyzer {
                 | "html_entity_decode"
                 | "htmlspecialchars_decode"
                 | "addslashes"
+                | "addcslashes"
                 | "nl2br"
                 | "urlencode"
                 | "urldecode"
@@ -564,7 +565,10 @@ impl CallAnalyzer {
                 | "base64_encode"
                 | "quoted_printable_encode"
                 | "quoted_printable_decode"
-                | "str_rot13" => {
+                | "str_rot13"
+                | "str_pad"
+                | "chunk_split"
+                | "wordwrap" => {
                     super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
                 }
                 // sprintf/vsprintf: non-empty when the format string guarantees it.
