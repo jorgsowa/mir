@@ -1,7 +1,7 @@
 use super::helpers::{
-    extract_simple_var, extract_string_from_expr, infer_arithmetic, infer_int_range_arithmetic,
-    is_property_type_coercion, property_assign_compatible, type_refs_any_template,
-    widen_array_as_list, widen_array_with_value_and_key,
+    as_concat_str, extract_simple_var, extract_string_from_expr, infer_arithmetic,
+    infer_int_range_arithmetic, is_property_type_coercion, property_assign_compatible,
+    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -82,12 +82,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(var_name) = extract_simple_var(&a.target) {
                     // `.=` reads the LHS before writing — mark the old write consumed.
                     ctx.mark_consumed(&var_name);
-                    ctx.set_var(&var_name, Type::single(Atomic::TString));
+                    let lhs_ty = ctx.get_var(&var_name);
+                    let result_ty = if let (Some(l), Some(r)) =
+                        (as_concat_str(&lhs_ty), as_concat_str(&rhs_ty))
+                    {
+                        let combined = format!("{l}{r}");
+                        if combined.len() <= 1000 {
+                            Type::single(Atomic::TLiteralString(combined.into()))
+                        } else {
+                            Type::single(Atomic::TNonEmptyString)
+                        }
+                    } else {
+                        Type::single(Atomic::TString)
+                    };
+                    ctx.set_var(&var_name, result_ty.clone());
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
+                    result_ty
+                } else {
+                    Type::single(Atomic::TString)
                 }
-                Type::single(Atomic::TString)
             }
             AssignOp::Plus
             | AssignOp::Minus

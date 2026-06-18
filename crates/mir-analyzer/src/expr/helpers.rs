@@ -277,6 +277,21 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
     }
 }
 
+/// Extract the string representation of a single scalar literal for concat folding.
+/// Returns `None` for unions or non-literal types.
+pub fn as_concat_str(ty: &Type) -> Option<String> {
+    if ty.types.len() != 1 {
+        return None;
+    }
+    match &ty.types[0] {
+        Atomic::TLiteralString(s) => Some(s.as_ref().to_string()),
+        Atomic::TLiteralInt(n) => Some(n.to_string()),
+        Atomic::TTrue => Some("1".to_string()),
+        Atomic::TFalse => Some(String::new()),
+        _ => None,
+    }
+}
+
 pub fn extract_simple_var(expr: &Expr) -> Option<String> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),

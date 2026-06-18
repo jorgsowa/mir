@@ -1,4 +1,4 @@
-use super::helpers::{infer_arithmetic, infer_int_range_arithmetic};
+use super::helpers::{as_concat_str, infer_arithmetic, infer_int_range_arithmetic};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
@@ -219,10 +219,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Literal string fold: "foo" . "bar" = "foobar".
                 // Also folds single literal int operands to their string repr.
                 // Cap at 1000 chars to avoid storing arbitrarily large strings.
-                if let (Some(l), Some(r)) = (
-                    as_concat_str(&left_ty),
-                    as_concat_str(&right_ty),
-                ) {
+                if let (Some(l), Some(r)) = (as_concat_str(&left_ty), as_concat_str(&right_ty)) {
                     let combined = format!("{l}{r}");
                     if combined.len() <= 1000 {
                         return Type::single(Atomic::TLiteralString(combined.into()));
@@ -400,17 +397,3 @@ fn operand_has_any_array_member(ty: &Type) -> bool {
     })
 }
 
-/// Extract the string representation of a single scalar literal for concat folding.
-/// Returns `None` for unions or non-literal types.
-fn as_concat_str(ty: &Type) -> Option<String> {
-    if ty.types.len() != 1 {
-        return None;
-    }
-    match &ty.types[0] {
-        Atomic::TLiteralString(s) => Some(s.as_ref().to_string()),
-        Atomic::TLiteralInt(n) => Some(n.to_string()),
-        Atomic::TTrue => Some("1".to_string()),
-        Atomic::TFalse => Some(String::new()),
-        _ => None,
-    }
-}
