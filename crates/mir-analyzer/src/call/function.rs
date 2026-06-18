@@ -502,6 +502,9 @@ impl CallAnalyzer {
                 "intdiv" => super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty),
                 "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
                 "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
+                "rand" | "mt_rand" | "random_int" => {
+                    super::callable::rand_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 // preg_match returns 1 on match, 0 on no-match, false on error.
                 "preg_match" => {
                     let mut ty = Type::single(Atomic::TIntRange {

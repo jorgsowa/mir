@@ -664,6 +664,29 @@ fn make_int_range_atom(min: Option<i64>, max: Option<i64>) -> Atomic {
     }
 }
 
+/// Infer the return type of `rand($min, $max)` / `mt_rand($min, $max)` /
+/// `random_int($min, $max)` when both bounds are known integer literals.
+///
+/// With no arguments, `rand()` / `mt_rand()` return an unspecified int — fall
+/// through to the stub. With two literal bounds, narrow to `int<min, max>`.
+pub(crate) fn rand_return_type(arg_types: &[Type]) -> Option<Type> {
+    let (min_ty, max_ty) = (arg_types.first()?, arg_types.get(1)?);
+    let extract_literal = |ty: &Type| {
+        if ty.types.len() == 1 {
+            if let Atomic::TLiteralInt(n) = ty.types[0] {
+                return Some(n);
+            }
+        }
+        None
+    };
+    let lo = extract_literal(min_ty)?;
+    let hi = extract_literal(max_ty)?;
+    if lo > hi {
+        return None; // degenerate — let stub handle it
+    }
+    Some(Type::single(make_int_range_atom(Some(lo), Some(hi))))
+}
+
 /// The default PHP array-key type, `int|string`, used when a source array's
 /// key type cannot be determined more precisely.
 fn array_key_type() -> Type {
