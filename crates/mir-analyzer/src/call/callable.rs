@@ -439,6 +439,90 @@ fn is_non_empty_string(ty: &Type) -> bool {
         })
 }
 
+/// Infer the return type of `abs($num)`.
+///
+/// PHP semantics: abs always returns a non-negative value with the same type
+/// (int → int, float → float). When the argument is a known int subtype or
+/// range, we can tighten the result accordingly.
+pub(crate) fn abs_return_type(arg_types: &[Type]) -> Option<Type> {
+    let arg = arg_types.first()?;
+    // Only engage when the argument is purely integer (no float components).
+    // A float argument returns float per PHP semantics; we leave that to the stub.
+    let all_int = arg.types.iter().all(|a| {
+        matches!(
+            a,
+            Atomic::TInt
+                | Atomic::TLiteralInt(_)
+                | Atomic::TPositiveInt
+                | Atomic::TNonNegativeInt
+                | Atomic::TNegativeInt
+                | Atomic::TIntRange { .. }
+        )
+    });
+    if !all_int || arg.types.is_empty() {
+        return None;
+    }
+
+    let mut result = Type::empty();
+    for a in &arg.types {
+        let atom = match a {
+            // Already non-negative — abs is identity.
+            Atomic::TPositiveInt | Atomic::TNonNegativeInt => a.clone(),
+            // Any int → non-negative-int.
+            Atomic::TInt => Atomic::TNonNegativeInt,
+            // Literal fold: use checked_neg to avoid i64::MIN overflow.
+            Atomic::TLiteralInt(n) => {
+                let abs = if *n >= 0 {
+                    *n
+                } else {
+                    n.checked_neg().unwrap_or(i64::MAX)
+                };
+                Atomic::TLiteralInt(abs)
+            }
+            // negative-int is int<-∞, -1>: abs gives int<1, ∞> = positive-int.
+            Atomic::TNegativeInt => Atomic::TPositiveInt,
+            Atomic::TIntRange { min, max } => {
+                let (lo, hi) = (*min, *max);
+                let lo_is_nn = lo.is_some_and(|m| m >= 0);
+                let hi_is_np = hi.is_some_and(|m| m <= 0);
+                // Safe abs of a bound: None → None, saturate at i64::MAX on overflow.
+                let abs_bound = |v: Option<i64>| {
+                    v.map(|n| {
+                        if n >= 0 {
+                            n
+                        } else {
+                            n.checked_neg().unwrap_or(i64::MAX)
+                        }
+                    })
+                };
+                if lo_is_nn {
+                    // Range is entirely non-negative: abs is identity.
+                    a.clone()
+                } else if hi_is_np {
+                    // Range is entirely non-positive: abs flips and negates.
+                    Atomic::TIntRange {
+                        min: abs_bound(hi),
+                        max: abs_bound(lo),
+                    }
+                } else {
+                    // Mixed range: result is int<0, max(|lo|, hi)>.
+                    let new_max = match (abs_bound(lo), hi) {
+                        (Some(a), Some(b)) => Some(a.max(b)),
+                        _ => None, // unbounded in at least one direction
+                    };
+                    Atomic::TIntRange {
+                        min: Some(0),
+                        max: new_max,
+                    }
+                }
+            }
+            _ => return None,
+        };
+        result.add_type(atom);
+    }
+    Some(result)
+}
+
 /// The default PHP array-key type, `int|string`, used when a source array's
 /// key type cannot be determined more precisely.
 fn array_key_type() -> Type {

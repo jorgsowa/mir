@@ -37,13 +37,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPrefixOp::BooleanNot => Type::single(Atomic::TBool),
-            UnaryPrefixOp::Negate => {
-                if operand_ty.contains(|t| t.is_int()) {
-                    Type::single(Atomic::TInt)
-                } else {
-                    Type::single(Atomic::TFloat)
-                }
-            }
+            UnaryPrefixOp::Negate => negate_type(&operand_ty),
             UnaryPrefixOp::Plus => operand_ty,
             UnaryPrefixOp::BitwiseNot => {
                 if operand_is_non_bitwise(&operand_ty) {
@@ -150,4 +144,65 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
     }
+}
+
+/// Infer the result type of the unary negation operator (`-$x`).
+///
+/// Propagates literal and range information through negation so that
+/// e.g. `-7` gives `int<-7,-7>` rather than bare `int`, and
+/// `-positive-int` gives `negative-int`.
+fn negate_type(ty: &Type) -> Type {
+    if ty.is_mixed() {
+        return Type::mixed();
+    }
+    // Safe negation of an optional bound: None (unbounded) stays None; overflow
+    // (i64::MIN.checked_neg() == None) falls back to None (unbounded).
+    let neg_bound = |v: Option<i64>| v.and_then(|n| n.checked_neg());
+
+    let mut result = Type::empty();
+    for a in &ty.types {
+        let atom = match a {
+            Atomic::TLiteralInt(n) => {
+                if let Some(neg) = n.checked_neg() {
+                    Atomic::TLiteralInt(neg)
+                } else {
+                    // i64::MIN — falls back to bare int.
+                    Atomic::TInt
+                }
+            }
+            Atomic::TPositiveInt => Atomic::TNegativeInt,
+            Atomic::TNegativeInt => Atomic::TPositiveInt,
+            // non-negative-int negated is int<-∞, 0> (no named type — use TIntRange).
+            Atomic::TNonNegativeInt => Atomic::TIntRange {
+                min: None,
+                max: Some(0),
+            },
+            Atomic::TInt => Atomic::TInt,
+            Atomic::TIntRange { min, max } => {
+                let new_min = neg_bound(*max);
+                let new_max = neg_bound(*min);
+                match (new_min, new_max) {
+                    (Some(1), None) => Atomic::TPositiveInt,
+                    (Some(0), None) => Atomic::TNonNegativeInt,
+                    (None, Some(-1)) => Atomic::TNegativeInt,
+                    (None, None) => Atomic::TInt,
+                    _ => Atomic::TIntRange {
+                        min: new_min,
+                        max: new_max,
+                    },
+                }
+            }
+            Atomic::TFloat | Atomic::TLiteralFloat(..) => Atomic::TFloat,
+            _ => {
+                // Non-numeric operands: fallback to int (PHP coerces to 0 then negates).
+                if ty.contains(|t| t.is_int()) {
+                    Atomic::TInt
+                } else {
+                    Atomic::TFloat
+                }
+            }
+        };
+        result.add_type(atom);
+    }
+    result
 }
