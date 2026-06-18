@@ -492,6 +492,9 @@ impl CallAnalyzer {
                 "array_values" => {
                     super::callable::infer_array_values_return(&arg_types).unwrap_or(return_ty)
                 }
+                "array_merge" => {
+                    super::callable::infer_array_merge_return(&arg_types).unwrap_or(return_ty)
+                }
                 // array_fill with a positive count returns a non-empty list.
                 "array_fill" => {
                     super::callable::array_fill_return_type(&arg_types).unwrap_or(return_ty)

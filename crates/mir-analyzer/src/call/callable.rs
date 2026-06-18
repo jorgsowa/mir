@@ -1089,6 +1089,50 @@ pub(crate) fn infer_array_values_return(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atomic))
 }
 
+/// Infer the result type of `array_merge($arr1, $arr2, ...)`.
+///
+/// When ALL arguments are list types, the merged result is also a list (PHP
+/// re-indexes integer keys from 0 for array_merge). The result is non-empty
+/// if at least one argument is provably non-empty.
+/// Falls back to `None` when any arg is a non-list array (string-keyed arrays
+/// or mixed-key arrays) — the generic stub handles those cases.
+pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
+    if arg_types.is_empty() {
+        return None;
+    }
+    // All args must be list types for us to produce a list result.
+    let all_lists = arg_types.iter().all(|t| {
+        !t.types.is_empty()
+            && t.types
+                .iter()
+                .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }))
+    });
+    if !all_lists {
+        return None;
+    }
+    // Compute the union of all element types.
+    let mut value = Type::empty();
+    for arg in arg_types {
+        let (_, v) = crate::stmt::infer_foreach_types(arg);
+        value.merge_with(&v);
+    }
+    if value.is_empty() || value.is_mixed() {
+        return None;
+    }
+    // Non-empty if ANY arg is non-empty.
+    let any_non_empty = arg_types.iter().any(is_non_empty_collection);
+    let atomic = if any_non_empty {
+        Atomic::TNonEmptyList {
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
 /// Returns `(callback_arg_index, min_required_arity)` for built-in functions that enforce a
 /// minimum callback arity via `check_min_arity_callback`. Functions with more complex rules
 /// (array_map, array_filter) use their own specialized handlers instead.
