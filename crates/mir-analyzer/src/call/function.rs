@@ -525,6 +525,12 @@ impl CallAnalyzer {
                 | "lcfirst" | "ucwords" => {
                     super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
                 }
+                // number_format() always returns a non-empty string.
+                "number_format" => super::callable::number_format_return_type(),
+                // str_repeat() with a non-empty string and positive count returns non-empty.
+                "str_repeat" => {
+                    super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 _ => return_ty,
             };
 

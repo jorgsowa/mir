@@ -1206,6 +1206,8 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TLiteralString(_), Atomic::TScalar) => true,
         (Atomic::TNonEmptyString, Atomic::TString) => true,
         (Atomic::TCallableString, Atomic::TString) => true,
+        // numeric-string is always non-empty (e.g. "42", "-1", "0.5") — "" is not numeric.
+        (Atomic::TNumericString, Atomic::TNonEmptyString) => true,
         (Atomic::TNumericString, Atomic::TString) => true,
         (Atomic::TClassString(_), Atomic::TString) => true,
         (Atomic::TInterfaceString, Atomic::TString) => true,

@@ -456,6 +456,40 @@ pub(crate) fn string_preserve_non_empty(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
+/// Infer the return type of `number_format()`.
+///
+/// `number_format()` always returns a non-empty string — even `number_format(0)`
+/// returns "0". The stub declares `string`; we refine that here.
+pub(crate) fn number_format_return_type() -> Type {
+    Type::single(Atomic::TNonEmptyString)
+}
+
+/// Infer the return type of `str_repeat($input, $count)`.
+///
+/// When the input is provably non-empty AND the count is a positive literal,
+/// the result is guaranteed non-empty. Falls through (returns `None`) for
+/// the general case so the stub's `string` is used.
+pub(crate) fn str_repeat_return_type(arg_types: &[Type]) -> Option<Type> {
+    let input = arg_types.first()?;
+    let count = arg_types.get(1)?;
+    let count_is_positive = count.types.iter().any(|a| match a {
+        Atomic::TLiteralInt(n) => *n >= 1,
+        Atomic::TPositiveInt => true,
+        Atomic::TIntRange { min, .. } => min.is_some_and(|m| m >= 1),
+        _ => false,
+    }) && count.types.iter().all(|a| match a {
+        Atomic::TLiteralInt(n) => *n >= 1,
+        Atomic::TPositiveInt => true,
+        Atomic::TIntRange { min, .. } => min.is_some_and(|m| m >= 1),
+        _ => false,
+    });
+    if count_is_positive && is_non_empty_string(input) {
+        Some(Type::single(Atomic::TNonEmptyString))
+    } else {
+        None
+    }
+}
+
 /// Infer the return type of `abs($num)`.
 ///
 /// PHP semantics: abs always returns a non-negative value with the same type
