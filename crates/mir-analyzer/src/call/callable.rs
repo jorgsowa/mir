@@ -490,6 +490,73 @@ pub(crate) fn str_repeat_return_type(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
+/// Returns true when a `sprintf` format string guarantees a non-empty result.
+///
+/// The result is non-empty when:
+/// - the format string has any literal character that isn't consumed by a `%s`
+///   specifier (literal prefix/suffix, or any non-`%s` specifier like `%d`, `%%`)
+///
+/// This is conservative: we return false for any format that cannot be proven
+/// non-empty from the format string alone (e.g. pure `%s%s`).
+fn sprintf_format_guarantees_non_empty(fmt: &str) -> bool {
+    let bytes = fmt.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            i += 1;
+            if i >= bytes.len() {
+                // Dangling `%` — treated as literal
+                return true;
+            }
+            // Skip optional flags, width, precision
+            while i < bytes.len()
+                && matches!(
+                    bytes[i],
+                    b'+' | b'-' | b' ' | b'0'..=b'9' | b'.' | b'\'' | b'('
+                )
+            {
+                i += 1;
+            }
+            if i >= bytes.len() {
+                return true;
+            }
+            match bytes[i] {
+                // `%%` is a literal `%` — always non-empty
+                b'%' => return true,
+                // `%s` can produce an empty string — skip without declaring non-empty
+                b's' => {}
+                // All other specifiers produce non-empty output
+                _ => return true,
+            }
+            i += 1;
+        } else {
+            // Literal character outside any format specifier
+            return true;
+        }
+    }
+    false
+}
+
+/// Infer the return type of `sprintf($format, ...)`.
+///
+/// When the format string is a literal and `sprintf_format_guarantees_non_empty`
+/// is true, the result is `non-empty-string`. Falls through to `None` otherwise.
+pub(crate) fn sprintf_return_type(arg_types: &[Type]) -> Option<Type> {
+    let fmt_ty = arg_types.first()?;
+    if fmt_ty.types.len() != 1 {
+        return None;
+    }
+    let fmt = match &fmt_ty.types[0] {
+        Atomic::TLiteralString(s) => s.as_ref(),
+        _ => return None,
+    };
+    if sprintf_format_guarantees_non_empty(fmt) {
+        Some(Type::single(Atomic::TNonEmptyString))
+    } else {
+        None
+    }
+}
+
 /// Infer the return type of `abs($num)`.
 ///
 /// PHP semantics: abs always returns a non-negative value with the same type
