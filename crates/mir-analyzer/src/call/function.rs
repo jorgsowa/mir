@@ -492,6 +492,25 @@ impl CallAnalyzer {
                 "array_values" => {
                     super::callable::infer_array_values_return(&arg_types).unwrap_or(return_ty)
                 }
+                // array_fill with a positive count returns a non-empty list.
+                "array_fill" => {
+                    super::callable::array_fill_return_type(&arg_types).unwrap_or(return_ty)
+                }
+                // implode/join with a non-empty array of non-empty strings returns non-empty-string.
+                "implode" | "join" => {
+                    super::callable::implode_return_type(&arg_types).unwrap_or(return_ty)
+                }
+                // str_split with a non-empty string returns a non-empty list<non-empty-string>.
+                "str_split" => {
+                    super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
+                }
+                // array_keys of a non-empty array returns a non-empty list (preserving the
+                // stub's key type from template resolution).
+                "array_keys" => super::callable::array_keys_return_type(&arg_types, &return_ty),
+                // array_reverse preserves the non-emptiness of the source array.
+                "array_reverse" => {
+                    super::callable::array_reverse_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 // Faithful integer-range returns: counts and lengths are
                 // non-negative (and counts of non-empty collections are `>= 1`).
                 "count" | "sizeof" => {

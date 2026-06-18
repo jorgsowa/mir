@@ -490,6 +490,135 @@ pub(crate) fn str_repeat_return_type(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
+/// Infer the return type of `array_fill($start_index, $count, $value)`.
+///
+/// When the count argument is provably >= 1, the result is `non-empty-list<T>`
+/// where T is the type of `$value`. Falls through to `None` otherwise so the
+/// stub's generic `array` is used.
+pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
+    let count = arg_types.get(1)?;
+    let value = arg_types.get(2)?;
+    let count_is_positive = !count.types.is_empty()
+        && count.types.iter().all(|a| match a {
+            Atomic::TLiteralInt(n) => *n >= 1,
+            Atomic::TPositiveInt => true,
+            Atomic::TIntRange { min, .. } => min.is_some_and(|m| m >= 1),
+            _ => false,
+        });
+    if count_is_positive {
+        Some(Type::single(Atomic::TNonEmptyList {
+            value: Box::new(value.clone()),
+        }))
+    } else {
+        None
+    }
+}
+
+/// Infer the return type of `implode($separator, $array)` / `join($separator, $array)`.
+///
+/// When the array argument is a non-empty collection of non-empty strings,
+/// the result is a `non-empty-string`. Falls through to `None` otherwise.
+pub(crate) fn implode_return_type(arg_types: &[Type]) -> Option<Type> {
+    // implode supports both 1-arg (array only) and 2-arg (separator, array) forms.
+    let arr = if arg_types.len() == 1 {
+        arg_types.first()?
+    } else {
+        arg_types.get(1)?
+    };
+    if !is_non_empty_collection(arr) {
+        return None;
+    }
+    // Check that all elements of the array are non-empty strings.
+    let all_elements_non_empty = arr.types.iter().all(|a| match a {
+        Atomic::TNonEmptyList { value } | Atomic::TList { value } => is_non_empty_string(value),
+        Atomic::TNonEmptyArray { value, .. } | Atomic::TArray { value, .. } => {
+            is_non_empty_string(value)
+        }
+        Atomic::TKeyedArray { properties, .. } => {
+            properties.values().all(|p| is_non_empty_string(&p.ty))
+        }
+        _ => false,
+    });
+    if all_elements_non_empty {
+        Some(Type::single(Atomic::TNonEmptyString))
+    } else {
+        None
+    }
+}
+
+/// Infer the return type of `str_split($string, $length)`.
+///
+/// When the string argument is provably non-empty, every chunk is non-empty
+/// and there is at least one chunk, so the result is `non-empty-list<non-empty-string>`.
+pub(crate) fn str_split_return_type(arg_types: &[Type]) -> Option<Type> {
+    let s = arg_types.first()?;
+    if is_non_empty_string(s) {
+        Some(Type::single(Atomic::TNonEmptyList {
+            value: Box::new(Type::single(Atomic::TNonEmptyString)),
+        }))
+    } else {
+        None
+    }
+}
+
+/// Infer the return type of `array_keys($array)`.
+///
+/// When the argument is a statically non-empty array, upgrades `list<K>` in
+/// the stub's template-resolved return type to `non-empty-list<K>` so the key
+/// type from Psalm-style template inference is preserved. Returns the stub
+/// return unchanged when the source is not provably non-empty.
+pub(crate) fn array_keys_return_type(arg_types: &[Type], return_ty: &Type) -> Type {
+    let Some(arr) = arg_types.first() else {
+        return return_ty.clone();
+    };
+    if !is_non_empty_collection(arr) {
+        return return_ty.clone();
+    }
+    // Upgrade list<K> → non-empty-list<K> while keeping the stub's key type.
+    let mut result = Type::empty();
+    result.from_docblock = return_ty.from_docblock;
+    for atomic in &return_ty.types {
+        match atomic {
+            Atomic::TList { value } => {
+                result.add_type(Atomic::TNonEmptyList {
+                    value: value.clone(),
+                });
+            }
+            other => result.add_type(other.clone()),
+        }
+    }
+    if result.is_empty() {
+        return_ty.clone()
+    } else {
+        result
+    }
+}
+
+/// Infer the return type of `array_reverse($array)`.
+///
+/// Preserves non-emptiness: a non-empty array reversed is still non-empty.
+/// Uses the same value type as the source array.
+pub(crate) fn array_reverse_return_type(arg_types: &[Type]) -> Option<Type> {
+    let arr = arg_types.first()?;
+    if arr.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(arr);
+    if value.is_mixed() {
+        return None;
+    }
+    let atomic = if is_non_empty_collection(arr) {
+        Atomic::TNonEmptyList {
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
 /// Returns true when a `sprintf` format string guarantees a non-empty result.
 ///
 /// The result is non-empty when:
