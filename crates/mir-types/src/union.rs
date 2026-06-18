@@ -435,6 +435,10 @@ impl Type {
             match t {
                 // bool: only false is falsy; falsy branch is false.
                 Atomic::TBool => result.add_type(Atomic::TFalse),
+                // int: only 0 is falsy.
+                Atomic::TInt => result.add_type(Atomic::TLiteralInt(0)),
+                // float: only 0.0 is falsy.
+                Atomic::TFloat => result.add_type(Atomic::TLiteralFloat(0, 0)),
                 // string: only "" and "0" are falsy.
                 Atomic::TString => {
                     result.add_type(Atomic::TLiteralString("".into()));
