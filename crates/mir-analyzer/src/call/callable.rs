@@ -1428,6 +1428,37 @@ pub(crate) fn check_typed_callable_arg(
     }
 }
 
+/// Infer the by-ref array type after an in-place sort function.
+///
+/// All sort functions preserve element types. Re-indexing sorts (`sort`, `rsort`, `usort`,
+/// `shuffle`) also re-index integer keys from 0, making the result a `list<T>`.
+/// Key-preserving sorts (`asort`, `arsort`, `ksort`, `krsort`, `uasort`, `uksort`) leave
+/// key types unchanged — so the original type is returned as-is.
+///
+/// The main benefit over the stub's generic `array` is that element types are not lost.
+pub(crate) fn sort_byref_type(arr: &Type, reindex: bool) -> Type {
+    if arr.is_mixed() {
+        return arr.clone();
+    }
+    if !reindex {
+        return arr.clone();
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(arr);
+    if value.is_mixed() {
+        return arr.clone();
+    }
+    let atom = if is_non_empty_collection(arr) {
+        Atomic::TNonEmptyList {
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(value),
+        }
+    };
+    Type::single(atom)
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {

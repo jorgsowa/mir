@@ -609,6 +609,30 @@ impl CallAnalyzer {
                 _ => return_ty,
             };
 
+            // Sort functions: the by-ref loop above set $arr to generic `array`; restore
+            // the original element type. Re-indexing sorts also convert to a list.
+            {
+                let reindex = matches!(
+                    resolved_fn_name.as_str(),
+                    "sort" | "rsort" | "usort" | "shuffle"
+                );
+                let preserve = matches!(
+                    resolved_fn_name.as_str(),
+                    "asort" | "arsort" | "ksort" | "krsort" | "uasort" | "uksort"
+                );
+                if reindex || preserve {
+                    if let (Some(arr_arg), Some(original_arr)) =
+                        (call.args.first(), arg_types.first())
+                    {
+                        if let ExprKind::Variable(name) = &arr_arg.value.kind {
+                            let var_name = name.as_ref().trim_start_matches('$');
+                            let new_type = super::callable::sort_byref_type(original_arr, reindex);
+                            ctx.set_var(var_name, new_type);
+                        }
+                    }
+                }
+            }
+
             super::ARG_TYPES_BUF.with(|b| {
                 let mut g = b.borrow_mut();
                 if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {
