@@ -362,6 +362,34 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
+                } else if matches!(
+                    bare.to_ascii_lowercase().as_str(),
+                    "str_contains" | "str_starts_with" | "str_ends_with"
+                ) {
+                    // str_contains($haystack, 'x') true → $haystack is non-empty-string
+                    // (when the needle is a non-empty literal — a non-empty needle can
+                    // only be found in a non-empty haystack).
+                    if is_true {
+                        if let (Some(haystack_arg), Some(needle_arg)) =
+                            (call.args.first(), call.args.get(1))
+                        {
+                            let needle_non_empty = match &needle_arg.value.kind {
+                                ExprKind::String(s) => !s.is_empty(),
+                                _ => false,
+                            };
+                            if needle_non_empty {
+                                if let Some(var_name) = extract_var_name(&haystack_arg.value) {
+                                    let current = ctx.get_var(&var_name);
+                                    if !current.is_mixed() {
+                                        let narrowed = narrow_string_to_non_empty(&current);
+                                        if narrowed != current {
+                                            ctx.set_var(&var_name, narrowed);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
@@ -1102,6 +1130,20 @@ fn intersect_int_range_into(
         min: new_min,
         max: new_max,
     });
+}
+
+/// Narrow all `TString` atoms to `TNonEmptyString`, preserving other atoms.
+/// Used when a condition proves the string is non-empty.
+fn narrow_string_to_non_empty(ty: &Type) -> Type {
+    let mut result = Type::empty();
+    result.from_docblock = ty.from_docblock;
+    for t in &ty.types {
+        match t {
+            Atomic::TString => result.add_type(Atomic::TNonEmptyString),
+            _ => result.add_type(t.clone()),
+        }
+    }
+    result
 }
 
 fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
