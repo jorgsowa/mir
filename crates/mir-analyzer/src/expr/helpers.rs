@@ -175,7 +175,32 @@ fn contains_int_range(ty: &Type) -> bool {
 /// `count($a) + 1` is `int<1, max>` and `count($a) - 1` is `int<-1, max>`.
 /// Returns `None` for anything else (including literal-only arithmetic, left to
 /// [`infer_arithmetic`] so it is not perturbed).
+fn as_single_literal_int(ty: &Type) -> Option<i64> {
+    if ty.types.len() == 1 {
+        if let Atomic::TLiteralInt(n) = &ty.types[0] {
+            return Some(*n);
+        }
+    }
+    None
+}
+
 pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Option<Type> {
+    // Fast path: both operands are known literal ints — fold at analysis time.
+    if let (Some(l), Some(r)) = (as_single_literal_int(left), as_single_literal_int(right)) {
+        let result = match op {
+            BinaryOp::Add => l.checked_add(r),
+            BinaryOp::Sub => l.checked_sub(r),
+            BinaryOp::Mul => l.checked_mul(r),
+            // Integer division only when divisor is nonzero and result is exact.
+            BinaryOp::Div if r != 0 && l % r == 0 => Some(l / r),
+            BinaryOp::Mod if r != 0 => Some(l % r),
+            _ => None,
+        };
+        if let Some(n) = result {
+            return Some(Type::single(Atomic::TLiteralInt(n)));
+        }
+    }
+
     // Only engage when a genuine range is in play; plain int/literal operands
     // keep the existing scalar inference.
     if !contains_int_range(left) && !contains_int_range(right) {

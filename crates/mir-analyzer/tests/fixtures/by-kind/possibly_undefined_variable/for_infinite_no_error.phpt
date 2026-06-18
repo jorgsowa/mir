@@ -4,8 +4,7 @@ for(;;) body assigned before break is not possibly-undefined after loop
 suppress=UnusedVariable
 ===file===
 <?php
-function foo(callable $cb): mixed {
-    $i = 0;
+function foo(callable $cb, int $i): mixed {
     for (;;) {
         $result = $i++;
         if ($result > 3) { break; }
