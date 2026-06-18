@@ -378,6 +378,21 @@ fn is_non_empty_collection(ty: &Type) -> bool {
 /// collection. Modeling this as `int<0, max>` / `int<1, max>` is the faithful
 /// type and feeds range-aware arithmetic at use sites.
 pub(crate) fn count_return_type(arg_types: &[Type]) -> Option<Type> {
+    // Fast path: single sealed keyed-array shape with an exact known count.
+    if let Some(ty) = arg_types.first() {
+        if ty.types.len() == 1 {
+            if let Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } = &ty.types[0]
+            {
+                if !is_open && properties.values().all(|p| !p.optional) {
+                    return Some(Type::single(Atomic::TLiteralInt(properties.len() as i64)));
+                }
+            }
+        }
+    }
     let min = match arg_types.first() {
         Some(t) if is_non_empty_collection(t) => 1,
         _ => 0,
