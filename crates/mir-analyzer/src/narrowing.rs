@@ -1257,9 +1257,8 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                         Atomic::TString | Atomic::TNonEmptyString => {
                             narrowed_parts.add_type(Atomic::TNumericString);
                         }
-                        // A literal string is numeric only if it parses as a number;
-                        // keep it optimistically (the user may know it is numeric).
-                        Atomic::TLiteralString(_) => {
+                        // A literal string is numeric only if it parses as a number.
+                        Atomic::TLiteralString(s) if is_numeric_string(s) => {
                             narrowed_parts.add_type(t.clone());
                         }
                         Atomic::TScalar | Atomic::TMixed => {
@@ -1283,7 +1282,7 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                             | Atomic::TNumericString
                             | Atomic::TLiteralInt(_)
                             | Atomic::TLiteralFloat(..)
-                    )
+                    ) && !matches!(t, Atomic::TLiteralString(s) if is_numeric_string(s))
                 })
             }
         }
@@ -1695,4 +1694,9 @@ impl UnionNarrowExt for Type {
         }
         result
     }
+}
+
+fn is_numeric_string(s: &str) -> bool {
+    let t = s.trim();
+    !t.is_empty() && (t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok())
 }
