@@ -459,8 +459,23 @@ pub fn narrow_from_condition(
                                     if !narrowed.is_empty() && narrowed != current {
                                         ctx.set_var(&var_name, narrowed);
                                     }
-                                    // false branch: removing exact literals from a broad type is
-                                    // rarely safe without full exhaustiveness knowledge — skip.
+                                } else if !current.is_mixed() && !is_true {
+                                    // False branch: safe only when the current type is a
+                                    // finite literal union — remove the matched haystack values.
+                                    let all_literals = !current.types.is_empty()
+                                        && current.types.iter().all(|a| {
+                                            matches!(
+                                                a,
+                                                Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)
+                                            )
+                                        });
+                                    if all_literals {
+                                        let narrowed = current
+                                            .filter(|a| !haystack_ty.types.iter().any(|h| h == a));
+                                        if !narrowed.is_empty() && narrowed != current {
+                                            ctx.set_var(&var_name, narrowed);
+                                        }
+                                    }
                                 }
                             }
                         }
