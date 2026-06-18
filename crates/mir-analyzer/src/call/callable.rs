@@ -523,6 +523,71 @@ pub(crate) fn abs_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `intdiv($num1, $num2)`.
+///
+/// PHP semantics: intdiv returns the integer quotient (truncated toward zero).
+/// When the dividend is non-negative and the divisor is positive, the result
+/// is also non-negative. If both bounds are known we can narrow further.
+pub(crate) fn intdiv_return_type(arg_types: &[Type]) -> Option<Type> {
+    let (num1_ty, num2_ty) = (arg_types.first()?, arg_types.get(1)?);
+
+    // Extract bounds from the first argument.
+    let (n1_min, n1_max) = int_type_bounds(num1_ty)?;
+    // Extract bounds from the divisor — only engage when divisor is positive.
+    let (n2_min, _n2_max) = int_type_bounds(num2_ty)?;
+
+    // Only infer when dividend is non-negative and divisor is strictly positive
+    // to keep the logic simple and avoid dealing with rounding toward zero for
+    // negative operands. Mixed-sign or zero-divisor cases fall through to `int`.
+    let dividend_nn = n1_min.is_some_and(|m| m >= 0);
+    let divisor_pos = n2_min.is_some_and(|m| m > 0);
+    if !dividend_nn || !divisor_pos {
+        return None;
+    }
+
+    // Result is in [0, n1_max / n2_min] when both are known; [0, ∞) otherwise.
+    let new_max = match (n1_max, n2_min) {
+        (Some(hi), Some(lo)) => hi.checked_div(lo),
+        _ => None,
+    };
+    let atom = match (Some(0i64), new_max) {
+        (Some(0), None) => Atomic::TNonNegativeInt,
+        (Some(1), None) => Atomic::TPositiveInt,
+        (min, max) => Atomic::TIntRange { min, max },
+    };
+    Some(Type::single(atom))
+}
+
+/// Extract (min, max) int bounds from a type that consists entirely of int subtypes.
+/// Returns `None` when the type contains non-integer components.
+fn int_type_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
+    if ty.types.is_empty() {
+        return None;
+    }
+    let mut min: Option<i64> = Some(i64::MAX);
+    let mut max: Option<i64> = Some(i64::MIN);
+    for a in &ty.types {
+        let (lo, hi) = match a {
+            Atomic::TLiteralInt(n) => (Some(*n), Some(*n)),
+            Atomic::TIntRange { min, max } => (*min, *max),
+            Atomic::TPositiveInt => (Some(1), None),
+            Atomic::TNonNegativeInt => (Some(0), None),
+            Atomic::TNegativeInt => (None, Some(-1)),
+            Atomic::TInt => (None, None),
+            _ => return None,
+        };
+        min = match (min, lo) {
+            (Some(m), Some(l)) => Some(m.min(l)),
+            _ => None,
+        };
+        max = match (max, hi) {
+            (Some(m), Some(h)) => Some(m.max(h)),
+            _ => None,
+        };
+    }
+    Some((min, max))
+}
+
 /// The default PHP array-key type, `int|string`, used when a source array's
 /// key type cannot be determined more precisely.
 fn array_key_type() -> Type {
