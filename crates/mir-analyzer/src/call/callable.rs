@@ -388,13 +388,31 @@ pub(crate) fn count_return_type(arg_types: &[Type]) -> Option<Type> {
     }))
 }
 
-/// Result type of `strlen($s)` / `mb_strlen($s)`: a byte/character length is
-/// always `>= 0`, i.e. `int<0, max>`.
-pub(crate) fn non_negative_int() -> Type {
+/// Result type of `strlen($s)` / `mb_strlen($s)`: `int<0, max>` normally,
+/// `int<1, max>` when the argument is statically non-empty.
+pub(crate) fn strlen_return_type(arg_types: &[Type]) -> Type {
+    let min = match arg_types.first() {
+        Some(t) if is_non_empty_string(t) => 1,
+        _ => 0,
+    };
     Type::single(Atomic::TIntRange {
-        min: Some(0),
+        min: Some(min),
         max: None,
     })
+}
+
+fn is_non_empty_string(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TNonEmptyString
+                    | Atomic::TClassString(_)
+                    | Atomic::TInterfaceString
+                    | Atomic::TEnumString
+                    | Atomic::TTraitString
+            ) || matches!(a, Atomic::TLiteralString(s) if !s.is_empty())
+        })
 }
 
 /// The default PHP array-key type, `int|string`, used when a source array's

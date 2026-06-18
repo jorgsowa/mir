@@ -497,7 +497,7 @@ impl CallAnalyzer {
                 "count" | "sizeof" => {
                     super::callable::count_return_type(&arg_types).unwrap_or(return_ty)
                 }
-                "strlen" | "mb_strlen" => super::callable::non_negative_int(),
+                "strlen" | "mb_strlen" => super::callable::strlen_return_type(&arg_types),
                 _ => return_ty,
             };
 
