@@ -61,7 +61,11 @@ fn fold_bool_cast(ty: &Type) -> Option<Type> {
         Atomic::TLiteralString(_) => true,
         _ => return None,
     };
-    Some(Type::single(if result { Atomic::TTrue } else { Atomic::TFalse }))
+    Some(Type::single(if result {
+        Atomic::TTrue
+    } else {
+        Atomic::TFalse
+    }))
 }
 
 /// Returns true for atomic types that are safely castable to any scalar.

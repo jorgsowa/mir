@@ -396,4 +396,3 @@ fn operand_has_any_array_member(ty: &Type) -> bool {
         )
     })
 }
-

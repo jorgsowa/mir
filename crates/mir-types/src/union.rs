@@ -391,6 +391,18 @@ impl Type {
                     };
                     result.add_type(atom);
                 }
+                // int<min, 0>: 0 is the only falsy value; truthy branch excludes it → int<min, -1>.
+                Atomic::TIntRange { min, max: Some(0) } => {
+                    let atom = match min {
+                        None => Atomic::TNegativeInt,
+                        Some(n) if *n <= -1 => Atomic::TIntRange {
+                            min: *min,
+                            max: Some(-1),
+                        },
+                        _ => continue, // min >= 0 with max == 0 → range is {0} — can_be_truthy() handles this
+                    };
+                    result.add_type(atom);
+                }
                 // Anything else that can never be truthy — drop.
                 t if !t.can_be_truthy() => {}
                 _ => result.add_type(t.clone()),
@@ -420,6 +432,8 @@ impl Type {
                     min: Some(0),
                     max: Some(_) | None,
                 } => result.add_type(Atomic::TLiteralInt(0)),
+                // int<min, 0>: only 0 is falsy.
+                Atomic::TIntRange { max: Some(0), .. } => result.add_type(Atomic::TLiteralInt(0)),
                 t if !t.can_be_falsy() => {} // always truthy — exclude
                 _ => result.add_type(t.clone()),
             }
