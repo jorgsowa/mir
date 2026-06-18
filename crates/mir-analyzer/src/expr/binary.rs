@@ -1,4 +1,6 @@
-use super::helpers::{as_concat_str, infer_arithmetic, infer_int_range_arithmetic};
+use super::helpers::{
+    as_concat_str, infer_arithmetic, infer_int_range_arithmetic, is_non_empty_when_concat,
+};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
@@ -450,37 +452,6 @@ fn extract_non_negative_literal(ty: &Type) -> Option<i64> {
         }
     }
     None
-}
-
-/// True when all atoms of `ty` produce a non-empty string in PHP's string cast.
-///
-/// This is used for concatenation: if either operand is guaranteed non-empty
-/// after string conversion, the result can never be empty.
-fn is_non_empty_when_concat(ty: &Type) -> bool {
-    !ty.types.is_empty()
-        && ty.types.iter().all(|a| match a {
-            // String subtypes that are always non-empty
-            Atomic::TNonEmptyString
-            | Atomic::TNumericString
-            | Atomic::TCallableString
-            | Atomic::TClassString(_)
-            | Atomic::TInterfaceString
-            | Atomic::TEnumString
-            | Atomic::TTraitString => true,
-            Atomic::TLiteralString(s) => !s.is_empty(),
-            // Any integer — including 0 — casts to a non-empty string ("0", "1", "-1", …)
-            Atomic::TLiteralInt(_)
-            | Atomic::TInt
-            | Atomic::TPositiveInt
-            | Atomic::TNegativeInt
-            | Atomic::TNonNegativeInt
-            | Atomic::TIntRange { .. } => true,
-            // Any float casts to a non-empty string ("0", "1.5", …)
-            Atomic::TFloat | Atomic::TLiteralFloat(..) => true,
-            // true → "1"; false → "" so TBool and TFalse are excluded
-            Atomic::TTrue => true,
-            _ => false,
-        })
 }
 
 /// True when all atoms of `ty` are non-negative integer types.

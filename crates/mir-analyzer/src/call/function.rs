@@ -531,6 +531,8 @@ impl CallAnalyzer {
                 "str_repeat" => {
                     super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // date/time formatting functions always return non-empty strings.
+                "date" | "gmdate" | "date_format" => Type::single(Atomic::TNonEmptyString),
                 _ => return_ty,
             };
 

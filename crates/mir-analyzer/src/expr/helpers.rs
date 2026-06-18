@@ -299,6 +299,36 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
     }
 }
 
+/// Returns true when all atoms of `ty` produce a non-empty string in PHP's string cast.
+///
+/// Used by the concat (`.`) operator and `.=` assignment to determine whether the
+/// result of a concatenation is guaranteed non-empty.
+pub fn is_non_empty_when_concat(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|a| match a {
+            Atomic::TNonEmptyString
+            | Atomic::TNumericString
+            | Atomic::TCallableString
+            | Atomic::TClassString(_)
+            | Atomic::TInterfaceString
+            | Atomic::TEnumString
+            | Atomic::TTraitString => true,
+            Atomic::TLiteralString(s) => !s.is_empty(),
+            // Any integer — including 0 — casts to a non-empty string ("0", "1", "-1", …)
+            Atomic::TLiteralInt(_)
+            | Atomic::TInt
+            | Atomic::TPositiveInt
+            | Atomic::TNegativeInt
+            | Atomic::TNonNegativeInt
+            | Atomic::TIntRange { .. } => true,
+            // Any float casts to a non-empty string ("0", "1.5", …)
+            Atomic::TFloat | Atomic::TLiteralFloat(..) => true,
+            // true → "1"; false → "" so TBool and TFalse are excluded
+            Atomic::TTrue => true,
+            _ => false,
+        })
+}
+
 /// Extract the string representation of a single scalar literal for concat folding.
 /// Returns `None` for unions or non-literal types.
 pub fn as_concat_str(ty: &Type) -> Option<String> {

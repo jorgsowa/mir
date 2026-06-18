@@ -38,4 +38,12 @@ function test_plain_string_is_not_narrowed(string $s): void {
     /** @mir-check $r is string */
     $_ = $r;
 }
+
+/** @param positive-int $n */
+function test_concat_assign(int $n): void {
+    $r = "id=";
+    $r .= $n;
+    /** @mir-check $r is non-empty-string */
+    $_ = $r;
+}
 ===expect===

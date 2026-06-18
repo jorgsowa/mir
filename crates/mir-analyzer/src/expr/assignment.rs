@@ -1,7 +1,8 @@
 use super::helpers::{
     as_concat_str, extract_simple_var, extract_string_from_expr, infer_arithmetic,
-    infer_int_range_arithmetic, is_property_type_coercion, property_assign_compatible,
-    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key,
+    infer_int_range_arithmetic, is_non_empty_when_concat, is_property_type_coercion,
+    property_assign_compatible, type_refs_any_template, widen_array_as_list,
+    widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -92,6 +93,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         } else {
                             Type::single(Atomic::TNonEmptyString)
                         }
+                    } else if is_non_empty_when_concat(&lhs_ty) || is_non_empty_when_concat(&rhs_ty)
+                    {
+                        Type::single(Atomic::TNonEmptyString)
                     } else {
                         Type::single(Atomic::TString)
                     };
