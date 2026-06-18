@@ -1326,3 +1326,88 @@ fn symbol_at_self_keyword_in_static_call_resolves_to_self_class() {
         sym.kind
     );
 }
+
+// ---------------------------------------------------------------------------
+// Regression: analyze_source must surface declared types, not `mixed`.
+//
+// `analyze_source` previously registered its file with a bare `SourceFile::new`,
+// bypassing the workspace symbol index. Body analysis then could not look up the
+// file's own functions/methods, so every parameter fell back to `mixed`
+// (`ast_derived_fn_params`). The single-file/LSP surface must report real types.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn analyze_source_native_param_read_resolves_to_declared_type() {
+    let src = "<?php\nfunction g(int $n): int { return $n; }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    // `$n` in `return $n` — the read site, not the declaration.
+    let offset = src.rfind("$n").unwrap() as u32;
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find Variable(n) at the return read");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "n"),
+        "expected Variable(n), got {:?}",
+        sym.kind
+    );
+    let ty = format!("{}", sym.resolved_type);
+    assert_eq!(
+        ty, "int",
+        "native-typed param must resolve to `int`, not `mixed` (workspace-index regression)"
+    );
+}
+
+#[test]
+fn analyze_source_receiver_var_resolves_to_declared_class() {
+    // A native-typed receiver must carry its class type so member resolution and
+    // hover work; previously this degraded to `mixed`.
+    let src = "<?php\nclass Repo { public function go(): void {} }\nfunction h(Repo $repo): void { $repo->go(); }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("$repo->go").unwrap() as u32;
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find Variable(repo) at the method-call receiver");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(n) if n.as_ref() == "repo"),
+        "expected Variable(repo), got {:?}",
+        sym.kind
+    );
+    let ty = format!("{}", sym.resolved_type);
+    assert_eq!(
+        ty, "Repo",
+        "native-typed receiver must resolve to `Repo`, not `mixed`"
+    );
+
+    // The method call itself must resolve against the in-file class.
+    let m = result.symbols.iter().find(|s| {
+        matches!(&s.kind, ReferenceKind::MethodCall { class, method }
+            if class.as_ref() == "Repo" && method.as_ref() == "go")
+    });
+    assert!(
+        m.is_some(),
+        "expected MethodCall(Repo::go) resolved via the workspace index"
+    );
+}
+
+#[test]
+fn analyze_source_typed_param_has_no_typecheck_mismatch() {
+    // Internal-inference guard: @mir-check reads the same flow state that
+    // resolved_type is built from. A native-typed param must satisfy it.
+    let src = "<?php\nfunction g(int $n): void {\n/** @mir-check $n is int */\necho $n;\n}\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let mismatches: Vec<_> = result
+        .issues
+        .iter()
+        .filter(|i| matches!(i.kind, mir_analyzer::IssueKind::TypeCheckMismatch { .. }))
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "native-typed param should infer as `int`; got mismatches: {:?}",
+        mismatches.iter().map(|i| &i.kind).collect::<Vec<_>>()
+    );
+}

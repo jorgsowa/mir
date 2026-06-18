@@ -323,7 +323,12 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     let mut db = MirDbStorage::default();
     db.set_php_version(Arc::from(php_version.to_string().as_str()));
     crate::stubs::load_stubs_for_version(&mut db, php_version);
-    let salsa_file = SourceFile::new(&db, file.clone(), Arc::from(source));
+    // Register the file through the workspace registry (not a bare
+    // `SourceFile::new`) so it lands in `all_source_files()` and the
+    // workspace symbol index. Without this, body analysis can't look up the
+    // file's own functions/methods/classes and degrades every parameter to
+    // `mixed` via the `ast_derived_fn_params` fallback.
+    let salsa_file = db.upsert_source_file(file.clone(), Arc::from(source));
     let file_defs = collect_file_definitions(&db, salsa_file);
     let suppressions = crate::suppression::SuppressionMap::from_source(source);
     let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
