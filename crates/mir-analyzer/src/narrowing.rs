@@ -1235,26 +1235,56 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
         }
         "is_numeric" => {
             if is_true {
-                current.filter(|t| {
-                    matches!(
-                        t,
+                // In the truthy branch: keep numeric types and string types that
+                // *could* be numeric. TString / TNonEmptyString narrow to TNumericString
+                // (a string proven to be numeric-valued). All int and float variants are
+                // always numeric. TMixed is kept as-is.
+                let mut narrowed_parts = Type::empty();
+                for t in &current.types {
+                    match t {
+                        // All int and float variants are unconditionally numeric.
                         Atomic::TInt
-                            | Atomic::TFloat
-                            | Atomic::TNumeric
-                            | Atomic::TNumericString
-                            | Atomic::TLiteralInt(_)
-                            | Atomic::TMixed
-                    )
-                })
+                        | Atomic::TIntRange { .. }
+                        | Atomic::TPositiveInt
+                        | Atomic::TNonNegativeInt
+                        | Atomic::TNegativeInt
+                        | Atomic::TLiteralInt(_)
+                        | Atomic::TFloat
+                        | Atomic::TLiteralFloat(..)
+                        | Atomic::TNumeric
+                        | Atomic::TNumericString => {
+                            narrowed_parts.add_type(t.clone());
+                        }
+                        // A generic string could be numeric; narrow to numeric-string.
+                        Atomic::TString | Atomic::TNonEmptyString => {
+                            narrowed_parts.add_type(Atomic::TNumericString);
+                        }
+                        // A literal string is numeric only if it parses as a number;
+                        // keep it optimistically (the user may know it is numeric).
+                        Atomic::TLiteralString(_) => {
+                            narrowed_parts.add_type(t.clone());
+                        }
+                        Atomic::TScalar | Atomic::TMixed => {
+                            narrowed_parts.add_type(t.clone());
+                        }
+                        _ => {} // non-numeric types are excluded
+                    }
+                }
+                narrowed_parts
             } else {
                 current.filter(|t| {
                     !matches!(
                         t,
                         Atomic::TInt
+                            | Atomic::TIntRange { .. }
+                            | Atomic::TPositiveInt
+                            | Atomic::TNonNegativeInt
+                            | Atomic::TNegativeInt
                             | Atomic::TFloat
                             | Atomic::TNumeric
                             | Atomic::TNumericString
                             | Atomic::TLiteralInt(_)
+                            | Atomic::TLiteralFloat(..)
                     )
                 })
             }
