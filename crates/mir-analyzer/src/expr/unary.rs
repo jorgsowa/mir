@@ -1,10 +1,10 @@
 use super::binary::{operand_contains_null, operand_is_non_bitwise};
-use super::helpers::extract_simple_var;
+use super::helpers::{extract_simple_var, infer_int_range_arithmetic};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
-use php_ast::ast::{UnaryPostfixOp, UnaryPrefixOp};
+use php_ast::ast::{BinaryOp, UnaryPostfixOp, UnaryPrefixOp};
 use php_ast::owned::{UnaryPostfixExpr, UnaryPrefixExpr};
 
 /// Returns true when every member of `ty` is definitively `true` or `bool`
@@ -76,7 +76,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     {
                         Type::single(Atomic::TFloat)
                     } else {
-                        Type::single(Atomic::TInt)
+                        let op = if u.op == UnaryPrefixOp::PreIncrement {
+                            BinaryOp::Add
+                        } else {
+                            BinaryOp::Sub
+                        };
+                        let one = Type::single(Atomic::TLiteralInt(1));
+                        infer_int_range_arithmetic(&ty, &one, op)
+                            .unwrap_or_else(|| Type::single(Atomic::TInt))
                     };
                     ctx.set_var(&var_name, new_ty.clone());
                     let (line, col_start) = self.offset_to_line_col(u.operand.span.start);
@@ -125,7 +132,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     {
                         Type::single(Atomic::TFloat)
                     } else {
-                        Type::single(Atomic::TInt)
+                        let op = if u.op == UnaryPostfixOp::PostIncrement {
+                            BinaryOp::Add
+                        } else {
+                            BinaryOp::Sub
+                        };
+                        let one = Type::single(Atomic::TLiteralInt(1));
+                        infer_int_range_arithmetic(&operand_ty, &one, op)
+                            .unwrap_or_else(|| Type::single(Atomic::TInt))
                     };
                     ctx.set_var(&var_name, new_ty);
                     let (line, col_start) = self.offset_to_line_col(u.operand.span.start);
