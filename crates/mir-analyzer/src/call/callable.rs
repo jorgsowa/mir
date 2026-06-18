@@ -483,10 +483,25 @@ pub(crate) fn infer_array_map_return(
         Type::single(Atomic::TInt)
     };
 
-    Some(Type::single(Atomic::TArray {
-        key: Box::new(key),
-        value: Box::new(value),
-    }))
+    // Preserve the non-empty property: array_map on a non-empty input is also non-empty.
+    let src_is_non_empty = arg_types.get(1).is_some_and(|t| {
+        !t.types.is_empty()
+            && t.types
+                .iter()
+                .all(|a| matches!(a, Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }))
+    });
+    let atom = if src_is_non_empty {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atom))
 }
 
 /// Infer the result type of `array_filter($array, $callback?, ...)`.
