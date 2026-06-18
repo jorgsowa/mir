@@ -377,6 +377,12 @@ impl Type {
                 | Atomic::TNull
                 | Atomic::TFalse => {}
                 Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => {}
+                // string: only "" and "0" are falsy; truthy branch is non-empty-string.
+                // non-empty-string still includes "0" (which is falsy) but that is the
+                // standard approximation used by Psalm and other analyzers.
+                Atomic::TString => result.add_type(Atomic::TNonEmptyString),
+                // numeric-string: "0" is the only falsy value; non-zero numerics are truthy.
+                // No named "non-zero numeric-string" type exists; keep as-is conservatively.
                 // int<0, max> only has 0 as its falsy value; truthy branch is int<1, max>.
                 // (int<0, 0> is handled by the can_be_truthy() false guard below.)
                 Atomic::TNonNegativeInt => result.add_type(Atomic::TPositiveInt),
@@ -425,6 +431,13 @@ impl Type {
         result.from_docblock = self.from_docblock;
         for t in &self.types {
             match t {
+                // string: only "" and "0" are falsy.
+                Atomic::TString => {
+                    result.add_type(Atomic::TLiteralString("".into()));
+                    result.add_type(Atomic::TLiteralString("0".into()));
+                }
+                // numeric-string: only "0" is a falsy numeric string.
+                Atomic::TNumericString => result.add_type(Atomic::TLiteralString("0".into())),
                 // non-negative-int: only 0 is falsy.
                 Atomic::TNonNegativeInt => result.add_type(Atomic::TLiteralInt(0)),
                 // int<0, hi>: only 0 is falsy.
