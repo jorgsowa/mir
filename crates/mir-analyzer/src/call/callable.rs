@@ -1478,6 +1478,31 @@ pub(crate) fn array_search_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `preg_split($pattern, $subject, $limit?, $flags?)`.
+///
+/// `preg_split` always produces at least one string unless `PREG_SPLIT_NO_EMPTY` (value 1) is
+/// set and every part is empty. When `$flags` is 0 (default) or absent, the result is
+/// guaranteed non-empty: `non-empty-list<string>|false`. When `PREG_SPLIT_OFFSET_CAPTURE` (4)
+/// is set each element is an array, which we don't model — falls back to stub.
+/// Falls back to stub `array|false` for other flag combinations.
+pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
+    // flags is the 4th argument (index 3). When absent the default is 0.
+    let flags_ty = arg_types.get(3);
+    let flags_zero = match flags_ty {
+        None => true,
+        Some(t) => t.types.len() == 1 && matches!(t.types.first(), Some(Atomic::TLiteralInt(0))),
+    };
+    if !flags_zero {
+        return None;
+    }
+    // No PREG_SPLIT_NO_EMPTY → always at least one part.
+    let mut result = Type::single(Atomic::TNonEmptyList {
+        value: Box::new(Type::single(Atomic::TString)),
+    });
+    result.add_type(Atomic::TFalse);
+    Some(result)
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {
