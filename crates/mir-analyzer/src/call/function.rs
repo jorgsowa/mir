@@ -514,6 +514,14 @@ impl CallAnalyzer {
                 "array_reverse" => {
                     super::callable::array_reverse_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // array_key_first/array_key_last: non-null for non-empty input; int for lists.
+                "array_key_first" | "array_key_last" => {
+                    super::callable::array_key_first_last_return(&arg_types).unwrap_or(return_ty)
+                }
+                // array_pop/array_shift: return value type (not mixed) when source is typed.
+                "array_pop" | "array_shift" => {
+                    super::callable::array_pop_shift_return(&arg_types).unwrap_or(return_ty)
+                }
                 // Faithful integer-range returns: counts and lengths are
                 // non-negative (and counts of non-empty collections are `>= 1`).
                 "count" | "sizeof" => {

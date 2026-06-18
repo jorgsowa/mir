@@ -1133,6 +1133,53 @@ pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atomic))
 }
 
+/// Infer the return type of `array_key_first($array)` / `array_key_last($array)`.
+///
+/// For non-empty collections the result is always `string|int` (never null).
+/// For `list` / `non-empty-list` it is always `int`.
+/// Returns `None` to fall back to the stub when the collection is possibly empty.
+pub(crate) fn array_key_first_last_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() || !is_non_empty_collection(source) {
+        return None;
+    }
+    let all_list = source
+        .types
+        .iter()
+        .all(|a| matches!(a, Atomic::TNonEmptyList { .. } | Atomic::TList { .. }));
+    if all_list {
+        Some(Type::single(Atomic::TInt))
+    } else {
+        let mut ty = Type::single(Atomic::TInt);
+        ty.add_type(Atomic::TString);
+        Some(ty)
+    }
+}
+
+/// Infer the return type of `array_pop($array)` / `array_shift($array)`.
+///
+/// When the collection element type is known and the collection is provably
+/// non-empty, the return is `T` (not `T|null`). When the collection is typed
+/// but possibly empty, returns `T|null`. Falls back to `None` (→ stub) for
+/// unknown / `mixed` sources.
+pub(crate) fn array_pop_shift_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+    if is_non_empty_collection(source) {
+        Some(value)
+    } else {
+        let mut ty = value;
+        ty.add_type(Atomic::TNull);
+        Some(ty)
+    }
+}
+
 /// Returns `(callback_arg_index, min_required_arity)` for built-in functions that enforce a
 /// minimum callback arity via `check_min_arity_callback`. Functions with more complex rules
 /// (array_map, array_filter) use their own specialized handlers instead.
