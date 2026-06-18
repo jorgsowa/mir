@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.45.0] - 2026-06-18
+
+### Added
+
+- Comparison-driven integer-range narrowing: `<`, `<=`, `>`, `>=`, `===`, and `!==` against literal bounds now tighten `int<a,b>` ranges (and named subtypes like `positive-int`, `non-negative-int`) in each branch, narrowing to `TLiteralInt` on a single-point match.
+- Integer-range inference for arithmetic and built-ins: unary negate and `abs()`, modulo with a positive literal divisor, multiplication of non-negative ranges, bitwise-AND masks and right-shifts, `intdiv()` on non-negative dividends, and `min()`/`max()` over all-integer arguments now produce bounded `int<min,max>` results. `rand()`, `mt_rand()`, and `random_int()` infer their range from literal bounds.
+- Literal folding at analysis time: integer arithmetic, casts, and string concatenation (including `.=`) of literal operands now fold to exact literal values. `strlen`/`mb_strlen` and `count()` on a sealed keyed-array shape return exact literal `int`s; `strlen`/`mb_strlen` return `int<1,max>` for `non-empty-string` arguments.
+- `non-empty-string` preservation and inference across string operations: case-conversion and encoding functions, `(string)` casts of `int`/`float`/`true`, `sprintf` with literal format chars, `number_format`, `str_repeat`, `date`/`gmdate`/`date_format`, and concatenation all preserve or produce `non-empty-string`. `str_contains`/`str_starts_with`/`str_ends_with` narrow the haystack to `non-empty-string` in the true-branch.
+- Array element- and key-type-preserving inference for `array_slice`, `array_map`, `array_merge`, `array_unique`, `array_fill`, `array_fill_keys`, `array_keys`, `array_reverse`, `array_chunk` (`list<list<T>>`), `sort`/`rsort`/`usort`/`shuffle`, `array_push`/`array_unshift` (by-ref), `array_pop`/`array_shift` (value type), and `array_key_first`/`array_key_last` (non-null on non-empty). `explode`, `str_split`, `implode`, `preg_split`, and `range()` produce typed `(non-empty-)list` results. `array_values` is now `@template`-annotated and returns `list<TValue>`.
+- Collection narrowing: `array_is_list`, `count`/`strlen` comparisons, `$arr !== []` (narrows to non-empty), truthy checks on arrays/lists (narrow to non-empty variant), and `in_array($needle, [...])` (narrows to the literal union; the false-branch removes matched literals from a finite union).
+- `array_search` narrows its return key type from the haystack.
+
+### Fixed
+
+- Truthy/falsy narrowing corrected across scalar types: `bool` narrows to the `true`/`false` literal (including on `=== true`/`=== false`), `string` narrows the string type, `int`/`float` falsy checks narrow to the zero literal, and `int` ranges tighten their bounds around zero (`int<min,0>`, zero-inclusive ranges, single-point exclusion now marks branch divergence). `!==` / `===` on an int-range edge tightens the bound.
+- `non-empty-array`/`non-empty-list` are never falsy and a closed empty `array{}` is never truthy, fixing `can_be_falsy`/`can_be_truthy` for these and for `TNumericString`, `TNonNegativeInt`, and zero-inclusive `TIntRange`.
+- Named integer subtypes (`positive-int`, `non-negative-int`, etc.) now carry their implicit bounds through arithmetic and comparisons, intersect correctly on comparison, and have correct subtype/contradiction handling — fixing missing `TNumeric`/`TScalar`/`TFloat` subtype entries, `DocblockTypeContradiction` detection, `impossible_comparison` with negative literals, and `RedundantCondition` on always-true named-int comparisons.
+- `+=`/`-=` and `++`/`--` preserve integer-range bounds.
+- `is_numeric` and `is_scalar`/`narrow_to_scalar` now handle all string and integer subtypes (including literal strings) correctly.
+- `remove_false` on `TBool` yields `TTrue` (not empty), and return-type checks guard against an empty `remove_false` result.
+- Static-call and method-call diagnostics: `PossiblyNullMethodCall` is now suppressed against `mixed` receivers.
+- `MissingThrowsDocblock` is suppressed for `@template T of Exception` parameters.
+- `TKeyedArray` property keys are validated against a generic `array<K,V>`.
+- `Foo::class` expressions no longer emit `UndefinedClass`.
+- A PHP type hint is now preferred over a conflicting scalar `@param` docblock.
+- In non-strict-mode files, `int`/`false` → `bool` is no longer flagged as `InvalidReturnType`, and scalar `int`/`float` → `string` is reclassified from `InvalidArgument` to `ArgumentTypeCoercion`.
+- A `mixed|null` argument is treated as `mixed`, not possibly-null.
+- The `analyze_source` file is now registered in the workspace index.
+
 ## [0.44.0] - 2026-06-17
 
 ### Fixed
