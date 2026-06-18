@@ -1532,6 +1532,59 @@ pub(crate) fn array_fill_keys_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atom))
 }
 
+/// Infer the return type of `array_chunk($array, $length, $preserve_keys?)`.
+///
+/// `array_chunk` splits an array into sub-arrays of at most `$length` elements:
+/// - The outer array is a `list<…>` (always re-indexed by chunk index).
+/// - When `$preserve_keys` is false (default) each chunk is also a `list<T>`.
+/// - When `$preserve_keys` is true each chunk preserves the original keys → `array<K,T>`.
+/// - Non-empty source → non-empty outer list (there is at least one chunk).
+///
+/// Falls back to stub `array` when value type is unknown.
+pub(crate) fn array_chunk_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (key, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+    let preserve_keys = arg_types.get(2).is_some_and(|t| {
+        t.types
+            .iter()
+            .any(|a| matches!(a, Atomic::TTrue | Atomic::TBool))
+            && !t
+                .types
+                .iter()
+                .any(|a| matches!(a, Atomic::TFalse | Atomic::TNull))
+    });
+    let chunk_atom = if preserve_keys {
+        if key.is_mixed() {
+            return None;
+        }
+        Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(value),
+        }
+    };
+    let chunk_ty = Type::single(chunk_atom);
+    let outer_atom = if is_non_empty_collection(source) {
+        Atomic::TNonEmptyList {
+            value: Box::new(chunk_ty),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(chunk_ty),
+        }
+    };
+    Some(Type::single(outer_atom))
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {

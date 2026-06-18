@@ -605,6 +605,11 @@ impl CallAnalyzer {
                     super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
                 }
                 // date/time formatting functions always return non-empty strings.
+                // array_chunk splits an array into sub-arrays; outer list is non-empty when
+                // source is non-empty; chunks are list<T> by default (preserve_keys=false).
+                "array_chunk" => {
+                    super::callable::array_chunk_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 // array_fill_keys uses the values of $keys as result keys and $value as each result value.
                 "array_fill_keys" => {
                     super::callable::array_fill_keys_return_type(&arg_types).unwrap_or(return_ty)
