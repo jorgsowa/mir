@@ -16,14 +16,14 @@ A fast, incremental PHP static analyzer written in Rust, inspired by [Psalm](htt
 
 ## Features
 
-- **77 diagnostic rules** across type errors, undefined symbols, dead code, taint, and more
+- **140+ diagnostic rules** across type errors, undefined symbols, dead code, taint, and more
 - Sound type system — scalars, objects, generics, unions, intersections, literals, `never`, `void`
 - Full type inference — return types, literal narrowing, `if`/`match`/`instanceof`/`is_string()` etc.
 - Call checking — argument count and types for user-defined and built-in functions/methods
 - Class analysis — inheritance, interface compliance, abstract enforcement, visibility, `readonly`, `final`
 - Dead code detection — unused variables, parameters, private methods, properties, and functions
 - Taint analysis — tracks data from `$_GET`/`$_POST` to HTML/SQL/shell sinks
-- Incremental cache — unchanged files skipped on re-runs via SHA-256 content hashing
+- Incremental cache — unchanged files skipped on re-runs via content hashing
 - Parallel analysis — rayon-powered; scales to available CPUs
 - PHP 7.4–8.5 support with version-aware stub filtering
 - Comprehensive built-in coverage — powered by [JetBrains phpstorm-stubs](https://github.com/JetBrains/phpstorm-stubs) (57 extensions, 500+ functions, 100+ classes)
@@ -38,9 +38,9 @@ vendor/bin/mir src/
 ```
 
 A `post-install-cmd` hook downloads the prebuilt binary matching your version
-and host platform from GitHub Releases. See
-[docs/getting-started.md](docs/getting-started.md#installation) for supported
-targets.
+and host platform from GitHub Releases. See the
+[getting started guide](https://jorgsowa.github.io/mir/guides/getting-started/)
+for supported targets.
 
 ### From crates.io
 
@@ -66,7 +66,7 @@ mir --format json src/     # machine-readable output
 mir --baseline baseline.xml src/  # suppress known issues
 ```
 
-See [docs/cli.md](docs/cli.md) for the full CLI reference.
+See the [CLI reference](https://jorgsowa.github.io/mir/reference/cli/) for all flags and options.
 
 ### Suppressing issues inline
 
