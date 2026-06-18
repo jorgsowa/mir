@@ -1116,17 +1116,32 @@ fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
 
 fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool) {
     let current = ctx.get_var(name);
-    let narrowed = if is_value {
-        if value {
-            current.filter(|t| matches!(t, Atomic::TTrue | Atomic::TBool | Atomic::TMixed))
-        } else {
-            current.filter(|t| matches!(t, Atomic::TFalse | Atomic::TBool | Atomic::TMixed))
+    // `TBool` (PHP `bool`) must be split into TTrue/TFalse rather than kept wholesale.
+    // e.g. `$x: bool; if ($x === false)` → true-branch should be `false`, not `bool`.
+    let mut narrowed = Type::empty();
+    narrowed.from_docblock = current.from_docblock;
+    for t in &current.types {
+        let keep = match t {
+            Atomic::TBool => {
+                // Split: narrow TBool to the specific literal being tested.
+                if is_value {
+                    let lit = if value { Atomic::TTrue } else { Atomic::TFalse };
+                    narrowed.add_type(lit);
+                } else {
+                    let lit = if value { Atomic::TFalse } else { Atomic::TTrue };
+                    narrowed.add_type(lit);
+                }
+                false // handled above — don't fall through
+            }
+            Atomic::TTrue => is_value == value,
+            Atomic::TFalse => is_value != value,
+            Atomic::TMixed => true,
+            _ => !is_value, // non-bool atoms: keep only when narrowing away
+        };
+        if keep {
+            narrowed.add_type(t.clone());
         }
-    } else if value {
-        current.filter(|t| !matches!(t, Atomic::TTrue))
-    } else {
-        current.filter(|t| !matches!(t, Atomic::TFalse))
-    };
+    }
     set_narrowed(ctx, name, &current, narrowed, false);
 }
 
