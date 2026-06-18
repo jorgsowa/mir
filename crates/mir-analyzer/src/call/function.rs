@@ -520,6 +520,11 @@ impl CallAnalyzer {
                     ty.add_type(Atomic::TFalse);
                     ty
                 }
+                // Case-folding and similar string functions preserve non-emptiness.
+                "strtolower" | "strtoupper" | "mb_strtolower" | "mb_strtoupper" | "ucfirst"
+                | "lcfirst" | "ucwords" => {
+                    super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
+                }
                 _ => return_ty,
             };
 

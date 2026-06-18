@@ -439,6 +439,23 @@ fn is_non_empty_string(ty: &Type) -> bool {
         })
 }
 
+/// Infer the return type of a string function that preserves non-emptiness:
+/// `strtolower`, `strtoupper`, `mb_strtolower`, `mb_strtoupper`, `ucfirst`,
+/// `lcfirst`, `ucwords`.
+///
+/// These functions can never return an empty string when given a non-empty
+/// input (they only change casing, never remove characters). When the argument
+/// is provably non-empty, we return `non-empty-string` instead of the stub's
+/// plain `string`.
+pub(crate) fn string_preserve_non_empty(arg_types: &[Type]) -> Option<Type> {
+    let arg = arg_types.first()?;
+    if is_non_empty_string(arg) {
+        Some(Type::single(Atomic::TNonEmptyString))
+    } else {
+        None
+    }
+}
+
 /// Infer the return type of `abs($num)`.
 ///
 /// PHP semantics: abs always returns a non-negative value with the same type
