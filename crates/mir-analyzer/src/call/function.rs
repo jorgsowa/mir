@@ -502,6 +502,21 @@ impl CallAnalyzer {
                 "intdiv" => super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty),
                 "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
                 "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
+                // preg_match returns 1 on match, 0 on no-match, false on error.
+                "preg_match" => {
+                    let mut ty = Type::single(Atomic::TIntRange {
+                        min: Some(0),
+                        max: Some(1),
+                    });
+                    ty.add_type(Atomic::TFalse);
+                    ty
+                }
+                // preg_match_all returns the count of matches (>= 0) or false on error.
+                "preg_match_all" => {
+                    let mut ty = Type::single(Atomic::TNonNegativeInt);
+                    ty.add_type(Atomic::TFalse);
+                    ty
+                }
                 _ => return_ty,
             };
 

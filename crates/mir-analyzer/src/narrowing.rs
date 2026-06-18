@@ -1390,7 +1390,16 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
                 Atomic::TLiteralInt(n) if *n == value => {} // excluded
                 Atomic::TIntRange { min, max } => {
                     if let Some(tightened) = tighten(*min, *max) {
-                        result.add_type(tightened);
+                        // Skip the atom entirely when tightening produced an empty
+                        // range (lo > hi). This correctly empties the result for
+                        // single-point ranges like `int<1,1>` when excluding 1.
+                        let is_empty_range = matches!(
+                            &tightened,
+                            Atomic::TIntRange { min: Some(lo), max: Some(hi) } if lo > hi
+                        );
+                        if !is_empty_range {
+                            result.add_type(tightened);
+                        }
                     } else {
                         result.add_type(t.clone());
                     }
@@ -1421,7 +1430,10 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
         }
         result
     };
-    set_narrowed(ctx, name, &current, narrowed, false);
+    // For closed-precise types (bounded ranges, named int subtypes, literal unions),
+    // an empty result means the exclusion is a genuine contradiction — mark divergence.
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
 fn narrow_var_to_literal_enum_case(
