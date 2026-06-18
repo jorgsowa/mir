@@ -1,13 +1,13 @@
 use super::helpers::{
-    extract_simple_var, extract_string_from_expr, infer_arithmetic, is_property_type_coercion,
-    property_assign_compatible, type_refs_any_template, widen_array_as_list,
-    widen_array_with_value_and_key,
+    extract_simple_var, extract_string_from_expr, infer_arithmetic, infer_int_range_arithmetic,
+    is_property_type_coercion, property_assign_compatible, type_refs_any_template,
+    widen_array_as_list, widen_array_with_value_and_key,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
-use php_ast::ast::AssignOp;
+use php_ast::ast::{AssignOp, BinaryOp};
 use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
 use rustc_hash::FxHashSet;
@@ -106,7 +106,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .count()
                 });
                 let lhs_ty = self.analyze(&a.target, ctx);
-                let result_ty = infer_arithmetic(&lhs_ty, &rhs_ty);
+                let range_op = match a.op {
+                    AssignOp::Plus => Some(BinaryOp::Add),
+                    AssignOp::Minus => Some(BinaryOp::Sub),
+                    _ => None,
+                };
+                let result_ty = range_op
+                    .and_then(|op| infer_int_range_arithmetic(&lhs_ty, &rhs_ty, op))
+                    .unwrap_or_else(|| infer_arithmetic(&lhs_ty, &rhs_ty));
                 self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                 if let (Some(name), Some(pre_count)) = (&target_var_name, pre_lhs_consumed_count) {
                     let sym = mir_types::Name::from(name.as_str());
