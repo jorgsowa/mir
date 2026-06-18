@@ -1347,7 +1347,64 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
         }
         result
     } else {
-        current.filter(|t| !matches!(t, Atomic::TLiteralInt(n) if *n == value))
+        // Remove the excluded literal from the type.  For named int subtypes and
+        // int ranges, also tighten the bound when the excluded value sits exactly
+        // at the lower or upper edge.
+        let tighten = |min: Option<i64>, max: Option<i64>| {
+            let (new_min, new_max) = if min == Some(value) {
+                (value.checked_add(1), max)
+            } else if max == Some(value) {
+                (min, value.checked_sub(1))
+            } else {
+                return None; // excluded value is not on an edge — keep as-is
+            };
+            // Canonicalise tightened ranges back to named subtypes.
+            let atom = match (new_min, new_max) {
+                (Some(1), None) => Atomic::TPositiveInt,
+                (Some(0), None) => Atomic::TNonNegativeInt,
+                (None, Some(-1)) => Atomic::TNegativeInt,
+                (None, None) => Atomic::TInt,
+                (min, max) => Atomic::TIntRange { min, max },
+            };
+            Some(atom)
+        };
+        let mut result = Type::empty();
+        result.from_docblock = current.from_docblock;
+        for t in &current.types {
+            match t {
+                Atomic::TLiteralInt(n) if *n == value => {} // excluded
+                Atomic::TIntRange { min, max } => {
+                    if let Some(tightened) = tighten(*min, *max) {
+                        result.add_type(tightened);
+                    } else {
+                        result.add_type(t.clone());
+                    }
+                }
+                Atomic::TPositiveInt => {
+                    if let Some(tightened) = tighten(Some(1), None) {
+                        result.add_type(tightened);
+                    } else {
+                        result.add_type(t.clone());
+                    }
+                }
+                Atomic::TNonNegativeInt => {
+                    if let Some(tightened) = tighten(Some(0), None) {
+                        result.add_type(tightened);
+                    } else {
+                        result.add_type(t.clone());
+                    }
+                }
+                Atomic::TNegativeInt => {
+                    if let Some(tightened) = tighten(None, Some(-1)) {
+                        result.add_type(tightened);
+                    } else {
+                        result.add_type(t.clone());
+                    }
+                }
+                _ => result.add_type(t.clone()),
+            }
+        }
+        result
     };
     set_narrowed(ctx, name, &current, narrowed, false);
 }
