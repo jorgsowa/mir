@@ -507,6 +507,11 @@ impl CallAnalyzer {
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // array_slice preserves the element type (and list structure when not
+                // preserving keys).
+                "array_slice" => {
+                    super::callable::array_slice_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 // array_keys of a non-empty array returns a non-empty list (preserving the
                 // stub's key type from template resolution).
                 "array_keys" => super::callable::array_keys_return_type(&arg_types, &return_ty),

@@ -1063,6 +1063,58 @@ pub(crate) fn infer_array_filter_return(arg_types: &[Type]) -> Option<Type> {
     }))
 }
 
+/// Infer the result type of `array_slice($array, $offset, $length, $preserve_keys)`.
+///
+/// When the source is a list type and `preserve_keys` is false (the default),
+/// the result is re-indexed to start from 0 → returns `list<TValue>`.
+/// When the source is a generic array, key and value types are preserved.
+/// The result is always possibly-empty (we cannot know whether the slice is
+/// non-empty without evaluating the offset/length at analysis time).
+pub(crate) fn array_slice_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    // Check if preserve_keys is explicitly true (4th arg is TTrue or TBool).
+    let preserve_keys = arg_types.get(3).is_some_and(|t| {
+        t.types
+            .iter()
+            .any(|a| matches!(a, Atomic::TTrue | Atomic::TBool))
+            && !t
+                .types
+                .iter()
+                .any(|a| matches!(a, Atomic::TFalse | Atomic::TNull))
+    });
+
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+
+    // When the source is a list and preserve_keys is false (default), the
+    // result is also a list (integer keys are re-indexed from 0).
+    let is_source_list = source
+        .types
+        .iter()
+        .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }));
+
+    if is_source_list && !preserve_keys {
+        return Some(Type::single(Atomic::TList {
+            value: Box::new(value),
+        }));
+    }
+
+    // Generic array: preserve key type too.
+    let (key, _) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() {
+        return None;
+    }
+    Some(Type::single(Atomic::TArray {
+        key: Box::new(key),
+        value: Box::new(value),
+    }))
+}
+
 /// Infer the result type of `array_values($array)`.
 ///
 /// Re-indexing produces a `list<TValue>` (or `non-empty-list<TValue>` when the
