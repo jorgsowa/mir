@@ -404,8 +404,17 @@ pub(crate) fn count_return_type(arg_types: &[Type]) -> Option<Type> {
 }
 
 /// Result type of `strlen($s)` / `mb_strlen($s)`: `int<0, max>` normally,
-/// `int<1, max>` when the argument is statically non-empty.
+/// `int<1, max>` when the argument is statically non-empty, or a literal
+/// `int<n, n>` when the argument is a known literal string.
 pub(crate) fn strlen_return_type(arg_types: &[Type]) -> Type {
+    // Fast path: single literal string with a statically known length.
+    if let Some(ty) = arg_types.first() {
+        if ty.types.len() == 1 {
+            if let Atomic::TLiteralString(s) = &ty.types[0] {
+                return Type::single(Atomic::TLiteralInt(s.len() as i64));
+            }
+        }
+    }
     let min = match arg_types.first() {
         Some(t) if is_non_empty_string(t) => 1,
         _ => 0,
@@ -486,9 +495,12 @@ pub(crate) fn infer_array_map_return(
     // Preserve the non-empty property: array_map on a non-empty input is also non-empty.
     let src_is_non_empty = arg_types.get(1).is_some_and(|t| {
         !t.types.is_empty()
-            && t.types
-                .iter()
-                .all(|a| matches!(a, Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }))
+            && t.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+                )
+            })
     });
     let atom = if src_is_non_empty {
         Atomic::TNonEmptyArray {
