@@ -1,3 +1,4 @@
+use super::helpers::is_non_empty_when_concat;
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
@@ -273,7 +274,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
-                Type::single(Atomic::TString)
+                if is_non_empty_when_concat(&inner_ty) {
+                    Type::single(Atomic::TNonEmptyString)
+                } else {
+                    Type::single(Atomic::TString)
+                }
             }
             CastKind::Bool => {
                 // Literal fold: (bool)0 → false, (bool)1 → true, (bool)"" → false, etc.
