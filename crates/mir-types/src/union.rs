@@ -367,14 +367,36 @@ impl Type {
         if self.is_mixed() {
             return Type::mixed();
         }
-        let narrowed = self.filter(|t| t.can_be_truthy());
-        // Remove specific falsy literals from string/int
-        narrowed.filter(|t| match t {
-            Atomic::TLiteralInt(0) => false,
-            Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => false,
-            Atomic::TLiteralFloat(0, 0) => false,
-            _ => true,
-        })
+        let mut result = Type::empty();
+        result.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                // Always-falsy — exclude entirely.
+                Atomic::TLiteralInt(0)
+                | Atomic::TLiteralFloat(0, 0)
+                | Atomic::TNull
+                | Atomic::TFalse => {}
+                Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => {}
+                // int<0, max> only has 0 as its falsy value; truthy branch is int<1, max>.
+                // (int<0, 0> is handled by the can_be_truthy() false guard below.)
+                Atomic::TNonNegativeInt => result.add_type(Atomic::TPositiveInt),
+                Atomic::TIntRange { min: Some(0), max } if max.is_none_or(|m| m >= 1) => {
+                    let atom = if max.is_none() {
+                        Atomic::TPositiveInt
+                    } else {
+                        Atomic::TIntRange {
+                            min: Some(1),
+                            max: *max,
+                        }
+                    };
+                    result.add_type(atom);
+                }
+                // Anything else that can never be truthy — drop.
+                t if !t.can_be_truthy() => {}
+                _ => result.add_type(t.clone()),
+            }
+        }
+        result
     }
 
     /// Keep only falsy atomics (e.g. after `if (!$x)`).
@@ -387,7 +409,22 @@ impl Type {
                 Atomic::TLiteralString("".into()),
             ]);
         }
-        self.filter(|t| t.can_be_falsy())
+        let mut result = Type::empty();
+        result.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                // non-negative-int: only 0 is falsy.
+                Atomic::TNonNegativeInt => result.add_type(Atomic::TLiteralInt(0)),
+                // int<0, hi>: only 0 is falsy.
+                Atomic::TIntRange {
+                    min: Some(0),
+                    max: Some(_) | None,
+                } => result.add_type(Atomic::TLiteralInt(0)),
+                t if !t.can_be_falsy() => {} // always truthy — exclude
+                _ => result.add_type(t.clone()),
+            }
+        }
+        result
     }
 
     /// Narrow this type as if `$x instanceof ClassName` is true.

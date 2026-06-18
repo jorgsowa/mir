@@ -1,6 +1,6 @@
 ===description===
-An int range that includes 0 is not a redundant condition in a truthy check;
-`int<0,10>` can be both truthy (1-10) and falsy (0).
+Truthy check on an int range that includes 0 tightens the lower bound:
+`int<0,10>` → `int<1,10>` (truthy) / `0` (falsy); `non-negative-int` → `positive-int` (truthy).
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===
@@ -8,7 +8,10 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<0, 10> $x */
 function test(int $x): void {
     if ($x) {
-        /** @mir-check $x is int<0, 10> */
+        /** @mir-check $x is int<1, 10> */
+        $_ = $x;
+    } else {
+        /** @mir-check $x is 0 */
         $_ = $x;
     }
 }
@@ -16,7 +19,10 @@ function test(int $x): void {
 /** @param non-negative-int $x */
 function test_nonneg(int $x): void {
     if ($x) {
-        /** @mir-check $x is non-negative-int */
+        /** @mir-check $x is positive-int */
+        $_ = $x;
+    } else {
+        /** @mir-check $x is 0 */
         $_ = $x;
     }
 }
