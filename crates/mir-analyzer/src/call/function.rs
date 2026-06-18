@@ -507,6 +507,9 @@ impl CallAnalyzer {
                 "str_split" => {
                     super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // explode with a non-empty separator always returns non-empty-list<string>.
+                "explode" => super::callable::explode_return_type(&arg_types, &return_ty)
+                    .unwrap_or(return_ty),
                 // array_slice preserves the element type (and list structure when not
                 // preserving keys).
                 "array_slice" => {

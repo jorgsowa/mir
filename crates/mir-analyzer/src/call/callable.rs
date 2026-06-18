@@ -668,6 +668,36 @@ fn sprintf_format_guarantees_non_empty(fmt: &str) -> bool {
 
 /// Infer the return type of `sprintf($format, ...)`.
 ///
+/// Infer the result type of `explode($separator, $string, $limit)`.
+///
+/// When the separator is provably non-empty, PHP always returns at least one
+/// element (the whole subject string when the separator is not found). Upgrades
+/// the array portion of `stub_return` to `non-empty-list<string>` while
+/// preserving any `false` component (PHP 7.x stub). Returns `None` when the
+/// separator's non-emptiness cannot be proven so the stub type is used as-is.
+pub(crate) fn explode_return_type(arg_types: &[Type], stub_return: &Type) -> Option<Type> {
+    let separator = arg_types.first()?;
+    let sep_non_empty = separator.types.iter().any(|a| {
+        matches!(a, Atomic::TNonEmptyString)
+            || matches!(a, Atomic::TLiteralString(s) if !s.as_ref().is_empty())
+    });
+    if !sep_non_empty {
+        return None;
+    }
+    let mut result = Type::single(Atomic::TNonEmptyList {
+        value: Box::new(Type::single(Atomic::TString)),
+    });
+    // Preserve the `|false` that phpstorm-stubs emits for PHP < 8.0.
+    if stub_return
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TFalse))
+    {
+        result.add_type(Atomic::TFalse);
+    }
+    Some(result)
+}
+
 /// When the format string is a literal and `sprintf_format_guarantees_non_empty`
 /// is true, the result is `non-empty-string`. Falls through to `None` otherwise.
 pub(crate) fn sprintf_return_type(arg_types: &[Type]) -> Option<Type> {

@@ -6,6 +6,6 @@ suppress=UnusedVariable
 ===file===
 <?php
 $parts = explode(",", "a,b,c");
-/** @mir-check $parts is array<int, string> */
+/** @mir-check $parts is non-empty-list<string> */
 echo $parts[0];
 ===expect===

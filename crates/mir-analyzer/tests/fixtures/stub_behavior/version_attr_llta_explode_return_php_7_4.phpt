@@ -6,6 +6,6 @@ suppress=UnusedVariable,PossiblyInvalidArrayAccess
 ===file===
 <?php
 $parts = explode(",", "a,b,c");
-/** @mir-check $parts is array<int, string>|false */
+/** @mir-check $parts is non-empty-list<string>|false */
 echo $parts[0];
 ===expect===
