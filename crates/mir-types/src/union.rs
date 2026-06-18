@@ -490,21 +490,20 @@ impl Type {
     /// Narrow as if `is_scalar($x)` is true (int | string | float | bool).
     pub fn narrow_to_scalar(&self) -> Type {
         self.filter(|t| {
-            matches!(
-                t,
-                Atomic::TString
-                    | Atomic::TLiteralString(..)
-                    | Atomic::TNumericString
-                    | Atomic::TInt
-                    | Atomic::TLiteralInt(..)
-                    | Atomic::TFloat
-                    | Atomic::TLiteralFloat(..)
-                    | Atomic::TBool
-                    | Atomic::TTrue
-                    | Atomic::TFalse
-                    | Atomic::TScalar
-                    | Atomic::TMixed
-            )
+            t.is_string()
+                || t.is_int()
+                || matches!(
+                    t,
+                    Atomic::TFloat
+                        | Atomic::TLiteralFloat(..)
+                        | Atomic::TBool
+                        | Atomic::TTrue
+                        | Atomic::TFalse
+                        | Atomic::TScalar
+                        | Atomic::TNumeric
+                        | Atomic::TNumericString
+                        | Atomic::TMixed
+                )
         })
     }
 

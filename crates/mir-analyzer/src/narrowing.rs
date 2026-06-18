@@ -1194,20 +1194,18 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                 current.narrow_to_scalar()
             } else {
                 current.filter(|t| {
-                    !matches!(
-                        t,
-                        Atomic::TString
-                            | Atomic::TLiteralString(..)
-                            | Atomic::TNumericString
-                            | Atomic::TInt
-                            | Atomic::TLiteralInt(..)
-                            | Atomic::TFloat
-                            | Atomic::TLiteralFloat(..)
-                            | Atomic::TBool
-                            | Atomic::TTrue
-                            | Atomic::TFalse
-                            | Atomic::TScalar
-                    )
+                    !t.is_string()
+                        && !t.is_int()
+                        && !matches!(
+                            t,
+                            Atomic::TFloat
+                                | Atomic::TLiteralFloat(..)
+                                | Atomic::TBool
+                                | Atomic::TTrue
+                                | Atomic::TFalse
+                                | Atomic::TScalar
+                                | Atomic::TNumeric
+                        )
                 })
             }
         }
