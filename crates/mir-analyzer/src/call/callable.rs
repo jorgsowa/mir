@@ -1133,6 +1133,69 @@ pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atomic))
 }
 
+/// Infer the return type of `array_unique($array)`.
+///
+/// `array_unique` preserves keys and drops duplicates; a non-empty input always
+/// yields a non-empty result. List-ness is NOT preserved (keys can have gaps after
+/// deduplication). Returns `None` to fall back to the stub for unknown inputs.
+pub(crate) fn array_unique_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (key, value) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() && value.is_mixed() {
+        return None;
+    }
+    let atomic = if is_non_empty_collection(source) {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
+/// Infer the return type of `range($start, $end, $step?)`.
+///
+/// When both bounds are integer literals (or single-value integer ranges), return
+/// `non-empty-list<int<min, max>>`. Otherwise fall back to `None`.
+/// `range()` always returns a list (re-indexed from 0) and is always non-empty.
+pub(crate) fn range_return_type(arg_types: &[Type]) -> Option<Type> {
+    let start = arg_types.first()?;
+    let end = arg_types.get(1)?;
+
+    fn single_int_bound(t: &Type) -> Option<i64> {
+        if t.types.len() != 1 {
+            return None;
+        }
+        match &t.types[0] {
+            Atomic::TLiteralInt(n) => Some(*n),
+            Atomic::TIntRange {
+                min: Some(lo),
+                max: Some(hi),
+            } if lo == hi => Some(*lo),
+            _ => None,
+        }
+    }
+
+    let lo = single_int_bound(start)?;
+    let hi = single_int_bound(end)?;
+    let (range_min, range_max) = if lo <= hi { (lo, hi) } else { (hi, lo) };
+    let elem = Atomic::TIntRange {
+        min: Some(range_min),
+        max: Some(range_max),
+    };
+    Some(Type::single(Atomic::TNonEmptyList {
+        value: Box::new(Type::single(elem)),
+    }))
+}
+
 /// Infer the return type of `array_key_first($array)` / `array_key_last($array)`.
 ///
 /// For non-empty collections the result is always `string|int` (never null).

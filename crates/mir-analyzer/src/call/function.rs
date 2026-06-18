@@ -514,6 +514,12 @@ impl CallAnalyzer {
                 "array_reverse" => {
                     super::callable::array_reverse_return_type(&arg_types).unwrap_or(return_ty)
                 }
+                // array_unique preserves key/value types and non-empty status.
+                "array_unique" => {
+                    super::callable::array_unique_return(&arg_types).unwrap_or(return_ty)
+                }
+                // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
+                "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
                 // array_key_first/array_key_last: non-null for non-empty input; int for lists.
                 "array_key_first" | "array_key_last" => {
                     super::callable::array_key_first_last_return(&arg_types).unwrap_or(return_ty)
