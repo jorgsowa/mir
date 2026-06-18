@@ -5,6 +5,65 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::CastKind;
 use php_ast::owned::Expr;
 
+/// Try to fold a `(int)` cast of a single known literal to a literal int result.
+fn fold_int_cast(ty: &Type) -> Option<Type> {
+    if ty.types.len() != 1 {
+        return None;
+    }
+    let lit = match &ty.types[0] {
+        Atomic::TLiteralInt(n) => *n,
+        Atomic::TTrue => 1,
+        Atomic::TFalse => 0,
+        Atomic::TLiteralString(s) => {
+            let t = s.trim();
+            // PHP truncates floats: "3.7" → 3
+            if let Ok(n) = t.parse::<i64>() {
+                n
+            } else if let Ok(f) = t.parse::<f64>() {
+                f as i64
+            } else {
+                return None;
+            }
+        }
+        _ => return None,
+    };
+    Some(Type::single(Atomic::TLiteralInt(lit)))
+}
+
+/// Try to fold a `(string)` cast of a single known literal to a literal string result.
+fn fold_string_cast(ty: &Type) -> Option<Type> {
+    if ty.types.len() != 1 {
+        return None;
+    }
+    let s = match &ty.types[0] {
+        Atomic::TLiteralInt(n) => n.to_string(),
+        Atomic::TTrue => "1".to_string(),
+        Atomic::TFalse => String::new(),
+        Atomic::TLiteralString(s) => s.as_ref().to_string(),
+        Atomic::TLiteralFloat(hi, lo) => {
+            let bits = ((*hi as u64) << 32) | (*lo as u32 as u64);
+            f64::from_bits(bits).to_string()
+        }
+        _ => return None,
+    };
+    Some(Type::single(Atomic::TLiteralString(s.into())))
+}
+
+/// Try to fold a `(bool)` cast of a single known literal to `TTrue` or `TFalse`.
+fn fold_bool_cast(ty: &Type) -> Option<Type> {
+    if ty.types.len() != 1 {
+        return None;
+    }
+    let result = match &ty.types[0] {
+        Atomic::TLiteralInt(0) | Atomic::TFalse => false,
+        Atomic::TLiteralInt(_) | Atomic::TTrue => true,
+        Atomic::TLiteralString(s) if s.is_empty() || s.as_ref() == "0" => false,
+        Atomic::TLiteralString(_) => true,
+        _ => return None,
+    };
+    Some(Type::single(if result { Atomic::TTrue } else { Atomic::TFalse }))
+}
+
 /// Returns true for atomic types that are safely castable to any scalar.
 /// Used to suppress InvalidCast on union types that include both "bad" atoms
 /// (arrays/objects) and "good" atoms (scalars) — e.g. `string|array|bool|null`
@@ -35,7 +94,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         let inner_ty = self.analyze(inner, ctx);
         match kind {
             CastKind::Int => {
-                // Check for RedundantCast when already int
+                // Literal fold: (int)42, (int)"123", (int)true, etc.
+                if let Some(folded) = fold_int_cast(&inner_ty) {
+                    // TLiteralInt input is a redundant cast.
+                    if inner_ty.is_single() && inner_ty.contains(|t| t.is_int()) {
+                        self.emit(
+                            IssueKind::RedundantCast {
+                                from: inner_ty.to_string(),
+                                to: "int".to_string(),
+                            },
+                            Severity::Info,
+                            inner.span,
+                        );
+                    }
+                    return folded;
+                }
+                // Check for RedundantCast when already int (non-literal)
                 if inner_ty.is_single() && inner_ty.contains(|t| t.is_int()) {
                     self.emit(
                         IssueKind::RedundantCast {
@@ -115,7 +189,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TFloat)
             }
             CastKind::String => {
-                // Check for RedundantCast when already string
+                // Literal fold: (string)42 → "42", (string)true → "1", etc.
+                if let Some(folded) = fold_string_cast(&inner_ty) {
+                    // TLiteralString input is a redundant cast.
+                    if inner_ty.is_single() && inner_ty.contains(|t| t.is_string()) {
+                        self.emit(
+                            IssueKind::RedundantCast {
+                                from: inner_ty.to_string(),
+                                to: "string".to_string(),
+                            },
+                            Severity::Info,
+                            inner.span,
+                        );
+                    }
+                    return folded;
+                }
+                // Check for RedundantCast when already string (non-literal)
                 if inner_ty.is_single() && inner_ty.contains(|t| t.is_string()) {
                     self.emit(
                         IssueKind::RedundantCast {
@@ -183,7 +272,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TString)
             }
             CastKind::Bool => {
-                // Check for RedundantCast when already bool
+                // Literal fold: (bool)0 → false, (bool)1 → true, (bool)"" → false, etc.
+                if let Some(folded) = fold_bool_cast(&inner_ty) {
+                    // TTrue/TFalse input is a redundant cast.
+                    if inner_ty.is_single()
+                        && inner_ty.contains(|t| {
+                            matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse)
+                        })
+                    {
+                        self.emit(
+                            IssueKind::RedundantCast {
+                                from: inner_ty.to_string(),
+                                to: "bool".to_string(),
+                            },
+                            Severity::Info,
+                            inner.span,
+                        );
+                    }
+                    return folded;
+                }
+                // Check for RedundantCast when already bool (non-literal)
                 if inner_ty.is_single()
                     && inner_ty
                         .contains(|t| matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse))
