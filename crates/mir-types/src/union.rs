@@ -542,6 +542,63 @@ impl Type {
         self.filter(|t| t.is_array() || matches!(t, Atomic::TMixed))
     }
 
+    /// Narrow array/list types to their non-empty variants (for `count() > 0` etc.).
+    pub fn narrow_to_non_empty_collection(&self) -> Type {
+        let mut out = Type::empty();
+        out.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                Atomic::TArray { key, value } => out.add_type(Atomic::TNonEmptyArray {
+                    key: key.clone(),
+                    value: value.clone(),
+                }),
+                Atomic::TList { value } => out.add_type(Atomic::TNonEmptyList {
+                    value: value.clone(),
+                }),
+                _ => out.add_type(t.clone()),
+            }
+        }
+        out
+    }
+
+    /// Narrow as if `array_is_list($x)` is true.
+    /// Lists have sequential integer keys starting from 0, so:
+    /// - `list<T>` / `non-empty-list<T>` are kept unchanged.
+    /// - `array<int, T>` is narrowed to `list<T>` (could be sequential).
+    /// - `non-empty-array<int, T>` is narrowed to `non-empty-list<T>`.
+    /// - `mixed` becomes `list<mixed>` (array_is_list implies array).
+    /// - All other types (string-keyed arrays, non-arrays) are dropped.
+    pub fn narrow_to_list(&self) -> Type {
+        let mut out = Type::empty();
+        out.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => out.add_type(t.clone()),
+                Atomic::TArray { key, value } if matches!(key.types.as_slice(), [Atomic::TInt]) => {
+                    out.add_type(Atomic::TList {
+                        value: value.clone(),
+                    });
+                }
+                Atomic::TNonEmptyArray { key, value }
+                    if matches!(key.types.as_slice(), [Atomic::TInt]) =>
+                {
+                    out.add_type(Atomic::TNonEmptyList {
+                        value: value.clone(),
+                    });
+                }
+                Atomic::TMixed => out.add_type(Atomic::TList {
+                    value: Box::new(Type::mixed()),
+                }),
+                _ => {}
+            }
+        }
+        if out.is_empty() {
+            self.filter(|t| matches!(t, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }))
+        } else {
+            out
+        }
+    }
+
     /// Narrow as if `is_object($x)` is true. A `mixed` becomes a concrete bare
     /// `object` (rather than staying `mixed`) so downstream object-only
     /// operations — `clone`, `instanceof`, method calls — see an object type

@@ -212,6 +212,31 @@ pub fn narrow_from_condition(
             {
                 narrow_var_int_comparison(ctx, &var_name, cmp_op, n, is_true);
             }
+            // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
+            let (count_expr, count_cmp_op, count_lit) = if extract_count_of_var(&b.left).is_some() {
+                (&b.left, b.op, &b.right)
+            } else {
+                (&b.right, flip_comparison_op(b.op), &b.left)
+            };
+            if let (Some(arr_var), Some(n)) = (
+                extract_count_of_var(count_expr),
+                extract_int_literal(count_lit),
+            ) {
+                narrow_array_count_comparison(ctx, &arr_var, count_cmp_op, n, is_true);
+            }
+            // strlen($str) op N  /  N op strlen($str) — same normalization.
+            let (strlen_expr, strlen_cmp_op, strlen_lit) =
+                if extract_strlen_of_var(&b.left).is_some() {
+                    (&b.left, b.op, &b.right)
+                } else {
+                    (&b.right, flip_comparison_op(b.op), &b.left)
+                };
+            if let (Some(str_var), Some(n)) = (
+                extract_strlen_of_var(strlen_expr),
+                extract_int_literal(strlen_lit),
+            ) {
+                narrow_string_strlen_comparison(ctx, &str_var, strlen_cmp_op, n, is_true);
+            }
         }
 
         // $x == null  (loose equality)
@@ -1258,6 +1283,14 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                 current.filter(|t| !t.is_array())
             }
         }
+        "array_is_list" => {
+            if is_true {
+                current.narrow_to_list()
+            } else {
+                current
+                    .filter(|t| !matches!(t, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }))
+            }
+        }
         "is_object" => {
             if is_true {
                 current.narrow_to_object()
@@ -1877,4 +1910,98 @@ impl UnionNarrowExt for Type {
 fn is_numeric_string(s: &str) -> bool {
     let t = s.trim();
     !t.is_empty() && (t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok())
+}
+
+/// Extract the variable name from `count($var)` / `sizeof($var)`.
+fn extract_count_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        let name = match &call.name.kind {
+            ExprKind::Identifier(n) => n.as_ref(),
+            _ => return None,
+        };
+        let bare = name.trim_start_matches('\\');
+        if bare.eq_ignore_ascii_case("count") || bare.eq_ignore_ascii_case("sizeof") {
+            if let Some(arg) = call.args.first() {
+                return extract_var_name(&arg.value);
+            }
+        }
+    }
+    None
+}
+
+/// Extract the variable name from `strlen($var)` / `mb_strlen($var, ...)`.
+fn extract_strlen_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        let name = match &call.name.kind {
+            ExprKind::Identifier(n) => n.as_ref(),
+            _ => return None,
+        };
+        let bare = name.trim_start_matches('\\');
+        if bare.eq_ignore_ascii_case("strlen") || bare.eq_ignore_ascii_case("mb_strlen") {
+            if let Some(arg) = call.args.first() {
+                return extract_var_name(&arg.value);
+            }
+        }
+    }
+    None
+}
+
+/// Narrow an array variable based on `count($arr) op n` being `is_true`.
+/// Promotes `array` / `list` to their non-empty variants when the comparison
+/// proves the count is >= 1.
+fn narrow_array_count_comparison(
+    ctx: &mut FlowState,
+    arr_var: &str,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    // Determine whether the comparison proves count >= 1 (i.e., non-empty).
+    let non_empty = match (op, is_true) {
+        (BinaryOp::Greater, true) if n >= 0 => true, // count > 0 (or > n>=0)
+        (BinaryOp::GreaterOrEqual, true) if n >= 1 => true, // count >= 1
+        (BinaryOp::Less, false) if n >= 1 => true,   // NOT (count < 1)
+        (BinaryOp::LessOrEqual, false) if n >= 0 => true, // NOT (count <= 0)
+        _ => false,
+    };
+    if !non_empty {
+        return;
+    }
+    let current = ctx.get_var(arr_var);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = current.narrow_to_non_empty_collection();
+    if narrowed != current {
+        ctx.set_var(arr_var, narrowed);
+    }
+}
+
+/// Narrow a string variable based on `strlen($str) op n` being `is_true`.
+/// Promotes `string` to `non-empty-string` when the comparison proves length >= 1.
+fn narrow_string_strlen_comparison(
+    ctx: &mut FlowState,
+    str_var: &str,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let non_empty = match (op, is_true) {
+        (BinaryOp::Greater, true) if n >= 0 => true,
+        (BinaryOp::GreaterOrEqual, true) if n >= 1 => true,
+        (BinaryOp::Less, false) if n >= 1 => true,
+        (BinaryOp::LessOrEqual, false) if n >= 0 => true,
+        _ => false,
+    };
+    if !non_empty {
+        return;
+    }
+    let current = ctx.get_var(str_var);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = narrow_string_to_non_empty(&current);
+    if narrowed != current {
+        ctx.set_var(str_var, narrowed);
+    }
 }
