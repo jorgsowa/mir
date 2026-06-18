@@ -627,6 +627,24 @@ impl CallAnalyzer {
                 _ => return_ty,
             };
 
+            // array_push/array_unshift: the by-ref loop above set $arr to the stub's
+            // generic `array` type — replace it with the precise post-push type derived
+            // from the original array type (arg_types[0]) and the pushed value types.
+            if matches!(resolved_fn_name.as_str(), "array_push" | "array_unshift") {
+                if let (Some(arr_arg), Some(original_arr)) = (call.args.first(), arg_types.first())
+                {
+                    if let ExprKind::Variable(name) = &arr_arg.value.kind {
+                        let var_name = name.as_ref().trim_start_matches('$');
+                        let push_types: Vec<Type> = arg_types.iter().skip(1).cloned().collect();
+                        let new_type = super::callable::array_push_unshift_byref_type(
+                            original_arr,
+                            &push_types,
+                        );
+                        ctx.set_var(var_name, new_type);
+                    }
+                }
+            }
+
             // Sort functions: the by-ref loop above set $arr to generic `array`; restore
             // the original element type. Re-indexing sorts also convert to a list.
             {

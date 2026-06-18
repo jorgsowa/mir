@@ -1593,3 +1593,47 @@ fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
         "(closure)".to_string()
     }
 }
+
+/// Infer the new type of the by-ref array argument after `array_push($arr, ...$vals)` or
+/// `array_unshift($arr, ...$vals)`.
+///
+/// Both functions append/prepend to the array and always make it non-empty when at least one
+/// value is pushed. The value type grows to include all pushed types. List structure is
+/// preserved: if the source is a list, the result is `non-empty-list<T>`.
+///
+/// Returns the original array type unchanged when inference is not possible (mixed input,
+/// no pushed values, etc.).
+pub(crate) fn array_push_unshift_byref_type(arr: &Type, push_types: &[Type]) -> Type {
+    if arr.is_mixed() || push_types.is_empty() {
+        return arr.clone();
+    }
+    let (_, src_value) = crate::stmt::infer_foreach_types(arr);
+    let mut value = src_value;
+    for pushed in push_types {
+        if pushed.is_mixed() {
+            return arr.clone();
+        }
+        value.merge_with(pushed);
+    }
+    if value.is_empty() || value.is_mixed() {
+        return arr.clone();
+    }
+    let is_src_list = !arr.types.is_empty()
+        && arr
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }));
+    if is_src_list {
+        return Type::single(Atomic::TNonEmptyList {
+            value: Box::new(value),
+        });
+    }
+    let (key, _) = crate::stmt::infer_foreach_types(arr);
+    if key.is_mixed() {
+        return arr.clone();
+    }
+    Type::single(Atomic::TNonEmptyArray {
+        key: Box::new(key),
+        value: Box::new(value),
+    })
+}
