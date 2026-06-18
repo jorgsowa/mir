@@ -135,13 +135,12 @@ fn int_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
         let (lo, hi) = match a {
             Atomic::TLiteralInt(n) => (Some(*n), Some(*n)),
             Atomic::TIntRange { min, max } => (*min, *max),
-            Atomic::TInt
-            | Atomic::TPositiveInt
-            | Atomic::TNonNegativeInt
-            | Atomic::TNegativeInt => {
-                // A general integer is unbounded for the purpose of range math.
-                (None, None)
-            }
+            // Named int subtypes carry implicit bounds: use them so arithmetic
+            // like `positive-int + 1` yields `int<2, max>` rather than bare `int`.
+            Atomic::TPositiveInt => (Some(1), None),
+            Atomic::TNonNegativeInt => (Some(0), None),
+            Atomic::TNegativeInt => (None, Some(-1)),
+            Atomic::TInt => (None, None),
             _ => return None,
         };
         // Widen the accumulated bounds to cover this member (union semantics).
@@ -157,11 +156,18 @@ fn int_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
     Some((min, max))
 }
 
-/// Whether `ty` carries an explicit integer range atomic.
+/// Whether `ty` carries an explicit integer range or a named int subtype with
+/// known implicit bounds (positive-int, non-negative-int, negative-int).
 fn contains_int_range(ty: &Type) -> bool {
-    ty.types
-        .iter()
-        .any(|a| matches!(a, Atomic::TIntRange { .. }))
+    ty.types.iter().any(|a| {
+        matches!(
+            a,
+            Atomic::TIntRange { .. }
+                | Atomic::TPositiveInt
+                | Atomic::TNonNegativeInt
+                | Atomic::TNegativeInt
+        )
+    })
 }
 
 /// Range-aware integer arithmetic for `+` and `-`: when at least one operand is
