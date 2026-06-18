@@ -377,6 +377,8 @@ impl Type {
                 | Atomic::TNull
                 | Atomic::TFalse => {}
                 Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0" => {}
+                // bool contains both true (truthy) and false (falsy); truthy branch is true.
+                Atomic::TBool => result.add_type(Atomic::TTrue),
                 // string: only "" and "0" are falsy; truthy branch is non-empty-string.
                 // non-empty-string still includes "0" (which is falsy) but that is the
                 // standard approximation used by Psalm and other analyzers.
@@ -431,6 +433,8 @@ impl Type {
         result.from_docblock = self.from_docblock;
         for t in &self.types {
             match t {
+                // bool: only false is falsy; falsy branch is false.
+                Atomic::TBool => result.add_type(Atomic::TFalse),
                 // string: only "" and "0" are falsy.
                 Atomic::TString => {
                     result.add_type(Atomic::TLiteralString("".into()));
