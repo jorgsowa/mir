@@ -588,6 +588,82 @@ fn int_type_bounds(ty: &Type) -> Option<(Option<i64>, Option<i64>)> {
     Some((min, max))
 }
 
+/// Infer the return type of `min($a, $b, ...)` when all arguments are purely integer.
+///
+/// For `min(a, b)`:
+/// - result_min = min(a_min, b_min) — the smallest possible value we could see
+/// - result_max = min(a_max, b_max) — the smallest of the upper bounds
+pub(crate) fn min_return_type(arg_types: &[Type]) -> Option<Type> {
+    if arg_types.is_empty() {
+        return None;
+    }
+    // Only engage when every argument is purely integer.
+    let bounds: Vec<(Option<i64>, Option<i64>)> = arg_types
+        .iter()
+        .map(int_type_bounds)
+        .collect::<Option<_>>()?;
+    let result_min = bounds.iter().fold(None::<Option<i64>>, |acc, (lo, _)| {
+        Some(match (acc, lo) {
+            (None, v) => *v,
+            (Some(Some(a)), Some(b)) => Some(a.min(*b)),
+            _ => None,
+        })
+    })?;
+    let result_max = bounds.iter().fold(None::<Option<i64>>, |acc, (_, hi)| {
+        Some(match (acc, hi) {
+            (None, v) => *v,
+            (Some(Some(a)), Some(b)) => Some(a.min(*b)),
+            (Some(None), Some(b)) => Some(*b),
+            (Some(Some(a)), None) => Some(a),
+            _ => None,
+        })
+    })?;
+    Some(Type::single(make_int_range_atom(result_min, result_max)))
+}
+
+/// Infer the return type of `max($a, $b, ...)` when all arguments are purely integer.
+///
+/// For `max(a, b)`:
+/// - result_min = max(a_min, b_min) — the largest of the lower bounds
+/// - result_max = max(a_max, b_max) — the largest possible value we could see
+pub(crate) fn max_return_type(arg_types: &[Type]) -> Option<Type> {
+    if arg_types.is_empty() {
+        return None;
+    }
+    let bounds: Vec<(Option<i64>, Option<i64>)> = arg_types
+        .iter()
+        .map(int_type_bounds)
+        .collect::<Option<_>>()?;
+    let result_min = bounds.iter().fold(None::<Option<i64>>, |acc, (lo, _)| {
+        Some(match (acc, lo) {
+            (None, v) => *v,
+            (Some(Some(a)), Some(b)) => Some(a.max(*b)),
+            (Some(None), Some(b)) => Some(*b),
+            (Some(Some(a)), None) => Some(a),
+            _ => None,
+        })
+    })?;
+    let result_max = bounds.iter().fold(None::<Option<i64>>, |acc, (_, hi)| {
+        Some(match (acc, hi) {
+            (None, v) => *v,
+            (Some(Some(a)), Some(b)) => Some(a.max(*b)),
+            _ => None,
+        })
+    })?;
+    Some(Type::single(make_int_range_atom(result_min, result_max)))
+}
+
+/// Canonicalise (min, max) int bounds into the most specific int Atomic.
+fn make_int_range_atom(min: Option<i64>, max: Option<i64>) -> Atomic {
+    match (min, max) {
+        (Some(1), None) => Atomic::TPositiveInt,
+        (Some(0), None) => Atomic::TNonNegativeInt,
+        (None, Some(-1)) => Atomic::TNegativeInt,
+        (None, None) => Atomic::TInt,
+        (min, max) => Atomic::TIntRange { min, max },
+    }
+}
+
 /// The default PHP array-key type, `int|string`, used when a source array's
 /// key type cannot be determined more precisely.
 fn array_key_type() -> Type {

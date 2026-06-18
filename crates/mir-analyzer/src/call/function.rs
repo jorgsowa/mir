@@ -500,6 +500,8 @@ impl CallAnalyzer {
                 "strlen" | "mb_strlen" => super::callable::strlen_return_type(&arg_types),
                 "abs" => super::callable::abs_return_type(&arg_types).unwrap_or(return_ty),
                 "intdiv" => super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty),
+                "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
+                "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
                 _ => return_ty,
             };
 
